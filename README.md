@@ -13,7 +13,7 @@
 
   <p align="center">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-ELv2-blue?style=flat-square" alt="ELv2 License"></a>
-    <a href="https://github.com/Pipelex/pipelex/releases"><img src="https://img.shields.io/badge/release-v0.1.10-orange?style=flat-square" alt="Release v0.1.10"></a>
+    <a href="https://github.com/Pipelex/pipelex/releases"><img src="https://img.shields.io/badge/release-v0.1.15-orange?style=flat-square" alt="Release v0.1.15"></a>
     <img src="https://img.shields.io/pypi/v/pipelex?logo=pypi&logoColor=white&color=blue&style=flat-square"
      alt="PyPI – latest release">
     <img src="https://img.shields.io/badge/npm-coming_soon-red?logo=npm&logoColor=white&style=flat-square" alt="npm (coming soon)">
@@ -59,6 +59,8 @@ Pipes function like modular building blocks, **assembled by connecting other pip
 Pipelex will be distributed as an **open-source Python library,** with a hosted API launching soon, enabling effortless integration into existing software systems and automation frameworks. Additionally, Pipelex will provide an MCP server that will enable AI Agents to run pipelines like any other tool.
 
 ## 🚀 Getting Started
+
+> :books: Check out the cookbook for an easier Getting Started [Pipelex Cookbook](https://github.com/Pipelex/pipelex) and the documentation [Pipelex Documentation](doc/Documentation.md) for more information.
 
 ### Prerequisites
 
