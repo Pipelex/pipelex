@@ -1,0 +1,20 @@
+version = 1
+
+[[annotations]]
+path = [
+    "**/*.txt",
+    "**/*.png",
+    "**/*.jpg",
+    "**/*.jpeg",
+    "**/*.pdf",
+    "**/*.mdc",
+    "**/*.md",
+    "**/*.toml",
+    "**/*.lock",
+    ".env.example",
+    ".github/**",
+    ".vscode/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "© 2025 Evotis S.A.S."
+SPDX-License-Identifier = "Elastic-2.0"

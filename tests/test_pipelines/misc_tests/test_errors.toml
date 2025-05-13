@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+domain = "test_errors"
+definition = "This library is intended for testing errors"
+
+# [pipe.jinja2_syntax_error]
+# PipeLLM = "Jinja2 syntax error (on purpose, for testing): bad curly braces"
+# input = "native.Text"
+# output = "native.Text"
+# prompt_template = """
+# {{ a123|tag }
+# """
+
+# [pipe.jinja2_dummy_filter1]
+# PipeLLM = "Jinja2 undefined filter (on purpose, for testing)"
+# input = "native.Text"
+# output = "native.Text"
+# prompt_template = """
+# {{ foobar|dummy_filter1 }}
+# """
+
+# [pipe.jinja2_dummy_filter2]
+# PipeLLM = "Jinja2 undefined filter (on purpose, for testing)"
+# input = "native.Text"
+# output = "native.Text"
+# prompt_template = """
+# {{ foobar|dummy_filter2() }}
+# """
+
+# [pipe.jinja2_dummy_filter3]
+# PipeLLM = "Jinja2 undefined filter (on purpose, for testing)"
+# input = "native.Text"
+# output = "native.Text"
+# prompt_template = """
+# {{ foobar|dummy_filter3("param") }}
+# """
+
+
+# [pipe.jinja2_dummy_filter4]
+# PipeLLM = "Jinja2 undefined filter (on purpose, for testing)"
+# input = "native.Text"
+# output = "native.Text"
+# prompt_template = """
+# {{ foobar|dummy_filter4(param1, param2) }}
+# """

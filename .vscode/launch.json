@@ -1,0 +1,47 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vv",
+                "-m inference",
+                "-k test_pipe_run"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug legacy check",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pipelex.cli._cli",
+            "args": [
+                "check",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Debug Expense Report",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pipelex.cli",
+            "args": [
+                "expense",
+                "--pipe",
+                "process_expense_report",
+                "--expense-report",
+                "expense_report_diner"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}

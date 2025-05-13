@@ -1,0 +1,84 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+####################################################################################################
+# LLM Deck
+####################################################################################################
+
+# Match a llm_handle with a complete blueprint (llm_name, llm_version and llm_platform_choice).
+[llm_handles]
+gpt-4o-2024-08-06 = { llm_name = "gpt-4o", llm_version = "2024-08-06" }
+best-claude = "claude-3-7-sonnet"
+best-gemini = "gemini-2.5-pro"
+
+####################################################################################################
+# LLM Presets
+####################################################################################################
+
+[llm_presets]
+
+####################################################################################################
+# LLM Presets — General purpose
+
+llm_for_text = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
+llm_for_object = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
+llm_to_structure = { llm_handle = "gpt-4o-mini", temperature = 0.1 }
+
+llm_for_testing_gen_text = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
+llm_for_testing_gen_object = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
+
+####################################################################################################
+# LLM Presets — Specific skills
+
+# Generation skills
+llm_for_factual_writing = { llm_handle = "gpt-4o", temperature = 0.1 }
+llm_for_creative_writing = { llm_handle = "best-claude", temperature = 0.9 }
+
+# Reasoning skills
+llm_to_reason_short = { llm_handle = "best-claude", temperature = 0.5, max_tokens = 500 }
+llm_to_reason = { llm_handle = "o4-mini", temperature = 1 }
+llm_to_reason_on_diagram = { llm_handle = "best-claude", temperature = 0.5 }
+
+# Search and answer skills
+llm_to_answer = { llm_handle = "best-claude", temperature = 0.1 }
+llm_to_retrieve = { llm_handle = "best-gemini", temperature = 0.1 }
+llm_for_enrichment = { llm_handle = "gpt-4o", temperature = 0.1 }
+llm_to_enrich = { llm_handle = "best-claude", temperature = 0.1 }
+llm_for_question_and_excerpt_reformulation = { llm_handle = "gpt-4o", temperature = 0.9 }
+
+# Engineering skills
+llm_to_engineer = { llm_handle = "best-claude", temperature = 0.5 }
+
+# Image skills
+llm_to_write_imgg_prompt = { llm_handle = "best-claude", temperature = 0.2 }
+llm_to_describe_img = { llm_handle = "best-claude", temperature = 0.5 }
+llm_to_design_fashion = { llm_handle = "best-claude", temperature = 0.7 }
+
+# Extraction skills
+llm_to_extract_diagram = { llm_handle = "best-claude", temperature = 0.5 }
+llm_to_extract_invoice = { llm_handle = "claude-3-7-sonnet", temperature = 0.1 }
+llm_to_extract_invoice_from_scan = { llm_handle = "best-claude", temperature = 0.5 }
+llm_to_extract_legal_terms = { llm_handle = "best-claude", temperature = 0.1 }
+llm_to_extract_tables = { llm_handle = "best-claude", temperature = 0.1 }
+
+# OCR skills
+llm_for_ocr = { llm_handle = "best-claude", temperature = 0.1 }
+
+####################################################################################################
+# LLM Choices
+####################################################################################################
+
+[llm_choice_defaults]
+for_text = "llm_for_text"
+for_object = "llm_for_object"
+for_object_direct = "llm_for_object"
+for_object_list = "llm_for_object"
+for_object_list_direct = "llm_for_object"
+
+[llm_choice_overrides]
+for_text = "disabled"
+for_object = "disabled"
+for_object_direct = "disabled"
+for_object_list = "disabled"
+for_object_list_direct = "disabled"

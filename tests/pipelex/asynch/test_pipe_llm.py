@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+
+import pytest
+
+from pipelex import log, pretty_print
+from pipelex.core.domain import SpecialDomain
+from pipelex.hub import get_report_delegate
+from pipelex.pipe_operators.pipe_llm import PipeLLM, PipeLLMOutput
+from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
+from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+from tests.pipelex.test_data import PipeTestCases
+
+
+@pytest.mark.llm
+@pytest.mark.inference
+@pytest.mark.asyncio(loop_scope="class")
+class TestPipeLLM:
+    async def test_pipe_llm(self, pipe_router: PipeRouterProtocol):
+        pipe_job = PipeJobFactory.make_pipe_job(
+            pipe=PipeLLM(
+                code="adhoc_for_test_pipe_llm",
+                domain="generic",
+                output_concept_code=f"{SpecialDomain.NATIVE}.Text",
+                pipe_llm_prompt=PipeLLMPrompt(
+                    code="adhoc_for_test_pipe_llm",
+                    domain="generic",
+                    system_prompt=PipeTestCases.SYSTEM_PROMPT,
+                    user_text=PipeTestCases.USER_PROMPT,
+                ),
+            ),
+        )
+        pipe_llm_output: PipeLLMOutput = await pipe_router.run_pipe_job(
+            pipe_job=pipe_job,
+        )
+
+        log.verbose(pipe_llm_output, title="stuff")
+        llm_generated_text = pipe_llm_output.main_stuff_as_text
+        pretty_print(llm_generated_text, title="llm_generated_text")
+        get_report_delegate().general_report()

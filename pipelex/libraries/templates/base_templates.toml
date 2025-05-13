@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+[generic_prompts]
+
+structure_from_preliminary_text_system = "You are a data modeling expert specialized in extracting structure from text."
+structure_from_preliminary_text_user = """
+Your job is to extract and structure information from a text.
+Here is the text:
+{{ preliminary_text|tag("text") }}
+
+Now generate the JSON in the required format.
+Do not create information that is not in the text.
+"""
+
+[test_prompts]
+
+jinja2_test_template = "I want a {{ place_holder }} t-shirt."

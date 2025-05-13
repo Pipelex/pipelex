@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+[claude-3.claude-3-haiku.latest]
+max_tokens = 4096
+is_gen_object_supported = true
+is_vision_supported = true
+max_prompt_images = 100
+cost_per_million_tokens_usd = { input = 0.25, output = 1.25 }
+platform_llm_id = { anthropic = "claude-3-haiku-20240307" }
+
+[claude-3.claude-3-opus.latest]
+max_tokens = 4096
+is_gen_object_supported = true
+is_vision_supported = true
+max_prompt_images = 100
+cost_per_million_tokens_usd = { input = 15.0, output = 75.0 }
+platform_llm_id = { anthropic = "claude-3-opus-20240229" }
+
+["claude-3.5".claude-3-5-sonnet.latest]
+max_tokens = 8192
+is_gen_object_supported = true
+is_vision_supported = true
+max_prompt_images = 100
+cost_per_million_tokens_usd = { input = 3.0, output = 15.0 }
+platform_llm_id = { anthropic = "claude-3-5-sonnet-20240620", bedrock_anthropic = "us.anthropic.claude-3-5-sonnet-20240620-v1:0" }
+default_platform = "anthropic"
+
+["claude-3.5".claude-3-5-sonnet-v2.latest]
+max_tokens = 8192
+is_gen_object_supported = true
+is_vision_supported = true
+max_prompt_images = 100
+cost_per_million_tokens_usd = { input = 3.0, output = 15.0 }
+platform_llm_id = { anthropic = "claude-3-5-sonnet-20241022", bedrock_anthropic = "anthropic.claude-3-5-sonnet-20241022-v2:0" }
+default_platform = "anthropic"
+
+["claude-3.7".claude-3-7-sonnet.latest]
+max_tokens = 8192
+is_gen_object_supported = true
+is_vision_supported = true
+max_prompt_images = 100
+cost_per_million_tokens_usd = { input = 3.0, output = 15.0 }
+platform_llm_id = { anthropic = "claude-3-7-sonnet-20250219", bedrock_anthropic = "us.anthropic.claude-3-7-sonnet-20250219-v1:0" }
+default_platform = "anthropic"

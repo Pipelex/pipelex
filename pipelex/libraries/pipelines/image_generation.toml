@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+domain = "image_generation"
+definition = "Image generation"
+
+[concept]
+
+[pipe]
+
+[pipe.generate_image]
+PipeImgGen = "Generate AI image"
+input = "ImggPrompt"
+output = "Image"
+nb_steps = 2
+
+
+[pipe.generate_photo]
+PipeImgGen = "Generate AI image"
+input = "ImggPrompt"
+output = "images.Photo"
+nb_steps = 8

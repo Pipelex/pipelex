@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+domain = "animals"
+definition = "The test domain for handling animal descriptions"
+system_prompt = "You are an expert at describing animals based on their species, breed, and age."
+
+[concept]
+Animal = "An animal reference, including its species, breed, and age"
+AnimalDescription = "A detailed description of an animal"
+
+[pipe]
+[pipe.generate_animal_description]
+PipeLLM = "Generate a description of an animal"
+input = "Animal"
+output = "AnimalDescription"
+prompt_template = """
+Given the reference to an animal, generate a description of the animal.
+
+Animal:
+{{ animal|tag }}
+"""

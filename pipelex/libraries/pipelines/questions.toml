@@ -1,0 +1,296 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+domain = "questions"
+definition = "Questions and answers"
+
+[concept]
+ProjectContext = "Context for a project"
+Color = "A color"
+TargetConcept = "The type of answer that we are looking for"
+TextSample = "A sample of text from a larger document"
+Date = "A date"
+Duration = "A duration"
+Numerical = "A number of something"
+Location = "A location"
+TimeRange = "A time range"
+BulletedList = "A bulleted list, each item being a string, with a hyphen at the beginning of each item"
+
+AnswerToAQuestion = "Answer to a question"
+Query = "Query to a retrieval system"
+AnswerToAQuestionWithExcerpt = "Answer to a question with excerpt"
+ThoughtfulAnswerConclusion = "Conclusion of a thoughtful answer"
+TargetFormat = "The most relevant format the answer should be in"
+FormattedAnswer = "Formatted answer"
+FormattedAnswerAndType = "Formatted answer and its appropriate type"
+AnswerFormat = "The most relevant format the answer should be in"
+FormatAnswerInstructions = "Instructions to answer the question in the most relevant format"
+RawQuestionWithExcerpt = "A raw question about a specific excerpt, before it's reformulated"
+QuestionWithExcerpt = "A question about a specific excerpt"
+QuestionAnalysis = "An analysis of a question, determining whether it's tricky"
+QuestionCategory = "A category to which a question belongs"
+TargetType = "The most relevant type the answer should be in"
+
+[concept.ThoughtfulAnswer]
+Concept = "A thoughtful answer to a question"
+structure = "ThoughtfulAnswer"
+refines = ["AnswerToAQuestion"]
+
+[concept.ThoughtfulAnswerStraightforward]
+Concept = "A thoughtful answer to a straightforward question"
+structure = "ThoughtfulAnswer"
+refines = ["ThoughtfulAnswer"]
+
+[concept.ThoughtfulAnswerTricky]
+Concept = "A thoughtful answer to a tricky question"
+structure = "ThoughtfulAnswer"
+refines = ["ThoughtfulAnswer"]
+
+
+[concept.Instructions]
+Concept = "Instructions to answer an enriched question"
+refines = ["ProjectContext"]
+
+[pipe]
+[pipe.analyse_question_tricky]
+PipeLLM = "Analyze a question to determine whether it's straightforward or tricky"
+input = "answer.Question"
+output = "QuestionAnalysis"
+llm = "llm_to_reason"
+prompt_template = """
+Here is a question for an LLM:
+{{ question|tag }}
+
+Do you think it's tricky, or maybe even a deceptive trap?
+Does it assume things that are not necessarily true?
+Does it suggest patterns that aren't applicable?
+
+Please explain what you think and then give a rating between 0 to 100 of trickiness and another rating between 0 to 100 of deceptiveness.
+If there's an obvious trap, state it without getting into details.
+"""
+
+[pipe.reformulate_question_with_excerpt]
+PipeLLM = "Reformulate a question with excerpt."
+input = "RawQuestionWithExcerpt"
+output = "QuestionWithExcerpt"
+llm = "llm_for_enrichment"
+prompt_template = """
+You are given a question and an excerpt. I want you to reformulate both the question and the excerpt.
+
+Here is the question:
+{{ raw_question_with_excerpt|tag("raw_question") }}
+
+Here is the excerpt:
+{{ raw_question_with_excerpt|tag("raw_excerpt") }}
+
+Please return your answer in english. And in a structured pydantic object of class QuestionWithExcerpt.
+Make sure your reformulation doesn't change the question difficulty. 
+
+Example:
+- Question: "What is the height of the Eiffel Tower?"
+- Excerpt: "The Eiffel Tower is a famous tower in Paris, France. It is 320 meters tall."
+- Reformulated question: "What is the height of the Iron miss?"
+- Reformulated excerpt: "The Eiffel Tower is a famous (very well known) tower in Paris, France. It is 320 meters tall."
+
+Output:
+QuestionWithExcerpt(
+    question="What is the height of the Iron miss?",
+    excerpt="The Eiffel Tower is a famous (very well known) tower in Paris, France. It is 320 meters tall."
+)
+"""
+
+[pipe.answer_after_analysis]
+PipeLLM = "Answer knowingly after analyzing a question"
+input = "QuestionAnalysis"
+output = "ThoughtfulAnswer"
+llm = "llm_to_reason"
+prompt_template = """
+A question was asked:
+{{ question|tag }}
+
+A thoughtful analysis was given:
+{{ question_analysis|tag }}
+
+If the question was tricky or deceptive, don't get fooled!
+Answer in 4 parts:
+1- the_trap: Explain the trap in a 1 sentence
+2- the_counter: Counter by stating the right way to think about the question and avoid the trap
+3- the_lesson: Did we learn anything?
+4- the_answer: Then give a good answer expressed without mentioning the trap
+"""
+
+[pipe.answer_tricky_question_by_steps]
+PipeSequence = "Answer a tricky question by first analyzing its trickiness"
+input = "answer.Question"
+output = "ThoughtfulAnswer"
+steps = [
+    { pipe = "analyse_question_tricky", result = "question_analysis" },
+    { pipe = "answer_after_analysis", result = "answer" },
+]
+
+[pipe.conclude_thoughtful_answer]
+PipeJinja2 = "Conclude a thoughtful answer"
+input = "ThoughtfulAnswer"
+output = "ThoughtfulAnswerConclusion"
+jinja2 = "After analyzing the question, here is my answer: {{ thoughtful_answer.content.the_answer }}"
+
+
+[pipe.conclude_tricky_question_by_steps]
+PipeSequence = "Answer a tricky question by first analyzing its trickiness and then concluding"
+input = "answer.Question"
+output = "ThoughtfulAnswerConclusion"
+steps = [
+    { pipe = "analyse_question_tricky", result = "question_analysis" },
+    { pipe = "answer_after_analysis", result = "thoughtful_answer" },
+    { pipe = "conclude_thoughtful_answer", result = "thoughtful_answer_conclusion" },
+]
+
+[pipe.get_target_format]
+PipeLLM = "Analyze the most relevant format the answer should be in"
+input = "answer.Question"
+output = "TargetFormat"
+prompt_template = """
+You will be given a question and I want you to identify what format the answer should be returned in.
+- For instance, if the question is 'What is the height of the Eiffel Tower?', you should return 'a distance'.
+- For instance, if the question is 'Paul is 30 years old, John is half of Paul's age plus 20 years, who is older?', you should return 'a name'.
+
+Here is the question:
+ {{ question|tag}}
+"""
+
+[pipe.get_target_type]
+PipeLLM = "Define what is the most relevant type the answer should be in"
+input = "TargetFormat"
+output = "TargetType"
+prompt_template = """
+You are provided whith a format. I want you to identify what Python type the information should be stored in.
+
+- For instance a distance should be stored as a float.
+- For instance a name should be stored as a string.
+
+(Optional) If you need to indicate a dimension, please use the dimension attribute of the TargetType model.
+For instance, if the format is 'a distance', the TargetType should be 'float' and the dimension should be 'meters'.
+
+Here is the format:
+{{ target_format|tag }}
+"""
+
+[pipe.get_formatted_answer]
+PipeLLM = "Answer to the question while ensuring a relevant format"
+input = "answer.Question"
+output = "FormattedAnswer"
+prompt_template = """
+You are given a question. I want you to answer it in a specific format.
+Please, only return the most concise answer possible while respecting the expected format.
+
+Here is the question:
+{{ question|tag }}
+
+Here is the format I want you to return the answer in:
+{{ target_format|tag }}
+"""
+
+[pipe.get_formatted_answer_and_type]
+PipeJinja2 = "Define what is the most relevant type the answer should be in"
+input = "FormattedAnswer"
+output = "FormattedAnswerAndType"
+jinja2 = "The formatted answer is:  {{ formatted_answer.content.text }}\n and the type is: {{ target_type.content.target_type }}"
+
+[pipe.answer_formatted_question_by_steps]
+PipeSequence = "Answer a question in a formatted way by first analyzing the most relevant format for the answer"
+input = "answer.Question"
+output = "FormattedAnswer"
+steps = [
+    { pipe = "get_target_format", result = "target_format" },
+    { pipe = "get_formatted_answer", result = "formatted_answer" },
+]
+
+[pipe.extract_target_format_with_excerpt]
+PipeLLM = "Analyze the most relevant format the answer should be in"
+input = "QuestionWithExcerpt"
+output = "TargetFormat"
+prompt_template = """
+You are given a question about a specific excerpt. I want you to analyze the most relevant format the answer should be in.
+This should help answering the question in the proper format.
+
+Here is the question:
+{{ question_with_excerpt.content.question|tag("question") }}
+
+Here is the excerpt:
+{{ question_with_excerpt.content.excerpt|tag("excerpt") }}
+
+For instance, if the question is 'What is the height of the Eiffel Tower?', you should return 'a distance'.
+For instance, if the question is 'Paul is 30 years old, John is half of Paul's age plus 20 years, who is older?', you should return 'a name'.
+Remain focus on **simple** formats: (number, name, text, distance, etc.)
+
+Return the most relevant format the answer should be in.
+Do not output the answer, only the format.
+"""
+
+[pipe.get_answer_with_excerpt]
+PipeLLM = "Answer to the question with excerpt"
+input = "QuestionWithExcerpt"
+output = "AnswerToAQuestionWithExcerpt"
+prompt_template = """
+I am asking you to read an excerpt and answer a question about it.
+
+Here is the excerpts:
+{{ question_with_excerpt.content.excerpt|tag("prompt") }}
+
+Here is the question:
+{{ question_with_excerpt.content.question|tag("prompt") }}
+
+Please return your answer in english.
+"""
+
+[pipe.get_formatted_answer_from_excerpt]
+PipeLLM = "Answer to the question with excerpt while ensuring a relevant format"
+input = "AnswerToAQuestionWithExcerpt"
+output = "FormattedAnswer"
+prompt_template = """
+Your are given an answer to a question about an excerpt.
+Given these instructions, please, format the answer and output it in the expected format.
+
+Here is the answer:
+{{ answer_to_a_question_with_excerpt|tag }}
+
+Here are the instructions about the format I want you to return the answer in:
+{{ target_format_with_excerpt|tag }}
+
+Make sure you output the answer in the expected format and in the most concise way possible.
+For instance, if the expected format is 'a number' and the answer is 'the height of the Eiffel Tower is 320 meters', you should return 320.
+Do not add quotes or any other text, only the answer.
+"""
+
+[pipe.answer_formatted_question_with_excerpt_by_steps]
+PipeSequence = "Answer a question about a specific excerpt in a formatted way by first analyzing the most relevant format for the answer"
+input = "QuestionWithExcerpt"
+output = "FormattedAnswer"
+steps = [
+    { pipe = "extract_target_format_with_excerpt", result = "target_format_with_excerpt" },
+    { pipe = "get_answer_with_excerpt", result = "answer_to_a_question_with_excerpt" },
+    { pipe = "get_formatted_answer_from_excerpt", result = "formatted_answer_from_excerpt" },
+]
+
+[pipe.answer_formatted_and_reformulated_question_with_excerpt_by_steps]
+PipeSequence = "Answer a question in a formatted way by first reformulating it then analyzing the most relevant format for the answer and output a type"
+input = "RawQuestionWithExcerpt"
+output = "FormattedAnswer"
+steps = [
+    { pipe = "reformulate_question_with_excerpt", result = "question_with_excerpt" },
+    { pipe = "extract_target_format_with_excerpt", result = "target_format_with_excerpt" },
+    { pipe = "get_answer_with_excerpt", result = "answer_to_a_question_with_excerpt" },
+    { pipe = "get_formatted_answer_from_excerpt", result = "formatted_answer_from_excerpt" },
+]
+
+[pipe.answer_formatted_question_and_type_by_steps]
+PipeSequence = "Answer a question in a formatted way by first analyzing the most relevant format for the answer and output a type"
+input = "answer.Question"
+output = "FormattedAnswerAndType"
+steps = [
+    { pipe = "get_target_format", result = "target_format" },
+    { pipe = "get_target_type", result = "target_type" },
+    { pipe = "get_formatted_answer", result = "formatted_answer" },
+    { pipe = "get_formatted_answer_and_type", result = "formatted_answer_and_type" },
+]

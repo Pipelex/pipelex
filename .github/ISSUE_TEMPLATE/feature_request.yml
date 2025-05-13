@@ -1,0 +1,62 @@
+name: 💡 Feature Request
+description: Suggest a new feature or improvement
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    attributes:
+      label: Problem Statement
+      description: Describe the problem you're trying to solve or the limitation you're facing.
+      placeholder: |
+        What's the challenge you're encountering?
+        Why is this important to address?
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Proposed Solution
+      description: Describe your ideal solution to the problem. Be as specific as possible.
+      placeholder: |
+        How would you like this to work?
+        What would the user experience be like?
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Alternative Approaches
+      description: Describe any alternative solutions or features you've considered.
+      placeholder: |
+        What other ways might this problem be solved?
+        What are the trade-offs of different approaches?
+
+  - type: textarea
+    attributes:
+      label: Implementation Ideas
+      description: If you have any thoughts on how this could be implemented, share them here.
+      placeholder: |
+        Technical considerations
+        Potential challenges
+        Integration points
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Would you like to help implement this feature?
+      description: We welcome contributions and can provide guidance!
+      options:
+        - "Not at this time"
+        - "Yes, I'd like to contribute"
+    validations:
+      required: true
+
+  - type: checkboxes
+    attributes:
+      label: Confirmations
+      description: Please confirm the following
+      options:
+        - label: I have searched for similar feature requests
+          required: true
+        - label: This feature would benefit the broader community
+          required: true 

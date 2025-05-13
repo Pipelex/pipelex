@@ -1,0 +1,75 @@
+---
+description: Use LLM models with approrpiate settings. Define LLM handles. Define LLM parameters directly in PipeLLM or through presets.
+globs: 
+alwaysApply: false
+---
+# Rules to choose LLM models used in PipeLLMs.
+
+In order to use it in a pipe, an LLM is referenced by its llm_handle and possibly by an llm_preset.
+Both llm_handles and llm_presets are defined in this toml config file: [config_pipelex_llm_deck.toml](mdc:pipelex/config_pipelex_llm_deck.toml)
+
+## LLM Handles
+
+An llm_handle matches the handle (an id of sorts) with the full specification of the LLM to use, i.e.:
+- llm_name
+- llm_version
+- llm_platform_choice
+
+The declaration looks like this in toml syntax:
+```toml
+[cogt.llm_config.llm_deck.llm_handle_to_llm_engine_blueprint.gpt-4o-2024-05-13]
+llm_name = "gpt-4o"
+llm_version = "2024-05-13"
+llm_platform_choice = "openai"
+```
+
+In mosty cases, we only want to use version "latest" and llm_platform_choice "default" in which case the declaration is simply a match of the llm_handle to the llm_name, like this:
+```toml
+gemini-2-5-pro = "gemini-2.5-pro"
+```
+
+## Using an LLM Handle in a PipeLLM
+
+Here is an example of using an llm_handle to specify which LLM to use in a PipeLLM:
+
+```toml
+[pipe.hello_world]
+PipeLLM = "Write text about Hello World."
+output = "Text"
+llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
+prompt = """
+Write a haiku about Hello World.
+"""
+```
+
+As you can see, to use the LLM, you must also indicate the temperature (float between 0 and 1) and max_tokens (either an int or the string "auto").
+
+## LLM Presets
+
+Presets are meant to record the choice of an llm with its hyper parameters (temperature and max_tokens) if it's good for a particular task. LLM Presets are skill-oriented.
+
+Examples:
+```toml
+llm_to_reason = { llm_handle = "o4-mini", temperature = 1, max_tokens = "auto" }
+llm_to_extract_invoice = { llm_handle = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
+```
+
+The interest is that these presets can be used to set the LLM choice in a PipeLLM, like this:
+
+```toml
+[pipe.extract_invoice]
+PipeLLM = "Extract invoice information from an invoice text transcript"
+input = "InvoiceText"
+output = "Invoice"
+llm = "llm_to_extract_invoice"
+prompt_template = """
+Extract invoice information from this invoice:
+
+The category of this invoice is: $invoice_details.category.
+
+@invoice_text
+"""
+```
+
+The setting here `llm = "llm_to_extract_invoice"` works because "llm_to_extract_invoice" has been declared as an llm_preset in the deck.
+You must not use an LLM preset in a PipeLLM that does not exist in the deck. If needed, you can add llm presets.

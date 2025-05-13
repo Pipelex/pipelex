@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+domain = "test_pipe_batch"
+definition = "Pipelines to test Pipe Batch"
+
+[concept]
+[concept.Random]
+Concept = "TestPipeBatchItem"
+
+[pipe.test_pipe_batch_item]
+PipeLLM = "Test Pipe Batch"
+input = "TestPipeBatchItem"
+output = "TestPipeBatchItem"
+prompt_template = """
+Output this "item" and add "Hello" at the beginning of the output.
+{{  _batch_item|tag("item") }}
+"""
+
+[pipe.test_pipe_batch]
+PipeBatch = "Test Pipe Batch 2"
+input = "TestPipeBatchItem"
+output = "TestPipeBatchItem"
+branch_pipe_code = "test_pipe_batch_item"

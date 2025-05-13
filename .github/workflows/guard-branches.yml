@@ -1,0 +1,63 @@
+name: Guard branch flow
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  # ───────────────────────────────────────────────────────────────
+  # 1) Only release/vX.Y.Z → main
+  # ───────────────────────────────────────────────────────────────
+  gate-main:
+    if: github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify source branch is a Release
+        env:
+          HEAD: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "PR → main from $HEAD"
+          if [[ ! "$HEAD" =~ ^release\/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Only release/vX.Y.Z branches may merge into main."
+            exit 1
+          fi
+
+  # ───────────────────────────────────────────────────────────────
+  # 2) Only work-branches → release/vX.Y.Z
+  # ───────────────────────────────────────────────────────────────
+  gate-release:
+    if: startsWith(github.event.pull_request.base.ref, 'release/v') || github.event.pull_request.base.ref == 'dev'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify source branch uses allowed prefix
+        env:
+          HEAD: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "PR → ${{ github.event.pull_request.base.ref }} from $HEAD"
+          if [[ "$HEAD" == "dev" ]]; then
+            exit 0
+          fi
+          if [[ ! "$HEAD" =~ ^(fix|feature|refactor|chore|doc|ci-cd)\/[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::Branch must start with fix/, feature/, refactor/, chore/, doc/, or ci-cd/."
+            exit 1
+          fi
+
+  # ───────────────────────────────────────────────────────────────
+  # 3) Prevent forks from editing your workflows
+  # ───────────────────────────────────────────────────────────────
+  protect-workflows:
+    runs-on: ubuntu-latest
+    # only block non-maintainers
+    if: github.event.pull_request.author_association == 'CONTRIBUTOR'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect workflow changes
+        run: |
+          git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+          CHANGED=$(git diff --name-only FETCH_HEAD HEAD | grep -E '^\.github/workflows/.*\.ya?ml$' || true)
+          if [ -n "$CHANGED" ]; then
+            echo "::error::External contributors may not modify workflow files: $CHANGED"
+            exit 1
+          fi

@@ -1,0 +1,62 @@
+---
+description: 
+globs: **/pipelex_libraries/pipelines/toml/**/*.toml
+alwaysApply: false
+---
+This rule explains how to write prompt templates in PipeLLM definitions. These prompts will be rendered and become the user_text or the system_prompt part of LLM chat completion queries.
+
+# Jinja2
+
+- We support jinja2 templates, so all the syntax capacities of jinja2 can be used such as variables inserted with double-curly-braces {{ like.this }}
+- But we don't support jinja2 importing other templates: our templates only work as self-contained
+
+# Preprocessing shorthands
+
+Before handing over templates to jinja2, we preprocess them in order to support a simpler more readable syntax that will generate jinja2 syntax to insert variables and use appropriate filters. Our shorthand syntax is presented here:
+
+## Insert stuff inside a tagged block
+
+If the inserted text is supposedly long text, made of several lines or paragraphs, you want it inserted inside a block, possibly a block tagged and delimlited with proper syntax as one would do in a markdown documentation. To include stuff as a block, use the "@" prefix.
+
+Example template:
+```python
+prompt_template = """
+Match the expense with its corresponding invoice:
+
+@expense
+
+@invoices
+"""
+```
+In this example, the expense data and the invoices data are obviously made of several lines each, that's why it makes sense to use the "@" prefix in order to have them delimited inside a block. Note that our preprocessor will automatically include the block's title, so it doens't need to be explictly written in the prompt template.
+
+**DO NOT write things like "Here is the expense: @expense".**
+**DO write simply "@expense" alone in an isolated line.**
+
+
+## Insert stuff inline
+
+If the inserted text is short text and it makes sense to have it inserted directly into a sentence, you want it inserted inline. To insert stuff inline, use the "$" prefix. This will insert the stuff without delimiters and the content will be rendered as plain text.
+
+Example template:
+```python
+prompt_template = """
+Your goal is to summarize everything related to $topic in the provided text:
+
+@text
+
+Please provide only the summary, with no additional text or explanations.
+Your summary should not be longer than 2 sentences.
+"""
+```
+
+Here, $topic will be inserted inline, whereas @text will be a a delimited block.
+Be sure to make the proper choice of prefix for each insertion.
+
+**DO NOT write "$topic" alone in an isolated line.**
+**DO write things like "Write an essay about $topic" included in an actual sentence.**
+
+## Style rule
+
+Always favor the @ and $ prefixes instead of the jinja2 double-curly-brackets syntax, unless explicitly instructed otherwise.
+

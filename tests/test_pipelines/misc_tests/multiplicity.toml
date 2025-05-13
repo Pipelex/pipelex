@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+domain = "multiplicity"
+definition = "Test library about multiplicity"
+
+[concept]
+Color = "A color"
+ProductOfNature = "Something produced by Nature"
+FantasyScene = "A fantasy scene"
+
+[pipe.original_power_ranger_colors]
+PipeLLM = "Recall the colors of the original power rangers"
+output = "Color"
+prompt_template = """
+Remind me of the colors of the {{ _nb_output }} original power rangers.
+"""
+llm = "llm_for_creative_writing"
+nb_output = 5
+
+[pipe.alltime_power_ranger_colors]
+PipeLLM = "Recall the colors of all the power rangers"
+output = "Color"
+prompt_template = """
+Remind me of the colors of all the power rangers over all series.
+Don't list the names of the characters or the name of the series: just list the colors.
+"""
+llm = "llm_for_creative_writing"
+
+[pipe.imagine_nature_product]
+PipeLLM = "Imagine a product of nature"
+input = "Color"
+output = "ProductOfNature"
+prompt_template = """
+Propose a product of nature of this color: {{ color|format("plain") }}.
+Just state what it is in a single sentence.
+"""
+
+[pipe.imagine_fantasy_scene_including_products_of_nature]
+PipeLLM = "Imagine a fantasy scene including products of nature"
+input = "ProductOfNature"
+output = "FantasyScene"
+prompt_template = """
+Imagine a fantasy scene including the following products of nature:
+
+{{ product_of_nature|tag("products of nature") }}
+
+Keep it short and concise, just one sentence.
+"""
+
+[pipe.imagine_nature_product_list]
+PipeSequence = "Imagine nature products of different colors"
+output = "native.Image"
+steps = [
+    { pipe = "choose_colors", result = "color", nb_output = 3 },
+    { pipe = "imagine_nature_product", result = "product_of_nature" },
+    { pipe = "imagine_fantasy_scene_including_products_of_nature", result = "imgg_prompt" },
+    { pipe = "generate_image", result = "image" },
+]
+
+[pipe.imagine_nature_scene_of_original_power_rangers_colors]
+PipeSequence = "Imagine nature scenes of Power Rangers colors"
+output = "native.Image"
+steps = [
+    { pipe = "original_power_ranger_colors", result = "color" },
+    { pipe = "imagine_nature_product", result = "product_of_nature" },
+    { pipe = "imagine_fantasy_scene_including_products_of_nature", result = "imgg_prompt" },
+    # { pipe = "generate_image", result = "image" },
+]
+
+
+[pipe.imagine_nature_scene_of_alltime_power_rangers_colors]
+PipeSequence = "Imagine nature scenes of Power Rangers colors"
+output = "native.Image"
+steps = [
+    { pipe = "alltime_power_ranger_colors", result = "color", multiple_output = true },
+    { pipe = "imagine_nature_product", result = "product_of_nature" },
+    { pipe = "imagine_fantasy_scene_including_products_of_nature", result = "imgg_prompt" },
+    # { pipe = "generate_image", result = "image" },
+]

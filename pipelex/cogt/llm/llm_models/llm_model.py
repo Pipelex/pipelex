@@ -1,0 +1,52 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+from typing import Dict, Optional, Set
+
+from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Self
+
+from pipelex.cogt.exceptions import LLMModelDefinitionError
+from pipelex.cogt.llm.llm_models.llm_family import LLMFamily, LLMPlatform
+from pipelex.cogt.llm.token_category import TokenCostsByCategoryDict
+
+LATEST_VERSION_NAME = "latest"
+
+
+class LLMModel(BaseModel):
+    default_platform: LLMPlatform
+    llm_family: LLMFamily
+    llm_name: str
+    version: str
+    is_gen_object_supported: bool
+    is_vision_supported: bool = False
+    cost_per_million_tokens_usd: Optional[TokenCostsByCategoryDict] = None
+    platform_llm_id: Dict[LLMPlatform, str] = Field(..., min_length=1)
+    max_tokens: Optional[int] = None
+
+    max_prompt_images: Optional[int] = Field(None, ge=0)
+
+    @model_validator(mode="after")
+    def check_vision_and_nb_images(self) -> Self:
+        if self.is_vision_supported and self.max_prompt_images and self.max_prompt_images < 1:
+            raise LLMModelDefinitionError("If vision is True, max_prompt_images must be >= 1 or not set")
+        if not self.is_vision_supported and self.max_prompt_images and self.max_prompt_images > 0:
+            raise LLMModelDefinitionError("If vision is False, max_prompt_images must be 0 or not set")
+        return self
+
+    @property
+    def name_and_version(self) -> str:
+        return f"{self.llm_name}:{self.version}"
+
+    @property
+    def name_and_version_and_platform(self) -> str:
+        return f"{self.llm_name}:{self.version}:{self.default_platform}"
+
+    @property
+    def is_system_prompt_supported(self) -> bool:
+        return self.llm_family != LLMFamily.O_SERIES or self.llm_name == "o1"
+
+    @property
+    def supported_platforms(self) -> Set[LLMPlatform]:
+        return set(self.platform_llm_id.keys())

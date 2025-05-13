@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+domain = "retrieve"
+definition = "The domain for retrieving relevant excerpts from text"
+
+[concept]
+RetrievedExcerpt = "An excerpt from a text with its justification for being relevant to a question"
+
+[pipe]
+[pipe.retrieve_excerpt]
+PipeLLM = "Find the most relevant excerpt in a text that answers a specific question"
+input = "native.Text"
+output = "RetrievedExcerpt"
+llm = "llm_to_retrieve"
+prompt_template = """
+Given this text:
+{{ text_content|tag }}
+
+Given this question:
+{{ question|tag }}
+
+Your task is to find all relevant excerpts from the text that contribute to answering this question.
+
+Output each excerpt ONLY for actual found excerpts.
+"""

@@ -1,0 +1,161 @@
+---
+description: 
+globs: tests/**/*.py
+alwaysApply: false
+---
+These rules apply when writing unit tests.
+- Always use pytest
+
+## Test file structure
+
+- Name test files with `test_` prefix
+- Use descriptive names that match the functionality being tested
+- Place test files in the appropriate subdirectory of `tests/`:
+    - `tests/cogt/` for tests related to sub-package `pipelex.cogt`
+    - `tests/tools/` for tests related to sub-package `pipelex.tools`
+    - `tests/pipelex/` for tests related to `pipelex`and not its sub-packages
+- More precisely, for `pipelex` and `pipelex.cogt` place the tests inside subdirectories named either `asynch` for async test functions and `synchro` for normal non-async test functions
+
+## Markers
+
+Apply the appropriate markers:
+- "llm: uses an LLM to generate text or objects"
+- "imgg: uses an image generation AI"
+- "inference: uses either an LLM or an image generation AI"
+- "gha_disabled: will not be able to run properly on GitHub Actions"
+
+Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
+
+## Test Class Structure
+
+Always group the tests of a module into a test class:
+
+```python
+@pytest.mark.llm
+@pytest.mark.inference
+@pytest.mark.asyncio(loop_scope="class")
+class TestFooBar:
+    @pytest.mark.parametrize(
+        "topic test_case_blueprint",
+        [
+            TestCases.CASE_1,
+            TestCases.CASE_2,
+        ],
+    )
+    async def test_pipe_processing(
+        self,
+        request: FixtureRequest,
+        topic: str,
+        test_case_blueprint: StuffBlueprint,
+    ):
+        # Test implementation
+```
+
+Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get th test name using `cast(str, request.node.originalname),  # type: ignore`. 
+
+# Pipe tests
+
+## Required imports for pipe tests
+
+```python
+import pytest
+from pytest import FixtureRequest
+from pipelex import log, pretty_print
+from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.hub import get_report_delegate
+from pipelex_libraries.pipelines.base_library.retrieve import RetrievedExcerpt
+from pipelex.config_pipelex import get_config
+
+from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
+from pipelex.core.pipe_output import PipeOutput, PipeOutputType
+from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+```
+
+## Pipe test implementation steps
+
+1. Create Stuff from blueprint:
+
+```python
+stuff = StuffFactory.make_stuff(
+    concept_code="RetrievedExcerpt",
+    domain="retrieve",
+    content=RetrievedExcerpt(text="<Some retrieved text>", justification="<Some justification>")
+    name="retrieved_text",
+)
+```
+
+2. Create Working Memory:
+
+```python
+working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+```
+
+3. Run the pipe:
+
+```python
+pipe_output: PipeOutput = await pipe_router.run_pipe(
+    pipe_code="pipe_name",
+    pipe_run_params=PipeRunParams(),
+    working_memory=working_memory,
+    job_metadata=JobMetadata(
+        session_id=get_config().session_id,
+        top_job_id=cast(str, request.node.originalname),  # type: ignore
+    ),
+)
+```
+
+4. Log output and generate report:
+
+```python
+pretty_print(pipe_output, title=f"Pipe output")
+get_report_delegate().general_report()
+```
+
+5. Basic assertions:
+
+```python
+assert pipe_output is not None
+assert pipe_output.working_memory is not None
+assert pipe_output.main_stuff is not None
+```
+
+## Test Data Organization
+
+- If it's not already there, create a `test_data.py` file in the test directory
+- Define test cases using `StuffBlueprint`:
+
+```python
+class TestCases:
+    CASE_BLUEPRINT_1 = StuffBlueprint(
+        name="test_case_1",
+        concept_code="domain.ConceptName1",
+        value="test_value"
+    )
+    CASE_BLUEPRINT_2 = StuffBlueprint(
+        name="test_case_2",
+        concept_code="domain.ConceptName2",
+        value="test_value"
+    )
+
+    CASE_BLUEPRINTS: ClassVar[List[Tuple[str, str]]] = [  # topic, blueprint"
+        ("topic1", CASE_BLUEPRINT_1),
+        ("topic2", CASE_BLUEPRINT_2),
+    ]
+```
+
+Note how we avoid initializing a default mutable value within a class instance, instead we use ClassVar.
+Also note that we provide a topic for the test case, which is purely for convenience.
+
+## Best Practices for Testing
+
+- Use parametrize for multiple test cases
+- Test both success and failure cases
+- Verify working memory state
+- Check output structure and content
+- Use meaningful test case names
+- Include docstrings explaining test purpose
+- Log outputs for debugging
+- Generate reports for cost tracking

@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+[perplexity-search.sonar-pro.latest]
+is_gen_object_supported = false
+platform_llm_id = { perplexity = "sonar-pro" }
+
+[perplexity-search.sonar.latest]
+is_gen_object_supported = false
+platform_llm_id = { perplexity = "sonar" }
+
+[perplexity-research.sonar-deep-research.latest]
+is_gen_object_supported = false
+platform_llm_id = { perplexity = "sonar-deep-research" }
+
+[perplexity-reasoning.sonar-reasoning-pro.latest]
+is_gen_object_supported = false
+platform_llm_id = { perplexity = "sonar-reasoning-pro" }
+
+[perplexity-reasoning.sonar-reasoning.latest]
+is_gen_object_supported = false
+platform_llm_id = { perplexity = "sonar-reasoning" }
+
+[perplexity-deepseek.perplexity-deepseek-r1.latest]
+is_gen_object_supported = false
+platform_llm_id = { perplexity = "r1-1776" }

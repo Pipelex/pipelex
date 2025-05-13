@@ -1,0 +1,41 @@
+name: Lint check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+      - "release/v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  lint-check:
+    runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.11"
+
+      - name: Install poetry package
+        run: pip install "poetry>=2.0.0,<2.1.0"
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Run License check
+        run: make reuse-check
+
+      - name: Run ruff format merge check
+        run: make merge-check-ruff-format
+
+      - name: Run ruff lint merge check
+        run: make merge-check-ruff-lint
+
+      - name: Run pyright merge check
+        run: make merge-check-pyright
+
+      - name: Run mypy merge check
+        run: make merge-check-mypy

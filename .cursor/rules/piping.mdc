@@ -1,0 +1,18 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Rules to write pipes:
+
+- To write the pipes toml, check out:
+[pipes.mdc](mdc:.cursor/rules/pipes.mdc)
+
+- To write the structure classes for concepts used in pipes with structured generations, check out:
+[structures.mdc](mdc:.cursor/rules/structures.mdc)
+
+- To write prompts using our telmplating syntax, check out:
+[prompt-templates.mdc](mdc:.cursor/rules/prompt-templates.mdc)
+
+- To choose an llm preset or define a new one, check out:
+[llms.mdc](mdc:.cursor/rules/llms.mdc)

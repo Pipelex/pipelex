@@ -1,0 +1,219 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+[pipelex]
+extra_env_files = ["secrets.env"]
+
+####################################################################################################
+# Log config
+####################################################################################################
+
+[pipelex.log_config]
+default_log_level = "INFO"
+
+is_console_logging_enabled = true
+
+json_logs_indent = 4
+presentation_line_width = 120
+silenced_problem_ids = ["azure_openai_no_stream_options"]
+caller_info_template = "file_line"
+is_caller_info_enabled = false
+
+poor_loggers = [
+    "kajson.decoder.sandbox",
+    "kajson.encoder.sandbox",
+    "class_registry.sandbox",
+]
+generic_poor_logger = "#sandbox"
+
+[pipelex.log_config.package_log_levels]
+# for logger names, the dots "." have been replaced by "-" to avoid toml parsing issues
+# TODO: use quotes to re-enable names with dots
+anthropic = "INFO"
+asyncio = "INFO"
+botocore = "INFO"
+botocore-credentials = "WARNING"
+google = "INFO"
+httpx = "WARNING"
+httpcore = "INFO"
+openai = "INFO"
+instructor = "INFO"
+urllib3-connectionpool = "INFO"
+urllib3-util-retry = "INFO"
+
+kajson = "INFO"
+kajson-decoder-sandbox = "INFO"
+kajson-encoder-sandbox = "INFO"
+
+pipelex = "INFO"
+
+
+[pipelex.log_config.rich_log_config]
+is_show_time = false
+is_show_level = true
+is_link_path_enabled = true
+is_markup_enabled = false
+highlighter_name = "json"
+is_rich_tracebacks = true
+is_tracebacks_word_wrap = true
+is_tracebacks_show_locals = false
+tracebacks_suppress = []
+keywords_to_hilight = []
+
+[pipelex.aws_config]
+api_key_method = "env"  # "env", "secret_provider"
+aws_region = "us-west-2"
+
+aws_access_key_id_env_var_name = "AWS_ACCESS_KEY_ID"
+aws_secret_access_key_env_var_name = "AWS_SECRET_ACCESS_KEY"
+aws_region_env_var_name = "AWS_REGION"
+aws_access_key_id_secret_name = "AWS_ACCESS_KEY_ID"
+aws_secret_access_key_secret_name = "AWS_SECRET_ACCESS_KEY"
+
+[cogt]
+
+[cogt.inference_manager_config]
+is_auto_setup_preset_llm = true
+is_auto_setup_preset_imgg = true
+
+[cogt.cogt_report_config]
+is_log_costs_to_console = false
+is_generate_cost_report_file_enabled = true
+cost_report_dir_path = "reports"
+cost_report_base_name = "cost_report"
+cost_report_extension = "xlsx"
+cost_report_unit_scale = 1.0
+
+[cogt.llm_config]
+llm_integrations_path = "llm_integrations"
+
+default_max_images = 100
+
+[cogt.llm_config.instructor_config]
+is_openai_structured_output_enabled = false
+
+[cogt.llm_config.llm_job_config]
+max_retries = 3
+is_streaming_enabled = false
+
+####################################################################################################
+# Config to use LLM Platforms
+####################################################################################################
+
+[cogt.llm_config.preferred_platforms]
+# These overrride the defaults set for any llm handle
+# "gpt-4o-mini" = "openai"
+
+[cogt.llm_config.openai_openai_config]
+api_key_method = "env"  # "env", "secret_provider"
+api_key_env_var_name = "OPENAI_API_KEY"
+api_key_secret_name = "OPENAI_API_KEY"
+
+[cogt.llm_config.azure_openai_config]
+api_endpoint = "https://ev-openai-services-1.openai.azure.com/"
+api_version = "2024-05-01-preview"
+api_key_method = "env"  # "env", "secret_provider"
+api_key_env_var_name = "AZURE_OPENAI_API_KEY"
+api_key_secret_name = "AZURE_OPENAI_API_KEY"
+
+# TODO: handle multiple azure openai accounts with different resource groups and account names for various llm model
+
+[cogt.llm_config.perplexity_config]
+api_endpoint = "https://api.perplexity.ai"
+api_key_method = "env"  # "env", "secret_provider"
+api_key_env_var_name = "PERPLEXITY_API_KEY"
+api_key_secret_name = "PERPLEXITY_API_KEY"
+
+[cogt.llm_config.vertexai_config]
+project_id = "evotis-foundation"
+region = "us-central1"
+
+[cogt.llm_config.mistral_config]
+api_key_secret_name = "MISTRAL_API_KEY"
+
+[cogt.llm_config.bedrock_config]
+aws_region = "us-west-2"
+client_method = "aioboto3"
+
+[cogt.llm_config.anthropic_config]
+api_key_method = "env"  # "env", "secret_provider"
+api_key_env_var_name = "ANTHROPIC_API_KEY"
+api_key_secret_name = "ANTHROPIC_API_KEY"
+
+####################################################################################################
+# Image generation config
+####################################################################################################
+
+[cogt.imgg_config]
+imgg_handles = ["fal-ai/flux-pro", "fal-ai/fast-lightning-sdxl"]
+default_imgg_handle = "fal-ai/flux-pro/v1.1-ultra"  # use "fal-ai/fast-lightning-sdxl" for SDXL Lightning cheap and fast
+
+[cogt.imgg_config.imgg_job_config]
+is_sync_mode = false
+
+[cogt.imgg_config.imgg_param_defaults]
+aspect_ratio = "square"  # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
+nb_steps = 1  # 28 for Flux, one of [1,2,4,8] for SDXL Lightning
+guidance_scale = 3.5
+is_safety_checker_enabled = true
+safety_tolerance = 5
+is_raw = false
+output_format = "jpg"
+seed = "auto"
+# seed = 1
+
+####################################################################################################
+# OCR config
+####################################################################################################
+
+[cogt.ocr_config]
+[cogt.ocr_config.mistral_ocr_config]
+ocr_model_name = "mistral-ocr-latest"
+
+####################################################################################################
+# Pipelex prompting config
+####################################################################################################
+
+[pipelex.prompting_config]
+default_prompting_style = { tag_style = "ticks" }
+
+[pipelex.prompting_config.prompting_styles]
+openai = { tag_style = "ticks" }
+anthropic = { tag_style = "xml" }
+mistral = { tag_style = "square_brackets" }
+gemini = { tag_style = "xml" }
+
+[pipelex.structure_config]
+is_default_text_then_structure = true
+
+####################################################################################################
+# Pipelex libraries config
+####################################################################################################
+
+[pipelex.library_config]
+
+[pipelex.generic_template_names]
+structure_from_preliminary_text_system = "structure_from_preliminary_text_system"
+structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
+
+####################################################################################################
+# History graph config
+####################################################################################################
+
+[pipelex.history_graph_config]
+is_debug_mode = false
+is_include_text_preview = false
+is_include_interactivity = false
+nb_items_limit = "unlimited"
+theme = "base"
+layout = "dagre"  # "elk", "dagre", "fixed"
+sub_graph_colors = ["#e6f5ff", "#fff5f7", "#f0fff0"]
+wrapping_width = "auto"
+
+# TODO: adapt the length of the edges to different cases?
+pipe_edge_style = "---->"
+branch_edge_style = "-...-"
+aggregate_edge_style = "-...-"
+condition_edge_style = "-----"
+choice_edge_style = "-----"

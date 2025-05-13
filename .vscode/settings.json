@@ -1,0 +1,29 @@
+{
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    },
+    "ruff.configuration": "--config=pyproject.toml",
+    "mypy.enabled": true,
+    "mypy.runUsingActiveInterpreter": true,
+    "search.exclude": {
+        ".mypy_cache/*": true,
+        "**/dev_context": true
+    },
+    "editor.formatOnSave": true,
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#7c0040",
+        "titleBar.activeBackground": "#7c0040",
+        "titleBar.activeForeground": "#F5FCF0"
+    },
+    "files.exclude": {
+        "**/__pycache__": true,
+        ".mypy_cache": true,
+        ".pytest_cache": true,
+        ".ruff_cache": true,
+    },
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}

@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+[cogt.llm_config.preferred_platforms]
+# These override the defaults set for any llm integration
+# Use at your convinience:
+# gpt-4o-mini = "azure_openai"
+# gpt-4o = "azure_openai"
+# claude-3-7-sonnet = "bedrock_anthropic"
+
+[cogt.imgg_config]
+default_imgg_handle = "fal-ai/fast-lightning-sdxl"

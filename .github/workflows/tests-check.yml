@@ -1,0 +1,54 @@
+name: Tests check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+      - "release/v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  tests-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      ENV: dev
+      GOOGLE_ENCRYPTED_CREDENTIALS_KEY: ${{ secrets.GOOGLE_ENCRYPTED_CREDENTIALS_KEY }}
+      GOOGLE_ENCRYPTED_CREDENTIALS_PATH: ${{ secrets.GOOGLE_ENCRYPTED_CREDENTIALS_PATH }}
+      COLUMNS: 120
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          workload_identity_provider: "projects/634168471546/locations/global/workloadIdentityPools/github-wif/providers/githuboidc"
+          service_account: "github-actions@evotis-foundation.iam.gserviceaccount.com"
+
+      - name: "Get secret from Secret Manager"
+        id: get_secret
+        uses: "google-github-actions/get-secretmanager-secrets@v2"
+        with:
+          secrets: |-
+            GOOGLE_ENCRYPTED_CREDENTIALS:projects/634168471546/secrets/GOOGLE_ENCRYPTED_CREDENTIALS/versions/1
+
+      - name: "Create encrypted_credentials.txt file"
+        run: |
+          echo "${{ steps.get_secret.outputs.GOOGLE_ENCRYPTED_CREDENTIALS }}" > encrypted_credentials.txt
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.11"
+
+      - name: Install poetry package
+        run: pip install "poetry>=2.0.0,<2.1.0"
+
+      - name: Install virtual env and dependencies from pyproject.toml
+        run: make install
+
+      - name: Run tests
+        run: make runtests

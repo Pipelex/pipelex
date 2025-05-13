@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Rule to create BaseModels:
+
+- Respect Pydantic v2 standards
+- Keep models focused and single-purpose
+- Use descriptive field names
+- Use type hints for all fields
+- Document complex validations
+- Use Optional[] for nullable fields
+- Use Field(default_factory=...) for mutable defaults

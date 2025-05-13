@@ -1,0 +1,258 @@
+[tool.poetry]
+name = "pipelex"
+version = "0.1.14"
+description = "Pipelex is an open-source dev tool based on a simple declarative language that lets you define replicable, structured, composable LLM pipelines."
+authors = ["Evotis S.A.S. <evotis@pipelex.com>"]
+maintainers = ["Pipelex staff <oss@pipelex.com>"]
+exclude = ["tests/"]
+license = "Elastic License 2.0"
+readme = "README.md"
+repository = "https://github.com/Pipelex/pipelex"
+homepage = "https://pipelex.com"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+]
+
+[tool.poetry.urls]
+Documentation = "https://github.com/Pipelex/pipelex/blob/dev/doc/Documentation.md"
+Changelog = "https://github.com/Pipelex/pipelex/blob/dev/CHANGELOG.md"
+
+[[tool.poetry.packages]]
+include = "pipelex"
+
+[[tool.poetry.packages]]
+include = "pyproject.toml"
+to = "pipelex"
+
+[tool.poetry.scripts]
+pipelex = "pipelex.cli._cli:app"
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core"]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+aiofiles = "<24.0"
+filetype = "^1.2.0"
+httpx = "^0.27.0"
+instructor = "1.7.2"
+jinja2 = "^3.1.4"
+json2html = "^1.3.0"
+kajson = "0.1.0"
+markdown = "^3.6"
+networkx = "^3.4.2"
+openai = "^1.60.1"
+openpyxl = "^3.1.5"           # Used by pandas to handle excel files
+pandas = "^2.2.3"
+pydantic = "2.10.6"
+python-dotenv = "^1.0.1"
+PyYAML = "^6.0.2"
+rich = "^13.8.1"
+shortuuid = "^1.0.13"
+toml = "^0.10.2"
+typer = "^0.12.5"
+typing-extensions = "^4.12.2"
+yattag = "^1.15.2"
+
+aioboto3 = { version = "^13.4.0", optional = true }
+anthropic = { version = "^0.49.0", optional = true }
+boto3 = { version = "^1.34.131", optional = true }
+fal-client = { version = "^0.4.1", optional = true }
+google-auth-oauthlib = { version = "^1.2.1", optional = true }
+mistralai = { version = "1.5.2", optional = true }
+
+[tool.poetry.extras]
+anthropic = ["anthropic"]
+bedrock = ["boto3", "aioboto3"]
+fal = ["fal-client"]
+google = ["google-auth-oauthlib"]
+mistralai = ["mistralai"]
+
+[tool.poetry.group.dev.dependencies]
+boto3-stubs = "^1.35.24"
+mypy = "^1.11.2"
+pyright = "1.1.398" # version 1.1.399 generates a ton of false positives
+pandas-stubs = "^2.2.3.241126"
+pytest = "^8.3.3"
+pytest-cov = "^6.1.1"
+pytest-pretty = "1.2.0"
+pytest_asyncio = "^0.24.0"
+reuse = "5.0.2"
+ruff = "^0.6.8"
+types-aioboto3 = { version = "^13.4.0", extras = [
+    "bedrock",
+    "bedrock-runtime",
+] }
+types-aiofiles = "^24.1.0.20240626"
+types-beautifulsoup4 = "^4.12.0.20240907"
+types-markdown = "^3.6.0.20240316"
+types-networkx = "^3.3.0.20241020"
+types-openpyxl = "^3.1.5.20250306"
+types-requests = "^2.32.0.2024091"
+types-PyYAML = "^6.0.12.20250326"
+types-toml = "^0.10.8.20240310"
+
+[tool.mypy]
+check_untyped_defs = true
+exclude = "^.*\\.venv/.*$"
+mypy_path = "."
+packages = ["pipelex", "tests"]
+plugins = ["pydantic.mypy"]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+ignore_missing_imports = true
+module = ["json2html", "filetype"]
+
+[tool.pyright]
+analyzeUnannotatedFunctions = true
+deprecateTypingAliases = false
+disableBytesTypePromotions = true
+enableExperimentalFeatures = false
+enableTypeIgnoreComments = true
+exclude = ["**/node_modules", "**/__pycache__"]
+extraPaths = ["./tests"]
+include = ["pipelex", "tests"]
+pythonVersion = "3.11"
+reportAbstractUsage = "error"
+reportArgumentType = "error"
+reportAssertAlwaysTrue = "error"
+reportAssertTypeFailure = "error"
+reportAssignmentType = "error"
+reportAttributeAccessIssue = "error"
+reportCallInDefaultInitializer = true
+reportCallIssue = "error"
+reportConstantRedefinition = "error"
+reportDeprecated = "error"
+reportDuplicateImport = "error"
+reportFunctionMemberAccess = "error"
+reportGeneralTypeIssues = "error"
+reportImplicitOverride = true
+reportImplicitStringConcatenation = false
+reportImportCycles = true
+reportIncompatibleMethodOverride = "error"
+reportIncompatibleVariableOverride = "error"
+reportIncompleteStub = "error"
+reportInconsistentConstructor = "error"
+reportInconsistentOverload = "error"
+reportIndexIssue = "error"
+reportInvalidStringEscapeSequence = "error"
+reportInvalidStubStatement = "error"
+reportInvalidTypeArguments = "error"
+reportInvalidTypeForm = "error"
+reportInvalidTypeVarUse = "error"
+reportMatchNotExhaustive = "error"
+reportMissingImports = "error"
+reportMissingModuleSource = "warning"
+reportMissingParameterType = "error"
+reportMissingSuperCall = "none"
+reportMissingTypeArgument = "error"
+reportMissingTypeStubs = false
+reportNoOverloadImplementation = "error"
+reportOperatorIssue = "error"
+reportOptionalCall = "error"
+reportOptionalContextManager = "error"
+reportOptionalIterable = "error"
+reportOptionalMemberAccess = "error"
+reportOptionalOperand = "error"
+reportOptionalSubscript = "error"
+reportOverlappingOverload = "error"
+reportPossiblyUnboundVariable = "error"
+reportPrivateImportUsage = "error"
+reportPrivateUsage = "error"
+reportPropertyTypeMismatch = true
+reportRedeclaration = "error"
+reportReturnType = "error"
+reportSelfClsParameterName = "error"
+reportShadowedImports = true
+reportTypeCommentUsage = "error"
+reportTypedDictNotRequiredAccess = "error"
+reportUnboundVariable = "error"
+reportUndefinedVariable = "error"
+reportUninitializedInstanceVariable = "none"
+reportUnknownArgumentType = "error"
+reportUnknownLambdaType = "error"
+reportUnknownMemberType = "error"
+reportUnknownParameterType = "error"
+reportUnknownVariableType = "error"
+reportUnnecessaryCast = "error"
+reportUnnecessaryComparison = "error"
+reportUnnecessaryContains = "error"
+reportUnnecessaryIsInstance = "error"
+reportUnnecessaryTypeIgnoreComment = "none"
+reportUnsupportedDunderAll = "error"
+reportUntypedBaseClass = "error"
+reportUntypedClassDecorator = "error"
+reportUntypedFunctionDecorator = "error"
+reportUntypedNamedTuple = "error"
+reportUnusedCallResult = "none"
+reportUnusedClass = "error"
+reportUnusedCoroutine = "error"
+reportUnusedExcept = "error"
+reportUnusedExpression = "error"
+reportUnusedFunction = "error"
+reportUnusedImport = "none"
+reportUnusedVariable = "error"
+reportWildcardImportFromLibrary = "error"
+strictDictionaryInference = true
+strictListInference = true
+strictParameterNoneValue = true
+strictSetInference = true
+typeCheckingMode = "strict"
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib -ra -m 'not inference and not imgg'"
+asyncio_default_fixture_loop_scope = "session"
+markers = [
+    "inference: slow and costly due to inference calls",
+    "llm: slow and costly due to llm inference calls",
+    "imgg: slow and costly due to imgg inference calls",
+    "gha_disabled: tests that should not run in GitHub Actions",
+]
+minversion = "8.0"
+
+[tool.coverage.run]
+source = ["pipelex"]
+omit = ["tests/*", "**/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
+
+[tool.ruff]
+exclude = [".mypy_cache", ".ruff_cache", ".venv", ".vscode", "trigger_pipeline"]
+line-length = 150
+target-version = "py311"
+
+[tool.ruff.format]
+
+[tool.ruff.lint]
+ignore = ["F401"]
+external = ["F401"]
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "A001",
+    "A002",
+    "A003",
+    "RUF008",
+    "RUF009",
+    "RUF012",
+    "RUF013",
+    "RUF100",
+    "E501",
+    "I",
+]

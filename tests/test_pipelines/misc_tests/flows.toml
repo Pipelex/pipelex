@@ -1,0 +1,82 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+domain = "flows"
+definition = "A collection of pipes that are used to test the flow of a pipeline"
+
+[concept]
+Color = "A color"
+
+[pipe.extract_colors]
+PipeLLM = "Extract Colors"
+output = "Color"
+prompt_template = """
+Extract colors from the following text:
+
+{{ text|tag }}
+"""
+multiple_output = true
+
+[pipe]
+[pipe.choose_colors]
+PipeLLM = "Choose Colors"
+output = "Color"
+prompt_template = """
+Choose {{ _nb_output }} colors.
+"""
+llm = "llm_for_creative_writing"
+
+[pipe.sequence_for_batch_test]
+PipeSequence = "Sequence for parallel test"
+input = "Color"
+output = "Color"
+steps = [
+    { pipe = "capitalize_color", result = "capitalized_color" },
+    { pipe = "capitalize_last_letter", result = "capitalized_last_letter" },
+    # { pipe = "reverse_letters", result = "reversed_color" },
+]
+
+[pipe.batch_test]
+PipeBatch = "Batch Test"
+input = "Color"
+output = "Color"
+branch_pipe_code = "sequence_for_batch_test"
+
+[pipe.capitalize_color]
+PipeLLM = "Capitalize Colors"
+input = "Color"
+output = "Color"
+prompt_template = """
+Put the first letter of a word that represents a color as a capital letter.
+Here is the word:
+
+{{ color|tag("color") }}
+
+Output only the word, nothing else.
+"""
+
+[pipe.capitalize_last_letter]
+PipeLLM = "Capitalize Last Letter"
+input = "Color"
+output = "Color"
+prompt_template = """
+Put the last letter of a word that represents a color as a capital letter.
+Here is the word:
+
+{{ capitalized_color|tag("color") }}
+
+Output only the word, nothing else.
+"""
+
+[pipe.reverse_letters]
+PipeLLM = "Reverse Letters"
+input = "Color"
+output = "Color"
+prompt_template = """
+Reverse the letters of this word:
+
+{{ color|tag("word") }}
+
+Output only the reversed word, nothing else.
+"""

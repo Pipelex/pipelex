@@ -1,0 +1,142 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+["gpt-3.5"."gpt-3.5-turbo".latest]
+is_gen_object_supported = true
+cost_per_million_tokens_usd = { input = 0.5, output = 1.5 }
+platform_llm_id = { azure_openai = "gpt-35-turbo-16k", openai = "gpt-3.5-turbo-1106" }
+default_platform = "openai"
+
+[gpt-4.gpt-4.latest]
+is_gen_object_supported = false
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 30.0, output = 60.0 }
+platform_llm_id = { openai = "gpt-4" }
+
+[gpt-4.gpt-4-turbo.0125-preview]
+is_gen_object_supported = true
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 10.0, output = 30.0 }
+platform_llm_id = { openai = "gpt-4-0125-preview" }
+
+[gpt-4.gpt-4-turbo.1106-preview]
+is_gen_object_supported = true
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 10.0, output = 30.0 }
+platform_llm_id = { openai = "gpt-4-1106-preview" }
+
+[gpt-4.gpt-4-turbo."2024-04-09"]
+is_gen_object_supported = true
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 10.0, output = 30.0 }
+platform_llm_id = { azure_openai = "gpt-4-turbo", openai = "gpt-4-turbo-2024-04-09" }
+default_platform = "openai"
+
+[gpt-4.gpt-4-turbo.latest]
+is_gen_object_supported = true
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 10.0, output = 30.0 }
+platform_llm_id = { azure_openai = "gpt-4-turbo", openai = "gpt-4-turbo" }
+default_platform = "openai"
+
+[gpt-4o.gpt-4o."2024-05-13"]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 5.0, output = 15.0 }
+platform_llm_id = { azure_openai = "gpt-4o", openai = "gpt-4o-2024-05-13" }
+default_platform = "openai"
+
+[gpt-4.gpt-4o."2024-08-06"]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 2.5, output = 10.0 }
+platform_llm_id = { azure_openai = "gpt-4o-2024-08-06", openai = "gpt-4o-2024-08-06" }
+default_platform = "openai"
+
+[gpt-4.gpt-4o."2024-11-20"]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 2.5, output = 10.0 }
+platform_llm_id = { azure_openai = "gpt-4o-2024-11-20", openai = "gpt-4o-2024-11-20" }
+default_platform = "openai"
+
+[gpt-4o.gpt-4o.latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 2.5, output = 10.0 }
+platform_llm_id = { azure_openai = "gpt-4o-2024-11-20", openai = "gpt-4o" }
+default_platform = "openai"
+
+[gpt-4o.gpt-4o-mini."2024-07-18"]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
+platform_llm_id = { azure_openai = "gpt-4o-mini", openai = "gpt-4o-mini-2024-07-18" }
+default_platform = "openai"
+
+[gpt-4o.gpt-4o-mini.latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
+platform_llm_id = { azure_openai = "gpt-4o-mini", openai = "gpt-4o-mini" }
+default_platform = "openai"
+
+["gpt-4.5"."gpt-4.5-preview".latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 75, output = 150 }
+platform_llm_id = { openai = "gpt-4.5-preview" }
+
+["gpt-4.1"."gpt-4.1".latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 2, output = 8}
+platform_llm_id = { azure_openai = "gpt-4.1", openai = "gpt-4.1" }
+default_platform = "openai" # TODO: make it work with azure_openai by using automatically the right azure resource
+
+["gpt-4.1"."gpt-4.1-mini".latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 0.4, output = 1.6 }
+platform_llm_id = { azure_openai = "gpt-4.1-mini", openai = "gpt-4.1-mini" }
+default_platform = "openai" # TODO: make it work with azure_openai by using automatically the right azure resource
+
+["gpt-4.1"."gpt-4.1-nano".latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 0.1, output = 0.4 }
+platform_llm_id = { azure_openai = "gpt-4.1-nano", openai = "gpt-4.1-nano" }
+default_platform = "openai" # TODO: make it work with azure_openai by using automatically the right azure resource
+
+[o.o1-mini.latest]
+is_gen_object_supported = false
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 3.0, output = 12.0 }
+platform_llm_id = { openai = "o1-mini" }
+
+[o.o1.latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 15.0, output = 60.0 }
+platform_llm_id = { openai = "o1" }
+
+[o.o3-mini.latest]
+is_gen_object_supported = true
+cost_per_million_tokens_usd = { input = 1.1, output = 4.4 }
+# platform_llm_id = { openai = "o3-mini", azure_openai = "o3-mini" }
+platform_llm_id = { openai = "o3-mini"}
+default_platform = "openai"  # TODO: make it work with azure_openai by using automatically the right azure resource
+
+[o.o3.latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 10.0, output = 40.0 }
+platform_llm_id = { openai = "o3" }
+
+[o.o4-mini.latest]
+is_gen_object_supported = true
+cost_per_million_tokens_usd = { input = 1.1, output = 4.4 }
+platform_llm_id = { openai = "o4-mini"}
+default_platform = "openai"
+

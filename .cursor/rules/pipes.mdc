@@ -1,0 +1,215 @@
+---
+description: 
+globs: **/pipelex_libraries/pipelines/toml/**/*.toml
+alwaysApply: false
+---
+This rule explains how to build pipes.
+
+# File Naming & Structure
+
+## The pipelines/ directory
+
+- Pipelines and structures are defined in the `pipelex/pipelex_libraries/pipelines/` directory
+
+pipelex/pipelex_libraries
+└── pipelines
+    ├── structures
+    └── toml
+
+## Pipeline file naming
+
+- Pipeline TOML files should be placed in the `pipelex/pipelex_libraries/pipelines/toml/` directory or a subdirectory of it
+- The file name should be descriptive, in snake_case and end with `.toml`
+- The file should contain both concepts and pipes definitions
+
+## Pipeline file structure
+
+1- Domain statement (name, definition, other attributes)
+2- Concept definitions
+3- Pipe definitions
+
+# Domain statement
+
+- Format: `domain = "domain_name"`
+- Add a definition: `definition = "Description of the domain"`
+- Note: the domain name is usually the toml filename for domains that fit in a single toml file. Otherwise, the domain name should be the name of the subdirectory where the files of the domain are gathered
+
+# Concept definitions
+
+- Start with `[concept]` header
+- Naming: concepts are PascalCase, like python classes (e.g., `GanttTaskDetails`, `HtmlTable`)
+- Define the concept, i.e. just state what it means.
+    - Never include the usage context in the concept. The concept indicates what the stuff is in itself, it's not "for something", it just is something. e.g. don't define "TextToSummarize": it's just "Text". If you want to refine the concept for instance you can define "Essay".
+    - In particular, never define a concept as a plural form: if the context of the pipeline execution makes it multiple, it will just be handled using a ListContent (see below). e.g. don't define a concept for "Stories", just define "Story".
+    - Also, avoid including adjectives in concepts, e.g. don't define "LargeText", it's just "Text".
+
+- Define concepts in one of two ways:
+
+## Simple text-based concept definition
+
+```toml
+[concept]
+ConceptName = "Description of the concept"
+```
+
+## Detailed concept definition with `structure` and `refines`
+
+```toml
+[concept.ConceptName]
+Concept = "Description of the concept"
+structure = "StructureName"
+refines = ["ParentConcept"]  # Optional, for concept inheritance
+```
+
+About the `structure` field:
+- It's Optional
+- It's the name of the Python BaseModel class used for the concept
+- The class must be a subclass of StuffContent
+- The class must be defined in a python module placed inside the `pipelex/pipelex_libraries/pipelines/structures/` directory
+- If the `structure` field is omitted but a class with the same name as the concept is defined in the structures directory, then it's implicitly applied to the concept
+
+About the `refines` field:
+- It's an Optional[List[str]]
+- It indicates that the concept refines one or several other concepts: "refines" in the sense that it makes things more specific. e.g. "Dog" refines "Animal" and "Pet"
+- As of this version, concept "refines" declaration are purely semantic guides
+
+
+## Native structures
+
+Pipelex provides the following structures natively:
+
+- TextContent (that one is used if you don't specify any structure and the Concept's name does not exist as a structure class)
+- NumberContent
+- ImageContent
+- HtmlContent
+- MermaidContent
+- LLMPromptContent
+
+The native structures are implied when using the native concepts: "native.Text", "native.Number", "native.Image"... do you don't have the state it.
+
+Some subclasses of StuffContent exist which you should never use directly:
+- ListContent: this is used internally to manipulate a list of stuff, but you should NEVER define a plural concept
+- StructuredContent
+- DynamicContent
+
+# Pipes Section
+
+- Start with `[pipe]` header
+- Naming: pipe names are snake_case, like python functions (e.g., `extract_gantt_tasks`)
+- Define pipes using as PipeLLM, PipeSequence, PipeParallel, PipeCondition
+
+# Full pipeline toml template
+
+Get inspiration from this template filled with appropriate examples:
+
+```toml
+domain = "template"
+definition = "Template file demonstrating different pipe types in Pipelex"
+
+[concept]
+InputText = "A text input for processing"
+OutputText = "A processed text output"
+TableScreenshot = "An image of a table"
+HtmlTable = "An HTML table representation"
+Question = "A question to be answered"
+FormattedAnswer = "A formatted answer to a question"
+ExpenseReportText = "Text content of an expense report"
+Composite = "A composite output containing multiple pieces of information"
+Expense = "An expense record"
+RulesToApply = "Rules to be applied to an expense"
+
+[pipe]  ##############
+
+# Example of a PipeLLM that uses no input
+[pipe.write_poem]
+PipeLLM = "Write a poem"
+output = "Text"
+llm = "llm_for_creative_writing"
+prompt = """
+Write a poem about an AI that meets a Software and they fall in l0ve.
+"""
+
+# Example of a PipeLLM that uses @ prefix to insert a block of text
+[pipe.process_text]
+PipeLLM = "Process input text using an LLM"
+input = "Text"
+output = "Text"
+llm = "llm_to_summarize_text"
+system_prompt = """
+You are an expert in text summarization.
+"""
+prompt_template = """
+Summarize the following text:
+
+@text
+
+"""
+
+# Example of a PipeLLM that uses @ prefix to insert a block of text but also a $ prefix to insert text inline in a sentence (that is teh case for the $topic)
+[pipe.summarize_topic]
+PipeLLM = "Summarize a dense text with of focus on a specific topic."
+input = "Topic"
+output = "Summary"
+prompt_template = """
+Your goal is to summarize everything related to $topic in the provided text:
+
+@text
+
+Please provide only the summary, with no additional text or explanations.
+Your summary should not be longer than 2 sentences.
+"""
+
+# Example of a PipeLLM with image vision processing by a VLM
+[pipe.get_html_table_from_image]
+PipeLLM = "Convert table screenshot to HTML"
+input = "TableScreenshot"
+output = "HtmlTable"
+images = ["table_screenshot"]
+system_prompt = """
+You are a vision-based table extractor.
+"""
+prompt = """
+You are given a picture (screenshot) of a table, taken from a PDF document. 
+Your goal is to extract the table from the image **in html**.
+Make sure you do not forget any text. Make sure you do not invent any text. 
+Make sure your merge is consistent. Make sure you replicate the formatting 
+(borders, text formatting, colors, text alignment...)
+"""
+llm = "llm_to_extract_tables"
+
+# Example of a PipeSequence
+[pipe.answer_question_with_instructions]
+PipeSequence = "Answer a question with instructions"
+input = "Question"
+output = "FormattedAnswer"
+steps = [
+    { pipe = "enrich_instructions", result = "instructions",  },
+    { pipe = "answer_enriched_question", result = "answer" },
+    { pipe = "format_answer", result = "formatted_answer" },
+]
+
+# Example of a PipeParallel
+[pipe.extract_expense_report]
+PipeParallel = "Extract useful information from an expense report"
+input = "ExpenseReportText"
+output = "Composite"
+parallels = [
+    { pipe = "extract_employee_from_expense_report", result = "employee" },
+    { pipe = "extract_expenses_from_expense_report", result = "expenses" },
+]
+
+# Example of a PipeCondition
+[pipe.expense_conditional_validation]
+PipeCondition = "Choose the rules to apply"
+input = "Expense"
+output = "RulesToApply"
+expression = "expense_category.category"
+```
+
+# Building pipes
+
+When building a pipe:
+- First think about the logical steps you need to take. Then, plan the actual use of different patterns offered by Pipelex pipes, to apply them appropriately when you want to run things in sequence (PipeSequence) or in parallel, ot save time (PipeParallel).
+- Think about what PipeLLM you are going to need and which LLM skills they will need.
+- Write the pipe's toml and required structure in pipelex/pipelex_libraries/pipelines
+
