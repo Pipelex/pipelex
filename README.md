@@ -60,7 +60,7 @@ Pipelex will be distributed as an **open-source Python library,** with a hosted 
 
 ## 🚀 Getting Started
 
-> :books: Check out the cookbook for an easier Getting Started [Pipelex Cookbook](https://github.com/Pipelex/pipelex) and the documentation [Pipelex Documentation](doc/Documentation.md) for more information.
+> :books: Check out the cookbook for an easier Getting Started [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) and the documentation [Pipelex Documentation](doc/Documentation.md) for more information.
 
 ### Prerequisites
 
