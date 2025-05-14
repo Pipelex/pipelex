@@ -25,9 +25,6 @@
     <a href="https://www.linkedin.com/company/evotis"><img src="https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white" alt="LinkedIn"></a>
     <a href="https://pipelex.com"><img src="https://img.shields.io/badge/Website-pipelex.com-0A66C2?logo=google-chrome&logoColor=white&style=flat" alt="Website"></a>
     <br/>
-    <!-- <a href="https://github.com/Pipelex/pipelex/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed/Pipelex/pipelex?logo=github&color=purple" alt="Issues Closed"></a>
-    <a href="https://github.com/Pipelex/pipelex/discussions"><img src="https://img.shields.io/github/discussions/Pipelex/pipelex?logo=github&color=blue" alt="Discussions"></a>
-  </p> -->
 
   <h3 align="center">🎥 Watch Pipelex in Action</h3>
   <a href="https://vimeo.com/1075832879" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
