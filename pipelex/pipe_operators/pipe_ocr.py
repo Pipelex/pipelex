@@ -11,7 +11,7 @@ from pipelex.cogt.ocr.ocr_engine_factory import OCREngineFactory
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.stuff_content import TextContent
+from pipelex.core.stuff_content import TextAndImageContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.job_metadata import JobMetadata
@@ -56,7 +56,10 @@ class PipeOCR(PipeAbstract):
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
             concept_code=self.output_concept_code,
-            content=TextContent(text=ocr_output_text),
+            content=TextAndImageContent(
+                text=TextContent(text=ocr_output_text),
+                image=[],
+            ),
         )
 
         working_memory.set_new_main_stuff(

@@ -276,6 +276,34 @@ class MermaidContent(StuffContent):
         return json.dumps({"mermaid": self.mermaid_code})
 
 
+class TextAndImageContent(StuffContent):
+    text: Optional[TextContent]
+    image: Optional[List[ImageContent]]
+
+    @property
+    @override
+    def short_desc(self) -> str:
+        text_count = 1 if self.text else 0
+        image_count = len(self.image) if self.image else 0
+        return f"text and image content ({text_count} text, {image_count} images)"
+
+    @override
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+        if self.text:
+            rendered = self.text.rendered_markdown(level=level, is_pretty=is_pretty)
+        else:
+            rendered = ""
+        return rendered
+
+    @override
+    def rendered_html(self) -> str:
+        if self.text:
+            rendered = self.text.rendered_html()
+        else:
+            rendered = ""
+        return rendered
+
+
 class StructuredContent(StuffContent):
     @property
     @override

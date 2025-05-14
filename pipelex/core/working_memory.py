@@ -20,6 +20,7 @@ from pipelex.core.stuff_content import (
     NumberContent,
     StuffContent,
     StuffContentType,
+    TextAndImageContent,
     TextContent,
 )
 from pipelex.exceptions import WorkingMemoryError, WorkingMemoryStuffNotFoundError
@@ -258,6 +259,10 @@ class WorkingMemory(BaseModel):
         """Get stuff content as ImageContent if applicable."""
         return self.get_stuff(name=name).as_image
 
+    def get_stuff_as_text_and_image(self, name: str) -> TextAndImageContent:
+        """Get stuff content as TextAndImageContent if applicable."""
+        return self.get_stuff(name=name).as_text_and_image
+
     def get_stuff_as_number(self, name: str) -> NumberContent:
         """Get stuff content as NumberContent if applicable."""
         return self.get_stuff(name=name).as_number
@@ -294,6 +299,11 @@ class WorkingMemory(BaseModel):
     def main_stuff_as_image(self) -> ImageContent:
         """Get main stuff content as ImageContent if applicable."""
         return self.get_stuff_as_image(name=MAIN_STUFF_NAME)
+
+    @property
+    def main_stuff_as_text_and_image(self) -> TextAndImageContent:
+        """Get main stuff content as TextAndImageContent if applicable."""
+        return self.get_stuff_as_text_and_image(name=MAIN_STUFF_NAME)
 
     @property
     def main_stuff_as_number(self) -> NumberContent:

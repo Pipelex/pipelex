@@ -18,6 +18,7 @@ from pipelex.core.stuff_content import (
     NumberContent,
     StuffContent,
     StuffContentType,
+    TextAndImageContent,
     TextContent,
 )
 from pipelex.exceptions import StuffError
@@ -147,6 +148,11 @@ class Stuff(BaseModel):
     def as_image(self) -> ImageContent:
         """Get content as ImageContent if applicable."""
         return self.content_as(ImageContent)
+
+    @property
+    def as_text_and_image(self) -> TextAndImageContent:
+        """Get content as TextAndImageContent if applicable."""
+        return self.content_as(TextAndImageContent)
 
     @property
     def as_number(self) -> NumberContent:

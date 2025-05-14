@@ -39,5 +39,5 @@ class TestPipeOCR:
         pipe_ocr_output: PipeOCROutput = await pipe_router.run_pipe_job(
             pipe_job=pipe_job,
         )
-        ocr_text = pipe_ocr_output.main_stuff_as_text
+        ocr_text = pipe_ocr_output.main_stuff_as_text_and_image
         pretty_print(ocr_text, title="ocr_text")
