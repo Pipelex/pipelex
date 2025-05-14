@@ -14,8 +14,10 @@ from pipelex.core.stuff_content import (
     ListContent,
     LLMPromptContent,
     NumberContent,
+    PDFContent,
     StructuredContent,
     StuffContent,
+    TextAndImageContent,
     TextContent,
 )
 from pipelex.pipe_controllers.pipe_batch import PipeBatch
@@ -80,6 +82,8 @@ class PipelexRegistryModels(RegistryModels):
         HtmlContent,
         ListContent,
         StructuredContent,
+        PDFContent,
+        TextAndImageContent,
     ]
 
     EXPERIMENTAL: ClassVar[List[ModelType]] = [

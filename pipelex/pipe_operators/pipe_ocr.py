@@ -4,7 +4,8 @@
 
 from typing import Optional
 
-from typing_extensions import override
+from pydantic import model_validator
+from typing_extensions import Self, override
 
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
 from pipelex.cogt.ocr.ocr_engine_factory import OCREngineFactory
@@ -22,9 +23,20 @@ class PipeOCROutput(PipeOutput):
     pass
 
 
+class PipeOCRInputError(ValueError):
+    pass
+
+
 class PipeOCR(PipeAbstract):
-    image_stuff_name: str
+    image_stuff_name: Optional[str] = None
+    document_stuff_name: Optional[str] = None
     ocr_engine_name: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_at_least_one_stuff_name(self) -> Self:
+        if self.image_stuff_name is None and self.document_stuff_name is None:
+            raise PipeOCRInputError("At least one of 'image_stuff_name' or 'document_stuff_name' must be provided")
+        return self
 
     @override
     @update_job_metadata_for_pipe
@@ -36,28 +48,43 @@ class PipeOCR(PipeAbstract):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOCROutput:
-        if not self.output_concept_code:
-            raise ValueError("PipeOCR should have a non-None output_concept_code")
-        image_stuff = working_memory.get_stuff(name=self.image_stuff_name)
-        image_url = image_stuff.as_image.url
+        # TODO:
 
-        image_path, url = clarify_path_or_url(path_or_url=image_url)  # pyright: ignore
-        if not image_stuff.is_image:
-            raise ValueError(f"Image stuff '{self.image_stuff_name}' is not an image")
         ocr_engine: OCREngineAbstract = OCREngineFactory.make_ocr_engine()
 
-        ocr_output = await ocr_engine.extract_text_from_image(
-            image_path=image_path,
-            image_url=url,
-        )
+        if not self.output_concept_code:
+            raise PipeOCRInputError("PipeOCR should have a non-None output_concept_code")
 
-        ocr_output_text = ocr_output.text
+        if self.image_stuff_name:
+            image_stuff = working_memory.get_stuff(name=self.image_stuff_name)
+            image_url = image_stuff.as_image.url
+            image_path, url = clarify_path_or_url(path_or_url=image_url)  # pyright: ignore
+            if not image_stuff.is_image:
+                raise PipeOCRInputError(f"Image stuff '{self.image_stuff_name}' is not an image")
+            ocr_output = await ocr_engine.extract_text_from_image(
+                image_path=image_path,
+                image_url=url,
+            )
+
+        elif self.document_stuff_name:
+            document_stuff = working_memory.get_stuff(name=self.document_stuff_name)
+            document_url = document_stuff.as_pdf.url
+            document_path, url = clarify_path_or_url(path_or_url=document_url)  # pyright: ignore
+            if not document_stuff.is_pdf:
+                raise PipeOCRInputError(f"Document stuff '{self.document_stuff_name}' is not a PDF")
+            ocr_output = await ocr_engine.extract_text_from_pdf(
+                pdf_path=document_path,
+                pdf_url=url,
+            )
+
+        else:
+            raise PipeOCRInputError("PipeOCR should have a non-None image_stuff_name or document_stuff_name")
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
             concept_code=self.output_concept_code,
             content=TextAndImageContent(
-                text=TextContent(text=ocr_output_text),
+                text=TextContent(text=ocr_output.text),
                 image=[],
             ),
         )

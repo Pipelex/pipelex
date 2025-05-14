@@ -210,6 +210,37 @@ class ImageContent(StuffContentInitableFromStr):
         return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
 
 
+class PDFContent(StuffContentInitableFromStr):
+    url: str
+
+    @property
+    @override
+    def short_desc(self) -> str:
+        url_desc = interpret_path_or_url(path_or_url=self.url).desc
+        return f"{url_desc} of a PDF document"
+
+    @classmethod
+    @override
+    def make_from_str(cls, str_value: str) -> "PDFContent":
+        return PDFContent(url=str_value)
+
+    @override
+    def rendered_plain(self) -> str:
+        return self.url
+
+    @override
+    def rendered_html(self) -> str:
+        doc = Doc()
+        doc.stag("a", href=self.url, klass="msg-pdf")
+        doc.text(self.url)
+
+        return doc.getvalue()
+
+    @override
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+        return f"[{self.url}]({self.url})"
+
+
 class HtmlContent(StuffContent):
     inner_html: str
     css_class: str

@@ -30,7 +30,7 @@ class MistralOCREngine(OCREngineAbstract):
         self.model = get_config().cogt.ocr_config.mistral_ocr_config.ocr_model_name
 
     @override
-    async def process_document_url(
+    async def process_pdf_url(
         self,
         url: str,
         caption_image: bool = False,
@@ -131,7 +131,7 @@ class MistralOCREngine(OCREngineAbstract):
             OCR response containing extracted text and metadata
         """
         # Upload the file
-        uploaded_file_id = await self.upload_local_document(file_path)
+        uploaded_file_id = await self.upload_local_pdf(file_path)
 
         # Get signed URL
         signed_url = await self.client.files.get_signed_url_async(
@@ -156,13 +156,13 @@ class MistralOCREngine(OCREngineAbstract):
     async def caption_image(
         self,
         image_uri: str,
-    ) -> None:
+    ) -> str:
         """
         Not implemented yet.
         """
-        pass
+        return ""
 
-    async def upload_local_document(
+    async def upload_local_pdf(
         self,
         file_path: str,
     ) -> str:

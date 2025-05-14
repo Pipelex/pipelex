@@ -21,7 +21,7 @@ class TestMistralOCRAsync:
     @pytest.mark.inference
     async def test_process_document_url_async(self):
         ocr = MistralOCREngine()
-        result = await ocr.process_document_url(OCRTestCases.DOCUMENT_URL)
+        result = await ocr.process_pdf_url(OCRTestCases.DOCUMENT_URL)
         assert result.text
 
     @pytest.mark.asyncio

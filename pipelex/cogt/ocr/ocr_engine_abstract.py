@@ -40,8 +40,23 @@ class OCREngineAbstract(ABC):
         else:
             raise ValueError("Either image_path or image_url must be provided")
 
+    async def extract_text_from_pdf(
+        self,
+        pdf_path: Optional[str] = None,
+        pdf_url: Optional[str] = None,
+    ) -> OCROutput:
+        """
+        Extract text from a document asynchronously.
+        """
+        if pdf_url:
+            return await self.process_pdf_url(url=pdf_url)
+        elif pdf_path:
+            return await self.process_document_file(file_path=pdf_path)
+        else:
+            raise ValueError("Either pdf_path or pdf_url must be provided")
+
     @abstractmethod
-    async def process_document_url(self, url: str, caption_image: bool = False) -> OCROutput:
+    async def process_pdf_url(self, url: str, caption_image: bool = False) -> OCROutput:
         """
         Process a document from a URL asynchronously.
 
@@ -96,7 +111,7 @@ class OCREngineAbstract(ABC):
     async def caption_image(
         self,
         image_uri: str,
-    ) -> None:
+    ) -> str:
         """
         Caption an image asynchronously.
         """
