@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="https://www.pipelex.com/"><img src=".github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
+  <a href="https://www.pipelex.com/"><img src="https://github-production-user-asset-6210df.s3.amazonaws.com/160234518/443583972-27df5e04-5a14-4690-a8ee-213cf82ea040.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA/20250514/us-east-1/s3/aws4_request&X-Amz-Date=20250514T091456Z&X-Amz-Expires=300&X-Amz-Signature=3ea3915d99c58588144e3e2648745876cf963d9af992bd10df3ac20b6c89f3f5&X-Amz-SignedHeaders=host" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
 
   <h3 align="center">The simpler way to build reliable LLM Pipelines</h3>
   <p align="center">Pipelex is an open‑source dev tool based on a simple declarative language<br/>that lets you define replicable, structured, composable LLM pipelines.</p>
