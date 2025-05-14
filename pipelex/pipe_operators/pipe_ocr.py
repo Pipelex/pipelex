@@ -61,7 +61,7 @@ class PipeOCR(PipeAbstract):
             image_path, url = clarify_path_or_url(path_or_url=image_url)  # pyright: ignore
             if not image_stuff.is_image:
                 raise PipeOCRInputError(f"Image stuff '{self.image_stuff_name}' is not an image")
-            ocr_output = await ocr_engine.extract_text_from_image(
+            ocr_output = await ocr_engine.extraction_from_image(
                 image_path=image_path,
                 image_url=url,
             )
@@ -72,7 +72,7 @@ class PipeOCR(PipeAbstract):
             document_path, url = clarify_path_or_url(path_or_url=document_url)  # pyright: ignore
             if not document_stuff.is_pdf:
                 raise PipeOCRInputError(f"Document stuff '{self.document_stuff_name}' is not a PDF")
-            ocr_output = await ocr_engine.extract_text_from_pdf(
+            ocr_output = await ocr_engine.extraction_from_pdf(
                 pdf_path=document_path,
                 pdf_url=url,
             )

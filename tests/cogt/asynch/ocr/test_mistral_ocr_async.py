@@ -14,26 +14,26 @@ class TestMistralOCRAsync:
     @pytest.mark.inference
     async def test_process_document_file_async(self):
         ocr = MistralOCREngine()
-        result = await ocr.process_document_file(OCRTestCases.DOCUMENT_FILE_PATH)
+        result = await ocr.extract_from_pdf_file(OCRTestCases.DOCUMENT_FILE_PATH)
         assert result.text
 
     @pytest.mark.asyncio
     @pytest.mark.inference
     async def test_process_document_url_async(self):
         ocr = MistralOCREngine()
-        result = await ocr.process_pdf_url(OCRTestCases.DOCUMENT_URL)
+        result = await ocr.extract_from_pdf_url(OCRTestCases.DOCUMENT_URL)
         assert result.text
 
     @pytest.mark.asyncio
     @pytest.mark.inference
     async def test_process_image_file_async(self):
         ocr = MistralOCREngine()
-        result = await ocr.process_image_file(OCRTestCases.IMAGE_FILE_PATH)
+        result = await ocr.extract_from_image_file(OCRTestCases.IMAGE_FILE_PATH)
         assert result.text
 
     @pytest.mark.asyncio
     @pytest.mark.inference
     async def test_process_image_url_async(self):
         ocr = MistralOCREngine()
-        result = await ocr.process_image_url(OCRTestCases.IMAGE_URL)
+        result = await ocr.extract_from_image_url(OCRTestCases.IMAGE_URL)
         assert result.text
