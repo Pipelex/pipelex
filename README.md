@@ -13,7 +13,6 @@
 
   <p align="center">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-ELv2-blue?style=flat-square" alt="ELv2 License"></a>
-    <a href="https://github.com/Pipelex/pipelex/releases"><img src="https://img.shields.io/badge/release-v0.1.10-orange?style=flat-square" alt="Release v0.1.10"></a>
     <img src="https://img.shields.io/pypi/v/pipelex?logo=pypi&logoColor=white&color=blue&style=flat-square"
      alt="PyPI – latest release">
     <img src="https://img.shields.io/badge/npm-coming_soon-red?logo=npm&logoColor=white&style=flat-square" alt="npm (coming soon)">
@@ -27,8 +26,8 @@
     <br/>
 
   <h3 align="center">🎥 Watch Pipelex in Action</h3>
-  <a href="https://vimeo.com/1075832879" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
-    <img src="https://vumbnail.com/1075832879.jpg" alt="Watch the video" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
+  <a href="https://vimeo.com/1084081415" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
+    <img src="https://vumbnail.com/1084081415.jpg" alt="Watch the video" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
   </a>
 </div>
 
