@@ -1,5 +1,5 @@
 <div align="center">
-  <img src=".github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;">
+  <a href="https://www.pipelex.com/"><img src=".github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
 
   <h3 align="center">The simpler way to build reliable LLM Pipelines</h3>
   <p align="center">Pipelex is an open‑source dev tool based on a simple declarative language<br/>that lets you define replicable, structured, composable LLM pipelines.</p>
@@ -13,7 +13,6 @@
 
   <p align="center">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-ELv2-blue?style=flat-square" alt="ELv2 License"></a>
-    <a href="https://github.com/Pipelex/pipelex/releases"><img src="https://img.shields.io/badge/release-v0.1.15-orange?style=flat-square" alt="Release v0.1.15"></a>
     <img src="https://img.shields.io/pypi/v/pipelex?logo=pypi&logoColor=white&color=blue&style=flat-square"
      alt="PyPI – latest release">
     <img src="https://img.shields.io/badge/npm-coming_soon-red?logo=npm&logoColor=white&style=flat-square" alt="npm (coming soon)">
@@ -25,17 +24,14 @@
     <a href="https://www.linkedin.com/company/evotis"><img src="https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white" alt="LinkedIn"></a>
     <a href="https://pipelex.com"><img src="https://img.shields.io/badge/Website-pipelex.com-0A66C2?logo=google-chrome&logoColor=white&style=flat" alt="Website"></a>
     <br/>
-    <!-- <a href="https://github.com/Pipelex/pipelex/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed/Pipelex/pipelex?logo=github&color=purple" alt="Issues Closed"></a>
-    <a href="https://github.com/Pipelex/pipelex/discussions"><img src="https://img.shields.io/github/discussions/Pipelex/pipelex?logo=github&color=blue" alt="Discussions"></a>
-  </p> -->
 
   <h3 align="center">🎥 Watch Pipelex in Action</h3>
-  <a href="https://vimeo.com/1075832879" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
-    <img src="https://vumbnail.com/1075832879.jpg" alt="Watch the video" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
+  <a href="https://vimeo.com/1084081415" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
+    <img src="https://vumbnail.com/1084081415.jpg" alt="Watch the video" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
   </a>
 </div>
 
-## 📑 Table of Contents
+# 📑 Table of Contents
 
 - [Introduction](#-introduction)
 - [Getting Started](#-getting-started)
@@ -46,7 +42,7 @@
 - [Support](#-support)
 - [License](#-license)
 
-## 🚀 Introduction
+# 🚀 Introduction
 
 Pipelex™ is a developer tool designed to simplify building reliable AI applications. At its core is a clear, declarative pipeline language specifically crafted for knowledge-processing tasks.
 
@@ -56,9 +52,13 @@ Pipelex employs user-friendly TOML syntax, enabling developers to intuitively de
 
 Pipes function like modular building blocks, **assembled by connecting other pipes sequentially, in parallel, or by calling sub-pipes.** This assembly resembles function calls in traditional programming but emphasizes a more intuitive, plug-and-play structure, focused explicitly on clear knowledge input and output.
 
-Pipelex will be distributed as an **open-source Python library,** with a hosted API launching soon, enabling effortless integration into existing software systems and automation frameworks. Additionally, Pipelex will provide an MCP server that will enable AI Agents to run pipelines like any other tool.
+Pipelex is distributed as an **open-source Python library,** with a hosted API launching soon, enabling effortless integration into existing software systems and automation frameworks. Additionally, Pipelex will provide an MCP server that will enable AI Agents to run pipelines like any other tool.
 
-## 🚀 Getting Started
+# 🚀 Quick start
+
+> :books: Check out the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) for a quick-start guide and advanced samples and the [Pipelex Documentation](doc/Documentation.md) for more information.
+
+## Installation
 
 > :books: Check out the cookbook for an easier Getting Started [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) and the documentation [Pipelex Documentation](doc/Documentation.md) for more information.
 
@@ -67,27 +67,22 @@ Pipelex will be distributed as an **open-source Python library,** with a hosted 
 - Python >=3.11,<3.12
 - [pip](https://pip.pypa.io/en/stable/), [poetry](https://python-poetry.org/), or [uv](https://github.com/astral-sh/uv) package manager
 
-### Installation
-
-Choose your preferred installation method:
-
-#### Using pip
+### Install the package
 
 ```bash
+# Using pip
 pip install pipelex
-```
 
-#### Using Poetry
-
-```bash
+# Using Poetry
 poetry add pipelex
-```
 
-#### Using uv (Recommended)
-
-```bash
+# Using uv (Recommended)
 uv pip install pipelex
 ```
+
+## Recommended extension
+
+We **highly** recommend installing the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) VS Code extension for enhanced TOML editing features.
 
 ### Optional Features
 
