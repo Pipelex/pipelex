@@ -12,7 +12,7 @@ from pipelex.core.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 
 
 class PipeRunParamKey(StrEnum):
-    OUTPUT_CONCEPT = "_output_concept"
+    DYNAMIC_OUTPUT_CONCEPT = "_dynamic_output_concept"
     NB_OUTPUT = "_nb_output"
 
 
