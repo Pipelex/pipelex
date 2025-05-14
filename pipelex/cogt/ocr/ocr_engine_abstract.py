@@ -3,13 +3,20 @@
 # "Pipelex" is a trademark of Evotis S.A.S.
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
 
+class Image(BaseModel):
+    uri: str
+    base_64: Optional[str] = None
+    caption: Optional[str] = None
+
+
 class OCROutput(BaseModel):
     text: str
+    images: List[Image]
 
 
 class OCREngineAbstract(ABC):
@@ -34,7 +41,7 @@ class OCREngineAbstract(ABC):
             raise ValueError("Either image_path or image_url must be provided")
 
     @abstractmethod
-    async def process_document_url(self, url: str) -> OCROutput:
+    async def process_document_url(self, url: str, caption_image: bool = False) -> OCROutput:
         """
         Process a document from a URL asynchronously.
 
@@ -47,7 +54,7 @@ class OCREngineAbstract(ABC):
         pass
 
     @abstractmethod
-    async def process_image_url(self, url: str) -> OCROutput:
+    async def process_image_url(self, url: str, caption_image: bool = False) -> OCROutput:
         """
         Process an image from a URL asynchronously.
 
@@ -60,7 +67,7 @@ class OCREngineAbstract(ABC):
         pass
 
     @abstractmethod
-    async def process_image_file(self, image_path: str) -> OCROutput:
+    async def process_image_file(self, image_path: str, caption_image: bool = False) -> OCROutput:
         """
         Process an image from a local file asynchronously.
 
@@ -73,7 +80,7 @@ class OCREngineAbstract(ABC):
         pass
 
     @abstractmethod
-    async def process_document_file(self, file_path: str) -> OCROutput:
+    async def process_document_file(self, file_path: str, caption_image: bool = False) -> OCROutput:
         """
         Process a document from a local file asynchronously.
 
@@ -82,5 +89,15 @@ class OCREngineAbstract(ABC):
 
         Returns:
             OCR response containing extracted text and metadata
+        """
+        pass
+
+    @abstractmethod
+    async def caption_image(
+        self,
+        image_uri: str,
+    ) -> None:
+        """
+        Caption an image asynchronously.
         """
         pass
