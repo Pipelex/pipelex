@@ -335,3 +335,9 @@ class LibraryTestCases:
         # ("animals.AnimalDescription", "generate_animal_description"),
         # ("gpu.GPUDescription", "generate_gpu_description"),
     ]
+
+
+class PipeOCRTestCases:
+    PIPE_OCR_TEST_CASES: ClassVar[List[str]] = [  # image_file_path
+        "tests/cogt/data/documents/solar_system.png",
+    ]

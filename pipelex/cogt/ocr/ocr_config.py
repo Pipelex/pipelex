@@ -10,4 +10,5 @@ class MistralOCRConfig(BaseModel):
 
 
 class OCRConfig(BaseModel):
+    default_ocr_engine_name: str
     mistral_ocr_config: MistralOCRConfig
