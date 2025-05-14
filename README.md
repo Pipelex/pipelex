@@ -56,7 +56,7 @@ Pipelex employs user-friendly TOML syntax, enabling developers to intuitively de
 
 Pipes function like modular building blocks, **assembled by connecting other pipes sequentially, in parallel, or by calling sub-pipes.** This assembly resembles function calls in traditional programming but emphasizes a more intuitive, plug-and-play structure, focused explicitly on clear knowledge input and output.
 
-Pipelex will be distributed as an **open-source Python library,** with a hosted API launching soon, enabling effortless integration into existing software systems and automation frameworks. Additionally, Pipelex will provide an MCP server that will enable AI Agents to run pipelines like any other tool.
+Pipelex is distributed as an **open-source Python library,** with a hosted API launching soon, enabling effortless integration into existing software systems and automation frameworks. Additionally, Pipelex will provide an MCP server that will enable AI Agents to run pipelines like any other tool.
 
 ## 🚀 Getting Started
 
