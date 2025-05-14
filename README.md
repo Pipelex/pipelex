@@ -35,7 +35,7 @@
   </a>
 </div>
 
-## 📑 Table of Contents
+# 📑 Table of Contents
 
 - [Introduction](#-introduction)
 - [Getting Started](#-getting-started)
@@ -46,7 +46,7 @@
 - [Support](#-support)
 - [License](#-license)
 
-## 🚀 Introduction
+# 🚀 Introduction
 
 Pipelex™ is a developer tool designed to simplify building reliable AI applications. At its core is a clear, declarative pipeline language specifically crafted for knowledge-processing tasks.
 
@@ -58,34 +58,33 @@ Pipes function like modular building blocks, **assembled by connecting other pip
 
 Pipelex is distributed as an **open-source Python library,** with a hosted API launching soon, enabling effortless integration into existing software systems and automation frameworks. Additionally, Pipelex will provide an MCP server that will enable AI Agents to run pipelines like any other tool.
 
-## 🚀 Getting Started
+# 🚀 Quick start
+
+> :books: Check out the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) for a quick-start guide and advanced samples and the [Pipelex Documentation](doc/Documentation.md) for more information.
+
+## Installation
 
 ### Prerequisites
 
 - Python >=3.11,<3.12
 - [pip](https://pip.pypa.io/en/stable/), [poetry](https://python-poetry.org/), or [uv](https://github.com/astral-sh/uv) package manager
 
-### Installation
-
-Choose your preferred installation method:
-
-#### Using pip
+### Install the package
 
 ```bash
+# Using pip
 pip install pipelex
-```
 
-#### Using Poetry
-
-```bash
+# Using Poetry
 poetry add pipelex
-```
 
-#### Using uv (Recommended)
-
-```bash
+# Using uv (Recommended)
 uv pip install pipelex
 ```
+
+## Recommended extension
+
+We **highly** recommend installing the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) VS Code extension for enhanced TOML editing features.
 
 ### Optional Features
 
