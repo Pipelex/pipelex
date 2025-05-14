@@ -138,7 +138,7 @@ class PipeLLM(PipeAbstract):
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {pipe_code}")
         if self.output_concept_code == ConceptFactory.make_concept_code(SpecialDomain.NATIVE, NativeConceptCode.DYNAMIC):
-            output_concept_code = pipe_run_params.params[PipeRunParamKey.OUTPUT_CONCEPT]
+            output_concept_code = pipe_run_params.params[PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT]
             if not output_concept_code:
                 raise RuntimeError(f"No output concept code provided for dynamic output pipe '{pipe_code}'")
         else:
