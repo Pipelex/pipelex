@@ -19,7 +19,7 @@ from tests.pipelex.test_data import PipeOCRTestCases
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeOCR:
     @pytest.mark.parametrize("image_url,pdf_url", PipeOCRTestCases.PIPE_OCR_TEST_CASES)
-    async def test_pipe_ocr_local_image(
+    async def test_pipe_ocr(
         self,
         pipe_router: PipeRouterProtocol,
         image_url: str,
