@@ -18,11 +18,6 @@
     <br/>
     <br/>
     <a href="https://www.youtube.com/@PipelexAI"><img src="https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white" alt="YouTube"></a>
-    <!--
-    <a href="https://discord.gg/8UdjGyFh"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white&style=flat" alt="Discord"></a>
-    <a href="https://twitter.com/pipelexai"><img src="https://img.shields.io/twitter/follow/pipelexai?logo=X&color=%20%23f5f5f5" alt="Follow on X"></a>
-    <a href="https://www.linkedin.com/company/evotis"><img src="https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white" alt="LinkedIn"></a>
-    -->
     <a href="https://pipelex.com"><img src="https://img.shields.io/badge/Website-pipelex.com-0A66C2?logo=google-chrome&logoColor=white&style=flat" alt="Website"></a>
     <br/> 
     <br/>
