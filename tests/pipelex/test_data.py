@@ -338,9 +338,15 @@ class LibraryTestCases:
 
 
 class PipeOCRTestCases:
-    PIPE_OCR_TEST_CASES: ClassVar[List[Tuple[Optional[str], Optional[str]]]] = [  # image_file_path, pdf_url
-        ("tests/cogt/data/documents/solar_system.png", None),
-        (None, "tests/cogt/data/documents/solar_system.pdf"),
-        ("https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.png", None),
-        (None, "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.pdf"),
+    PIPE_OCR_IMAGE_TEST_CASES: ClassVar[List[str]] = [
+        # LOCAL
+        "tests/cogt/data/documents/solar_system.png",
+        # REMOTE
+        "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.png",
+    ]
+    PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = [
+        # LOCAL
+        "tests/cogt/data/documents/solar_system.pdf",
+        # REMOTE
+        "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.pdf",
     ]

@@ -24,7 +24,7 @@ class NativeConceptCode(StrEnum):
     DYNAMIC = "Dynamic"
     TEXT = "Text"
     IMAGE = "Image"
-    PDF = "Pdf"
+    PDF = "PDF"
     TEXT_AND_IMAGE = "TextAndImage"
     NUMBER = "Number"
     LLM_PROMPT = "LlmPrompt"

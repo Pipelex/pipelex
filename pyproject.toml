@@ -213,6 +213,7 @@ markers = [
     "llm: slow and costly due to llm inference calls",
     "imgg: slow and costly due to imgg inference calls",
     "gha_disabled: tests that should not run in GitHub Actions",
+    "ocr: slow and costly due to ocr inference calls",
 ]
 minversion = "8.0"
 
