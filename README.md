@@ -15,34 +15,31 @@
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-ELv2-blue?style=flat-square" alt="ELv2 License"></a>
     <img src="https://img.shields.io/pypi/v/pipelex?logo=pypi&logoColor=white&color=blue&style=flat-square"
      alt="PyPI – latest release">
-    <img src="https://img.shields.io/badge/npm-coming_soon-red?logo=npm&logoColor=white&style=flat-square" alt="npm (coming soon)">
     <br/>
     <br/>
-    <a href="https://discord.gg/8UdjGyFh"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white&style=flat" alt="Discord"></a>
     <a href="https://www.youtube.com/@PipelexAI"><img src="https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white" alt="YouTube"></a>
+    <!--
+    <a href="https://discord.gg/8UdjGyFh"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white&style=flat" alt="Discord"></a>
     <a href="https://twitter.com/pipelexai"><img src="https://img.shields.io/twitter/follow/pipelexai?logo=X&color=%20%23f5f5f5" alt="Follow on X"></a>
     <a href="https://www.linkedin.com/company/evotis"><img src="https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white" alt="LinkedIn"></a>
+    -->
     <a href="https://pipelex.com"><img src="https://img.shields.io/badge/Website-pipelex.com-0A66C2?logo=google-chrome&logoColor=white&style=flat" alt="Website"></a>
+    <br/> 
     <br/>
-
-  <h3 align="center">🎥 Watch Pipelex in Action</h3>
-  <a href="https://vimeo.com/1084081415" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
-    <img src="https://vumbnail.com/1084081415.jpg" alt="Watch the video" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
-  </a>
 </div>
 
 # 📑 Table of Contents
 
-- [Introduction](#-introduction)
-- [Getting Started](#-getting-started)
+- [Introduction](#introduction)
+- [Quick start](#🚀-quick-start)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Optional Features](#optional-features)
+  - [Optional features](#optional-features)
 - [Contributing](#-contributing)
 - [Support](#-support)
 - [License](#-license)
 
-# 🚀 Introduction
+# Introduction
 
 Pipelex™ is a developer tool designed to simplify building reliable AI applications. At its core is a clear, declarative pipeline language specifically crafted for knowledge-processing tasks.
 
@@ -55,8 +52,9 @@ Pipes function like modular building blocks, **assembled by connecting other pip
 Pipelex is distributed as an **open-source Python library,** with a hosted API launching soon, enabling effortless integration into existing software systems and automation frameworks. Additionally, Pipelex will provide an MCP server that will enable AI Agents to run pipelines like any other tool.
 
 # 🚀 Quick start
+# Quick start
 
-> :books: Check out the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) for a quick-start guide and advanced samples and the [Pipelex Documentation](doc/Documentation.md) for more information.
+> :books: Check out the [Pipelex Documentation](doc/Documentation.md) for more information and clone the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) repository for ready-to-run samples.
 
 ## Installation
 
