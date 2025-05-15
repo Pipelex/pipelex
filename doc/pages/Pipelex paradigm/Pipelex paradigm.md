@@ -53,7 +53,7 @@ Pipes embed **validation** of their outputs, so **we make sure of the knowledge 
 ![Schema explaining structured output validation](output_validation.png)
 
 
-:bulb: **Remember the Quick-start chapter?** We defined a `Character` concept and a `CharacterExtractedMetadata` concept (in toml, using the [concept] section and with Python BaseModels) to define the input and output of the pipe!
+:bulb: **Remember the Quick-start chapter?** We defined a `Character` concept and a `CharacterMetadata` concept (in toml, using the [concept] section and with Python BaseModels) to define the input and output of the pipe!
 
 :bulb: Soon we will also add input validation for pipes.
 
