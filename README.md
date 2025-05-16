@@ -47,9 +47,10 @@ Pipes function like modular building blocks, **assembled by connecting other pip
 Pipelex is distributed as an **open-source Python library,** with a hosted API launching soon, enabling effortless integration into existing software systems and automation frameworks. Additionally, Pipelex will provide an MCP server that will enable AI Agents to run pipelines like any other tool.
 
 # 🚀 Quick start
-# Quick start
 
-> :books: Check out the [Pipelex Documentation](doc/Documentation.md) for more information and clone the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) repository for ready-to-run samples.
+> :books: Note that you can check out the [Pipelex Documentation](doc/Documentation.md) for more information and clone the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) repository for ready-to-run samples.
+
+Follow these steps to get started:
 
 ## Installation
 
@@ -71,9 +72,9 @@ poetry add pipelex
 uv pip install pipelex
 ```
 
-## Recommended extension
+## IDE extension
 
-We **highly** recommend installing the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) VS Code extension for enhanced TOML editing features.
+We **highly** recommend installing an extension for TOML files into your IDE of choice. For VS Code, the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) extension does a great job of syntax coloring and checking.
 
 ### Optional Features
 
@@ -85,7 +86,7 @@ pip install "pipelex[anthropic]"    # For Anthropic/Claude support
 pip install "pipelex[google]"       # For Google API support
 pip install "pipelex[mistralai]"    # For Mistral AI support
 pip install "pipelex[bedrock]"      # For AWS Bedrock support
-pip install "pipelex[fal]"          # For image generation with FAL
+pip install "pipelex[fal]"          # For image generation with Black Forest Labs "FAL" service
 
 # Using poetry
 poetry add "pipelex[anthropic,google,mistralai,bedrock,fal]"  # Install all features
