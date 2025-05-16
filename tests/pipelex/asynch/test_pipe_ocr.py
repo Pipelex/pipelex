@@ -8,6 +8,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.libraries.pipelines.ocr import PageContent
 from pipelex.pipe_operators.pipe_ocr import PipeOCR, PipeOCRInputError, PipeOCROutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
@@ -38,7 +39,7 @@ class TestPipeOCR:
         pipe_ocr_output: PipeOCROutput = await pipe_router.run_pipe_job(
             pipe_job=pipe_job,
         )
-        ocr_text = pipe_ocr_output.main_stuff_as_text_and_image
+        ocr_text = pipe_ocr_output.main_stuff_as_list(item_type=PageContent)
         pretty_print(ocr_text, title="ocr_text")
 
     @pytest.mark.parametrize("pdf_url", PipeOCRTestCases.PIPE_OCR_PDF_TEST_CASES)
@@ -62,5 +63,5 @@ class TestPipeOCR:
         pipe_ocr_output: PipeOCROutput = await pipe_router.run_pipe_job(
             pipe_job=pipe_job,
         )
-        ocr_text = pipe_ocr_output.main_stuff_as_text_and_image
+        ocr_text = pipe_ocr_output.main_stuff_as_list(item_type=PageContent)
         pretty_print(ocr_text, title="ocr_text")

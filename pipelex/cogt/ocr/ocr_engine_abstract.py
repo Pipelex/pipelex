@@ -3,7 +3,7 @@
 # "Pipelex" is a trademark of Evotis S.A.S.
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -18,9 +18,14 @@ class OCRExtractedImage(BaseModel):
     caption: Optional[str] = None
 
 
+class Page(BaseModel):
+    text: str = ""
+    images: List[OCRExtractedImage] = []
+    screenshot: Optional[OCRExtractedImage] = None
+
+
 class OCROutput(BaseModel):
-    text: str
-    images: List[OCRExtractedImage]
+    pages: Dict[int, Page]
 
 
 class OCREngineAbstract(ABC):

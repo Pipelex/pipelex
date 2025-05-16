@@ -4,14 +4,14 @@
 
 import asyncio
 import os
-from typing import List
+from typing import Dict, List
 
 import aiofiles
 from mistralai import OCRImageObject, OCRResponse
 from typing_extensions import override
 
 from pipelex.cogt.mistral.mistral_factory import MistralFactory
-from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract, OCRExtractedImage, OCROutput
+from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract, OCRExtractedImage, OCROutput, Page
 from pipelex.cogt.ocr.ocr_utils import merge_markdown_pages
 from pipelex.config import get_config
 from pipelex.tools.utils.image_utils import (
@@ -240,15 +240,19 @@ class MistralOCREngine(OCREngineAbstract):
         Returns:
             OCROutput object containing extracted text and images
         """
-        full_markdown = merge_markdown_pages(
-            [page.markdown for page in ocr_response.pages],
-            separator="\n\n",
-        )
-        ocr_extracted_images = await self.ocr_extracted_images_from_ocr_response(
-            ocr_response=ocr_response,
-            caption_image=caption_image,
-        )
+        pages: Dict[int, Page] = {}
+        for ocr_response_page in ocr_response.pages:
+            pages[ocr_response_page.index] = Page(
+                text=ocr_response_page.markdown,
+                images=[],
+            )
+            for ocr_response_image in ocr_response_page.images:
+                image = await self.ocr_extracted_image_from_mistral_ocr_image_object(
+                    ocr_image_data=ocr_response_image,
+                    caption_image=caption_image,
+                )
+                pages[ocr_response_page.index].images.append(image)
+
         return OCROutput(
-            text=full_markdown,
-            images=ocr_extracted_images,
+            pages=pages,
         )

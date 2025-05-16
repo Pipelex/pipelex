@@ -13,7 +13,7 @@ from pipelex.pipe_operators.pipe_ocr import PipeOCR
 class PipeOCRBlueprint(PipeBlueprint):
     definition: Optional[str] = None
     image_stuff_name: str
-    ocr_engine_name: str
+    ocr_engine_name: Optional[str] = None
     output: str
 
 

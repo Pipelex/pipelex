@@ -309,13 +309,13 @@ class MermaidContent(StuffContent):
 
 class TextAndImageContent(StuffContent):
     text: Optional[TextContent]
-    image: Optional[List[ImageContent]]
+    images: Optional[List[ImageContent]]
 
     @property
     @override
     def short_desc(self) -> str:
         text_count = 1 if self.text else 0
-        image_count = len(self.image) if self.image else 0
+        image_count = len(self.images) if self.images else 0
         return f"text and image content ({text_count} text, {image_count} images)"
 
     @override

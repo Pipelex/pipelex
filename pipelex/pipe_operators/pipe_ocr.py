@@ -12,10 +12,11 @@ from pipelex.cogt.ocr.ocr_engine_factory import OCREngineFactory
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.stuff_content import TextAndImageContent, TextContent
+from pipelex.core.stuff_content import ImageContent, ListContent, TextAndImageContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.job_metadata import JobMetadata
+from pipelex.libraries.pipelines.ocr import PageContent
 from pipelex.tools.utils.path_utils import clarify_path_or_url
 
 
@@ -80,13 +81,21 @@ class PipeOCR(PipeAbstract):
         else:
             raise PipeOCRInputError("PipeOCR should have a non-None image_stuff_name or document_stuff_name")
 
+        content: ListContent[PageContent] = ListContent(items=[])
+        for _, page in ocr_output.pages.items():
+            page_screenshot = await self.get_page_screenshot()
+            content.items.append(
+                PageContent(
+                    text=TextContent(text=page.text),
+                    images=[ImageContent(url=image.uri) for image in page.images],
+                    screenshot=page_screenshot,
+                )
+            )
+
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
             concept_code=self.output_concept_code,
-            content=TextAndImageContent(
-                text=TextContent(text=ocr_output.text),
-                image=[],
-            ),
+            content=content,
         )
 
         working_memory.set_new_main_stuff(
@@ -98,3 +107,8 @@ class PipeOCR(PipeAbstract):
             working_memory=working_memory,
         )
         return pipe_output
+
+    async def get_page_screenshot(
+        self,
+    ) -> ImageContent:
+        return ImageContent(url="page_screenhot.png")
