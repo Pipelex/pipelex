@@ -142,9 +142,10 @@ class PipeLLMPrompt(PipeAbstract):
                     # Navigate through the attribute path
                     current_obj = base_stuff.content
                     for attr in attr_path:
-                        if not hasattr(current_obj, attr):
+                        try:
+                            current_obj = getattr(current_obj, attr)
+                        except AttributeError:
                             raise StuffContentError(f"Attribute '{attr}' not found in path '{user_image_name}'")
-                        current_obj = getattr(current_obj, attr)
 
                     prompt_image_stuff_content = current_obj
                 else:
