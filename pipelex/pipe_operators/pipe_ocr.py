@@ -58,8 +58,7 @@ class PipeOCR(PipeAbstract):
 
         if self.image_stuff_name:
             image_stuff = working_memory.get_stuff_as_image(name=self.image_stuff_name)
-            image_url = image_stuff.url
-            image_path, url = clarify_path_or_url(path_or_url=image_url)
+            image_path, url = clarify_path_or_url(path_or_url=image_stuff.url)
             ocr_output = await ocr_engine.extraction_from_image(
                 image_path=image_path,
                 image_url=url,
