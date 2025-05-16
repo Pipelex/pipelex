@@ -50,14 +50,25 @@ class TestPipeLLM:
     @pytest.mark.llm
     @pytest.mark.inference
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_pipe_llm_image(self, pipe_router: PipeRouterProtocol):
-        class ImageWrapper(StructuredContent):
+    @pytest.mark.parametrize(
+        "image_url",
+        [
+            PipeTestCases.URL_IMG_FASHION_PHOTO_1,
+        ],
+    )
+    async def test_pipe_llm_image(
+        self,
+        pipe_router: PipeRouterProtocol,
+        image_url: str,
+    ):
+        class SomeContentWithImageAttribute(StructuredContent):
             image: ImageContent
 
-        image_wrapper = ImageWrapper(image=ImageContent(url="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png"))
+        image_wrapper = SomeContentWithImageAttribute(image=ImageContent(url=image_url))
         image_wrapper_stuff = StuffFactory.make_stuff(
             concept_code="native.Image",
             content=image_wrapper,
+            name="image_wrapper",
         )
         working_memory = WorkingMemoryFactory.make_from_stuff_and_name(stuff=image_wrapper_stuff, name="image_wrapper")
 
