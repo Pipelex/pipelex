@@ -19,7 +19,7 @@ If you are using Pipelex elsewhere than in the Getting Started repository, make 
 # character.toml
 
 # Library definition
-domain = "character"
+domain = "characters"
 definition = "Tools for creating characters"
 
 # Pipe definition
@@ -88,7 +88,9 @@ prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 llm = "llm_for_creative_writing"
 
-# The llm preset above is defined as llm_for_creative_writing = { llm_handle = "best-claude", temperature = 0.9 } in `pipelex_libraries/llm_deck/base_llm_deck.toml`
+# The llm preset above is defined in `pipelex_libraries/llm_deck/base_llm_deck.toml` as:
+# llm_for_creative_writing = { llm_handle = "best-claude", temperature = 0.9 }
+# it's a base preset but you can add your own
 ```
 
 💡We have a lot of [LLM presets available](https://github.com/Pipelex/pipelex/tree/main/pipelex/libraries/llm_deck/base_llm_deck.toml).
@@ -103,12 +105,12 @@ Let's say that we no longer want plain text as output but a rigorous, structured
 Using the [Pydantic Basemodel](https://docs.pydantic.dev/latest/) syntax, define your object structure as a Python class.
 
 ```python
-# pipelex_libraries/character_model.py
+# pipelex_libraries/pipelines/characters.py
 
 from pipelex.core.stuff_content import StructuredContent
 
 # Define the structure of your output here
-# This class should inherit from StructuredContent
+# This class must inherit from StructuredContent
 class Character(StructuredContent):
     name: str
     age: int
@@ -120,23 +122,26 @@ class Character(StructuredContent):
 
 It's time to specify that your output should be a `Character` instance. Use the `output` field for that purpose.
 
-💡 Because the concept name matches the class name (ie. `character.Character`), the `Character` class will automatically be considered as the structure to output.
+💡 Here, the concept name matches the class name (ie. `Character`), the `Character` class will automatically be considered as the structure to output.
 
 ```toml
-domain = "character"
+domain = "characters"
 definition = "Tools for creating characters"
 
 [concept]
-[concept.Character] # Name matches class name. Structure is automatically used for structuring the output
-Concept = "A detailed description of a character"
+[concept.Character]
+Concept = "A character is a fiction story"
+# Concept matches class name. Structure is automatically used for structuring the output
 
 [pipe]
 [pipe.create_character]
 PipeLLM = "Create a character. Get a structured result."
-output = "character.Character"  # Output is character.Character
+output = "Character"
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
+
+💡 Defining the `Character` concept as "A character is a fiction story" might seem obvious but… think of it: "character" can also mean a letter or symbol in a text. Defining concepts is the best way to avoid any ambiguity and make sure the LLMs understand what you mean.
 
 ### **🏃 Run**
 
@@ -150,11 +155,11 @@ As you can see, the output is a `Character` instance.
 ## Generate using information in a prompt template
 
 What if you want to integrate some data into prompts?
-We have a tool for that: prompt templates!
+You can do that using a prompt template.
 
 In this example, we no longer want to generate characters. We want to process existing ones, especially their description attributes.
 
-We want to extract structured information from the description field. Thus we have a `Character` input and a `CharacterExtractedMetadata` output.
+We want to extract structured information from the description field. Thus we have a `Character` input and a `CharacterMetadata` output.
 
 ### **Define the output structure**
 
@@ -171,7 +176,7 @@ class Character(StructuredContent):
     description: str
 
 # output class
-class CharacterExtractedMetadata(StructuredContent):
+class CharacterMetadata(StructuredContent):
     name: str
     age: int
     height: float
@@ -184,13 +189,13 @@ class CharacterExtractedMetadata(StructuredContent):
 ```toml
 [concept]
 Character = "A character from a book"
-CharacterExtractedMetadata = "Metadata regarding a character."
+CharacterMetadata = "Metadata regarding a character."
 
 [pipe]
 [pipe.extract_character_1]
 PipeLLM = "Get character information from a description."
 input = "Character"
-output = "CharacterExtractedMetadata"
+output = "CharacterMetadata"
 prompt_template = """
 You are given a text description of a character.
 Your task is to extract specific data from the following description.
@@ -203,8 +208,8 @@ Your task is to extract specific data from the following description.
 
 ```python
 from pipelex.core.stuff_factory import StuffFactory
-from pipelex.run import execute_pipe
-from pipelex_libraries.character_model import Character
+from pipelex.run import run_pipe_code
+from pipelex_libraries.pipeline.characters import Character, CharacterMetadata
 
 async def process_existing_character():
     # Your existing data
@@ -220,24 +225,26 @@ async def process_existing_character():
         with ink, each mark a silent record of years spent charting unrecorded lands and handling fragile relics of lost civilizations.
         He moves with quiet purpose and speaks with a calm, thoughtful cadence that suggests he's always listening for more than just what's said."""
     )
-    # Wrapped in a stuff object
+    # Wrap it into a stuff object
     character_stuff = StuffFactory.make_stuff(
         concept_code="character.Character",
         name="character",
         content=character,
     )
-    # Added to a memory
+    # Add it to the working memory
     working_memory = WorkingMemoryFactory.make_from_single_stuff(
         stuff=character_stuff,
     )
-    # Processed by
-    pipe_output = await execute_pipe(
+    # Run the pipe identified by its pipe_code (it's the name of the pipe)
+    pipe_output = await run_pipe_code(
         pipe_code="extract_character_1",
         working_memory=working_memory,
     )
 
-    # Print the output
-    print(pipe_output.main_stuff_as_text)
+    # Get the result as a porperly typed instance
+    extracted_metadata = pipe_output.main_stuff_as(content_type=CharacterMetadata)
+    
+    print(CharacterMetadata)
 
 Pipelex.make()
 asyncio.run(create_character())
