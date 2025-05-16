@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from pipelex.core.stuff_content import ImageContent, StructuredContent, TextAndImageContent
 

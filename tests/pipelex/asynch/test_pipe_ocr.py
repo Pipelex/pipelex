@@ -9,7 +9,7 @@ from pipelex import pretty_print
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.libraries.pipelines.ocr import PageContent
-from pipelex.pipe_operators.pipe_ocr import PipeOCR, PipeOCRInputError, PipeOCROutput
+from pipelex.pipe_operators.pipe_ocr import PipeOCR, PipeOCROutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from tests.pipelex.test_data import PipeOCRTestCases

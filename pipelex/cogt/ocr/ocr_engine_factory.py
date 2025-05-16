@@ -3,12 +3,9 @@
 # "Pipelex" is a trademark of Evotis S.A.S.
 
 from enum import StrEnum
-from typing import Optional
 
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
-from pipelex.cogt.ocr.ocr_exceptions import UnsupportedOCREngineError
-from pipelex.config import get_config
 
 
 class OcrEngineName(StrEnum):
