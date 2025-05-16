@@ -33,7 +33,7 @@ def pdf_url_to_images(pdf_url: str, dpi: int = 175) -> List[Image.Image]:
     return images
 
 
-def pdf_to_image_paths(
+def pdf_to_saved_page_screenshot_paths(
     pdf_path: Optional[str] = None,
     pdf_url: Optional[str] = None,
     dpi: int = 175,

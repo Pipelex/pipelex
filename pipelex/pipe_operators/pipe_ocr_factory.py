@@ -11,10 +11,7 @@ from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineName
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_ocr import PipeOCR
-
-
-class PipeOCRBlueprintInputError(ValueError):
-    pass
+from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
 
 class PipeOCRBlueprint(PipeBlueprint):
@@ -26,7 +23,7 @@ class PipeOCRBlueprint(PipeBlueprint):
 
     @model_validator(mode="after")
     def validate_input_source(self) -> Self:
-        if self.image is None and self.pdf is None:
+        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["image", "pdf"]):
             raise PipeDefinitionError("Either 'image' or 'pdf' must be provided")
         return self
 
