@@ -8,7 +8,7 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
-from pipelex.cogt.ocr.ocr_engine_factory import OCREngineFactory
+from pipelex.cogt.ocr.ocr_engine_factory import OCREngineFactory, OcrEngineName
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
@@ -18,6 +18,7 @@ from pipelex.core.working_memory import WorkingMemory
 from pipelex.job_metadata import JobMetadata
 from pipelex.libraries.pipelines.ocr import PageContent
 from pipelex.tools.utils.path_utils import clarify_path_or_url
+from pipelex.config import get_config
 
 
 class PipeOCROutput(PipeOutput):
@@ -31,7 +32,7 @@ class PipeOCRInputError(ValueError):
 class PipeOCR(PipeAbstract):
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
-    ocr_engine_name: Optional[str] = None
+    ocr_engine_name: Optional[OcrEngineName] = None
 
     @model_validator(mode="after")
     def validate_at_least_one_stuff_name(self) -> Self:
@@ -51,7 +52,10 @@ class PipeOCR(PipeAbstract):
     ) -> PipeOCROutput:
         # TODO:
 
-        ocr_engine: OCREngineAbstract = OCREngineFactory.make_ocr_engine()
+        if not self.ocr_engine_name:
+            self.ocr_engine_name = OcrEngineName(get_config().cogt.ocr_config.default_ocr_engine_name)
+
+        ocr_engine: OCREngineAbstract = OCREngineFactory.make_ocr_engine(self.ocr_engine_name)
 
         if not self.output_concept_code:
             raise PipeOCRInputError("PipeOCR should have a non-None output_concept_code")

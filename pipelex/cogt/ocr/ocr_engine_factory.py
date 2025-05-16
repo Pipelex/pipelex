@@ -16,7 +16,7 @@ class OcrEngineName(StrEnum):
 class OCREngineFactory:
     @staticmethod
     def make_ocr_engine(
-        ocr_engine_name: OcrEngineName = OcrEngineName.MISTRAL,
+        ocr_engine_name: OcrEngineName,
     ) -> OCREngineAbstract:
         match ocr_engine_name:
             case OcrEngineName.MISTRAL:
