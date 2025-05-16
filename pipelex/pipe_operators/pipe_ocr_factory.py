@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 from pydantic import model_validator
 from typing_extensions import Self, override
 
+from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineName
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_ocr import PipeOCR
@@ -20,7 +21,7 @@ class PipeOCRBlueprint(PipeBlueprint):
     definition: Optional[str] = None
     image: Optional[str] = None
     pdf: Optional[str] = None
-    ocr_engine_name: Optional[str] = None
+    ocr_engine_name: Optional[OcrEngineName] = None
     output: str
 
     @model_validator(mode="after")

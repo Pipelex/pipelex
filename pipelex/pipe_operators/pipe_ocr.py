@@ -9,6 +9,7 @@ from typing_extensions import Self, override
 
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
 from pipelex.cogt.ocr.ocr_engine_factory import OCREngineFactory, OcrEngineName
+from pipelex.config import get_config
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
@@ -18,7 +19,6 @@ from pipelex.core.working_memory import WorkingMemory
 from pipelex.job_metadata import JobMetadata
 from pipelex.libraries.pipelines.ocr import PageContent
 from pipelex.tools.utils.path_utils import clarify_path_or_url
-from pipelex.config import get_config
 
 
 class PipeOCROutput(PipeOutput):
