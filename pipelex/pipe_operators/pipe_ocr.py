@@ -88,7 +88,7 @@ class PipeOCR(PipeAbstract):
                 )
             )
 
-        content = ListContent(items=page_contents)
+        content: ListContent[PageContent] = ListContent(items=page_contents)
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
