@@ -4,7 +4,7 @@
 
 import asyncio
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import aiofiles
 from mistralai import OCRImageObject, OCRResponse
@@ -12,7 +12,6 @@ from typing_extensions import override
 
 from pipelex.cogt.mistral.mistral_factory import MistralFactory
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract, OCRExtractedImage, OCROutput, Page
-from pipelex.cogt.ocr.ocr_utils import merge_markdown_pages
 from pipelex.config import get_config
 from pipelex.tools.utils.image_utils import (
     load_image_as_base64_from_path,
@@ -35,6 +34,7 @@ class MistralOCREngine(OCREngineAbstract):
         self,
         pdf_url: str,
         caption_image: bool = False,
+        get_screenshot: bool = False,
         include_image_base64: bool = False,
     ) -> OCROutput:
         """
@@ -56,10 +56,18 @@ class MistralOCREngine(OCREngineAbstract):
             },
             include_image_base64=include_image_base64,
         )
+
         ocr_output = await self.ocr_result_from_response(
             ocr_response=ocr_response,
             caption_image=caption_image,
         )
+
+        if get_screenshot:
+            ocr_output = await self.add_page_screenshots_to_ocr_output(
+                pdf_url=pdf_url,
+                image_url=None,
+                ocr_output=ocr_output,
+            )
         return ocr_output
 
     @override
@@ -67,6 +75,7 @@ class MistralOCREngine(OCREngineAbstract):
         self,
         image_url: str,
         caption_image: bool = False,
+        get_screenshot: bool = False,
     ) -> OCROutput:
         """
         Process an image from its URL.
@@ -89,6 +98,12 @@ class MistralOCREngine(OCREngineAbstract):
             ocr_response=ocr_response,
             caption_image=caption_image,
         )
+        if get_screenshot:
+            ocr_output = await self.add_page_screenshots_to_ocr_output(
+                pdf_url=None,
+                image_url=image_url,
+                ocr_output=ocr_output,
+            )
         return ocr_output
 
     @override
@@ -96,6 +111,7 @@ class MistralOCREngine(OCREngineAbstract):
         self,
         image_path: str,
         caption_image: bool = False,
+        get_screenshot: bool = False,
     ) -> OCROutput:
         """
         Process an image from a local file by encoding it to base64.
@@ -117,6 +133,12 @@ class MistralOCREngine(OCREngineAbstract):
             ocr_response=ocr_response,
             caption_image=caption_image,
         )
+        if get_screenshot:
+            ocr_output = await self.add_page_screenshots_to_ocr_output(
+                pdf_url=None,
+                image_url=None,
+                ocr_output=ocr_output,
+            )
         return ocr_output
 
     @override
@@ -124,6 +146,7 @@ class MistralOCREngine(OCREngineAbstract):
         self,
         pdf_path: str,
         caption_image: bool = False,
+        get_screenshot: bool = False,
     ) -> OCROutput:
         """
         Upload a PDF file and process it with OCR.
@@ -155,6 +178,12 @@ class MistralOCREngine(OCREngineAbstract):
             ocr_response=ocr_response,
             caption_image=caption_image,
         )
+        if get_screenshot:
+            ocr_output = await self.add_page_screenshots_to_ocr_output(
+                pdf_url=None,
+                image_url=None,
+                ocr_output=ocr_output,
+            )
         return ocr_output
 
     @override
@@ -256,3 +285,13 @@ class MistralOCREngine(OCREngineAbstract):
         return OCROutput(
             pages=pages,
         )
+
+    @override
+    async def add_page_screenshots_to_ocr_output(
+        self,
+        pdf_url: Optional[str],
+        image_url: Optional[str],
+        ocr_output: OCROutput,
+    ) -> OCROutput:
+        # TODO: not implemented yet
+        return ocr_output

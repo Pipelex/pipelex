@@ -4,6 +4,6 @@ from pipelex.core.stuff_content import ImageContent, StructuredContent, TextCont
 
 
 class PageContent(StructuredContent):
-    text: TextContent
+    text: Optional[TextContent] = None
     images: List[ImageContent]
     screenshot: Optional[ImageContent] = None

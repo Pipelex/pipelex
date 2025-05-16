@@ -30,13 +30,13 @@ class PipeOCRInputError(ValueError):
 
 class PipeOCR(PipeAbstract):
     image_stuff_name: Optional[str] = None
-    document_stuff_name: Optional[str] = None
+    pdf_stuff_name: Optional[str] = None
     ocr_engine_name: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_at_least_one_stuff_name(self) -> Self:
-        if self.image_stuff_name is None and self.document_stuff_name is None:
-            raise PipeOCRInputError("At least one of 'image_stuff_name' or 'document_stuff_name' must be provided")
+        if self.image_stuff_name is None and self.pdf_stuff_name is None:
+            raise PipeOCRInputError("At least one of 'image_stuff_name' or 'pdf_stuff_name' must be provided")
         return self
 
     @override
@@ -67,28 +67,28 @@ class PipeOCR(PipeAbstract):
                 image_url=url,
             )
 
-        elif self.document_stuff_name:
-            document_stuff = working_memory.get_stuff(name=self.document_stuff_name)
-            document_url = document_stuff.as_pdf.url
-            document_path, url = clarify_path_or_url(path_or_url=document_url)  # pyright: ignore
-            if not document_stuff.is_pdf:
-                raise PipeOCRInputError(f"Document stuff '{self.document_stuff_name}' is not a PDF")
+        elif self.pdf_stuff_name:
+            pdf_stuff = working_memory.get_stuff(name=self.pdf_stuff_name)
+            pdf_url = pdf_stuff.as_pdf.url
+            pdf_path, url = clarify_path_or_url(path_or_url=pdf_url)  # pyright: ignore
+            if not pdf_stuff.is_pdf:
+                raise PipeOCRInputError(f"pdf stuff '{self.pdf_stuff_name}' is not a PDF")
             ocr_output = await ocr_engine.extraction_from_pdf(
-                pdf_path=document_path,
+                pdf_path=pdf_path,
                 pdf_url=url,
             )
 
         else:
-            raise PipeOCRInputError("PipeOCR should have a non-None image_stuff_name or document_stuff_name")
+            raise PipeOCRInputError("PipeOCR should have a non-None image_stuff_name or pdf_stuff_name")
 
+        # Build the output stuff, which is a list of page contents
         content: ListContent[PageContent] = ListContent(items=[])
         for _, page in ocr_output.pages.items():
-            page_screenshot = await self.get_page_screenshot()
             content.items.append(
                 PageContent(
-                    text=TextContent(text=page.text),
+                    text=TextContent(text=page.text) if page.text else None,
                     images=[ImageContent(url=image.uri) for image in page.images],
-                    screenshot=page_screenshot,
+                    screenshot=ImageContent(url=page.screenshot.uri) if page.screenshot else None,
                 )
             )
 
@@ -107,8 +107,3 @@ class PipeOCR(PipeAbstract):
             working_memory=working_memory,
         )
         return pipe_output
-
-    async def get_page_screenshot(
-        self,
-    ) -> ImageContent:
-        return ImageContent(url="page_screenhot.png")

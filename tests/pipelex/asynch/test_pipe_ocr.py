@@ -51,7 +51,7 @@ class TestPipeOCR:
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeOCR(
                 domain="generic",
-                document_stuff_name="pdf",
+                pdf_stuff_name="pdf",
                 output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",
             ),
             working_memory=WorkingMemoryFactory.make_from_pdf(

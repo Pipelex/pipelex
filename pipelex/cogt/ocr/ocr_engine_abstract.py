@@ -19,7 +19,7 @@ class OCRExtractedImage(BaseModel):
 
 
 class Page(BaseModel):
-    text: str = ""
+    text: Optional[str] = None
     images: List[OCRExtractedImage] = []
     screenshot: Optional[OCRExtractedImage] = None
 
@@ -46,6 +46,7 @@ class OCREngineAbstract(ABC):
         image_path: Optional[str] = None,
         image_url: Optional[str] = None,
         caption_image: bool = False,
+        get_screenshot: bool = False,
     ) -> OCROutput:
         """
         Launch OCR extraction from an image asynchronously.
@@ -69,6 +70,7 @@ class OCREngineAbstract(ABC):
         pdf_path: Optional[str] = None,
         pdf_url: Optional[str] = None,
         caption_image: bool = False,
+        get_screenshot: bool = False,
     ) -> OCROutput:
         """
         Launch OCR extraction from a PDF asynchronously.
@@ -79,12 +81,14 @@ class OCREngineAbstract(ABC):
             return await self.extract_from_pdf_url(
                 pdf_url=pdf_url,
                 caption_image=caption_image,
+                get_screenshot=get_screenshot,
             )
         else:  # pdf_path must be provided based on validation
             assert pdf_path is not None  # Type narrowing for mypy
             return await self.extract_from_pdf_file(
                 pdf_path=pdf_path,
                 caption_image=caption_image,
+                get_screenshot=get_screenshot,
             )
 
     @abstractmethod
@@ -92,6 +96,7 @@ class OCREngineAbstract(ABC):
         self,
         pdf_url: str,
         caption_image: bool = False,
+        get_screenshot: bool = False,
     ) -> OCROutput:
         """
         Process a PDF from a URL asynchronously.
@@ -110,6 +115,7 @@ class OCREngineAbstract(ABC):
         self,
         image_url: str,
         caption_image: bool = False,
+        get_screenshot: bool = False,
     ) -> OCROutput:
         """
         Process an image from a URL asynchronously.
@@ -128,6 +134,7 @@ class OCREngineAbstract(ABC):
         self,
         image_path: str,
         caption_image: bool = False,
+        get_screenshot: bool = False,
     ) -> OCROutput:
         """
         Process an image from a local file asynchronously.
@@ -146,6 +153,7 @@ class OCREngineAbstract(ABC):
         self,
         pdf_path: str,
         caption_image: bool = False,
+        get_screenshot: bool = False,
     ) -> OCROutput:
         """
         Process a PDF from a local file asynchronously.
@@ -168,3 +176,15 @@ class OCREngineAbstract(ABC):
         Caption an image asynchronously.
         """
         pass
+
+    @abstractmethod
+    async def add_page_screenshots_to_ocr_output(
+        self,
+        pdf_url: str,
+        image_url: str,
+        ocr_output: OCROutput,
+    ) -> OCROutput:
+        """
+        Get a screenshot of a page asynchronously.
+        """
+        return ocr_output
