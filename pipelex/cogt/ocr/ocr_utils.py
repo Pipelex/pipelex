@@ -37,7 +37,7 @@ def pdf_to_image_paths(
     pdf_path: Optional[str] = None,
     pdf_url: Optional[str] = None,
     dpi: int = 175,
-    output_dir: str = "ocr_tmp",
+    output_dir: str = "temp",
 ) -> List[str]:
     # Extract the base name without extension and replace spaces with underscores
     if pdf_path:
