@@ -66,11 +66,8 @@ class PipeOCR(PipeAbstract):
             )
 
         elif self.pdf_stuff_name:
-            pdf_stuff = working_memory.get_stuff(name=self.pdf_stuff_name)
-            pdf_url = pdf_stuff.as_pdf.url
-            pdf_path, url = clarify_path_or_url(path_or_url=pdf_url)  # pyright: ignore
-            if not pdf_stuff.is_pdf:
-                raise PipeOCRInputError(f"pdf stuff '{self.pdf_stuff_name}' is not a PDF")
+            pdf_stuff = working_memory.get_stuff_as_pdf(name=self.pdf_stuff_name)
+            pdf_path, url = clarify_path_or_url(path_or_url=pdf_stuff.url)  # pyright: ignore
             ocr_output = await ocr_engine.extraction_from_pdf(
                 pdf_path=pdf_path,
                 pdf_url=url,

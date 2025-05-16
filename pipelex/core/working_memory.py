@@ -18,6 +18,7 @@ from pipelex.core.stuff_content import (
     ListContent,
     MermaidContent,
     NumberContent,
+    PDFContent,
     StuffContent,
     StuffContentType,
     TextAndImageContent,
@@ -262,6 +263,10 @@ class WorkingMemory(BaseModel):
     def get_stuff_as_text_and_image(self, name: str) -> TextAndImageContent:
         """Get stuff content as TextAndImageContent if applicable."""
         return self.get_stuff(name=name).as_text_and_image
+
+    def get_stuff_as_pdf(self, name: str) -> PDFContent:
+        """Get stuff content as PDFContent if applicable."""
+        return self.get_stuff(name=name).as_pdf
 
     def get_stuff_as_number(self, name: str) -> NumberContent:
         """Get stuff content as NumberContent if applicable."""
