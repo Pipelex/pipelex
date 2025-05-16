@@ -66,6 +66,7 @@ class PipeOCR(PipeAbstract):
             ocr_output = await ocr_engine.extraction_from_image(
                 image_path=image_path,
                 image_url=url,
+                get_screenshot=True,
             )
 
         elif self.pdf_stuff_name:
@@ -74,6 +75,7 @@ class PipeOCR(PipeAbstract):
             ocr_output = await ocr_engine.extraction_from_pdf(
                 pdf_path=pdf_path,
                 pdf_url=url,
+                get_screenshot=True,
             )
 
         else:

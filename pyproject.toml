@@ -76,6 +76,7 @@ boto3-stubs = "^1.35.24"
 mypy = "^1.11.2"
 pyright = "1.1.398" # version 1.1.399 generates a ton of false positives
 pandas-stubs = "^2.2.3.241126"
+pdf2image = "^1.16.0"
 pytest = "^8.3.3"
 pytest-cov = "^6.1.1"
 pytest-pretty = "1.2.0"

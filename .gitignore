@@ -47,3 +47,6 @@ pipelex_libraries/
 
 # personnal pipelex config file that overrides the default one
 pipelex_super.toml
+
+# temporay ocr images
+ocr_tmp/

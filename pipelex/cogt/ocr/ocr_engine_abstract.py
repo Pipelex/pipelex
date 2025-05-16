@@ -57,12 +57,14 @@ class OCREngineAbstract(ABC):
             return await self.extract_from_image_url(
                 image_url=image_url,
                 caption_image=caption_image,
+                get_screenshot=get_screenshot,
             )
         else:  # image_path must be provided based on validation
             assert image_path is not None  # Type narrowing for mypy
             return await self.extract_from_image_file(
                 image_path=image_path,
                 caption_image=caption_image,
+                get_screenshot=get_screenshot,
             )
 
     async def extraction_from_pdf(

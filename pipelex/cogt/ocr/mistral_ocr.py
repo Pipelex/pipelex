@@ -12,10 +12,12 @@ from typing_extensions import override
 
 from pipelex.cogt.mistral.mistral_factory import MistralFactory
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract, OCRExtractedImage, OCROutput, Page
+from pipelex.cogt.ocr.ocr_utils import PDFToImageError, pdf_to_image_paths
 from pipelex.config import get_config
 from pipelex.tools.utils.image_utils import (
     load_image_as_base64_from_path,
 )
+from pipelex.tools.utils.path_utils import clarify_path_or_url
 
 
 class MistralOCREngine(OCREngineAbstract):
@@ -136,7 +138,7 @@ class MistralOCREngine(OCREngineAbstract):
         if get_screenshot:
             ocr_output = await self.add_page_screenshots_to_ocr_output(
                 pdf_url=None,
-                image_url=None,
+                image_url=image_path,
                 ocr_output=ocr_output,
             )
         return ocr_output
@@ -180,7 +182,7 @@ class MistralOCREngine(OCREngineAbstract):
         )
         if get_screenshot:
             ocr_output = await self.add_page_screenshots_to_ocr_output(
-                pdf_url=None,
+                pdf_url=pdf_path,
                 image_url=None,
                 ocr_output=ocr_output,
             )
@@ -206,7 +208,7 @@ class MistralOCREngine(OCREngineAbstract):
         Returns:
             ID of the uploaded file
         """
-        async with aiofiles.open(pdf_path, "rb") as file:
+        async with aiofiles.open(pdf_path, "rb") as file:  # type: ignore[reportUnknownMemberType]
             file_content = await file.read()
 
         uploaded_file = await self.client.files.upload_async(
@@ -293,5 +295,14 @@ class MistralOCREngine(OCREngineAbstract):
         image_url: Optional[str],
         ocr_output: OCROutput,
     ) -> OCROutput:
-        # TODO: not implemented yet
+        if image_url:
+            screenshot_paths = [image_url]
+        elif pdf_url:
+            pdf_path, pdf_url = clarify_path_or_url(pdf_url)
+            screenshot_paths = pdf_to_image_paths(pdf_path=pdf_path, pdf_url=pdf_url)
+        else:
+            raise PDFToImageError("Either image_url or pdf_url must be provided")
+        for page_index, page in enumerate(ocr_output.pages.values()):
+            screenshot_path = screenshot_paths[page_index]
+            page.screenshot = OCRExtractedImage(uri=screenshot_path)
         return ocr_output

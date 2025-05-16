@@ -349,6 +349,5 @@ class PipeOCRTestCases:
         # LOCAL
         "tests/cogt/data/documents/solar_system.pdf",
         # REMOTE
-        # "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.pdf",
-        "https://arxiv.org/pdf/2201.04234",
+        "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.pdf",
     ]
