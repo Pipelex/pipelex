@@ -48,7 +48,7 @@ async def load_image_as_base64_from_path_async(path: str) -> bytes:
         FileNotFoundError: If the image file does not exist.
         IOError: If there are issues reading the file.
     """
-    async with aiofiles.open(path, "rb") as image_file:
+    async with aiofiles.open(path, "rb") as image_file:  # type: ignore[reportUnknownMemberType]
         image_data = await image_file.read()
         return base64.b64encode(image_data)
 

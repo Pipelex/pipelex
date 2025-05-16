@@ -16,8 +16,10 @@ from pipelex.core.stuff_content import (
     ListContent,
     MermaidContent,
     NumberContent,
+    PDFContent,
     StuffContent,
     StuffContentType,
+    TextAndImageContent,
     TextContent,
 )
 from pipelex.exceptions import StuffError
@@ -99,6 +101,10 @@ class Stuff(BaseModel):
         return isinstance(self.content, ImageContent)
 
     @property
+    def is_pdf(self) -> bool:
+        return isinstance(self.content, PDFContent)
+
+    @property
     def is_text(self) -> bool:
         return isinstance(self.content, TextContent)
 
@@ -147,6 +153,16 @@ class Stuff(BaseModel):
     def as_image(self) -> ImageContent:
         """Get content as ImageContent if applicable."""
         return self.content_as(ImageContent)
+
+    @property
+    def as_pdf(self) -> PDFContent:
+        """Get content as PDFContent if applicable."""
+        return self.content_as(PDFContent)
+
+    @property
+    def as_text_and_image(self) -> TextAndImageContent:
+        """Get content as TextAndImageContent if applicable."""
+        return self.content_as(TextAndImageContent)
 
     @property
     def as_number(self) -> NumberContent:

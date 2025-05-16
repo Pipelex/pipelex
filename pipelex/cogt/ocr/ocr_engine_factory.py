@@ -6,18 +6,20 @@ from enum import StrEnum
 
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
-from pipelex.cogt.ocr.ocr_exceptions import UnsupportedOCREngineError
 
 
 class OcrEngineName(StrEnum):
     MISTRAL = "mistral"
+    # Add a placeholder for future engines or use a different approach
 
 
 class OCREngineFactory:
     @staticmethod
-    def make_ocr_engine(ocr_model_name: str) -> OCREngineAbstract:
-        match ocr_model_name:
-            case OcrEngineName.MISTRAL.value:
+    def make_ocr_engine(
+        ocr_engine_name: OcrEngineName,
+    ) -> OCREngineAbstract:
+        match ocr_engine_name:
+            case OcrEngineName.MISTRAL:
                 try:
                     from pipelex.cogt.ocr.mistral_ocr import MistralOCREngine
                 except ImportError as exc:
@@ -27,5 +29,3 @@ class OCREngineFactory:
                         "The mistralai SDK is required to use Mistral OCR through the mistralai client.",
                     ) from exc
                 return MistralOCREngine()
-            case _:
-                raise UnsupportedOCREngineError(f"Unsupported OCR engine type: {ocr_model_name}")

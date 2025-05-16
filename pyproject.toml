@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pipelex"
-version = "0.1.17"
+version = "0.1.18"
 description = "Pipelex is an open-source dev tool based on a simple declarative language that lets you define replicable, structured, composable LLM pipelines."
 authors = ["Evotis S.A.S. <evotis@pipelex.com>"]
 maintainers = ["Pipelex staff <oss@pipelex.com>"]
@@ -47,6 +47,7 @@ networkx = "^3.4.2"
 openai = "^1.60.1"
 openpyxl = "^3.1.5"           # Used by pandas to handle excel files
 pandas = "^2.2.3"
+pdf2image = "^1.16.0"
 pydantic = "2.10.6"
 python-dotenv = "^1.0.1"
 PyYAML = "^6.0.2"
@@ -213,6 +214,7 @@ markers = [
     "llm: slow and costly due to llm inference calls",
     "imgg: slow and costly due to imgg inference calls",
     "gha_disabled: tests that should not run in GitHub Actions",
+    "ocr: slow and costly due to ocr inference calls",
 ]
 minversion = "8.0"
 

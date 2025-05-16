@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from pipelex.core.concept_native import NativeConceptCode
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ImageContent, TextContent
+from pipelex.core.stuff_content import ImageContent, PDFContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.exceptions import WorkingMemoryError
@@ -41,6 +41,20 @@ class WorkingMemoryFactory(BaseModel):
         stuff = StuffFactory.make_stuff(
             concept_code=concept_code,
             content=ImageContent(url=image_url),
+            name=name,
+        )
+        return cls.make_from_single_stuff(stuff=stuff)
+
+    @classmethod
+    def make_from_pdf(
+        cls,
+        pdf_url: str,
+        concept_code: str = NativeConceptCode.PDF.concept_code,
+        name: Optional[str] = "pdf",
+    ) -> WorkingMemory:
+        stuff = StuffFactory.make_stuff(
+            concept_code=concept_code,
+            content=PDFContent(url=pdf_url),
             name=name,
         )
         return cls.make_from_single_stuff(stuff=stuff)

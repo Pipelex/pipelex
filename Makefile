@@ -65,7 +65,9 @@ make tn                       - Shorthand -> test
 make test-with-prints         - Run tests with prints (no inference)
 make t                        - Shorthand -> test-with-prints
 make test-inference           - Run unit tests only for inference (with prints)
+make test-ocr                 - Run unit tests only for ocr (with prints)
 make ti                       - Shorthand -> test-inference
+make to                       - Shorthand -> test-ocr
 make test-imgg                - Run unit tests only for imgg (with prints)
 
 make check                    - Shorthand -> format lint mypy
@@ -251,8 +253,19 @@ test-inference: env
 		$(LOCAL_PYTEST) --exitfirst -m "inference and not imgg" -s $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	fi
 
+test-ocr: env
+	$(call PRINT_TITLE,"Unit testing ocr")
+	@if [ -n "$(TEST)" ]; then \
+		$(LOCAL_PYTEST) --exitfirst -m "ocr" -s -k "$(TEST)" $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+	else \
+		$(LOCAL_PYTEST) --exitfirst -m "ocr" -s $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+	fi
+
 ti: test-inference
 	@echo "> done: ti = test-inference"
+
+to: test-ocr
+	@echo "> done: to = test-ocr"
 
 test-imgg: env
 	$(call PRINT_TITLE,"Unit testing")

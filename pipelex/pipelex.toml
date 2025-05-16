@@ -168,6 +168,8 @@ seed = "auto"
 ####################################################################################################
 
 [cogt.ocr_config]
+default_ocr_engine_name = "mistral"
+
 [cogt.ocr_config.mistral_ocr_config]
 ocr_model_name = "mistral-ocr-latest"
 

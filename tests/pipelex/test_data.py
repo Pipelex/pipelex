@@ -31,6 +31,7 @@ class PipeTestCases:
         The sun is yellow.
         The moon is white.
     """
+    IMG_DESC_PROMPT = "Describe this image"
     URL_IMG_GANTT_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/diagrams/gantt_tree_house.png"  # AI generated
     URL_IMG_FASHION_PHOTO_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg"  # AI generated
 
@@ -239,4 +240,19 @@ class LibraryTestCases:
         ("cars.CarDescription", "generate_car_description"),
         ("animals.AnimalDescription", "generate_animal_description"),
         ("gpu.GPUDescription", "generate_gpu_description"),
+    ]
+
+
+class PipeOCRTestCases:
+    PIPE_OCR_IMAGE_TEST_CASES: ClassVar[List[str]] = [
+        # LOCAL
+        "tests/cogt/data/documents/solar_system.png",
+        # REMOTE
+        "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.png",
+    ]
+    PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = [
+        # LOCAL
+        "tests/cogt/data/documents/solar_system.pdf",
+        # REMOTE
+        "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.pdf",
     ]
