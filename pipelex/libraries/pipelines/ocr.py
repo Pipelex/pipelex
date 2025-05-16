@@ -1,9 +1,8 @@
 from typing import List, Optional
 
-from pipelex.core.stuff_content import ImageContent, StructuredContent, TextContent
+from pipelex.core.stuff_content import ImageContent, StructuredContent, TextAndImageContent
 
 
 class PageContent(StructuredContent):
-    text: Optional[TextContent] = None
-    images: List[ImageContent]
+    text_and_image_content: TextAndImageContent
     screenshot: Optional[ImageContent] = None

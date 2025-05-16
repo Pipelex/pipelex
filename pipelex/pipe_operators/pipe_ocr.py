@@ -86,8 +86,10 @@ class PipeOCR(PipeAbstract):
         for _, page in ocr_output.pages.items():
             content.items.append(
                 PageContent(
-                    text=TextContent(text=page.text) if page.text else None,
-                    images=[ImageContent(url=image.uri) for image in page.images],
+                    text_and_image_content=TextAndImageContent(
+                        text=TextContent(text=page.text) if page.text else None,
+                        images=[ImageContent(url=image.uri) for image in page.images],
+                    ),
                     screenshot=ImageContent(url=page.screenshot.uri) if page.screenshot else None,
                 )
             )
