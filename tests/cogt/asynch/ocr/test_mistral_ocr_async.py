@@ -12,28 +12,32 @@ from tests.cogt.test_data import OCRTestCases
 class TestMistralOCRAsync:
     @pytest.mark.asyncio
     @pytest.mark.inference
-    async def test_process_document_file_async(self):
+    @pytest.mark.parametrize("file_path", [OCRTestCases.DOCUMENT_FILE_PATH])
+    async def test_process_document_file_async(self, file_path: str):
         ocr = MistralOCREngine()
-        result = await ocr.extract_from_pdf_file(OCRTestCases.DOCUMENT_FILE_PATH)
+        result = await ocr.extract_from_pdf_file(file_path)
         assert result.pages
 
     @pytest.mark.asyncio
     @pytest.mark.inference
-    async def test_process_document_url_async(self):
+    @pytest.mark.parametrize("url", [OCRTestCases.DOCUMENT_URL])
+    async def test_process_document_url_async(self, url: str):
         ocr = MistralOCREngine()
-        result = await ocr.extract_from_pdf_url(OCRTestCases.DOCUMENT_URL)
+        result = await ocr.extract_from_pdf_url(url)
         assert result.pages
 
     @pytest.mark.asyncio
     @pytest.mark.inference
-    async def test_process_image_file_async(self):
+    @pytest.mark.parametrize("file_path", [OCRTestCases.IMAGE_FILE_PATH])
+    async def test_process_image_file_async(self, file_path: str):
         ocr = MistralOCREngine()
-        result = await ocr.extract_from_image_file(OCRTestCases.IMAGE_FILE_PATH)
+        result = await ocr.extract_from_image_file(file_path)
         assert result.pages
 
     @pytest.mark.asyncio
     @pytest.mark.inference
-    async def test_process_image_url_async(self):
+    @pytest.mark.parametrize("url", [OCRTestCases.IMAGE_URL])
+    async def test_process_image_url_async(self, url: str):
         ocr = MistralOCREngine()
-        result = await ocr.extract_from_image_url(OCRTestCases.IMAGE_URL)
+        result = await ocr.extract_from_image_url(url)
         assert result.pages

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import model_validator
 from typing_extensions import Self, override
@@ -57,11 +57,9 @@ class PipeOCR(PipeAbstract):
             raise PipeOCRInputError("PipeOCR should have a non-None output_concept_code")
 
         if self.image_stuff_name:
-            image_stuff = working_memory.get_stuff(name=self.image_stuff_name)
-            image_url = image_stuff.as_image.url
-            image_path, url = clarify_path_or_url(path_or_url=image_url)  # pyright: ignore
-            if not image_stuff.is_image:
-                raise PipeOCRInputError(f"Image stuff '{self.image_stuff_name}' is not an image")
+            image_stuff = working_memory.get_stuff_as_image(name=self.image_stuff_name)
+            image_url = image_stuff.url
+            image_path, url = clarify_path_or_url(path_or_url=image_url)
             ocr_output = await ocr_engine.extraction_from_image(
                 image_path=image_path,
                 image_url=url,
@@ -82,9 +80,9 @@ class PipeOCR(PipeAbstract):
             raise PipeOCRInputError("PipeOCR should have a non-None image_stuff_name or pdf_stuff_name")
 
         # Build the output stuff, which is a list of page contents
-        content: ListContent[PageContent] = ListContent(items=[])
+        page_contents: List[PageContent] = []
         for _, page in ocr_output.pages.items():
-            content.items.append(
+            page_contents.append(
                 PageContent(
                     text_and_image_content=TextAndImageContent(
                         text=TextContent(text=page.text) if page.text else None,
@@ -93,6 +91,8 @@ class PipeOCR(PipeAbstract):
                     screenshot=ImageContent(url=page.screenshot.uri) if page.screenshot else None,
                 )
             )
+
+        content = ListContent(items=page_contents)
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,

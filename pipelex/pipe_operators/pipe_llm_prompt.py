@@ -129,12 +129,34 @@ class PipeLLMPrompt(PipeAbstract):
         if self.user_images:
             for user_image_name in self.user_images:
                 log.debug(f"Getting user image '{user_image_name}' from context")
-                user_image_stuff = working_memory.get_stuff(user_image_name)
-                if not user_image_stuff:
-                    raise StuffContentError(f"User image '{user_image_name}' not found in context")
-                prompt_image_stuff_content = user_image_stuff.content
+                # Handle nested attributes with dot notation
+                if "." in user_image_name:
+                    parts = user_image_name.split(".")
+                    base_name = parts[0]
+                    attr_path = parts[1:]
+
+                    base_stuff = working_memory.get_stuff(base_name)
+                    if not base_stuff:
+                        raise StuffContentError(f"Base object '{base_name}' not found in context")
+
+                    # Navigate through the attribute path
+                    current_obj = base_stuff.content
+                    for attr in attr_path:
+                        if not hasattr(current_obj, attr):
+                            raise StuffContentError(f"Attribute '{attr}' not found in path '{user_image_name}'")
+                        current_obj = getattr(current_obj, attr)
+
+                    prompt_image_stuff_content = current_obj
+                else:
+                    # Original direct access logic
+                    user_image_stuff = working_memory.get_stuff(user_image_name)
+                    if not user_image_stuff:
+                        raise StuffContentError(f"User image '{user_image_name}' not found in context")
+                    prompt_image_stuff_content = user_image_stuff.content
+
                 if not isinstance(prompt_image_stuff_content, ImageContent):
-                    raise ValueError(f"Expected ImageContent, got {user_image_stuff.content.__class__}")
+                    raise ValueError(f"Expected ImageContent, got {prompt_image_stuff_content.__class__}")
+
                 image_url = prompt_image_stuff_content.url
                 file_path, url = clarify_path_or_url(path_or_url=image_url)
                 user_image = PromptImageFactory.make_prompt_image(

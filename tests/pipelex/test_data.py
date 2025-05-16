@@ -32,6 +32,7 @@ class PipeTestCases:
         The sun is yellow.
         The moon is white.
     """
+    IMG_DESC_PROMPT = "Describe this image"
     IMGG_PROMPT = "dog playing chess"
     URL_IMG_GANTT_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/diagrams/gantt_tree_house.png"  # AI generated
     URL_IMG_INVOICE_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/invoices/invoice_1.png"  # AI generated

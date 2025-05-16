@@ -13,17 +13,16 @@ from pipelex.config import get_config
 
 class OcrEngineName(StrEnum):
     MISTRAL = "mistral"
+    # Add a placeholder for future engines or use a different approach
 
 
 class OCREngineFactory:
     @staticmethod
     def make_ocr_engine(
-        ocr_engine_name: Optional[str] = None,
+        ocr_engine_name: OcrEngineName = OcrEngineName.MISTRAL,
     ) -> OCREngineAbstract:
-        if ocr_engine_name is None:
-            ocr_engine_name = get_config().cogt.ocr_config.default_ocr_engine_name
         match ocr_engine_name:
-            case OcrEngineName.MISTRAL.value:
+            case OcrEngineName.MISTRAL:
                 try:
                     from pipelex.cogt.ocr.mistral_ocr import MistralOCREngine
                 except ImportError as exc:
@@ -33,5 +32,3 @@ class OCREngineFactory:
                         "The mistralai SDK is required to use Mistral OCR through the mistralai client.",
                     ) from exc
                 return MistralOCREngine()
-            case _:
-                raise UnsupportedOCREngineError(f"Unsupported OCR engine type: {ocr_engine_name}")

@@ -187,4 +187,5 @@ class OCREngineAbstract(ABC):
         """
         Get a screenshot of a page asynchronously.
         """
+        # TODO: not implemented yet
         return ocr_output

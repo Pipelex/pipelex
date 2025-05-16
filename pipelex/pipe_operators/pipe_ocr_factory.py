@@ -4,17 +4,30 @@
 
 from typing import Any, Dict, Optional
 
-from typing_extensions import override
+from pydantic import model_validator
+from typing_extensions import Self, override
 
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_ocr import PipeOCR
+
+
+class PipeOCRBlueprintInputError(ValueError):
+    pass
 
 
 class PipeOCRBlueprint(PipeBlueprint):
     definition: Optional[str] = None
-    image_stuff_name: str
+    image: Optional[str] = None
+    pdf: Optional[str] = None
     ocr_engine_name: Optional[str] = None
     output: str
+
+    @model_validator(mode="after")
+    def validate_input_source(self) -> Self:
+        if self.image is None and self.pdf is None:
+            raise PipeDefinitionError("Either 'image' or 'pdf' must be provided")
+        return self
 
 
 class PipeOCRFactory(PipeSpecificFactoryProtocol[PipeOCRBlueprint, PipeOCR]):
@@ -32,7 +45,8 @@ class PipeOCRFactory(PipeSpecificFactoryProtocol[PipeOCRBlueprint, PipeOCR]):
             definition=pipe_blueprint.definition,
             ocr_engine_name=pipe_blueprint.ocr_engine_name,
             output_concept_code=pipe_blueprint.output,
-            image_stuff_name=pipe_blueprint.image_stuff_name,
+            image_stuff_name=pipe_blueprint.image,
+            pdf_stuff_name=pipe_blueprint.pdf,
         )
 
     @classmethod
