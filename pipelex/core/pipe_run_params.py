@@ -110,7 +110,7 @@ class PipeRunParams(BaseModel):
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
     batch_params: Optional[BatchParams] = None
     params: Dict[str, Any] = Field(default_factory=dict)
-    output_concept_code: Optional[str] = None
+    dynamic_output_concept_code: Optional[str] = None
 
     @field_validator("params")
     @classmethod

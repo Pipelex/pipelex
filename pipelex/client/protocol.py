@@ -92,7 +92,7 @@ class PipeRequest(BaseModel):
     """
 
     memory: WorkingMemory = Field(..., description="Input memory for the pipe")
-    output_concept: Optional[str] = Field(default=None, description="Concept code of the output stuff")
+    dynamic_output_concept: Optional[str] = Field(default=None, description="Concept code of the output stuff")
     output_multiplicity: Optional[PipeOutputMultiplicity] = Field(default=None, description="Multiplicity of the output stuff")
 
 

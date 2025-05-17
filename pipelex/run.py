@@ -20,7 +20,7 @@ async def run_pipe_code(
     working_memory: Optional[WorkingMemory] = None,
     output_name: Optional[str] = None,
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
-    output_concept_code: Optional[str] = None,
+    dynamic_output_concept_code: Optional[str] = None,
     job_id: Optional[str] = None,
 ) -> PipeOutput:
     """
@@ -46,7 +46,7 @@ async def run_pipe_code(
 
     pipe_run_params = PipeRunParams(
         output_multiplicity=output_multiplicity,
-        output_concept_code=output_concept_code,
+        dynamic_output_concept_code=dynamic_output_concept_code,
     )
 
     pretty_print(pipe, title=f"Running pipe '{pipe_code}'")

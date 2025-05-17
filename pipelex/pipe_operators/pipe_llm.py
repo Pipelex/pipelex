@@ -129,14 +129,14 @@ class PipeLLM(PipeAbstract):
         output_name: Optional[str] = None,
     ) -> PipeLLMOutput:
         # First put the output_name inside the params
-        pipe_run_params.output_concept_code = self.output_concept_code
+        # pipe_run_params.dynamic_output_concept_code = self.output_concept_code
 
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {pipe_code}")
         if self.output_concept_code == ConceptFactory.make_concept_code(SpecialDomain.NATIVE, NativeConceptCode.DYNAMIC):
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
-            output_concept_code = pipe_run_params.params[PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT]
+            output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
             if not output_concept_code:
                 raise RuntimeError(f"No output concept code provided for dynamic output pipe '{pipe_code}'")
         else:

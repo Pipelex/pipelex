@@ -162,8 +162,8 @@ class PipeLLMPrompt(PipeAbstract):
             raise ValueError("For user_text we need either a pipe_jinja2, a text_verbatim_name or a fixed user_text")
 
         # Append output structure prompt if needed
-        if pipe_run_params.output_concept_code:
-            user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=pipe_run_params.output_concept_code)
+        if pipe_run_params.dynamic_output_concept_code:
+            user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=pipe_run_params.dynamic_output_concept_code)
 
         ############################################################
         # System text
