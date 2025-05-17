@@ -44,7 +44,6 @@ class MistralFactory:
     # Client
     #########################################################
 
-    # MistralMistral uses the same class for sync and async
     @classmethod
     def make_mistral_client(cls) -> Mistral:
         return Mistral(

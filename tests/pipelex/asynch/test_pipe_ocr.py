@@ -16,6 +16,7 @@ from tests.pipelex.test_data import PipeOCRTestCases
 
 
 @pytest.mark.ocr
+@pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeOCR:
     @pytest.mark.parametrize("image_url", PipeOCRTestCases.PIPE_OCR_IMAGE_TEST_CASES)

@@ -32,8 +32,8 @@ class MistralOCREngine(OCREngineAbstract):
 
     def __init__(self):
         """Initialize the MistralOCR class with a Mistral client."""
-        self.client = MistralFactory.make_mistral_client()
-        self.model = get_config().cogt.ocr_config.mistral_ocr_config.ocr_model_name
+        self.mistral_client = MistralFactory.make_mistral_client()
+        self.ocr_model_name = get_config().cogt.ocr_config.mistral_ocr_config.ocr_model_name
 
     @override
     async def extract_from_pdf_url(
@@ -54,8 +54,8 @@ class MistralOCREngine(OCREngineAbstract):
         Returns:
             OCR response containing extracted text and images
         """
-        ocr_response = await self.client.ocr.process_async(
-            model=self.model,
+        ocr_response = await self.mistral_client.ocr.process_async(
+            model=self.ocr_model_name,
             document={
                 "type": "document_url",
                 "document_url": pdf_url,
@@ -93,8 +93,8 @@ class MistralOCREngine(OCREngineAbstract):
         Returns:
             OCR response containing extracted text and images
         """
-        ocr_response = await self.client.ocr.process_async(
-            model=self.model,
+        ocr_response = await self.mistral_client.ocr.process_async(
+            model=self.ocr_model_name,
             document={
                 "type": "image_url",
                 "image_url": image_url,
@@ -131,8 +131,8 @@ class MistralOCREngine(OCREngineAbstract):
         """
         base64_image = load_image_as_base64_from_path(path=image_path).decode("utf-8")
 
-        ocr_response = await self.client.ocr.process_async(
-            model=self.model,
+        ocr_response = await self.mistral_client.ocr.process_async(
+            model=self.ocr_model_name,
             document={"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image}"},
         )
         ocr_output = await self.ocr_result_from_response(
@@ -168,13 +168,13 @@ class MistralOCREngine(OCREngineAbstract):
         uploaded_file_id = await self.upload_local_pdf(pdf_path)
 
         # Get signed URL
-        signed_url = await self.client.files.get_signed_url_async(
+        signed_url = await self.mistral_client.files.get_signed_url_async(
             file_id=uploaded_file_id,
         )
 
         # Process the document
-        ocr_response = await self.client.ocr.process_async(
-            model=self.model,
+        ocr_response = await self.mistral_client.ocr.process_async(
+            model=self.ocr_model_name,
             document={
                 "type": "document_url",
                 "document_url": signed_url.url,
@@ -215,7 +215,7 @@ class MistralOCREngine(OCREngineAbstract):
         async with aiofiles.open(pdf_path, "rb") as file:  # type: ignore[reportUnknownMemberType]
             file_content = await file.read()
 
-        uploaded_file = await self.client.files.upload_async(
+        uploaded_file = await self.mistral_client.files.upload_async(
             file={"file_name": os.path.basename(pdf_path), "content": file_content},
             purpose="ocr",
         )

@@ -208,14 +208,14 @@ strictSetInference = true
 typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
-addopts = "--import-mode=importlib -ra -m 'not inference and not imgg'"
+addopts = "--import-mode=importlib -ra -m 'not inference and not llm and not imgg and not ocr'"
 asyncio_default_fixture_loop_scope = "session"
 markers = [
     "inference: slow and costly due to inference calls",
     "llm: slow and costly due to llm inference calls",
     "imgg: slow and costly due to imgg inference calls",
-    "gha_disabled: tests that should not run in GitHub Actions",
     "ocr: slow and costly due to ocr inference calls",
+    "gha_disabled: tests that should not run in GitHub Actions",
 ]
 minversion = "8.0"
 
