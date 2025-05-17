@@ -23,10 +23,6 @@ ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
 
-class StuffContentError(Exception):
-    pass
-
-
 class StuffContent(ABC, BaseModel):
     @property
     def short_desc(self) -> str:

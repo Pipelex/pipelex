@@ -11,11 +11,13 @@ from pipelex.tools.utils.image_utils import (
     load_image_as_base64_from_bytes_async,
     load_image_as_base64_from_path_async,
 )
+from pipelex.tools.utils.path_utils import clarify_path_or_url
 
 
 class PromptImageFactory:
-    @staticmethod
+    @classmethod
     def make_prompt_image(
+        cls,
         file_path: Optional[str] = None,
         url: Optional[str] = None,
         image_bytes: Optional[bytes] = None,
@@ -28,6 +30,17 @@ class PromptImageFactory:
             return PromptImageBytes(b64_image_bytes=image_bytes)
         else:
             raise PromptImageFactoryError("PromptImageFactory requires one of file_path, url, or image_bytes")
+
+    @classmethod
+    def make_prompt_image_from_uri(
+        cls,
+        uri: str,
+    ) -> PromptImage:
+        file_path, url = clarify_path_or_url(path_or_url=uri)
+        return PromptImageFactory.make_prompt_image(
+            file_path=file_path,
+            url=url,
+        )
 
     @classmethod
     async def make_promptimagebytes_from_url_async(
