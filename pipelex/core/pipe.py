@@ -49,7 +49,7 @@ def update_job_metadata_for_pipe(
 class PipeAbstract(ABC, BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    code: str = "adhoc_pipe"
+    code: str
     domain: str
 
     definition: Optional[str] = None

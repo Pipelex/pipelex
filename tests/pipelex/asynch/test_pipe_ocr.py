@@ -27,6 +27,7 @@ class TestPipeOCR:
     ):
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeOCR(
+                code="adhoc_for_test_pipe_ocr_image",
                 domain="generic",
                 image_stuff_name="page_scan",
                 output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",
@@ -51,6 +52,7 @@ class TestPipeOCR:
     ):
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeOCR(
+                code="adhoc_for_test_pipe_ocr_pdf",
                 domain="generic",
                 pdf_stuff_name="pdf",
                 output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",

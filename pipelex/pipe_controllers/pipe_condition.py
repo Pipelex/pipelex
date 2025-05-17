@@ -78,6 +78,7 @@ class PipeCondition(PipeAbstract):
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
 
         pipe_jinja2 = PipeJinja2(
+            code="adhoc_for_pipe_condition",
             domain=self.domain,
             jinja2=self.applied_expression_jinja2,
         )

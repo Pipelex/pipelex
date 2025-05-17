@@ -128,9 +128,6 @@ class PipeLLM(PipeAbstract):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeLLMOutput:
-        # First put the output_name inside the params
-        # pipe_run_params.dynamic_output_concept_code = self.output_concept_code
-
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {pipe_code}")
         if self.output_concept_code == ConceptFactory.make_concept_code(SpecialDomain.NATIVE, NativeConceptCode.DYNAMIC):
@@ -239,6 +236,7 @@ class PipeLLM(PipeAbstract):
                         )
                         system_prompt = self.system_prompt_to_structure or domain.system_prompt
                         pipe_llm_prompt_2 = PipeLLMPrompt(
+                            code="adhoc_for_pipe_llm_prompt_2",
                             domain=self.domain,
                             user_pipe_jinja2=user_pipe_jinja2,
                             system_prompt=system_prompt,
@@ -260,6 +258,7 @@ class PipeLLM(PipeAbstract):
                 )
                 system_prompt = self.system_prompt_to_structure or domain.system_prompt
                 pipe_llm_prompt_2 = PipeLLMPrompt(
+                    code="adhoc_for_pipe_llm_prompt_2",
                     domain=self.domain,
                     user_pipe_jinja2=user_pipe_jinja2,
                     system_prompt=system_prompt,
