@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
+from functools import reduce
 from typing import ClassVar, List, Optional, Self, Set
 
 from kajson.class_registry import class_registry
@@ -22,7 +23,7 @@ from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent, StuffContentError
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
+from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_template
 from pipelex.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
@@ -139,15 +140,12 @@ class PipeLLMPrompt(PipeAbstract):
                     if not base_stuff:
                         raise StuffContentError(f"Base object '{base_name}' not found in context")
 
-                    # Navigate through the attribute path
-                    current_obj = base_stuff.content
-                    for attr in attr_path:
-                        try:
-                            current_obj = getattr(current_obj, attr)
-                        except AttributeError:
-                            raise StuffContentError(f"Attribute '{attr}' not found in path '{user_image_name}'")
+                    # Navigate through the attribute path using reduce
+                    try:
+                        prompt_image_stuff_content = reduce(getattr, attr_path, base_stuff.content)
+                    except AttributeError as e:
+                        raise StuffContentError(f"Attribute not found in path '{user_image_name}': {str(e)}")
 
-                    prompt_image_stuff_content = current_obj
                 else:
                     # Original direct access logic
                     user_image_stuff = working_memory.get_stuff(user_image_name)

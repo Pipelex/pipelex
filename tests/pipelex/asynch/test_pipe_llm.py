@@ -7,6 +7,7 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.domain import SpecialDomain
+from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, StructuredContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
@@ -48,40 +49,27 @@ class TestPipeLLM:
     @pytest.mark.llm
     @pytest.mark.inference
     @pytest.mark.asyncio(loop_scope="class")
-    @pytest.mark.parametrize(
-        "image_url",
-        [
-            PipeTestCases.URL_IMG_FASHION_PHOTO_1,
-        ],
-    )
-    async def test_pipe_llm_image(
+    @pytest.mark.parametrize("stuff, attribute_path", PipeTestCases.STUFFS_IMAGE_ATTRIBUTES)
+    async def test_pipe_llm_attribute_image(
         self,
         pipe_router: PipeRouterProtocol,
-        image_url: str,
+        stuff: Stuff,
+        attribute_path: str,
     ):
-        class SomeContentWithImageAttribute(StructuredContent):
-            image: ImageContent
-
-        image_wrapper = SomeContentWithImageAttribute(image=ImageContent(url=image_url))
-        image_wrapper_stuff = StuffFactory.make_stuff(
-            concept_code="native.Image",
-            content=image_wrapper,
-            name="image_wrapper",
-        )
-        working_memory = WorkingMemoryFactory.make_from_stuff_and_name(stuff=image_wrapper_stuff, name="image_wrapper")
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         pipe_job = PipeJobFactory.make_pipe_job(
             working_memory=working_memory,
             pipe=PipeLLM(
-                code="adhoc_for_test_pipe_llm",
+                code="adhoc_for_test_pipe_llm_image",
                 domain="generic",
                 output_concept_code=f"{SpecialDomain.NATIVE}.Text",
                 pipe_llm_prompt=PipeLLMPrompt(
-                    code="adhoc_for_test_pipe_llm",
+                    code="adhoc_for_test_pipe_llm_image",
                     domain="generic",
                     system_prompt=PipeTestCases.SYSTEM_PROMPT,
                     user_text=PipeTestCases.IMG_DESC_PROMPT,
-                    user_images=["image_wrapper.image"],
+                    user_images=[attribute_path],
                 ),
             ),
         )

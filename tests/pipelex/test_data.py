@@ -9,10 +9,19 @@ from typing_extensions import override
 
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ImageContent, ListContent, PDFContent, TextContent
+from pipelex.core.stuff_content import ImageContent, ListContent, PDFContent, StructuredContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
 from tests.test_data import PDFTestCases
+
+
+class SomeContentWithImageAttribute(StructuredContent):
+    image_attribute: ImageContent
+
+
+class SomeContentWithImageSubObjectAttribute(StructuredContent):
+    image_attribute: ImageContent
+    sub_object: Optional["SomeContentWithImageAttribute"] = None
 
 
 class PipeTestCases:
@@ -35,6 +44,7 @@ class PipeTestCases:
     IMG_DESC_PROMPT = "Describe this image"
     URL_IMG_GANTT_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/diagrams/gantt_tree_house.png"  # AI generated
     URL_IMG_FASHION_PHOTO_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg"  # AI generated
+    URL_IMG_FASHION_PHOTO_2 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png"  # AI generated
 
     # Create simple Stuff objects
     SIMPLE_STUFF_TEXT = StuffFactory.make_stuff(
@@ -67,6 +77,28 @@ class PipeTestCases:
         pipelex_session_id="unit_test",
     )
 
+    STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1 = SomeContentWithImageAttribute(image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_1))
+    STUFF_WITH_IMAGE_ATTRIBUTE = StuffFactory.make_stuff(
+        concept_code="native.Image",
+        content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
+        name="stuff_content_with_image",
+        pipelex_session_id="unit_test",
+    )
+    STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = SomeContentWithImageSubObjectAttribute(
+        image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_2),
+        sub_object=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
+    )
+    STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = StuffFactory.make_stuff(
+        concept_code="native.Image",
+        content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
+        name="stuff_content_with_image_attribute_in_sub_object",
+        pipelex_session_id="unit_test",
+    )
+    STUFFS_IMAGE_ATTRIBUTES: ClassVar[List[Tuple[Stuff, str]]] = [  # stuff, attribute_path
+        (STUFF_WITH_IMAGE_ATTRIBUTE, "stuff_content_with_image.image_attribute"),
+        (STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT, "stuff_content_with_image_attribute_in_sub_object.image_attribute"),
+        (STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT, "stuff_content_with_image_attribute_in_sub_object.sub_object.image_attribute"),
+    ]
     TRICKY_QUESTION_BLUEPRINT = StuffBlueprint(name="question", concept="answer.Question", value=USER_TEXT_TRICKY_2)
     BLUEPRINT_AND_PIPE: ClassVar[List[Tuple[str, StuffBlueprint, str]]] = [  # topic, blueprint, pipe
         (

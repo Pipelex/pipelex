@@ -55,10 +55,6 @@ class StructuringMethod(StrEnum):
     PRELIMINARY_TEXT = "preliminary_text"
 
 
-class PipeLLMError(PipelexError):
-    pass
-
-
 class PipeLLMOutput(PipeOutput):
     pass
 
