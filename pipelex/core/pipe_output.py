@@ -14,7 +14,7 @@ from pipelex.core.stuff_content import (
     MermaidContent,
     NumberContent,
     StuffContentType,
-    TextAndImageContent,
+    TextAndImagesContent,
     TextContent,
 )
 from pipelex.core.working_memory import WorkingMemory
@@ -59,7 +59,7 @@ class PipeOutput(BaseModel):
         return self.working_memory.main_stuff_as_image
 
     @property
-    def main_stuff_as_text_and_image(self) -> TextAndImageContent:
+    def main_stuff_as_text_and_image(self) -> TextAndImagesContent:
         """Get main stuff content as TextAndImageContent if applicable."""
         return self.working_memory.main_stuff_as_text_and_image
 

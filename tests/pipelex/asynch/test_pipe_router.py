@@ -24,6 +24,7 @@ from tests.pipelex.test_data import PipeTestCases
 
 
 @pytest.mark.llm
+@pytest.mark.ocr
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeRouter:

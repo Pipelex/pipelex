@@ -5,38 +5,32 @@
 import pytest
 
 from pipelex.cogt.ocr.mistral_ocr import MistralOCREngine
-from tests.cogt.test_data import OCRTestCases
+from tests.test_data import PDFTestCases
 
 
-# TODO: create a new marker specifically for ocr, like we have for llm and imggg
+@pytest.mark.ocr
+@pytest.mark.inference
+@pytest.mark.asyncio(loop_scope="class")
 class TestMistralOCRAsync:
-    @pytest.mark.asyncio
-    @pytest.mark.inference
-    @pytest.mark.parametrize("file_path", [OCRTestCases.DOCUMENT_FILE_PATH])
+    @pytest.mark.parametrize("file_path", [PDFTestCases.DOCUMENT_FILE_PATH])
     async def test_process_document_file_async(self, file_path: str):
         ocr = MistralOCREngine()
         result = await ocr.extract_from_pdf_file(file_path)
         assert result.pages
 
-    @pytest.mark.asyncio
-    @pytest.mark.inference
-    @pytest.mark.parametrize("url", [OCRTestCases.DOCUMENT_URL])
+    @pytest.mark.parametrize("url", [PDFTestCases.DOCUMENT_URL])
     async def test_process_document_url_async(self, url: str):
         ocr = MistralOCREngine()
         result = await ocr.extract_from_pdf_url(url)
         assert result.pages
 
-    @pytest.mark.asyncio
-    @pytest.mark.inference
-    @pytest.mark.parametrize("file_path", [OCRTestCases.IMAGE_FILE_PATH])
+    @pytest.mark.parametrize("file_path", [PDFTestCases.IMAGE_FILE_PATH])
     async def test_process_image_file_async(self, file_path: str):
         ocr = MistralOCREngine()
         result = await ocr.extract_from_image_file(file_path)
         assert result.pages
 
-    @pytest.mark.asyncio
-    @pytest.mark.inference
-    @pytest.mark.parametrize("url", [OCRTestCases.IMAGE_URL])
+    @pytest.mark.parametrize("url", [PDFTestCases.IMAGE_URL])
     async def test_process_image_url_async(self, url: str):
         ocr = MistralOCREngine()
         result = await ocr.extract_from_image_url(url)

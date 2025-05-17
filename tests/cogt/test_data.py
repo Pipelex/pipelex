@@ -146,10 +146,3 @@ Woman typing on a laptop. On the laptop screen you see python code to generate c
         # ("images.Photo", IMGG_PROMPT_3),
         ("images.Photo", IMGG_PROMPT_4),
     ]
-
-
-class OCRTestCases:
-    DOCUMENT_FILE_PATH = "tests/cogt/data/documents/solar_system.pdf"
-    DOCUMENT_URL = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.pdf"
-    IMAGE_FILE_PATH = "tests/cogt/data/documents/solar_system.png"
-    IMAGE_URL = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.png"

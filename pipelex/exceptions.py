@@ -77,7 +77,15 @@ class WorkingMemoryError(PipelexError):
     pass
 
 
-class WorkingMemoryStuffNotFoundError(PipelexError):
+class WorkingMemoryTypeError(WorkingMemoryError):
+    pass
+
+
+class WorkingMemoryNotFoundError(WorkingMemoryError):
+    pass
+
+
+class WorkingMemoryStuffNotFoundError(WorkingMemoryNotFoundError):
     pass
 
 

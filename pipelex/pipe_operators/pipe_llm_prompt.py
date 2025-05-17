@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
+from functools import reduce
+from operator import attrgetter
 from typing import ClassVar, List, Optional, Self, Set
 
 from kajson.class_registry import class_registry
@@ -19,10 +21,17 @@ from pipelex.core.domain import SpecialDomain
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent, StuffContentError
+from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
+from pipelex.exceptions import (
+    PipeDefinitionError,
+    PipeInputError,
+    PipeRunParamsError,
+    WorkingMemoryNotFoundError,
+    WorkingMemoryStuffNotFoundError,
+    WorkingMemoryTypeError,
+)
 from pipelex.hub import get_template
 from pipelex.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
@@ -125,46 +134,18 @@ class PipeLLMPrompt(PipeAbstract):
         ############################################################
         # User images
         ############################################################
-        user_images: List[PromptImage] = []
+        prompt_user_images: List[PromptImage] = []
         if self.user_images:
             for user_image_name in self.user_images:
                 log.debug(f"Getting user image '{user_image_name}' from context")
-                # Handle nested attributes with dot notation
-                if "." in user_image_name:
-                    parts = user_image_name.split(".")
-                    base_name = parts[0]
-                    attr_path = parts[1:]
+                try:
+                    prompt_image_stuff_content = working_memory.get_stuff_attribute(name=user_image_name, wanted_type=ImageContent)
+                except (WorkingMemoryNotFoundError, WorkingMemoryStuffNotFoundError, WorkingMemoryTypeError) as exc:
+                    raise PipeInputError(f"A valid user image named '{user_image_name}' was not found in the working_memory: {exc}") from exc
 
-                    base_stuff = working_memory.get_stuff(base_name)
-                    if not base_stuff:
-                        raise StuffContentError(f"Base object '{base_name}' not found in context")
-
-                    # Navigate through the attribute path
-                    current_obj = base_stuff.content
-                    for attr in attr_path:
-                        try:
-                            current_obj = getattr(current_obj, attr)
-                        except AttributeError:
-                            raise StuffContentError(f"Attribute '{attr}' not found in path '{user_image_name}'")
-
-                    prompt_image_stuff_content = current_obj
-                else:
-                    # Original direct access logic
-                    user_image_stuff = working_memory.get_stuff(user_image_name)
-                    if not user_image_stuff:
-                        raise StuffContentError(f"User image '{user_image_name}' not found in context")
-                    prompt_image_stuff_content = user_image_stuff.content
-
-                if not isinstance(prompt_image_stuff_content, ImageContent):
-                    raise ValueError(f"Expected ImageContent, got {prompt_image_stuff_content.__class__}")
-
-                image_url = prompt_image_stuff_content.url
-                file_path, url = clarify_path_or_url(path_or_url=image_url)
-                user_image = PromptImageFactory.make_prompt_image(
-                    file_path=file_path,
-                    url=url,
-                )
-                user_images.append(user_image)
+                image_uri = prompt_image_stuff_content.url
+                user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
+                prompt_user_images.append(user_image)
 
         ############################################################
         # User text
@@ -202,7 +183,7 @@ class PipeLLMPrompt(PipeAbstract):
         llm_prompt = LLMPromptContent(
             system_text=system_text,
             user_text=user_text,
-            user_images=user_images,
+            user_images=prompt_user_images,
         )
 
         output_stuff = StuffFactory.make_stuff(

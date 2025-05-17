@@ -48,5 +48,5 @@ def pretty():
 
 
 @pytest.fixture(scope="session", autouse=True)  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
-def apply_manage_pipelex_libraries(manage_pipelex_libraries: Any):  # pyright: ignore[reportUnknownParameterType]
+def apply_manage_pipelex_libraries(manage_pipelex_libraries_with_overwrite: Any):  # pyright: ignore[reportUnknownParameterType]
     return

@@ -23,10 +23,6 @@ ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
 
-class StuffContentError(Exception):
-    pass
-
-
 class StuffContent(ABC, BaseModel):
     @property
     def short_desc(self) -> str:
@@ -307,7 +303,7 @@ class MermaidContent(StuffContent):
         return json.dumps({"mermaid": self.mermaid_code})
 
 
-class TextAndImageContent(StuffContent):
+class TextAndImagesContent(StuffContent):
     text: Optional[TextContent]
     images: Optional[List[ImageContent]]
 
