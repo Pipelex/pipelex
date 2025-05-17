@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
+from typing import List
 
 import pytest
 
@@ -49,12 +50,12 @@ class TestPipeLLM:
     @pytest.mark.llm
     @pytest.mark.inference
     @pytest.mark.asyncio(loop_scope="class")
-    @pytest.mark.parametrize("stuff, attribute_path", PipeTestCases.STUFFS_IMAGE_ATTRIBUTES)
+    @pytest.mark.parametrize("stuff, attribute_paths", PipeTestCases.STUFFS_IMAGE_ATTRIBUTES)
     async def test_pipe_llm_attribute_image(
         self,
         pipe_router: PipeRouterProtocol,
         stuff: Stuff,
-        attribute_path: str,
+        attribute_paths: List[str],
     ):
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
@@ -68,8 +69,8 @@ class TestPipeLLM:
                     code="adhoc_for_test_pipe_llm_image",
                     domain="generic",
                     system_prompt=PipeTestCases.SYSTEM_PROMPT,
-                    user_text=PipeTestCases.IMG_DESC_PROMPT,
-                    user_images=[attribute_path],
+                    user_text=PipeTestCases.MULTI_IMG_DESC_PROMPT,
+                    user_images=attribute_paths,
                 ),
             ),
         )

@@ -41,7 +41,7 @@ class PipeTestCases:
         The sun is yellow.
         The moon is white.
     """
-    IMG_DESC_PROMPT = "Describe this image"
+    MULTI_IMG_DESC_PROMPT = "If there is one image, describe it. If there are multiple images, compare them."
     URL_IMG_GANTT_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/diagrams/gantt_tree_house.png"  # AI generated
     URL_IMG_FASHION_PHOTO_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg"  # AI generated
     URL_IMG_FASHION_PHOTO_2 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png"  # AI generated
@@ -81,7 +81,7 @@ class PipeTestCases:
     STUFF_WITH_IMAGE_ATTRIBUTE = StuffFactory.make_stuff(
         concept_code="native.Image",
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
-        name="stuff_content_with_image",
+        name="stuff_with_image",
         pipelex_session_id="unit_test",
     )
     STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = SomeContentWithImageSubObjectAttribute(
@@ -91,13 +91,20 @@ class PipeTestCases:
     STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = StuffFactory.make_stuff(
         concept_code="native.Image",
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
-        name="stuff_content_with_image_attribute_in_sub_object",
+        name="stuff_with_image_in_sub_object",
         pipelex_session_id="unit_test",
     )
-    STUFFS_IMAGE_ATTRIBUTES: ClassVar[List[Tuple[Stuff, str]]] = [  # stuff, attribute_path
-        (STUFF_WITH_IMAGE_ATTRIBUTE, "stuff_content_with_image.image_attribute"),
-        (STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT, "stuff_content_with_image_attribute_in_sub_object.image_attribute"),
-        (STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT, "stuff_content_with_image_attribute_in_sub_object.sub_object.image_attribute"),
+    STUFFS_IMAGE_ATTRIBUTES: ClassVar[List[Tuple[Stuff, List[str]]]] = [  # stuff, attribute_paths
+        (STUFF_WITH_IMAGE_ATTRIBUTE, ["stuff_with_image.image_attribute"]),
+        (STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT, ["stuff_with_image_in_sub_object.image_attribute"]),
+        (STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT, ["stuff_with_image_in_sub_object.sub_object.image_attribute"]),
+        (
+            STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
+            [
+                "stuff_with_image_in_sub_object.image_attribute",
+                "stuff_with_image_in_sub_object.sub_object.image_attribute",
+            ],
+        ),
     ]
     TRICKY_QUESTION_BLUEPRINT = StuffBlueprint(name="question", concept="answer.Question", value=USER_TEXT_TRICKY_2)
     BLUEPRINT_AND_PIPE: ClassVar[List[Tuple[str, StuffBlueprint, str]]] = [  # topic, blueprint, pipe
