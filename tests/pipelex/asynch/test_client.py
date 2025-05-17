@@ -167,7 +167,11 @@ This amendment applies only to transactions originating from DataAnalytics Corp'
 
             # Execute pipe
             client = PipelexClient()
-            result = await client.execute_pipe(pipe_code=example.pipe_code, pipe_execute_request=pipe_execute_request, use_local_execution=True)
+            result = await client.execute_pipe(
+                pipe_code=example.pipe_code,
+                pipe_execute_request=pipe_execute_request,
+                use_local_execution=True,
+            )
             pretty_print(result)
 
             # Verify result
