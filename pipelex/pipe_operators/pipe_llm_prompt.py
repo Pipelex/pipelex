@@ -3,6 +3,7 @@
 # "Pipelex" is a trademark of Evotis S.A.S.
 
 from functools import reduce
+from operator import attrgetter
 from typing import ClassVar, List, Optional, Self, Set
 
 from kajson.class_registry import class_registry
@@ -132,19 +133,18 @@ class PipeLLMPrompt(PipeAbstract):
                 log.debug(f"Getting user image '{user_image_name}' from context")
                 # Handle nested attributes with dot notation
                 if "." in user_image_name:
-                    parts = user_image_name.split(".")
+                    parts = user_image_name.split(".", 1)  # Split only at the first dot
                     base_name = parts[0]
-                    attr_path = parts[1:]
+                    attr_path_str = parts[1]  # Keep the rest as a dot-separated string
 
                     base_stuff = working_memory.get_stuff(base_name)
                     if not base_stuff:
                         raise StuffContentError(f"Base object '{base_name}' not found in context")
 
-                    # Navigate through the attribute path using reduce
                     try:
-                        prompt_image_stuff_content = reduce(getattr, attr_path, base_stuff.content)
-                    except AttributeError as e:
-                        raise StuffContentError(f"Attribute not found in path '{user_image_name}': {str(e)}")
+                        prompt_image_stuff_content = attrgetter(attr_path_str)(base_stuff.content)
+                    except AttributeError as exc:
+                        raise StuffContentError(f"Attribute not found in path '{user_image_name}': {str(exc)}")
 
                 else:
                     # Original direct access logic
