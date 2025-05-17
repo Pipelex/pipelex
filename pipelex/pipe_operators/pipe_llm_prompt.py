@@ -118,7 +118,6 @@ class PipeLLMPrompt(PipeAbstract):
     @update_job_metadata_for_pipe
     async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
-        pipe_code: str,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -246,7 +245,6 @@ class PipeLLMPrompt(PipeAbstract):
             )
             the_text = (
                 await pipe_jinja2.run_pipe(
-                    pipe_code=PipeJinja2.adhoc_pipe_code,
                     job_metadata=jinja2_job_metadata,
                     working_memory=working_memory,
                     pipe_run_params=pipe_run_params,

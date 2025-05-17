@@ -37,7 +37,6 @@ class PipeBatch(PipeAbstract):
     @update_job_metadata_for_pipe
     async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
-        pipe_code: str,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -45,7 +44,7 @@ class PipeBatch(PipeAbstract):
     ) -> PipeOutput:
         """Run a sequence of steps in batch for each item in the input list."""
         if not self.input_concept_code:
-            raise PipeExecutionError(f"Missing input concept code for pipe '{pipe_code}' but it is required for PipeBatch")
+            raise PipeExecutionError(f"Missing input concept code for pipe '{self.code}' but it is required for PipeBatch")
         if pipe_run_params.final_stuff_code:
             log.debug(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None

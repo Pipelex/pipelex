@@ -30,7 +30,6 @@ class PipeRouter(PipeRouterProtocol):
         log.verbose(f"Routing {pipe.__class__.__name__} pipe '{pipe_job.pipe.code}': {pipe.definition}")
 
         pipe_output = await pipe.run_pipe(
-            pipe_code=pipe_job.pipe.code,
             job_metadata=pipe_job.job_metadata,
             working_memory=working_memory,
             output_name=pipe_job.output_name,
