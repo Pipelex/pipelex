@@ -21,7 +21,7 @@ from pipelex.core.stuff_content import (
     PDFContent,
     StuffContent,
     StuffContentType,
-    TextAndImageContent,
+    TextAndImagesContent,
     TextContent,
 )
 from pipelex.exceptions import WorkingMemoryError, WorkingMemoryStuffNotFoundError
@@ -260,7 +260,7 @@ class WorkingMemory(BaseModel):
         """Get stuff content as ImageContent if applicable."""
         return self.get_stuff(name=name).as_image
 
-    def get_stuff_as_text_and_image(self, name: str) -> TextAndImageContent:
+    def get_stuff_as_text_and_image(self, name: str) -> TextAndImagesContent:
         """Get stuff content as TextAndImageContent if applicable."""
         return self.get_stuff(name=name).as_text_and_image
 
@@ -306,7 +306,7 @@ class WorkingMemory(BaseModel):
         return self.get_stuff_as_image(name=MAIN_STUFF_NAME)
 
     @property
-    def main_stuff_as_text_and_image(self) -> TextAndImageContent:
+    def main_stuff_as_text_and_image(self) -> TextAndImagesContent:
         """Get main stuff content as TextAndImageContent if applicable."""
         return self.get_stuff_as_text_and_image(name=MAIN_STUFF_NAME)
 

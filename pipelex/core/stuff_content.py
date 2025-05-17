@@ -307,7 +307,7 @@ class MermaidContent(StuffContent):
         return json.dumps({"mermaid": self.mermaid_code})
 
 
-class TextAndImageContent(StuffContent):
+class TextAndImagesContent(StuffContent):
     text: Optional[TextContent]
     images: Optional[List[ImageContent]]
 

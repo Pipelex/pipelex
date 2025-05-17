@@ -9,9 +9,10 @@ from typing_extensions import override
 
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ImageContent, ListContent, TextContent
+from pipelex.core.stuff_content import ImageContent, ListContent, PDFContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
+from tests.test_data import PDFTestCases
 
 
 class PipeTestCases:
@@ -46,6 +47,12 @@ class PipeTestCases:
         name="image",
         concept_code="native.Image",
         content=ImageContent(url=URL_IMG_FASHION_PHOTO_1),
+        pipelex_session_id="unit_test",
+    )
+    SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
+        name="pdf",
+        concept_code="native.PDF",
+        content=PDFContent(url=PDFTestCases.DOCUMENT_URL),
         pipelex_session_id="unit_test",
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
@@ -112,10 +119,15 @@ class PipeTestCases:
         ),
     ]
     STUFF_AND_PIPE: ClassVar[List[Tuple[str, Stuff, str]]] = [  # topic, stuff, pipe_code
+        # (
+        #     "Process Simple Image",
+        #     SIMPLE_STUFF_IMAGE,
+        #     "simple_llm_test_from_image",
+        # ),
         (
-            "Process Simple Image",
-            SIMPLE_STUFF_IMAGE,
-            "simple_llm_test_from_image",
+            "Extract page contents from PDF",
+            SIMPLE_STUFF_PDF,
+            "extract_page_contents_from_pdf",
         ),
     ]
     SIMPLE_PIPE_RUN_FROM_STR: ClassVar[List[Tuple[str, str, str]]] = [  # pipe_code, input_concept_code, str_value

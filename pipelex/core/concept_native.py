@@ -15,7 +15,7 @@ class NativeConceptClass(StrEnum):
     TEXT = "TextContent"
     IMAGE = "ImageContent"
     PDF = "PDFContent"
-    TEXT_AND_IMAGE = "TextAndImageContent"
+    TEXT_AND_IMAGES = "TextAndImagesContent"
     NUMBER = "NumberContent"
     LLM_PROMPT = "LLMPromptContent"
 
@@ -25,7 +25,7 @@ class NativeConceptCode(StrEnum):
     TEXT = "Text"
     IMAGE = "Image"
     PDF = "PDF"
-    TEXT_AND_IMAGE = "TextAndImage"
+    TEXT_AND_IMAGES = "TextAndImage"
     NUMBER = "Number"
     LLM_PROMPT = "LlmPrompt"
 
@@ -57,12 +57,12 @@ class NativeConceptCode(StrEnum):
                     definition="A PDF",
                     structure_class_name=NativeConceptClass.PDF,
                 )
-            case NativeConceptCode.TEXT_AND_IMAGE:
+            case NativeConceptCode.TEXT_AND_IMAGES:
                 return Concept(
                     code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
                     domain=SpecialDomain.NATIVE,
                     definition="A text and an image",
-                    structure_class_name=NativeConceptClass.TEXT_AND_IMAGE,
+                    structure_class_name=NativeConceptClass.TEXT_AND_IMAGES,
                 )
 
             case NativeConceptCode.NUMBER:

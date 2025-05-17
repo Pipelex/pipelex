@@ -13,12 +13,12 @@ from pipelex.config import get_config
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.stuff_content import ImageContent, ListContent, TextAndImageContent, TextContent
+from pipelex.core.stuff_content import ImageContent, ListContent, TextAndImagesContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.job_metadata import JobMetadata
-from pipelex.libraries.pipelines.ocr import PageContent
+from pipelex.libraries.pipelines.documents import PageContent
 from pipelex.tools.utils.path_utils import clarify_path_or_url
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
@@ -82,7 +82,7 @@ class PipeOCR(PipeAbstract):
         for _, page in ocr_output.pages.items():
             page_contents.append(
                 PageContent(
-                    text_and_image_content=TextAndImageContent(
+                    text_and_images=TextAndImagesContent(
                         text=TextContent(text=page.text) if page.text else None,
                         images=[ImageContent(url=image.uri) for image in page.images],
                     ),

@@ -4,9 +4,9 @@
 
 from typing import Optional
 
-from pipelex.core.stuff_content import ImageContent, StructuredContent, TextAndImageContent
+from pipelex.core.stuff_content import ImageContent, StructuredContent, TextAndImagesContent
 
 
 class PageContent(StructuredContent):
-    text_and_image_content: TextAndImageContent
+    text_and_images: TextAndImagesContent
     screenshot: Optional[ImageContent] = None

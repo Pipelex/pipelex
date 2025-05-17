@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 from pydantic import model_validator
 from typing_extensions import Self, override
 
+from pipelex import pretty_print
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineName
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.exceptions import PipeDefinitionError
@@ -56,6 +57,7 @@ class PipeOCRFactory(PipeSpecificFactoryProtocol[PipeOCRBlueprint, PipeOCR]):
         details_dict: Dict[str, Any],
     ) -> PipeOCR:
         pipe_blueprint = PipeOCRBlueprint.model_validate(details_dict)
+        pretty_print(pipe_blueprint, title="pipe_blueprint")
         return cls.make_pipe_from_blueprint(
             domain_code=domain_code,
             pipe_code=pipe_code,
