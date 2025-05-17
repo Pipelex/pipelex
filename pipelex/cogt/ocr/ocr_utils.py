@@ -1,10 +1,13 @@
 import os
-import uuid
 from typing import List, Optional
 
-import pdf2image
 import requests
+import shortuuid
 from PIL import Image
+
+from pipelex.tools.misc.file_fetching_helpers import fetch_file_from_url_httpx
+from pipelex.tools.pdf.pdf_render import PdfInput, render_pdf_pages
+from pipelex.tools.utils.path_utils import ensure_path
 
 
 class PDFToImageError(ValueError):
@@ -18,47 +21,44 @@ def merge_markdown_pages(markdown_pages: List[str], separator: str = "\n") -> st
     return separator.join(markdown_pages)
 
 
-def pdf_path_to_images(pdf_path: str, dpi: int = 175) -> List[Image.Image]:
-    images = pdf2image.convert_from_path(  # type: ignore[reportUnknownMemberType]
-        pdf_path=pdf_path,
-        dpi=dpi,
-        fmt="png",
-    )
-    return images
+# def pdf_path_to_images(pdf_path: str, dpi: int = 175) -> List[Image.Image]:
+#     images = pdf2image.convert_from_path(  # type: ignore[reportUnknownMemberType]
+#         pdf_path=pdf_path,
+#         dpi=dpi,
+#         fmt="png",
+#     )
+#     return images
 
 
-def pdf_url_to_images(pdf_url: str, dpi: int = 175) -> List[Image.Image]:
-    pdf = requests.get(pdf_url)
-    images = pdf2image.convert_from_bytes(pdf.content, dpi=dpi, fmt="png")  # type: ignore[reportUnknownMemberType]
-    return images
+# def pdf_url_to_images(pdf_url: str, dpi: int = 175) -> List[Image.Image]:
+#     pdf = requests.get(pdf_url)
+#     images = pdf2image.convert_from_bytes(pdf.content, dpi=dpi, fmt="png")  # type: ignore[reportUnknownMemberType]
+#     return images
 
 
 def pdf_to_saved_page_screenshot_paths(
     pdf_path: Optional[str] = None,
     pdf_url: Optional[str] = None,
     dpi: int = 175,
-    output_dir: str = "temp",
 ) -> List[str]:
-    # Extract the base name without extension and replace spaces with underscores
-    if pdf_path:
-        base_name = os.path.basename(pdf_path)
-        base_name_no_ext = os.path.splitext(base_name)[0]
-        # Use provided output_dir or default to "ocr/base_name"
-
-        # Create the folder if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
-
-        images = pdf_path_to_images(pdf_path, dpi)
-    elif pdf_url:
-        images = pdf_url_to_images(pdf_url, dpi)
-        base_name_no_ext = f"pdf_from_bytes_{uuid.uuid4()}"
+    pdf_input: PdfInput
+    if pdf_url:
+        pdf_input = fetch_file_from_url_httpx(pdf_url)
+    elif pdf_path:
+        pdf_input = pdf_path
     else:
-        raise ValueError("Either pdf_path or pdf_url must be provided")
+        raise RuntimeError("Either pdf_path or pdf_url must be provided")
+
+    temp_directory_name = shortuuid.uuid()
+    temp_directory_path = f"temp/{temp_directory_name}"
+    ensure_path(temp_directory_path)
+
+    images = render_pdf_pages(pdf_input, dpi)
 
     # Save images to the folder and return their paths
     image_paths: List[str] = []
     for i, image in enumerate(images):
-        image_path = os.path.join(output_dir, f"{base_name_no_ext}_{i}.png")
+        image_path = f"{temp_directory_path}/page_{i}.png"
         image.save(image_path)
         image_paths.append(image_path)
 
