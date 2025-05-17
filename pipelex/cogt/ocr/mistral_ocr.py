@@ -12,12 +12,16 @@ from typing_extensions import override
 
 from pipelex.cogt.mistral.mistral_factory import MistralFactory
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract, OCRExtractedImage, OCROutput, Page
-from pipelex.cogt.ocr.ocr_utils import PDFToImageError, pdf_to_saved_page_screenshot_paths
+from pipelex.cogt.ocr.ocr_utils import pdf_to_saved_page_screenshot_paths
 from pipelex.config import get_config
 from pipelex.tools.utils.image_utils import (
     load_image_as_base64_from_path,
 )
 from pipelex.tools.utils.path_utils import clarify_path_or_url
+
+
+class MistralOCRError(ValueError):
+    pass
 
 
 class MistralOCREngine(OCREngineAbstract):
@@ -299,9 +303,10 @@ class MistralOCREngine(OCREngineAbstract):
             screenshot_paths = [image_url]
         elif pdf_url:
             pdf_path, pdf_url = clarify_path_or_url(pdf_url)
-            screenshot_paths = pdf_to_saved_page_screenshot_paths(pdf_path=pdf_path, pdf_url=pdf_url)
+            # TODO: use centralized / possibly online storage instead of local file system
+            screenshot_paths = await pdf_to_saved_page_screenshot_paths(pdf_path=pdf_path, pdf_url=pdf_url)
         else:
-            raise PDFToImageError("Either image_url or pdf_url must be provided")
+            raise MistralOCRError("Either image_url or pdf_url must be provided")
         for page_index, page in enumerate(ocr_output.pages.values()):
             screenshot_path = screenshot_paths[page_index]
             page.screenshot = OCRExtractedImage(uri=screenshot_path)

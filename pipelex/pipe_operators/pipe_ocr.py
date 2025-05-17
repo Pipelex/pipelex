@@ -16,16 +16,14 @@ from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ImageContent, ListContent, TextAndImageContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.exceptions import PipeDefinitionError
 from pipelex.job_metadata import JobMetadata
 from pipelex.libraries.pipelines.ocr import PageContent
 from pipelex.tools.utils.path_utils import clarify_path_or_url
+from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
 
 class PipeOCROutput(PipeOutput):
-    pass
-
-
-class PipeOCRInputError(ValueError):
     pass
 
 
@@ -36,8 +34,8 @@ class PipeOCR(PipeAbstract):
 
     @model_validator(mode="after")
     def validate_at_least_one_stuff_name(self) -> Self:
-        if self.image_stuff_name is None and self.pdf_stuff_name is None:
-            raise PipeOCRInputError("At least one of 'image_stuff_name' or 'pdf_stuff_name' must be provided")
+        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["image_stuff_name", "pdf_stuff_name"]):
+            raise PipeDefinitionError("At least one of 'image_stuff_name' or 'pdf_stuff_name' must be provided")
         return self
 
     @override
@@ -58,7 +56,7 @@ class PipeOCR(PipeAbstract):
         ocr_engine: OCREngineAbstract = OCREngineFactory.make_ocr_engine(self.ocr_engine_name)
 
         if not self.output_concept_code:
-            raise PipeOCRInputError("PipeOCR should have a non-None output_concept_code")
+            raise PipeDefinitionError("PipeOCR should have a non-None output_concept_code")
 
         if self.image_stuff_name:
             image_stuff = working_memory.get_stuff_as_image(name=self.image_stuff_name)
@@ -68,7 +66,6 @@ class PipeOCR(PipeAbstract):
                 image_url=url,
                 get_screenshot=True,
             )
-
         elif self.pdf_stuff_name:
             pdf_stuff = working_memory.get_stuff_as_pdf(name=self.pdf_stuff_name)
             pdf_path, url = clarify_path_or_url(path_or_url=pdf_stuff.url)  # pyright: ignore
@@ -77,9 +74,8 @@ class PipeOCR(PipeAbstract):
                 pdf_url=url,
                 get_screenshot=True,
             )
-
         else:
-            raise PipeOCRInputError("PipeOCR should have a non-None image_stuff_name or pdf_stuff_name")
+            raise PipeDefinitionError("PipeOCR should have a non-None image_stuff_name or pdf_stuff_name")
 
         # Build the output stuff, which is a list of page contents
         page_contents: List[PageContent] = []
