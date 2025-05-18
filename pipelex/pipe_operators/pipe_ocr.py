@@ -7,8 +7,8 @@ from typing import List, Optional
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
-from pipelex.cogt.ocr.ocr_engine_factory import OCREngineFactory, OcrPlatform
+from pipelex.cogt.ocr.ocr_engine import OcrEngine
+from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.config import get_config
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
@@ -17,6 +17,7 @@ from pipelex.core.stuff_content import ImageContent, ListContent, TextAndImagesC
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
+from pipelex.hub import get_inference_manager
 from pipelex.job_metadata import JobMetadata
 from pipelex.libraries.pipelines.documents import PageContent
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
@@ -27,7 +28,7 @@ class PipeOCROutput(PipeOutput):
 
 
 class PipeOCR(PipeAbstract):
-    ocr_platform: Optional[OcrPlatform] = None
+    ocr_engine: Optional[OcrEngine] = None
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
     should_add_screenshots: bool
@@ -49,11 +50,6 @@ class PipeOCR(PipeAbstract):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOCROutput:
-        if not self.ocr_platform:
-            self.ocr_platform = OcrPlatform(get_config().cogt.ocr_config.ocr_platform)
-
-        ocr_engine: OCREngineAbstract = OCREngineFactory.make_ocr_engine(self.ocr_platform)
-
         if not self.output_concept_code:
             raise PipeDefinitionError("PipeOCR should have a non-None output_concept_code")
 

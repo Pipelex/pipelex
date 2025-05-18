@@ -18,6 +18,10 @@ class OcrJob(InferenceJobAbstract):
     job_config: OcrJobConfig
     job_report: OcrJobReport
 
+    @override
+    def validate_before_execution(self):
+        pass
+
     def ocr_job_before_start(self, ocr_engine: OcrEngine):
         # Reset metadata
         self.job_metadata.started_at = datetime.now()

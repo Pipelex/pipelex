@@ -42,7 +42,7 @@ class PipeOCRFactory(PipeSpecificFactoryProtocol[PipeOCRBlueprint, PipeOCR]):
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            ocr_platform=pipe_blueprint.ocr_platform,
+            ocr_engine=pipe_blueprint.ocr_platform,
             output_concept_code=pipe_blueprint.output,
             image_stuff_name=pipe_blueprint.image,
             pdf_stuff_name=pipe_blueprint.pdf,

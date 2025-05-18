@@ -12,7 +12,7 @@ from pipelex import log
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.inference.inference_reporter_abstract import InferenceReporterAbstract
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
-from pipelex.cogt.ocr.ocr_extraction_models import OcrOutput
+from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.job_metadata import UnitJobId
 

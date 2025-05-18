@@ -16,10 +16,9 @@ from pipelex.cogt.inference.inference_report_delegate import InferenceReportDele
 from pipelex.cogt.mistral.mistral_factory import MistralFactory
 from pipelex.cogt.mistral.mistral_utils import upload_file_for_ocr
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
-from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
-from pipelex.cogt.ocr.ocr_extraction_models import OcrExtractedImage, OcrOutput
 from pipelex.cogt.ocr.ocr_input import OcrInputError
 from pipelex.cogt.ocr.ocr_job import OcrJob
+from pipelex.cogt.ocr.ocr_output import OcrExtractedImage, OcrOutput
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract, ocr_job_func
 from pipelex.config import get_config
 from pipelex.tools.misc.base_64 import load_binary_as_base64_async
