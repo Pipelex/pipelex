@@ -27,7 +27,7 @@ class FalWorker(ImggWorkerAbstract):
         super().__init__(imgg_engine=imgg_engine, report_delegate=report_delegate)
 
         if not isinstance(sdk_instance, AsyncClient):
-            raise SdkTypeError(f"Provided sdk_instance is not of type fal_client.AsyncClient: it's a '{type(sdk_instance)}'")
+            raise SdkTypeError(f"Provided Imgg sdk_instance is not of type fal_client.AsyncClient: it's a '{type(sdk_instance)}'")
 
         self.fal_async_client = sdk_instance
 

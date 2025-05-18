@@ -31,7 +31,7 @@ class MistralWorker(LLMWorkerAbstract):
         super().__init__(llm_engine=llm_engine, structure_method=structure_method, report_delegate=report_delegate)
 
         if not isinstance(sdk_instance, Mistral):
-            raise SdkTypeError(f"Provided sdk_instance for {self.__class__.__name__} is not of type Mistral: it's a '{type(sdk_instance)}'")
+            raise SdkTypeError(f"Provided LLM sdk_instance for {self.__class__.__name__} is not of type Mistral: it's a '{type(sdk_instance)}'")
 
         if default_max_tokens := llm_engine.llm_model.max_tokens:
             self.default_max_tokens = default_max_tokens

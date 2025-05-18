@@ -34,7 +34,9 @@ class OpenAIWorker(LLMWorkerAbstract):
         super().__init__(llm_engine=llm_engine, structure_method=structure_method, report_delegate=report_delegate)
 
         if not isinstance(sdk_instance, openai.AsyncOpenAI):
-            raise SdkTypeError(f"openai_sdk_instance is not of type openai.OpenAI: it's a '{type(sdk_instance)}'")
+            raise SdkTypeError(
+                f"Provided LLM sdk_instance for {self.__class__.__name__} is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'"
+            )
 
         self.openai_client_for_text: openai.AsyncOpenAI = sdk_instance
         if structure_method:

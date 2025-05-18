@@ -34,9 +34,9 @@ class PipeOCR(PipeAbstract):
     should_caption_images: bool
 
     @model_validator(mode="after")
-    def validate_at_least_one_stuff_name(self) -> Self:
+    def validate_exactly_one_input_stuff_name(self) -> Self:
         if not has_exactly_one_among_attributes_from_list(self, attributes_list=["image_stuff_name", "pdf_stuff_name"]):
-            raise PipeDefinitionError("At least one of 'image_stuff_name' or 'pdf_stuff_name' must be provided")
+            raise PipeDefinitionError("Exactly one of 'image_stuff_name' or 'pdf_stuff_name' must be provided")
         return self
 
     @override
