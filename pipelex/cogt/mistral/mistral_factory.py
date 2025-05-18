@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import List
+from typing import Dict, List
 
-from mistralai import Mistral
+from mistralai import Mistral, OCRImageObject, OCRResponse
 from mistralai.models import (
     ContentChunk,
     ImageURLChunk,
@@ -33,6 +33,7 @@ from pipelex.cogt.image.prompt_image import (
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import NbTokensByCategoryDict
 from pipelex.cogt.llm.token_category import TokenCategory
+from pipelex.cogt.ocr.ocr_extraction_models import OcrExtractedImage, OcrOutput, Page
 from pipelex.cogt.openai.openai_factory import OpenAIFactory
 from pipelex.config import get_config
 from pipelex.hub import get_secrets_provider
@@ -124,3 +125,23 @@ class MistralFactory:
             TokenCategory.OUTPUT: usage.completion_tokens,
         }
         return nb_tokens_by_category
+
+    @classmethod
+    async def make_ocr_output_from_mistral_response(
+        cls,
+        mistral_ocr_response: OCRResponse,
+    ) -> OcrOutput:
+        pages: Dict[int, Page] = {}
+        for ocr_response_page in mistral_ocr_response.pages:
+            pages[ocr_response_page.index] = Page(
+                text=ocr_response_page.markdown,
+                images=[],
+            )
+            for mistral_ocr_image_obj in ocr_response_page.images:
+                image_uri = mistral_ocr_image_obj.id
+                ocr_extracted_image = OcrExtractedImage(uri=image_uri)
+                pages[ocr_response_page.index].images.append(ocr_extracted_image)
+
+        return OcrOutput(
+            pages=pages,
+        )

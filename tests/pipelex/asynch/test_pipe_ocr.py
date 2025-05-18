@@ -29,6 +29,8 @@ class TestPipeOCR:
             pipe=PipeOCR(
                 domain="generic",
                 image_stuff_name="page_scan",
+                should_add_screenshots=True,
+                should_caption_images=False,
                 output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",
             ),
             working_memory=WorkingMemoryFactory.make_from_image(
@@ -53,6 +55,8 @@ class TestPipeOCR:
             pipe=PipeOCR(
                 domain="generic",
                 pdf_stuff_name="pdf",
+                should_add_screenshots=True,
+                should_caption_images=False,
                 output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",
             ),
             working_memory=WorkingMemoryFactory.make_from_pdf(

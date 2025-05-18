@@ -28,9 +28,11 @@ class PipeOCROutput(PipeOutput):
 
 
 class PipeOCR(PipeAbstract):
+    ocr_engine_name: Optional[OcrEngineName] = None
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
-    ocr_engine_name: Optional[OcrEngineName] = None
+    should_add_screenshots: bool
+    should_caption_images: bool
 
     @model_validator(mode="after")
     def validate_at_least_one_stuff_name(self) -> Self:
@@ -60,19 +62,16 @@ class PipeOCR(PipeAbstract):
 
         if self.image_stuff_name:
             image_stuff = working_memory.get_stuff_as_image(name=self.image_stuff_name)
-            image_path, url = clarify_path_or_url(path_or_url=image_stuff.url)
-            ocr_output = await ocr_engine.extraction_from_image(
-                image_path=image_path,
-                image_url=url,
-                get_screenshot=True,
+            ocr_output = await ocr_engine.make_ocr_output_from_image(
+                image_uri=image_stuff.url,
+                should_caption_image=self.should_caption_images,
             )
         elif self.pdf_stuff_name:
             pdf_stuff = working_memory.get_stuff_as_pdf(name=self.pdf_stuff_name)
-            pdf_path, url = clarify_path_or_url(path_or_url=pdf_stuff.url)  # pyright: ignore
-            ocr_output = await ocr_engine.extraction_from_pdf(
-                pdf_path=pdf_path,
-                pdf_url=url,
-                get_screenshot=True,
+            ocr_output = await ocr_engine.make_ocr_output_from_pdf(
+                pdf_uri=pdf_stuff.url,
+                should_caption_images=self.should_caption_images,
+                should_add_screenshots=True,
             )
         else:
             raise PipeDefinitionError("PipeOCR should have a non-None image_stuff_name or pdf_stuff_name")
