@@ -39,7 +39,6 @@ class TestSimplePipeRun:
 
     @pytest.mark.parametrize("pipe_code, input_concept_code, str_value", PipeTestCases.SIMPLE_PIPE_RUN_FROM_STR)
     async def test_execute_pipe_from_str(self, pipe_code: str, input_concept_code: str, str_value: str):
-        job_history.activate()
         working_memory = WorkingMemoryFactory.make_from_text(
             concept_code=input_concept_code,
             text=str_value,
@@ -52,4 +51,3 @@ class TestSimplePipeRun:
         log.verbose(pipe_output, title="pipe_output")
         pretty_print(pipe_output, title="pipe_output")
         get_report_delegate().general_report()
-        job_history.print_mermaid_flowchart_and_reset()
