@@ -4,7 +4,6 @@
 
 from abc import ABC, abstractmethod
 
-
 from pipelex.cogt.ocr.ocr_extraction_models import OcrOutput
 
 
