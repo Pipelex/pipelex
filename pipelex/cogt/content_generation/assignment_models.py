@@ -125,18 +125,3 @@ class Jinja2Assignment(BaseModel):
     jinja2: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
-
-
-AssignmentType = Union[
-    LLMAssignment,
-    ObjectAssignment,
-    TextThenObjectAssignment,
-    ImggAssignment,
-]
-
-ResultType = Union[
-    str,
-    BaseModel,
-    List[BaseModel],
-    GeneratedImage,
-]

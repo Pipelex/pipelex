@@ -49,8 +49,6 @@ class PipeOCR(PipeAbstract):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOCROutput:
-        # TODO:
-
         if not self.ocr_engine_name:
             self.ocr_engine_name = OcrEngineName(get_config().cogt.ocr_config.default_ocr_engine_name)
 
