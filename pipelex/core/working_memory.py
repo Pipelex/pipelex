@@ -3,7 +3,7 @@
 # "Pipelex" is a trademark of Evotis S.A.S.
 
 from operator import attrgetter
-from typing import Any, Dict, Generic, List, Optional, Self, Set, Type, TypeVar
+from typing import Any, Dict, List, Optional, Self, Set, Type, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
 

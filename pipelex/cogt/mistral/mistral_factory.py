@@ -4,7 +4,7 @@
 
 from typing import Dict, List
 
-from mistralai import Mistral, OCRImageObject, OCRResponse
+from mistralai import Mistral, OCRResponse
 from mistralai.models import (
     ContentChunk,
     ImageURLChunk,

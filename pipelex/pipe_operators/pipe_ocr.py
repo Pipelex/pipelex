@@ -19,7 +19,6 @@ from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.job_metadata import JobMetadata
 from pipelex.libraries.pipelines.documents import PageContent
-from pipelex.tools.utils.path_utils import clarify_path_or_url
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
 

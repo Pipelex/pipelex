@@ -5,11 +5,9 @@
 import importlib.resources
 import os
 import shutil
-import urllib.parse
 from contextlib import contextmanager
 from typing import List, Optional
 
-import requests
 
 from pipelex.tools.utils.path_utils import path_exists
 

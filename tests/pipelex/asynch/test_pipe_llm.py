@@ -9,8 +9,6 @@ import pytest
 from pipelex import log, pretty_print
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ImageContent, StructuredContent
-from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate
 from pipelex.pipe_operators.pipe_llm import PipeLLM, PipeLLMOutput

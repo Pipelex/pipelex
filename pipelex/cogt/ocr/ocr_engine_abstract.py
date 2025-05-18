@@ -3,9 +3,7 @@
 # "Pipelex" is a trademark of Evotis S.A.S.
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
 
-from pydantic import BaseModel
 
 from pipelex.cogt.ocr.ocr_extraction_models import OcrOutput
 
