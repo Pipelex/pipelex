@@ -50,7 +50,7 @@ class PipeOCR(PipeAbstract):
         output_name: Optional[str] = None,
     ) -> PipeOCROutput:
         if not self.ocr_engine_name:
-            self.ocr_engine_name = OcrEngineName(get_config().cogt.ocr_config.default_ocr_engine_name)
+            self.ocr_engine_name = OcrEngineName(get_config().cogt.ocr_config.ocr_engine_name)
 
         ocr_engine: OCREngineAbstract = OCREngineFactory.make_ocr_engine(self.ocr_engine_name)
 

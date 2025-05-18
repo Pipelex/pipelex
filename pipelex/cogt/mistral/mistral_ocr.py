@@ -30,7 +30,7 @@ class MistralOCREngine(OCREngineAbstract):
     def __init__(self):
         """Initialize the MistralOCR class with a Mistral client."""
         self.mistral_client = MistralFactory.make_mistral_client()
-        self.ocr_model_name = get_config().cogt.ocr_config.mistral_ocr_config.ocr_model_name
+        self.ocr_model_name = get_config().cogt.ocr_config.ocr_model_name
 
     @override
     async def make_ocr_output_from_image(
