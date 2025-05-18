@@ -14,7 +14,7 @@ from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_model_provider_abstract import LLMModelProviderAbstract
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
-from pipelex.cogt.sdk_manager import SdkManager
+from pipelex.cogt.plugin_manager import PluginManager
 from pipelex.core.concept import Concept
 from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.domain import Domain
@@ -45,7 +45,7 @@ class PipelexHub:
         # cogt
         self._llm_models_provider: Optional[LLMModelProviderAbstract] = None
         self._llm_deck_provider: Optional[LLMDeckAbstract] = None
-        self._sdk_manager: Optional[SdkManager] = None
+        self._plugin_manager: Optional[PluginManager] = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: InferenceReportDelegate
         self._content_generator: Optional[ContentGeneratorProtocol] = None
@@ -114,8 +114,8 @@ class PipelexHub:
     def set_llm_deck_provider(self, llm_deck_provider: LLMDeckAbstract):
         self._llm_deck_provider = llm_deck_provider
 
-    def set_sdk_manager(self, sdk_manager: SdkManager):
-        self._sdk_manager = sdk_manager
+    def set_plugin_manager(self, plugin_manager: PluginManager):
+        self._plugin_manager = plugin_manager
 
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
@@ -187,10 +187,10 @@ class PipelexHub:
             raise RuntimeError("LLMDeck is not initialized")
         return self._llm_deck_provider
 
-    def get_sdk_manager(self) -> SdkManager:
-        if self._sdk_manager is None:
+    def get_plugin_manager(self) -> PluginManager:
+        if self._plugin_manager is None:
             raise RuntimeError("SdkManager is not initialized")
-        return self._sdk_manager
+        return self._plugin_manager
 
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
@@ -275,8 +275,8 @@ def get_llm_deck() -> LLMDeckAbstract:
     return get_pipelex_hub().get_required_llm_deck()
 
 
-def get_sdk_manager() -> SdkManager:
-    return get_pipelex_hub().get_sdk_manager()
+def get_plugin_manager() -> PluginManager:
+    return get_pipelex_hub().get_plugin_manager()
 
 
 def get_inference_manager() -> InferenceManagerProtocol:

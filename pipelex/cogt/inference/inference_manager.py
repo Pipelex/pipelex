@@ -23,14 +23,12 @@ from pipelex.hub import get_llm_deck, get_report_delegate
 
 class InferenceManager(InferenceManagerProtocol):
     def __init__(self):
-        self.llm_worker_factory = LLMWorkerFactory()
         self.imgg_worker_factory = ImggWorkerFactory()
         self.llm_workers: Dict[str, LLMWorkerAbstract] = {}
         self.imgg_workers: Dict[str, ImggWorkerAbstract] = {}
 
     @override
     def reset(self):
-        self.llm_worker_factory = LLMWorkerFactory()
         self.imgg_worker_factory = ImggWorkerFactory()
         self.llm_workers.clear()
         self.imgg_workers.clear()
@@ -73,7 +71,7 @@ class InferenceManager(InferenceManagerProtocol):
         llm_handle: str,
     ) -> LLMWorkerAbstract:
         llm_engine = LLMEngineFactory.make_llm_engine(llm_engine_blueprint=llm_engine_blueprint)
-        llm_worker = self.llm_worker_factory.make_llm_worker(
+        llm_worker = LLMWorkerFactory.make_llm_worker(
             llm_engine=llm_engine,
             report_delegate=get_report_delegate(),
         )

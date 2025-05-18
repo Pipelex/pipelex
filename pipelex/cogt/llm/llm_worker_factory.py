@@ -2,8 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from enum import StrEnum
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
@@ -11,21 +10,21 @@ from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.cogt.sdk_manager import SdkHandle
+from pipelex.cogt.plugin_manager import PluginHandle
 from pipelex.config import get_config
-from pipelex.hub import get_sdk_manager
+from pipelex.hub import get_plugin_manager
 
 
 class LLMWorkerFactory:
+    @staticmethod
     def make_llm_worker(
-        self,
         llm_engine: LLMEngine,
         report_delegate: Optional[InferenceReportDelegate] = None,
     ) -> LLMWorkerAbstract:
         llm_worker: LLMWorkerAbstract
 
-        sdk_manager = get_sdk_manager()
-        llm_sdk_handle = SdkHandle.get_for_llm_platform(llm_platform=llm_engine.llm_platform)
+        plugin_manager = get_plugin_manager()
+        llm_sdk_handle = PluginHandle.get_for_llm_platform(llm_platform=llm_engine.llm_platform)
         match llm_engine.llm_platform:
             case LLMPlatform.OPENAI | LLMPlatform.AZURE_OPENAI | LLMPlatform.PERPLEXITY:
                 from pipelex.cogt.openai.openai_factory import OpenAIFactory
@@ -36,7 +35,7 @@ class LLMWorkerFactory:
 
                 from pipelex.cogt.openai.openai_worker import OpenAIWorker
 
-                llm_sdk_instance = sdk_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or sdk_manager.set_llm_sdk_instance(
+                llm_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=llm_engine.llm_platform),
                 )
@@ -56,7 +55,7 @@ class LLMWorkerFactory:
                 from pipelex.cogt.openai.openai_factory import OpenAIFactory
                 from pipelex.cogt.openai.openai_worker import OpenAIWorker
 
-                llm_sdk_instance = sdk_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or sdk_manager.set_llm_sdk_instance(
+                llm_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=llm_engine.llm_platform),
                 )
@@ -83,7 +82,7 @@ class LLMWorkerFactory:
                 from pipelex.cogt.anthropic.anthropic_factory import AnthropicFactory
                 from pipelex.cogt.anthropic.anthropic_worker import AnthropicWorker
 
-                llm_sdk_instance = sdk_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or sdk_manager.set_llm_sdk_instance(
+                llm_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=AnthropicFactory.make_anthropic_client(llm_platform=llm_engine.llm_platform),
                 )
@@ -109,7 +108,7 @@ class LLMWorkerFactory:
                 from pipelex.cogt.mistral.mistral_factory import MistralFactory
                 from pipelex.cogt.mistral.mistral_worker import MistralWorker
 
-                llm_sdk_instance = sdk_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or sdk_manager.set_llm_sdk_instance(
+                llm_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=MistralFactory.make_mistral_client(),
                 )
@@ -132,7 +131,7 @@ class LLMWorkerFactory:
                 from pipelex.cogt.bedrock.bedrock_factory import BedrockFactory
                 from pipelex.cogt.bedrock.bedrock_worker import BedrockWorker
 
-                llm_sdk_instance = sdk_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or sdk_manager.set_llm_sdk_instance(
+                llm_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=BedrockFactory.make_bedrock_client(),
                 )

@@ -18,7 +18,7 @@ from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.inference.inference_report_manager import InferenceReportManager
 from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
-from pipelex.cogt.sdk_manager import SdkManager
+from pipelex.cogt.plugin_manager import PluginManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
@@ -101,8 +101,8 @@ class Pipelex:
         self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
         self.report_manager = InferenceReportManager()
         self.pipelex_hub.set_report_delegate(self.report_manager)
-        self.sdk_manager = SdkManager()
-        self.pipelex_hub.set_sdk_manager(self.sdk_manager)
+        self.plugin_manager = PluginManager()
+        self.pipelex_hub.set_plugin_manager(self.plugin_manager)
         self.inference_manager = InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
