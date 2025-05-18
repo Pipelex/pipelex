@@ -30,7 +30,6 @@ class InferenceManager(InferenceManagerProtocol):
 
     @override
     def reset(self):
-        self.llm_worker_factory.clear()
         self.llm_worker_factory = LLMWorkerFactory()
         self.imgg_worker_factory = ImggWorkerFactory()
         self.llm_workers.clear()

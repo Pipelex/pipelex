@@ -7,10 +7,6 @@ from abc import ABC, abstractmethod
 from pipelex.cogt.ocr.ocr_extraction_models import OcrOutput
 
 
-class OCREngineInputError(ValueError):
-    pass
-
-
 class OCREngineAbstract(ABC):
     """
     Abstract base class for OCR engines.

@@ -11,55 +11,12 @@ from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
+from pipelex.cogt.sdk_manager import SdkHandle
 from pipelex.config import get_config
-
-
-class LLMSDKHandle(StrEnum):
-    OPENAI_ASYNC = "openai_async"
-    AZURE_OPENAI_ASYNC = "azure_openai_async"
-    ANTHROPIC_ASYNC = "anthropic_async"
-    BEDROCK_ANTHROPIC_ASYNC = "bedrock_anthropic_async"
-    MISTRAL_ASYNC = "mistral_async"
-    BEDROCK_ASYNC = "bedrock_async"
-    PERPLEXITY_ASYNC = "perplexity_async"
-    VERTEXAI_OPENAI_ASYNC = "vertexai_openai_async"
-
-    @staticmethod
-    def get_for(llm_platform: LLMPlatform) -> "LLMSDKHandle":
-        match llm_platform:
-            case LLMPlatform.OPENAI:
-                return LLMSDKHandle.OPENAI_ASYNC
-            case LLMPlatform.AZURE_OPENAI:
-                return LLMSDKHandle.AZURE_OPENAI_ASYNC
-            case LLMPlatform.ANTHROPIC:
-                return LLMSDKHandle.ANTHROPIC_ASYNC
-            case LLMPlatform.MISTRAL:
-                return LLMSDKHandle.MISTRAL_ASYNC
-            case LLMPlatform.BEDROCK:
-                return LLMSDKHandle.BEDROCK_ASYNC
-            case LLMPlatform.BEDROCK_ANTHROPIC:
-                return LLMSDKHandle.BEDROCK_ANTHROPIC_ASYNC
-            case LLMPlatform.PERPLEXITY:
-                return LLMSDKHandle.PERPLEXITY_ASYNC
-            case LLMPlatform.VERTEXAI_OPENAI:
-                return LLMSDKHandle.VERTEXAI_OPENAI_ASYNC
+from pipelex.hub import get_sdk_manager
 
 
 class LLMWorkerFactory:
-    def __init__(self):
-        self.llm_sdk_instances: Dict[LLMSDKHandle, Any] = {}
-
-    def clear(self):
-        self.llm_sdk_instances.clear()
-
-    def get_llm_sdk_instance(self, llm_sdk_handle: LLMSDKHandle) -> Optional[Any]:
-        llm_sdk_instance = self.llm_sdk_instances.get(llm_sdk_handle)
-        return llm_sdk_instance
-
-    def set_llm_sdk_instance(self, llm_sdk_handle: LLMSDKHandle, llm_sdk_instance: Any) -> Any:
-        self.llm_sdk_instances[llm_sdk_handle] = llm_sdk_instance
-        return llm_sdk_instance
-
     def make_llm_worker(
         self,
         llm_engine: LLMEngine,
@@ -67,7 +24,8 @@ class LLMWorkerFactory:
     ) -> LLMWorkerAbstract:
         llm_worker: LLMWorkerAbstract
 
-        llm_sdk_handle = LLMSDKHandle.get_for(llm_platform=llm_engine.llm_platform)
+        sdk_manager = get_sdk_manager()
+        llm_sdk_handle = SdkHandle.get_for_llm_platform(llm_platform=llm_engine.llm_platform)
         match llm_engine.llm_platform:
             case LLMPlatform.OPENAI | LLMPlatform.AZURE_OPENAI | LLMPlatform.PERPLEXITY:
                 from pipelex.cogt.openai.openai_factory import OpenAIFactory
@@ -78,7 +36,7 @@ class LLMWorkerFactory:
 
                 from pipelex.cogt.openai.openai_worker import OpenAIWorker
 
-                llm_sdk_instance = self.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or self.set_llm_sdk_instance(
+                llm_sdk_instance = sdk_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or sdk_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=llm_engine.llm_platform),
                 )
@@ -98,7 +56,7 @@ class LLMWorkerFactory:
                 from pipelex.cogt.openai.openai_factory import OpenAIFactory
                 from pipelex.cogt.openai.openai_worker import OpenAIWorker
 
-                llm_sdk_instance = self.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or self.set_llm_sdk_instance(
+                llm_sdk_instance = sdk_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or sdk_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=llm_engine.llm_platform),
                 )
@@ -125,7 +83,7 @@ class LLMWorkerFactory:
                 from pipelex.cogt.anthropic.anthropic_factory import AnthropicFactory
                 from pipelex.cogt.anthropic.anthropic_worker import AnthropicWorker
 
-                llm_sdk_instance = self.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or self.set_llm_sdk_instance(
+                llm_sdk_instance = sdk_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or sdk_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=AnthropicFactory.make_anthropic_client(llm_platform=llm_engine.llm_platform),
                 )
@@ -151,7 +109,7 @@ class LLMWorkerFactory:
                 from pipelex.cogt.mistral.mistral_factory import MistralFactory
                 from pipelex.cogt.mistral.mistral_worker import MistralWorker
 
-                llm_sdk_instance = self.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or self.set_llm_sdk_instance(
+                llm_sdk_instance = sdk_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or sdk_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=MistralFactory.make_mistral_client(),
                 )
@@ -174,7 +132,7 @@ class LLMWorkerFactory:
                 from pipelex.cogt.bedrock.bedrock_factory import BedrockFactory
                 from pipelex.cogt.bedrock.bedrock_worker import BedrockWorker
 
-                llm_sdk_instance = self.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or self.set_llm_sdk_instance(
+                llm_sdk_instance = sdk_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or sdk_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=BedrockFactory.make_bedrock_client(),
                 )

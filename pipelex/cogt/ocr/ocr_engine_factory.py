@@ -6,20 +6,16 @@ from enum import StrEnum
 
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
-
-
-class OcrEngineName(StrEnum):
-    MISTRAL = "mistral"
-    # Add a placeholder for future engines or use a different approach
+from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 
 
 class OCREngineFactory:
     @staticmethod
     def make_ocr_engine(
-        ocr_engine_name: OcrEngineName,
+        ocr_platform: OcrPlatform,
     ) -> OCREngineAbstract:
-        match ocr_engine_name:
-            case OcrEngineName.MISTRAL:
+        match ocr_platform:
+            case OcrPlatform.MISTRAL:
                 try:
                     from pipelex.cogt.mistral.mistral_ocr import MistralOCREngine
                 except ImportError as exc:

@@ -8,7 +8,7 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
-from pipelex.cogt.ocr.ocr_engine_factory import OCREngineFactory, OcrEngineName
+from pipelex.cogt.ocr.ocr_engine_factory import OCREngineFactory, OcrPlatform
 from pipelex.config import get_config
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
@@ -27,7 +27,7 @@ class PipeOCROutput(PipeOutput):
 
 
 class PipeOCR(PipeAbstract):
-    ocr_engine_name: Optional[OcrEngineName] = None
+    ocr_platform: Optional[OcrPlatform] = None
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
     should_add_screenshots: bool
@@ -49,10 +49,10 @@ class PipeOCR(PipeAbstract):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOCROutput:
-        if not self.ocr_engine_name:
-            self.ocr_engine_name = OcrEngineName(get_config().cogt.ocr_config.ocr_engine_name)
+        if not self.ocr_platform:
+            self.ocr_platform = OcrPlatform(get_config().cogt.ocr_config.ocr_platform)
 
-        ocr_engine: OCREngineAbstract = OCREngineFactory.make_ocr_engine(self.ocr_engine_name)
+        ocr_engine: OCREngineAbstract = OCREngineFactory.make_ocr_engine(self.ocr_platform)
 
         if not self.output_concept_code:
             raise PipeDefinitionError("PipeOCR should have a non-None output_concept_code")

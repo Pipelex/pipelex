@@ -17,10 +17,6 @@ from pipelex.tools.pdf.pdf_render import render_pdf_pages_to_images
 from pipelex.tools.utils.path_utils import clarify_path_or_url, ensure_path
 
 
-class MistralOCRError(ValueError):
-    pass
-
-
 class MistralOCREngine(OCREngineAbstract):
     """
     A wrapper class for Mistral OCR functionality.

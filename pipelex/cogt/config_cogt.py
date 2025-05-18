@@ -32,7 +32,7 @@ class CogtReportConfig(ConfigModel):
 
 
 class OcrConfig(ConfigModel):
-    ocr_engine_name: str
+    ocr_platform: str
     ocr_model_name: str
 
 
