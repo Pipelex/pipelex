@@ -19,7 +19,8 @@ class PipeOCRBlueprint(PipeBlueprint):
     image: Optional[str] = None
     pdf: Optional[str] = None
     ocr_engine_name: Optional[OcrEngineName] = None
-    output: str
+    add_screenshots: bool = False
+    caption_image: bool = False
 
     @model_validator(mode="after")
     def validate_input_source(self) -> Self:
@@ -45,6 +46,8 @@ class PipeOCRFactory(PipeSpecificFactoryProtocol[PipeOCRBlueprint, PipeOCR]):
             output_concept_code=pipe_blueprint.output,
             image_stuff_name=pipe_blueprint.image,
             pdf_stuff_name=pipe_blueprint.pdf,
+            should_add_screenshots=pipe_blueprint.add_screenshots,
+            should_caption_images=pipe_blueprint.caption_image,
         )
 
     @classmethod

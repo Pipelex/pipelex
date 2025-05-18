@@ -4,7 +4,7 @@
 
 import pytest
 
-from pipelex.cogt.ocr.mistral_ocr import MistralOCREngine
+from pipelex.cogt.mistral.mistral_ocr import MistralOCREngine
 from tests.test_data import PDFTestCases
 
 

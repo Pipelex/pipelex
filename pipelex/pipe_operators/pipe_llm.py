@@ -33,7 +33,7 @@ from pipelex.core.pipe_run_params import (
 from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError, PipeExecutionError, PipelexError
+from pipelex.exceptions import PipeDefinitionError, PipeExecutionError
 from pipelex.hub import (
     get_concept_provider,
     get_content_generator,

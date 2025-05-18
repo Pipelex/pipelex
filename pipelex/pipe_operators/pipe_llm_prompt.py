@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from functools import reduce
-from operator import attrgetter
 from typing import ClassVar, List, Optional, Self, Set
 
 from kajson.class_registry import class_registry
@@ -37,7 +35,6 @@ from pipelex.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.utils.class_structure_utils import get_type_structure
-from pipelex.tools.utils.path_utils import clarify_path_or_url
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
 
 

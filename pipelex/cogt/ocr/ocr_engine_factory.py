@@ -21,7 +21,7 @@ class OCREngineFactory:
         match ocr_engine_name:
             case OcrEngineName.MISTRAL:
                 try:
-                    from pipelex.cogt.ocr.mistral_ocr import MistralOCREngine
+                    from pipelex.cogt.mistral.mistral_ocr import MistralOCREngine
                 except ImportError as exc:
                     raise MissingDependencyError(
                         "mistralai",

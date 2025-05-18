@@ -31,8 +31,8 @@ from pipelex.cogt.llm.llm_report import NbTokensByCategoryDict
 from pipelex.cogt.llm.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.hub import get_secrets_provider
-from pipelex.tools.utils.image_utils import (
-    load_image_as_base64_from_path_async,
+from pipelex.tools.misc.base_64 import (
+    load_binary_as_base64_async,
 )
 
 
@@ -168,17 +168,17 @@ class AnthropicFactory:
         cls,
         prompt_image: PromptImage,
     ) -> PromptImageTypedBytesOrUrl:
-        the_typed_bytes_or_url: PromptImageTypedBytesOrUrl
+        typed_bytes_or_url: PromptImageTypedBytesOrUrl
         if isinstance(prompt_image, PromptImageBytes):
-            the_typed_bytes_or_url = prompt_image.make_prompt_image_typed_bytes()
+            typed_bytes_or_url = prompt_image.make_prompt_image_typed_bytes()
         elif isinstance(prompt_image, PromptImageUrl):
-            the_typed_bytes_or_url = prompt_image.url
+            typed_bytes_or_url = prompt_image.url
         elif isinstance(prompt_image, PromptImagePath):
-            the_bytes = await load_image_as_base64_from_path_async(prompt_image.file_path)
-            the_typed_bytes_or_url = PromptImageTypedBytes(image_bytes=the_bytes, file_type=prompt_image.get_file_type())
+            b64 = await load_binary_as_base64_async(prompt_image.file_path)
+            typed_bytes_or_url = PromptImageTypedBytes(image_bytes=b64, file_type=prompt_image.get_file_type())
         else:
             raise AnthropicFactoryError(f"Unsupported PromptImage type: '{type(prompt_image).__name__}'")
-        return the_typed_bytes_or_url
+        return typed_bytes_or_url
 
     @classmethod
     async def make_simple_messages(

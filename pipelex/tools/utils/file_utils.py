@@ -5,11 +5,9 @@
 import importlib.resources
 import os
 import shutil
-import urllib.parse
 from contextlib import contextmanager
 from typing import List, Optional
 
-import requests
 
 from pipelex.tools.utils.path_utils import path_exists
 
@@ -245,29 +243,3 @@ def find_folders_by_name(
             if dir_name == folder_name:
                 folder_paths.append(os.path.join(root, dir_name))
     return folder_paths
-
-
-# TODO: Implement this
-def get_local_file_type_from_content(path: str):
-    "Use file content to determine the type when no extension is provided in the path/filename"
-    pass
-
-
-def get_local_type_from_path(path: str) -> str:
-    _, extension = os.path.splitext(path)
-    extension = extension.lower()
-    return extension
-
-
-def get_remote_file_type_from_url(url: str) -> str:
-    parsed_url = urllib.parse.urlparse(url)
-    path = parsed_url.path
-    _, extension = os.path.splitext(path)
-    extension = extension.lower()
-    return extension
-
-
-def get_remote_file_type_from_content(url: str) -> str:
-    response = requests.head(url, timeout=5)
-    content_type = response.headers.get("Content-Type", "").lower()
-    return content_type

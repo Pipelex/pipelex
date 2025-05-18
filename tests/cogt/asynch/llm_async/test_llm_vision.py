@@ -12,7 +12,7 @@ from pipelex.cogt.image.prompt_image import PromptImageBytes, PromptImagePath, P
 from pipelex.cogt.llm.llm_job import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.hub import get_async_llm_worker
-from pipelex.tools.utils.image_utils import load_image_as_base64_from_path
+from pipelex.tools.misc.base_64 import load_binary_as_base64
 from tests.cogt.test_data import LLMVisionTestCases
 
 
@@ -39,7 +39,7 @@ class TestAsyncCogtLLMVision:
             pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle_for_vision} because {exc}")
 
     async def test_gen_text_from_vision_by_bytes_async(self, vision_image_param: str, llm_handle_for_vision: str):
-        image_bytes = load_image_as_base64_from_path(path=vision_image_param)
+        image_bytes = load_binary_as_base64(path=vision_image_param)
         prompt_image = PromptImageBytes(b64_image_bytes=image_bytes)
         llm_worker_async = get_async_llm_worker(llm_handle=llm_handle_for_vision)
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(

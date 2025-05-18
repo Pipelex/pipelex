@@ -1,0 +1,175 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+from typing import List
+
+import shortuuid
+from typing_extensions import override
+
+from pipelex.cogt.mistral.mistral_factory import MistralFactory
+from pipelex.cogt.mistral.mistral_utils import upload_file_for_ocr
+from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
+from pipelex.cogt.ocr.ocr_extraction_models import OcrExtractedImage, OcrOutput
+from pipelex.config import get_config
+from pipelex.tools.misc.base_64 import load_binary_as_base64_async
+from pipelex.tools.pdf.pdf_render import render_pdf_pages_to_images
+from pipelex.tools.utils.path_utils import clarify_path_or_url, ensure_path
+
+
+class MistralOCRError(ValueError):
+    pass
+
+
+class MistralOCREngine(OCREngineAbstract):
+    """
+    A wrapper class for Mistral OCR functionality.
+    Provides methods to process documents and images.
+    """
+
+    def __init__(self):
+        """Initialize the MistralOCR class with a Mistral client."""
+        self.mistral_client = MistralFactory.make_mistral_client()
+        self.ocr_model_name = get_config().cogt.ocr_config.mistral_ocr_config.ocr_model_name
+
+    @override
+    async def make_ocr_output_from_image(
+        self,
+        image_uri: str,
+        should_caption_image: bool = False,
+    ) -> OcrOutput:
+        if should_caption_image:
+            raise NotImplementedError("Captioning is not implemented for Mistral OCR.")
+        image_path, image_url = clarify_path_or_url(path_or_url=image_uri)
+        if image_url:
+            return await self.extract_from_image_url(
+                image_url=image_url,
+            )
+        else:
+            assert image_path is not None  # Type narrowing for mypy
+            return await self.extract_from_image_file(
+                image_path=image_path,
+            )
+
+    @override
+    async def make_ocr_output_from_pdf(
+        self,
+        pdf_uri: str,
+        should_caption_images: bool,
+        should_add_screenshots: bool,
+    ) -> OcrOutput:
+        if should_caption_images:
+            raise NotImplementedError("Captioning is not implemented for Mistral OCR.")
+        pdf_path, pdf_url = clarify_path_or_url(path_or_url=pdf_uri)  # pyright: ignore
+        ocr_output: OcrOutput
+        if pdf_url:
+            ocr_output = await self.extract_from_pdf_url(
+                pdf_url=pdf_url,
+            )
+        else:  # pdf_path must be provided based on validation
+            assert pdf_path is not None  # Type narrowing for mypy
+            ocr_output = await self.extract_from_pdf_file(
+                pdf_path=pdf_path,
+            )
+        if should_add_screenshots:
+            ocr_output = await self.add_page_screenshots_to_ocr_output(
+                pdf_uri=pdf_uri,
+                ocr_output=ocr_output,
+            )
+        return ocr_output
+
+    async def extract_from_image_url(
+        self,
+        image_url: str,
+    ) -> OcrOutput:
+        ocr_response = await self.mistral_client.ocr.process_async(
+            model=self.ocr_model_name,
+            document={
+                "type": "image_url",
+                "image_url": image_url,
+            },
+        )
+        ocr_output = await MistralFactory.make_ocr_output_from_mistral_response(
+            mistral_ocr_response=ocr_response,
+        )
+        return ocr_output
+
+    async def extract_from_image_file(
+        self,
+        image_path: str,
+    ) -> OcrOutput:
+        b64 = await load_binary_as_base64_async(path=image_path)
+
+        # TODO: set proper image format
+        ocr_response = await self.mistral_client.ocr.process_async(
+            model=self.ocr_model_name,
+            document={"type": "image_url", "image_url": f"data:image/jpeg;base64,{b64.decode('utf-8')}"},
+        )
+        ocr_output = await MistralFactory.make_ocr_output_from_mistral_response(
+            mistral_ocr_response=ocr_response,
+        )
+        return ocr_output
+
+    async def extract_from_pdf_url(
+        self,
+        pdf_url: str,
+        should_include_images: bool = False,
+    ) -> OcrOutput:
+        ocr_response = await self.mistral_client.ocr.process_async(
+            model=self.ocr_model_name,
+            document={
+                "type": "document_url",
+                "document_url": pdf_url,
+            },
+            include_image_base64=should_include_images,
+        )
+
+        ocr_output = await MistralFactory.make_ocr_output_from_mistral_response(
+            mistral_ocr_response=ocr_response,
+        )
+        return ocr_output
+
+    async def extract_from_pdf_file(
+        self,
+        pdf_path: str,
+        should_include_images: bool = False,
+    ) -> OcrOutput:
+        # Upload the file
+        uploaded_file_id = await upload_file_for_ocr(
+            mistral_client=self.mistral_client,
+            file_path=pdf_path,
+        )
+
+        # Get signed URL
+        signed_url = await self.mistral_client.files.get_signed_url_async(
+            file_id=uploaded_file_id,
+        )
+        return await self.extract_from_pdf_url(
+            pdf_url=signed_url.url,
+            should_include_images=should_include_images,
+        )
+
+    async def add_page_screenshots_to_ocr_output(
+        self,
+        pdf_uri: str,
+        ocr_output: OcrOutput,
+    ) -> OcrOutput:
+        screenshot_uris: List[str] = []
+        pdf_path, pdf_url = clarify_path_or_url(pdf_uri)
+        # TODO: use centralized / possibly online storage instead of local file system
+        images = await render_pdf_pages_to_images(pdf_path=pdf_path, pdf_url=pdf_url, dpi=300)
+
+        temp_directory_name = shortuuid.uuid()
+        temp_directory_path = f"temp/{temp_directory_name}"
+        ensure_path(temp_directory_path)
+
+        # Save images to the folder and return their paths
+        screenshot_uris = []
+        for image_index, image in enumerate(images):
+            image_path = f"{temp_directory_path}/page_{image_index}.png"
+            image.save(image_path)
+            screenshot_uris.append(image_path)
+        for page_index, page in enumerate(ocr_output.pages.values()):
+            screenshot_uri = screenshot_uris[page_index]
+            page.screenshot = OcrExtractedImage(uri=screenshot_uri)
+        return ocr_output
