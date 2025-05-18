@@ -36,7 +36,7 @@ from pipelex.cogt.llm.token_category import TokenCategory
 from pipelex.cogt.openai.openai_factory import OpenAIFactory
 from pipelex.config import get_config
 from pipelex.hub import get_secrets_provider
-from pipelex.tools.utils.image_utils import load_image_as_base64_from_bytes, load_image_as_base64_from_path
+from pipelex.tools.misc.base_64 import encode_to_base64, load_binary_as_base64
 
 
 class MistralFactory:
@@ -79,10 +79,12 @@ class MistralFactory:
         if isinstance(prompt_image, PromptImageUrl):
             return ImageURLChunk(image_url=prompt_image.url)
         elif isinstance(prompt_image, PromptImagePath):
-            image_bytes = load_image_as_base64_from_path(prompt_image.file_path).decode("utf-8")
+            image_bytes = load_binary_as_base64(prompt_image.file_path).decode("utf-8")
+            # TODO: use actual image type
             return ImageURLChunk(image_url=f"data:image/png;base64,{image_bytes}")
         elif isinstance(prompt_image, PromptImageBytes):
-            image_bytes = load_image_as_base64_from_bytes(prompt_image.b64_image_bytes).decode("utf-8")
+            image_bytes = encode_to_base64(prompt_image.b64_image_bytes).decode("utf-8")
+            # TODO: use actual image type
             return ImageURLChunk(image_url=f"data:image/png;base64,{image_bytes}")
         else:
             raise PromptImageFormatError(f"prompt_image of type {type(prompt_image)} is not supported")

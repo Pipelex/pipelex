@@ -7,17 +7,19 @@ import os
 from typing import Dict, List, Optional
 
 import aiofiles
+import shortuuid
 from mistralai import OCRImageObject, OCRResponse
+from PIL import Image
 from typing_extensions import override
 
 from pipelex.cogt.mistral.mistral_factory import MistralFactory
 from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract, OCRExtractedImage, OCROutput, Page
-from pipelex.cogt.ocr.ocr_utils import pdf_to_saved_page_screenshot_paths
 from pipelex.config import get_config
-from pipelex.tools.utils.image_utils import (
-    load_image_as_base64_from_path,
+from pipelex.tools.misc.base_64 import (
+    load_binary_as_base64,
 )
-from pipelex.tools.utils.path_utils import clarify_path_or_url
+from pipelex.tools.pdf.pdf_render import render_pdf_pages_to_images
+from pipelex.tools.utils.path_utils import clarify_path_or_url, ensure_path
 
 
 class MistralOCRError(ValueError):
@@ -129,7 +131,7 @@ class MistralOCREngine(OCREngineAbstract):
         Returns:
             OCR response containing extracted text and images
         """
-        base64_image = load_image_as_base64_from_path(path=image_path).decode("utf-8")
+        base64_image = load_binary_as_base64(path=image_path).decode("utf-8")
 
         ocr_response = await self.mistral_client.ocr.process_async(
             model=self.ocr_model_name,
@@ -299,15 +301,27 @@ class MistralOCREngine(OCREngineAbstract):
         image_url: Optional[str],
         ocr_output: OCROutput,
     ) -> OCROutput:
+        screenshot_uris: List[str] = []
         if image_url:
-            screenshot_paths = [image_url]
+            screenshot_uris = [image_url]
         elif pdf_url:
             pdf_path, pdf_url = clarify_path_or_url(pdf_url)
             # TODO: use centralized / possibly online storage instead of local file system
-            screenshot_paths = await pdf_to_saved_page_screenshot_paths(pdf_path=pdf_path, pdf_url=pdf_url)
+            images = await render_pdf_pages_to_images(pdf_path=pdf_path, pdf_url=pdf_url, dpi=300)
+
+            temp_directory_name = shortuuid.uuid()
+            temp_directory_path = f"temp/{temp_directory_name}"
+            ensure_path(temp_directory_path)
+
+            # Save images to the folder and return their paths
+            screenshot_uris = []
+            for image_index, image in enumerate(images):
+                image_path = f"{temp_directory_path}/page_{image_index}.png"
+                image.save(image_path)
+                screenshot_uris.append(image_path)
         else:
             raise MistralOCRError("Either image_url or pdf_url must be provided")
         for page_index, page in enumerate(ocr_output.pages.values()):
-            screenshot_path = screenshot_paths[page_index]
-            page.screenshot = OCRExtractedImage(uri=screenshot_path)
+            screenshot_uri = screenshot_uris[page_index]
+            page.screenshot = OCRExtractedImage(uri=screenshot_uri)
         return ocr_output

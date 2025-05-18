@@ -6,11 +6,11 @@ from typing import Optional
 
 from pipelex.cogt.exceptions import PromptImageFactoryError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
-from pipelex.tools.misc.file_fetching_helpers import fetch_file_from_url_httpx_async
-from pipelex.tools.utils.image_utils import (
-    load_image_as_base64_from_bytes_async,
-    load_image_as_base64_from_path_async,
+from pipelex.tools.misc.base_64 import (
+    encode_to_base64_async,
+    load_binary_as_base64_async,
 )
+from pipelex.tools.misc.file_fetching_helpers import fetch_file_from_url_httpx_async
 from pipelex.tools.utils.path_utils import clarify_path_or_url
 
 
@@ -48,13 +48,13 @@ class PromptImageFactory:
         prompt_image_url: PromptImageUrl,
     ) -> PromptImageBytes:
         raw_image_bytes = await fetch_file_from_url_httpx_async(prompt_image_url.url)
-        b64_image_bytes = await load_image_as_base64_from_bytes_async(raw_image_bytes)
+        b64_image_bytes = await encode_to_base64_async(raw_image_bytes)
         return PromptImageBytes(b64_image_bytes=b64_image_bytes)
 
     @classmethod
     async def promptimage_to_b64_async(cls, image_prompt: PromptImage) -> bytes:
         if isinstance(image_prompt, PromptImagePath):
-            return await load_image_as_base64_from_path_async(image_prompt.file_path)
+            return await load_binary_as_base64_async(image_prompt.file_path)
         elif isinstance(image_prompt, PromptImageBytes):
             return image_prompt.b64_image_bytes
         elif isinstance(image_prompt, PromptImageUrl):

@@ -119,16 +119,6 @@ class OCREngineAbstract(ABC):
         caption_image: bool = False,
         get_screenshot: bool = False,
     ) -> OCROutput:
-        """
-        Process an image from a URL asynchronously.
-
-        Args:
-            url: URL of the image to process
-            caption_image: Whether to generate captions for the image
-
-        Returns:
-            OCR response containing extracted text and metadata
-        """
         pass
 
     @abstractmethod
@@ -138,16 +128,6 @@ class OCREngineAbstract(ABC):
         caption_image: bool = False,
         get_screenshot: bool = False,
     ) -> OCROutput:
-        """
-        Process an image from a local file asynchronously.
-
-        Args:
-            image_path: Path to the local image file
-            caption_image: Whether to generate captions for the image
-
-        Returns:
-            OCR response containing extracted text and metadata
-        """
         pass
 
     @abstractmethod
@@ -157,16 +137,6 @@ class OCREngineAbstract(ABC):
         caption_image: bool = False,
         get_screenshot: bool = False,
     ) -> OCROutput:
-        """
-        Process a PDF from a local file asynchronously.
-
-        Args:
-            file_path: Path to the local PDF file
-            caption_image: Whether to generate captions for extracted images
-
-        Returns:
-            OCR response containing extracted text and metadata
-        """
         pass
 
     @abstractmethod
@@ -174,9 +144,6 @@ class OCREngineAbstract(ABC):
         self,
         image_uri: str,
     ) -> str:
-        """
-        Caption an image asynchronously.
-        """
         pass
 
     @abstractmethod
@@ -186,8 +153,4 @@ class OCREngineAbstract(ABC):
         image_url: str,
         ocr_output: OCROutput,
     ) -> OCROutput:
-        """
-        Get a screenshot of a page asynchronously.
-        """
-        # TODO: not implemented yet
-        return ocr_output
+        pass
