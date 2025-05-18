@@ -21,10 +21,9 @@ class LLMWorkerFactory:
         llm_engine: LLMEngine,
         report_delegate: Optional[InferenceReportDelegate] = None,
     ) -> LLMWorkerAbstract:
-        llm_worker: LLMWorkerAbstract
-
-        plugin_manager = get_plugin_manager()
         llm_sdk_handle = PluginHandle.get_for_llm_platform(llm_platform=llm_engine.llm_platform)
+        plugin_manager = get_plugin_manager()
+        llm_worker: LLMWorkerAbstract
         match llm_engine.llm_platform:
             case LLMPlatform.OPENAI | LLMPlatform.AZURE_OPENAI | LLMPlatform.PERPLEXITY:
                 from pipelex.cogt.openai.openai_factory import OpenAIFactory

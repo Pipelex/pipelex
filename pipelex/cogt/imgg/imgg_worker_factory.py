@@ -24,11 +24,11 @@ class ImggWorkerFactory:
         imgg_engine: ImggEngine,
         report_delegate: Optional[InferenceReportDelegate] = None,
     ) -> ImggWorkerAbstract:
-        imgg_worker: ImggWorkerAbstract
+        imgg_sdk_handle = PluginHandle.get_for_imgg_engine(imgg_platform=imgg_engine.imgg_platform)
         plugin_manager = get_plugin_manager()
+        imgg_worker: ImggWorkerAbstract
         match imgg_engine.imgg_platform:
             case ImggPlatform.FAL_AI:
-                imgg_sdk_handle = PluginHandle.FAL_ASYNC
                 try:
                     fal_api_key = get_secret(secret_id="FAL_API_KEY")
                 except SecretNotFoundError as exc:

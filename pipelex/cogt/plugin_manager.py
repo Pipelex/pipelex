@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import Field, RootModel
 
+from pipelex.cogt.imgg.imgg_platform import ImggPlatform
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 
@@ -17,7 +18,6 @@ class PluginHandle(StrEnum):
     PERPLEXITY_ASYNC = "perplexity_async"
     VERTEXAI_OPENAI_ASYNC = "vertexai_openai_async"
     FAL_ASYNC = "fal_async"
-    # FAL = "fal"
 
     @staticmethod
     def get_for_llm_platform(llm_platform: LLMPlatform) -> "PluginHandle":
@@ -44,6 +44,12 @@ class PluginHandle(StrEnum):
         match ocr_platform:
             case OcrPlatform.MISTRAL:
                 return PluginHandle.MISTRAL_ASYNC
+
+    @staticmethod
+    def get_for_imgg_engine(imgg_platform: ImggPlatform) -> "PluginHandle":
+        match imgg_platform:
+            case ImggPlatform.FAL_AI:
+                return PluginHandle.FAL_ASYNC
 
 
 PluginManagerRoot = Dict[str, Any]
