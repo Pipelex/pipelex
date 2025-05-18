@@ -16,6 +16,8 @@ class PluginHandle(StrEnum):
     BEDROCK_ASYNC = "bedrock_async"
     PERPLEXITY_ASYNC = "perplexity_async"
     VERTEXAI_OPENAI_ASYNC = "vertexai_openai_async"
+    FAL_ASYNC = "fal_async"
+    # FAL = "fal"
 
     @staticmethod
     def get_for_llm_platform(llm_platform: LLMPlatform) -> "PluginHandle":
@@ -66,3 +68,10 @@ class PluginManager(RootModel[PluginManagerRoot]):
     def set_ocr_sdk_instance(self, ocr_sdk_handle: PluginHandle, ocr_sdk_instance: Any) -> Any:
         self.root[ocr_sdk_handle] = ocr_sdk_instance
         return ocr_sdk_instance
+
+    def get_imgg_sdk_instance(self, imgg_sdk_handle: PluginHandle) -> Optional[Any]:
+        return self.root.get(imgg_sdk_handle)
+
+    def set_imgg_sdk_instance(self, imgg_sdk_handle: PluginHandle, imgg_sdk_instance: Any) -> Any:
+        self.root[imgg_sdk_handle] = imgg_sdk_instance
+        return imgg_sdk_instance

@@ -9,9 +9,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.bedrock.bedrock_client_protocol import BedrockClientProtocol
 from pipelex.cogt.bedrock.bedrock_factory import BedrockFactory
-from pipelex.cogt.exceptions import (
-    LLMCapabilityError,
-)
+from pipelex.cogt.exceptions import LLMCapabilityError, LLMEngineParameterError, SdkTypeError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
@@ -36,12 +34,14 @@ class BedrockWorker(LLMWorkerAbstract):
         )
 
         if not isinstance(sdk_instance, BedrockClientProtocol):
-            raise ValueError(f"Provided sdk_instance for {self.__class__.__name__} is not of type BedrockClient: {sdk_instance}")
+            raise SdkTypeError(
+                f"Provided sdk_instance for {self.__class__.__name__} is not of type BedrockClientProtocol: it's a '{type(sdk_instance)}'"
+            )
 
         if default_max_tokens := llm_engine.llm_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise ValueError("llm_engine.model.max_tokens is None, but it is required for Bedrock models")
+            raise LLMEngineParameterError(f"No max_tokens provided for llm model '{llm_engine.llm_model}', but it must be providedfor Bedrock models")
         self.bedrock_client_for_text = sdk_instance
 
     @override

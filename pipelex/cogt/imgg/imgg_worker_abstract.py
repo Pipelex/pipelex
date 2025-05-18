@@ -10,7 +10,7 @@ from typing_extensions import Awaitable, override
 
 from pipelex import log
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_engine_abstract import ImggEngineAbstract
+from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.inference.inference_reporter_abstract import InferenceReporterAbstract
@@ -58,7 +58,7 @@ def imgg_job_func(func: F) -> F:
 class ImggWorkerAbstract(InferenceReporterAbstract):
     def __init__(
         self,
-        imgg_engine: ImggEngineAbstract,
+        imgg_engine: ImggEngine,
         report_delegate: Optional[InferenceReportDelegate] = None,
     ):
         InferenceReporterAbstract.__init__(self, report_delegate=report_delegate)

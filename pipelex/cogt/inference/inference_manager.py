@@ -115,7 +115,7 @@ class InferenceManager(InferenceManagerProtocol):
         log.debug("Done setting up Imgg Workers (async)")
 
     def _setup_one_imgg_worker(self, imgg_handle: str) -> ImggWorkerAbstract:
-        imgg_engine = ImggEngineFactory.make_imgg_engine_for_fal(imgg_name=imgg_handle)
+        imgg_engine = ImggEngineFactory.make_imgg_engine(imgg_handle=imgg_handle)
         log.verbose(imgg_engine.desc, title=f"Setting up ImgEngine for '{imgg_handle}'")
         imgg_worker = self.imgg_worker_factory.make_imgg_worker(
             imgg_engine=imgg_engine,

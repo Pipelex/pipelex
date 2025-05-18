@@ -65,10 +65,11 @@ make tn                       - Shorthand -> test
 make test-with-prints         - Run tests with prints (no inference)
 make t                        - Shorthand -> test-with-prints
 make test-inference           - Run unit tests only for inference (with prints)
-make test-ocr                 - Run unit tests only for ocr (with prints)
 make ti                       - Shorthand -> test-inference
+make test-ocr                 - Run unit tests only for ocr (with prints)
 make to                       - Shorthand -> test-ocr
 make test-imgg                - Run unit tests only for imgg (with prints)
+make test-g					  - Shorthand -> test-imgg
 
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
@@ -80,7 +81,7 @@ make fix-unused-imports       - Fix unused imports with ruff
 endef
 export HELP
 
-.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv run-setup s runtests test test-with-prints test-inference t ti test-imgg check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version reuse reuse-check
+.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv run-setup s runtests test test-with-prints test-inference t ti test-imgg tg check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version reuse reuse-check
 
 all help:
 	@echo "$$HELP"
@@ -253,6 +254,9 @@ test-inference: env
 		$(LOCAL_PYTEST) --exitfirst -m "inference and not imgg" -s $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	fi
 
+ti: test-inference
+	@echo "> done: ti = test-inference"
+
 test-ocr: env
 	$(call PRINT_TITLE,"Unit testing ocr")
 	@if [ -n "$(TEST)" ]; then \
@@ -260,9 +264,6 @@ test-ocr: env
 	else \
 		$(LOCAL_PYTEST) --exitfirst -m "ocr" -s $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	fi
-
-ti: test-inference
-	@echo "> done: ti = test-inference"
 
 to: test-ocr
 	@echo "> done: to = test-ocr"
@@ -274,6 +275,9 @@ test-imgg: env
 	else \
 		$(LOCAL_PYTEST) --exitfirst -m "imgg" -s $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	fi
+
+tg: test-imgg
+	@echo "> done: tg = test-imgg"
 
 ############################################################################################
 ############################               Linting              ############################
