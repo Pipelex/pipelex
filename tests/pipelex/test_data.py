@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Any, ClassVar, List, Optional, Tuple
+from typing import Any, ClassVar, List, Optional, Tuple, Type
 
 from pydantic import BaseModel
 from typing_extensions import override
@@ -11,6 +11,7 @@ from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, ListContent, PDFContent, StructuredContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
+from pipelex.exceptions import PipeStackOverflowError
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
 from tests.test_data import ImageTestCases, PDFTestCases
 
@@ -174,6 +175,13 @@ class PipeTestCases:
             "extract_colors",
             "native.Text",
             USER_TEXT_COLORS,
+        ),
+    ]
+    FAILURE_PIPES: ClassVar[List[Tuple[str, Type[Exception], str]]] = [
+        (
+            "infinite_loop_1",
+            PipeStackOverflowError,
+            "Pipe stack overflow: ['infinite_loop_1'",
         ),
     ]
 

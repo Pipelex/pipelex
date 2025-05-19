@@ -21,14 +21,6 @@ class ClientAuthenticationError(PipelexError):
     pass
 
 
-class ConceptGraphError(PipelexError):
-    pass
-
-
-class RoadmapError(PipelexError):
-    pass
-
-
 class DomainDefinitionError(PipelexError):
     pass
 
@@ -98,6 +90,10 @@ class PipeExecutionError(PipelexError):
 
 
 class PipeRunError(PipeExecutionError):
+    pass
+
+
+class PipeStackOverflowError(PipeExecutionError):
     pass
 
 

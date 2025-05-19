@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Any, Optional, Tuple, cast
+from typing import Any, Optional, Tuple, Type, cast
 
 import pytest
 from pytest import FixtureRequest
@@ -16,7 +16,7 @@ from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_factory import StuffBlueprint
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_report_delegate
+from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.job_history import job_history
 from pipelex.job_metadata import JobMetadata
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
@@ -113,10 +113,10 @@ class TestPipeRouter:
         result_dir_path, _ = pipe_result_handler
         await save_working_memory(pipe_output, result_dir_path)
 
-        if stuff := pipe_output.main_stuff:
-            pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
-            pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
-            pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
+        stuff = pipe_output.main_stuff
+        pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
+        pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
+        pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
 
     @pytest.mark.parametrize("topic, pipe_code, output_multiplicity", PipeTestCases.NO_INPUT_PARALLEL1)
     async def test_pipe_batch_no_input(
@@ -147,10 +147,10 @@ class TestPipeRouter:
         result_dir_path, _ = pipe_result_handler
         await save_working_memory(pipe_output, result_dir_path)
 
-        if stuff := pipe_output.main_stuff:
-            pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
-            pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
-            pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
+        stuff = pipe_output.main_stuff
+        pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
+        pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
+        pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
 
     @pytest.mark.parametrize("pipe_code, stuff, input_list_stuff_name, input_item_stuff_name", PipeTestCases.BATCH_TEST)
     async def test_pipe_batch_with_list_content(
@@ -184,3 +184,28 @@ class TestPipeRouter:
         get_report_delegate().general_report()
 
         job_history.print_mermaid_flowchart_code_and_url()
+
+    @pytest.mark.parametrize("pipe_code, exception, expected_error_message", PipeTestCases.FAILURE_PIPES)
+    async def test_pipe_infinite_loop(
+        self,
+        request: FixtureRequest,
+        pipe_code: str,
+        exception: Type[Exception],
+        expected_error_message: str,
+    ):
+        pipe_code = "infinite_loop_1"
+        log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
+        with pytest.raises(exception) as exc:
+            await get_pipe_router().run_pipe_code(
+                pipe_code=pipe_code,
+                pipe_run_params=PipeRunParams(
+                    pipe_stack_max_size=6,
+                ),
+                job_metadata=JobMetadata(
+                    session_id=get_config().session_id,
+                    top_job_id=cast(str, request.node.originalname),  # type: ignore
+                ),
+            )
+        pretty_print(exc.value, title="exception")
+        assert expected_error_message in str(exc.value)
+        get_report_delegate().general_report()

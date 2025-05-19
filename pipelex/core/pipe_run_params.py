@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from pipelex import log
 from pipelex.core.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
-from pipelex.exceptions import PipeRunError
+from pipelex.exceptions import PipeRunError, PipeStackOverflowError
 
 
 class PipeRunParamKey(StrEnum):
@@ -113,6 +113,7 @@ class PipeRunParams(BaseModel):
     batch_params: Optional[BatchParams] = None
     params: Dict[str, Any] = Field(default_factory=dict)
     dynamic_output_concept_code: Optional[str] = None
+    pipe_stack_max_size: int = 10
 
     @field_validator("params")
     @classmethod
@@ -148,11 +149,15 @@ class PipeRunParams(BaseModel):
 
     def push_pipe_to_stack(self, pipe_code: str) -> None:
         self.pipe_stack.append(pipe_code)
+        log.debug(f"Push Pipe stack --> {self.pipe_stack}")
+        if len(self.pipe_stack) > self.pipe_stack_max_size:
+            raise PipeStackOverflowError(f"Pipe stack overflow: {self.pipe_stack}")
 
     def pop_pipe_from_stack(self, pipe_code: str) -> None:
         popped_pipe_code = self.pipe_stack.pop()
         if popped_pipe_code != pipe_code:
             raise PipeRunError(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
+        log.debug(f"Pop Pipe stack <-- {self.pipe_stack}")
 
     def push_pipe_layer(self, pipe_code: str) -> None:
         if self.pipe_layers and self.pipe_layers[-1] == pipe_code:
