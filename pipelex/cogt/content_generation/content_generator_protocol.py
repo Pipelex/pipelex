@@ -135,4 +135,5 @@ class ContentGeneratorProtocol(Protocol):
         job_metadata: JobMetadata,
         job_params: OcrJobParams,
         job_config: OcrJobConfig,
+        wfid: Optional[str] = None,
     ) -> OcrOutput: ...
