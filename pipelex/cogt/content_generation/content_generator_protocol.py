@@ -130,9 +130,10 @@ class ContentGeneratorProtocol(Protocol):
 
     async def make_ocr_extract_pages(
         self,
+        job_metadata: JobMetadata,
         ocr_input: OcrInput,
         ocr_handle: OcrHandle,
-        job_metadata: JobMetadata,
-        job_params: OcrJobParams,
-        job_config: OcrJobConfig,
+        ocr_job_params: OcrJobParams,
+        ocr_job_config: OcrJobConfig,
+        wfid: Optional[str] = None,
     ) -> OcrOutput: ...

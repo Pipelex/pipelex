@@ -46,7 +46,7 @@ class LLMVisionTestCases:
 
     URL_WIKIPEDIA_ALAN_TURING = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Alan_Turing_%281912-1954%29_in_1936_at_Princeton_University_%28cropped%29.jpg/440px-Alan_Turing_%281912-1954%29_in_1936_at_Princeton_University_%28cropped%29.jpg"
 
-    TEST_IMAGE_DIRECTORY = "tests/cogt/data/images"
+    TEST_IMAGE_DIRECTORY = "tests/data/images"
 
     PATH_IMG_PNG_1 = f"{TEST_IMAGE_DIRECTORY}/ai_lympics.png"
     PATH_IMG_JPEG_1 = f"{TEST_IMAGE_DIRECTORY}/ai_lympics.jpg"

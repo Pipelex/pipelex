@@ -109,7 +109,7 @@ warn_unused_configs = true
 
 [[tool.mypy.overrides]]
 ignore_missing_imports = true
-module = ["json2html", "filetype", "pypdfium2", "pypdfium2.raw"]
+module = ["filetype", "json2html", "pypdfium2", "pypdfium2.raw"]
 
 [tool.pyright]
 analyzeUnannotatedFunctions = true
