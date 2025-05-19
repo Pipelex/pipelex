@@ -63,7 +63,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         if ocr_job.job_params.export_dir:
             save_to_path(
                 text_to_save=ocr_output.concatenated_text,
-                path=f"{ocr_job.job_params.export_dir}/text.md",
+                path=f"{ocr_job.job_params.export_dir}/text_from_ocr.md",
                 create_directory=True,
             )
         return ocr_output
