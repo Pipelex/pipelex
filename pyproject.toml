@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pipelex"
-version = "0.1.18"
+version = "0.2.0"
 description = "Pipelex is an open-source dev tool based on a simple declarative language that lets you define replicable, structured, composable LLM pipelines."
 authors = ["Evotis S.A.S. <evotis@pipelex.com>"]
 maintainers = ["Pipelex staff <oss@pipelex.com>"]
