@@ -14,7 +14,7 @@ from pipelex.cogt.inference.inference_reporter_abstract import InferenceReporter
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.mission.mission_metadata import UnitJobId
+from pipelex.mission.job_metadata import UnitJobId
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 

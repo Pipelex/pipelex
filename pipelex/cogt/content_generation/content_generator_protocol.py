@@ -16,7 +16,7 @@ from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.mission.mission_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
 from pipelex.tools.misc.model_helpers import BaseModelType
 from pipelex.tools.templating.jinja2_environment import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
@@ -39,7 +39,6 @@ def update_job_metadata(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P
 
         updated_metadata = JobMetadata(
             content_generation_job_id=func.__name__,
-            session_id=job_metadata.session_id,
         )
         job_metadata.update(updated_metadata=updated_metadata)
 

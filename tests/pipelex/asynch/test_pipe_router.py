@@ -9,7 +9,6 @@ from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.activity_handler import ActivityHandlerForResultFiles
-from pipelex.config import get_config
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunParams
 from pipelex.core.stuff import Stuff
@@ -17,7 +16,7 @@ from pipelex.core.stuff_factory import StuffBlueprint
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
-from pipelex.mission.mission_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
 from pipelex.mission.mission_tracker import job_history
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from tests.pipelex.test_data import PipeTestCases
@@ -46,7 +45,6 @@ class TestPipeRouter:
             pipe_run_params=PipeRunParams(),
             working_memory=working_memory,
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
@@ -77,7 +75,6 @@ class TestPipeRouter:
             pipe_run_params=PipeRunParams(),
             working_memory=working_memory,
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
@@ -103,7 +100,6 @@ class TestPipeRouter:
             pipe_run_params=PipeRunParams(),
             working_memory=WorkingMemory(),
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
@@ -137,7 +133,6 @@ class TestPipeRouter:
             ),
             working_memory=WorkingMemory(),
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
@@ -176,7 +171,6 @@ class TestPipeRouter:
             ),
             working_memory=working_memory,
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
@@ -202,7 +196,6 @@ class TestPipeRouter:
                     pipe_stack_limit=6,
                 ),
                 job_metadata=JobMetadata(
-                    session_id=get_config().session_id,
                     top_job_id=cast(str, request.node.originalname),  # type: ignore
                 ),
             )

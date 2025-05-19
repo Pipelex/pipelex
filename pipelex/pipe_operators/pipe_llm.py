@@ -40,7 +40,7 @@ from pipelex.hub import (
     get_required_pipe,
     get_template,
 )
-from pipelex.mission.mission_metadata import JobCategory, JobMetadata
+from pipelex.mission.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -168,7 +168,6 @@ class PipeLLM(PipeOperator):
         # prepare the job
         prompt_job_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 job_category=JobCategory.PROMPTING_JOB,
             )
         )
@@ -184,7 +183,7 @@ class PipeLLM(PipeOperator):
         #         pipe_run_params=llm_prompt_run_params,
         #     )
         # ).llm_prompt
-        # kludge
+        # TODO: kludge
         pipe_output: PipeOutput = await self.pipe_llm_prompt.run_pipe(
             job_metadata=prompt_job_metadata,
             working_memory=working_memory,

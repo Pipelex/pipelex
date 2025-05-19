@@ -12,7 +12,6 @@ from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConceptCode
 from pipelex.core.domain import SpecialDomain
@@ -30,7 +29,7 @@ from pipelex.exceptions import (
     WorkingMemoryTypeError,
 )
 from pipelex.hub import get_template
-from pipelex.mission.mission_metadata import JobCategory, JobMetadata
+from pipelex.mission.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.tools.templating.templating_models import PromptingStyle
@@ -235,7 +234,6 @@ class PipeLLMPrompt(PipeOperator):
 
             jinja2_job_metadata = job_metadata.copy_with_update(
                 updated_metadata=JobMetadata(
-                    session_id=get_config().session_id,
                     job_category=JobCategory.JINJA2_JOB,
                 )
             )
@@ -246,7 +244,7 @@ class PipeLLMPrompt(PipeOperator):
             #         pipe_run_params=pipe_run_params,
             #     )
             # ).rendered_text
-            # kludge
+            # TODO: kludge
             pipe_output: PipeOutput = await pipe_jinja2.run_pipe(
                 job_metadata=jinja2_job_metadata,
                 working_memory=working_memory,

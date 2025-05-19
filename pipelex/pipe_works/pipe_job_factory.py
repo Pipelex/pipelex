@@ -4,11 +4,10 @@
 
 from typing import Optional
 
-from pipelex.config import get_config
 from pipelex.core.pipe import PipeAbstract
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.mission.mission_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_works.pipe_job import PipeJob
 
 
@@ -22,7 +21,7 @@ class PipeJobFactory:
         job_metadata: Optional[JobMetadata] = None,
         output_name: Optional[str] = None,
     ) -> PipeJob:
-        job_metadata = job_metadata or JobMetadata(session_id=get_config().session_id)
+        job_metadata = job_metadata or JobMetadata()
         working_memory = working_memory or WorkingMemory()
         if not pipe_run_params:
             pipe_run_params = PipeRunParams()

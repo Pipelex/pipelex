@@ -22,7 +22,7 @@ from pipelex.core.domain import Domain
 from pipelex.core.domain_provider_abstract import DomainProviderAbstract
 from pipelex.core.pipe import PipeAbstract
 from pipelex.core.pipe_provider_abstract import PipeProviderAbstract
-from pipelex.mission.mission_manager import MissionManager
+from pipelex.mission.mission_manager_abstract import MissionManagerAbstract
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigRoot
@@ -58,7 +58,7 @@ class PipelexHub:
         self._pipe_provider: Optional[PipeProviderAbstract] = None
         self._pipe_router: Optional[PipeRouterProtocol] = None
 
-        self._mission_manager: Optional[MissionManager] = None
+        self._mission_manager: Optional[MissionManagerAbstract] = None
 
     ############################################################
     # Class methods for singleton management
@@ -144,7 +144,7 @@ class PipelexHub:
     def set_pipe_router(self, pipe_router: PipeRouterProtocol):
         self._pipe_router = pipe_router
 
-    def set_mission_manager(self, mission_manager: MissionManager):
+    def set_mission_manager(self, mission_manager: MissionManagerAbstract):
         self._mission_manager = mission_manager
 
     ############################################################
@@ -238,7 +238,7 @@ class PipelexHub:
             raise RuntimeError("PipeRouter is not initialized")
         return self._pipe_router
 
-    def get_required_mission_manager(self) -> MissionManager:
+    def get_required_mission_manager(self) -> MissionManagerAbstract:
         if self._mission_manager is None:
             raise RuntimeError("MissionManager is not initialized")
         return self._mission_manager
@@ -392,5 +392,5 @@ def get_pipe_router() -> PipeRouterProtocol:
     return get_pipelex_hub().get_required_pipe_router()
 
 
-def get_mission_manager() -> MissionManager:
+def get_mission_manager() -> MissionManagerAbstract:
     return get_pipelex_hub().get_required_mission_manager()

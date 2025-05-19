@@ -9,13 +9,12 @@ from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import get_config
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeConditionError, PipeDefinitionError, PipeExecutionError, PipeInputError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_pipe_router
-from pipelex.mission.mission_metadata import JobCategory, JobMetadata
+from pipelex.mission.job_metadata import JobCategory, JobMetadata
 from pipelex.mission.mission_tracker import job_history
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -82,7 +81,6 @@ class PipeCondition(PipeController):
         )
         jinja2_job_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 job_category=JobCategory.JINJA2_JOB,
             )
         )
@@ -94,7 +92,7 @@ class PipeCondition(PipeController):
         #         pipe_run_params=pipe_run_params,
         #     )
         # ).rendered_text.strip()
-        # kludge
+        # TODO: kludge
         pipe_output_1: PipeOutput = await pipe_jinja2.run_pipe(
             job_metadata=jinja2_job_metadata,
             working_memory=working_memory,

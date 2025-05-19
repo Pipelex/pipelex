@@ -8,7 +8,7 @@ from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams, ImggJobReport
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.config import get_config
-from pipelex.mission.mission_metadata import JobCategory, JobMetadata
+from pipelex.mission.job_metadata import JobCategory, JobMetadata
 
 
 class ImggJobFactory:
@@ -25,7 +25,6 @@ class ImggJobFactory:
         config = get_config()
         imgg_config = get_config().cogt.imgg_config
         job_metadata = job_metadata or JobMetadata(
-            session_id=get_config().session_id,
             top_job_id=f"IMGGJob for {config.project_name}",
             job_category=JobCategory.IMGG_JOB,
         )
@@ -52,7 +51,6 @@ class ImggJobFactory:
         config = get_config()
         imgg_config = get_config().cogt.imgg_config
         job_metadata = job_metadata or JobMetadata(
-            session_id=get_config().session_id,
             top_job_id=f"IMGGJob for {config.project_name}",
             job_category=JobCategory.IMGG_JOB,
         )

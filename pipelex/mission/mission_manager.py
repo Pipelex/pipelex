@@ -2,25 +2,35 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from enum import StrEnum
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from pydantic import Field, RootModel
+from typing_extensions import override
 
 from pipelex.mission.mission import Mission
+from pipelex.mission.mission_factory import MissionFactory
+from pipelex.mission.mission_manager_abstract import MissionManagerAbstract
 
 MissionManagerRoot = Dict[str, Mission]
 
 
-class MissionManager(RootModel[MissionManagerRoot]):
+class MissionManager(MissionManagerAbstract, RootModel[MissionManagerRoot]):
     root: MissionManagerRoot = Field(default_factory=dict)
 
+    @override
     def teardown(self):
         self.root.clear()
 
+    @override
     def get_mission(self, mission_id: str) -> Optional[Mission]:
         return self.root.get(mission_id)
 
-    def set_mission(self, mission_id: str, mission: Mission) -> Mission:
+    def _set_mission(self, mission_id: str, mission: Mission) -> Mission:
         self.root[mission_id] = mission
+        return mission
+
+    @override
+    def add_new_mission(self) -> Mission:
+        mission = MissionFactory.make_mission()
+        self._set_mission(mission_id=mission.mission_id, mission=mission)
         return mission

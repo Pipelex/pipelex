@@ -101,7 +101,7 @@ pipe_output: PipeOutput = await pipe_router.run_pipe(
     pipe_run_params=PipeRunParams(),
     working_memory=working_memory,
     job_metadata=JobMetadata(
-        session_id=get_config().session_id,
+        
         top_job_id=cast(str, request.node.originalname),  # type: ignore
     ),
 )

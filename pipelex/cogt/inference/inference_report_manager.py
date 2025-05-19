@@ -12,14 +12,16 @@ from rich.table import Table
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.config_cogt import CogtReportConfig
 from pipelex.cogt.exceptions import InferenceReportManagerError
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage, model_cost_per_token
 from pipelex.cogt.llm.token_category import TokenCategory
-from pipelex.config import get_config
 from pipelex.tools.utils.path_utils import ensure_path, get_incremental_file_path
+
+# from pipelex.config import get_config
 
 LLMUsageRegistryRoot = List[LLMTokensUsage]
 CostRegistryRoot = List[LLMTokenCostReport]
@@ -46,15 +48,17 @@ class UsageRegistry(RootModel[LLMUsageRegistryRoot]):
 
 
 class InferenceReportManager(InferenceReportDelegate):
-    def __init__(self):
+    def __init__(self, report_config: CogtReportConfig, mission_id: Optional[str] = None):
+        self.mission_id: Optional[str] = mission_id
         self.usage_registery = UsageRegistry()
+        self.report_config = report_config
 
     def teardown(self):
         self.usage_registery.root.clear()
 
-    @property
-    def report_config(self):
-        return get_config().cogt.cogt_report_config
+    # @property
+    # def report_config(self):
+    #     return get_config().cogt.cogt_report_config
 
     # according to openai docs, cached input tokens are discounted 50%
     def _compute_total_cost(self, input_non_cached_cost: float, input_cached_cost: float, output_cost: float) -> float:
@@ -62,8 +66,8 @@ class InferenceReportManager(InferenceReportDelegate):
 
     def _complete_cost_report(self, llm_tokens_usage: LLMTokensUsage) -> LLMTokenCostReport:
         cost_report = llm_tokens_usage.compute_cost_report()
-        if not cost_report.job_metadata.project_id:
-            cost_report.job_metadata.project_id = get_config().project_name
+        # if not cost_report.job_metadata.mission_id:
+        #     cost_report.job_metadata.mission_id = get_config().project_name
         # compute the input_non_cached tokens
         if cost_report.nb_tokens_by_category.get(TokenCategory.INPUT_NON_CACHED) is not None:
             raise InferenceReportManagerError("TokenCategory.INPUT_NON_CACHED already exists in the cost report")
@@ -136,7 +140,12 @@ class InferenceReportManager(InferenceReportDelegate):
             raise InferenceReportManagerError("Empty report aggregation by LLM name")
 
         console = Console()
-        table = Table(title="Costs by LLM model", box=box.ROUNDED)
+        title = "Costs by LLM model"
+        if self.mission_id:
+            title += f" for mission {self.mission_id}"
+        else:
+            title += " — no mission id"
+        table = Table(title=title, box=box.ROUNDED)
 
         scale = self.report_config.cost_report_unit_scale
         scale_str: str

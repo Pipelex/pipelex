@@ -11,7 +11,7 @@ from pipelex.core.pipe import PipeAbstract
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.mission.mission_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
 
 
 class PipeController(PipeAbstract):
@@ -27,7 +27,6 @@ class PipeController(PipeAbstract):
         self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
 
         updated_metadata = JobMetadata(
-            session_id=job_metadata.session_id,
             pipe_job_ids=[self.code],
         )
         job_metadata.update(updated_metadata=updated_metadata)

@@ -12,7 +12,7 @@ from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, Pi
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeInputError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_pipe_router, get_required_pipe
-from pipelex.mission.mission_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
 from pipelex.mission.mission_tracker import job_history
 from pipelex.pipe_controllers.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.pipe_condition import PipeCondition

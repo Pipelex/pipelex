@@ -18,7 +18,7 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_content_generator
-from pipelex.mission.mission_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 

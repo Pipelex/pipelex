@@ -28,12 +28,7 @@ class UnitJobId(StrEnum):
 class JobMetadata(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # session_id: str = Field(default_factory=lambda: (get_config().session_id))
-    session_id: str
-    client_id: Optional[str] = None
-    # if left empty, the project_id will be set to the get_config().project_name when reporting
-    project_id: Optional[str] = None
-
+    mission_id: Optional[str] = None
     top_job_id: Optional[str] = None
     pipe_job_ids: Optional[List[str]] = None
     content_generation_job_id: Optional[str] = None
@@ -50,12 +45,6 @@ class JobMetadata(BaseModel):
         return None
 
     def update(self, updated_metadata: "JobMetadata"):
-        # We are preventing strange updates here for safety
-        if updated_metadata.client_id and self.client_id:
-            assert self.client_id == updated_metadata.client_id, f"Cannot update client_id from {self.client_id} to {updated_metadata.client_id}"
-        if updated_metadata.project_id and self.project_id:
-            assert self.project_id == updated_metadata.project_id, f"Cannot update project_id from {self.project_id} to {updated_metadata.project_id}"
-        self.project_id = updated_metadata.project_id
         if updated_metadata.job_category:
             self.job_category = updated_metadata.job_category
         if updated_metadata.top_job_id:

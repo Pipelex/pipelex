@@ -14,7 +14,7 @@ from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.inference.inference_reporter_abstract import InferenceReporterAbstract
-from pipelex.mission.mission_metadata import UnitJobId
+from pipelex.mission.job_metadata import UnitJobId
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 

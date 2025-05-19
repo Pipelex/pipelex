@@ -11,7 +11,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.config import get_config
-from pipelex.mission.mission_metadata import JobCategory, JobMetadata
+from pipelex.mission.job_metadata import JobCategory, JobMetadata
 
 
 class LLMJobFactory:
@@ -29,13 +29,11 @@ class LLMJobFactory:
         if job_metadata:
             job_metadata.update(
                 JobMetadata(
-                    session_id=get_config().session_id,
                     job_category=JobCategory.LLM_JOB,
                 )
             )
         else:
             job_metadata = JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=f"LLMJob for {config.project_name}",
                 job_category=JobCategory.LLM_JOB,
             )
@@ -106,13 +104,11 @@ class LLMJobFactory:
         if job_metadata:
             job_metadata.update(
                 JobMetadata(
-                    session_id=get_config().session_id,
                     job_category=JobCategory.LLM_JOB,
                 )
             )
         else:
             job_metadata = JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=f"LLMJob for {config.project_name}",
                 job_category=JobCategory.LLM_JOB,
             )

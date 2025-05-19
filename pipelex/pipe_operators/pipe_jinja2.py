@@ -18,7 +18,7 @@ from pipelex.core.stuff_content import TextContent
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
 from pipelex.hub import get_content_generator, get_template, get_template_provider
-from pipelex.mission.mission_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing

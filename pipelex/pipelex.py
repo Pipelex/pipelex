@@ -118,7 +118,7 @@ class Pipelex:
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
-        self.report_manager = InferenceReportManager()
+        self.report_manager = InferenceReportManager(report_config=get_config().cogt.cogt_report_config)
         self.pipelex_hub.set_report_delegate(self.report_manager)
 
         # pipelex libraries

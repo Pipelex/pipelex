@@ -8,7 +8,7 @@ from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams, OcrJobReport
 from pipelex.config import get_config
-from pipelex.mission.mission_metadata import JobCategory, JobMetadata
+from pipelex.mission.job_metadata import JobCategory, JobMetadata
 
 
 class OcrJobFactory:
@@ -24,7 +24,6 @@ class OcrJobFactory:
         # TODO: manahge the param default sthrough the config
         # ocr_config = get_config().cogt.ocr_config
         job_metadata = job_metadata or JobMetadata(
-            session_id=get_config().session_id,
             top_job_id=f"OCRJob for {config.project_name}",
             job_category=JobCategory.OCR_JOB,
         )
