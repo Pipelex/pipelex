@@ -11,10 +11,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.domain import SpecialDomain
-from pipelex.core.pipe import (
-    PipeAbstract,
-    update_job_metadata_for_pipe,
-)
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff import Stuff
@@ -23,6 +19,7 @@ from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
 from pipelex.hub import get_content_generator, get_template, get_template_provider
 from pipelex.job_metadata import JobMetadata
+from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
@@ -37,7 +34,7 @@ class PipeJinja2Output(PipeOutput):
         return self.main_stuff_as_text.text
 
 
-class PipeJinja2(PipeAbstract):
+class PipeJinja2(PipeOperator):
     model_config = ConfigDict(extra="forbid", strict=False)
 
     adhoc_pipe_code: ClassVar[str] = "jinja2_render"
@@ -85,8 +82,7 @@ class PipeJinja2(PipeAbstract):
         return required_variables
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,

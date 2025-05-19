@@ -109,8 +109,8 @@ class JobHistory:
         else:
             raise JobHistoryError(f"Node name is not a string: {node_name}")
 
-    def _pipe_stack_to_subgraph_name(self, pipe_stack: List[str]) -> str:
-        return "-".join(pipe_stack)
+    def _pipe_layer_to_subgraph_name(self, pipe_layer: List[str]) -> str:
+        return "-".join(pipe_layer)
 
     def _add_start_node(self) -> str:
         node = SpecialNodeName.START
@@ -143,7 +143,7 @@ class JobHistory:
     def _add_stuff_node(
         self,
         stuff: Stuff,
-        pipe_stack: List[str],
+        pipe_layer: List[str],
         comment: str,
         as_item_index: Optional[int] = None,
     ) -> str:
@@ -167,7 +167,7 @@ class JobHistory:
         )
         if stuff.is_text and get_config().pipelex.history_graph_config.is_include_text_preview:
             node_tag += f"<br/>{stuff_content_rendered[:100]}"
-        pipe_stack_str = self._pipe_stack_to_subgraph_name(pipe_stack)
+        pipe_layer_str = self._pipe_layer_to_subgraph_name(pipe_layer)
         node_attributes: Dict[str, Any] = {
             NodeAttributeKey.CATEGORY: NodeCategory.STUFF,
             NodeAttributeKey.TAG: node_tag,
@@ -175,7 +175,7 @@ class JobHistory:
             NodeAttributeKey.DESCRIPTION: stuff_description,
             NodeAttributeKey.DEBUG_INFO: stuff.stuff_code,
             NodeAttributeKey.COMMENT: comment,
-            NodeAttributeKey.SUBGRAPH: pipe_stack_str,
+            NodeAttributeKey.SUBGRAPH: pipe_layer_str,
         }
         self.nx_graph.add_node(node, **node_attributes)
         return node
@@ -210,7 +210,7 @@ class JobHistory:
         to_stuff: Stuff,
         pipe_code: str,
         comment: str,
-        pipe_stack: List[str],
+        pipe_layer: List[str],
         as_item_index: Optional[int] = None,
         is_with_edge: bool = True,
     ):
@@ -221,7 +221,7 @@ class JobHistory:
             from_node = self._add_stuff_node(
                 stuff=from_stuff,
                 as_item_index=as_item_index,
-                pipe_stack=pipe_stack,
+                pipe_layer=pipe_layer,
                 comment=comment,
             )
         else:
@@ -231,7 +231,7 @@ class JobHistory:
         to_node = self._add_stuff_node(
             stuff=to_stuff,
             as_item_index=as_item_index,
-            pipe_stack=pipe_stack,
+            pipe_layer=pipe_layer,
             comment=comment,
         )
         edge_caption = pipe_code
@@ -253,7 +253,7 @@ class JobHistory:
         from_stuff: Optional[Stuff],
         to_stuff: Stuff,
         to_branch_index: int,
-        pipe_stack: List[str],
+        pipe_layer: List[str],
         comment: str,
     ):
         if not self.is_active:
@@ -262,7 +262,7 @@ class JobHistory:
         if from_stuff:
             from_node = self._add_stuff_node(
                 stuff=from_stuff,
-                pipe_stack=pipe_stack,
+                pipe_layer=pipe_layer,
                 comment=comment,
             )
         else:
@@ -272,7 +272,7 @@ class JobHistory:
         to_node = self._add_stuff_node(
             stuff=to_stuff,
             as_item_index=to_branch_index,
-            pipe_stack=pipe_stack,
+            pipe_layer=pipe_layer,
             comment=comment,
         )
         self._add_edge(
@@ -285,19 +285,19 @@ class JobHistory:
         self,
         from_stuff: Stuff,
         to_stuff: Stuff,
-        pipe_stack: List[str],
+        pipe_layer: List[str],
         comment: str,
     ):
         if not self.is_active:
             return
         from_node = self._add_stuff_node(
             stuff=from_stuff,
-            pipe_stack=pipe_stack,
+            pipe_layer=pipe_layer,
             comment=comment,
         )
         to_node = self._add_stuff_node(
             stuff=to_stuff,
-            pipe_stack=pipe_stack,
+            pipe_layer=pipe_layer,
             comment=comment,
         )
         self._add_edge(
@@ -306,15 +306,15 @@ class JobHistory:
             edge_category=EdgeCategory.AGGREGATE,
         )
 
-    def _add_condition_node(self, condition: PipeConditionDetails, pipe_stack: List[str]) -> str:
+    def _add_condition_node(self, condition: PipeConditionDetails, pipe_layer: List[str]) -> str:
         node = condition.code
         condition_node_tag = f"Condition:<br>**{condition.test_expression}<br>= {condition.evaluated_expression}**"
-        pipe_stack_str = self._pipe_stack_to_subgraph_name(pipe_stack)
+        pipe_layer_str = self._pipe_layer_to_subgraph_name(pipe_layer)
         node_attributes: Dict[str, Any] = {
             NodeAttributeKey.CATEGORY: NodeCategory.CONDITION,
             NodeAttributeKey.TAG: condition_node_tag,
             NodeAttributeKey.NAME: condition.code,
-            NodeAttributeKey.SUBGRAPH: pipe_stack_str,
+            NodeAttributeKey.SUBGRAPH: pipe_layer_str,
         }
         self.nx_graph.add_node(node, **node_attributes)
         return node
@@ -324,17 +324,17 @@ class JobHistory:
         from_stuff: Stuff,
         to_condition: PipeConditionDetails,
         condition_expression: str,
-        pipe_stack: List[str],
+        pipe_layer: List[str],
         comment: str,
     ):
         if not self.is_active:
             return
         from_node = self._add_stuff_node(
             stuff=from_stuff,
-            pipe_stack=pipe_stack,
+            pipe_layer=pipe_layer,
             comment=comment,
         )
-        to_node = self._add_condition_node(condition=to_condition, pipe_stack=pipe_stack)
+        to_node = self._add_condition_node(condition=to_condition, pipe_layer=pipe_layer)
         edge_attributes: Dict[str, Any] = {
             EdgeAttributeKey.CONDITION_EXPRESSION: condition_expression,
         }
@@ -349,14 +349,14 @@ class JobHistory:
         self,
         from_condition: PipeConditionDetails,
         to_stuff: Stuff,
-        pipe_stack: List[str],
+        pipe_layer: List[str],
         comment: str,
     ):
         if not self.is_active:
             return
         to_node = self._add_stuff_node(
             stuff=to_stuff,
-            pipe_stack=pipe_stack,
+            pipe_layer=pipe_layer,
             comment=comment,
         )
         edge_attributes: Dict[str, Any] = {
@@ -399,13 +399,13 @@ class JobHistory:
             node_attributes = self.nx_graph.nodes[node]
             if not node_attributes:
                 raise JobHistoryError(f"Node attributes are empty for node '{node}'")
-            node_pipe_stack = node_attributes.get(NodeAttributeKey.SUBGRAPH)
-            if not node_pipe_stack:
-                node_pipe_stack = "Unknown"
-            elif not isinstance(node_pipe_stack, str):
+            node_pipe_layer = node_attributes.get(NodeAttributeKey.SUBGRAPH)
+            if not node_pipe_layer:
+                node_pipe_layer = "Unknown"
+            elif not isinstance(node_pipe_layer, str):
                 raise JobHistoryError(f"Node '{node}' has no pipe stack: {node_attributes}")
 
-            sub_graph = node_pipe_stack or "root"
+            sub_graph = node_pipe_layer or "root"
             # Split sub_graph by "-" and keep the last token
             if "-" in sub_graph:
                 sub_graph = sub_graph.split("-")[-1]

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Any
+from typing import Any, cast
 
 from typing_extensions import override
 
@@ -10,10 +10,11 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract, make_empty_prompt
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from pipelex.config import get_config
+from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.job_metadata import JobMetadata
-from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
+from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 
 
 class PipedLLMPromptFactory(LLMPromptFactoryAbstract):
@@ -33,11 +34,18 @@ class PipedLLMPromptFactory(LLMPromptFactoryAbstract):
     ) -> LLMPrompt:
         arguments_dict = prompt_arguments.copy()
         working_memory = WorkingMemoryFactory.make_from_strings_from_dict(input_dict=arguments_dict)
-        llm_prompt: LLMPrompt = (
-            await self.pipe_llm_prompt.run_pipe(
-                pipe_run_params=PipeRunParams(),
-                job_metadata=JobMetadata(session_id=get_config().session_id),
-                working_memory=working_memory,
-            )
-        ).llm_prompt
+        # llm_prompt: LLMPrompt = (
+        #     await self.pipe_llm_prompt.run_pipe(
+        #         pipe_run_params=PipeRunParams(),
+        #         job_metadata=JobMetadata(session_id=get_config().session_id),
+        #         working_memory=working_memory,
+        #     )
+        # ).llm_prompt
+        # kludge
+        pipe_output: PipeOutput = await self.pipe_llm_prompt.run_pipe(
+            pipe_run_params=PipeRunParams(),
+            job_metadata=JobMetadata(session_id=get_config().session_id),
+            working_memory=working_memory,
+        )
+        llm_prompt = cast(PipeLLMPromptOutput, pipe_output).llm_prompt
         return llm_prompt

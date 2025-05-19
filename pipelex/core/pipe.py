@@ -13,34 +13,6 @@ from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.job_metadata import JobMetadata
 
-F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
-P = ParamSpec("P")
-R = TypeVar("R")
-
-
-def update_job_metadata_for_pipe(
-    func: Callable[P, Coroutine[Any, Any, R]],
-) -> Callable[P, Coroutine[Any, Any, R]]:
-    @wraps(func)
-    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        self = cast("PipeAbstract", args[0])
-
-        job_metadata = kwargs.get("job_metadata")
-        if job_metadata is None:
-            raise RuntimeError("job_metadata argument is required for this decorated function.")
-        if not isinstance(job_metadata, JobMetadata):
-            raise TypeError("The job_metadata argument must be of type JobMetadata.")
-
-        updated_metadata = JobMetadata(
-            session_id=job_metadata.session_id,
-            pipe_job_ids=[self.code],
-        )
-        job_metadata.update(updated_metadata=updated_metadata)
-
-        return await func(*args, **kwargs)
-
-    return wrapper
-
 
 class PipeAbstract(ABC, BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")

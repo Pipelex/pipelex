@@ -11,7 +11,6 @@ from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ImageContent, ListContent, PageContent, TextAndImagesContent, TextContent
@@ -20,6 +19,7 @@ from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_content_generator
 from pipelex.job_metadata import JobMetadata
+from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
 
@@ -27,7 +27,7 @@ class PipeOcrOutput(PipeOutput):
     pass
 
 
-class PipeOcr(PipeAbstract):
+class PipeOcr(PipeOperator):
     ocr_engine: Optional[OcrEngine] = None
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
@@ -41,8 +41,7 @@ class PipeOcr(PipeAbstract):
         return self
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,

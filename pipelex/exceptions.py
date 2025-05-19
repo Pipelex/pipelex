@@ -97,6 +97,10 @@ class PipeExecutionError(PipelexError):
     pass
 
 
+class PipeRunError(PipeExecutionError):
+    pass
+
+
 class PipeConditionError(PipelexError):
     pass
 

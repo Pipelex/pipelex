@@ -3,7 +3,7 @@
 # "Pipelex" is a trademark of Evotis S.A.S.
 
 from enum import StrEnum
-from typing import List, Optional, Self, Set, Type
+from typing import List, Optional, Self, Set, Type, cast
 
 from kajson.class_registry import class_registry
 from pydantic import model_validator
@@ -19,10 +19,6 @@ from pipelex.config import get_config
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConceptClass, NativeConceptCode
 from pipelex.core.domain import Domain, SpecialDomain
-from pipelex.core.pipe import (
-    PipeAbstract,
-    update_job_metadata_for_pipe,
-)
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import (
     PipeOutputMultiplicity,
@@ -46,7 +42,8 @@ from pipelex.hub import (
 )
 from pipelex.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
-from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
+from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
+from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_operators.piped_llm_prompt_factory import PipedLLMPromptFactory
 
 
@@ -59,7 +56,7 @@ class PipeLLMOutput(PipeOutput):
     pass
 
 
-class PipeLLM(PipeAbstract):
+class PipeLLM(PipeOperator):
     pipe_llm_prompt: PipeLLMPrompt
     llm_choices: Optional[LLMSettingChoices] = None
     structuring_method: Optional[StructuringMethod] = None
@@ -119,8 +116,7 @@ class PipeLLM(PipeAbstract):
         return required_variables
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -181,13 +177,20 @@ class PipeLLM(PipeAbstract):
             pipe_run_params=pipe_run_params,
             applied_output_multiplicity=applied_output_multiplicity,
         )
-        llm_prompt_1: LLMPrompt = (
-            await self.pipe_llm_prompt.run_pipe(
-                job_metadata=prompt_job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=llm_prompt_run_params,
-            )
-        ).llm_prompt
+        # llm_prompt_1: LLMPrompt = (
+        #     await self.pipe_llm_prompt.run_pipe(
+        #         job_metadata=prompt_job_metadata,
+        #         working_memory=working_memory,
+        #         pipe_run_params=llm_prompt_run_params,
+        #     )
+        # ).llm_prompt
+        # kludge
+        pipe_output: PipeOutput = await self.pipe_llm_prompt.run_pipe(
+            job_metadata=prompt_job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=llm_prompt_run_params,
+        )
+        llm_prompt_1 = cast(PipeLLMPromptOutput, pipe_output).llm_prompt
 
         if input_concept_code := self.input_concept_code:
             if (

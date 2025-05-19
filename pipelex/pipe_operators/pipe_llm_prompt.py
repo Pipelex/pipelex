@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import ClassVar, List, Optional, Self, Set
+from typing import ClassVar, List, Optional, Self, Set, cast
 
 from kajson.class_registry import class_registry
 from pydantic import model_validator
@@ -16,7 +16,6 @@ from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConceptCode
 from pipelex.core.domain import SpecialDomain
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent
@@ -32,7 +31,8 @@ from pipelex.exceptions import (
 )
 from pipelex.hub import get_template
 from pipelex.job_metadata import JobCategory, JobMetadata
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
+from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
+from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.utils.class_structure_utils import get_type_structure
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
@@ -45,7 +45,7 @@ class PipeLLMPromptOutput(PipeOutput):
 
 
 # TODO: consider adding a PipeLLMPromptFactory for consistency
-class PipeLLMPrompt(PipeAbstract):
+class PipeLLMPrompt(PipeOperator):
     adhoc_pipe_code: ClassVar[str] = "adhoc_pipe_code_for_prompt_llm"
 
     output_concept_code: str = f"{SpecialDomain.NATIVE}.{NativeConceptCode.LLM_PROMPT}"
@@ -112,8 +112,7 @@ class PipeLLMPrompt(PipeAbstract):
         return required_variables
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -240,13 +239,22 @@ class PipeLLMPrompt(PipeAbstract):
                     job_category=JobCategory.JINJA2_JOB,
                 )
             )
-            the_text = (
-                await pipe_jinja2.run_pipe(
-                    job_metadata=jinja2_job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=pipe_run_params,
-                )
-            ).rendered_text
+            # the_text = (
+            #     await pipe_jinja2.run_pipe(
+            #         job_metadata=jinja2_job_metadata,
+            #         working_memory=working_memory,
+            #         pipe_run_params=pipe_run_params,
+            #     )
+            # ).rendered_text
+            # kludge
+            pipe_output: PipeOutput = await pipe_jinja2.run_pipe(
+                job_metadata=jinja2_job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+            )
+            pipe_jinja2_output = cast(PipeJinja2Output, pipe_output)
+            the_text = pipe_jinja2_output.rendered_text
+
         elif text_verbatim_name:
             user_text_verbatim = get_template(
                 template_name=text_verbatim_name,

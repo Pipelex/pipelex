@@ -72,7 +72,7 @@ class SubPipe(BaseModel):
             try:
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
             except WorkingMemoryStuffNotFoundError as exc:
-                error_details = f"sub_pipe '{self.pipe_code}', stack: {sub_pipe_run_params.pipe_stack}, required_variables: {required_variables}"
+                error_details = f"sub_pipe '{self.pipe_code}', stack: {sub_pipe_run_params.pipe_layers}, required_variables: {required_variables}"
                 raise PipeInputError(f"Some required stuff(s) not found - {error_details}") from exc
             log.debug(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
             pipe_output = await get_pipe_router().run_pipe_code(
@@ -88,7 +88,7 @@ class SubPipe(BaseModel):
                     from_stuff=stuff,
                     to_stuff=new_output_stuff,
                     pipe_code=self.pipe_code,
-                    pipe_stack=sub_pipe_run_params.pipe_stack,
+                    pipe_layer=sub_pipe_run_params.pipe_layers,
                     comment="SubPipe on required_stuff",
                 )
         pretty_print(pipe_output.main_stuff, title=f"Pipe output for {self.pipe_code}")

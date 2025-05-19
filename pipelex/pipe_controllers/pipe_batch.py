@@ -10,7 +10,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.core.stuff import Stuff
@@ -21,9 +20,10 @@ from pipelex.exceptions import PipeExecutionError
 from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.job_history import job_history
 from pipelex.job_metadata import JobMetadata
+from pipelex.pipe_controllers.pipe_controller import PipeController
 
 
-class PipeBatch(PipeAbstract):
+class PipeBatch(PipeController):
     """Runs a PipeSequence in parallel for each item in a list."""
 
     branch_pipe_code: str
@@ -34,8 +34,7 @@ class PipeBatch(PipeAbstract):
         return set([self.branch_pipe_code])
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -49,7 +48,8 @@ class PipeBatch(PipeAbstract):
             log.debug(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
 
-        pipe_run_params.push_pipe_code(pipe_code=self.branch_pipe_code)
+        # pipe_run_params.push_pipe_to_stack(pipe_code=self.branch_pipe_code)
+        pipe_run_params.push_pipe_layer(pipe_code=self.branch_pipe_code)
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_stuff_key = batch_params.input_list_stuff_name
         input_stuff = working_memory.get_stuff(input_stuff_key)
@@ -131,7 +131,7 @@ class PipeBatch(PipeAbstract):
                 from_stuff=input_stuff,
                 to_stuff=item_input_stuff,
                 to_branch_index=branch_index,
-                pipe_stack=pipe_run_params.pipe_stack,
+                pipe_layer=pipe_run_params.pipe_layers,
                 comment="PipeBatch.run_pipe() in zip",
             )
             for required_stuff in required_stuff_list:
@@ -139,7 +139,7 @@ class PipeBatch(PipeAbstract):
                     from_stuff=required_stuff,
                     to_stuff=item_output_stuff,
                     pipe_code=self.branch_pipe_code,
-                    pipe_stack=pipe_run_params.pipe_stack,
+                    pipe_layer=pipe_run_params.pipe_layers,
                     comment="PipeBatch.run_pipe() on required_stuff_list",
                     as_item_index=branch_index,
                     is_with_edge=(required_stuff.stuff_name != MAIN_STUFF_NAME),
@@ -150,7 +150,7 @@ class PipeBatch(PipeAbstract):
             job_history.add_aggregate_step(
                 from_stuff=branch_output_stuff,
                 to_stuff=output_stuff,
-                pipe_stack=pipe_run_params.pipe_stack,
+                pipe_layer=pipe_run_params.pipe_layers,
                 comment="PipeBatch.run_pipe() on branch_index of batch",
             )
 
