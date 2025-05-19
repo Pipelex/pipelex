@@ -61,7 +61,6 @@ make s                        - Shorthand -> run-setup
 make init                     - Run pipelex init
 make runtests		          - Run tests for github actions (exit on first failure) (no inference)
 make test                     - Run unit tests (no inference)
-make tn                       - Shorthand -> test
 make test-with-prints         - Run tests with prints (no inference)
 make t                        - Shorthand -> test-with-prints
 make test-inference           - Run unit tests only for inference (with prints)
@@ -81,7 +80,7 @@ make fix-unused-imports       - Fix unused imports with ruff
 endef
 export HELP
 
-.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv run-setup s runtests test test-with-prints test-inference t ti test-imgg tg check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version reuse reuse-check
+.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv run-setup s runtests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version reuse reuse-check
 
 all help:
 	@echo "$$HELP"
@@ -230,9 +229,6 @@ test: env
 	else \
 		$(LOCAL_PYTEST) -s -o log_cli=true -o log_level=WARNING $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	fi
-
-tn: test
-	@echo "> done: tn = test"
 
 test-with-prints: env
 	$(call PRINT_TITLE,"Unit testing with prints and our rich logs")
