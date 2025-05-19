@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from mistralai import Mistral, OCRResponse
 from mistralai.models import (
@@ -38,6 +38,7 @@ from pipelex.cogt.openai.openai_factory import OpenAIFactory
 from pipelex.config import get_config
 from pipelex.hub import get_secrets_provider
 from pipelex.tools.misc.base_64 import encode_to_base64, load_binary_as_base64
+from pipelex.tools.utils.file_utils import save_base64_image_to_file
 
 
 class MistralFactory:
@@ -130,6 +131,8 @@ class MistralFactory:
     async def make_ocr_output_from_mistral_response(
         cls,
         mistral_ocr_response: OCRResponse,
+        should_include_images: bool = False,
+        export_dir: Optional[str] = None,
     ) -> OcrOutput:
         pages: Dict[int, Page] = {}
         for ocr_response_page in mistral_ocr_response.pages:
@@ -140,6 +143,14 @@ class MistralFactory:
             for mistral_ocr_image_obj in ocr_response_page.images:
                 image_uri = mistral_ocr_image_obj.id
                 ocr_extracted_image = OcrExtractedImage(uri=image_uri)
+                if should_include_images:
+                    if export_dir:
+                        if mistral_ocr_image_obj.image_base64:
+                            save_base64_image_to_file(
+                                base64_image=mistral_ocr_image_obj.image_base64,
+                                file_path=f"{export_dir}/{image_uri}",
+                            )
+
                 pages[ocr_response_page.index].images.append(ocr_extracted_image)
 
         return OcrOutput(

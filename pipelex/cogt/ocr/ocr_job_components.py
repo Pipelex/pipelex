@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
+from typing import Optional
+
 from pydantic import BaseModel
 
 from pipelex.tools.config.models import ConfigModel
@@ -10,14 +12,18 @@ from pipelex.tools.config.models import ConfigModel
 class OcrJobParams(BaseModel):
     should_caption_images: bool
     should_add_screenshots: bool
+    should_include_images: bool
     screenshots_dpi: int
+    export_dir: Optional[str]
 
     @classmethod
     def make_default_ocr_job_params(cls) -> "OcrJobParams":
         return OcrJobParams(
             should_caption_images=False,
             should_add_screenshots=False,
+            should_include_images=True,
             screenshots_dpi=300,
+            export_dir=None,
         )
 
 

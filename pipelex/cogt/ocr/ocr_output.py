@@ -21,3 +21,7 @@ class Page(BaseModel):
 
 class OcrOutput(BaseModel):
     pages: Dict[int, Page]
+
+    @property
+    def concatenated_text(self) -> str:
+        return "\n".join([page.text for page in self.pages.values() if page.text])

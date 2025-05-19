@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
-
+import base64
 import importlib.resources
 import os
 import shutil
@@ -11,7 +11,7 @@ from typing import List, Optional
 from pipelex.tools.utils.path_utils import path_exists
 
 
-def save_to_path(text_to_save: str, path: str):
+def save_to_path(text_to_save: str, path: str, create_directory: bool = False):
     """
     Writes text content to a file at the specified path.
 
@@ -21,10 +21,17 @@ def save_to_path(text_to_save: str, path: str):
     Args:
         text_to_save (str): The text content to write to the file.
         path (str): The file path where the content should be saved.
+        create_directory (bool, optional): Whether to create the directory if it doesn't exist.
+            Defaults to False.
 
     Raises:
         IOError: If there are issues writing to the file (e.g., permission denied).
     """
+    if create_directory:
+        directory = os.path.dirname(path)
+        if directory:
+            ensure_directory_exists(directory)
+
     with open(path, "w") as file:
         file.write(text_to_save)
 
@@ -242,3 +249,43 @@ def find_folders_by_name(
             if dir_name == folder_name:
                 folder_paths.append(os.path.join(root, dir_name))
     return folder_paths
+
+
+def save_base64_image_to_file(
+    base64_image: str,
+    file_path: str,
+):
+    # Ensure we're getting clean base64 data without any prefixes
+    base64_data = base64_image
+    # Remove potential data URL prefix if present
+    if "," in base64_data:
+        base64_data = base64_data.split(",", 1)[1]
+    if "data:" in base64_data and ";base64," in base64_data:
+        base64_data = base64_data.split(";base64,", 1)[1]
+
+    # Decode base64 image
+    image_data = base64.b64decode(base64_data)
+
+    # Save directly to file without trying to open with PIL first
+    write_bytes_to_file(file_path, image_data)
+
+
+def write_bytes_to_file(file_path: str, byte_data: bytes) -> str:
+    """
+    Write binary data to a file.
+
+    Args:
+        file_path (str): Path where the binary data will be saved
+        byte_data (bytes): Binary data to be written
+
+    Returns:
+        str: Path to the saved file
+    """
+    # Ensure the directory exists
+    directory = os.path.dirname(file_path)
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory, exist_ok=True)
+
+    with open(file_path, "wb") as f:
+        f.write(byte_data)
+    return file_path

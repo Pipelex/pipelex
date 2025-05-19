@@ -19,6 +19,7 @@ from pipelex.cogt.ocr.ocr_output import OcrExtractedImage, OcrOutput
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract, ocr_job_func
 from pipelex.tools.misc.base_64 import load_binary_as_base64_async
 from pipelex.tools.pdf.pdf_render import render_pdf_pages_to_images
+from pipelex.tools.utils.file_utils import save_to_path
 from pipelex.tools.utils.path_utils import clarify_path_or_url, ensure_path
 
 
@@ -44,18 +45,28 @@ class MistralOcrWorker(OcrWorkerAbstract):
     ) -> OcrOutput:
         # TODO: report usage
         if image_uri := ocr_job.ocr_input.image_uri:
-            return await self.make_ocr_output_from_image(
+            ocr_output = await self.make_ocr_output_from_image(
                 image_uri=image_uri,
                 should_caption_image=ocr_job.job_params.should_caption_images,
             )
+
         elif pdf_uri := ocr_job.ocr_input.pdf_uri:
-            return await self.make_ocr_output_from_pdf(
+            ocr_output = await self.make_ocr_output_from_pdf(
                 pdf_uri=pdf_uri,
                 should_caption_images=ocr_job.job_params.should_caption_images,
                 should_add_screenshots=ocr_job.job_params.should_add_screenshots,
+                should_include_images=ocr_job.job_params.should_include_images,
+                export_dir=ocr_job.job_params.export_dir,
             )
         else:
             raise OcrInputError("No image or PDF URI provided in OcrJob")
+        if ocr_job.job_params.export_dir:
+            save_to_path(
+                text_to_save=ocr_output.concatenated_text,
+                path=f"{ocr_job.job_params.export_dir}/text.md",
+                create_directory=True,
+            )
+        return ocr_output
 
     async def make_ocr_output_from_image(
         self,
@@ -80,6 +91,8 @@ class MistralOcrWorker(OcrWorkerAbstract):
         pdf_uri: str,
         should_caption_images: bool,
         should_add_screenshots: bool,
+        should_include_images: bool,
+        export_dir: Optional[str] = None,
     ) -> OcrOutput:
         if should_caption_images:
             raise NotImplementedError("Captioning is not implemented for Mistral OCR.")
@@ -88,11 +101,15 @@ class MistralOcrWorker(OcrWorkerAbstract):
         if pdf_url:
             ocr_output = await self.extract_from_pdf_url(
                 pdf_url=pdf_url,
+                should_include_images=should_include_images,
+                export_dir=export_dir,
             )
         else:  # pdf_path must be provided based on validation
             assert pdf_path is not None  # Type narrowing for mypy
             ocr_output = await self.extract_from_pdf_file(
                 pdf_path=pdf_path,
+                should_include_images=should_include_images,
+                export_dir=export_dir,
             )
         if should_add_screenshots:
             ocr_output = await self.add_page_screenshots_to_ocr_output(
@@ -137,6 +154,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         self,
         pdf_url: str,
         should_include_images: bool = False,
+        export_dir: Optional[str] = None,
     ) -> OcrOutput:
         ocr_response = await self.mistral_client.ocr.process_async(
             model=self.ocr_engine.ocr_model_name,
@@ -149,6 +167,8 @@ class MistralOcrWorker(OcrWorkerAbstract):
 
         ocr_output = await MistralFactory.make_ocr_output_from_mistral_response(
             mistral_ocr_response=ocr_response,
+            should_include_images=should_include_images,
+            export_dir=export_dir,
         )
         return ocr_output
 
@@ -156,6 +176,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         self,
         pdf_path: str,
         should_include_images: bool = False,
+        export_dir: Optional[str] = None,
     ) -> OcrOutput:
         # Upload the file
         uploaded_file_id = await upload_file_for_ocr(
@@ -170,6 +191,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         return await self.extract_from_pdf_url(
             pdf_url=signed_url.url,
             should_include_images=should_include_images,
+            export_dir=export_dir,
         )
 
     async def add_page_screenshots_to_ocr_output(
@@ -190,7 +212,9 @@ class MistralOcrWorker(OcrWorkerAbstract):
         screenshot_uris = []
         for image_index, image in enumerate(images):
             image_path = f"{temp_directory_path}/page_{image_index}.png"
-            image.save(image_path)
+            image.save(
+                image_path,
+            )
             screenshot_uris.append(image_path)
         for page_index, page in enumerate(ocr_output.pages.values()):
             screenshot_uri = screenshot_uris[page_index]
