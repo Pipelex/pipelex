@@ -73,8 +73,8 @@ class PipeOcr(PipeAbstract):
             ocr_input=ocr_input,
             ocr_handle=ocr_handle,
             job_metadata=job_metadata,
-            job_params=ocr_job_params,
-            job_config=OcrJobConfig(),
+            ocr_job_params=ocr_job_params,
+            ocr_job_config=OcrJobConfig(),
         )
 
         # Build the output stuff, which is a list of page contents

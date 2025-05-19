@@ -274,19 +274,19 @@ class ContentGenerator(ContentGeneratorProtocol):
     @override
     async def make_ocr_extract_pages(
         self,
+        job_metadata: JobMetadata,
         ocr_input: OcrInput,
         ocr_handle: OcrHandle,
-        job_metadata: JobMetadata,
-        job_params: OcrJobParams,
-        job_config: OcrJobConfig,
+        ocr_job_params: OcrJobParams,
+        ocr_job_config: OcrJobConfig,
         wfid: Optional[str] = None,
     ) -> OcrOutput:
         ocr_assignment = OcrAssignment(
             job_metadata=job_metadata,
             ocr_input=ocr_input,
             ocr_handle=ocr_handle,
-            ocr_job_params=job_params,
-            ocr_job_config=job_config,
+            ocr_job_params=ocr_job_params,
+            ocr_job_config=ocr_job_config,
         )
         ocr_output = await ocr_gen_extract_pages(ocr_assignment=ocr_assignment)
         return ocr_output
