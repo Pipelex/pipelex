@@ -251,11 +251,11 @@ class LibraryManager:
             )
         except ClassRegistryNotFoundError as factory_not_found_error:
             raise PipeFactoryError(
-                f"Pipe '{pipe_code}' could not be created because '{factory_class_name}' was found in the class registry: {factory_not_found_error}"
+                f"Pipe '{pipe_code}' couldn't be created: factory '{factory_class_name}' not found: {factory_not_found_error}"
             ) from factory_not_found_error
         except ClassRegistryInheritanceError as factory_inheritance_error:
             raise PipeFactoryError(
-                f"Pipe '{pipe_code}' could not be created because '{factory_class_name}' is not a subclass of PipeSpecificFactoryProtocol."
+                f"Pipe '{pipe_code}' couldn't be created: factory '{factory_class_name}' is not a subclass of {type(PipeSpecificFactoryProtocol)}."
             ) from factory_inheritance_error
 
         details_dict["definition"] = pipe_definition
