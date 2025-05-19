@@ -14,13 +14,12 @@ from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.stuff_content import ImageContent, ListContent, TextAndImagesContent, TextContent
+from pipelex.core.stuff_content import ImageContent, ListContent, PageContent, TextAndImagesContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_content_generator
 from pipelex.job_metadata import JobMetadata
-from pipelex.libraries.pipelines.documents import PageContent
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
 

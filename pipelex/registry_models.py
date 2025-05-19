@@ -14,6 +14,7 @@ from pipelex.core.stuff_content import (
     ListContent,
     LLMPromptContent,
     NumberContent,
+    PageContent,
     PDFContent,
     StructuredContent,
     StuffContent,
@@ -88,6 +89,7 @@ class PipelexRegistryModels(RegistryModels):
         StructuredContent,
         PDFContent,
         TextAndImagesContent,
+        PageContent,
     ]
 
     EXPERIMENTAL: ClassVar[List[ModelType]] = [

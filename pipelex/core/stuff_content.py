@@ -303,34 +303,6 @@ class MermaidContent(StuffContent):
         return json.dumps({"mermaid": self.mermaid_code})
 
 
-class TextAndImagesContent(StuffContent):
-    text: Optional[TextContent]
-    images: Optional[List[ImageContent]]
-
-    @property
-    @override
-    def short_desc(self) -> str:
-        text_count = 1 if self.text else 0
-        image_count = len(self.images) if self.images else 0
-        return f"text and image content ({text_count} text, {image_count} images)"
-
-    @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
-        if self.text:
-            rendered = self.text.rendered_markdown(level=level, is_pretty=is_pretty)
-        else:
-            rendered = ""
-        return rendered
-
-    @override
-    def rendered_html(self) -> str:
-        if self.text:
-            rendered = self.text.rendered_html()
-        else:
-            rendered = ""
-        return rendered
-
-
 class StructuredContent(StuffContent):
     @property
     @override
@@ -434,3 +406,36 @@ class ListContent(StuffContent, Generic[StuffContentType]):
                 rendered += item.rendered_str(text_format=TextFormat.MARKDOWN)
                 rendered += "\n"
         return rendered
+
+
+class TextAndImagesContent(StuffContent):
+    text: Optional[TextContent]
+    images: Optional[List[ImageContent]]
+
+    @property
+    @override
+    def short_desc(self) -> str:
+        text_count = 1 if self.text else 0
+        image_count = len(self.images) if self.images else 0
+        return f"text and image content ({text_count} text, {image_count} images)"
+
+    @override
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+        if self.text:
+            rendered = self.text.rendered_markdown(level=level, is_pretty=is_pretty)
+        else:
+            rendered = ""
+        return rendered
+
+    @override
+    def rendered_html(self) -> str:
+        if self.text:
+            rendered = self.text.rendered_html()
+        else:
+            rendered = ""
+        return rendered
+
+
+class PageContent(StructuredContent):
+    text_and_images: TextAndImagesContent
+    screenshot: Optional[ImageContent] = None

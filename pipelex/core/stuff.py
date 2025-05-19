@@ -140,7 +140,7 @@ class Stuff(BaseModel):
         # Validate all items are of the expected type
         for i, item in enumerate(list_content.items):
             if not isinstance(item, item_type):
-                raise TypeError(f"Item {i} in list is of type {type(item).__name__}, not {item_type.__name__}")
+                raise TypeError(f"Item {i} in list is of type {type(item)}, not {item_type}")
 
         return list_content
 
