@@ -94,6 +94,14 @@ prompt_template = """
 Explain that this is a test prompt which took no input from the user.
 """
 
+[pipe.test_no_input_that_could_be_long]
+PipeLLM = "No Input but generates a text that could be long"
+output = "native.Text"
+llm = { llm_handle = "gpt-4o-mini", temperature = 0.5, max_tokens = 100 }
+prompt_template = """
+Tell me a short story about a red baloon.
+"""
+
 [pipe.generate_3_images]
 PipeImgGen = "Generate 3 AI images"
 input = "images.ImggPrompt"

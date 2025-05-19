@@ -120,6 +120,10 @@ class PipeTestCases:
             "Test with no input",
             "test_no_input",
         ),
+        (
+            "Test with no input that could be long",
+            "test_no_input_that_could_be_long",
+        ),
     ]
     NO_INPUT_PARALLEL1: ClassVar[List[Tuple[str, str, Optional[PipeOutputMultiplicity]]]] = [  # topic, pipe, multiplicity
         (
