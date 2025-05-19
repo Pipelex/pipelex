@@ -89,7 +89,6 @@ class PipeImgGen(PipeAbstract):
         )
         imgg_handle = self.imgg_handle or imgg_config.default_imgg_handle
         log.debug(f"Using imgg handle: {imgg_handle}")
-        pretty_print(imgg_job_params, title=f"Imgg Job Params used with '{imgg_handle}'")
 
         the_content: StuffContent
         image_urls: List[str] = []
