@@ -18,7 +18,7 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.tools.misc.model_helpers import BaseModelType
 
 
-class BedrockWorker(LLMWorkerAbstract):
+class BedrockLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,

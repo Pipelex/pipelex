@@ -10,7 +10,7 @@ from pipelex import pretty_print
 from pipelex.cogt.llm.llm_job import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
-from pipelex.hub import get_async_llm_worker
+from pipelex.hub import get_llm_worker
 from tests.cogt.test_data import LLMTestConstants
 
 
@@ -41,7 +41,7 @@ class TestAsyncLLMJobFactory:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_llm_job_and_gen_text(self, llm_handle: str):
-        llm_worker_async = get_async_llm_worker(llm_handle=llm_handle)
+        llm_worker_async = get_llm_worker(llm_handle=llm_handle)
         llm_prompt_template = LLMPromptTemplate.from_template_contents(user_text=LLMTestConstants.PROMPT_TEMPLATE_TEXT)
         random_color = random.choice(LLMTestConstants.PROMPT_COLOR_EXAMPLES)
         llm_job = await LLMJobFactory.make_llm_job_from_prompt_template(

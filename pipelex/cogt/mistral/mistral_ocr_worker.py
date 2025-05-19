@@ -2,16 +2,13 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Any, List, Optional, Type
+from typing import Any, List, Optional
 
-import instructor
 import shortuuid
 from mistralai import Mistral
-from mistralai.models import ChatCompletionResponse
 from typing_extensions import override
 
-from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, SdkTypeError
+from pipelex.cogt.exceptions import SdkTypeError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.mistral.mistral_factory import MistralFactory
 from pipelex.cogt.mistral.mistral_utils import upload_file_for_ocr
@@ -20,7 +17,6 @@ from pipelex.cogt.ocr.ocr_input import OcrInputError
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import OcrExtractedImage, OcrOutput
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract, ocr_job_func
-from pipelex.config import get_config
 from pipelex.tools.misc.base_64 import load_binary_as_base64_async
 from pipelex.tools.pdf.pdf_render import render_pdf_pages_to_images
 from pipelex.tools.utils.path_utils import clarify_path_or_url, ensure_path
@@ -46,6 +42,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         self,
         ocr_job: OcrJob,
     ) -> OcrOutput:
+        # TODO: report usage
         if image_uri := ocr_job.ocr_input.image_uri:
             return await self.make_ocr_output_from_image(
                 image_uri=image_uri,

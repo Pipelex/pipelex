@@ -33,8 +33,6 @@ class CogtReportConfig(ConfigModel):
 
 class OcrConfig(ConfigModel):
     ocr_handles: List[str]
-    ocr_platform: str
-    ocr_model_name: str
 
 
 class ImggConfig(ConfigModel):

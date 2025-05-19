@@ -20,7 +20,7 @@ from pipelex.cogt.mistral.mistral_factory import MistralFactory
 from pipelex.tools.misc.model_helpers import BaseModelType
 
 
-class MistralWorker(LLMWorkerAbstract):
+class MistralLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform

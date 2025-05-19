@@ -4,14 +4,13 @@
 
 from typing import Optional
 
-from pipelex.cogt.exceptions import CogtError, MissingDependencyError
+from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.cogt.plugin_manager import PluginHandle
-from pipelex.hub import get_plugin_manager, get_secret
-from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
+from pipelex.hub import get_plugin_manager
 
 
 class OcrWorkerFactory:

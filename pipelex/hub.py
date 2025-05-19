@@ -284,7 +284,7 @@ def get_inference_manager() -> InferenceManagerProtocol:
     return get_pipelex_hub().get_inference_manager()
 
 
-def get_async_llm_worker(
+def get_llm_worker(
     llm_handle: str,
     specific_llm_engine_blueprint: Optional[LLMEngineBlueprint] = None,
 ) -> LLMWorkerAbstract:
@@ -294,13 +294,13 @@ def get_async_llm_worker(
     )
 
 
-def get_async_imgg_worker(
+def get_imgg_worker(
     imgg_handle: str,
 ) -> ImggWorkerAbstract:
     return get_inference_manager().get_imgg_worker(imgg_handle=imgg_handle)
 
 
-def get_async_ocr_worker(
+def get_ocr_worker(
     ocr_handle: str,
 ) -> OcrWorkerAbstract:
     return get_inference_manager().get_ocr_worker(ocr_handle=ocr_handle)

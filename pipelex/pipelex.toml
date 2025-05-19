@@ -170,8 +170,6 @@ seed = "auto"
 
 [cogt.ocr_config]
 ocr_handles = ["mistral/mistral-ocr-latest"]
-ocr_platform = "mistral"
-ocr_model_name = "mistral-ocr-latest"
 
 ####################################################################################################
 # Pipelex prompting config

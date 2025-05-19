@@ -2,18 +2,15 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import List, Union
 
-from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import OcrAssignment
-from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.hub import get_async_ocr_worker
+from pipelex.hub import get_ocr_worker
 
 
 async def ocr_gen_extract_pages(ocr_assignment: OcrAssignment) -> OcrOutput:
-    ocr_worker = get_async_ocr_worker(ocr_handle=ocr_assignment.ocr_handle)
+    ocr_worker = get_ocr_worker(ocr_handle=ocr_assignment.ocr_handle)
     ocr_job = OcrJobFactory.make_ocr_job(
         ocr_input=ocr_assignment.ocr_input,
         ocr_job_params=ocr_assignment.ocr_job_params,

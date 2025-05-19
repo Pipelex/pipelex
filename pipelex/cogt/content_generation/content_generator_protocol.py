@@ -14,7 +14,6 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
-from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.job_metadata import JobMetadata

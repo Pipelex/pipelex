@@ -4,7 +4,7 @@
 
 from abc import abstractmethod
 from functools import wraps
-from typing import Any, Callable, List, Optional, TypeVar, cast
+from typing import Any, Callable, Optional, TypeVar, cast
 
 from typing_extensions import Awaitable, override
 

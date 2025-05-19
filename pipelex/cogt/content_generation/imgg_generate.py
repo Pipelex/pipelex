@@ -8,11 +8,11 @@ from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import ImggAssignment
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_job_factory import ImggJobFactory
-from pipelex.hub import get_async_imgg_worker
+from pipelex.hub import get_imgg_worker
 
 
 async def imgg_gen_single_image(imgg_assignment: ImggAssignment) -> GeneratedImage:
-    imgg_worker = get_async_imgg_worker(imgg_handle=imgg_assignment.imgg_handle)
+    imgg_worker = get_imgg_worker(imgg_handle=imgg_assignment.imgg_handle)
     imgg_job = ImggJobFactory.make_imgg_job_from_prompt(
         imgg_prompt=imgg_assignment.imgg_prompt,
         imgg_job_params=imgg_assignment.imgg_job_params,
@@ -25,7 +25,7 @@ async def imgg_gen_single_image(imgg_assignment: ImggAssignment) -> GeneratedIma
 
 
 async def imgg_gen_image_list(imgg_assignment: ImggAssignment) -> List[GeneratedImage]:
-    imgg_worker = get_async_imgg_worker(imgg_handle=imgg_assignment.imgg_handle)
+    imgg_worker = get_imgg_worker(imgg_handle=imgg_assignment.imgg_handle)
     imgg_job = ImggJobFactory.make_imgg_job_from_prompt(
         imgg_prompt=imgg_assignment.imgg_prompt,
         imgg_job_params=imgg_assignment.imgg_job_params,

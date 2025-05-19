@@ -23,7 +23,7 @@ from pipelex.cogt.openai.openai_factory import OpenAIFactory
 from pipelex.tools.misc.model_helpers import BaseModelType
 
 
-class OpenAIWorker(LLMWorkerAbstract):
+class OpenAILLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,

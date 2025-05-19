@@ -9,7 +9,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceManagerWorkerSetupError
 from pipelex.cogt.imgg.imgg_engine_factory import ImggEngineFactory
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.imgg.imgg_worker_factory import ImggWorkerFactory
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol

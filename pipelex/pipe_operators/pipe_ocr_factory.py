@@ -7,7 +7,6 @@ from typing import Any, Dict, Optional
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory, OcrPlatform
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol

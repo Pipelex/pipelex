@@ -11,9 +11,6 @@ from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
-from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
-from pipelex.cogt.ocr.ocr_platform import OcrPlatform
-from pipelex.config import get_config
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
@@ -21,7 +18,7 @@ from pipelex.core.stuff_content import ImageContent, ListContent, TextAndImagesC
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.hub import get_content_generator, get_inference_manager
+from pipelex.hub import get_content_generator
 from pipelex.job_metadata import JobMetadata
 from pipelex.libraries.pipelines.documents import PageContent
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list

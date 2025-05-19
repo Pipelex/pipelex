@@ -41,14 +41,14 @@ class ImggWorkerFactory:
                         "fal-client", "fal", "The fal-client SDK is required to use FAL models (generation of images)."
                     ) from exc
 
-                from pipelex.cogt.fal.fal_worker import FalWorker
+                from pipelex.cogt.fal.fal_imgg_worker import FalImggWorker
 
                 imgg_sdk_instance = plugin_manager.get_imgg_sdk_instance(imgg_sdk_handle=imgg_sdk_handle) or plugin_manager.set_imgg_sdk_instance(
                     imgg_sdk_handle=imgg_sdk_handle,
                     imgg_sdk_instance=FalAsyncClient(key=fal_api_key),
                 )
 
-                imgg_worker = FalWorker(
+                imgg_worker = FalImggWorker(
                     sdk_instance=imgg_sdk_instance,
                     imgg_engine=imgg_engine,
                     report_delegate=report_delegate,

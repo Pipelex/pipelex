@@ -8,7 +8,7 @@ from pipelex import pretty_print
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
-from pipelex.hub import get_async_ocr_worker
+from pipelex.hub import get_ocr_worker
 from tests.test_data import PDFTestCases
 
 
@@ -18,7 +18,7 @@ from tests.test_data import PDFTestCases
 class TestCogtOcr:
     @pytest.mark.parametrize("file_path", [PDFTestCases.DOCUMENT_FILE_PATH])
     async def test_ocr_pdr_path(self, file_path: str):
-        ocr_worker = get_async_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
+        ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(pdf_uri=file_path),
         )
@@ -28,7 +28,7 @@ class TestCogtOcr:
 
     @pytest.mark.parametrize("url", [PDFTestCases.DOCUMENT_URL])
     async def test_ocr_url(self, url: str):
-        ocr_worker = get_async_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
+        ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(pdf_uri=url),
         )
@@ -38,7 +38,7 @@ class TestCogtOcr:
 
     @pytest.mark.parametrize("file_path", [PDFTestCases.IMAGE_FILE_PATH])
     async def test_ocr_image_file(self, file_path: str):
-        ocr_worker = get_async_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
+        ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(image_uri=file_path),
         )
@@ -48,7 +48,7 @@ class TestCogtOcr:
 
     @pytest.mark.parametrize("url", [PDFTestCases.IMAGE_URL])
     async def test_ocr_image_url(self, url: str):
-        ocr_worker = get_async_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
+        ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(image_uri=url),
         )

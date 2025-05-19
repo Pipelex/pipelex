@@ -17,7 +17,7 @@ from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract, imgg_job_
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 
 
-class FalWorker(ImggWorkerAbstract):
+class FalImggWorker(ImggWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,

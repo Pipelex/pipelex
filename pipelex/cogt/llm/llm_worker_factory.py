@@ -32,14 +32,14 @@ class LLMWorkerFactory:
                 if get_config().cogt.llm_config.instructor_config.is_openai_structured_output_enabled:
                     structure_method = StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED
 
-                from pipelex.cogt.openai.openai_worker import OpenAIWorker
+                from pipelex.cogt.openai.openai_llm_worker import OpenAILLMWorker
 
                 llm_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=llm_engine.llm_platform),
                 )
 
-                llm_worker = OpenAIWorker(
+                llm_worker = OpenAILLMWorker(
                     sdk_instance=llm_sdk_instance,
                     llm_engine=llm_engine,
                     structure_method=structure_method,
@@ -52,14 +52,14 @@ class LLMWorkerFactory:
                     raise MissingDependencyError("google-auth-oauthlib", "google", "This dependency is required to connect to google.") from exc
 
                 from pipelex.cogt.openai.openai_factory import OpenAIFactory
-                from pipelex.cogt.openai.openai_worker import OpenAIWorker
+                from pipelex.cogt.openai.openai_llm_worker import OpenAILLMWorker
 
                 llm_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=llm_engine.llm_platform),
                 )
 
-                llm_worker = OpenAIWorker(
+                llm_worker = OpenAILLMWorker(
                     sdk_instance=llm_sdk_instance,
                     llm_engine=llm_engine,
                     structure_method=StructureMethod.INSTRUCTOR_VERTEX_JSON,
@@ -79,14 +79,14 @@ class LLMWorkerFactory:
                     ) from exc
 
                 from pipelex.cogt.anthropic.anthropic_factory import AnthropicFactory
-                from pipelex.cogt.anthropic.anthropic_worker import AnthropicWorker
+                from pipelex.cogt.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 
                 llm_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=AnthropicFactory.make_anthropic_client(llm_platform=llm_engine.llm_platform),
                 )
 
-                llm_worker = AnthropicWorker(
+                llm_worker = AnthropicLLMWorker(
                     sdk_instance=llm_sdk_instance,
                     llm_engine=llm_engine,
                     structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS,
@@ -105,14 +105,14 @@ class LLMWorkerFactory:
                     ) from exc
 
                 from pipelex.cogt.mistral.mistral_factory import MistralFactory
-                from pipelex.cogt.mistral.mistral_worker import MistralWorker
+                from pipelex.cogt.mistral.mistral_llm_worker import MistralLLMWorker
 
                 llm_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=MistralFactory.make_mistral_client(),
                 )
 
-                llm_worker = MistralWorker(
+                llm_worker = MistralLLMWorker(
                     sdk_instance=llm_sdk_instance,
                     llm_engine=llm_engine,
                     structure_method=StructureMethod.INSTRUCTOR_MISTRAL_TOOLS,
@@ -128,14 +128,14 @@ class LLMWorkerFactory:
                     ) from exc
 
                 from pipelex.cogt.bedrock.bedrock_factory import BedrockFactory
-                from pipelex.cogt.bedrock.bedrock_worker import BedrockWorker
+                from pipelex.cogt.bedrock.bedrock_llm_worker import BedrockLLMWorker
 
                 llm_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=llm_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
                     llm_sdk_instance=BedrockFactory.make_bedrock_client(),
                 )
 
-                llm_worker = BedrockWorker(
+                llm_worker = BedrockLLMWorker(
                     sdk_instance=llm_sdk_instance,
                     llm_engine=llm_engine,
                     report_delegate=report_delegate,

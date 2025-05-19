@@ -4,7 +4,6 @@
 
 from typing import Optional
 
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams, OcrJobReport
@@ -22,6 +21,7 @@ class OcrJobFactory:
         job_metadata: Optional[JobMetadata] = None,
     ) -> OcrJob:
         config = get_config()
+        # TODO: manahge the param default sthrough the config
         # ocr_config = get_config().cogt.ocr_config
         job_metadata = job_metadata or JobMetadata(
             session_id=get_config().session_id,
