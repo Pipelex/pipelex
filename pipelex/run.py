@@ -4,7 +4,6 @@
 
 from typing import Any, Dict, Optional
 
-from pydantic import Field
 from pipelex import pretty_print
 from pipelex.config import get_config
 from pipelex.core.pipe import PipeAbstract
