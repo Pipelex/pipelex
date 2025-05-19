@@ -7,7 +7,7 @@ from typing import List, Literal, Optional, Union, cast
 from pydantic import Field
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, ImggJobParams
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt

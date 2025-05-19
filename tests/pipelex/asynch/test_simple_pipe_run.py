@@ -11,7 +11,6 @@ from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.stuff_content import ListContent, TextContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate
-from pipelex.job_history import job_history
 from pipelex.run import run_pipe_code
 from tests.pipelex.test_data import PipeTestCases
 
