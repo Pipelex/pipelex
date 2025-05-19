@@ -4,7 +4,7 @@
 
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import Any, Awaitable, Callable, Coroutine, Optional, ParamSpec, Set, Type, TypeVar
+from typing import Any, Awaitable, Callable, Coroutine, Optional, ParamSpec, Set, Type, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -23,11 +23,7 @@ def update_job_metadata_for_pipe(
 ) -> Callable[P, Coroutine[Any, Any, R]]:
     @wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        pipe_code = kwargs.get("pipe_code")
-        if pipe_code is None:
-            raise RuntimeError("pipe_code argument is required for this decorated function.")
-        if not isinstance(pipe_code, str):
-            raise TypeError("The pipe_code argument must be of type str.")
+        self = cast("PipeAbstract", args[0])
 
         job_metadata = kwargs.get("job_metadata")
         if job_metadata is None:
@@ -37,7 +33,7 @@ def update_job_metadata_for_pipe(
 
         updated_metadata = JobMetadata(
             session_id=job_metadata.session_id,
-            pipe_job_ids=[pipe_code],
+            pipe_job_ids=[self.code],
         )
         job_metadata.update(updated_metadata=updated_metadata)
 
@@ -49,7 +45,7 @@ def update_job_metadata_for_pipe(
 class PipeAbstract(ABC, BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    code: str = "adhoc_pipe"
+    code: str
     domain: str
 
     definition: Optional[str] = None
@@ -80,7 +76,6 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def run_pipe(
         self,
-        pipe_code: str,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,

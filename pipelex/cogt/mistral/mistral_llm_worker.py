@@ -10,7 +10,7 @@ from mistralai.models import ChatCompletionResponse
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionError
+from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, SdkTypeError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
@@ -20,7 +20,7 @@ from pipelex.cogt.mistral.mistral_factory import MistralFactory
 from pipelex.tools.misc.model_helpers import BaseModelType
 
 
-class MistralWorker(LLMWorkerAbstract):
+class MistralLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
@@ -28,20 +28,17 @@ class MistralWorker(LLMWorkerAbstract):
         structure_method: Optional[StructureMethod] = None,
         report_delegate: Optional[InferenceReportDelegate] = None,
     ):
-        LLMWorkerAbstract.__init__(
-            self,
-            llm_engine=llm_engine,
-            structure_method=structure_method,
-            report_delegate=report_delegate,
-        )
+        super().__init__(llm_engine=llm_engine, structure_method=structure_method, report_delegate=report_delegate)
 
         if not isinstance(sdk_instance, Mistral):
-            raise ValueError(f"Provided sdk_instance for {self.__class__.__name__} is not of type Mistral: {sdk_instance}")
+            raise SdkTypeError(f"Provided LLM sdk_instance for {self.__class__.__name__} is not of type Mistral: it's a '{type(sdk_instance)}'")
 
         if default_max_tokens := llm_engine.llm_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise ValueError(f"llm_engine.model.max_tokens is None for {llm_engine.llm_model.llm_name}, but it is required for Mistral models")
+            raise LLMEngineParameterError(
+                f"No max_tokens provided for llm model '{llm_engine.llm_model}', but it must be provided for Mistral models"
+            )
         self.mistral_client_for_text: Mistral = sdk_instance
 
         if structure_method:

@@ -6,6 +6,8 @@ import base64
 import json
 import zlib
 
+from pipelex import pretty_print
+
 
 def encode_pako_encore_from_bytes(state_bytes: bytes) -> str:
     compressed = zlib.compress(state_bytes, level=9)
@@ -45,3 +47,8 @@ def clean_str_for_mermaid_node_title(text: str) -> str:
     text = text.replace('"', "″")  # Replace with prime symbol
     text = text.replace("'", "′")  # Replace with curly quote
     return text
+
+
+def print_mermaid_url(url: str, title: str):
+    pretty_print("⚠️  Warning: By clicking on the following mermaid URL, you send data to https://mermaid.live/.", border_style="red")
+    pretty_print(url, title=title, border_style="yellow")

@@ -19,16 +19,22 @@ from pipelex.core.domain import SpecialDomain
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent, StuffContentError
+from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
+from pipelex.exceptions import (
+    PipeDefinitionError,
+    PipeInputError,
+    PipeRunParamsError,
+    WorkingMemoryNotFoundError,
+    WorkingMemoryStuffNotFoundError,
+    WorkingMemoryTypeError,
+)
 from pipelex.hub import get_template
 from pipelex.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.utils.class_structure_utils import get_type_structure
-from pipelex.tools.utils.path_utils import clarify_path_or_url
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
 
 
@@ -109,7 +115,6 @@ class PipeLLMPrompt(PipeAbstract):
     @update_job_metadata_for_pipe
     async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
-        pipe_code: str,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -125,23 +130,18 @@ class PipeLLMPrompt(PipeAbstract):
         ############################################################
         # User images
         ############################################################
-        user_images: List[PromptImage] = []
+        prompt_user_images: List[PromptImage] = []
         if self.user_images:
             for user_image_name in self.user_images:
                 log.debug(f"Getting user image '{user_image_name}' from context")
-                user_image_stuff = working_memory.get_stuff(user_image_name)
-                if not user_image_stuff:
-                    raise StuffContentError(f"User image '{user_image_name}' not found in context")
-                prompt_image_stuff_content = user_image_stuff.content
-                if not isinstance(prompt_image_stuff_content, ImageContent):
-                    raise ValueError(f"Expected ImageContent, got {user_image_stuff.content.__class__}")
-                image_url = prompt_image_stuff_content.url
-                file_path, url = clarify_path_or_url(path_or_url=image_url)
-                user_image = PromptImageFactory.make_prompt_image(
-                    file_path=file_path,
-                    url=url,
-                )
-                user_images.append(user_image)
+                try:
+                    prompt_image_stuff_content = working_memory.get_stuff_attribute(name=user_image_name, wanted_type=ImageContent)
+                except (WorkingMemoryNotFoundError, WorkingMemoryStuffNotFoundError, WorkingMemoryTypeError) as exc:
+                    raise PipeInputError(f"A valid user image named '{user_image_name}' was not found in the working_memory: {exc}") from exc
+
+                image_uri = prompt_image_stuff_content.url
+                user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
+                prompt_user_images.append(user_image)
 
         ############################################################
         # User text
@@ -158,8 +158,8 @@ class PipeLLMPrompt(PipeAbstract):
             raise ValueError("For user_text we need either a pipe_jinja2, a text_verbatim_name or a fixed user_text")
 
         # Append output structure prompt if needed
-        if pipe_run_params.output_concept_code:
-            user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=pipe_run_params.output_concept_code)
+        if pipe_run_params.dynamic_output_concept_code:
+            user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=pipe_run_params.dynamic_output_concept_code)
 
         ############################################################
         # System text
@@ -179,7 +179,7 @@ class PipeLLMPrompt(PipeAbstract):
         llm_prompt = LLMPromptContent(
             system_text=system_text,
             user_text=user_text,
-            user_images=user_images,
+            user_images=prompt_user_images,
         )
 
         output_stuff = StuffFactory.make_stuff(
@@ -242,7 +242,6 @@ class PipeLLMPrompt(PipeAbstract):
             )
             the_text = (
                 await pipe_jinja2.run_pipe(
-                    pipe_code=PipeJinja2.adhoc_pipe_code,
                     job_metadata=jinja2_job_metadata,
                     working_memory=working_memory,
                     pipe_run_params=pipe_run_params,

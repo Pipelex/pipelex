@@ -75,6 +75,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         if pipe_blueprint.system_prompt_template or pipe_blueprint.system_prompt_template_name:
             try:
                 system_prompt_pipe_jinja2 = PipeJinja2(
+                    code="adhoc_for_system_prompt",
                     domain=domain_code,
                     jinja2=pipe_blueprint.system_prompt_template,
                     jinja2_name=pipe_blueprint.system_prompt_template_name,
@@ -109,11 +110,13 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         elif pipe_blueprint.prompt is None and pipe_blueprint.prompt_name is None:
             # no jinja2 provided, no verbatim name, no fixed text, let's use the pipe code as jinja2 name
             user_pipe_jinja2 = PipeJinja2(
+                code="adhoc_for_user_prompt",
                 domain=domain_code,
                 jinja2_name=pipe_code,
             )
 
         pipe_llm_prompt = PipeLLMPrompt(
+            code="adhoc_for_pipe_llm_prompt",
             domain=domain_code,
             system_prompt_pipe_jinja2=system_prompt_pipe_jinja2,
             system_prompt_verbatim_name=pipe_blueprint.system_prompt_name,

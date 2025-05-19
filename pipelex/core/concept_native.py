@@ -14,16 +14,22 @@ class NativeConceptClass(StrEnum):
     DYNAMIC = "DynamicContent"
     TEXT = "TextContent"
     IMAGE = "ImageContent"
+    PDF = "PDFContent"
+    TEXT_AND_IMAGES = "TextAndImagesContent"
     NUMBER = "NumberContent"
     LLM_PROMPT = "LLMPromptContent"
+    PAGE = "PageContent"
 
 
 class NativeConceptCode(StrEnum):
     DYNAMIC = "Dynamic"
     TEXT = "Text"
     IMAGE = "Image"
+    PDF = "PDF"
+    TEXT_AND_IMAGES = "TextAndImage"
     NUMBER = "Number"
     LLM_PROMPT = "LlmPrompt"
+    PAGE = "Page"
 
     @property
     def concept_code(self) -> str:
@@ -46,6 +52,21 @@ class NativeConceptCode(StrEnum):
                     definition="An image",
                     structure_class_name=NativeConceptClass.IMAGE,
                 )
+            case NativeConceptCode.PDF:
+                return Concept(
+                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
+                    domain=SpecialDomain.NATIVE,
+                    definition="A PDF",
+                    structure_class_name=NativeConceptClass.PDF,
+                )
+            case NativeConceptCode.TEXT_AND_IMAGES:
+                return Concept(
+                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
+                    domain=SpecialDomain.NATIVE,
+                    definition="A text and an image",
+                    structure_class_name=NativeConceptClass.TEXT_AND_IMAGES,
+                )
+
             case NativeConceptCode.NUMBER:
                 return Concept(
                     code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
@@ -66,6 +87,13 @@ class NativeConceptCode(StrEnum):
                     domain=SpecialDomain.NATIVE,
                     definition="A dynamic concept",
                     structure_class_name=NativeConceptClass.DYNAMIC,
+                )
+            case NativeConceptCode.PAGE:
+                return Concept(
+                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
+                    domain=SpecialDomain.NATIVE,
+                    definition="The content of a page of a document, comprising text and linked images as well as an optional screenshot of the page",
+                    structure_class_name=NativeConceptClass.PAGE,
                 )
 
     @classmethod

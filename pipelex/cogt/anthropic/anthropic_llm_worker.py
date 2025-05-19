@@ -19,7 +19,7 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.tools.misc.model_helpers import BaseModelType
 
 
-class AnthropicWorker(LLMWorkerAbstract):
+class AnthropicLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,

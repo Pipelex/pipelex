@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+domain = "documents"
+definition = "The domain of documents that can comprise pages, text, images, etc. in PDF or other formats"
+
+[concept]
+TextAndImagesContent = "A content that comprises text and images where the text can include local links to the images"
+PDF = "A PDF document"
+
+[pipe]
+
+[pipe.extract_page_contents_from_pdf]
+PipeOcr = "Extract page contents from a PDF document"
+input = "native.PDF"
+output = "PageContent"
+pdf = "pdf"

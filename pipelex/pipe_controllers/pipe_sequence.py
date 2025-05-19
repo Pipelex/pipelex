@@ -27,14 +27,13 @@ class PipeSequence(PipeAbstract):
     @update_job_metadata_for_pipe
     async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
-        pipe_code: str,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         log.debug(f"run_pipe_direct: output_name={output_name}")
-        pipe_run_params.push_pipe_code(pipe_code=pipe_code)
+        pipe_run_params.push_pipe_code(pipe_code=self.code)
         if pipe_run_params.is_multiple_output_required:
             raise PipeRunParamsError(
                 f"PipeSequence does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"

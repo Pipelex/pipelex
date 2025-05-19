@@ -63,11 +63,11 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
         # "o1",
         # "o3-mini",
         # "gpt-4o",
-        # "gpt-4o-mini",
+        "gpt-4o-mini",
         # "gpt-4-5-preview",
         # "claude-3-haiku",
         # "claude-3-5-sonnet",
-        "claude-3-7-sonnet",
+        # "claude-3-7-sonnet",
         # "pixtral-12b",
         # "pixtral-large",
         # "gemini-1-5-pro",
@@ -123,8 +123,8 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
 
 @pytest.fixture(
     params=[
-        LLMPlatform.ANTHROPIC,
-        # LLMPlatform.AZURE_OPENAI,
+        # LLMPlatform.ANTHROPIC,
+        LLMPlatform.AZURE_OPENAI,
         # LLMPlatform.BEDROCK,
         # LLMPlatform.BEDROCK_ANTHROPIC,
         # LLMPlatform.MISTRAL,
@@ -140,7 +140,7 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
 
 @pytest.fixture(
     params=[
-        # "gpt-4o-mini",
+        "gpt-4o-mini",
         # "open-mixtral-8x7b",
         # "google/gemini-2.0-flash",
         # "google/gemini-2.5-pro-exp-03-25",
@@ -148,7 +148,7 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
         # "o4-mini",
         # "bedrock-mistral-large",
         # "sonar",
-        "claude-3-7-sonnet",
+        # "claude-3-7-sonnet",
     ]
 )
 def llm_id(request: pytest.FixtureRequest) -> str:

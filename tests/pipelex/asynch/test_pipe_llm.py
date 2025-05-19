@@ -2,11 +2,14 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
+from typing import List
 
 import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.domain import SpecialDomain
+from pipelex.core.stuff import Stuff
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate
 from pipelex.pipe_operators.pipe_llm import PipeLLM, PipeLLMOutput
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
@@ -30,6 +33,42 @@ class TestPipeLLM:
                     domain="generic",
                     system_prompt=PipeTestCases.SYSTEM_PROMPT,
                     user_text=PipeTestCases.USER_PROMPT,
+                ),
+            ),
+        )
+        pipe_llm_output: PipeLLMOutput = await pipe_router.run_pipe_job(
+            pipe_job=pipe_job,
+        )
+
+        log.verbose(pipe_llm_output, title="stuff")
+        llm_generated_text = pipe_llm_output.main_stuff_as_text
+        pretty_print(llm_generated_text, title="llm_generated_text")
+        get_report_delegate().general_report()
+
+    @pytest.mark.llm
+    @pytest.mark.inference
+    @pytest.mark.asyncio(loop_scope="class")
+    @pytest.mark.parametrize("stuff, attribute_paths", PipeTestCases.STUFFS_IMAGE_ATTRIBUTES)
+    async def test_pipe_llm_attribute_image(
+        self,
+        pipe_router: PipeRouterProtocol,
+        stuff: Stuff,
+        attribute_paths: List[str],
+    ):
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+
+        pipe_job = PipeJobFactory.make_pipe_job(
+            working_memory=working_memory,
+            pipe=PipeLLM(
+                code="adhoc_for_test_pipe_llm_image",
+                domain="generic",
+                output_concept_code=f"{SpecialDomain.NATIVE}.Text",
+                pipe_llm_prompt=PipeLLMPrompt(
+                    code="adhoc_for_test_pipe_llm_image",
+                    domain="generic",
+                    system_prompt=PipeTestCases.SYSTEM_PROMPT,
+                    user_text=PipeTestCases.MULTI_IMG_DESC_PROMPT,
+                    user_images=attribute_paths,
                 ),
             ),
         )

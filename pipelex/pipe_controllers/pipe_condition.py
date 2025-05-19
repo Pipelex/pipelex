@@ -66,7 +66,6 @@ class PipeCondition(PipeAbstract):
     @update_job_metadata_for_pipe
     async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
-        pipe_code: str,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -78,6 +77,7 @@ class PipeCondition(PipeAbstract):
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
 
         pipe_jinja2 = PipeJinja2(
+            code="adhoc_for_pipe_condition",
             domain=self.domain,
             jinja2=self.applied_expression_jinja2,
         )
@@ -90,7 +90,6 @@ class PipeCondition(PipeAbstract):
         log.debug(f"Jinja2 expression: {self.applied_expression_jinja2}")
         evaluated_expression = (
             await pipe_jinja2.run_pipe(
-                pipe_code=PipeJinja2.adhoc_pipe_code,
                 job_metadata=jinja2_job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
@@ -98,7 +97,7 @@ class PipeCondition(PipeAbstract):
         ).rendered_text.strip()
 
         if not evaluated_expression or evaluated_expression == "None":
-            error_msg = f"Conditional expression returned an empty string in pipe {pipe_code}:"
+            error_msg = f"Conditional expression returned an empty string in pipe {self.code}:"
             error_msg += f"\n\nExpression: {self.applied_expression_jinja2}"
             raise PipeConditionError(error_msg)
         log.debug(f"evaluated_expression: '{evaluated_expression}'")
@@ -112,7 +111,7 @@ class PipeCondition(PipeAbstract):
 
         chosen_pipe_code = self.pipe_map.get(evaluated_expression, self.default_pipe_code)
         if not chosen_pipe_code:
-            error_msg = f"No pipe code found for evaluated expression '{evaluated_expression}' in pipe {pipe_code}:"
+            error_msg = f"No pipe code found for evaluated expression '{evaluated_expression}' in pipe {self.code}:"
             error_msg += f"\n\nExpression: {self.applied_expression_jinja2}"
             error_msg += f"\n\nPipe map: {self.pipe_map}"
             raise PipeConditionError(error_msg)
@@ -122,12 +121,12 @@ class PipeCondition(PipeAbstract):
             chosen_pipe_code=chosen_pipe_code,
         )
         required_variables = pipe_jinja2.required_variables()
-        log.debug(required_variables, title=f"Required variables for PipeCondition '{pipe_code}'")
+        log.debug(required_variables, title=f"Required variables for PipeCondition '{self.code}'")
         required_stuff_names = set([required_variable for required_variable in required_variables if not required_variable.startswith("_")])
         try:
             required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
         except WorkingMemoryStuffNotFoundError as exc:
-            error_details = f"PipeCondition '{pipe_code}', stack: {pipe_run_params.pipe_stack}, required_variables: {required_variables}"
+            error_details = f"PipeCondition '{self.code}', stack: {pipe_run_params.pipe_stack}, required_variables: {required_variables}"
             raise PipeInputError(f"Some required stuff(s) not found - {error_details}") from exc
 
         for required_stuff in required_stuffs:

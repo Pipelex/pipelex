@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pipelex"
-version = "0.1.17"
+version = "0.2.0"
 description = "Pipelex is an open-source dev tool based on a simple declarative language that lets you define replicable, structured, composable LLM pipelines."
 authors = ["Evotis S.A.S. <evotis@pipelex.com>"]
 maintainers = ["Pipelex staff <oss@pipelex.com>"]
@@ -47,6 +47,8 @@ networkx = "^3.4.2"
 openai = "^1.60.1"
 openpyxl = "^3.1.5"           # Used by pandas to handle excel files
 pandas = "^2.2.3"
+pillow = "^11.2.1"
+pypdfium2 = "^4.30.1"
 pydantic = "2.10.6"
 python-dotenv = "^1.0.1"
 PyYAML = "^6.0.2"
@@ -107,7 +109,7 @@ warn_unused_configs = true
 
 [[tool.mypy.overrides]]
 ignore_missing_imports = true
-module = ["json2html", "filetype"]
+module = ["filetype", "json2html", "pypdfium2", "pypdfium2.raw"]
 
 [tool.pyright]
 analyzeUnannotatedFunctions = true
@@ -206,12 +208,13 @@ strictSetInference = true
 typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
-addopts = "--import-mode=importlib -ra -m 'not inference and not imgg'"
+addopts = "--import-mode=importlib -ra -m 'not inference and not llm and not imgg and not ocr'"
 asyncio_default_fixture_loop_scope = "session"
 markers = [
     "inference: slow and costly due to inference calls",
     "llm: slow and costly due to llm inference calls",
     "imgg: slow and costly due to imgg inference calls",
+    "ocr: slow and costly due to ocr inference calls",
     "gha_disabled: tests that should not run in GitHub Actions",
 ]
 minversion = "8.0"

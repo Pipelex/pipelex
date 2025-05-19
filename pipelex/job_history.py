@@ -13,13 +13,13 @@ import networkx as nx
 import yaml
 from pydantic import BaseModel
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.stuff import Stuff
 from pipelex.exceptions import JobHistoryError
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
-from pipelex.tools.misc.mermaid_helpers import clean_str_for_mermaid_node_title, make_mermaid_url
+from pipelex.tools.misc.mermaid_helpers import clean_str_for_mermaid_node_title, make_mermaid_url, print_mermaid_url
 from pipelex.tools.utils.string_utils import snake_to_capitalize_first_letter
 
 
@@ -372,7 +372,10 @@ class JobHistory:
     def generate_mermaid_flowchart(self, title: Optional[str] = None, subtitle: Optional[str] = None) -> Tuple[str, str]:
         if not self.is_active:
             raise JobHistoryError("Job history is not active")
-        log.debug("Generating mermaid flowchart for the whole graph")
+        nb_nodes = len(self.nx_graph.nodes)
+        if nb_nodes == 0:
+            raise JobHistoryError("Graph has no nodes")
+        log.debug(f"Generating mermaid flowchart for the whole graph which holds {nb_nodes} nodes")
         mermaid_settings: Dict[str, Any] = {}
         if title:
             mermaid_settings["title"] = title
@@ -525,22 +528,24 @@ class JobHistory:
 
         return subgraph_lines
 
-    def print_mermaid_flowchart_and_reset(self, title: Optional[str] = None, subtitle: Optional[str] = None):
+    def print_mermaid_flowchart_code_and_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
         if not self.is_active:
             return
         mermaid_code, url = self.generate_mermaid_flowchart(title=title, subtitle=subtitle)
         print(mermaid_code)
-        pretty_print("⚠️  Warning: By clicking on the following mermaid flowchart URL, you send data to https://mermaid.live/.", border_style="red")
-        pretty_print(url, title=f"Mermaid flowchart URL for {title}", border_style="yellow")
-        self.reset()
+        title_to_print = "Mermaid flowchart URL"
+        if title:
+            title_to_print += f" for {title}"
+        print_mermaid_url(url=url, title=title_to_print)
 
     def print_mermaid_flowchart_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
         if not self.is_active:
             return
         _, url = self.generate_mermaid_flowchart(title=title, subtitle=subtitle)
-        pretty_print("⚠️  Warning: By clicking on the following mermaid flowchart URL, you send data to https://mermaid.live/.", border_style="red")
-        pretty_print(url, title=f"Mermaid flowchart URL for {title}", border_style="yellow")
-        self.reset()
+        title_to_print = "Mermaid flowchart URL"
+        if title:
+            title_to_print += f" for {title}"
+        print_mermaid_url(url=url, title=title_to_print)
 
 
 job_history = JobHistory()

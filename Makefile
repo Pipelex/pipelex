@@ -61,12 +61,14 @@ make s                        - Shorthand -> run-setup
 make init                     - Run pipelex init
 make runtests		          - Run tests for github actions (exit on first failure) (no inference)
 make test                     - Run unit tests (no inference)
-make tn                       - Shorthand -> test
 make test-with-prints         - Run tests with prints (no inference)
 make t                        - Shorthand -> test-with-prints
 make test-inference           - Run unit tests only for inference (with prints)
 make ti                       - Shorthand -> test-inference
+make test-ocr                 - Run unit tests only for ocr (with prints)
+make to                       - Shorthand -> test-ocr
 make test-imgg                - Run unit tests only for imgg (with prints)
+make test-g					  - Shorthand -> test-imgg
 
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
@@ -78,7 +80,7 @@ make fix-unused-imports       - Fix unused imports with ruff
 endef
 export HELP
 
-.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv run-setup s runtests test test-with-prints test-inference t ti test-imgg check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version reuse reuse-check
+.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv run-setup s runtests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version reuse reuse-check
 
 all help:
 	@echo "$$HELP"
@@ -228,9 +230,6 @@ test: env
 		$(LOCAL_PYTEST) -s -o log_cli=true -o log_level=WARNING $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	fi
 
-tn: test
-	@echo "> done: tn = test"
-
 test-with-prints: env
 	$(call PRINT_TITLE,"Unit testing with prints and our rich logs")
 	@echo "• Running unit tests"
@@ -254,6 +253,17 @@ test-inference: env
 ti: test-inference
 	@echo "> done: ti = test-inference"
 
+test-ocr: env
+	$(call PRINT_TITLE,"Unit testing ocr")
+	@if [ -n "$(TEST)" ]; then \
+		$(LOCAL_PYTEST) --exitfirst -m "ocr" -s -k "$(TEST)" $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+	else \
+		$(LOCAL_PYTEST) --exitfirst -m "ocr" -s $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+	fi
+
+to: test-ocr
+	@echo "> done: to = test-ocr"
+
 test-imgg: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
@@ -261,6 +271,9 @@ test-imgg: env
 	else \
 		$(LOCAL_PYTEST) --exitfirst -m "imgg" -s $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	fi
+
+tg: test-imgg
+	@echo "> done: tg = test-imgg"
 
 ############################################################################################
 ############################               Linting              ############################

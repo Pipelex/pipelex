@@ -46,7 +46,7 @@ class LLMVisionTestCases:
 
     URL_WIKIPEDIA_ALAN_TURING = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Alan_Turing_%281912-1954%29_in_1936_at_Princeton_University_%28cropped%29.jpg/440px-Alan_Turing_%281912-1954%29_in_1936_at_Princeton_University_%28cropped%29.jpg"
 
-    TEST_IMAGE_DIRECTORY = "tests/cogt/data/images"
+    TEST_IMAGE_DIRECTORY = "tests/data/images"
 
     PATH_IMG_PNG_1 = f"{TEST_IMAGE_DIRECTORY}/ai_lympics.png"
     PATH_IMG_JPEG_1 = f"{TEST_IMAGE_DIRECTORY}/ai_lympics.jpg"
@@ -68,10 +68,14 @@ class LLMVisionTestCases:
         ("AI Lympics PNG", (PATH_IMG_PNG_1, PATH_IMG_PNG_2)),
     ]
 
-    IMAGES: ClassVar[List[Tuple[str, str]]] = [  # topic, image_url
+    IMAGES_MIXED_SOURCES: ClassVar[List[Tuple[str, str]]] = [  # topic, image_uri
         (
             "Alan Turing",
             URL_WIKIPEDIA_ALAN_TURING,
+        ),
+        (
+            "AI Lympics",
+            PATH_IMG_PNG_1,
         ),
         (
             "Eiffel Tower",
@@ -141,15 +145,8 @@ Woman typing on a laptop. On the laptop screen you see python code to generate c
     IMGG_PROMPT_4 = "a dog wearing sunglasses and playing poker"
 
     IMAGE_DESC: ClassVar[List[Tuple[str, str]]] = [  # topic, imgg_prompt_text
-        # ("images.Photo", IMGG_PROMPT_1),
-        # ("images.Photo", IMGG_PROMPT_2),
-        # ("images.Photo", IMGG_PROMPT_3),
-        ("images.Photo", IMGG_PROMPT_4),
+        # (IMGG_PROMPT_1, IMGG_PROMPT_1),
+        # (IMGG_PROMPT_2, IMGG_PROMPT_2),
+        # (IMGG_PROMPT_3, IMGG_PROMPT_3),
+        (IMGG_PROMPT_4, IMGG_PROMPT_4),
     ]
-
-
-class OCRTestCases:
-    DOCUMENT_FILE_PATH = "tests/cogt/data/documents/solar_system.pdf"
-    DOCUMENT_URL = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.pdf"
-    IMAGE_FILE_PATH = "tests/cogt/data/documents/solar_system.png"
-    IMAGE_URL = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.png"

@@ -20,7 +20,7 @@ from pipelex import pretty_print
 
 class Example(BaseModel):
     pipe_code: str
-    output_concept: str
+    dynamic_output_concept: str
     memory: List[Stuff]
 
 
@@ -41,7 +41,7 @@ class TestPipelexClient:
         return [
             Example(
                 pipe_code="retrieve_then_answer",  # pipe_code
-                output_concept="contracts.Fees",
+                dynamic_output_concept="contracts.Fees",
                 memory=[
                     StuffFactory.make_stuff(
                         concept_code="questions.ProjectContext",
@@ -162,12 +162,16 @@ This amendment applies only to transactions originating from DataAnalytics Corp'
 
             pipe_execute_request = PipeRequest(
                 memory=memory,
-                output_concept=example.output_concept,
+                dynamic_output_concept=example.dynamic_output_concept,
             )
 
             # Execute pipe
             client = PipelexClient()
-            result = await client.execute_pipe(pipe_code=example.pipe_code, pipe_execute_request=pipe_execute_request, use_local_execution=True)
+            result = await client.execute_pipe(
+                pipe_code=example.pipe_code,
+                pipe_execute_request=pipe_execute_request,
+                use_local_execution=True,
+            )
             pretty_print(result)
 
             # Verify result

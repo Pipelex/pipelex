@@ -26,7 +26,7 @@
 # 📑 Table of Contents
 
 - [Introduction](#introduction)
-- [Quick start](#🚀-quick-start)
+- [Quick start](#-quick-start)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
   - [Optional features](#optional-features)

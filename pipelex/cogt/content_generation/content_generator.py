@@ -13,12 +13,14 @@ from pipelex.cogt.content_generation.assignment_models import (
     LLMAssignment,
     LLMAssignmentFactory,
     ObjectAssignment,
+    OcrAssignment,
     TextThenObjectAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.content_generation.imgg_generate import imgg_gen_image_list, imgg_gen_single_image
 from pipelex.cogt.content_generation.jinja2_generate import jinja2_gen_text
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
+from pipelex.cogt.content_generation.ocr_generate import ocr_gen_extract_pages
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams
@@ -27,6 +29,10 @@ from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
+from pipelex.cogt.ocr.ocr_handle import OcrHandle
+from pipelex.cogt.ocr.ocr_input import OcrInput
+from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
+from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.config import get_config
 from pipelex.job_metadata import JobMetadata
 from pipelex.tools.misc.model_helpers import BaseModelType
@@ -264,3 +270,23 @@ class ContentGenerator(ContentGeneratorProtocol):
         jinja2_text = await jinja2_gen_text(jinja2_assignment=jinja2_assignment)
         log.dev(f"{self.__class__.__name__} jinja2: {jinja2_text}")
         return jinja2_text
+
+    @override
+    async def make_ocr_extract_pages(
+        self,
+        job_metadata: JobMetadata,
+        ocr_input: OcrInput,
+        ocr_handle: OcrHandle,
+        ocr_job_params: Optional[OcrJobParams] = None,
+        ocr_job_config: Optional[OcrJobConfig] = None,
+        wfid: Optional[str] = None,
+    ) -> OcrOutput:
+        ocr_assignment = OcrAssignment(
+            job_metadata=job_metadata,
+            ocr_input=ocr_input,
+            ocr_handle=ocr_handle,
+            ocr_job_params=ocr_job_params or OcrJobParams.make_default_ocr_job_params(),
+            ocr_job_config=ocr_job_config or OcrJobConfig(),
+        )
+        ocr_output = await ocr_gen_extract_pages(ocr_assignment=ocr_assignment)
+        return ocr_output

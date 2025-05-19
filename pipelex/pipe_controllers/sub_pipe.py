@@ -52,7 +52,6 @@ class SubPipe(BaseModel):
                 branch_pipe_code=self.pipe_code,
             )
             pipe_output = await pipe_batch.run_pipe(
-                pipe_code=self.pipe_code,
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=sub_pipe_run_params,

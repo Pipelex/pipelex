@@ -14,7 +14,6 @@ from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate
 from pipelex.job_history import job_history
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
-from tests.pipelex.data.test_pipe_batch.test_pipe_batch import DATA_1, DATA_2
 
 
 @pytest.mark.llm
@@ -33,8 +32,8 @@ class TestPipeBatch:
             concept_code="test_pipe_batch.TestPipeBatchItem",
             content=ListContent(
                 items=[
-                    TextContent(text=DATA_1),
-                    TextContent(text=DATA_2),
+                    TextContent(text="data_1"),
+                    TextContent(text="data_2"),
                 ]
             ),
             name="test_pipe_batch_item",

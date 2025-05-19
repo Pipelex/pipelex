@@ -14,8 +14,11 @@ from pipelex.core.stuff_content import (
     ListContent,
     LLMPromptContent,
     NumberContent,
+    PageContent,
+    PDFContent,
     StructuredContent,
     StuffContent,
+    TextAndImagesContent,
     TextContent,
 )
 from pipelex.pipe_controllers.pipe_batch import PipeBatch
@@ -35,6 +38,8 @@ from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm import PipeLLM
 from pipelex.pipe_operators.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
+from pipelex.pipe_operators.pipe_ocr import PipeOcr
+from pipelex.pipe_operators.pipe_ocr_factory import PipeOcrFactory
 from pipelex.tools.registry_models import ModelType, RegistryModels
 
 
@@ -47,6 +52,7 @@ class PipelexRegistryModels(RegistryModels):
         PipeJinja2,
         PipeLLM,
         PipeLLMPrompt,
+        PipeOcr,
     ]
 
     PIPE_OPERATORS_FACTORY: ClassVar[List[PipeSpecificFactoryProtocol[Any, Any]]] = [
@@ -54,6 +60,7 @@ class PipelexRegistryModels(RegistryModels):
         PipeImgGenFactory,
         PipeJinja2Factory,
         PipeLLMFactory,
+        PipeOcrFactory,
     ]
 
     PIPE_CONTROLLERS: ClassVar[List[PipeAbstractType]] = [
@@ -80,6 +87,9 @@ class PipelexRegistryModels(RegistryModels):
         HtmlContent,
         ListContent,
         StructuredContent,
+        PDFContent,
+        TextAndImagesContent,
+        PageContent,
     ]
 
     EXPERIMENTAL: ClassVar[List[ModelType]] = [

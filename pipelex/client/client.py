@@ -76,7 +76,7 @@ class PipelexClient:
             pipe_output = await run_pipe_code(
                 pipe_code=pipe_code,
                 working_memory=pipe_execute_request.memory,
-                output_concept_code=pipe_execute_request.output_concept,
+                dynamic_output_concept_code=pipe_execute_request.dynamic_output_concept,
             )
             return PipeStatus(
                 pipe_execution_id="local",

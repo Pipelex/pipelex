@@ -15,12 +15,14 @@ class JobCategory(StrEnum):
     IMGG_JOB = "imgg_job"
     PROMPTING_JOB = "prompting_job"
     JINJA2_JOB = "jinja2_job"
+    OCR_JOB = "ocr_job"
 
 
 class UnitJobId(StrEnum):
     LLM_GEN_TEXT = "llm_gen_text"
     LLM_GEN_OBJECT = "llm_gen_object"
     IMGG_TEXT_TO_IMAGE = "imgg_text_to_image"
+    OCR_EXTRACT_PAGES = "ocr_extract_pages"
 
 
 class JobMetadata(BaseModel):

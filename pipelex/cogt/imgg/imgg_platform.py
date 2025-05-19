@@ -5,6 +5,5 @@
 from enum import StrEnum
 
 
-class ImggSDKHandle(StrEnum):
-    FAL = "fal"
-    FAL_ASYNC = "fal_async"
+class ImggPlatform(StrEnum):
+    FAL_AI = "fal-ai"
