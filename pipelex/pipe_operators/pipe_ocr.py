@@ -34,7 +34,6 @@ class PipeOcr(PipeAbstract):
     should_add_screenshots: bool
     should_caption_images: bool
     should_include_images: bool = False
-    export_dir: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_exactly_one_input_stuff_name(self) -> Self:
@@ -70,7 +69,7 @@ class PipeOcr(PipeAbstract):
         ocr_job_params.should_add_screenshots = self.should_add_screenshots
         ocr_job_params.should_caption_images = self.should_caption_images
         ocr_job_params.should_include_images = self.should_include_images
-        ocr_job_params.export_dir = self.export_dir
+        ocr_job_params.export_dir = pipe_run_params.params.get("export_dir")
         ocr_input = OcrInput(
             image_uri=image_uri,
             pdf_uri=pdf_uri,

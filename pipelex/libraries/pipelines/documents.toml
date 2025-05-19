@@ -16,3 +16,5 @@ PipeOcr = "Extract page contents from a PDF document"
 input = "native.PDF"
 output = "PageContent"
 pdf = "pdf"
+include_images = true
+add_screenshots = true

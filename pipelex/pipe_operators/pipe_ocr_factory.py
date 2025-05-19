@@ -23,7 +23,6 @@ class PipeOcrBlueprint(PipeBlueprint):
     add_screenshots: bool = False
     caption_image: bool = False
     include_images: bool = False
-    export_dir: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_input_source(self) -> Self:
@@ -57,7 +56,6 @@ class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
             should_add_screenshots=pipe_blueprint.add_screenshots,
             should_caption_images=pipe_blueprint.caption_image,
             should_include_images=pipe_blueprint.include_images,
-            export_dir=pipe_blueprint.export_dir,
         )
 
     @classmethod
