@@ -9,6 +9,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.cogt.exceptions import LLMCapabilityError, PromptImageFormatError
 from pipelex.cogt.image.prompt_image import PromptImageBytes, PromptImagePath, PromptImageUrl
+from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_job import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.hub import get_llm_worker
@@ -20,9 +21,9 @@ from tests.cogt.test_data import LLMVisionTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestAsyncCogtLLMVision:
-    @pytest.mark.parametrize("topic, image_url", LLMVisionTestCases.IMAGES)
-    async def test_gen_text_from_vision_by_url_async(self, llm_handle_for_vision: str, topic: str, image_url: str):
-        prompt_image = PromptImageUrl(url=image_url)
+    @pytest.mark.parametrize("topic, image_uri", LLMVisionTestCases.IMAGES_MIXED_SOURCES)
+    async def test_gen_text_from_vision_by_url_async(self, llm_handle_for_vision: str, topic: str, image_uri: str):
+        prompt_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
         llm_worker_async = get_llm_worker(llm_handle=llm_handle_for_vision)
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_USER_TEXT_2,

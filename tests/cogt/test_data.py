@@ -68,10 +68,14 @@ class LLMVisionTestCases:
         ("AI Lympics PNG", (PATH_IMG_PNG_1, PATH_IMG_PNG_2)),
     ]
 
-    IMAGES: ClassVar[List[Tuple[str, str]]] = [  # topic, image_url
+    IMAGES_MIXED_SOURCES: ClassVar[List[Tuple[str, str]]] = [  # topic, image_uri
         (
             "Alan Turing",
             URL_WIKIPEDIA_ALAN_TURING,
+        ),
+        (
+            "AI Lympics",
+            PATH_IMG_PNG_1,
         ),
         (
             "Eiffel Tower",
