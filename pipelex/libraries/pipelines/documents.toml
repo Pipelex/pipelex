@@ -12,7 +12,7 @@ PDF = "A PDF document"
 [pipe]
 
 [pipe.extract_page_contents_from_pdf]
-PipeOCR = "Extract page contents from a PDF document"
+PipeOcr = "Extract page contents from a PDF document"
 input = "native.PDF"
-output = "documents.PageContent"
+output = "PageContent"
 pdf = "pdf"

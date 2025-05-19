@@ -11,11 +11,11 @@ from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory, OcrPlatform
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.pipe_operators.pipe_ocr import PipeOCR
+from pipelex.pipe_operators.pipe_ocr import PipeOcr
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
 
-class PipeOCRBlueprint(PipeBlueprint):
+class PipeOcrBlueprint(PipeBlueprint):
     definition: Optional[str] = None
     image: Optional[str] = None
     pdf: Optional[str] = None
@@ -30,21 +30,21 @@ class PipeOCRBlueprint(PipeBlueprint):
         return self
 
 
-class PipeOCRFactory(PipeSpecificFactoryProtocol[PipeOCRBlueprint, PipeOCR]):
+class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
     @classmethod
     @override
     def make_pipe_from_blueprint(
         cls,
         domain_code: str,
         pipe_code: str,
-        pipe_blueprint: PipeOCRBlueprint,
-    ) -> PipeOCR:
+        pipe_blueprint: PipeOcrBlueprint,
+    ) -> PipeOcr:
         ocr_platform = pipe_blueprint.ocr_platform or OcrPlatform.MISTRAL
         match ocr_platform:
             case OcrPlatform.MISTRAL:
                 ocr_engine = OcrEngineFactory.make_ocr_engine(ocr_handle=OcrHandle.MISTRAL_OCR)
 
-        return PipeOCR(
+        return PipeOcr(
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
@@ -63,8 +63,8 @@ class PipeOCRFactory(PipeSpecificFactoryProtocol[PipeOCRBlueprint, PipeOCR]):
         domain_code: str,
         pipe_code: str,
         details_dict: Dict[str, Any],
-    ) -> PipeOCR:
-        pipe_blueprint = PipeOCRBlueprint.model_validate(details_dict)
+    ) -> PipeOcr:
+        pipe_blueprint = PipeOcrBlueprint.model_validate(details_dict)
         return cls.make_pipe_from_blueprint(
             domain_code=domain_code,
             pipe_code=pipe_code,

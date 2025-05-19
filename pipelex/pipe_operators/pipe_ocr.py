@@ -23,11 +23,11 @@ from pipelex.job_metadata import JobMetadata
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
 
-class PipeOCROutput(PipeOutput):
+class PipeOcrOutput(PipeOutput):
     pass
 
 
-class PipeOCR(PipeAbstract):
+class PipeOcr(PipeAbstract):
     ocr_engine: Optional[OcrEngine] = None
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
@@ -48,9 +48,9 @@ class PipeOCR(PipeAbstract):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
-    ) -> PipeOCROutput:
+    ) -> PipeOcrOutput:
         if not self.output_concept_code:
-            raise PipeDefinitionError("PipeOCR should have a non-None output_concept_code")
+            raise PipeDefinitionError("PipeOcr should have a non-None output_concept_code")
 
         image_uri: Optional[str] = None
         pdf_uri: Optional[str] = None
@@ -61,7 +61,7 @@ class PipeOCR(PipeAbstract):
             pdf_stuff = working_memory.get_stuff_as_pdf(name=self.pdf_stuff_name)
             pdf_uri = pdf_stuff.url
         else:
-            raise PipeDefinitionError("PipeOCR should have a non-None image_stuff_name or pdf_stuff_name")
+            raise PipeDefinitionError("PipeOcr should have a non-None image_stuff_name or pdf_stuff_name")
 
         ocr_handle = OcrHandle.MISTRAL_OCR
         ocr_job_params = OcrJobParams.make_default_ocr_job_params()
@@ -103,7 +103,7 @@ class PipeOCR(PipeAbstract):
             name=output_name,
         )
 
-        pipe_output = PipeOCROutput(
+        pipe_output = PipeOcrOutput(
             working_memory=working_memory,
         )
         return pipe_output
