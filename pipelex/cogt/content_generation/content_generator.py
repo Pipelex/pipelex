@@ -277,16 +277,16 @@ class ContentGenerator(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         ocr_input: OcrInput,
         ocr_handle: OcrHandle,
-        ocr_job_params: OcrJobParams,
-        ocr_job_config: OcrJobConfig,
+        ocr_job_params: Optional[OcrJobParams] = None,
+        ocr_job_config: Optional[OcrJobConfig] = None,
         wfid: Optional[str] = None,
     ) -> OcrOutput:
         ocr_assignment = OcrAssignment(
             job_metadata=job_metadata,
             ocr_input=ocr_input,
             ocr_handle=ocr_handle,
-            ocr_job_params=ocr_job_params,
-            ocr_job_config=ocr_job_config,
+            ocr_job_params=ocr_job_params or OcrJobParams.make_default_ocr_job_params(),
+            ocr_job_config=ocr_job_config or OcrJobConfig(),
         )
         ocr_output = await ocr_gen_extract_pages(ocr_assignment=ocr_assignment)
         return ocr_output
