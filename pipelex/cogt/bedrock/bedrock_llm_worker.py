@@ -41,7 +41,9 @@ class BedrockLLMWorker(LLMWorkerAbstract):
         if default_max_tokens := llm_engine.llm_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise LLMEngineParameterError(f"No max_tokens provided for llm model '{llm_engine.llm_model}', but it must be providedfor Bedrock models")
+            raise LLMEngineParameterError(
+                f"No max_tokens provided for llm model '{llm_engine.llm_model}', but it must be provided for Bedrock models"
+            )
         self.bedrock_client_for_text = sdk_instance
 
     @override
