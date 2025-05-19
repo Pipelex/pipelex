@@ -28,7 +28,9 @@ class LibraryConfig(ConfigModel):
 
     @classmethod
     def get_llm_deck_paths(cls) -> List[str]:
-        return [str(path) for path in find_files_in_dir(dir_path=cls.exported_llm_deck_path, pattern="*.toml", is_recursive=True)]
+        llm_deck_paths = [str(path) for path in find_files_in_dir(dir_path=cls.exported_llm_deck_path, pattern="*.toml", is_recursive=True)]
+        llm_deck_paths.sort()
+        return llm_deck_paths
 
     @classmethod
     def get_templates_paths(cls) -> List[str]:
