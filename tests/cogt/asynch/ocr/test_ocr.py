@@ -9,7 +9,7 @@ from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
 from pipelex.hub import get_ocr_worker
-from tests.test_data import PDFTestCases
+from tests.test_data import ImageTestCases, PDFTestCases
 
 
 @pytest.mark.ocr
@@ -36,7 +36,7 @@ class TestCogtOcr:
         pretty_print(ocr_output, title="OCR Output")
         assert ocr_output.pages
 
-    @pytest.mark.parametrize("file_path", [PDFTestCases.IMAGE_FILE_PATH])
+    @pytest.mark.parametrize("file_path", [ImageTestCases.IMAGE_FILE_PATH])
     async def test_ocr_image_file(self, file_path: str):
         ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job = OcrJobFactory.make_ocr_job(
@@ -46,7 +46,7 @@ class TestCogtOcr:
         pretty_print(ocr_output, title="OCR Output")
         assert ocr_output.pages
 
-    @pytest.mark.parametrize("url", [PDFTestCases.IMAGE_URL])
+    @pytest.mark.parametrize("url", [ImageTestCases.IMAGE_URL])
     async def test_ocr_image_url(self, url: str):
         ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job = OcrJobFactory.make_ocr_job(
