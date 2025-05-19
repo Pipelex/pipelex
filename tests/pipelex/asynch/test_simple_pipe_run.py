@@ -11,12 +11,12 @@ from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.stuff_content import ListContent, TextContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate
-from pipelex.job_history import job_history
 from pipelex.run import run_pipe_code
 from tests.pipelex.test_data import PipeTestCases
 
 
 @pytest.mark.llm
+@pytest.mark.ocr
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestSimplePipeRun:
@@ -38,7 +38,6 @@ class TestSimplePipeRun:
 
     @pytest.mark.parametrize("pipe_code, input_concept_code, str_value", PipeTestCases.SIMPLE_PIPE_RUN_FROM_STR)
     async def test_execute_pipe_from_str(self, pipe_code: str, input_concept_code: str, str_value: str):
-        job_history.activate()
         working_memory = WorkingMemoryFactory.make_from_text(
             concept_code=input_concept_code,
             text=str_value,
@@ -51,4 +50,3 @@ class TestSimplePipeRun:
         log.verbose(pipe_output, title="pipe_output")
         pretty_print(pipe_output, title="pipe_output")
         get_report_delegate().general_report()
-        job_history.print_mermaid_flowchart_and_reset()

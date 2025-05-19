@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from pipelex.core.stuff_content import StructuredContent
+from enum import StrEnum
 
 
-class TextExtractionResult(StructuredContent):
-    markdown_text: str
+class ImggPlatform(StrEnum):
+    FAL_AI = "fal-ai"

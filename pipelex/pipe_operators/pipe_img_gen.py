@@ -7,7 +7,7 @@ from typing import List, Literal, Optional, Union, cast
 from pydantic import Field
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, ImggJobParams
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
@@ -48,7 +48,6 @@ class PipeImgGen(PipeAbstract):
     @update_job_metadata_for_pipe
     async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
-        pipe_code: str,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -90,7 +89,6 @@ class PipeImgGen(PipeAbstract):
         )
         imgg_handle = self.imgg_handle or imgg_config.default_imgg_handle
         log.debug(f"Using imgg handle: {imgg_handle}")
-        pretty_print(imgg_job_params, title=f"Imgg Job Params used with '{imgg_handle}'")
 
         the_content: StuffContent
         image_urls: List[str] = []

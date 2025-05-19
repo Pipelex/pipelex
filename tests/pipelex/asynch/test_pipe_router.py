@@ -24,6 +24,7 @@ from tests.pipelex.test_data import PipeTestCases
 
 
 @pytest.mark.llm
+@pytest.mark.ocr
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeRouter:
@@ -129,7 +130,6 @@ class TestPipeRouter:
         output_multiplicity: Optional[PipeOutputMultiplicity],
     ):
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
-        job_history.activate()
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParams(
@@ -151,8 +151,6 @@ class TestPipeRouter:
             pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
             pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
             pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
-
-        job_history.print_mermaid_flowchart_and_reset()
 
     @pytest.mark.parametrize("pipe_code, stuff, input_list_stuff_name, input_item_stuff_name", PipeTestCases.BATCH_TEST)
     async def test_pipe_batch_with_list_content(
@@ -185,4 +183,4 @@ class TestPipeRouter:
         pretty_print(pipe_output, title=f"run pipe '{pipe_code}'")
         get_report_delegate().general_report()
 
-        job_history.print_mermaid_flowchart_and_reset()
+        job_history.print_mermaid_flowchart_code_and_url()

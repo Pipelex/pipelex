@@ -6,7 +6,7 @@ import base64
 
 import pytest
 
-from pipelex.tools.utils.image_utils import load_image_as_base64_from_bytes_async, load_image_as_base64_from_path_async
+from pipelex.tools.misc.base_64 import encode_to_base64_async, load_binary_as_base64_async
 from tests.tools.test_data import FileHelperTestCases
 
 
@@ -18,7 +18,7 @@ async def test_load_image_as_base64_from_bytes_async():
     expected_base64 = base64.b64encode(test_image_bytes)
 
     # Call the function
-    result = await load_image_as_base64_from_bytes_async(test_image_bytes)
+    result = await encode_to_base64_async(test_image_bytes)
 
     # Assert the result
     assert result == expected_base64
@@ -28,7 +28,7 @@ async def test_load_image_as_base64_from_bytes_async():
 @pytest.mark.asyncio
 async def test_load_image_as_base64_from_path_async():
     # Call the function
-    result = await load_image_as_base64_from_path_async(FileHelperTestCases.TEST_IMAGE)
+    result = await load_binary_as_base64_async(FileHelperTestCases.TEST_IMAGE)
 
     # Assert that the result is bytes
     assert isinstance(result, bytes)

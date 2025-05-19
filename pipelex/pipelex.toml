@@ -76,6 +76,7 @@ aws_secret_access_key_secret_name = "AWS_SECRET_ACCESS_KEY"
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
 is_auto_setup_preset_imgg = true
+is_auto_setup_preset_ocr = true
 
 [cogt.cogt_report_config]
 is_log_costs_to_console = false
@@ -168,8 +169,7 @@ seed = "auto"
 ####################################################################################################
 
 [cogt.ocr_config]
-[cogt.ocr_config.mistral_ocr_config]
-ocr_model_name = "mistral-ocr-latest"
+ocr_handles = ["mistral/mistral-ocr-latest"]
 
 ####################################################################################################
 # Pipelex prompting config

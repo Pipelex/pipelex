@@ -14,6 +14,8 @@ class NativeConceptClass(StrEnum):
     DYNAMIC = "DynamicContent"
     TEXT = "TextContent"
     IMAGE = "ImageContent"
+    PDF = "PDFContent"
+    TEXT_AND_IMAGES = "TextAndImagesContent"
     NUMBER = "NumberContent"
     LLM_PROMPT = "LLMPromptContent"
 
@@ -22,6 +24,8 @@ class NativeConceptCode(StrEnum):
     DYNAMIC = "Dynamic"
     TEXT = "Text"
     IMAGE = "Image"
+    PDF = "PDF"
+    TEXT_AND_IMAGES = "TextAndImage"
     NUMBER = "Number"
     LLM_PROMPT = "LlmPrompt"
 
@@ -46,6 +50,21 @@ class NativeConceptCode(StrEnum):
                     definition="An image",
                     structure_class_name=NativeConceptClass.IMAGE,
                 )
+            case NativeConceptCode.PDF:
+                return Concept(
+                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
+                    domain=SpecialDomain.NATIVE,
+                    definition="A PDF",
+                    structure_class_name=NativeConceptClass.PDF,
+                )
+            case NativeConceptCode.TEXT_AND_IMAGES:
+                return Concept(
+                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
+                    domain=SpecialDomain.NATIVE,
+                    definition="A text and an image",
+                    structure_class_name=NativeConceptClass.TEXT_AND_IMAGES,
+                )
+
             case NativeConceptCode.NUMBER:
                 return Concept(
                     code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),

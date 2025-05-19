@@ -88,7 +88,6 @@ class PipeJinja2(PipeAbstract):
     @update_job_metadata_for_pipe
     async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
-        pipe_code: str,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,

@@ -35,7 +35,6 @@ class PipedLLMPromptFactory(LLMPromptFactoryAbstract):
         working_memory = WorkingMemoryFactory.make_from_strings_from_dict(input_dict=arguments_dict)
         llm_prompt: LLMPrompt = (
             await self.pipe_llm_prompt.run_pipe(
-                pipe_code="pipe_llm_prompt_from_factory",
                 pipe_run_params=PipeRunParams(),
                 job_metadata=JobMetadata(session_id=get_config().session_id),
                 working_memory=working_memory,

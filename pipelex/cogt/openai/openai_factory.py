@@ -26,7 +26,7 @@ from pipelex.cogt.llm.llm_report import NbTokensByCategoryDict
 from pipelex.cogt.llm.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.hub import get_secrets_provider
-from pipelex.tools.utils.image_utils import load_image_as_base64_from_path
+from pipelex.tools.misc.base_64 import load_binary_as_base64
 
 
 class OpenAIFactoryError(CogtError):
@@ -119,7 +119,7 @@ class OpenAIFactory:
             url_with_bytes: str = f"data:image/jpeg;base64,{prompt_image.b64_image_bytes.decode('utf-8')}"
             openai_image_url = ImageURL(url=url_with_bytes, detail="high")
         elif isinstance(prompt_image, PromptImagePath):
-            image_bytes = load_image_as_base64_from_path(path=prompt_image.file_path)
+            image_bytes = load_binary_as_base64(path=prompt_image.file_path)
             return cls.make_openai_image_url(PromptImageBytes(b64_image_bytes=image_bytes))
         else:
             raise ValueError(f"prompt_image of type {type(prompt_image)} is not supported")

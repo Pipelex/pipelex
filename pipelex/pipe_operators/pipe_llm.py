@@ -33,7 +33,7 @@ from pipelex.core.pipe_run_params import (
 from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError, PipeExecutionError, PipelexError
+from pipelex.exceptions import PipeDefinitionError, PipeExecutionError
 from pipelex.hub import (
     get_concept_provider,
     get_content_generator,
@@ -53,10 +53,6 @@ from pipelex.pipe_operators.piped_llm_prompt_factory import PipedLLMPromptFactor
 class StructuringMethod(StrEnum):
     DIRECT = "direct"
     PRELIMINARY_TEXT = "preliminary_text"
-
-
-class PipeLLMError(PipelexError):
-    pass
 
 
 class PipeLLMOutput(PipeOutput):
@@ -126,23 +122,19 @@ class PipeLLM(PipeAbstract):
     @update_job_metadata_for_pipe
     async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
-        pipe_code: str,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeLLMOutput:
-        # First put the output_name inside the params
-        pipe_run_params.output_concept_code = self.output_concept_code
-
         # interpret / unwrap the arguments
-        log.debug(f"PipeLLM pipe_code = {pipe_code}")
+        log.debug(f"PipeLLM pipe_code = {self.code}")
         if self.output_concept_code == ConceptFactory.make_concept_code(SpecialDomain.NATIVE, NativeConceptCode.DYNAMIC):
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
-            output_concept_code = pipe_run_params.params[PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT]
+            output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
             if not output_concept_code:
-                raise RuntimeError(f"No output concept code provided for dynamic output pipe '{pipe_code}'")
+                raise RuntimeError(f"No output concept code provided for dynamic output pipe '{self.code}'")
         else:
             output_concept_code = self.output_concept_code
 
@@ -151,7 +143,7 @@ class PipeLLM(PipeAbstract):
             output_multiplicity_override=pipe_run_params.output_multiplicity,
         )
         log.debug(
-            f"PipeLLM pipe_code = {pipe_code}: applied_output_multiplicity = {applied_output_multiplicity}, "
+            f"PipeLLM pipe_code = {self.code}: applied_output_multiplicity = {applied_output_multiplicity}, "
             f"is_multiple_output = {is_multiple_output}, fixed_nb_output = {fixed_nb_output}"
         )
 
@@ -191,7 +183,6 @@ class PipeLLM(PipeAbstract):
         )
         llm_prompt_1: LLMPrompt = (
             await self.pipe_llm_prompt.run_pipe(
-                pipe_code=PipeLLMPrompt.adhoc_pipe_code,
                 job_metadata=prompt_job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=llm_prompt_run_params,
@@ -207,7 +198,7 @@ class PipeLLM(PipeAbstract):
                 and not llm_prompt_1.user_images
             ):
                 raise PipeExecutionError(
-                    f"No user images provided in the prompt with input concept '{input_concept_code}' but it's required for pipe '{pipe_code}'"
+                    f"No user images provided in the prompt with input concept '{input_concept_code}' but it's required for pipe '{self.code}'"
                 )
 
         the_content: StuffContent
@@ -228,12 +219,12 @@ class PipeLLM(PipeAbstract):
 
             llm_prompt_2_factory: Optional[LLMPromptFactoryAbstract]
             if structuring_method := self.structuring_method:
-                log.debug(f"PipeLLM pipe_code is '{pipe_code}' and structuring_method is '{structuring_method}'")
+                log.debug(f"PipeLLM pipe_code is '{self.code}' and structuring_method is '{structuring_method}'")
                 match structuring_method:
                     case StructuringMethod.DIRECT:
                         llm_prompt_2_factory = None
                     case StructuringMethod.PRELIMINARY_TEXT:
-                        pipe = get_required_pipe(pipe_code=pipe_code)
+                        pipe = get_required_pipe(pipe_code=self.code)
                         # TODO: run_pipe() could get the domain at the same time as the pip_code
                         domain = get_required_domain(domain_code=pipe.domain)
                         prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
@@ -243,6 +234,7 @@ class PipeLLM(PipeAbstract):
                         )
                         system_prompt = self.system_prompt_to_structure or domain.system_prompt
                         pipe_llm_prompt_2 = PipeLLMPrompt(
+                            code="adhoc_for_pipe_llm_prompt_2",
                             domain=self.domain,
                             user_pipe_jinja2=user_pipe_jinja2,
                             system_prompt=system_prompt,
@@ -251,9 +243,9 @@ class PipeLLM(PipeAbstract):
                             pipe_llm_prompt=pipe_llm_prompt_2,
                         )
             elif get_config().pipelex.structure_config.is_default_text_then_structure:
-                log.debug(f"PipeLLM pipe_code is '{pipe_code}' and is_default_text_then_structure")
+                log.debug(f"PipeLLM pipe_code is '{self.code}' and is_default_text_then_structure")
                 # TODO: run_pipe() should get the domain along with the pip_code
-                if the_pipe := get_optional_pipe(pipe_code=pipe_code):
+                if the_pipe := get_optional_pipe(pipe_code=self.code):
                     domain = get_required_domain(domain_code=the_pipe.domain)
                 else:
                     domain = Domain.make_default()
@@ -264,6 +256,7 @@ class PipeLLM(PipeAbstract):
                 )
                 system_prompt = self.system_prompt_to_structure or domain.system_prompt
                 pipe_llm_prompt_2 = PipeLLMPrompt(
+                    code="adhoc_for_pipe_llm_prompt_2",
                     domain=self.domain,
                     user_pipe_jinja2=user_pipe_jinja2,
                     system_prompt=system_prompt,

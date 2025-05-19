@@ -23,10 +23,6 @@ ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
 
-class StuffContentError(Exception):
-    pass
-
-
 class StuffContent(ABC, BaseModel):
     @property
     def short_desc(self) -> str:
@@ -210,6 +206,37 @@ class ImageContent(StuffContentInitableFromStr):
         return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
 
 
+class PDFContent(StuffContentInitableFromStr):
+    url: str
+
+    @property
+    @override
+    def short_desc(self) -> str:
+        url_desc = interpret_path_or_url(path_or_url=self.url).desc
+        return f"{url_desc} of a PDF document"
+
+    @classmethod
+    @override
+    def make_from_str(cls, str_value: str) -> "PDFContent":
+        return PDFContent(url=str_value)
+
+    @override
+    def rendered_plain(self) -> str:
+        return self.url
+
+    @override
+    def rendered_html(self) -> str:
+        doc = Doc()
+        doc.stag("a", href=self.url, klass="msg-pdf")
+        doc.text(self.url)
+
+        return doc.getvalue()
+
+    @override
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+        return f"[{self.url}]({self.url})"
+
+
 class HtmlContent(StuffContent):
     inner_html: str
     css_class: str
@@ -274,6 +301,34 @@ class MermaidContent(StuffContent):
     @override
     def rendered_json(self) -> str:
         return json.dumps({"mermaid": self.mermaid_code})
+
+
+class TextAndImagesContent(StuffContent):
+    text: Optional[TextContent]
+    images: Optional[List[ImageContent]]
+
+    @property
+    @override
+    def short_desc(self) -> str:
+        text_count = 1 if self.text else 0
+        image_count = len(self.images) if self.images else 0
+        return f"text and image content ({text_count} text, {image_count} images)"
+
+    @override
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+        if self.text:
+            rendered = self.text.rendered_markdown(level=level, is_pretty=is_pretty)
+        else:
+            rendered = ""
+        return rendered
+
+    @override
+    def rendered_html(self) -> str:
+        if self.text:
+            rendered = self.text.rendered_html()
+        else:
+            rendered = ""
+        return rendered
 
 
 class StructuredContent(StuffContent):

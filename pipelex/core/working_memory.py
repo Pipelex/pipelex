@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Any, Dict, List, Optional, Self, Set, Type
+from operator import attrgetter
+from typing import Any, Dict, List, Optional, Self, Set, Type, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -18,11 +19,13 @@ from pipelex.core.stuff_content import (
     ListContent,
     MermaidContent,
     NumberContent,
+    PDFContent,
     StuffContent,
     StuffContentType,
+    TextAndImagesContent,
     TextContent,
 )
-from pipelex.exceptions import WorkingMemoryError, WorkingMemoryStuffNotFoundError
+from pipelex.exceptions import WorkingMemoryError, WorkingMemoryNotFoundError, WorkingMemoryStuffNotFoundError, WorkingMemoryTypeError
 from pipelex.tools.utils.json_utils import save_as_json_to_path
 
 MAIN_STUFF_NAME = "main_stuff"
@@ -30,6 +33,9 @@ BATCH_ITEM_STUFF_NAME = "_batch_item"
 
 StuffDict = Dict[str, Stuff]
 StuffArtefactDict = Dict[str, StuffArtefact]
+
+# Create a generic type variable
+T = TypeVar("T")
 
 
 class WorkingMemory(BaseModel):
@@ -94,6 +100,31 @@ class WorkingMemory(BaseModel):
                 raise WorkingMemoryStuffNotFoundError(f"Alias '{alias}' points to a non-existent stuff '{name}'")
             return stuff
         raise WorkingMemoryStuffNotFoundError(f"Stuff '{name}' not found in working memory, valid keys are: {self.list_keys()}")
+
+    def get_stuff_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
+        if "." in name:
+            parts = name.split(".", 1)  # Split only at the first dot
+            base_name = parts[0]
+            attr_path_str = parts[1]  # Keep the rest as a dot-separated string
+
+            base_stuff = self.get_stuff(base_name)
+
+            try:
+                stuff_content = attrgetter(attr_path_str)(base_stuff.content)
+            except AttributeError as exc:
+                raise WorkingMemoryNotFoundError(f"Stuff attribute not found in attribute path '{name}': {exc}") from exc
+
+            if wanted_type is not None and not isinstance(stuff_content, wanted_type):
+                raise WorkingMemoryTypeError(f"Content at '{name}' is of type {type(stuff_content).__name__}, it should be {wanted_type.__name__}")
+
+            return stuff_content
+        else:
+            content = self.get_stuff(name).content
+
+            if wanted_type is not None and not isinstance(content, wanted_type):
+                raise WorkingMemoryTypeError(f"Content of '{name}' is of type {type(content).__name__}, it should be {wanted_type.__name__}")
+
+            return content
 
     def get_stuffs(self, names: Set[str]) -> List[Stuff]:
         the_stuffs: List[Stuff] = []
@@ -258,6 +289,14 @@ class WorkingMemory(BaseModel):
         """Get stuff content as ImageContent if applicable."""
         return self.get_stuff(name=name).as_image
 
+    def get_stuff_as_text_and_image(self, name: str) -> TextAndImagesContent:
+        """Get stuff content as TextAndImageContent if applicable."""
+        return self.get_stuff(name=name).as_text_and_image
+
+    def get_stuff_as_pdf(self, name: str) -> PDFContent:
+        """Get stuff content as PDFContent if applicable."""
+        return self.get_stuff(name=name).as_pdf
+
     def get_stuff_as_number(self, name: str) -> NumberContent:
         """Get stuff content as NumberContent if applicable."""
         return self.get_stuff(name=name).as_number
@@ -294,6 +333,11 @@ class WorkingMemory(BaseModel):
     def main_stuff_as_image(self) -> ImageContent:
         """Get main stuff content as ImageContent if applicable."""
         return self.get_stuff_as_image(name=MAIN_STUFF_NAME)
+
+    @property
+    def main_stuff_as_text_and_image(self) -> TextAndImagesContent:
+        """Get main stuff content as TextAndImageContent if applicable."""
+        return self.get_stuff_as_text_and_image(name=MAIN_STUFF_NAME)
 
     @property
     def main_stuff_as_number(self) -> NumberContent:
