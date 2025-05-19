@@ -15,7 +15,7 @@ MissionManagerRoot = Dict[str, Mission]
 class MissionManager(RootModel[MissionManagerRoot]):
     root: MissionManagerRoot = Field(default_factory=dict)
 
-    def reset(self):
+    def teardown(self):
         self.root.clear()
 
     def get_mission(self, mission_id: str) -> Optional[Mission]:

@@ -51,9 +51,16 @@ class Pipelex:
         pipelex_hub: Optional[PipelexHub] = None,
         config_cls: Optional[Type[ConfigRoot]] = None,
         ready_made_config: Optional[ConfigRoot] = None,
+        template_provider: Optional[TemplateLibrary] = None,
+        llm_model_provider: Optional[LLMModelLibrary] = None,
+        plugin_manager: Optional[PluginManager] = None,
+        inference_manager: Optional[InferenceManager] = None,
+        mission_manager: Optional[MissionManager] = None,
     ) -> Self:
         if cls._pipelex_instance is not None:
-            raise RuntimeError("Pipelex is a singleton, it should be created only once. Use get_system() to access the unique instance.")
+            raise RuntimeError(
+                "Pipelex is a singleton, it is instantiated only once. Its instance is private. All you need is accesible through the hub."
+            )
         if pipelex_cls is None:
             pipelex_cls = cls
 
@@ -68,6 +75,11 @@ class Pipelex:
         pipelex_hub: Optional[PipelexHub] = None,
         config_cls: Optional[Type[ConfigRoot]] = None,
         ready_made_config: Optional[ConfigRoot] = None,
+        template_provider: Optional[TemplateLibrary] = None,
+        llm_model_provider: Optional[LLMModelLibrary] = None,
+        plugin_manager: Optional[PluginManager] = None,
+        inference_manager: Optional[InferenceManager] = None,
+        mission_manager: Optional[MissionManager] = None,
     ) -> None:
         print(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init started...", flush=True)
         self.pipelex_hub = pipelex_hub or PipelexHub()
@@ -94,24 +106,30 @@ class Pipelex:
         )
         log.info("Logs are configured")
 
-        self.template_provider = TemplateLibrary()
+        # tools
+        self.template_provider = template_provider or TemplateLibrary()
         self.pipelex_hub.set_template_provider(self.template_provider)
 
         # cogt
-        self.llm_model_provider = LLMModelLibrary()
+        self.llm_model_provider = llm_model_provider or LLMModelLibrary()
         self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
-        self.report_manager = InferenceReportManager()
-        self.pipelex_hub.set_report_delegate(self.report_manager)
-        self.plugin_manager = PluginManager()
+        self.plugin_manager = plugin_manager or PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
-        self.inference_manager = InferenceManager()
+        self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
-        # pipelex
+        self.report_manager = InferenceReportManager()
+        self.pipelex_hub.set_report_delegate(self.report_manager)
+
+        # pipelex libraries
         self.library_manager = LibraryManager()
         self.pipelex_hub.set_domain_provider(domain_provider=self.library_manager.domain_library)
         self.pipelex_hub.set_concept_provider(concept_provider=self.library_manager.concept_library)
         self.pipelex_hub.set_pipe_provider(pipe_provider=self.library_manager.pipe_library)
+
+        # pipelex mission
+        self.mission_manager = mission_manager or MissionManager()
+        self.pipelex_hub.set_mission_manager(mission_manager=self.mission_manager)
 
         Pipelex._pipelex_instance = self
         log.info(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
@@ -167,6 +185,7 @@ class Pipelex:
 
     def teardown(self):
         # pipelex
+        self.mission_manager.teardown()
         job_history.reset()
         self.library_manager.teardown()
         self.template_provider.teardown()

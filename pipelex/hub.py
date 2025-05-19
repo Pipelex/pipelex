@@ -22,6 +22,7 @@ from pipelex.core.domain import Domain
 from pipelex.core.domain_provider_abstract import DomainProviderAbstract
 from pipelex.core.pipe import PipeAbstract
 from pipelex.core.pipe_provider_abstract import PipeProviderAbstract
+from pipelex.mission.mission_manager import MissionManager
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigRoot
@@ -56,6 +57,8 @@ class PipelexHub:
         self._concept_provider: Optional[ConceptProviderAbstract] = None
         self._pipe_provider: Optional[PipeProviderAbstract] = None
         self._pipe_router: Optional[PipeRouterProtocol] = None
+
+        self._mission_manager: Optional[MissionManager] = None
 
     ############################################################
     # Class methods for singleton management
@@ -140,6 +143,9 @@ class PipelexHub:
 
     def set_pipe_router(self, pipe_router: PipeRouterProtocol):
         self._pipe_router = pipe_router
+
+    def set_mission_manager(self, mission_manager: MissionManager):
+        self._mission_manager = mission_manager
 
     ############################################################
     # Getters
@@ -231,6 +237,11 @@ class PipelexHub:
         if self._pipe_router is None:
             raise RuntimeError("PipeRouter is not initialized")
         return self._pipe_router
+
+    def get_required_mission_manager(self) -> MissionManager:
+        if self._mission_manager is None:
+            raise RuntimeError("MissionManager is not initialized")
+        return self._mission_manager
 
 
 # Shorthand functions for accessing the singleton
@@ -379,3 +390,7 @@ def get_required_concept(concept_code: str) -> Concept:
 
 def get_pipe_router() -> PipeRouterProtocol:
     return get_pipelex_hub().get_required_pipe_router()
+
+
+def get_mission_manager() -> MissionManager:
+    return get_pipelex_hub().get_required_mission_manager()
