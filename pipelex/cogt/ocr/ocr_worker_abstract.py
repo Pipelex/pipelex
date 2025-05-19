@@ -4,65 +4,65 @@
 
 from abc import abstractmethod
 from functools import wraps
-from typing import Any, Callable, List, Optional, TypeVar, cast
+from typing import Any, Callable, Optional, TypeVar, cast
 
 from typing_extensions import Awaitable, override
 
 from pipelex import log
-from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_engine import ImggEngine
-from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.inference.inference_reporter_abstract import InferenceReporterAbstract
+from pipelex.cogt.ocr.ocr_engine import OcrEngine
+from pipelex.cogt.ocr.ocr_job import OcrJob
+from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.job_metadata import UnitJobId
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 
-def imgg_job_func(func: F) -> F:
+def ocr_job_func(func: F) -> F:
     @wraps(func)
     async def wrapper(
         self: Any,
-        imgg_job: ImggJob,
+        ocr_job: OcrJob,
         *args: Any,
         **kwargs: Any,
     ) -> Any:
-        log.debug(f"Working — {func.__name__} using:\n{self.imgg_engine.desc}")
+        log.debug(f"Working — {func.__name__} using:\n{self.ocr_engine.desc}")
 
         # Verify that the job is valid
-        imgg_job.validate_before_execution()
+        ocr_job.validate_before_execution()
 
         # Verify feasibility
-        self.check_can_perform_job(imgg_job=imgg_job)
+        self.check_can_perform_job(ocr_job=ocr_job)
         # TODO: check can generate object (where it will be appropriate)
 
         # metadata
-        imgg_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
+        ocr_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
 
         # Prepare job
-        imgg_job.imgg_job_before_start(imgg_engine=self.imgg_engine)
+        ocr_job.ocr_job_before_start(ocr_engine=self.ocr_engine)
 
         # Execute job
-        result = await func(self, imgg_job, *args, **kwargs)
+        result = await func(self, ocr_job, *args, **kwargs)
 
         # Report job
-        imgg_job.imgg_job_after_complete()
+        ocr_job.ocr_job_after_complete()
         if self.report_delegate:
-            self.report_delegate.report_inference_job(inference_job=imgg_job)
+            self.report_delegate.report_inference_job(inference_job=ocr_job)
 
         return result
 
     return cast(F, wrapper)
 
 
-class ImggWorkerAbstract(InferenceReporterAbstract):
+class OcrWorkerAbstract(InferenceReporterAbstract):
     def __init__(
         self,
-        imgg_engine: ImggEngine,
+        ocr_engine: OcrEngine,
         report_delegate: Optional[InferenceReportDelegate] = None,
     ):
         InferenceReporterAbstract.__init__(self, report_delegate=report_delegate)
-        self.imgg_engine = imgg_engine
+        self.ocr_engine = ocr_engine
 
     #########################################################
     # Instance methods
@@ -71,22 +71,14 @@ class ImggWorkerAbstract(InferenceReporterAbstract):
     @property
     @override
     def desc(self) -> str:
-        return f"Img Worker using:\n{self.imgg_engine.desc}"
+        return f"Ocr Worker using:\n{self.ocr_engine.desc}"
 
-    def check_can_perform_job(self, imgg_job: ImggJob):
+    def check_can_perform_job(self, ocr_job: OcrJob):
         pass
 
     @abstractmethod
-    async def gen_image(
+    async def ocr_extract_pages(
         self,
-        imgg_job: ImggJob,
-    ) -> GeneratedImage:
-        pass
-
-    @abstractmethod
-    async def gen_image_list(
-        self,
-        imgg_job: ImggJob,
-        nb_images: int,
-    ) -> List[GeneratedImage]:
+        ocr_job: OcrJob,
+    ) -> OcrOutput:
         pass

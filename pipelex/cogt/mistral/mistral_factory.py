@@ -33,7 +33,7 @@ from pipelex.cogt.image.prompt_image import (
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import NbTokensByCategoryDict
 from pipelex.cogt.llm.token_category import TokenCategory
-from pipelex.cogt.ocr.ocr_extraction_models import OcrExtractedImage, OcrOutput, Page
+from pipelex.cogt.ocr.ocr_output import OcrExtractedImage, OcrOutput, Page
 from pipelex.cogt.openai.openai_factory import OpenAIFactory
 from pipelex.config import get_config
 from pipelex.hub import get_secrets_provider

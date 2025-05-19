@@ -14,7 +14,6 @@ from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams, 
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.mistral.mistral_config import MistralConfig
-from pipelex.cogt.ocr.ocr_config import OCRConfig
 from pipelex.cogt.openai.azure_openai_config import AzureOpenAIConfig
 from pipelex.cogt.openai.openai_config import OpenAIOpenAIConfig
 from pipelex.cogt.openai.perplexity_config import PerplexityConfig
@@ -30,6 +29,10 @@ class CogtReportConfig(ConfigModel):
     cost_report_base_name: str
     cost_report_extension: str
     cost_report_unit_scale: float
+
+
+class OcrConfig(ConfigModel):
+    ocr_handles: List[str]
 
 
 class ImggConfig(ConfigModel):
@@ -88,6 +91,7 @@ class LLMConfig(ConfigModel):
 class InferenceManagerConfig(ConfigModel):
     is_auto_setup_preset_llm: bool
     is_auto_setup_preset_imgg: bool
+    is_auto_setup_preset_ocr: bool
 
 
 class Cogt(ConfigModel):
@@ -95,4 +99,4 @@ class Cogt(ConfigModel):
     cogt_report_config: CogtReportConfig
     llm_config: LLMConfig
     imgg_config: ImggConfig
-    ocr_config: OCRConfig
+    ocr_config: OcrConfig

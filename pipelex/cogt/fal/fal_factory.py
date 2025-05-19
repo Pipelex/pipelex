@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 
 from pipelex import log
 from pipelex.cogt.exceptions import CogtError
-from pipelex.cogt.fal.fal_engine import FalEngine
 from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, OutputFormat
@@ -22,6 +22,10 @@ class FalParameterError(CogtError):
 
 
 class FalFactory:
+    @staticmethod
+    def make_fal_application(imgg_engine: ImggEngine) -> str:
+        return f"{imgg_engine.imgg_platform}/{imgg_engine.imgg_model_name}"
+
     @classmethod
     def image_size_for_flux_1(cls, aspect_ratio: AspectRatio) -> str:
         match aspect_ratio:
@@ -71,13 +75,13 @@ class FalFactory:
     @classmethod
     def make_fal_arguments(
         cls,
-        fal_engine: FalEngine,
+        fal_application: str,
         imgg_job: ImggJob,
         nb_images: int,
     ) -> Dict[str, Any]:
         params = imgg_job.job_params
         args_dict: Dict[str, Any]
-        match fal_engine.fal_application:
+        match fal_application:
             case ImggHandle.FLUX_1_PRO_LEGACY | ImggHandle.FLUX_1_1_PRO:
                 args_dict = {
                     "prompt": imgg_job.imgg_prompt.positive_text,
@@ -118,6 +122,9 @@ class FalFactory:
                     "output_format": cls.output_format_for_flux(params.output_format),
                     "sync_mode": imgg_job.job_config.is_sync_mode,
                 }
+            case _:
+                raise FalParameterError(f"Invalid fal application: '{fal_application}'")
+
         return args_dict
 
     @staticmethod

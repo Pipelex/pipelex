@@ -19,7 +19,15 @@ class InferenceReportManagerError(CogtError):
     pass
 
 
+class SdkTypeError(CogtError):
+    pass
+
+
 class LLMWorkerError(CogtError):
+    pass
+
+
+class LLMEngineParameterError(CogtError):
     pass
 
 

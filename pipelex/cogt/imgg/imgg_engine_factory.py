@@ -2,17 +2,30 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from pipelex.cogt.imgg.imgg_engine_abstract import ImggEngineAbstract
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
+from pipelex.cogt.exceptions import CogtError
+from pipelex.cogt.imgg.imgg_engine import ImggEngine
+from pipelex.cogt.imgg.imgg_platform import ImggPlatform
+
+
+class ImggEngineFactoryError(CogtError):
+    pass
 
 
 class ImggEngineFactory:
     @classmethod
-    def make_imgg_engine_for_fal(
+    def make_imgg_engine(
         cls,
-        imgg_name: str,
-    ) -> ImggEngineAbstract:
-        fal_application: ImggHandle = ImggHandle(imgg_name)
-        from pipelex.cogt.fal.fal_engine import FalEngine
+        imgg_handle: str,
+    ) -> ImggEngine:
+        parts = imgg_handle.split("/")
+        if len(parts) != 2:
+            raise ImggEngineFactoryError(f"Invalid Imgg handle: {imgg_handle}")
 
-        return FalEngine(fal_application=fal_application)
+        try:
+            imgg_platform = ImggPlatform(parts[0])
+        except ValueError:
+            raise ImggEngineFactoryError(f"Invalid Imgg platform: {parts[0]}")
+
+        imgg_model_name = parts[1]
+
+        return ImggEngine(imgg_platform=imgg_platform, imgg_model_name=imgg_model_name)

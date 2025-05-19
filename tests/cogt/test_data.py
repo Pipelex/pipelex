@@ -141,8 +141,8 @@ Woman typing on a laptop. On the laptop screen you see python code to generate c
     IMGG_PROMPT_4 = "a dog wearing sunglasses and playing poker"
 
     IMAGE_DESC: ClassVar[List[Tuple[str, str]]] = [  # topic, imgg_prompt_text
-        # ("images.Photo", IMGG_PROMPT_1),
-        # ("images.Photo", IMGG_PROMPT_2),
-        # ("images.Photo", IMGG_PROMPT_3),
-        ("images.Photo", IMGG_PROMPT_4),
+        # (IMGG_PROMPT_1, IMGG_PROMPT_1),
+        # (IMGG_PROMPT_2, IMGG_PROMPT_2),
+        # (IMGG_PROMPT_3, IMGG_PROMPT_3),
+        (IMGG_PROMPT_4, IMGG_PROMPT_4),
     ]

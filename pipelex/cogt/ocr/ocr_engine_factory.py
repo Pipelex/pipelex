@@ -2,30 +2,30 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from enum import StrEnum
-
-from pipelex.cogt.exceptions import MissingDependencyError
-from pipelex.cogt.ocr.ocr_engine_abstract import OCREngineAbstract
-
-
-class OcrEngineName(StrEnum):
-    MISTRAL = "mistral"
-    # Add a placeholder for future engines or use a different approach
+from pipelex.cogt.exceptions import CogtError
+from pipelex.cogt.ocr.ocr_engine import OcrEngine
+from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 
 
-class OCREngineFactory:
-    @staticmethod
+class OcrEngineFactoryError(CogtError):
+    pass
+
+
+class OcrEngineFactory:
+    @classmethod
     def make_ocr_engine(
-        ocr_engine_name: OcrEngineName,
-    ) -> OCREngineAbstract:
-        match ocr_engine_name:
-            case OcrEngineName.MISTRAL:
-                try:
-                    from pipelex.cogt.mistral.mistral_ocr import MistralOCREngine
-                except ImportError as exc:
-                    raise MissingDependencyError(
-                        "mistralai",
-                        "mistral",
-                        "The mistralai SDK is required to use Mistral OCR through the mistralai client.",
-                    ) from exc
-                return MistralOCREngine()
+        cls,
+        ocr_handle: str,
+    ) -> OcrEngine:
+        parts = ocr_handle.split("/")
+        if len(parts) != 2:
+            raise OcrEngineFactoryError(f"Invalid Ocr handle: {ocr_handle}")
+
+        try:
+            ocr_platform = OcrPlatform(parts[0])
+        except ValueError:
+            raise OcrEngineFactoryError(f"Invalid Ocr platform: {parts[0]}")
+
+        ocr_model_name = parts[1]
+
+        return OcrEngine(ocr_platform=ocr_platform, ocr_model_name=ocr_model_name)

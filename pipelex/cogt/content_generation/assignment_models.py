@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, Optional, Type
 
 from kajson.class_registry import class_registry
 from pydantic import BaseModel
@@ -10,7 +10,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMAssignmentError
-from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
@@ -18,6 +17,9 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
+from pipelex.cogt.ocr.ocr_handle import OcrHandle
+from pipelex.cogt.ocr.ocr_input import OcrInput
+from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_environment import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
@@ -127,16 +129,9 @@ class Jinja2Assignment(BaseModel):
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
 
 
-AssignmentType = Union[
-    LLMAssignment,
-    ObjectAssignment,
-    TextThenObjectAssignment,
-    ImggAssignment,
-]
-
-ResultType = Union[
-    str,
-    BaseModel,
-    List[BaseModel],
-    GeneratedImage,
-]
+class OcrAssignment(BaseModel):
+    job_metadata: JobMetadata
+    ocr_handle: OcrHandle
+    ocr_input: OcrInput
+    ocr_job_params: OcrJobParams
+    ocr_job_config: OcrJobConfig

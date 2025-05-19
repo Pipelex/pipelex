@@ -10,11 +10,11 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.hub import get_async_llm_worker
+from pipelex.hub import get_llm_worker
 
 
 async def llm_gen_text(llm_assignment: LLMAssignment) -> str:
-    llm_worker = get_async_llm_worker(llm_handle=llm_assignment.llm_handle)
+    llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
     llm_job = LLMJobFactory.make_llm_job(
         job_metadata=llm_assignment.job_metadata,
         llm_prompt=llm_assignment.llm_prompt,
@@ -28,7 +28,7 @@ async def llm_gen_text(llm_assignment: LLMAssignment) -> str:
 async def llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
     llm_assignment = object_assignment.llm_assignment_for_object
     log.verbose(f"llm_gen_object to generate a: '{object_assignment.object_class_name}'")
-    llm_worker = get_async_llm_worker(llm_handle=llm_assignment.llm_handle)
+    llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
     llm_job = LLMJobFactory.make_llm_job(
         job_metadata=llm_assignment.job_metadata,
         llm_prompt=llm_assignment.llm_prompt,
@@ -46,7 +46,7 @@ async def llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
 async def llm_gen_object_list(object_assignment: ObjectAssignment) -> List[BaseModel]:
     llm_assignment = object_assignment.llm_assignment_for_object
     log.verbose(f"llm_gen_object_list to generate a list of '{object_assignment.object_class_name}'")
-    llm_worker = get_async_llm_worker(llm_handle=llm_assignment.llm_handle)
+    llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
     llm_job = LLMJobFactory.make_llm_job(
         job_metadata=llm_assignment.job_metadata,
         llm_prompt=llm_assignment.llm_prompt,

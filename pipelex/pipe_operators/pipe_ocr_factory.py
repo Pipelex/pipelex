@@ -7,7 +7,8 @@ from typing import Any, Dict, Optional
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineName
+from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory, OcrPlatform
+from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_ocr import PipeOCR
@@ -18,7 +19,7 @@ class PipeOCRBlueprint(PipeBlueprint):
     definition: Optional[str] = None
     image: Optional[str] = None
     pdf: Optional[str] = None
-    ocr_engine_name: Optional[OcrEngineName] = None
+    ocr_platform: Optional[OcrPlatform] = None
     add_screenshots: bool = False
     caption_image: bool = False
 
@@ -38,11 +39,16 @@ class PipeOCRFactory(PipeSpecificFactoryProtocol[PipeOCRBlueprint, PipeOCR]):
         pipe_code: str,
         pipe_blueprint: PipeOCRBlueprint,
     ) -> PipeOCR:
+        ocr_platform = pipe_blueprint.ocr_platform or OcrPlatform.MISTRAL
+        match ocr_platform:
+            case OcrPlatform.MISTRAL:
+                ocr_engine = OcrEngineFactory.make_ocr_engine(ocr_handle=OcrHandle.MISTRAL_OCR)
+
         return PipeOCR(
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            ocr_engine_name=pipe_blueprint.ocr_engine_name,
+            ocr_engine=ocr_engine,
             output_concept_code=pipe_blueprint.output,
             image_stuff_name=pipe_blueprint.image,
             pdf_stuff_name=pipe_blueprint.pdf,

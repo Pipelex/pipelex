@@ -7,7 +7,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_factory import ImggJobFactory
-from pipelex.hub import get_async_imgg_worker
+from pipelex.hub import get_imgg_worker
 from tests.cogt.test_data import IMGGTestCases
 
 
@@ -17,7 +17,7 @@ from tests.cogt.test_data import IMGGTestCases
 class TestFalAsync:
     @pytest.mark.parametrize("topic, imgg_prompt_text", IMGGTestCases.IMAGE_DESC)
     async def test_fal_async(self, topic: str, imgg_prompt_text: str, imgg_handle: ImggHandle):
-        fal_worker_async = get_async_imgg_worker(imgg_handle=imgg_handle)
+        fal_worker_async = get_imgg_worker(imgg_handle=imgg_handle)
         imgg_job = ImggJobFactory.make_imgg_job_from_prompt_contents(
             positive_text=imgg_prompt_text,
         )

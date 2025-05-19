@@ -15,6 +15,7 @@ class JobCategory(StrEnum):
     IMGG_JOB = "imgg_job"
     PROMPTING_JOB = "prompting_job"
     JINJA2_JOB = "jinja2_job"
+    OCR_JOB = "ocr_job"
 
 
 class UnitJobId(StrEnum):

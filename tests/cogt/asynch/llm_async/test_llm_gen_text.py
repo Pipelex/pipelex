@@ -11,7 +11,7 @@ from pipelex import log, pretty_print
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
-from pipelex.hub import get_async_llm_worker, get_llm_deck, get_report_delegate
+from pipelex.hub import get_llm_deck, get_llm_worker, get_report_delegate
 from tests.cogt.test_data import LLMTestCases
 
 
@@ -19,7 +19,7 @@ def get_async_worker_and_job(llm_preset_id: str, user_text: str):
     llm_setting = get_llm_deck().get_llm_setting(llm_setting_or_preset_id=llm_preset_id)
     pretty_print(llm_setting, title=llm_preset_id)
     pretty_print(user_text)
-    llm_worker_async = get_async_llm_worker(llm_handle=llm_setting.llm_handle)
+    llm_worker_async = get_llm_worker(llm_handle=llm_setting.llm_handle)
     llm_job_params = llm_setting.make_llm_job_params()
     llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
         user_text=user_text,
@@ -35,7 +35,7 @@ class TestAsyncCogtLLMGenText:
     @pytest.mark.parametrize("topic, prompt_text", LLMTestCases.SINGLE_TEXT)
     async def test_gen_text_async_using_handle(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str):
         pretty_print(prompt_text, title=topic)
-        llm_worker_async = get_async_llm_worker(llm_handle=llm_handle)
+        llm_worker_async = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=prompt_text,
             llm_job_params=llm_job_params,
