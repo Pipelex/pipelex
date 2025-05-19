@@ -17,7 +17,7 @@ from pipelex.cogt.inference.inference_reporter_abstract import InferenceReporter
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.job_metadata import UnitJobId
+from pipelex.mission.mission_metadata import UnitJobId
 from pipelex.tools.misc.model_helpers import BaseModelType
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])

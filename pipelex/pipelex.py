@@ -22,8 +22,9 @@ from pipelex.cogt.plugin_manager import PluginManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
-from pipelex.job_history import job_history
 from pipelex.libraries.library_manager import LibraryManager
+from pipelex.mission.mission_manager import MissionManager
+from pipelex.mission.mission_tracker import job_history
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.registry_funcs import PipelexRegistryFuncs
@@ -172,13 +173,13 @@ class Pipelex:
         ActivityManager.teardown()
 
         # cogt
-        self.inference_manager.reset()
-        self.report_manager.reset()
+        self.inference_manager.teardown()
+        self.report_manager.teardown()
         self.llm_model_provider.teardown()
 
         # tools
         class_registry.reset()
-        func_registry.reset()
+        func_registry.teardown()
 
         Pipelex._pipelex_instance = None
         project_name = get_config().project_name

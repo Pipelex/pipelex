@@ -13,7 +13,7 @@ from pipelex.config import get_config
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.mission_metadata import JobMetadata
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 
 

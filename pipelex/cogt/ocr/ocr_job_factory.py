@@ -8,7 +8,7 @@ from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams, OcrJobReport
 from pipelex.config import get_config
-from pipelex.job_metadata import JobCategory, JobMetadata
+from pipelex.mission.mission_metadata import JobCategory, JobMetadata
 
 
 class OcrJobFactory:

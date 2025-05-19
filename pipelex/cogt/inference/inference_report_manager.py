@@ -49,8 +49,8 @@ class InferenceReportManager(InferenceReportDelegate):
     def __init__(self):
         self.usage_registery = UsageRegistry()
 
-    def reset(self):
-        self.usage_registery = UsageRegistry()
+    def teardown(self):
+        self.usage_registery.root.clear()
 
     @property
     def report_config(self):

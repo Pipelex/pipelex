@@ -12,12 +12,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import networkx as nx
 import yaml
 from pydantic import BaseModel
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.stuff import Stuff
 from pipelex.exceptions import JobHistoryError
+from pipelex.mission.mission_tracker_protocol import MissionTrackerProtocol
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.tools.misc.mermaid_helpers import clean_str_for_mermaid_node_title, make_mermaid_url, print_mermaid_url
 from pipelex.tools.utils.string_utils import snake_to_capitalize_first_letter
@@ -75,7 +77,7 @@ def _indent_line(line: str, indent: int) -> str:
     return f"{'    ' * indent}{line}"
 
 
-class JobHistory:
+class MissionTracker(MissionTrackerProtocol):
     def __init__(self):
         self.is_active: bool = False
         self.nx_graph: nx.DiGraph = nx.DiGraph()
@@ -204,6 +206,7 @@ class JobHistory:
             edge_attributes.update(attributes)
         self.nx_graph.add_edge(from_node, to_node, **edge_attributes)
 
+    @override
     def add_pipe_step(
         self,
         from_stuff: Optional[Stuff],
@@ -248,6 +251,7 @@ class JobHistory:
                 attributes=edge_attributes,
             )
 
+    @override
     def add_batch_step(
         self,
         from_stuff: Optional[Stuff],
@@ -281,6 +285,7 @@ class JobHistory:
             edge_category=EdgeCategory.BATCH,
         )
 
+    @override
     def add_aggregate_step(
         self,
         from_stuff: Stuff,
@@ -319,6 +324,7 @@ class JobHistory:
         self.nx_graph.add_node(node, **node_attributes)
         return node
 
+    @override
     def add_condition_step(
         self,
         from_stuff: Stuff,
@@ -345,6 +351,7 @@ class JobHistory:
             attributes=edge_attributes,
         )
 
+    @override
     def add_choice_step(
         self,
         from_condition: PipeConditionDetails,
@@ -548,4 +555,4 @@ class JobHistory:
         print_mermaid_url(url=url, title=title_to_print)
 
 
-job_history = JobHistory()
+job_history = MissionTracker()

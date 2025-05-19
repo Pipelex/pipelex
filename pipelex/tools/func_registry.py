@@ -34,9 +34,9 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         else:
             self._logger.debug(message)
 
-    def reset(self) -> None:
+    def teardown(self) -> None:
         """Resets the registry to an empty state."""
-        self.root = {}
+        self.root.clear()
 
     def register_function(
         self,

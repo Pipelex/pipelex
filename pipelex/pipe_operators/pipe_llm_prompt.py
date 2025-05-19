@@ -30,7 +30,7 @@ from pipelex.exceptions import (
     WorkingMemoryTypeError,
 )
 from pipelex.hub import get_template
-from pipelex.job_metadata import JobCategory, JobMetadata
+from pipelex.mission.mission_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.tools.templating.templating_models import PromptingStyle

@@ -17,8 +17,8 @@ from pipelex.core.stuff_factory import StuffBlueprint
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
-from pipelex.job_history import job_history
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.mission_metadata import JobMetadata
+from pipelex.mission.mission_tracker import job_history
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from tests.pipelex.test_data import PipeTestCases
 

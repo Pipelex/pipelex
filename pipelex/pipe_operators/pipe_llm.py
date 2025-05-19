@@ -40,7 +40,7 @@ from pipelex.hub import (
     get_required_pipe,
     get_template,
 )
-from pipelex.job_metadata import JobCategory, JobMetadata
+from pipelex.mission.mission_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_operators.pipe_operator import PipeOperator

@@ -11,7 +11,7 @@ from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeRunParamsError
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.mission_metadata import JobMetadata
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 

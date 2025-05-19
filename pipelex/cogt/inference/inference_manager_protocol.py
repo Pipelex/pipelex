@@ -16,7 +16,7 @@ class InferenceManagerProtocol(Protocol):
     Its point is only to avoid a circular import.
     """
 
-    def reset(self): ...
+    def teardown(self): ...
 
     ####################################################################################################
     # LLM Workers

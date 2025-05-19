@@ -20,7 +20,7 @@ from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.config import get_config
 from pipelex.hub import get_llm_deck
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.mission_metadata import JobMetadata
 from pipelex.tools.config.errors import ConfigNotFoundError
 from tests.cogt.test_data import Employee
 from tests.test_data import ImageTestCases

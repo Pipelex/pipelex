@@ -11,7 +11,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.config import get_config
-from pipelex.job_metadata import JobCategory, JobMetadata
+from pipelex.mission.mission_metadata import JobCategory, JobMetadata
 
 
 class LLMJobFactory:

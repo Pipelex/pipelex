@@ -20,7 +20,7 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeRunParamsError
 from pipelex.hub import get_content_generator
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.mission_metadata import JobMetadata
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 
 

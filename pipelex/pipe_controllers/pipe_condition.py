@@ -15,8 +15,8 @@ from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeConditionError, PipeDefinitionError, PipeExecutionError, PipeInputError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_pipe_router
-from pipelex.job_history import job_history
-from pipelex.job_metadata import JobCategory, JobMetadata
+from pipelex.mission.mission_metadata import JobCategory, JobMetadata
+from pipelex.mission.mission_tracker import job_history
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output

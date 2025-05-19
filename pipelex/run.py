@@ -11,7 +11,7 @@ from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.hub import get_pipe_router, get_required_pipe
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.mission_metadata import JobMetadata
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 
 
