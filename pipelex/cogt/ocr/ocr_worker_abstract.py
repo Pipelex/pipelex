@@ -37,7 +37,7 @@ def ocr_job_func(func: F) -> F:
         # TODO: check can generate object (where it will be appropriate)
 
         # metadata
-        ocr_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
+        ocr_job.job_metadata.unit_job_id = UnitJobId.OCR_EXTRACT_PAGES
 
         # Prepare job
         ocr_job.ocr_job_before_start(ocr_engine=self.ocr_engine)

@@ -14,11 +14,16 @@ from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.ocr.ocr_handle import OcrHandle
+from pipelex.cogt.ocr.ocr_input import OcrInput
+from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
+from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.config import get_config
 from pipelex.hub import get_llm_deck
 from pipelex.job_metadata import JobMetadata
 from pipelex.tools.config.errors import ConfigNotFoundError
 from tests.cogt.test_data import Employee
+from tests.test_data import ImageTestCases
 
 USER_TEXT_FOR_BASE = """
 Write a detailed description of a woman's clothing in the style of a 19th-century novel.
@@ -123,7 +128,7 @@ class TestContentGenerator:
         pretty_print(image, title="make_image")
         assert isinstance(image, GeneratedImage)
 
-    async def test_jinja2_text(self, request: FixtureRequest, content_generator: ContentGenerator):
+    async def test_make_jinja2_text(self, request: FixtureRequest, content_generator: ContentGenerator):
         context = {
             "the_answer": "elementary, my dear Watson",
         }
@@ -135,6 +140,22 @@ class TestContentGenerator:
         pretty_print(jinja2_text, title="jinja2_text")
         assert isinstance(jinja2_text, str)
         assert jinja2_text == "The answer is: elementary, my dear Watson"
+
+    @pytest.mark.ocr
+    @pytest.mark.inference
+    async def test_make_ocr_extract_pages(self, request: FixtureRequest, content_generator: ContentGenerator):
+        ocr_output = await content_generator.make_ocr_extract_pages(
+            job_metadata=JobMetadata(
+                session_id=get_config().session_id,
+                top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
+            ),
+            ocr_handle=OcrHandle.MISTRAL_OCR,
+            ocr_input=OcrInput(image_uri=ImageTestCases.IMAGE_FILE_PATH),
+            ocr_job_params=OcrJobParams.make_default_ocr_job_params(),
+            ocr_job_config=OcrJobConfig(),
+        )
+        pretty_print(ocr_output, title="ocr_extract_pages")
+        assert isinstance(ocr_output, OcrOutput)
 
     @pytest.mark.llm
     @pytest.mark.inference

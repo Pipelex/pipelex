@@ -12,7 +12,7 @@ from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, ListContent, PDFContent, StructuredContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
-from tests.test_data import PDFTestCases
+from tests.test_data import ImageTestCases, PDFTestCases
 
 
 class SomeContentWithImageAttribute(StructuredContent):
@@ -294,16 +294,12 @@ class LibraryTestCases:
     ]
 
 
-class PipeOCRTestCases:
+class PipeOcrTestCases:
     PIPE_OCR_IMAGE_TEST_CASES: ClassVar[List[str]] = [
-        # LOCAL
-        "tests/cogt/data/documents/solar_system.png",
-        # REMOTE
-        "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.png",
+        ImageTestCases.IMAGE_FILE_PATH,
+        ImageTestCases.IMAGE_URL,
     ]
     PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = [
-        # LOCAL
-        "tests/cogt/data/documents/solar_system.pdf",
-        # REMOTE
-        "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/documents/solar_system.pdf",
+        PDFTestCases.DOCUMENT_FILE_PATH,
+        PDFTestCases.DOCUMENT_URL,
     ]
