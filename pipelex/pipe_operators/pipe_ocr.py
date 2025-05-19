@@ -66,6 +66,8 @@ class PipeOCR(PipeAbstract):
 
         ocr_handle = OcrHandle.MISTRAL_OCR
         ocr_job_params = OcrJobParams.make_default_ocr_job_params()
+        ocr_job_params.should_add_screenshots = self.should_add_screenshots
+        ocr_job_params.should_caption_images = self.should_caption_images
         ocr_input = OcrInput(
             image_uri=image_uri,
             pdf_uri=pdf_uri,
