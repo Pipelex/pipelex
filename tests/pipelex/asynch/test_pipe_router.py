@@ -199,7 +199,7 @@ class TestPipeRouter:
             await get_pipe_router().run_pipe_code(
                 pipe_code=pipe_code,
                 pipe_run_params=PipeRunParams(
-                    pipe_stack_max_size=6,
+                    pipe_stack_limit=6,
                 ),
                 job_metadata=JobMetadata(
                     session_id=get_config().session_id,

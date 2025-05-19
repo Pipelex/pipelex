@@ -24,6 +24,7 @@ class PipeController(PipeAbstract):
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
+        self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
 
         updated_metadata = JobMetadata(
             session_id=job_metadata.session_id,

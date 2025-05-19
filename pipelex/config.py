@@ -21,6 +21,11 @@ class PipelexConfigError(PipelexError):
     pass
 
 
+class PipeRunConfig(ConfigModel):
+    # TODO: this config value is not applied yet
+    pipe_stack_limit: int
+
+
 class GenericTemplateNames(ConfigModel):
     structure_from_preliminary_text_user: str
     structure_from_preliminary_text_system: str
@@ -95,6 +100,8 @@ class Pipelex(ConfigModel):
     history_graph_config: HistoryGraphConfig
     structure_config: StructureConfig
     prompting_config: PromptingConfig
+
+    pipe_run_config: PipeRunConfig
 
 
 class PipelexConfig(ConfigRoot):

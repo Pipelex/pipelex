@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.exceptions import PipeStackOverflowError
 from pipelex.job_metadata import JobMetadata
 
 
@@ -23,6 +24,15 @@ class PipeAbstract(ABC, BaseModel):
     input_concept_code: Optional[str] = None
     output_concept_code: str
 
+    @property
+    def class_name(self) -> str:
+        return self.__class__.__name__
+
+    def validate_with_libraries(self):
+        pass
+
+    # Dependencies
+
     def pipe_dependencies(self) -> Set[str]:
         return set()
 
@@ -32,8 +42,7 @@ class PipeAbstract(ABC, BaseModel):
             required_concepts.add(self.input_concept_code)
         return required_concepts
 
-    def validate_with_libraries(self):
-        pass
+    # Required variables
 
     @property
     def required_input_concept_code(self) -> str:
@@ -43,6 +52,8 @@ class PipeAbstract(ABC, BaseModel):
 
     def required_variables(self) -> Set[str]:
         return set()
+
+    # Run pipe
 
     @abstractmethod
     async def run_pipe(
@@ -54,9 +65,11 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         pass
 
-    @property
-    def class_name(self) -> str:
-        return self.__class__.__name__
+    def monitor_pipe_stack(self, pipe_run_params: PipeRunParams):
+        pipe_stack = pipe_run_params.pipe_stack
+        limit = pipe_run_params.pipe_stack_limit
+        if len(pipe_stack) > limit:
+            raise PipeStackOverflowError(f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{pipe_stack}")
 
 
 PipeAbstractType = Type[PipeAbstract]

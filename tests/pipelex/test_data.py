@@ -185,7 +185,7 @@ class PipeTestCases:
         (
             "infinite_loop_1",
             PipeStackOverflowError,
-            "Pipe stack overflow: ['infinite_loop_1'",
+            "Exceeded pipe stack limit",
         ),
     ]
 

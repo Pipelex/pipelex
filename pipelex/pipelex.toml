@@ -217,3 +217,11 @@ branch_edge_style = "-...-"
 aggregate_edge_style = "-...-"
 condition_edge_style = "-----"
 choice_edge_style = "-----"
+
+####################################################################################################
+# Pipelex run config
+####################################################################################################
+
+[pipelex.pipe_run_config]
+# TODO: this config value is not applied yet
+pipe_stack_limit = 20
