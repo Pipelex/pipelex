@@ -79,6 +79,7 @@ class LibraryConfig(ConfigModel):
             folder_path_in_package=cls.internal_llm_deck_path,
             target_dir=cls.exported_llm_deck_path,
             overwrite=overwrite,
+            non_overwrite_files=["overrides.toml"],
         )
 
         # templates

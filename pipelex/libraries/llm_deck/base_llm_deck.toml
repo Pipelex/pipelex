@@ -3,7 +3,7 @@
 # "Pipelex" is a trademark of Evotis S.A.S.
 
 ####################################################################################################
-# LLM Deck
+# LLM Deck base
 ####################################################################################################
 
 # Match a llm_handle with a complete blueprint (llm_name, llm_version and llm_platform_choice).
@@ -21,9 +21,9 @@ best-gemini = "gemini-2.5-pro"
 ####################################################################################################
 # LLM Presets — General purpose
 
-llm_for_text = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
-llm_for_object = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
-llm_to_structure = { llm_handle = "gpt-4o-mini", temperature = 0.1 }
+cheap_llm_for_text = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
+cheap_llm_for_object = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
+cheap_llm_to_structure = { llm_handle = "gpt-4o-mini", temperature = 0.1 }
 
 llm_for_testing_gen_text = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
 llm_for_testing_gen_object = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
@@ -70,15 +70,8 @@ llm_for_ocr = { llm_handle = "best-claude", temperature = 0.1 }
 ####################################################################################################
 
 [llm_choice_defaults]
-for_text = "llm_for_text"
-for_object = "llm_for_object"
-for_object_direct = "llm_for_object"
-for_object_list = "llm_for_object"
-for_object_list_direct = "llm_for_object"
-
-[llm_choice_overrides]
-for_text = "disabled"
-for_object = "disabled"
-for_object_direct = "disabled"
-for_object_list = "disabled"
-for_object_list_direct = "disabled"
+for_text = "cheap_llm_for_text"
+for_object = "cheap_llm_for_object"
+for_object_direct = "cheap_llm_for_object"
+for_object_list = "cheap_llm_for_object"
+for_object_list_direct = "cheap_llm_for_object"

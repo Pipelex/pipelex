@@ -177,6 +177,7 @@ def copy_folder_from_package(
     folder_path_in_package: str,
     target_dir: str,
     overwrite: bool = True,
+    non_overwrite_files: Optional[List[str]] = None,
 ) -> None:
     """
     Copies a folder from a package to a target directory.
@@ -205,13 +206,16 @@ def copy_folder_from_package(
         target_subdir = os.path.join(target_dir, rel_path) if rel_path != "." else target_dir
         os.makedirs(target_subdir, exist_ok=True)
 
+        if non_overwrite_files is None:
+            non_overwrite_files = []
+
         # Copy all files in the current directory
         for file in files:
             src_file = os.path.join(root, file)
             dest_file = os.path.join(target_subdir, file)
 
             # Check if the file exists and respect the overwrite parameter
-            if not os.path.exists(dest_file) or overwrite:
+            if not os.path.exists(dest_file) or (overwrite and file not in non_overwrite_files):
                 copy_file(
                     source_path=src_file,
                     target_path=dest_file,
