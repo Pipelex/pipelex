@@ -42,9 +42,9 @@ class InferenceManager(InferenceManagerProtocol):
 
     def print_workers(self):
         log.debug("LLM Workers:")
-        for handle, llm_worker_async in self.llm_workers.items():
+        for handle, llm_worker in self.llm_workers.items():
             log.debug(f"  {handle}:")
-            log.debug(llm_worker_async.desc)
+            log.debug(llm_worker.desc)
         log.debug("Image Workers:")
         for handle, imgg_worker_async in self.imgg_workers.items():
             log.debug(f"  {handle}:")
