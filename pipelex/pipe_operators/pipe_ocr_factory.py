@@ -7,7 +7,9 @@ from typing import Any, Dict, Optional
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex.cogt.ocr.ocr_engine_factory import OcrPlatform
+from pipelex.cogt.ocr.ocr_engine import OcrEngine
+from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory, OcrPlatform
+from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_ocr import PipeOCR
@@ -38,11 +40,16 @@ class PipeOCRFactory(PipeSpecificFactoryProtocol[PipeOCRBlueprint, PipeOCR]):
         pipe_code: str,
         pipe_blueprint: PipeOCRBlueprint,
     ) -> PipeOCR:
+        ocr_platform = pipe_blueprint.ocr_platform or OcrPlatform.MISTRAL
+        match ocr_platform:
+            case OcrPlatform.MISTRAL:
+                ocr_engine = OcrEngineFactory.make_ocr_engine(ocr_handle=OcrHandle.MISTRAL_OCR)
+
         return PipeOCR(
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            ocr_engine=pipe_blueprint.ocr_platform,
+            ocr_engine=ocr_engine,
             output_concept_code=pipe_blueprint.output,
             image_stuff_name=pipe_blueprint.image,
             pdf_stuff_name=pipe_blueprint.pdf,

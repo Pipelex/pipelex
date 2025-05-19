@@ -14,6 +14,7 @@ from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_model_provider_abstract import LLMModelProviderAbstract
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.cogt.plugin_manager import PluginManager
 from pipelex.core.concept import Concept
 from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
@@ -297,6 +298,12 @@ def get_async_imgg_worker(
     imgg_handle: str,
 ) -> ImggWorkerAbstract:
     return get_inference_manager().get_imgg_worker(imgg_handle=imgg_handle)
+
+
+def get_async_ocr_worker(
+    ocr_handle: str,
+) -> OcrWorkerAbstract:
+    return get_inference_manager().get_ocr_worker(ocr_handle=ocr_handle)
 
 
 def get_report_delegate() -> InferenceReportDelegate:

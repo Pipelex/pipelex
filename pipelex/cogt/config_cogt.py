@@ -32,6 +32,7 @@ class CogtReportConfig(ConfigModel):
 
 
 class OcrConfig(ConfigModel):
+    ocr_handles: List[str]
     ocr_platform: str
     ocr_model_name: str
 
@@ -92,6 +93,7 @@ class LLMConfig(ConfigModel):
 class InferenceManagerConfig(ConfigModel):
     is_auto_setup_preset_llm: bool
     is_auto_setup_preset_imgg: bool
+    is_auto_setup_preset_ocr: bool
 
 
 class Cogt(ConfigModel):

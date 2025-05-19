@@ -8,6 +8,10 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
+from pipelex.cogt.ocr.ocr_handle import OcrHandle
+from pipelex.cogt.ocr.ocr_input import OcrInput
+from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
+from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.config import get_config
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
@@ -17,7 +21,7 @@ from pipelex.core.stuff_content import ImageContent, ListContent, TextAndImagesC
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.hub import get_inference_manager
+from pipelex.hub import get_content_generator, get_inference_manager
 from pipelex.job_metadata import JobMetadata
 from pipelex.libraries.pipelines.documents import PageContent
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
@@ -53,21 +57,30 @@ class PipeOCR(PipeAbstract):
         if not self.output_concept_code:
             raise PipeDefinitionError("PipeOCR should have a non-None output_concept_code")
 
+        image_uri: Optional[str] = None
+        pdf_uri: Optional[str] = None
         if self.image_stuff_name:
             image_stuff = working_memory.get_stuff_as_image(name=self.image_stuff_name)
-            ocr_output = await ocr_engine.make_ocr_output_from_image(
-                image_uri=image_stuff.url,
-                should_caption_image=self.should_caption_images,
-            )
+            image_uri = image_stuff.url
         elif self.pdf_stuff_name:
             pdf_stuff = working_memory.get_stuff_as_pdf(name=self.pdf_stuff_name)
-            ocr_output = await ocr_engine.make_ocr_output_from_pdf(
-                pdf_uri=pdf_stuff.url,
-                should_caption_images=self.should_caption_images,
-                should_add_screenshots=True,
-            )
+            pdf_uri = pdf_stuff.url
         else:
             raise PipeDefinitionError("PipeOCR should have a non-None image_stuff_name or pdf_stuff_name")
+
+        ocr_handle = OcrHandle.MISTRAL_OCR
+        ocr_job_params = OcrJobParams.make_default_ocr_job_params()
+        ocr_input = OcrInput(
+            image_uri=image_uri,
+            pdf_uri=pdf_uri,
+        )
+        ocr_output = await get_content_generator().make_ocr_extract_pages(
+            ocr_input=ocr_input,
+            ocr_handle=ocr_handle,
+            job_metadata=job_metadata,
+            job_params=ocr_job_params,
+            job_config=OcrJobConfig(),
+        )
 
         # Build the output stuff, which is a list of page contents
         page_contents: List[PageContent] = []

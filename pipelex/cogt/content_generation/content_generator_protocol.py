@@ -12,6 +12,7 @@ from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
+from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
@@ -131,6 +132,7 @@ class ContentGeneratorProtocol(Protocol):
     async def make_ocr_extract_pages(
         self,
         ocr_input: OcrInput,
+        ocr_handle: OcrHandle,
         job_metadata: JobMetadata,
         job_params: OcrJobParams,
         job_config: OcrJobConfig,

@@ -17,6 +17,9 @@ from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_engine_factory import LLMEngineFactory
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
+from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
+from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
+from pipelex.cogt.ocr.ocr_worker_factory import OcrWorkerFactory
 from pipelex.config import get_config
 from pipelex.hub import get_llm_deck, get_report_delegate
 
@@ -24,14 +27,18 @@ from pipelex.hub import get_llm_deck, get_report_delegate
 class InferenceManager(InferenceManagerProtocol):
     def __init__(self):
         self.imgg_worker_factory = ImggWorkerFactory()
+        self.ocr_worker_factory = OcrWorkerFactory()
         self.llm_workers: Dict[str, LLMWorkerAbstract] = {}
         self.imgg_workers: Dict[str, ImggWorkerAbstract] = {}
+        self.ocr_workers: Dict[str, OcrWorkerAbstract] = {}
 
     @override
     def reset(self):
         self.imgg_worker_factory = ImggWorkerFactory()
+        self.ocr_worker_factory = OcrWorkerFactory()
         self.llm_workers.clear()
         self.imgg_workers.clear()
+        self.ocr_workers.clear()
         log.verbose("InferenceManagerAsync reset")
 
     def print_workers(self):
@@ -43,13 +50,10 @@ class InferenceManager(InferenceManagerProtocol):
         for handle, imgg_worker_async in self.imgg_workers.items():
             log.debug(f"  {handle}:")
             log.debug(imgg_worker_async.desc)
-
-    ####################################################################################################
-    # Config shorthands
-    ####################################################################################################
-    @property
-    def _default_imgg_handle(self) -> ImggHandle:
-        return get_config().cogt.imgg_config.default_imgg_handle
+        log.debug("OCR Workers:")
+        for handle, ocr_worker_async in self.ocr_workers.items():
+            log.debug(f"  {handle}:")
+            log.debug(ocr_worker_async.desc)
 
     ####################################################################################################
     # Setup LLM Workers
@@ -101,7 +105,7 @@ class InferenceManager(InferenceManagerProtocol):
         return llm_worker
 
     ####################################################################################################
-    # Manage IMG Workers
+    # Manage IMGG Workers
     ####################################################################################################
 
     @override
@@ -135,3 +139,39 @@ class InferenceManager(InferenceManagerProtocol):
 
             imgg_worker = self._setup_one_imgg_worker(imgg_handle=imgg_handle)
         return imgg_worker
+
+    ####################################################################################################
+    # Manage OCR Workers
+    ####################################################################################################
+
+    @override
+    def setup_ocr_workers(self):
+        log.verbose("Setting up OCR Workers...")
+        ocr_handles = get_config().cogt.ocr_config.ocr_handles
+        log.verbose(f"{len(ocr_handles)} OCR handles found")
+        for ocr_handle in ocr_handles:
+            self._setup_one_ocr_worker(ocr_handle=ocr_handle)
+
+        log.debug("Done setting up OCR Workers (async)")
+
+    def _setup_one_ocr_worker(self, ocr_handle: str) -> OcrWorkerAbstract:
+        ocr_engine = OcrEngineFactory.make_ocr_engine(ocr_handle=ocr_handle)
+        log.verbose(ocr_engine.desc, title=f"Setting up OcrEngine for '{ocr_handle}'")
+        ocr_worker = self.ocr_worker_factory.make_ocr_worker(
+            ocr_engine=ocr_engine,
+            report_delegate=get_report_delegate(),
+        )
+        self.ocr_workers[ocr_handle] = ocr_worker
+        return ocr_worker
+
+    @override
+    def get_ocr_worker(self, ocr_handle: str) -> OcrWorkerAbstract:
+        ocr_worker = self.ocr_workers.get(ocr_handle)
+        if ocr_worker is None:
+            if not get_config().cogt.inference_manager_config.is_auto_setup_preset_ocr:
+                raise InferenceManagerWorkerSetupError(
+                    f"Found no OCR worker for '{ocr_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_ocr"
+                )
+
+            ocr_worker = self._setup_one_ocr_worker(ocr_handle=ocr_handle)
+        return ocr_worker

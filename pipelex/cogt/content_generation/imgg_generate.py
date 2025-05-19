@@ -17,6 +17,7 @@ async def imgg_gen_single_image(imgg_assignment: ImggAssignment) -> GeneratedIma
         imgg_prompt=imgg_assignment.imgg_prompt,
         imgg_job_params=imgg_assignment.imgg_job_params,
         imgg_job_config=imgg_assignment.imgg_job_config,
+        job_metadata=imgg_assignment.job_metadata,
     )
     generated_image = await imgg_worker.gen_image(imgg_job=imgg_job)
     log.verbose(f"generated_image:\n{generated_image}")
@@ -29,6 +30,7 @@ async def imgg_gen_image_list(imgg_assignment: ImggAssignment) -> List[Generated
         imgg_prompt=imgg_assignment.imgg_prompt,
         imgg_job_params=imgg_assignment.imgg_job_params,
         imgg_job_config=imgg_assignment.imgg_job_config,
+        job_metadata=imgg_assignment.job_metadata,
     )
     generated_image_list = await imgg_worker.gen_image_list(
         imgg_job=imgg_job,

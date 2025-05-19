@@ -16,7 +16,7 @@ class OcrJob(InferenceJobAbstract):
     ocr_input: OcrInput
     job_params: OcrJobParams
     job_config: OcrJobConfig
-    job_report: OcrJobReport
+    job_report: OcrJobReport = OcrJobReport()
 
     @override
     def validate_before_execution(self):
