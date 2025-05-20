@@ -49,7 +49,6 @@ class PipeParallel(PipeController):
             log.debug(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
 
-        # pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         tasks: List[Coroutine[Any, Any, PipeOutput]] = []
 
         for parallel_sub_pipe in self.parallel_sub_pipes:

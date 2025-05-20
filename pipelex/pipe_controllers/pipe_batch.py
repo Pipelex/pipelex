@@ -48,7 +48,6 @@ class PipeBatch(PipeController):
             log.debug(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
 
-        # pipe_run_params.push_pipe_to_stack(pipe_code=self.branch_pipe_code)
         pipe_run_params.push_pipe_layer(pipe_code=self.branch_pipe_code)
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_stuff_key = batch_params.input_list_stuff_name
