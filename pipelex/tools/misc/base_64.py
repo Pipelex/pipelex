@@ -9,8 +9,8 @@ import aiofiles
 
 
 def load_binary_as_base64(path: str) -> bytes:
-    with open(path, "rb") as image_file:
-        return base64.b64encode(image_file.read())
+    with open(path, "rb") as fp:
+        return base64.b64encode(fp.read())
 
 
 async def load_binary_as_base64_async(path: str) -> bytes:
