@@ -14,7 +14,11 @@ class MissionManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_mission(self, mission_id: str) -> Optional[Mission]:
+    def get_optional_mission(self, mission_id: str) -> Optional[Mission]:
+        pass
+
+    @abstractmethod
+    def get_mission(self, mission_id: str) -> Mission:
         pass
 
     @abstractmethod

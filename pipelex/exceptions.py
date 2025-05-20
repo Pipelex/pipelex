@@ -161,3 +161,7 @@ class ConceptCodeError(ConceptError):
 
 class ConceptDomainError(ConceptError):
     pass
+
+
+class MissionManagerNotFoundError(PipelexError):
+    pass

@@ -22,7 +22,9 @@ from pipelex.core.domain import Domain
 from pipelex.core.domain_provider_abstract import DomainProviderAbstract
 from pipelex.core.pipe import PipeAbstract
 from pipelex.core.pipe_provider_abstract import PipeProviderAbstract
+from pipelex.mission.mission import Mission
 from pipelex.mission.mission_manager_abstract import MissionManagerAbstract
+from pipelex.mission.mission_models import SpecialMissionId
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigRoot
@@ -317,8 +319,11 @@ def get_ocr_worker(
     return get_inference_manager().get_ocr_worker(ocr_handle=ocr_handle)
 
 
-def get_report_delegate() -> InferenceReportDelegate:
-    return get_pipelex_hub().get_report_delegate()
+def get_report_delegate(mission_id: Optional[str] = None) -> InferenceReportDelegate:
+    if mission_id is None or mission_id == SpecialMissionId.UNTITLED:
+        return get_pipelex_hub().get_report_delegate()
+    else:
+        return get_mission(mission_id=mission_id).get_report_delegate()
 
 
 def get_content_generator() -> ContentGeneratorProtocol:
@@ -394,3 +399,7 @@ def get_pipe_router() -> PipeRouterProtocol:
 
 def get_mission_manager() -> MissionManagerAbstract:
     return get_pipelex_hub().get_required_mission_manager()
+
+
+def get_mission(mission_id: str) -> Mission:
+    return get_mission_manager().get_mission(mission_id=mission_id)

@@ -7,6 +7,7 @@ from typing import Dict, Optional
 from pydantic import Field, RootModel
 from typing_extensions import override
 
+from pipelex.exceptions import MissionManagerNotFoundError
 from pipelex.mission.mission import Mission
 from pipelex.mission.mission_factory import MissionFactory
 from pipelex.mission.mission_manager_abstract import MissionManagerAbstract
@@ -22,8 +23,15 @@ class MissionManager(MissionManagerAbstract, RootModel[MissionManagerRoot]):
         self.root.clear()
 
     @override
-    def get_mission(self, mission_id: str) -> Optional[Mission]:
+    def get_optional_mission(self, mission_id: str) -> Optional[Mission]:
         return self.root.get(mission_id)
+
+    @override
+    def get_mission(self, mission_id: str) -> Mission:
+        mission = self.get_optional_mission(mission_id=mission_id)
+        if mission is None:
+            raise MissionManagerNotFoundError(f"Mission {mission_id} not found")
+        return mission
 
     def _set_mission(self, mission_id: str, mission: Mission) -> Mission:
         self.root[mission_id] = mission
