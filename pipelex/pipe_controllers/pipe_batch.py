@@ -16,10 +16,9 @@ from pipelex.core.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ListContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import MAIN_STUFF_NAME, WorkingMemory
+from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeExecutionError
-from pipelex.hub import get_pipe_router, get_required_pipe
-from pipelex.job_history import job_history
+from pipelex.hub import get_pipe_router
 from pipelex.job_metadata import JobMetadata
 
 
