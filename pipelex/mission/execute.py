@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Optional
+from typing import Optional, Tuple
 
 from pipelex import pretty_print
 from pipelex.core.pipe_output import PipeOutput
@@ -19,7 +19,7 @@ async def execute_mission(
     output_name: Optional[str] = None,
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
     dynamic_output_concept_code: Optional[str] = None,
-) -> PipeOutput:
+) -> Tuple[PipeOutput, str]:
     mission = get_mission_manager().add_new_mission()
     pipe = get_required_pipe(pipe_code=pipe_code)
 
@@ -44,4 +44,4 @@ async def execute_mission(
         output_name=output_name,
     )
 
-    return await get_pipe_router().run_pipe_job(pipe_job)
+    return await get_pipe_router().run_pipe_job(pipe_job), mission.mission_id
