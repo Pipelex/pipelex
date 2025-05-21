@@ -14,7 +14,6 @@ class OcrJobParams(BaseModel):
     should_add_screenshots: bool
     should_include_images: bool
     screenshots_dpi: int
-    export_dir: Optional[str]
 
     @classmethod
     def make_default_ocr_job_params(cls) -> "OcrJobParams":
@@ -23,7 +22,6 @@ class OcrJobParams(BaseModel):
             should_add_screenshots=False,
             should_include_images=True,
             screenshots_dpi=300,
-            export_dir=None,
         )
 
 

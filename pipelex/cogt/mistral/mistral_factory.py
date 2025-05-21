@@ -4,7 +4,7 @@
 
 from typing import Dict, List, Optional
 
-from mistralai import Mistral, OCRResponse
+from mistralai import Mistral, OCRImageObject, OCRResponse
 from mistralai.models import (
     ContentChunk,
     ImageURLChunk,
@@ -33,7 +33,7 @@ from pipelex.cogt.image.prompt_image import (
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import NbTokensByCategoryDict
 from pipelex.cogt.llm.token_category import TokenCategory
-from pipelex.cogt.ocr.ocr_output import OcrExtractedImage, OcrOutput, Page
+from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
 from pipelex.cogt.openai.openai_factory import OpenAIFactory
 from pipelex.config import get_config
 from pipelex.hub import get_secrets_provider
@@ -132,27 +132,54 @@ class MistralFactory:
         cls,
         mistral_ocr_response: OCRResponse,
         should_include_images: bool = False,
-        export_dir: Optional[str] = None,
+        # export_dir: Optional[str] = None,
     ) -> OcrOutput:
+        # pages: Dict[int, Page] = {}
+        # for ocr_response_page in mistral_ocr_response.pages:
+        #     pages[ocr_response_page.index] = Page(
+        #         text=ocr_response_page.markdown,
+        #         images=[],
+        #     )
+        #     for mistral_ocr_image_obj in ocr_response_page.images:
+        # image_uri = mistral_ocr_image_obj.id
+        # ocr_extracted_image = ExtractedImageFromPage(image_id=image_uri)
+        # if should_include_images:
+        #     if export_dir:
+        #         if mistral_ocr_image_obj.image_base64:
+        #             save_base64_image_to_file(
+        #                 base64_image=mistral_ocr_image_obj.image_base64,
+        #                 file_path=f"{export_dir}/{image_uri}",
+        #             )
+
+        # pages[ocr_response_page.index].images.append(ocr_extracted_image)
+
         pages: Dict[int, Page] = {}
         for ocr_response_page in mistral_ocr_response.pages:
-            pages[ocr_response_page.index] = Page(
+            page = Page(
                 text=ocr_response_page.markdown,
-                images=[],
+                extracted_images=[],
             )
-            for mistral_ocr_image_obj in ocr_response_page.images:
-                image_uri = mistral_ocr_image_obj.id
-                ocr_extracted_image = OcrExtractedImage(uri=image_uri)
-                if should_include_images:
-                    if export_dir:
-                        if mistral_ocr_image_obj.image_base64:
-                            save_base64_image_to_file(
-                                base64_image=mistral_ocr_image_obj.image_base64,
-                                file_path=f"{export_dir}/{image_uri}",
-                            )
-
-                pages[ocr_response_page.index].images.append(ocr_extracted_image)
+            if should_include_images:
+                for mistral_ocr_image_obj in ocr_response_page.images:
+                    extracted_image = cls.make_extracted_image_from_page_from_mistral_ocr_image_obj(mistral_ocr_image_obj)
+                    page.extracted_images.append(extracted_image)
+            pages[ocr_response_page.index] = page
 
         return OcrOutput(
             pages=pages,
         )
+
+    @classmethod
+    def make_extracted_image_from_page_from_mistral_ocr_image_obj(
+        cls,
+        mistral_ocr_image_obj: OCRImageObject,
+    ) -> ExtractedImageFromPage:
+        extracted_image = ExtractedImageFromPage(
+            image_id=mistral_ocr_image_obj.id,
+            top_left_x=mistral_ocr_image_obj.top_left_x,
+            top_left_y=mistral_ocr_image_obj.top_left_y,
+            bottom_right_x=mistral_ocr_image_obj.bottom_right_x,
+            bottom_right_y=mistral_ocr_image_obj.bottom_right_y,
+            base_64=mistral_ocr_image_obj.image_base64 if mistral_ocr_image_obj.image_base64 else None,
+        )
+        return extracted_image

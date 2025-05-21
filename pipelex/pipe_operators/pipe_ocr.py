@@ -69,7 +69,6 @@ class PipeOcr(PipeAbstract):
         ocr_job_params.should_add_screenshots = self.should_add_screenshots
         ocr_job_params.should_caption_images = self.should_caption_images
         ocr_job_params.should_include_images = self.should_include_images
-        ocr_job_params.export_dir = pipe_run_params.params.get("export_dir")
         ocr_input = OcrInput(
             image_uri=image_uri,
             pdf_uri=pdf_uri,
@@ -89,9 +88,9 @@ class PipeOcr(PipeAbstract):
                 PageContent(
                     text_and_images=TextAndImagesContent(
                         text=TextContent(text=page.text) if page.text else None,
-                        images=[ImageContent(url=image.uri) for image in page.images],
+                        images=[ImageContent(url=image.image_id) for image in page.extracted_images],
                     ),
-                    screenshot=ImageContent(url=page.screenshot.uri) if page.screenshot else None,
+                    screenshot=ImageContent(url=page.screenshot.image_id) if page.screenshot else None,
                 )
             )
 

@@ -7,16 +7,23 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 
 
-class OcrExtractedImage(BaseModel):
-    uri: str
+class ExtractedImage(BaseModel):
+    image_id: str
     base_64: Optional[str] = None
     caption: Optional[str] = None
 
 
+class ExtractedImageFromPage(ExtractedImage):
+    top_left_x: Optional[int] = None
+    top_left_y: Optional[int] = None
+    bottom_right_x: Optional[int] = None
+    bottom_right_y: Optional[int] = None
+
+
 class Page(BaseModel):
     text: Optional[str] = None
-    images: List[OcrExtractedImage] = []
-    screenshot: Optional[OcrExtractedImage] = None
+    extracted_images: List[ExtractedImageFromPage] = []
+    screenshot: Optional[ExtractedImageFromPage] = None
 
 
 class OcrOutput(BaseModel):

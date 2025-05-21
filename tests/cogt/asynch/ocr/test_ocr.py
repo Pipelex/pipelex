@@ -63,7 +63,6 @@ class TestCogtOcr:
         ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job_params = OcrJobParams.make_default_ocr_job_params()
         ocr_job_params.should_include_images = True
-        ocr_job_params.export_dir = "temp/test_image_save"
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(pdf_uri=file_path),
             ocr_job_params=ocr_job_params,
