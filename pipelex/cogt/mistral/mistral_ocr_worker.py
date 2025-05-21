@@ -8,7 +8,7 @@ import shortuuid
 from mistralai import Mistral
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import SdkTypeError
+from pipelex.cogt.exceptions import OcrCapabilityError, SdkTypeError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.mistral.mistral_factory import MistralFactory
 from pipelex.cogt.mistral.mistral_utils import upload_file_for_ocr
@@ -53,9 +53,9 @@ class MistralOcrWorker(OcrWorkerAbstract):
         elif pdf_uri := ocr_job.ocr_input.pdf_uri:
             ocr_output = await self.make_ocr_output_from_pdf(
                 pdf_uri=pdf_uri,
-                should_caption_images=ocr_job.job_params.should_caption_images,
-                should_add_screenshots=ocr_job.job_params.should_add_screenshots,
                 should_include_images=ocr_job.job_params.should_include_images,
+                should_caption_images=ocr_job.job_params.should_caption_images,
+                should_include_screenshots=ocr_job.job_params.should_include_screenshots,
             )
         else:
             raise OcrInputError("No image or PDF URI provided in OcrJob")
@@ -82,12 +82,14 @@ class MistralOcrWorker(OcrWorkerAbstract):
     async def make_ocr_output_from_pdf(
         self,
         pdf_uri: str,
-        should_caption_images: bool,
-        should_add_screenshots: bool,
         should_include_images: bool,
+        should_caption_images: bool,
+        should_include_screenshots: bool,
     ) -> OcrOutput:
         if should_caption_images:
-            raise NotImplementedError("Captioning is not implemented for Mistral OCR.")
+            raise OcrCapabilityError("Captioning is not implemented for Mistral OCR.")
+        if should_include_screenshots:
+            raise OcrCapabilityError("Screenshots are not implemented for Mistral OCR.")
         pdf_path, pdf_url = clarify_path_or_url(path_or_url=pdf_uri)  # pyright: ignore
         ocr_output: OcrOutput
         if pdf_url:
@@ -100,11 +102,6 @@ class MistralOcrWorker(OcrWorkerAbstract):
             ocr_output = await self.extract_from_pdf_file(
                 pdf_path=pdf_path,
                 should_include_images=should_include_images,
-            )
-        if should_add_screenshots:
-            ocr_output = await self.add_page_screenshots_to_ocr_output(
-                pdf_uri=pdf_uri,
-                ocr_output=ocr_output,
             )
         return ocr_output
 
@@ -179,30 +176,3 @@ class MistralOcrWorker(OcrWorkerAbstract):
             pdf_url=signed_url.url,
             should_include_images=should_include_images,
         )
-
-    async def add_page_screenshots_to_ocr_output(
-        self,
-        pdf_uri: str,
-        ocr_output: OcrOutput,
-    ) -> OcrOutput:
-        screenshot_uris: List[str] = []
-        pdf_path, pdf_url = clarify_path_or_url(pdf_uri)
-        # TODO: use centralized / possibly online storage instead of local file system
-        images = await render_pdf_pages_to_images(pdf_path=pdf_path, pdf_url=pdf_url, dpi=300)
-
-        temp_directory_name = shortuuid.uuid()
-        temp_directory_path = f"temp/{temp_directory_name}"
-        ensure_path(temp_directory_path)
-
-        # Save images to the folder and return their paths
-        screenshot_uris = []
-        for image_index, image in enumerate(images):
-            image_path = f"{temp_directory_path}/page_{image_index}.png"
-            image.save(
-                image_path,
-            )
-            screenshot_uris.append(image_path)
-        for page_index, page in enumerate(ocr_output.pages.values()):
-            screenshot_uri = screenshot_uris[page_index]
-            page.screenshot = ExtractedImageFromPage(image_id=screenshot_uri)
-        return ocr_output

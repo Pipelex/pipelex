@@ -61,8 +61,12 @@ class TestCogtOcr:
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
     async def test_ocr_image_save(self, file_path: str):
         ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
-        ocr_job_params = OcrJobParams.make_default_ocr_job_params()
-        ocr_job_params.should_include_images = True
+        ocr_job_params = OcrJobParams(
+            should_include_images=True,
+            should_caption_images=False,
+            should_include_screenshots=False,
+            screenshots_dpi=72,
+        )
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(pdf_uri=file_path),
             ocr_job_params=ocr_job_params,

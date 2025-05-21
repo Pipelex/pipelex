@@ -4,7 +4,7 @@
 
 import json
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Self, Type, TypeVar, Union
 
 import markdown
 from json2html import json2html
@@ -14,6 +14,7 @@ from typing_extensions import override
 from yattag import Doc
 
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.ocr.ocr_output import ExtractedImage
 from pipelex.tools.misc.markdown_helpers import convert_to_markdown
 from pipelex.tools.misc.model_helpers import clean_model_to_dict
 from pipelex.tools.templating.templating_models import TextFormat
@@ -174,6 +175,8 @@ class NumberContent(StuffContentInitableFromStr):
 class ImageContent(StuffContentInitableFromStr):
     url: str
     source_prompt: Optional[str] = None
+    caption: Optional[str] = None
+    base_64: Optional[str] = None
 
     @property
     @override
@@ -204,6 +207,14 @@ class ImageContent(StuffContentInitableFromStr):
     @override
     def rendered_json(self) -> str:
         return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
+
+    @classmethod
+    def make_from_extracted_image(cls, extracted_image: ExtractedImage) -> Self:
+        return cls(
+            url=extracted_image.image_id,
+            base_64=extracted_image.base_64,
+            caption=extracted_image.caption,
+        )
 
 
 class PDFContent(StuffContentInitableFromStr):

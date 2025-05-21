@@ -10,16 +10,16 @@ from pipelex.tools.config.models import ConfigModel
 
 
 class OcrJobParams(BaseModel):
-    should_caption_images: bool
-    should_add_screenshots: bool
     should_include_images: bool
+    should_caption_images: bool
+    should_include_screenshots: bool
     screenshots_dpi: int
 
     @classmethod
     def make_default_ocr_job_params(cls) -> "OcrJobParams":
         return OcrJobParams(
             should_caption_images=False,
-            should_add_screenshots=False,
+            should_include_screenshots=False,
             should_include_images=True,
             screenshots_dpi=300,
         )

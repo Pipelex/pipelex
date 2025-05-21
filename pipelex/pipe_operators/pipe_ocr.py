@@ -66,7 +66,7 @@ class PipeOcr(PipeAbstract):
 
         ocr_handle = OcrHandle.MISTRAL_OCR
         ocr_job_params = OcrJobParams.make_default_ocr_job_params()
-        ocr_job_params.should_add_screenshots = self.should_add_screenshots
+        ocr_job_params.should_include_screenshots = self.should_add_screenshots
         ocr_job_params.should_caption_images = self.should_caption_images
         ocr_job_params.should_include_images = self.should_include_images
         ocr_input = OcrInput(
@@ -84,13 +84,15 @@ class PipeOcr(PipeAbstract):
         # Build the output stuff, which is a list of page contents
         page_contents: List[PageContent] = []
         for _, page in ocr_output.pages.items():
+            images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
+            screenshot = ImageContent.make_from_extracted_image(extracted_image=page.screenshot) if page.screenshot else None
             page_contents.append(
                 PageContent(
                     text_and_images=TextAndImagesContent(
                         text=TextContent(text=page.text) if page.text else None,
-                        images=[ImageContent(url=image.image_id) for image in page.extracted_images],
+                        images=images,
                     ),
-                    screenshot=ImageContent(url=page.screenshot.image_id) if page.screenshot else None,
+                    screenshot=screenshot,
                 )
             )
 
