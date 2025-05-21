@@ -7,6 +7,7 @@ from typing import List, Optional
 from pydantic import model_validator
 from typing_extensions import Self, override
 
+from pipelex import log
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
@@ -20,6 +21,7 @@ from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_content_generator
 from pipelex.job_metadata import JobMetadata
+from pipelex.tools.pdf.pypdfium2_renderer import PdfInput, PyPdfium2Renderer, pypdfium2_renderer
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
 
@@ -85,10 +87,30 @@ class PipeOcr(PipeAbstract):
         )
 
         # Build the output stuff, which is a list of page contents
+        screenshot_contents: List[ImageContent] = []
+        if self.should_include_screenshots and pdf_uri:
+            for page in ocr_output.pages.values():
+                if page.screenshot:
+                    screenshot_contents.append(ImageContent.make_from_extracted_image(extracted_image=page.screenshot))
+            needs_to_generate_screenshots: bool
+            if len(screenshot_contents) == 0:
+                log.debug("No screenshots found in the OCR output")
+                needs_to_generate_screenshots = True
+            elif len(screenshot_contents) < len(ocr_output.pages):
+                log.warning(f"Only {len(screenshot_contents)} screenshots found in the OCR output, but {len(ocr_output.pages)} pages")
+                needs_to_generate_screenshots = True
+            else:
+                log.debug("All screenshots found in the OCR output")
+                needs_to_generate_screenshots = False
+
+            if needs_to_generate_screenshots:
+                screenshot_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=pdf_uri, dpi=self.screenshots_dpi)
+                screenshot_contents = [ImageContent.make_from_image(image=img) for img in screenshot_images]
+
         page_contents: List[PageContent] = []
-        for _, page in ocr_output.pages.items():
+        for page_index, page in ocr_output.pages.items():
             images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
-            screenshot = ImageContent.make_from_extracted_image(extracted_image=page.screenshot) if page.screenshot else None
+            screenshot = screenshot_contents[page_index] if self.should_include_screenshots and pdf_uri else None
             page_contents.append(
                 PageContent(
                     text_and_images=TextAndImagesContent(

@@ -2,13 +2,16 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
+import base64
 import json
 from abc import ABC, abstractmethod
+from io import BytesIO
 from typing import Any, Dict, Generic, List, Optional, Self, Type, TypeVar, Union
 
 import markdown
 from json2html import json2html
 from kajson import kajson
+from PIL import Image
 from pydantic import BaseModel
 from typing_extensions import override
 from yattag import Doc
@@ -26,6 +29,8 @@ from pipelex.tools.utils.path_utils import InterpretedPathOrUrl, clarify_path_or
 
 ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
+
+# TODO: split in separate files
 
 
 class StuffContent(ABC, CustomBaseModel):
@@ -223,6 +228,16 @@ class ImageContent(StuffContentInitableFromStr):
             url=extracted_image.image_id,
             base_64=extracted_image.base_64,
             caption=extracted_image.caption,
+        )
+
+    @classmethod
+    def make_from_image(cls, image: Image.Image) -> Self:
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        base_64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return cls(
+            url=f"data:image/png;base64,{base_64}",
+            base_64=base_64,
         )
 
     def save_to_directory(self, directory: str, filename: Optional[str] = None):

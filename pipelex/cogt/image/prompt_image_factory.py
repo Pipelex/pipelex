@@ -20,14 +20,14 @@ class PromptImageFactory:
         cls,
         file_path: Optional[str] = None,
         url: Optional[str] = None,
-        image_bytes: Optional[bytes] = None,
+        base_64: Optional[bytes] = None,
     ) -> PromptImage:
         if file_path:
             return PromptImagePath(file_path=file_path)
         elif url:
             return PromptImageUrl(url=url)
-        elif image_bytes:
-            return PromptImageBytes(b64_image_bytes=image_bytes)
+        elif base_64:
+            return PromptImageBytes(b64_image_bytes=base_64)
         else:
             raise PromptImageFactoryError("PromptImageFactory requires one of file_path, url, or image_bytes")
 

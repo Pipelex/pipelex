@@ -22,7 +22,10 @@ class CustomBaseModel(BaseModel):
                 if len(tuple_item) >= 2:
                     name = tuple_item[0]
                     value = tuple_item[1]
-                    if name == "base_64" and isinstance(value, str) and len(value) > TRUNCATE_LENGTH:
+                    should_truncate = (name == "base_64" and isinstance(value, str) and len(value) > TRUNCATE_LENGTH) or (
+                        name == "url" and isinstance(value, str) and value.startswith("data:image/") and len(value) > TRUNCATE_LENGTH
+                    )
+                    if should_truncate:
                         truncated_value = value[:TRUNCATE_LENGTH] + TRUNCATE_SUFFIX
                         if len(tuple_item) == 3:
                             yield name, truncated_value, tuple_item[2]
@@ -37,7 +40,10 @@ class CustomBaseModel(BaseModel):
     def __repr_args__(self) -> Sequence[tuple[Optional[str], Any]]:
         processed_args: list[tuple[Optional[str], Any]] = []
         for name, value in super().__repr_args__():
-            if name == "base_64" and isinstance(value, str) and len(value) > TRUNCATE_LENGTH:
+            should_truncate = (name == "base_64" and isinstance(value, str) and len(value) > TRUNCATE_LENGTH) or (
+                name == "url" and isinstance(value, str) and value.startswith("data:image/") and len(value) > TRUNCATE_LENGTH
+            )
+            if should_truncate:
                 processed_args.append((name, value[:TRUNCATE_LENGTH] + TRUNCATE_SUFFIX))
             else:
                 processed_args.append((name, value))

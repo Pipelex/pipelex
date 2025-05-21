@@ -104,6 +104,7 @@ class InterpretedPathOrUrl(StrEnum):
     FILE_PATH = "file_path"
     URL = "uri"
     FILE_NAME = "file_name"
+    BASE_64 = "base_64"
 
     @property
     def desc(self) -> str:
@@ -116,6 +117,8 @@ class InterpretedPathOrUrl(StrEnum):
                 return "URL"
             case InterpretedPathOrUrl.FILE_NAME:
                 return "File Name"
+            case InterpretedPathOrUrl.BASE_64:
+                return "Base 64"
 
 
 def interpret_path_or_url(path_or_uri: str) -> InterpretedPathOrUrl:
@@ -134,8 +137,10 @@ def interpret_path_or_url(path_or_uri: str) -> InterpretedPathOrUrl:
     Returns:
         InterpretedPathOrUrl: An enum value indicating the type of the input string:
             - FILE_URI for file:// URIs
-            - URL for http(s) URLs
             - FILE_PATH for everything else
+            - URL for http(s) URLs
+            - FILE_NAME for file names
+            - BASE_64 for base64-encoded images
 
     Example:
         >>> interpret_path_or_url("file:///home/user/file.txt")
@@ -197,6 +202,8 @@ def clarify_path_or_url(path_or_uri: str) -> Tuple[Optional[str], Optional[str]]
         case InterpretedPathOrUrl.FILE_NAME:
             file_path = path_or_uri
             url = None
+        case InterpretedPathOrUrl.BASE_64:
+            raise NotImplementedError("Base 64 is not supported yet by clarify_path_or_url")
     return file_path, url
 
 

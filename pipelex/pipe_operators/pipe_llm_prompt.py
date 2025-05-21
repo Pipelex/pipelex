@@ -135,12 +135,15 @@ class PipeLLMPrompt(PipeAbstract):
             for user_image_name in self.user_images:
                 log.debug(f"Getting user image '{user_image_name}' from context")
                 try:
-                    prompt_image_stuff_content = working_memory.get_stuff_attribute(name=user_image_name, wanted_type=ImageContent)
+                    prompt_image_content = working_memory.get_stuff_attribute(name=user_image_name, wanted_type=ImageContent)
                 except (WorkingMemoryNotFoundError, WorkingMemoryStuffNotFoundError, WorkingMemoryTypeError) as exc:
                     raise PipeInputError(f"A valid user image named '{user_image_name}' was not found in the working_memory: {exc}") from exc
 
-                image_uri = prompt_image_stuff_content.url
-                user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
+                if base_64 := prompt_image_content.base_64:
+                    user_image = PromptImageFactory.make_prompt_image(base_64=base_64)
+                else:
+                    image_uri = prompt_image_content.url
+                    user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
                 prompt_user_images.append(user_image)
 
         ############################################################

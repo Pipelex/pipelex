@@ -8,6 +8,7 @@ import shortuuid
 from mistralai import Mistral
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.exceptions import OcrCapabilityError, SdkTypeError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.mistral.mistral_factory import MistralFactory
@@ -18,8 +19,6 @@ from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract, ocr_job_func
 from pipelex.tools.misc.base_64 import load_binary_as_base64_async
-from pipelex.tools.pdf.pdf_render import render_pdf_pages_to_images
-from pipelex.tools.utils.file_utils import save_text_to_path
 from pipelex.tools.utils.path_utils import clarify_path_or_url, ensure_path
 
 
@@ -89,7 +88,8 @@ class MistralOcrWorker(OcrWorkerAbstract):
         if should_caption_images:
             raise OcrCapabilityError("Captioning is not implemented for Mistral OCR.")
         if should_include_screenshots:
-            raise OcrCapabilityError("Screenshots are not implemented for Mistral OCR.")
+            # raise OcrCapabilityError("Screenshots are not implemented for Mistral OCR.")
+            log.debug("Screenshots are not implemented for Mistral OCR.")
         pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)  # pyright: ignore
         ocr_output: OcrOutput
         if pdf_url:
