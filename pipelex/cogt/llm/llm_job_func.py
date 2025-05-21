@@ -11,7 +11,6 @@ from pipelex import log
 from pipelex.cogt.exceptions import LLMWorkerError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract, LLMWorkerJobFuncName
-from pipelex.hub import get_report_delegate
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 

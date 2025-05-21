@@ -24,7 +24,6 @@ from pipelex.core.pipe import PipeAbstract
 from pipelex.core.pipe_provider_abstract import PipeProviderAbstract
 from pipelex.mission.mission import Mission
 from pipelex.mission.mission_manager_abstract import MissionManagerAbstract
-from pipelex.mission.mission_models import SpecialMissionId
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigRoot

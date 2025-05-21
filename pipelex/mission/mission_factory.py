@@ -1,6 +1,5 @@
 import shortuuid
 
-from pipelex.config import get_config
 from pipelex.mission.mission import Mission
 
 
