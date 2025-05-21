@@ -17,8 +17,6 @@ from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
 from pipelex.mission.mission_models import SpecialMissionId
 from pipelex.tools.utils.path_utils import ensure_path, get_incremental_file_path
 
-# from pipelex.config import get_config
-
 LLMUsageRegistryRoot = List[LLMTokensUsage]
 
 
@@ -38,13 +36,10 @@ class InferenceReportManager(InferenceReportDelegate):
     def teardown(self):
         self._usage_registries.clear()
 
+    # TODO: manage multiple registries by mission_id
     @property
     def _usage_registery(self) -> UsageRegistry:
         return self._usage_registries[SpecialMissionId.UNTITLED]
-
-    # @property
-    # def report_config(self):
-    #     return get_config().cogt.cogt_report_config
 
     @override
     def report_inference_job(self, inference_job: InferenceJobAbstract):
