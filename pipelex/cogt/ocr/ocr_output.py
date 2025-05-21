@@ -4,6 +4,8 @@
 
 from typing import Dict, List, Optional
 
+from pydantic import Field
+
 from pipelex import log
 from pipelex.tools.misc.base_64 import save_base64_to_binary_file
 from pipelex.tools.misc.custom_base_model import CustomBaseModel
@@ -33,7 +35,7 @@ class ExtractedImageFromPage(ExtractedImage):
 
 class Page(CustomBaseModel):
     text: Optional[str] = None
-    extracted_images: List[ExtractedImageFromPage] = []
+    extracted_images: List[ExtractedImageFromPage] = Field(default_factory=list)
     screenshot: Optional[ExtractedImageFromPage] = None
 
     def save_to_directory(self, directory: str):

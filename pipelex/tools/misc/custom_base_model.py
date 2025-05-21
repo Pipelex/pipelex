@@ -17,17 +17,19 @@ class CustomBaseModel(BaseModel):
     @override
     def __rich_repr__(self) -> RichReprResult:  # type: ignore
         for item in super().__rich_repr__():  # type: ignore
-            if isinstance(item, tuple) and len(item) >= 2:
-                name = item[0]
-                value = item[1]
-                if name == "base_64" and isinstance(value, str) and len(value) > TRUNCATE_LENGTH:
-                    truncated_value = value[:TRUNCATE_LENGTH] + TRUNCATE_SUFFIX
-                    if len(item) == 3:
-                        yield name, truncated_value, item[2]
+            if isinstance(item, tuple):
+                tuple_item: tuple[Any, ...] = item
+                if len(tuple_item) >= 2:
+                    name = tuple_item[0]
+                    value = tuple_item[1]
+                    if name == "base_64" and isinstance(value, str) and len(value) > TRUNCATE_LENGTH:
+                        truncated_value = value[:TRUNCATE_LENGTH] + TRUNCATE_SUFFIX
+                        if len(tuple_item) == 3:
+                            yield name, truncated_value, tuple_item[2]
+                        else:
+                            yield name, truncated_value
                     else:
-                        yield name, truncated_value
-                else:
-                    yield item
+                        yield item
             else:
                 yield item
 

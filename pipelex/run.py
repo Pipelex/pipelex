@@ -22,7 +22,6 @@ async def run_pipe_code(
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
     dynamic_output_concept_code: Optional[str] = None,
     job_id: Optional[str] = None,
-    params: Optional[Dict[str, Any]] = None,
 ) -> PipeOutput:
     """
     Simple wrapper to run a pipe with a working memory using the default PipeRouter.
@@ -49,8 +48,6 @@ async def run_pipe_code(
         output_multiplicity=output_multiplicity,
         dynamic_output_concept_code=dynamic_output_concept_code,
     )
-    if params:
-        pipe_run_params.params = params
 
     pretty_print(pipe, title=f"Running pipe '{pipe_code}'")
     if working_memory:

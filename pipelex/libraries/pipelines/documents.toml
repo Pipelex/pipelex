@@ -13,8 +13,8 @@ PDF = "A PDF document"
 
 [pipe.extract_page_contents_from_pdf]
 PipeOcr = "Extract page contents from a PDF document"
-input = "native.PDF"
+input = "PDF"
 output = "PageContent"
 pdf = "pdf"
-include_images = true
-add_screenshots = true
+page_images = true
+screenshots = false
