@@ -71,8 +71,6 @@ def llm_job_func(func: F) -> F:
 
         # Report job
         llm_job.llm_job_after_complete()
-        # if mission_id := llm_job.job_metadata.mission_id:
-        #     get_report_delegate(mission_id=mission_id).report_inference_job(inference_job=llm_job)
         if self.report_delegate:
             self.report_delegate.report_inference_job(inference_job=llm_job)
 

@@ -43,7 +43,7 @@ class TestAsyncCogtLLMGenText:
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("topic, prompt_text", LLMTestCases.SINGLE_TEXT)
     async def test_gen_text_async_using_llm_preset(self, llm_preset_id: str, topic: str, prompt_text: str):

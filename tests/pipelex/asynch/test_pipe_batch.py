@@ -51,7 +51,7 @@ class TestPipeBatch:
 
         # Log output and generate report
         pretty_print(pipe_output, title="Processing output for invoice")
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
         # Basic assertions
         assert pipe_output is not None

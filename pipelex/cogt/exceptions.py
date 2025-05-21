@@ -15,6 +15,10 @@ class InferenceManagerWorkerSetupError(CogtError, FatalError):
     pass
 
 
+class CostRegistryError(CogtError):
+    pass
+
+
 class InferenceReportManagerError(CogtError):
     pass
 

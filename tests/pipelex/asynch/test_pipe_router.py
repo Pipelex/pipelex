@@ -55,7 +55,7 @@ class TestPipeRouter:
         result_dir_path, _ = pipe_result_handler
         await save_working_memory(pipe_output, result_dir_path)
 
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("topic, stuff, pipe_code", PipeTestCases.STUFF_AND_PIPE)
     async def test_pipe_from_stuff(
@@ -78,7 +78,7 @@ class TestPipeRouter:
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
@@ -103,7 +103,7 @@ class TestPipeRouter:
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
@@ -136,7 +136,7 @@ class TestPipeRouter:
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
@@ -175,7 +175,7 @@ class TestPipeRouter:
             ),
         )
         pretty_print(pipe_output, title=f"run pipe '{pipe_code}'")
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
         job_history.print_mermaid_flowchart_code_and_url()
 
@@ -201,4 +201,4 @@ class TestPipeRouter:
             )
         pretty_print(exc.value, title="exception")
         assert expected_error_message in str(exc.value)
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()

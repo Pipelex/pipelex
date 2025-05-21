@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex import log
-from pipelex.cogt.exceptions import InferenceReportManagerError
+from pipelex.cogt.exceptions import CostRegistryError
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage, model_cost_per_token
 from pipelex.cogt.llm.token_category import TokenCategory
 
@@ -29,24 +29,21 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         df = pd.DataFrame(records)
         return df
 
-    @property
-    def is_empty(self) -> bool:
-        return not self.root
-
     @classmethod
-    def general_report(
+    def generate_report(
         cls,
+        mission_id: str,
         llm_tokens_usages: List[LLMTokensUsage],
         unit_scale: float,
         cost_report_file_path: Optional[str] = None,
     ):
+        if not llm_tokens_usages:
+            log.warning(f"No report to generate for mission '{mission_id}'")
+            return
         cost_registry = CostRegistry()
         for llm_tokens_usage in llm_tokens_usages:
             cost_report = cls.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
             cost_registry.root.append(cost_report)
-        if cost_registry.is_empty:
-            log.warning("Cost registry is empty")
-            return
 
         cost_registry_df = cost_registry.to_dataframe()
 
@@ -80,14 +77,11 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             }
         ).reset_index()
         if agg_by_llm_name is None or agg_by_llm_name.empty:  # pyright: ignore[reportUnnecessaryComparison]
-            raise InferenceReportManagerError("Empty report aggregation by LLM name")
+            raise CostRegistryError("Empty report aggregation by LLM name")
 
         console = Console()
         title = "Costs by LLM model"
-        # if self.mission_id:
-        #     title += f" for mission {self.mission_id}"
-        # else:
-        title += " — no mission id"
+        title += f" for mission '{mission_id}'"
         table = Table(title=title, box=box.ROUNDED)
 
         scale_str: str
@@ -161,7 +155,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         cost_report = llm_tokens_usage.compute_cost_report()
         # compute the input_non_cached tokens
         if cost_report.nb_tokens_by_category.get(TokenCategory.INPUT_NON_CACHED) is not None:
-            raise InferenceReportManagerError("TokenCategory.INPUT_NON_CACHED already exists in the cost report")
+            raise CostRegistryError("TokenCategory.INPUT_NON_CACHED already exists in the cost report")
         # we use pop to remove input tokens which will be replaced by "input joined"
         nb_tokens_input_joined = cost_report.nb_tokens_by_category.pop(TokenCategory.INPUT, 0)
         cost_report.costs_by_token_category.pop(TokenCategory.INPUT, None)
