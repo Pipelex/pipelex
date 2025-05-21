@@ -4,10 +4,10 @@
 
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pipelex.tools.misc.custom_base import TruncatableBase64BaseModel  # Import the new base model
 
 
-class ExtractedImage(BaseModel):
+class ExtractedImage(TruncatableBase64BaseModel):  # Inherit from the new base model
     image_id: str
     base_64: Optional[str] = None
     caption: Optional[str] = None
@@ -20,13 +20,13 @@ class ExtractedImageFromPage(ExtractedImage):
     bottom_right_y: Optional[int] = None
 
 
-class Page(BaseModel):
+class Page(TruncatableBase64BaseModel):  # Inherit from the new base model for consistency if it might have base64 fields in future
     text: Optional[str] = None
     extracted_images: List[ExtractedImageFromPage] = []
     screenshot: Optional[ExtractedImageFromPage] = None
 
 
-class OcrOutput(BaseModel):
+class OcrOutput(TruncatableBase64BaseModel):  # Inherit from the new base model for consistency
     pages: Dict[int, Page]
 
     @property
