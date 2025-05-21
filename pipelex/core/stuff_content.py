@@ -15,16 +15,20 @@ from yattag import Doc
 
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.ocr.ocr_output import ExtractedImage
+from pipelex.tools.misc.base_64 import save_base64_to_binary_file
+from pipelex.tools.misc.custom_base_model import CustomBaseModel
 from pipelex.tools.misc.markdown_helpers import convert_to_markdown
 from pipelex.tools.misc.model_helpers import clean_model_to_dict
 from pipelex.tools.templating.templating_models import TextFormat
-from pipelex.tools.utils.path_utils import interpret_path_or_url
+from pipelex.tools.utils.file_utils import ensure_directory_exists, save_text_to_path
+from pipelex.tools.utils.filetype_utils import FileType, detect_file_type_from_bytes
+from pipelex.tools.utils.path_utils import InterpretedPathOrUrl, clarify_path_or_url, interpret_path_or_url
 
 ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
 
-class StuffContent(ABC, BaseModel):
+class StuffContent(ABC, CustomBaseModel):
     @property
     def short_desc(self) -> str:
         return f"some {self.__class__.__name__}"
@@ -113,6 +117,11 @@ class TextContent(StuffContentInitableFromStr):
     def rendered_json(self) -> str:
         return json.dumps({"text": self.text})
 
+    def save_to_directory(self, directory: str):
+        ensure_directory_exists(directory)
+        filename = "text_content.txt"
+        save_text_to_path(text=self.text, path=f"{directory}/{filename}")
+
 
 class DynamicContent(StuffContent):
     @property
@@ -181,7 +190,7 @@ class ImageContent(StuffContentInitableFromStr):
     @property
     @override
     def short_desc(self) -> str:
-        url_desc = interpret_path_or_url(path_or_url=self.url).desc
+        url_desc = interpret_path_or_url(path_or_uri=self.url).desc
         return f"{url_desc} or an image"
 
     @classmethod
@@ -216,6 +225,26 @@ class ImageContent(StuffContentInitableFromStr):
             caption=extracted_image.caption,
         )
 
+    def save_to_directory(self, directory: str, filename: Optional[str] = None):
+        ensure_directory_exists(directory)
+        if base_64 := self.base_64:
+            if not filename:
+                match interpret_path_or_url(path_or_uri=self.url):
+                    case InterpretedPathOrUrl.FILE_NAME:
+                        filename = self.url
+                    case _:
+                        file_type = detect_file_type_from_bytes(buf=base_64.encode("utf-8"))
+                        filename = f"{filename}.{file_type.extension}"
+            if filename:
+                file_path = f"{directory}/{filename}"
+                save_base64_to_binary_file(b64=base_64, file_path=file_path)
+        if filename:
+            name = filename.rsplit(".", 1)[0]
+            if caption := self.caption:
+                save_text_to_path(text=caption, path=f"{directory}/{name}_caption.txt")
+            if source_prompt := self.source_prompt:
+                save_text_to_path(text=source_prompt, path=f"{directory}/{name}_source_prompt.txt")
+
 
 class PDFContent(StuffContentInitableFromStr):
     url: str
@@ -223,7 +252,7 @@ class PDFContent(StuffContentInitableFromStr):
     @property
     @override
     def short_desc(self) -> str:
-        url_desc = interpret_path_or_url(path_or_url=self.url).desc
+        url_desc = interpret_path_or_url(path_or_uri=self.url).desc
         return f"{url_desc} of a PDF document"
 
     @classmethod
@@ -446,7 +475,21 @@ class TextAndImagesContent(StuffContent):
             rendered = ""
         return rendered
 
+    def save_to_directory(self, directory: str):
+        ensure_directory_exists(directory)
+        if text_content := self.text:
+            text_content.save_to_directory(directory=directory)
+        if images := self.images:
+            for image_content in images:
+                image_content.save_to_directory(directory=directory)
+
 
 class PageContent(StructuredContent):
     text_and_images: TextAndImagesContent
     screenshot: Optional[ImageContent] = None
+
+    def save_to_directory(self, directory: str):
+        ensure_directory_exists(directory)
+        self.text_and_images.save_to_directory(directory=directory)
+        if screenshot := self.screenshot:
+            screenshot.save_to_directory(directory=directory)

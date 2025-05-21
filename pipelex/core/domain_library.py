@@ -11,7 +11,7 @@ from pipelex import log
 from pipelex.core.domain import Domain
 from pipelex.core.domain_provider_abstract import DomainProviderAbstract
 from pipelex.exceptions import DomainLibraryError
-from pipelex.tools.utils.file_utils import save_to_path
+from pipelex.tools.utils.file_utils import save_text_to_path
 
 DomainLibraryRoot = Dict[str, Domain]
 
@@ -52,7 +52,7 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
         log.dev(f"Exporting DomainLibrary to {export_path}")
         log.dev("-" * 80)
         exported_string = self._export_as_text_listing()
-        save_to_path(exported_string, export_path)
+        save_text_to_path(exported_string, export_path)
 
     @override
     def get_domain(self, domain_code: str) -> Optional[Domain]:

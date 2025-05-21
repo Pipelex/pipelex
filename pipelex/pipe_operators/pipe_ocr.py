@@ -31,9 +31,10 @@ class PipeOcr(PipeAbstract):
     ocr_engine: Optional[OcrEngine] = None
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
-    should_add_screenshots: bool
+    should_include_screenshots: bool
     should_caption_images: bool
-    should_include_images: bool = False
+    should_include_images: bool
+    screenshots_dpi: int
 
     @model_validator(mode="after")
     def validate_exactly_one_input_stuff_name(self) -> Self:
@@ -65,8 +66,13 @@ class PipeOcr(PipeAbstract):
             raise PipeDefinitionError("PipeOcr should have a non-None image_stuff_name or pdf_stuff_name")
 
         ocr_handle = OcrHandle.MISTRAL_OCR
-        ocr_job_params = OcrJobParams.make_default_ocr_job_params()
-        ocr_job_params.should_include_screenshots = self.should_add_screenshots
+        ocr_job_params = OcrJobParams(
+            should_include_images=self.should_include_images,
+            should_caption_images=self.should_caption_images,
+            should_include_screenshots=self.should_include_screenshots,
+            screenshots_dpi=self.screenshots_dpi,
+        )
+        ocr_job_params.should_include_screenshots = self.should_include_screenshots
         ocr_job_params.should_caption_images = self.should_caption_images
         ocr_job_params.should_include_images = self.should_include_images
         ocr_input = OcrInput(

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 
+# TODO: merge with ensure_directory_exists()
 def ensure_path(path: str) -> bool:
     """
     Ensures a directory exists at the specified path, creating it if necessary.
@@ -101,7 +102,8 @@ def get_incremental_file_path(base_path: str, base_name: str, extension: str, st
 class InterpretedPathOrUrl(StrEnum):
     FILE_URI = "file_uri"
     FILE_PATH = "file_path"
-    URL = "url"
+    URL = "uri"
+    FILE_NAME = "file_name"
 
     @property
     def desc(self) -> str:
@@ -112,9 +114,11 @@ class InterpretedPathOrUrl(StrEnum):
                 return "File Path"
             case InterpretedPathOrUrl.URL:
                 return "URL"
+            case InterpretedPathOrUrl.FILE_NAME:
+                return "File Name"
 
 
-def interpret_path_or_url(path_or_url: str) -> InterpretedPathOrUrl:
+def interpret_path_or_url(path_or_uri: str) -> InterpretedPathOrUrl:
     """
     Determines whether a string represents a file URI, URL, or file path.
 
@@ -124,7 +128,7 @@ def interpret_path_or_url(path_or_url: str) -> InterpretedPathOrUrl:
     - File path (anything else)
 
     Args:
-        path_or_url (str): The string to interpret, which could be a file URI,
+        path_or_uri (str): The string to interpret, which could be a file URI,
             URL, or file path.
 
     Returns:
@@ -141,24 +145,26 @@ def interpret_path_or_url(path_or_url: str) -> InterpretedPathOrUrl:
         >>> interpret_path_or_url("/home/user/file.txt")
         InterpretedPathOrUrl.FILE_PATH
     """
-    if path_or_url.startswith("file://"):
+    if path_or_uri.startswith("file://"):
         return InterpretedPathOrUrl.FILE_URI
-    elif path_or_url.startswith("http"):
+    elif path_or_uri.startswith("http"):
         return InterpretedPathOrUrl.URL
-    else:
+    elif os.sep in path_or_uri:
         return InterpretedPathOrUrl.FILE_PATH
+    else:
+        return InterpretedPathOrUrl.FILE_NAME
 
 
-def clarify_path_or_url(path_or_url: str) -> Tuple[Optional[str], Optional[str]]:
+def clarify_path_or_url(path_or_uri: str) -> Tuple[Optional[str], Optional[str]]:
     """
-    Separates a path-or-URL string into either a file path or URL component.
+    Separates a path_or_uri string into either a file path or online URL component.
 
     This function processes the input string to determine its type and returns
     the appropriate components. For file URIs, it converts them to regular file paths.
     Only one of the returned values will be non-None.
 
     Args:
-        path_or_url (str): The string to process, which could be a file URI,
+        path_or_uri (str): The string to process, which could be a file URI,
             URL, or file path.
 
     Returns:
@@ -176,17 +182,20 @@ def clarify_path_or_url(path_or_url: str) -> Tuple[Optional[str], Optional[str]]
     """
     file_path: Optional[str]
     url: Optional[str]
-    match interpret_path_or_url(path_or_url):
+    match interpret_path_or_url(path_or_uri):
         case InterpretedPathOrUrl.FILE_URI:
-            parsed_uri = urllib.parse.urlparse(path_or_url)
+            parsed_uri = urllib.parse.urlparse(path_or_uri)
             file_path = urllib.parse.unquote(parsed_uri.path)
             url = None
         case InterpretedPathOrUrl.URL:
             file_path = None
-            url = path_or_url
+            url = path_or_uri
         case InterpretedPathOrUrl.FILE_PATH:
             # it's a file path
-            file_path = path_or_url
+            file_path = path_or_uri
+            url = None
+        case InterpretedPathOrUrl.FILE_NAME:
+            file_path = path_or_uri
             url = None
     return file_path, url
 

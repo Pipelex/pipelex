@@ -19,7 +19,7 @@ from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract, ocr_job_func
 from pipelex.tools.misc.base_64 import load_binary_as_base64_async
 from pipelex.tools.pdf.pdf_render import render_pdf_pages_to_images
-from pipelex.tools.utils.file_utils import save_to_path
+from pipelex.tools.utils.file_utils import save_text_to_path
 from pipelex.tools.utils.path_utils import clarify_path_or_url, ensure_path
 
 
@@ -68,7 +68,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
     ) -> OcrOutput:
         if should_caption_image:
             raise NotImplementedError("Captioning is not implemented for Mistral OCR.")
-        image_path, image_url = clarify_path_or_url(path_or_url=image_uri)
+        image_path, image_url = clarify_path_or_url(path_or_uri=image_uri)
         if image_url:
             return await self.extract_from_image_url(
                 image_url=image_url,
@@ -90,7 +90,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
             raise OcrCapabilityError("Captioning is not implemented for Mistral OCR.")
         if should_include_screenshots:
             raise OcrCapabilityError("Screenshots are not implemented for Mistral OCR.")
-        pdf_path, pdf_url = clarify_path_or_url(path_or_url=pdf_uri)  # pyright: ignore
+        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)  # pyright: ignore
         ocr_output: OcrOutput
         if pdf_url:
             ocr_output = await self.extract_from_pdf_url(

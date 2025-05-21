@@ -13,7 +13,7 @@ TRUNCATE_LENGTH = 50
 TRUNCATE_SUFFIX = "…"
 
 
-class TruncatableBase64BaseModel(BaseModel):
+class CustomBaseModel(BaseModel):
     @override
     def __rich_repr__(self) -> RichReprResult:  # type: ignore
         for item in super().__rich_repr__():  # type: ignore

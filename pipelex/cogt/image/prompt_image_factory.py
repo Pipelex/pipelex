@@ -36,7 +36,7 @@ class PromptImageFactory:
         cls,
         uri: str,
     ) -> PromptImage:
-        file_path, url = clarify_path_or_url(path_or_url=uri)
+        file_path, url = clarify_path_or_url(path_or_uri=uri)
         return PromptImageFactory.make_prompt_image(
             file_path=file_path,
             url=url,

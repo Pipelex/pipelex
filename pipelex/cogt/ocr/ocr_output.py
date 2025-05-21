@@ -4,13 +4,24 @@
 
 from typing import Dict, List, Optional
 
-from pipelex.tools.misc.custom_base import TruncatableBase64BaseModel  # Import the new base model
+from pipelex import log
+from pipelex.tools.misc.base_64 import save_base64_to_binary_file
+from pipelex.tools.misc.custom_base_model import CustomBaseModel
+from pipelex.tools.utils.file_utils import ensure_directory_exists, save_text_to_path
 
 
-class ExtractedImage(TruncatableBase64BaseModel):  # Inherit from the new base model
+class ExtractedImage(CustomBaseModel):
     image_id: str
     base_64: Optional[str] = None
     caption: Optional[str] = None
+
+    def save_to_directory(self, directory: str):
+        ensure_directory_exists(directory)
+        log.debug(f"Saving image to directory: {directory}")
+        if base_64 := self.base_64:
+            filename = self.image_id
+            file_path = f"{directory}/{filename}"
+            save_base64_to_binary_file(b64=base_64, file_path=file_path)
 
 
 class ExtractedImageFromPage(ExtractedImage):
@@ -20,15 +31,32 @@ class ExtractedImageFromPage(ExtractedImage):
     bottom_right_y: Optional[int] = None
 
 
-class Page(TruncatableBase64BaseModel):  # Inherit from the new base model for consistency if it might have base64 fields in future
+class Page(CustomBaseModel):
     text: Optional[str] = None
     extracted_images: List[ExtractedImageFromPage] = []
     screenshot: Optional[ExtractedImageFromPage] = None
 
+    def save_to_directory(self, directory: str):
+        ensure_directory_exists(directory)
+        log.debug(f"Saving page to directory: {directory}")
+        if text := self.text:
+            filename = "page_text.txt"
+            save_text_to_path(text=text, path=f"{directory}/{filename}")
+        for image in self.extracted_images:
+            image.save_to_directory(directory=directory)
+        if screenshot := self.screenshot:
+            screenshot.save_to_directory(directory=directory)
 
-class OcrOutput(TruncatableBase64BaseModel):  # Inherit from the new base model for consistency
+
+class OcrOutput(CustomBaseModel):
     pages: Dict[int, Page]
 
     @property
     def concatenated_text(self) -> str:
         return "\n".join([page.text for page in self.pages.values() if page.text])
+
+    def save_to_directory(self, directory: str):
+        ensure_directory_exists(directory)
+        for page_number, page in self.pages.items():
+            directory_for_page = f"{directory}/page_{page_number}"
+            page.save_to_directory(directory=directory_for_page)

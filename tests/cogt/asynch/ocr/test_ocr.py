@@ -10,6 +10,7 @@ from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobParams
 from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
 from pipelex.hub import get_ocr_worker
+from pipelex.tools.utils.path_utils import get_incremental_directory_path
 from tests.test_data import ImageTestCases, PDFTestCases
 
 
@@ -73,3 +74,8 @@ class TestCogtOcr:
         )
         ocr_output = await ocr_worker.ocr_extract_pages(ocr_job=ocr_job)
         pretty_print(ocr_output, title="OCR Output")
+        directory = get_incremental_directory_path(
+            base_path="results/test_ocr_image_save",
+            base_name="ocr_output",
+        )
+        ocr_output.save_to_directory(directory=directory)
