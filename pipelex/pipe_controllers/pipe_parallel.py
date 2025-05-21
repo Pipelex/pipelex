@@ -16,7 +16,7 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.mission.job_metadata import JobMetadata
-from pipelex.mission.mission_tracker import job_history
+from pipelex.mission.track.mission_tracker import job_history
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 

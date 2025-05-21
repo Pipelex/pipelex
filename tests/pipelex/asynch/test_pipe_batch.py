@@ -12,7 +12,7 @@ from pipelex.core.stuff_content import ListContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate
-from pipelex.mission.mission_tracker import job_history
+from pipelex.mission.track.mission_tracker import job_history
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 
 

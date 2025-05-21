@@ -24,7 +24,7 @@ from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.mission.mission_manager import MissionManager
-from pipelex.mission.mission_tracker import job_history
+from pipelex.mission.track.mission_tracker import job_history
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.registry_funcs import PipelexRegistryFuncs
