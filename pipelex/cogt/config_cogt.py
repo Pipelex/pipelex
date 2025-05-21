@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-import os
 from typing import Dict, List, Optional, cast
 
 from pydantic import Field, field_validator
@@ -18,7 +17,6 @@ from pipelex.cogt.openai.azure_openai_config import AzureOpenAIConfig
 from pipelex.cogt.openai.openai_config import OpenAIOpenAIConfig
 from pipelex.cogt.openai.perplexity_config import PerplexityConfig
 from pipelex.cogt.openai.vertexai_config import VertexAIConfig
-from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigModel
 
 
