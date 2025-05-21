@@ -325,6 +325,9 @@ class MissionTracker(MissionTrackerProtocol):
         )
 
     def print_mermaid_flowchart_code_and_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
+        if not self.nx_graph.nodes:
+            log.info("No nodes in the mission tracker")
+            return
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")
         flowchart = MissionFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, is_debug_mode=self._is_debug_mode)
@@ -336,6 +339,9 @@ class MissionTracker(MissionTrackerProtocol):
         print_mermaid_url(url=url, title=title_to_print)
 
     def print_mermaid_flowchart_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
+        if not self.nx_graph.nodes:
+            log.info("No nodes in the mission tracker")
+            return
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")
         flowchart = MissionFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, is_debug_mode=self._is_debug_mode)
