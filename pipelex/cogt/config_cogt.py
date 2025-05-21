@@ -50,7 +50,6 @@ class InstructorConfig(ConfigModel):
 
 
 class LLMConfig(ConfigModel):
-    llm_integrations_path: str
     preferred_platforms: Dict[str, LLMPlatform]
 
     anthropic_config: AnthropicConfig
@@ -65,10 +64,6 @@ class LLMConfig(ConfigModel):
     llm_job_config: LLMJobConfig
 
     default_max_images: int
-
-    @property
-    def llm_model_libraries_dir_path(self) -> str:
-        return os.path.abspath(os.path.join(config_manager.pipelex_root_dir, self.llm_integrations_path))
 
     @field_validator("preferred_platforms", mode="before")
     def validate_preferred_platforms_enums(cls, value: Dict[str, str]) -> Dict[str, LLMPlatform]:
