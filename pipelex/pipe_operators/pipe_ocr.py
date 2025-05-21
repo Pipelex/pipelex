@@ -7,6 +7,7 @@ from typing import List, Optional
 from pydantic import model_validator
 from typing_extensions import Self, override
 
+from pipelex import log
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
@@ -20,6 +21,7 @@ from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_content_generator
 from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
 
@@ -31,8 +33,10 @@ class PipeOcr(PipeOperator):
     ocr_engine: Optional[OcrEngine] = None
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
-    should_add_screenshots: bool
+    should_include_screenshots: bool
     should_caption_images: bool
+    should_include_images: bool
+    screenshots_dpi: int
 
     @model_validator(mode="after")
     def validate_exactly_one_input_stuff_name(self) -> Self:
@@ -63,7 +67,12 @@ class PipeOcr(PipeOperator):
             raise PipeDefinitionError("PipeOcr should have a non-None image_stuff_name or pdf_stuff_name")
 
         ocr_handle = OcrHandle.MISTRAL_OCR
-        ocr_job_params = OcrJobParams.make_default_ocr_job_params()
+        ocr_job_params = OcrJobParams(
+            should_include_images=self.should_include_images,
+            should_caption_images=self.should_caption_images,
+            should_include_screenshots=self.should_include_screenshots,
+            screenshots_dpi=self.screenshots_dpi,
+        )
         ocr_input = OcrInput(
             image_uri=image_uri,
             pdf_uri=pdf_uri,
@@ -77,15 +86,37 @@ class PipeOcr(PipeOperator):
         )
 
         # Build the output stuff, which is a list of page contents
+        screenshot_contents: List[ImageContent] = []
+        if self.should_include_screenshots and pdf_uri:
+            for page in ocr_output.pages.values():
+                if page.screenshot:
+                    screenshot_contents.append(ImageContent.make_from_extracted_image(extracted_image=page.screenshot))
+            needs_to_generate_screenshots: bool
+            if len(screenshot_contents) == 0:
+                log.debug("No screenshots found in the OCR output")
+                needs_to_generate_screenshots = True
+            elif len(screenshot_contents) < len(ocr_output.pages):
+                log.warning(f"Only {len(screenshot_contents)} screenshots found in the OCR output, but {len(ocr_output.pages)} pages")
+                needs_to_generate_screenshots = True
+            else:
+                log.debug("All screenshots found in the OCR output")
+                needs_to_generate_screenshots = False
+
+            if needs_to_generate_screenshots:
+                screenshot_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=pdf_uri, dpi=self.screenshots_dpi)
+                screenshot_contents = [ImageContent.make_from_image(image=img) for img in screenshot_images]
+
         page_contents: List[PageContent] = []
-        for _, page in ocr_output.pages.items():
+        for page_index, page in ocr_output.pages.items():
+            images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
+            screenshot = screenshot_contents[page_index] if self.should_include_screenshots and pdf_uri else None
             page_contents.append(
                 PageContent(
                     text_and_images=TextAndImagesContent(
                         text=TextContent(text=page.text) if page.text else None,
-                        images=[ImageContent(url=image.uri) for image in page.images],
+                        images=images,
                     ),
-                    screenshot=ImageContent(url=page.screenshot.uri) if page.screenshot else None,
+                    screenshot=screenshot,
                 )
             )
 

@@ -2,24 +2,23 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Any, List, Optional
+from typing import Any, Optional
 
-import shortuuid
 from mistralai import Mistral
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import SdkTypeError
+from pipelex import log
+from pipelex.cogt.exceptions import OcrCapabilityError, SdkTypeError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.mistral.mistral_factory import MistralFactory
 from pipelex.cogt.mistral.mistral_utils import upload_file_for_ocr
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_input import OcrInputError
 from pipelex.cogt.ocr.ocr_job import OcrJob
-from pipelex.cogt.ocr.ocr_output import OcrExtractedImage, OcrOutput
+from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract, ocr_job_func
 from pipelex.tools.misc.base_64 import load_binary_as_base64_async
-from pipelex.tools.pdf.pdf_render import render_pdf_pages_to_images
-from pipelex.tools.utils.path_utils import clarify_path_or_url, ensure_path
+from pipelex.tools.utils.path_utils import clarify_path_or_url
 
 
 class MistralOcrWorker(OcrWorkerAbstract):
@@ -44,18 +43,21 @@ class MistralOcrWorker(OcrWorkerAbstract):
     ) -> OcrOutput:
         # TODO: report usage
         if image_uri := ocr_job.ocr_input.image_uri:
-            return await self.make_ocr_output_from_image(
+            ocr_output = await self.make_ocr_output_from_image(
                 image_uri=image_uri,
                 should_caption_image=ocr_job.job_params.should_caption_images,
             )
+
         elif pdf_uri := ocr_job.ocr_input.pdf_uri:
-            return await self.make_ocr_output_from_pdf(
+            ocr_output = await self.make_ocr_output_from_pdf(
                 pdf_uri=pdf_uri,
+                should_include_images=ocr_job.job_params.should_include_images,
                 should_caption_images=ocr_job.job_params.should_caption_images,
-                should_add_screenshots=ocr_job.job_params.should_add_screenshots,
+                should_include_screenshots=ocr_job.job_params.should_include_screenshots,
             )
         else:
             raise OcrInputError("No image or PDF URI provided in OcrJob")
+        return ocr_output
 
     async def make_ocr_output_from_image(
         self,
@@ -64,7 +66,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
     ) -> OcrOutput:
         if should_caption_image:
             raise NotImplementedError("Captioning is not implemented for Mistral OCR.")
-        image_path, image_url = clarify_path_or_url(path_or_url=image_uri)
+        image_path, image_url = clarify_path_or_url(path_or_uri=image_uri)
         if image_url:
             return await self.extract_from_image_url(
                 image_url=image_url,
@@ -78,26 +80,27 @@ class MistralOcrWorker(OcrWorkerAbstract):
     async def make_ocr_output_from_pdf(
         self,
         pdf_uri: str,
+        should_include_images: bool,
         should_caption_images: bool,
-        should_add_screenshots: bool,
+        should_include_screenshots: bool,
     ) -> OcrOutput:
         if should_caption_images:
-            raise NotImplementedError("Captioning is not implemented for Mistral OCR.")
-        pdf_path, pdf_url = clarify_path_or_url(path_or_url=pdf_uri)  # pyright: ignore
+            raise OcrCapabilityError("Captioning is not implemented for Mistral OCR.")
+        if should_include_screenshots:
+            # raise OcrCapabilityError("Screenshots are not implemented for Mistral OCR.")
+            log.debug("Screenshots are not implemented for Mistral OCR.")
+        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)  # pyright: ignore
         ocr_output: OcrOutput
         if pdf_url:
             ocr_output = await self.extract_from_pdf_url(
                 pdf_url=pdf_url,
+                should_include_images=should_include_images,
             )
         else:  # pdf_path must be provided based on validation
             assert pdf_path is not None  # Type narrowing for mypy
             ocr_output = await self.extract_from_pdf_file(
                 pdf_path=pdf_path,
-            )
-        if should_add_screenshots:
-            ocr_output = await self.add_page_screenshots_to_ocr_output(
-                pdf_uri=pdf_uri,
-                ocr_output=ocr_output,
+                should_include_images=should_include_images,
             )
         return ocr_output
 
@@ -149,6 +152,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
 
         ocr_output = await MistralFactory.make_ocr_output_from_mistral_response(
             mistral_ocr_response=ocr_response,
+            should_include_images=should_include_images,
         )
         return ocr_output
 
@@ -171,28 +175,3 @@ class MistralOcrWorker(OcrWorkerAbstract):
             pdf_url=signed_url.url,
             should_include_images=should_include_images,
         )
-
-    async def add_page_screenshots_to_ocr_output(
-        self,
-        pdf_uri: str,
-        ocr_output: OcrOutput,
-    ) -> OcrOutput:
-        screenshot_uris: List[str] = []
-        pdf_path, pdf_url = clarify_path_or_url(pdf_uri)
-        # TODO: use centralized / possibly online storage instead of local file system
-        images = await render_pdf_pages_to_images(pdf_path=pdf_path, pdf_url=pdf_url, dpi=300)
-
-        temp_directory_name = shortuuid.uuid()
-        temp_directory_path = f"temp/{temp_directory_name}"
-        ensure_path(temp_directory_path)
-
-        # Save images to the folder and return their paths
-        screenshot_uris = []
-        for image_index, image in enumerate(images):
-            image_path = f"{temp_directory_path}/page_{image_index}.png"
-            image.save(image_path)
-            screenshot_uris.append(image_path)
-        for page_index, page in enumerate(ocr_output.pages.values()):
-            screenshot_uri = screenshot_uris[page_index]
-            page.screenshot = OcrExtractedImage(uri=screenshot_uri)
-        return ocr_output

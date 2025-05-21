@@ -87,8 +87,6 @@ cost_report_extension = "xlsx"
 cost_report_unit_scale = 1.0
 
 [cogt.llm_config]
-llm_integrations_path = "llm_integrations"
-
 default_max_images = 100
 
 [cogt.llm_config.instructor_config]

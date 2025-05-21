@@ -9,7 +9,7 @@ from kajson import kajson
 from pydantic import BaseModel
 
 from pipelex.tools.exceptions import FatalError
-from pipelex.tools.utils.file_utils import save_to_path
+from pipelex.tools.utils.file_utils import save_text_to_path
 
 JsonContent = Union[Dict[Any, Any], List[Any]]
 
@@ -81,7 +81,7 @@ def save_as_json_to_path(
         None
     """
     _, json_string = purify_json(object_to_save, indent=indent, is_warning_enabled=is_warning_enabled)
-    save_to_path(json_string, path)
+    save_text_to_path(json_string, path)
 
 
 def load_json_from_path(path: str) -> JsonContent:

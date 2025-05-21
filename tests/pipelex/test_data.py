@@ -63,7 +63,7 @@ class PipeTestCases:
     SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
         name="pdf",
         concept_code="native.PDF",
-        content=PDFContent(url=PDFTestCases.DOCUMENT_URL),
+        content=PDFContent(url=PDFTestCases.DOCUMENT_URLS[0]),
         pipelex_session_id="unit_test",
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
@@ -311,7 +311,4 @@ class PipeOcrTestCases:
         ImageTestCases.IMAGE_FILE_PATH,
         ImageTestCases.IMAGE_URL,
     ]
-    PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = [
-        PDFTestCases.DOCUMENT_FILE_PATH,
-        PDFTestCases.DOCUMENT_URL,
-    ]
+    PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS

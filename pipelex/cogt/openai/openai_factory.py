@@ -116,6 +116,7 @@ class OpenAIFactory:
             url = prompt_image.url
             openai_image_url = ImageURL(url=url, detail="high")
         elif isinstance(prompt_image, PromptImageBytes):
+            # TODO: manage image type
             url_with_bytes: str = f"data:image/jpeg;base64,{prompt_image.b64_image_bytes.decode('utf-8')}"
             openai_image_url = ImageURL(url=url_with_bytes, detail="high")
         elif isinstance(prompt_image, PromptImagePath):

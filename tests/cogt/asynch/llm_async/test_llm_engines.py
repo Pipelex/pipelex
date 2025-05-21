@@ -34,7 +34,7 @@ class TestAsyncLLMEngines:
         else:
             log.info(f"No object generation supported for this model: '{llm_model.name_and_version_and_platform}'")
 
-    async def test_one_llm_engine_async(self, llm_job_params: LLMJobParams, llm_handle: str):
+    async def test_one_llm_engine(self, llm_job_params: LLMJobParams, llm_handle: str):
         inference_manager = get_inference_manager()
         llm_worker = inference_manager.get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
@@ -44,7 +44,7 @@ class TestAsyncLLMEngines:
         )
         await self.run_inference(llm_worker=llm_worker, llm_job=llm_job)
 
-    async def test_one_llm_engine_by_llm_id_and_platform_async(self, llm_job_params: LLMJobParams, llm_id: str, llm_platform: LLMPlatform):
+    async def test_one_llm_engine_by_llm_id_and_platform(self, llm_job_params: LLMJobParams, llm_id: str, llm_platform: LLMPlatform):
         log.info(f"Testing {llm_id} on {llm_platform}")
         llm_models_provider = get_llm_models_provider()
         llm_models = llm_models_provider.get_all_llm_models()
@@ -70,7 +70,7 @@ class TestAsyncLLMEngines:
             log.info(f"Running inference for {llm_model.name_and_version_and_platform}")
             await self.run_inference(llm_worker=llm_worker, llm_job=llm_job)
 
-    async def test_llm_engines_from_one_family_async(self, llm_job_params: LLMJobParams, llm_family: LLMFamily):
+    async def test_llm_engines_from_one_family(self, llm_job_params: LLMJobParams, llm_family: LLMFamily):
         inference_manager = get_inference_manager()
         llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
         count = 0
@@ -92,7 +92,7 @@ class TestAsyncLLMEngines:
 
         log.info(f"Tested {count} llm_engines for family {llm_family}")
 
-    async def test_llm_engines_from_one_creator_async(self, llm_job_params: LLMJobParams, llm_creator: LLMCreator):
+    async def test_llm_engines_from_one_creator(self, llm_job_params: LLMJobParams, llm_creator: LLMCreator):
         inference_manager = get_inference_manager()
         llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
         for llm_handle, llm_engine_blueprint in llm_handle_to_llm_engine_blueprint.items():
@@ -110,12 +110,12 @@ class TestAsyncLLMEngines:
             )
             await self.run_inference(llm_worker=llm_worker, llm_job=llm_job)
 
-    async def test_llm_engines_from_one_platform_async(self, llm_job_params: LLMJobParams, llm_platform: LLMPlatform):
+    async def test_llm_engines_from_one_platform(self, llm_job_params: LLMJobParams, llm_platform: LLMPlatform):
         llm_models_provider = get_llm_models_provider()
         llm_models = llm_models_provider.get_all_llm_models()
         llm_worker_factory = LLMWorkerFactory()
         for llm_model in llm_models:
-            if llm_platform not in llm_model.supported_platforms:
+            if llm_platform not in llm_model.enabled_platforms:
                 continue
             llm_engine = LLMEngine(
                 llm_platform=llm_platform,
@@ -132,7 +132,7 @@ class TestAsyncLLMEngines:
             )
             await self.run_inference(llm_worker=llm_worker, llm_job=llm_job)
 
-    async def test_llm_handle_to_llm_engine_default_async(self, llm_job_params: LLMJobParams):
+    async def test_llm_handle_to_llm_engine_default(self, llm_job_params: LLMJobParams):
         inference_manager = get_inference_manager()
         llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
         for llm_handle in llm_handle_to_llm_engine_blueprint.keys():

@@ -12,6 +12,7 @@ from pipelex.cogt.llm.llm_models.llm_family import LLMFamily, LLMPlatform
 from pipelex.cogt.llm.token_category import TokenCostsByCategoryDict
 
 LATEST_VERSION_NAME = "latest"
+DISABLED_PLATFORM_NAME = "disabled"
 
 
 class LLMModel(BaseModel):
@@ -50,3 +51,7 @@ class LLMModel(BaseModel):
     @property
     def supported_platforms(self) -> Set[LLMPlatform]:
         return set(self.platform_llm_id.keys())
+
+    @property
+    def enabled_platforms(self) -> Set[LLMPlatform]:
+        return set([key for key, value in self.platform_llm_id.items() if value != DISABLED_PLATFORM_NAME])
