@@ -72,9 +72,6 @@ class PipeOcr(PipeAbstract):
             should_include_screenshots=self.should_include_screenshots,
             screenshots_dpi=self.screenshots_dpi,
         )
-        ocr_job_params.should_include_screenshots = self.should_include_screenshots
-        ocr_job_params.should_caption_images = self.should_caption_images
-        ocr_job_params.should_include_images = self.should_include_images
         ocr_input = OcrInput(
             image_uri=image_uri,
             pdf_uri=pdf_uri,
