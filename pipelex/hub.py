@@ -20,7 +20,7 @@ from pipelex.core.concept import Concept
 from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.domain import Domain
 from pipelex.core.domain_provider_abstract import DomainProviderAbstract
-from pipelex.core.pipe import PipeAbstract
+from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_provider_abstract import PipeProviderAbstract
 from pipelex.mission.mission import Mission
 from pipelex.mission.mission_manager_abstract import MissionManagerAbstract

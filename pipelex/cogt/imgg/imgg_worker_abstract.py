@@ -13,7 +13,7 @@ from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
-from pipelex.cogt.inference.inference_reporter_abstract import InferenceReporterAbstract
+from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.mission.job_metadata import UnitJobId
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
@@ -55,13 +55,13 @@ def imgg_job_func(func: F) -> F:
     return cast(F, wrapper)
 
 
-class ImggWorkerAbstract(InferenceReporterAbstract):
+class ImggWorkerAbstract(InferenceWorkerAbstract):
     def __init__(
         self,
         imgg_engine: ImggEngine,
         report_delegate: Optional[InferenceReportDelegate] = None,
     ):
-        InferenceReporterAbstract.__init__(self, report_delegate=report_delegate)
+        InferenceWorkerAbstract.__init__(self, report_delegate=report_delegate)
         self.imgg_engine = imgg_engine
 
     #########################################################

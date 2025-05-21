@@ -3,7 +3,7 @@
 # "Pipelex" is a trademark of Evotis S.A.S.
 
 from abc import ABC, abstractmethod
-from typing import Optional, Set, Type
+from typing import Any, Optional, Set, Type
 
 from pydantic import BaseModel, ConfigDict
 

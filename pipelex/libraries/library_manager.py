@@ -17,7 +17,7 @@ from pipelex.core.concept_library import ConceptLibrary
 from pipelex.core.concept_native import NativeConceptCode
 from pipelex.core.domain import Domain
 from pipelex.core.domain_library import DomainLibrary
-from pipelex.core.pipe import PipeAbstract
+from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_blueprint import PipeSpecificFactoryProtocol
 from pipelex.core.pipe_library import PipeLibrary
 from pipelex.exceptions import ConceptLibraryError, LibraryError, LibraryParsingError, PipeFactoryError, PipeLibraryError

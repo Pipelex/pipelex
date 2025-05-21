@@ -4,7 +4,7 @@
 
 from typing import Any, ClassVar, List
 
-from pipelex.core.pipe import PipeAbstractType
+from pipelex.core.pipe_abstract import PipeAbstractType
 from pipelex.core.pipe_blueprint import PipeSpecificFactoryProtocol
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import (

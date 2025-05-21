@@ -5,7 +5,7 @@
 from typing import Optional
 
 from pipelex import pretty_print
-from pipelex.core.pipe import PipeAbstract
+from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunParams
 from pipelex.core.working_memory import WorkingMemory

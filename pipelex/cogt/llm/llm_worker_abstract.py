@@ -10,7 +10,7 @@ from typing_extensions import override
 
 from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
-from pipelex.cogt.inference.inference_reporter_abstract import InferenceReporterAbstract
+from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.structured_output import StructureMethod
@@ -23,7 +23,7 @@ class LLMWorkerJobFuncName(StrEnum):
     GEN_OBJECT = "gen_object"
 
 
-class LLMWorkerAbstract(InferenceReporterAbstract, ABC):
+class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     def __init__(
         self,
         llm_engine: LLMEngine,
@@ -38,7 +38,7 @@ class LLMWorkerAbstract(InferenceReporterAbstract, ABC):
             structure_method (Optional[StructureMethod]): The structure method to be used by the worker.
             report_delegate (Optional[InferenceReportDelegate]): An optional report delegate for reporting unit jobs.
         """
-        InferenceReporterAbstract.__init__(self, report_delegate=report_delegate)
+        InferenceWorkerAbstract.__init__(self, report_delegate=report_delegate)
         self.llm_engine = llm_engine
         self.structure_method = structure_method
 
