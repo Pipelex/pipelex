@@ -146,7 +146,7 @@ class Pipelex:
 
         # cogt
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
-
+        self.report_manager.setup()
         class_registry.register_classes(PipelexRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
             log.debug("Registering test models for unit testing")

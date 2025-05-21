@@ -19,6 +19,7 @@ from pipelex.cogt.inference.inference_report_delegate import InferenceReportDele
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage, model_cost_per_token
 from pipelex.cogt.llm.token_category import TokenCategory
+from pipelex.mission.mission_models import SpecialMissionId
 from pipelex.tools.utils.path_utils import ensure_path, get_incremental_file_path
 
 # from pipelex.config import get_config
@@ -48,13 +49,20 @@ class UsageRegistry(RootModel[LLMUsageRegistryRoot]):
 
 
 class InferenceReportManager(InferenceReportDelegate):
-    def __init__(self, report_config: CogtReportConfig, mission_id: Optional[str] = None):
-        self.mission_id: Optional[str] = mission_id
-        self.usage_registery = UsageRegistry()
-        self.report_config = report_config
+    def __init__(self, report_config: CogtReportConfig):
+        self._usage_registries: Dict[str, UsageRegistry] = {}
+        self._report_config = report_config
+
+    def setup(self):
+        self._usage_registries.clear()
+        self._usage_registries[SpecialMissionId.UNTITLED] = UsageRegistry()
 
     def teardown(self):
-        self.usage_registery.root.clear()
+        self._usage_registries.clear()
+
+    @property
+    def _usage_registery(self) -> UsageRegistry:
+        return self._usage_registries[SpecialMissionId.UNTITLED]
 
     # @property
     # def report_config(self):
@@ -92,11 +100,11 @@ class InferenceReportManager(InferenceReportDelegate):
         return cost_report
 
     def _make_cost_registery(self) -> CostRegistry:
-        cost_registery = CostRegistry()
-        for llm_tokens_usage in self.usage_registery.root:
+        cost_registry = CostRegistry()
+        for llm_tokens_usage in self._usage_registery.root:
             cost_report = self._complete_cost_report(llm_tokens_usage=llm_tokens_usage)
-            cost_registery.root.append(cost_report)
-        return cost_registery
+            cost_registry.root.append(cost_report)
+        return cost_registry
 
     @override
     def general_report(self):
@@ -141,13 +149,13 @@ class InferenceReportManager(InferenceReportDelegate):
 
         console = Console()
         title = "Costs by LLM model"
-        if self.mission_id:
-            title += f" for mission {self.mission_id}"
-        else:
-            title += " — no mission id"
+        # if self.mission_id:
+        #     title += f" for mission {self.mission_id}"
+        # else:
+        title += " — no mission id"
         table = Table(title=title, box=box.ROUNDED)
 
-        scale = self.report_config.cost_report_unit_scale
+        scale = self._report_config.cost_report_unit_scale
         scale_str: str
         if scale == 1:
             scale_str = ""
@@ -204,12 +212,12 @@ class InferenceReportManager(InferenceReportDelegate):
 
         console.print(table)
 
-        if self.report_config.is_generate_cost_report_file_enabled:
-            ensure_path(self.report_config.cost_report_dir_path)
+        if self._report_config.is_generate_cost_report_file_enabled:
+            ensure_path(self._report_config.cost_report_dir_path)
             cost_report_file_path = get_incremental_file_path(
-                base_path=self.report_config.cost_report_dir_path,
-                base_name=self.report_config.cost_report_base_name,
-                extension=self.report_config.cost_report_extension,
+                base_path=self._report_config.cost_report_dir_path,
+                base_name=self._report_config.cost_report_base_name,
+                extension=self._report_config.cost_report_extension,
             )
             cost_registery_df.to_excel(  # pyright: ignore[reportUnknownMemberType]
                 cost_report_file_path,
@@ -232,10 +240,10 @@ class InferenceReportManager(InferenceReportDelegate):
 
         llm_token_cost_report: Optional[LLMTokenCostReport] = None
 
-        if self.report_config.is_log_costs_to_console:
+        if self._report_config.is_log_costs_to_console:
             llm_token_cost_report = self._complete_cost_report(llm_tokens_usage=llm_tokens_usage)
 
-        self.usage_registery.root.append(llm_tokens_usage)
+        self._usage_registery.root.append(llm_tokens_usage)
 
-        if self.report_config.is_log_costs_to_console:
+        if self._report_config.is_log_costs_to_console:
             log.verbose(llm_token_cost_report, title="Token Cost report")

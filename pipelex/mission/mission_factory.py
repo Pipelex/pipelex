@@ -9,5 +9,4 @@ class MissionFactory:
     def make_mission(cls) -> Mission:
         return Mission(
             mission_id=shortuuid.uuid(),
-            report_config=get_config().cogt.cogt_report_config,
         )

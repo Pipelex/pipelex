@@ -319,11 +319,8 @@ def get_ocr_worker(
     return get_inference_manager().get_ocr_worker(ocr_handle=ocr_handle)
 
 
-def get_report_delegate(mission_id: Optional[str] = None) -> InferenceReportDelegate:
-    if mission_id is None or mission_id == SpecialMissionId.UNTITLED:
-        return get_pipelex_hub().get_report_delegate()
-    else:
-        return get_mission(mission_id=mission_id).get_report_delegate()
+def get_report_delegate() -> InferenceReportDelegate:
+    return get_pipelex_hub().get_report_delegate()
 
 
 def get_content_generator() -> ContentGeneratorProtocol:
