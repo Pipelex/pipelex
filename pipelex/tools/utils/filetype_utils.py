@@ -58,7 +58,7 @@ def detect_file_type_from_bytes(buf: bytes) -> FileType:
     """
     kind = filetype.guess(buf)  # pyright: ignore[reportUnknownMemberType]
     if kind is None:
-        raise FileTypeException("Could not identify file type of given bytes")
+        raise FileTypeException(f"Could not identify file type of given bytes: {buf[:300]!r}")
     extension = f"{kind.extension}"
     mime = f"{kind.mime}"
     return FileType(extension=extension, mime=mime)

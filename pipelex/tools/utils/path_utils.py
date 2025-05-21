@@ -73,7 +73,13 @@ def get_incremental_directory_path(base_path: str, base_name: str, start_at: int
     return tested_path
 
 
-def get_incremental_file_path(base_path: str, base_name: str, extension: str, start_at: int = 1) -> str:
+def get_incremental_file_path(
+    base_path: str,
+    base_name: str,
+    extension: str,
+    start_at: int = 1,
+    avoid_suffix_if_possible: bool = False,
+) -> str:
     """
     Generates a unique file path by incrementing a counter until an unused path is found.
 
@@ -90,6 +96,13 @@ def get_incremental_file_path(base_path: str, base_name: str, extension: str, st
     Returns:
         str: A unique file path that does not exist in the filesystem.
     """
+    if avoid_suffix_if_possible:
+        # try without adding the suffix
+        tested_path = f"{base_path}/{base_name}.{extension}"
+        if not path_exists(tested_path):
+            return tested_path
+
+    # we must add a number to the base name
     counter = start_at
     while True:
         tested_path = f"{base_path}/{base_name}_%02d.{extension}" % counter

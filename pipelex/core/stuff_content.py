@@ -24,8 +24,8 @@ from pipelex.tools.misc.markdown_helpers import convert_to_markdown
 from pipelex.tools.misc.model_helpers import clean_model_to_dict
 from pipelex.tools.templating.templating_models import TextFormat
 from pipelex.tools.utils.file_utils import ensure_directory_exists, save_text_to_path
-from pipelex.tools.utils.filetype_utils import FileType, detect_file_type_from_bytes
-from pipelex.tools.utils.path_utils import InterpretedPathOrUrl, clarify_path_or_url, interpret_path_or_url
+from pipelex.tools.utils.filetype_utils import FileType, detect_file_type_from_base64, detect_file_type_from_bytes
+from pipelex.tools.utils.path_utils import InterpretedPathOrUrl, clarify_path_or_url, get_incremental_file_path, interpret_path_or_url
 
 ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
@@ -240,25 +240,44 @@ class ImageContent(StuffContentInitableFromStr):
             base_64=base_64,
         )
 
-    def save_to_directory(self, directory: str, filename: Optional[str] = None):
+    def save_to_directory(self, directory: str, base_name: Optional[str] = None, extension: Optional[str] = None):
         ensure_directory_exists(directory)
+        base_name = base_name or "img"
         if base_64 := self.base_64:
-            if not filename:
+            if not extension:
                 match interpret_path_or_url(path_or_uri=self.url):
                     case InterpretedPathOrUrl.FILE_NAME:
-                        filename = self.url
+                        parts = self.url.rsplit(".", 1)
+                        base_name = parts[0]
+                        extension = parts[1]
                     case _:
-                        file_type = detect_file_type_from_bytes(buf=base_64.encode("utf-8"))
-                        filename = f"{filename}.{file_type.extension}"
-            if filename:
-                file_path = f"{directory}/{filename}"
+                        file_type = detect_file_type_from_base64(b64=base_64)
+                        base_name = base_name or "img"
+                        extension = file_type.extension
+                file_path = get_incremental_file_path(
+                    base_path=directory,
+                    base_name=base_name,
+                    extension=extension,
+                    avoid_suffix_if_possible=True,
+                )
                 save_base64_to_binary_file(b64=base_64, file_path=file_path)
-        if filename:
-            name = filename.rsplit(".", 1)[0]
-            if caption := self.caption:
-                save_text_to_path(text=caption, path=f"{directory}/{name}_caption.txt")
-            if source_prompt := self.source_prompt:
-                save_text_to_path(text=source_prompt, path=f"{directory}/{name}_source_prompt.txt")
+
+        if caption := self.caption:
+            caption_file_path = get_incremental_file_path(
+                base_path=directory,
+                base_name=f"{base_name}_caption",
+                extension="txt",
+                avoid_suffix_if_possible=True,
+            )
+            save_text_to_path(text=caption, path=caption_file_path)
+        if source_prompt := self.source_prompt:
+            source_prompt_file_path = get_incremental_file_path(
+                base_path=directory,
+                base_name=f"{base_name}_source_prompt",
+                extension="txt",
+                avoid_suffix_if_possible=True,
+            )
+            save_text_to_path(text=source_prompt, path=source_prompt_file_path)
 
 
 class PDFContent(StuffContentInitableFromStr):
@@ -507,4 +526,4 @@ class PageContent(StructuredContent):
         ensure_directory_exists(directory)
         self.text_and_images.save_to_directory(directory=directory)
         if screenshot := self.screenshot:
-            screenshot.save_to_directory(directory=directory)
+            screenshot.save_to_directory(directory=directory, base_name="screenshot")
