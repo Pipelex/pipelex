@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from pipelex import pretty_print
 from pipelex.config import get_config

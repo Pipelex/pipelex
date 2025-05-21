@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Optional
 
 from pydantic import BaseModel
 

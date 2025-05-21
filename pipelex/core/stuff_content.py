@@ -24,8 +24,8 @@ from pipelex.tools.misc.markdown_helpers import convert_to_markdown
 from pipelex.tools.misc.model_helpers import clean_model_to_dict
 from pipelex.tools.templating.templating_models import TextFormat
 from pipelex.tools.utils.file_utils import ensure_directory_exists, save_text_to_path
-from pipelex.tools.utils.filetype_utils import FileType, detect_file_type_from_base64, detect_file_type_from_bytes
-from pipelex.tools.utils.path_utils import InterpretedPathOrUrl, clarify_path_or_url, get_incremental_file_path, interpret_path_or_url
+from pipelex.tools.utils.filetype_utils import detect_file_type_from_base64
+from pipelex.tools.utils.path_utils import InterpretedPathOrUrl, get_incremental_file_path, interpret_path_or_url
 
 ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")

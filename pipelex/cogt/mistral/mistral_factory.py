@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from mistralai import Mistral, OCRImageObject, OCRResponse
 from mistralai.models import (
