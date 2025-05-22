@@ -18,7 +18,7 @@ from tests.test_data import ImageTestCases, PDFTestCases
 @pytest.mark.ocr
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestCogtOcr:
+class TestOcr:
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
     async def test_ocr_pdr_path(self, file_path: str):
         ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
