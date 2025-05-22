@@ -35,66 +35,52 @@ class NativeConceptCode(StrEnum):
     def concept_code(self) -> str:
         return ConceptFactory.make_concept_code(SpecialDomain.NATIVE, self.value)
 
-    def make_concept(self) -> Concept:
-        code: str = self.value
+    @property
+    def content_class_name(self) -> NativeConceptClass:
         match self:
             case NativeConceptCode.TEXT:
-                return Concept(
-                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
-                    domain=SpecialDomain.NATIVE,
-                    definition="A text",
-                    structure_class_name=NativeConceptClass.TEXT,
-                )
+                return NativeConceptClass.TEXT
             case NativeConceptCode.IMAGE:
-                return Concept(
-                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
-                    domain=SpecialDomain.NATIVE,
-                    definition="An image",
-                    structure_class_name=NativeConceptClass.IMAGE,
-                )
+                return NativeConceptClass.IMAGE
             case NativeConceptCode.PDF:
-                return Concept(
-                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
-                    domain=SpecialDomain.NATIVE,
-                    definition="A PDF",
-                    structure_class_name=NativeConceptClass.PDF,
-                )
+                return NativeConceptClass.PDF
             case NativeConceptCode.TEXT_AND_IMAGES:
-                return Concept(
-                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
-                    domain=SpecialDomain.NATIVE,
-                    definition="A text and an image",
-                    structure_class_name=NativeConceptClass.TEXT_AND_IMAGES,
-                )
-
+                return NativeConceptClass.TEXT_AND_IMAGES
             case NativeConceptCode.NUMBER:
-                return Concept(
-                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
-                    domain=SpecialDomain.NATIVE,
-                    definition="A number",
-                    structure_class_name=NativeConceptClass.NUMBER,
-                )
+                return NativeConceptClass.NUMBER
             case NativeConceptCode.LLM_PROMPT:
-                return Concept(
-                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
-                    domain=SpecialDomain.NATIVE,
-                    definition="A prompt for an LLM",
-                    structure_class_name=NativeConceptClass.LLM_PROMPT,
-                )
+                return NativeConceptClass.LLM_PROMPT
             case NativeConceptCode.DYNAMIC:
-                return Concept(
-                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
-                    domain=SpecialDomain.NATIVE,
-                    definition="A dynamic concept",
-                    structure_class_name=NativeConceptClass.DYNAMIC,
-                )
+                return NativeConceptClass.DYNAMIC
             case NativeConceptCode.PAGE:
-                return Concept(
-                    code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
-                    domain=SpecialDomain.NATIVE,
-                    definition="The content of a page of a document, comprising text and linked images as well as an optional screenshot of the page",
-                    structure_class_name=NativeConceptClass.PAGE,
-                )
+                return NativeConceptClass.PAGE
+
+    def make_concept(self) -> Concept:
+        definition: str
+        match self:
+            case NativeConceptCode.TEXT:
+                definition = "A text"
+            case NativeConceptCode.IMAGE:
+                definition = "An image"
+            case NativeConceptCode.PDF:
+                definition = "A PDF"
+            case NativeConceptCode.TEXT_AND_IMAGES:
+                definition = "A text and an image"
+            case NativeConceptCode.NUMBER:
+                definition = "A number"
+            case NativeConceptCode.LLM_PROMPT:
+                definition = "A prompt for an LLM"
+            case NativeConceptCode.DYNAMIC:
+                definition = "A dynamic concept"
+            case NativeConceptCode.PAGE:
+                definition = "The content of a page of a document, comprising text and linked images as well as an optional screenshot of the page"
+
+        return Concept(
+            code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, self),
+            domain=SpecialDomain.NATIVE,
+            definition=definition,
+            structure_class_name=self.content_class_name,
+        )
 
     @classmethod
     def all_concepts(cls) -> List[Concept]:
