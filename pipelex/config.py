@@ -47,8 +47,13 @@ class PromptingConfig(ConfigModel):
             return None
 
 
+class FeatureConfig(ConfigModel):
+    is_mission_tracking_enabled: bool
+
+
 class Pipelex(ConfigModel):
     extra_env_files: List[str]
+    feature_config: FeatureConfig
     log_config: LogConfig
     aws_config: AwsConfig
 

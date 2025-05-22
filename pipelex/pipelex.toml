@@ -5,6 +5,10 @@
 [pipelex]
 extra_env_files = ["secrets.env"]
 
+[pipelex.feature_config]
+# WIP feature flag (pushed back by a recent refactor)
+is_mission_tracking_enabled = false
+
 ####################################################################################################
 # Log config
 ####################################################################################################

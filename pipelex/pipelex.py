@@ -25,6 +25,7 @@ from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.mission.mission_manager import MissionManager
 from pipelex.mission.track.mission_tracker import MissionTracker
+from pipelex.mission.track.mission_tracker_protocol import MissionTrackerNoOp, MissionTrackerProtocol
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.registry_funcs import PipelexRegistryFuncs
@@ -130,7 +131,13 @@ class Pipelex:
         self.pipelex_hub.set_pipe_provider(pipe_provider=self.library_manager.pipe_library)
 
         # pipelex mission
-        self.mission_tracker = mission_tracker or MissionTracker(tracker_config=get_config().pipelex.tracker_config)
+        self.mission_tracker: MissionTrackerProtocol
+        if mission_tracker:
+            self.mission_tracker = mission_tracker
+        elif get_config().pipelex.feature_config.is_mission_tracking_enabled:
+            self.mission_tracker = MissionTracker(tracker_config=get_config().pipelex.tracker_config)
+        else:
+            self.mission_tracker = MissionTrackerNoOp()
         self.pipelex_hub.set_mission_tracker(mission_tracker=self.mission_tracker)
         self.mission_manager = mission_manager or MissionManager()
         self.pipelex_hub.set_mission_manager(mission_manager=self.mission_manager)
