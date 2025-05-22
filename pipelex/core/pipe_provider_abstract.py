@@ -5,7 +5,7 @@
 from abc import ABC, abstractmethod
 from typing import ClassVar, Dict, List, Optional
 
-from pipelex.core.pipe import PipeAbstract
+from pipelex.core.pipe_abstract import PipeAbstract
 
 
 class PipeProviderAbstract(ABC):

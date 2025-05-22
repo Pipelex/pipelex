@@ -8,7 +8,7 @@ from pydantic import ConfigDict, field_validator, model_validator
 from typing_extensions import Self, runtime_checkable
 
 from pipelex.core.concept_native import NativeConceptCode
-from pipelex.core.pipe import PipeAbstract
+from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.stuff_content import StructuredContent
 
 

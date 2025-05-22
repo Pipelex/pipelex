@@ -2,23 +2,22 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Any, Optional, Tuple, cast
+from typing import Any, Optional, Tuple, Type, cast
 
 import pytest
 from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.activity_handler import ActivityHandlerForResultFiles
-from pipelex.config import get_config
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunParams
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_factory import StuffBlueprint
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_report_delegate
-from pipelex.job_history import job_history
-from pipelex.job_metadata import JobMetadata
+from pipelex.hub import get_mission_tracker, get_pipe_router, get_report_delegate
+from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from tests.pipelex.test_data import PipeTestCases
 
@@ -43,10 +42,9 @@ class TestPipeRouter:
         working_memory = WorkingMemoryFactory.make_from_single_blueprint(blueprint=blueprint)
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParams(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(),
             working_memory=working_memory,
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
@@ -57,7 +55,7 @@ class TestPipeRouter:
         result_dir_path, _ = pipe_result_handler
         await save_working_memory(pipe_output, result_dir_path)
 
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("topic, stuff, pipe_code", PipeTestCases.STUFF_AND_PIPE)
     async def test_pipe_from_stuff(
@@ -74,14 +72,13 @@ class TestPipeRouter:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParams(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(),
             working_memory=working_memory,
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
@@ -100,23 +97,22 @@ class TestPipeRouter:
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParams(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(),
             working_memory=WorkingMemory(),
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
         await save_working_memory(pipe_output, result_dir_path)
 
-        if stuff := pipe_output.main_stuff:
-            pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
-            pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
-            pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
+        stuff = pipe_output.main_stuff
+        pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
+        pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
+        pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
 
     @pytest.mark.parametrize("topic, pipe_code, output_multiplicity", PipeTestCases.NO_INPUT_PARALLEL1)
     async def test_pipe_batch_no_input(
@@ -132,25 +128,24 @@ class TestPipeRouter:
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParams(
+            pipe_run_params=PipeRunParamsFactory.make_run_params(
                 output_multiplicity=output_multiplicity,
             ),
             working_memory=WorkingMemory(),
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
         await save_working_memory(pipe_output, result_dir_path)
 
-        if stuff := pipe_output.main_stuff:
-            pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
-            pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
-            pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
+        stuff = pipe_output.main_stuff
+        pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
+        pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
+        pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
 
     @pytest.mark.parametrize("pipe_code, stuff, input_list_stuff_name, input_item_stuff_name", PipeTestCases.BATCH_TEST)
     async def test_pipe_batch_with_list_content(
@@ -164,11 +159,10 @@ class TestPipeRouter:
         input_list_stuff_name: str,
         input_item_stuff_name: str,
     ):
-        job_history.activate()
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParams(
+            pipe_run_params=PipeRunParamsFactory.make_run_params(
                 batch_params=BatchParams(
                     input_list_stuff_name=input_list_stuff_name,
                     input_item_stuff_name=input_item_stuff_name,
@@ -176,11 +170,34 @@ class TestPipeRouter:
             ),
             working_memory=working_memory,
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
             ),
         )
         pretty_print(pipe_output, title=f"run pipe '{pipe_code}'")
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
-        job_history.print_mermaid_flowchart_code_and_url()
+        get_mission_tracker().output_flowchart(is_detailed=True)
+
+    @pytest.mark.parametrize("pipe_code, exception, expected_error_message", PipeTestCases.FAILURE_PIPES)
+    async def test_pipe_infinite_loop(
+        self,
+        request: FixtureRequest,
+        pipe_code: str,
+        exception: Type[Exception],
+        expected_error_message: str,
+    ):
+        pipe_code = "infinite_loop_1"
+        log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
+        with pytest.raises(exception) as exc:
+            await get_pipe_router().run_pipe_code(
+                pipe_code=pipe_code,
+                pipe_run_params=PipeRunParams(
+                    pipe_stack_limit=6,
+                ),
+                job_metadata=JobMetadata(
+                    top_job_id=cast(str, request.node.originalname),  # type: ignore
+                ),
+            )
+        pretty_print(exc.value, title="exception")
+        assert expected_error_message in str(exc.value)
+        get_report_delegate().generate_report()

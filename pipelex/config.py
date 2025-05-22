@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, List, Optional
 
 import shortuuid
 
@@ -11,6 +11,7 @@ from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
 from pipelex.exceptions import PipelexError
 from pipelex.hub import get_required_config
 from pipelex.libraries.library_config import LibraryConfig
+from pipelex.mission.track.tracker_config import TrackerConfig
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.config.models import ConfigModel, ConfigRoot
 from pipelex.tools.log.log_config import LogConfig
@@ -19,6 +20,10 @@ from pipelex.tools.templating.templating_models import PromptingStyle
 
 class PipelexConfigError(PipelexError):
     pass
+
+
+class PipeRunConfig(ConfigModel):
+    pipe_stack_limit: int
 
 
 class GenericTemplateNames(ConfigModel):
@@ -41,60 +46,23 @@ class PromptingConfig(ConfigModel):
             return None
 
 
-class HistoryGraphConfig(ConfigModel):
-    is_debug_mode: bool
-    is_include_text_preview: bool
-    is_include_interactivity: bool
-    theme: Union[str, Literal["auto"]]
-    layout: Union[str, Literal["auto"]]
-    wrapping_width: Union[int, Literal["auto"]]
-    nb_items_limit: Union[int, Literal["unlimited"]]
-    sub_graph_colors: List[str]
-    pipe_edge_style: str
-    branch_edge_style: str
-    aggregate_edge_style: str
-    condition_edge_style: str
-    choice_edge_style: str
-
-    @property
-    def applied_theme(self) -> Optional[str]:
-        if self.theme == "auto":
-            return None
-        else:
-            return self.theme
-
-    @property
-    def applied_layout(self) -> Optional[str]:
-        if self.layout == "auto":
-            return None
-        else:
-            return self.layout
-
-    @property
-    def applied_wrapping_width(self) -> Optional[int]:
-        if self.wrapping_width == "auto":
-            return None
-        else:
-            return self.wrapping_width
-
-    @property
-    def applied_nb_items_limit(self) -> Optional[int]:
-        if self.nb_items_limit == "unlimited":
-            return None
-        else:
-            return self.nb_items_limit
+class FeatureConfig(ConfigModel):
+    is_mission_tracking_enabled: bool
 
 
 class Pipelex(ConfigModel):
     extra_env_files: List[str]
+    feature_config: FeatureConfig
     log_config: LogConfig
     aws_config: AwsConfig
 
     library_config: LibraryConfig
     generic_template_names: GenericTemplateNames
-    history_graph_config: HistoryGraphConfig
+    tracker_config: TrackerConfig
     structure_config: StructureConfig
     prompting_config: PromptingConfig
+
+    pipe_run_config: PipeRunConfig
 
 
 class PipelexConfig(ConfigRoot):

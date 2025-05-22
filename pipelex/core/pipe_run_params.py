@@ -106,11 +106,14 @@ class BatchParams(BaseModel):
 
 class PipeRunParams(BaseModel):
     final_stuff_code: Optional[str] = None
-    pipe_stack: List[str] = Field(default_factory=list)
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
+    dynamic_output_concept_code: Optional[str] = None
     batch_params: Optional[BatchParams] = None
     params: Dict[str, Any] = Field(default_factory=dict)
-    dynamic_output_concept_code: Optional[str] = None
+
+    pipe_stack_limit: int
+    pipe_stack: List[str] = Field(default_factory=list)
+    pipe_layers: List[str] = Field(default_factory=list)
 
     @field_validator("params")
     @classmethod
@@ -144,14 +147,23 @@ class PipeRunParams(BaseModel):
     def is_multiple_output_required(self) -> bool:
         return isinstance(self.output_multiplicity, int) and self.output_multiplicity > 1  # pyright: ignore[reportUnnecessaryIsInstance]
 
-    # TODO: restore pipe_stack functionality
-    # def push_pipe_code(self, pipe_code: str) -> None:
-    #     self.pipe_stack.append(pipe_code)
-
-    def push_pipe_code(self, pipe_code: str) -> None:
-        if self.pipe_stack and self.pipe_stack[-1] == pipe_code:
-            return
+    def push_pipe_to_stack(self, pipe_code: str) -> None:
         self.pipe_stack.append(pipe_code)
+        log.debug(f"Push Pipe stack --> {self.pipe_stack}")
+
+    def pop_pipe_from_stack(self, pipe_code: str) -> None:
+        popped_pipe_code = self.pipe_stack.pop()
+        if popped_pipe_code != pipe_code:
+            # raise PipeRunError(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
+            log.error(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
+            # TODO: investigate how this can happen, maybe due to a shared object between branches of PipeBatch or PipeParallel
+            # (which should be copied instead)
+        log.debug(f"Pop Pipe stack <-- {self.pipe_stack}")
+
+    def push_pipe_layer(self, pipe_code: str) -> None:
+        if self.pipe_layers and self.pipe_layers[-1] == pipe_code:
+            return
+        self.pipe_layers.append(pipe_code)
 
     def pop_pipe_code(self) -> str:
-        return self.pipe_stack.pop()
+        return self.pipe_layers.pop()

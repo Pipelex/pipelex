@@ -18,9 +18,8 @@ from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.config import get_config
 from pipelex.hub import get_llm_deck
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
 from pipelex.tools.config.errors import ConfigNotFoundError
 from tests.cogt.test_data import Employee
 from tests.test_data import ImageTestCases
@@ -65,7 +64,6 @@ class TestContentGenerator:
 
         text: str = await content_generator.make_llm_text(
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
             llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
@@ -82,7 +80,6 @@ class TestContentGenerator:
 
         person_direct: Employee = await content_generator.make_object_direct(
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
             object_class=Employee,
@@ -100,7 +97,6 @@ class TestContentGenerator:
 
         person_list_direct: List[Employee] = await content_generator.make_object_list_direct(
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
             object_class=Employee,
@@ -117,7 +113,6 @@ class TestContentGenerator:
     async def test_make_image(self, request: FixtureRequest, content_generator: ContentGenerator):
         image: GeneratedImage = await content_generator.make_single_image(
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
             imgg_handle=ImggHandle.SDXL_LIGHTNING,
@@ -146,7 +141,6 @@ class TestContentGenerator:
     async def test_make_ocr_extract_pages(self, request: FixtureRequest, content_generator: ContentGenerator):
         ocr_output = await content_generator.make_ocr_extract_pages(
             job_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
             ocr_handle=OcrHandle.MISTRAL_OCR,
@@ -165,7 +159,6 @@ class TestContentGenerator:
         with pytest.raises(ConfigNotFoundError) as excinfo:
             await content_generator.make_llm_text(
                 job_metadata=JobMetadata(
-                    session_id=get_config().session_id,
                     top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
                 ),
                 llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),

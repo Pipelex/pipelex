@@ -5,13 +5,13 @@
 from typing import Optional
 
 from pipelex import pretty_print
-from pipelex.config import get_config
-from pipelex.core.pipe import PipeAbstract
+from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunParams
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.hub import get_pipe_router, get_required_pipe
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 
 
@@ -40,11 +40,10 @@ async def run_pipe_code(
     pipe = get_required_pipe(pipe_code=pipe_code)
 
     job_metadata = JobMetadata(
-        session_id=get_config().session_id,
         top_job_id=job_id or pipe_code,
     )
 
-    pipe_run_params = PipeRunParams(
+    pipe_run_params = PipeRunParamsFactory.make_run_params(
         output_multiplicity=output_multiplicity,
         dynamic_output_concept_code=dynamic_output_concept_code,
     )

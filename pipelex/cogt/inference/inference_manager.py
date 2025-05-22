@@ -32,7 +32,7 @@ class InferenceManager(InferenceManagerProtocol):
         self.ocr_workers: Dict[str, OcrWorkerAbstract] = {}
 
     @override
-    def reset(self):
+    def teardown(self):
         self.imgg_worker_factory = ImggWorkerFactory()
         self.ocr_worker_factory = OcrWorkerFactory()
         self.llm_workers.clear()

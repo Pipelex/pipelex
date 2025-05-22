@@ -7,13 +7,13 @@ from typing import List, Optional, cast
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.tools.func_registry import func_registry
 
 
@@ -21,12 +21,11 @@ class PipeFuncOutput(PipeOutput):
     pass
 
 
-class PipeFunc(PipeAbstract):
+class PipeFunc(PipeOperator):
     function_name: str
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,

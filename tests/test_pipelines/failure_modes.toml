@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+domain = "failure_modes"
+definition = "This domain is for testing failure modes"
+
+[concept]
+
+[pipe.dummy]
+PipeLLM = "This pipe is a dummy pipe"
+input = "native.Text"
+output = "native.Text"
+llm = { llm_handle = "gpt-4o-mini", temperature = 1, max_tokens = 50 }
+prompt_template = """
+This is a dummy prompt, do whatever you want. Something funny but not a joke, ok?
+"""
+
+[pipe.infinite_loop_1]
+PipeSequence = "This pipe will cause an infinite loop"
+input = "native.Text"
+output = "native.Text"
+steps = [
+    { pipe = "dummy", result = "dummy_result" },
+    { pipe = "infinite_loop_1", result = "disaster" },
+]

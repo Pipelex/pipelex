@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-import os
 from typing import Dict, List, Optional, cast
 
 from pydantic import Field, field_validator
@@ -18,7 +17,6 @@ from pipelex.cogt.openai.azure_openai_config import AzureOpenAIConfig
 from pipelex.cogt.openai.openai_config import OpenAIOpenAIConfig
 from pipelex.cogt.openai.perplexity_config import PerplexityConfig
 from pipelex.cogt.openai.vertexai_config import VertexAIConfig
-from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigModel
 
 
@@ -33,6 +31,7 @@ class CogtReportConfig(ConfigModel):
 
 class OcrConfig(ConfigModel):
     ocr_handles: List[str]
+    page_output_text_file_name: str
 
 
 class ImggConfig(ConfigModel):
@@ -50,7 +49,6 @@ class InstructorConfig(ConfigModel):
 
 
 class LLMConfig(ConfigModel):
-    llm_integrations_path: str
     preferred_platforms: Dict[str, LLMPlatform]
 
     anthropic_config: AnthropicConfig
@@ -65,10 +63,6 @@ class LLMConfig(ConfigModel):
     llm_job_config: LLMJobConfig
 
     default_max_images: int
-
-    @property
-    def llm_model_libraries_dir_path(self) -> str:
-        return os.path.abspath(os.path.join(config_manager.pipelex_root_dir, self.llm_integrations_path))
 
     @field_validator("preferred_platforms", mode="before")
     def validate_preferred_platforms_enums(cls, value: Dict[str, str]) -> Dict[str, LLMPlatform]:

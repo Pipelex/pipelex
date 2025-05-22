@@ -13,7 +13,6 @@ from pipelex.cogt.imgg.imgg_job_components import AspectRatio, ImggJobParams
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.config import get_config
 from pipelex.core.domain import SpecialDomain
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunParams, output_multiplicity_to_apply
 from pipelex.core.stuff_content import ImageContent, ListContent, StuffContent, TextContent
@@ -21,7 +20,8 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeRunParamsError
 from pipelex.hub import get_content_generator
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipe_operators.pipe_operator import PipeOperator
 
 
 class PipeImgGenOutput(PipeOutput):
@@ -31,7 +31,7 @@ class PipeImgGenOutput(PipeOutput):
         return [item.url for item in items]
 
 
-class PipeImgGen(PipeAbstract):
+class PipeImgGen(PipeOperator):
     output_concept_code: str = f"{SpecialDomain.NATIVE}.Image"
     # TODO: wrap this up in imgg llm_presets like for llm
     imgg_handle: Optional[ImggHandle] = None
@@ -45,8 +45,7 @@ class PipeImgGen(PipeAbstract):
     output_multiplicity: PipeOutputMultiplicity
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,

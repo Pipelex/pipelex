@@ -21,14 +21,6 @@ class ClientAuthenticationError(PipelexError):
     pass
 
 
-class ConceptGraphError(PipelexError):
-    pass
-
-
-class RoadmapError(PipelexError):
-    pass
-
-
 class DomainDefinitionError(PipelexError):
     pass
 
@@ -97,6 +89,14 @@ class PipeExecutionError(PipelexError):
     pass
 
 
+class PipeRunError(PipeExecutionError):
+    pass
+
+
+class PipeStackOverflowError(PipeExecutionError):
+    pass
+
+
 class PipeConditionError(PipelexError):
     pass
 
@@ -160,4 +160,8 @@ class ConceptCodeError(ConceptError):
 
 
 class ConceptDomainError(ConceptError):
+    pass
+
+
+class MissionManagerNotFoundError(PipelexError):
     pass

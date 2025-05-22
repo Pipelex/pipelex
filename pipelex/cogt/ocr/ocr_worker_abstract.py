@@ -10,11 +10,11 @@ from typing_extensions import Awaitable, override
 
 from pipelex import log
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
-from pipelex.cogt.inference.inference_reporter_abstract import InferenceReporterAbstract
+from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.job_metadata import UnitJobId
+from pipelex.mission.job_metadata import UnitJobId
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
@@ -55,13 +55,13 @@ def ocr_job_func(func: F) -> F:
     return cast(F, wrapper)
 
 
-class OcrWorkerAbstract(InferenceReporterAbstract):
+class OcrWorkerAbstract(InferenceWorkerAbstract):
     def __init__(
         self,
         ocr_engine: OcrEngine,
         report_delegate: Optional[InferenceReportDelegate] = None,
     ):
-        InferenceReporterAbstract.__init__(self, report_delegate=report_delegate)
+        InferenceWorkerAbstract.__init__(self, report_delegate=report_delegate)
         self.ocr_engine = ocr_engine
 
     #########################################################

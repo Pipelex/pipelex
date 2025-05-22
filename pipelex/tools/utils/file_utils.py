@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
-
 import importlib.resources
 import os
 import shutil
@@ -11,7 +10,7 @@ from typing import List, Optional
 from pipelex.tools.utils.path_utils import path_exists
 
 
-def save_to_path(text_to_save: str, path: str):
+def save_text_to_path(text: str, path: str, create_directory: bool = False):
     """
     Writes text content to a file at the specified path.
 
@@ -19,14 +18,21 @@ def save_to_path(text_to_save: str, path: str):
     If the file already exists, it will be overwritten.
 
     Args:
-        text_to_save (str): The text content to write to the file.
+        text (str): The text content to write to the file.
         path (str): The file path where the content should be saved.
+        create_directory (bool, optional): Whether to create the directory if it doesn't exist.
+            Defaults to False.
 
     Raises:
         IOError: If there are issues writing to the file (e.g., permission denied).
     """
-    with open(path, "w") as file:
-        file.write(text_to_save)
+    if create_directory:
+        directory = os.path.dirname(path)
+        if directory:
+            ensure_directory_exists(directory)
+
+    with open(path, "w", encoding="utf-8") as file:
+        file.write(text)
 
 
 def remove_file(file_path: str):
@@ -81,13 +87,13 @@ def temp_file(file_path: str, content: str):
             # File will be automatically removed after the with block
     """
     try:
-        save_to_path(content, file_path)
+        save_text_to_path(content, file_path)
         yield file_path
     finally:
         remove_file(file_path)
 
 
-def load_from_path(path: str) -> str:
+def load_text_from_path(path: str) -> str:
     """
     Reads and returns the entire contents of a text file.
 
@@ -107,7 +113,7 @@ def load_from_path(path: str) -> str:
         return file.read()
 
 
-def failable_load_from_path(path: str) -> Optional[str]:
+def failable_load_text_from_path(path: str) -> Optional[str]:
     """
     Attempts to read a text file, returning None if the file doesn't exist.
 
@@ -122,7 +128,7 @@ def failable_load_from_path(path: str) -> Optional[str]:
     """
     if not path_exists(path):
         return None
-    return load_from_path(path)
+    return load_text_from_path(path)
 
 
 def ensure_directory_exists(directory_path: str) -> None:
@@ -177,6 +183,7 @@ def copy_folder_from_package(
     folder_path_in_package: str,
     target_dir: str,
     overwrite: bool = True,
+    non_overwrite_files: Optional[List[str]] = None,
 ) -> None:
     """
     Copies a folder from a package to a target directory.
@@ -205,13 +212,16 @@ def copy_folder_from_package(
         target_subdir = os.path.join(target_dir, rel_path) if rel_path != "." else target_dir
         os.makedirs(target_subdir, exist_ok=True)
 
+        if non_overwrite_files is None:
+            non_overwrite_files = []
+
         # Copy all files in the current directory
         for file in files:
             src_file = os.path.join(root, file)
             dest_file = os.path.join(target_subdir, file)
 
             # Check if the file exists and respect the overwrite parameter
-            if not os.path.exists(dest_file) or overwrite:
+            if not os.path.exists(dest_file) or (overwrite and file not in non_overwrite_files):
                 copy_file(
                     source_path=src_file,
                     target_path=dest_file,
@@ -242,3 +252,23 @@ def find_folders_by_name(
             if dir_name == folder_name:
                 folder_paths.append(os.path.join(root, dir_name))
     return folder_paths
+
+
+def save_bytes_to_binary_file(file_path: str, byte_data: bytes, create_directory: bool = False) -> str:
+    """
+    Write binary data to a file.
+
+    Args:
+        file_path (str): Path where the binary data will be saved
+        byte_data (bytes): Binary data to be written
+
+    Returns:
+        str: Path to the saved file
+    """
+    # Ensure the directory exists
+    if create_directory:
+        ensure_directory_exists(os.path.dirname(file_path))
+
+    with open(file_path, "wb") as f:
+        f.write(byte_data)
+    return file_path

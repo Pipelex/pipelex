@@ -49,4 +49,4 @@ class TestSimplePipeRun:
 
         log.verbose(pipe_output, title="pipe_output")
         pretty_print(pipe_output, title="pipe_output")
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()

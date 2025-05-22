@@ -15,6 +15,10 @@ class InferenceManagerWorkerSetupError(CogtError, FatalError):
     pass
 
 
+class CostRegistryError(CogtError):
+    pass
+
+
 class InferenceReportManagerError(CogtError):
     pass
 
@@ -94,3 +98,7 @@ class MissingDependencyError(CogtError):
             error_msg += f" {message}"
         error_msg += f" Please install it with 'pip install pipelex[{extra_name}]'."
         super().__init__(error_msg)
+
+
+class OcrCapabilityError(CogtError):
+    pass

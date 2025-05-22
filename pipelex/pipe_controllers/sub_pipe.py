@@ -11,9 +11,8 @@ from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeInputError, WorkingMemoryStuffNotFoundError
-from pipelex.hub import get_pipe_router, get_required_pipe
-from pipelex.job_history import job_history
-from pipelex.job_metadata import JobMetadata
+from pipelex.hub import get_mission_tracker, get_pipe_router, get_required_pipe
+from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_controllers.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.pipe_condition import PipeCondition
 
@@ -72,7 +71,7 @@ class SubPipe(BaseModel):
             try:
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
             except WorkingMemoryStuffNotFoundError as exc:
-                error_details = f"sub_pipe '{self.pipe_code}', stack: {sub_pipe_run_params.pipe_stack}, required_variables: {required_variables}"
+                error_details = f"sub_pipe '{self.pipe_code}', stack: {sub_pipe_run_params.pipe_layers}, required_variables: {required_variables}"
                 raise PipeInputError(f"Some required stuff(s) not found - {error_details}") from exc
             log.debug(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
             pipe_output = await get_pipe_router().run_pipe_code(
@@ -84,11 +83,11 @@ class SubPipe(BaseModel):
             )
             new_output_stuff = pipe_output.main_stuff
             for stuff in required_stuffs:
-                job_history.add_pipe_step(
+                get_mission_tracker().add_pipe_step(
                     from_stuff=stuff,
                     to_stuff=new_output_stuff,
                     pipe_code=self.pipe_code,
-                    pipe_stack=sub_pipe_run_params.pipe_stack,
+                    pipe_layer=sub_pipe_run_params.pipe_layers,
                     comment="SubPipe on required_stuff",
                 )
         pretty_print(pipe_output.main_stuff, title=f"Pipe output for {self.pipe_code}")

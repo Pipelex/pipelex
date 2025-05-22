@@ -8,7 +8,6 @@ from typing import Any, Coroutine, Dict, List, Optional, Set
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff import Stuff
@@ -16,12 +15,13 @@ from pipelex.core.stuff_content import StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.job_history import job_history
-from pipelex.job_metadata import JobMetadata
+from pipelex.hub import get_mission_tracker
+from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 
 
-class PipeParallel(PipeAbstract):
+class PipeParallel(PipeController):
     """Runs a list of pipes in parallel to produce a list of results."""
 
     parallel_sub_pipes: List[SubPipe]
@@ -33,8 +33,7 @@ class PipeParallel(PipeAbstract):
         return set(sub_pipe.pipe_code for sub_pipe in self.parallel_sub_pipes)
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -50,8 +49,6 @@ class PipeParallel(PipeAbstract):
             log.debug(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
 
-        # TODO: restore pipe_stack feature
-        # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
         tasks: List[Coroutine[Any, Any, PipeOutput]] = []
 
         for parallel_sub_pipe in self.parallel_sub_pipes:
@@ -100,10 +97,10 @@ class PipeParallel(PipeAbstract):
                 name=output_name,
             )
             for stuff in output_stuffs.values():
-                job_history.add_aggregate_step(
+                get_mission_tracker().add_aggregate_step(
                     from_stuff=stuff,
                     to_stuff=combined_output_stuff,
-                    pipe_stack=pipe_run_params.pipe_stack,
+                    pipe_layer=pipe_run_params.pipe_layers,
                     comment="PipeParallel on output_stuffs",
                 )
         return PipeOutput(
