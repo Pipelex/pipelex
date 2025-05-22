@@ -6,12 +6,9 @@
 # pyright: reportUnknownArgumentType=false
 # pyright: reportUnknownMemberType=false
 # pyright: reportMissingTypeArgument=false
-from enum import StrEnum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import networkx as nx
-import yaml
-from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex import log
@@ -27,12 +24,13 @@ from pipelex.mission.track.tracker_models import (
     NodeAttributeKey,
     NodeCategory,
     SpecialNodeName,
-    SubGraphClassDef,
 )
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.tools.misc.mermaid_helpers import print_mermaid_url
 
 
+# TODO: manage a separate graph for each mission_id
+# TODO: restore disabled tracking functionality in PipeBatch
 class MissionTracker(MissionTrackerProtocol):
     def __init__(self, tracker_config: TrackerConfig):
         self._tracker_config = tracker_config

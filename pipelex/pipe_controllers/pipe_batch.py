@@ -17,7 +17,7 @@ from pipelex.core.stuff_content import ListContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeExecutionError
-from pipelex.hub import get_mission_tracker, get_pipe_router, get_required_pipe
+from pipelex.hub import get_pipe_router
 from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_controllers.pipe_controller import PipeController
 
