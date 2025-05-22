@@ -15,9 +15,8 @@ from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_factory import StuffBlueprint
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_pipe_router, get_report_delegate
+from pipelex.hub import get_mission_tracker, get_pipe_router, get_report_delegate
 from pipelex.mission.job_metadata import JobMetadata
-from pipelex.mission.track.mission_tracker import job_history
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from tests.pipelex.test_data import PipeTestCases
 
@@ -159,7 +158,6 @@ class TestPipeRouter:
         input_list_stuff_name: str,
         input_item_stuff_name: str,
     ):
-        job_history.activate()
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
@@ -177,7 +175,7 @@ class TestPipeRouter:
         pretty_print(pipe_output, title=f"run pipe '{pipe_code}'")
         get_report_delegate().generate_report()
 
-        job_history.print_mermaid_flowchart_code_and_url()
+        get_mission_tracker().output_flowchart(is_detailed=True)
 
     @pytest.mark.parametrize("pipe_code, exception, expected_error_message", PipeTestCases.FAILURE_PIPES)
     async def test_pipe_infinite_loop(

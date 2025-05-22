@@ -15,12 +15,12 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.stuff import Stuff
 from pipelex.exceptions import JobHistoryError
 from pipelex.mission.track.flow_chart import MissionFlowChart
 from pipelex.mission.track.mission_tracker_protocol import MissionTrackerProtocol
+from pipelex.mission.track.tracker_config import TrackerConfig
 from pipelex.mission.track.tracker_models import (
     EdgeAttributeKey,
     EdgeCategory,
@@ -34,22 +34,22 @@ from pipelex.tools.misc.mermaid_helpers import print_mermaid_url
 
 
 class MissionTracker(MissionTrackerProtocol):
-    def __init__(self):
+    def __init__(self, tracker_config: TrackerConfig):
+        self._tracker_config = tracker_config
+        self._is_debug_mode = tracker_config.is_debug_mode
         self.is_active: bool = False
         self.nx_graph: nx.DiGraph = nx.DiGraph()
         self.start_node: Optional[str] = None
 
-    def activate(self):
+    @override
+    def setup(self):
         self.is_active = True
 
-    def reset(self):
+    @override
+    def teardown(self):
         self.is_active = False
         self.nx_graph = nx.DiGraph()
         self.start_node = None
-
-    @property
-    def _is_debug_mode(self) -> bool:
-        return get_config().pipelex.history_graph_config.is_debug_mode
 
     def _get_node_name(self, node: str) -> Optional[str]:
         node_attributes = self.nx_graph.nodes[node]
@@ -115,7 +115,7 @@ class MissionTracker(MissionTrackerProtocol):
             stuff=stuff,
             as_item_index=as_item_index,
         )
-        if stuff.is_text and get_config().pipelex.history_graph_config.is_include_text_preview:
+        if stuff.is_text and self._tracker_config.is_include_text_preview:
             node_tag += f"<br/>{stuff_content_rendered[:100]}"
         pipe_layer_str = self._pipe_layer_to_subgraph_name(pipe_layer)
         node_attributes: Dict[str, Any] = {
@@ -324,13 +324,13 @@ class MissionTracker(MissionTrackerProtocol):
             attributes=edge_attributes,
         )
 
-    def print_mermaid_flowchart_code_and_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
+    def _print_mermaid_flowchart_code_and_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
         if not self.nx_graph.nodes:
             log.info("No nodes in the mission tracker")
             return
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")
-        flowchart = MissionFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, is_debug_mode=self._is_debug_mode)
+        flowchart = MissionFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, tracker_config=self._tracker_config)
         mermaid_code, url = flowchart.generate_mermaid_flowchart(title=title, subtitle=subtitle)
         print(mermaid_code)
         title_to_print = "Mermaid flowchart URL"
@@ -338,18 +338,27 @@ class MissionTracker(MissionTrackerProtocol):
             title_to_print += f" for {title}"
         print_mermaid_url(url=url, title=title_to_print)
 
-    def print_mermaid_flowchart_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
+    def _print_mermaid_flowchart_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
         if not self.nx_graph.nodes:
             log.info("No nodes in the mission tracker")
             return
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")
-        flowchart = MissionFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, is_debug_mode=self._is_debug_mode)
+        flowchart = MissionFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, tracker_config=self._tracker_config)
         _, url = flowchart.generate_mermaid_flowchart(title=title, subtitle=subtitle)
         title_to_print = "Mermaid flowchart URL"
         if title:
             title_to_print += f" for {title}"
         print_mermaid_url(url=url, title=title_to_print)
 
-
-job_history = MissionTracker()
+    @override
+    def output_flowchart(
+        self,
+        title: Optional[str] = None,
+        subtitle: Optional[str] = None,
+        is_detailed: bool = False,
+    ):
+        if is_detailed:
+            self._print_mermaid_flowchart_code_and_url(title=title, subtitle=subtitle)
+        else:
+            self._print_mermaid_flowchart_url(title=title, subtitle=subtitle)

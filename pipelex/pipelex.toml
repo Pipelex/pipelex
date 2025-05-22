@@ -199,7 +199,7 @@ structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
 # History graph config
 ####################################################################################################
 
-[pipelex.history_graph_config]
+[pipelex.tracker_config]
 is_debug_mode = false
 is_include_text_preview = false
 is_include_interactivity = false

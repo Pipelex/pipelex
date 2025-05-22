@@ -24,7 +24,7 @@ from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.mission.mission_manager import MissionManager
-from pipelex.mission.track.mission_tracker import job_history
+from pipelex.mission.track.mission_tracker import MissionTracker
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.registry_funcs import PipelexRegistryFuncs
@@ -56,6 +56,7 @@ class Pipelex:
         plugin_manager: Optional[PluginManager] = None,
         inference_manager: Optional[InferenceManager] = None,
         mission_manager: Optional[MissionManager] = None,
+        mission_tracker: Optional[MissionTracker] = None,
     ) -> Self:
         if cls._pipelex_instance is not None:
             raise RuntimeError(
@@ -80,6 +81,7 @@ class Pipelex:
         plugin_manager: Optional[PluginManager] = None,
         inference_manager: Optional[InferenceManager] = None,
         mission_manager: Optional[MissionManager] = None,
+        mission_tracker: Optional[MissionTracker] = None,
     ) -> None:
         print(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init started...", flush=True)
         self.pipelex_hub = pipelex_hub or PipelexHub()
@@ -128,6 +130,8 @@ class Pipelex:
         self.pipelex_hub.set_pipe_provider(pipe_provider=self.library_manager.pipe_library)
 
         # pipelex mission
+        self.mission_tracker = mission_tracker or MissionTracker(tracker_config=get_config().pipelex.tracker_config)
+        self.pipelex_hub.set_mission_tracker(mission_tracker=self.mission_tracker)
         self.mission_manager = mission_manager or MissionManager()
         self.pipelex_hub.set_mission_manager(mission_manager=self.mission_manager)
 
@@ -159,6 +163,10 @@ class Pipelex:
 
         self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter())
 
+        # mission
+        self.mission_tracker.setup()
+        self.mission_manager.setup()
+
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}")
 
     def finish_setup(self):
@@ -186,7 +194,7 @@ class Pipelex:
     def teardown(self):
         # pipelex
         self.mission_manager.teardown()
-        job_history.reset()
+        self.mission_tracker.teardown()
         self.library_manager.teardown()
         self.template_provider.teardown()
         ActivityManager.teardown()

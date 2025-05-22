@@ -16,11 +16,11 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.stuff import Stuff
 from pipelex.exceptions import JobHistoryError
 from pipelex.mission.track.mission_tracker_protocol import MissionTrackerProtocol
+from pipelex.mission.track.tracker_config import TrackerConfig
 from pipelex.mission.track.tracker_models import (
     EdgeAttributeKey,
     EdgeCategory,
@@ -43,13 +43,13 @@ def _indent_line(line: str, indent: int) -> str:
 
 
 class MissionFlowChart:
-    def __init__(self, nx_graph: nx.DiGraph, start_node: str, is_debug_mode: bool):
+    def __init__(self, nx_graph: nx.DiGraph, start_node: str, tracker_config: TrackerConfig):
         self.nx_graph = nx_graph
-        self.is_debug_mode = is_debug_mode
+        self._tracker_config = tracker_config
+        self.is_debug_mode = tracker_config.is_debug_mode
         self.start_node = start_node
         self.sub_graph_class_defs: List[SubGraphClassDef] = []
-        history_graph_config = get_config().pipelex.history_graph_config
-        for sub_graph_index, sub_graph_color in enumerate(history_graph_config.sub_graph_colors):
+        for sub_graph_index, sub_graph_color in enumerate(self._tracker_config.sub_graph_colors):
             class_def_letter = chr(ord("a") + sub_graph_index)
             class_def_name = f"sub_{class_def_letter}"
             self.sub_graph_class_defs.append(SubGraphClassDef(name=class_def_name, color=sub_graph_color))
@@ -66,14 +66,13 @@ class MissionFlowChart:
         mermaid_settings: Dict[str, Any] = {}
         if title:
             mermaid_settings["title"] = title
-        history_graph_config = get_config().pipelex.history_graph_config
         mermaid_settings["config"] = {}
-        if history_graph_config.applied_theme:
-            mermaid_settings["config"]["theme"] = history_graph_config.applied_theme
-        if history_graph_config.applied_layout:
-            mermaid_settings["config"]["layout"] = history_graph_config.applied_layout
-        if history_graph_config.applied_wrapping_width:
-            mermaid_settings["config"]["flowchart"] = {"wrappingWidth": history_graph_config.applied_wrapping_width}
+        if self._tracker_config.applied_theme:
+            mermaid_settings["config"]["theme"] = self._tracker_config.applied_theme
+        if self._tracker_config.applied_layout:
+            mermaid_settings["config"]["layout"] = self._tracker_config.applied_layout
+        if self._tracker_config.applied_wrapping_width:
+            mermaid_settings["config"]["flowchart"] = {"wrappingWidth": self._tracker_config.applied_wrapping_width}
         mermaid_code = "---\n"
         mermaid_code += yaml.dump(mermaid_settings)
         mermaid_code += "---\n"
@@ -133,25 +132,25 @@ class MissionFlowChart:
                 case EdgeCategory.PIPE:
                     if pipe_code := edge_data.get(EdgeAttributeKey.PIPE_CODE):
                         edge_tag = nice_edge_tag(pipe_code)
-                        mermaid_code += f"    {source} -- {edge_tag} {history_graph_config.pipe_edge_style} {target}\n"
+                        mermaid_code += f"    {source} -- {edge_tag} {self._tracker_config.pipe_edge_style} {target}\n"
                     else:
                         raise JobHistoryError(f"Pipe edge missing pipe code: {edge_data}")
                 case EdgeCategory.BATCH:
-                    mermaid_code += f"    {source} {history_graph_config.branch_edge_style} {target}\n"
+                    mermaid_code += f"    {source} {self._tracker_config.branch_edge_style} {target}\n"
                 case EdgeCategory.AGGREGATE:
-                    mermaid_code += f"    {source} {history_graph_config.aggregate_edge_style} {target}\n"
+                    mermaid_code += f"    {source} {self._tracker_config.aggregate_edge_style} {target}\n"
                 case EdgeCategory.CONDITION:
                     condition_expression = edge_data.get(EdgeAttributeKey.CONDITION_EXPRESSION)
                     if not condition_expression:
                         raise JobHistoryError(f"Condition edge missing condition expression: {edge_data}")
                     edge_tag = nice_edge_tag(condition_expression)
-                    mermaid_code += f"    {source} {history_graph_config.condition_edge_style} {target}\n"
+                    mermaid_code += f"    {source} {self._tracker_config.condition_edge_style} {target}\n"
                 case EdgeCategory.CHOICE:
                     chosen_pipe_code = edge_data.get(EdgeAttributeKey.CHOSEN_PIPE)
                     if not chosen_pipe_code:
                         raise JobHistoryError(f"No chosen pipe code set for edge {source} --- {target}")
                     edge_tag = nice_edge_tag(chosen_pipe_code)
-                    mermaid_code += f"    {source} -- {edge_tag} {history_graph_config.choice_edge_style} {target}\n"
+                    mermaid_code += f"    {source} -- {edge_tag} {self._tracker_config.choice_edge_style} {target}\n"
 
         url = make_mermaid_url(mermaid_code)
         return mermaid_code, url
@@ -187,7 +186,7 @@ class MissionFlowChart:
                         node_lines.append(f'{node}["{node_text}"]')
                     case NodeCategory.CONDITION:
                         node_lines.append(f'{node}{{"{node_text}"}}')
-                if get_config().pipelex.history_graph_config.is_include_interactivity:
+                if self._tracker_config.is_include_interactivity:
                     if node_description := node_attributes.get(NodeAttributeKey.DESCRIPTION):
                         if not isinstance(node_description, str):
                             raise JobHistoryError(f"Node description is not a string: {node_description}")

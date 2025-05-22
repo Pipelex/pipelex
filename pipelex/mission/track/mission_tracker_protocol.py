@@ -13,6 +13,10 @@ from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 
 
 class MissionTrackerProtocol(Protocol):
+    def setup(self): ...
+
+    def teardown(self): ...
+
     # def reset(self): ...
     def add_pipe_step(
         self,
@@ -57,4 +61,11 @@ class MissionTrackerProtocol(Protocol):
         to_stuff: Stuff,
         pipe_layer: List[str],
         comment: str,
+    ): ...
+
+    def output_flowchart(
+        self,
+        title: Optional[str] = None,
+        subtitle: Optional[str] = None,
+        is_detailed: bool = False,
     ): ...

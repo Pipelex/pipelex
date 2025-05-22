@@ -13,9 +13,8 @@ from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeConditionError, PipeDefinitionError, PipeExecutionError, PipeInputError, WorkingMemoryStuffNotFoundError
-from pipelex.hub import get_pipe_router
+from pipelex.hub import get_mission_tracker, get_pipe_router
 from pipelex.mission.job_metadata import JobCategory, JobMetadata
-from pipelex.mission.track.mission_tracker import job_history
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
@@ -135,7 +134,7 @@ class PipeCondition(PipeController):
             raise PipeInputError(f"Some required stuff(s) not found - {error_details}") from exc
 
         for required_stuff in required_stuffs:
-            job_history.add_condition_step(
+            get_mission_tracker().add_condition_step(
                 from_stuff=required_stuff,
                 to_condition=condition_details,
                 condition_expression=self.expression or self.applied_expression_jinja2,
@@ -151,7 +150,7 @@ class PipeCondition(PipeController):
             pipe_run_params=pipe_run_params,
             output_name=output_name,
         )
-        job_history.add_choice_step(
+        get_mission_tracker().add_choice_step(
             from_condition=condition_details,
             to_stuff=pipe_output.main_stuff,
             pipe_layer=pipe_run_params.pipe_layers,

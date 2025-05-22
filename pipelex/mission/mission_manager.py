@@ -19,6 +19,10 @@ class MissionManager(MissionManagerAbstract, RootModel[MissionManagerRoot]):
     root: MissionManagerRoot = Field(default_factory=dict)
 
     @override
+    def setup(self):
+        pass
+
+    @override
     def teardown(self):
         self.root.clear()
 

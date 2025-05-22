@@ -15,8 +15,8 @@ from pipelex.core.stuff_content import StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
+from pipelex.hub import get_mission_tracker
 from pipelex.mission.job_metadata import JobMetadata
-from pipelex.mission.track.mission_tracker import job_history
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 
@@ -97,7 +97,7 @@ class PipeParallel(PipeController):
                 name=output_name,
             )
             for stuff in output_stuffs.values():
-                job_history.add_aggregate_step(
+                get_mission_tracker().add_aggregate_step(
                     from_stuff=stuff,
                     to_stuff=combined_output_stuff,
                     pipe_layer=pipe_run_params.pipe_layers,

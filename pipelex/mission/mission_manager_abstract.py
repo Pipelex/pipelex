@@ -10,6 +10,10 @@ from pipelex.mission.mission import Mission
 
 class MissionManagerAbstract(ABC):
     @abstractmethod
+    def setup(self) -> None:
+        pass
+
+    @abstractmethod
     def teardown(self) -> None:
         pass
 
