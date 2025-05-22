@@ -10,6 +10,7 @@ from pydantic import ConfigDict, model_validator
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
@@ -38,7 +39,7 @@ class PipeJinja2(PipeOperator):
     model_config = ConfigDict(extra="forbid", strict=False)
 
     adhoc_pipe_code: ClassVar[str] = "jinja2_render"
-    output_concept_code: str = f"{SpecialDomain.NATIVE}.Text"
+    output_concept_code: str = NativeConcept.TEXT.code
 
     jinja2_name: Optional[str] = None
     jinja2: Optional[str] = None

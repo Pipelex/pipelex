@@ -13,7 +13,7 @@ from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.core.concept import Concept
-from pipelex.core.concept_native import NativeConceptCode
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
@@ -47,7 +47,7 @@ class PipeLLMPromptOutput(PipeOutput):
 class PipeLLMPrompt(PipeOperator):
     adhoc_pipe_code: ClassVar[str] = "adhoc_pipe_code_for_prompt_llm"
 
-    output_concept_code: str = f"{SpecialDomain.NATIVE}.{NativeConceptCode.LLM_PROMPT}"
+    output_concept_code: str = NativeConcept.LLM_PROMPT.code
 
     prompting_style: Optional[PromptingStyle] = None
 

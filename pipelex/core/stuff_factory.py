@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from pipelex.config import get_config
 from pipelex.core.concept import Concept
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff import Stuff, StuffCreationRecord
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
@@ -131,10 +132,7 @@ class StuffFactory:
         Make multiple stuffs from a dictionary of strings.
         It is implied that each string value should be associated with a native.Text concept.
         """
-        return [
-            cls.make_from_str(concept_code=f"{SpecialDomain.NATIVE}.Text", str_value=str_value, name=name)
-            for name, str_value in str_text_dict.items()
-        ]
+        return [cls.make_from_str(concept_code=NativeConcept.TEXT.code, str_value=str_value, name=name) for name, str_value in str_text_dict.items()]
 
     @classmethod
     def make_multiple_stuff_from_str(cls, str_stuff_and_concepts_dict: Dict[str, Tuple[str, str]]) -> List[Stuff]:

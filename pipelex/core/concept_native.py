@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from enum import StrEnum
+from enum import Enum, StrEnum
 from typing import List
 
 from pipelex.core.concept import Concept
@@ -21,62 +21,68 @@ class NativeConceptClass(StrEnum):
     PAGE = "PageContent"
 
 
-class NativeConceptCode(StrEnum):
+# Exceptionally, we use an Enum here (and not our usual StrEnum) to avoid confusion with
+# the concept_code with must have the form "native.ConceptName"
+class NativeConcept(Enum):
     DYNAMIC = "Dynamic"
     TEXT = "Text"
     IMAGE = "Image"
     PDF = "PDF"
-    TEXT_AND_IMAGES = "TextAndImage"
+    TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
     LLM_PROMPT = "LlmPrompt"
     PAGE = "Page"
 
+    @classmethod
+    def names(cls) -> List[str]:
+        return [code.value for code in cls]
+
     @property
-    def concept_code(self) -> str:
+    def code(self) -> str:
         return ConceptFactory.make_concept_code(SpecialDomain.NATIVE, self.value)
 
     @property
     def content_class_name(self) -> NativeConceptClass:
         match self:
-            case NativeConceptCode.TEXT:
+            case NativeConcept.TEXT:
                 return NativeConceptClass.TEXT
-            case NativeConceptCode.IMAGE:
+            case NativeConcept.IMAGE:
                 return NativeConceptClass.IMAGE
-            case NativeConceptCode.PDF:
+            case NativeConcept.PDF:
                 return NativeConceptClass.PDF
-            case NativeConceptCode.TEXT_AND_IMAGES:
+            case NativeConcept.TEXT_AND_IMAGES:
                 return NativeConceptClass.TEXT_AND_IMAGES
-            case NativeConceptCode.NUMBER:
+            case NativeConcept.NUMBER:
                 return NativeConceptClass.NUMBER
-            case NativeConceptCode.LLM_PROMPT:
+            case NativeConcept.LLM_PROMPT:
                 return NativeConceptClass.LLM_PROMPT
-            case NativeConceptCode.DYNAMIC:
+            case NativeConcept.DYNAMIC:
                 return NativeConceptClass.DYNAMIC
-            case NativeConceptCode.PAGE:
+            case NativeConcept.PAGE:
                 return NativeConceptClass.PAGE
 
     def make_concept(self) -> Concept:
         definition: str
         match self:
-            case NativeConceptCode.TEXT:
+            case NativeConcept.TEXT:
                 definition = "A text"
-            case NativeConceptCode.IMAGE:
+            case NativeConcept.IMAGE:
                 definition = "An image"
-            case NativeConceptCode.PDF:
+            case NativeConcept.PDF:
                 definition = "A PDF"
-            case NativeConceptCode.TEXT_AND_IMAGES:
+            case NativeConcept.TEXT_AND_IMAGES:
                 definition = "A text and an image"
-            case NativeConceptCode.NUMBER:
+            case NativeConcept.NUMBER:
                 definition = "A number"
-            case NativeConceptCode.LLM_PROMPT:
+            case NativeConcept.LLM_PROMPT:
                 definition = "A prompt for an LLM"
-            case NativeConceptCode.DYNAMIC:
+            case NativeConcept.DYNAMIC:
                 definition = "A dynamic concept"
-            case NativeConceptCode.PAGE:
+            case NativeConcept.PAGE:
                 definition = "The content of a page of a document, comprising text and linked images as well as an optional screenshot of the page"
 
         return Concept(
-            code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, self),
+            code=self.code,
             domain=SpecialDomain.NATIVE,
             definition=definition,
             structure_class_name=self.content_class_name,

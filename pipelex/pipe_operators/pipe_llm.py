@@ -17,7 +17,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.config import get_config
 from pipelex.core.concept_factory import ConceptFactory
-from pipelex.core.concept_native import NativeConceptClass, NativeConceptCode
+from pipelex.core.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.domain import Domain, SpecialDomain
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import (
@@ -76,7 +76,7 @@ class PipeLLM(PipeOperator):
     def validate_with_libraries(self):
         if self.input_concept_code and get_concept_provider().is_compatible_by_concept_code(
             tested_concept_code=self.input_concept_code,
-            wanted_concept_code=f"{SpecialDomain.NATIVE}.Image",
+            wanted_concept_code=NativeConcept.IMAGE.code,
         ):
             if not self.pipe_llm_prompt.user_images:
                 raise PipeDefinitionError(f"No user images provided for concept '{self.input_concept_code}' but it's required")
@@ -125,7 +125,10 @@ class PipeLLM(PipeOperator):
     ) -> PipeLLMOutput:
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {self.code}")
-        if self.output_concept_code == ConceptFactory.make_concept_code(SpecialDomain.NATIVE, NativeConceptCode.DYNAMIC):
+        if self.output_concept_code == ConceptFactory.make_concept_code(
+            SpecialDomain.NATIVE,
+            NativeConcept.DYNAMIC.code,
+        ):
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
             output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
@@ -195,7 +198,7 @@ class PipeLLM(PipeOperator):
             if (
                 get_concept_provider().is_compatible_by_concept_code(
                     tested_concept_code=input_concept_code,
-                    wanted_concept_code=f"{SpecialDomain.NATIVE}.Image",
+                    wanted_concept_code=NativeConcept.IMAGE.code,
                 )
                 and not llm_prompt_1.user_images
             ):

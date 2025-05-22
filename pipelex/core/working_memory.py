@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 from pipelex import log, pretty_print
 from pipelex.activity_manager import get_activity_manager
 from pipelex.activity_models import ActivityReport
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_artefact import StuffArtefact
@@ -257,7 +258,7 @@ class WorkingMemory(BaseModel):
             update_stuff_dict[name] = Stuff(
                 stuff_name=name,
                 stuff_code="",
-                concept_code=f"{SpecialDomain.NATIVE}.Text",
+                concept_code=NativeConcept.TEXT.code,
                 content=stuff_content,
             )
         self.root.update(update_stuff_dict)

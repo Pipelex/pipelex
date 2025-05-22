@@ -6,6 +6,7 @@
 import pytest
 
 from pipelex import pretty_print
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff_content import PageContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
@@ -34,7 +35,7 @@ class TestPipeOCR:
                 should_caption_images=False,
                 should_include_screenshots=True,
                 screenshots_dpi=300,
-                output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",
+                output_concept_code=NativeConcept.TEXT_AND_IMAGES.code,
             ),
             working_memory=WorkingMemoryFactory.make_from_image(
                 image_url=image_url,
@@ -63,11 +64,11 @@ class TestPipeOCR:
                 should_caption_images=False,
                 should_include_screenshots=True,
                 screenshots_dpi=300,
-                output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",
+                output_concept_code=NativeConcept.TEXT_AND_IMAGES.code,
             ),
             working_memory=WorkingMemoryFactory.make_from_pdf(
                 pdf_url=pdf_url,
-                concept_code=f"{SpecialDomain.NATIVE}.PDF",
+                concept_code=NativeConcept.PDF.code,
                 name="pdf",
             ),
         )
