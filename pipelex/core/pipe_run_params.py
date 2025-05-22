@@ -149,7 +149,6 @@ class PipeRunParams(BaseModel):
 
     def push_pipe_to_stack(self, pipe_code: str) -> None:
         self.pipe_stack.append(pipe_code)
-        log.debug(f"Push Pipe stack --> {self.pipe_stack}")
 
     def pop_pipe_from_stack(self, pipe_code: str) -> None:
         popped_pipe_code = self.pipe_stack.pop()
@@ -158,7 +157,6 @@ class PipeRunParams(BaseModel):
             log.error(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
             # TODO: investigate how this can happen, maybe due to a shared object between branches of PipeBatch or PipeParallel
             # (which should be copied instead)
-        log.debug(f"Pop Pipe stack <-- {self.pipe_stack}")
 
     def push_pipe_layer(self, pipe_code: str) -> None:
         if self.pipe_layers and self.pipe_layers[-1] == pipe_code:
