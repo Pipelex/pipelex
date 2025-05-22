@@ -111,7 +111,7 @@ pipe_output: PipeOutput = await pipe_router.run_pipe(
 
 ```python
 pretty_print(pipe_output, title=f"Pipe output")
-get_report_delegate().general_report()
+get_report_delegate().generate_report()
 ```
 
 5. Basic assertions:

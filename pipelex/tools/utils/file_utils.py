@@ -117,7 +117,7 @@ def failable_load_text_from_path(path: str) -> Optional[str]:
     """
     Attempts to read a text file, returning None if the file doesn't exist.
 
-    This function is a safer version of load_from_path that handles missing files
+    This function is a safer version of load_text_from_path that handles missing files
     gracefully by returning None instead of raising an error.
 
     Args:
