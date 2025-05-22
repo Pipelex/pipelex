@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Any, ClassVar, List, Optional, Tuple
+from typing import Any, ClassVar, List, Optional, Tuple, Type
 
 from pydantic import BaseModel
 from typing_extensions import override
@@ -11,6 +11,7 @@ from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, ListContent, PDFContent, StructuredContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
+from pipelex.exceptions import PipeStackOverflowError
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
 from tests.test_data import ImageTestCases, PDFTestCases
 
@@ -62,7 +63,7 @@ class PipeTestCases:
     SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
         name="pdf",
         concept_code="native.PDF",
-        content=PDFContent(url=PDFTestCases.DOCUMENT_URL),
+        content=PDFContent(url=PDFTestCases.DOCUMENT_URLS[0]),
         pipelex_session_id="unit_test",
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
@@ -119,6 +120,10 @@ class PipeTestCases:
             "Test with no input",
             "test_no_input",
         ),
+        (
+            "Test with no input that could be long",
+            "test_no_input_that_could_be_long",
+        ),
     ]
     NO_INPUT_PARALLEL1: ClassVar[List[Tuple[str, str, Optional[PipeOutputMultiplicity]]]] = [  # topic, pipe, multiplicity
         (
@@ -174,6 +179,13 @@ class PipeTestCases:
             "extract_colors",
             "native.Text",
             USER_TEXT_COLORS,
+        ),
+    ]
+    FAILURE_PIPES: ClassVar[List[Tuple[str, Type[Exception], str]]] = [
+        (
+            "infinite_loop_1",
+            PipeStackOverflowError,
+            "Exceeded pipe stack limit",
         ),
     ]
 
@@ -299,7 +311,4 @@ class PipeOcrTestCases:
         ImageTestCases.IMAGE_FILE_PATH,
         ImageTestCases.IMAGE_URL,
     ]
-    PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = [
-        PDFTestCases.DOCUMENT_FILE_PATH,
-        PDFTestCases.DOCUMENT_URL,
-    ]
+    PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS

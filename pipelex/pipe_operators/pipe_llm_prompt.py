@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import ClassVar, List, Optional, Self, Set
+from typing import ClassVar, List, Optional, Self, Set, cast
 
 from kajson.class_registry import class_registry
 from pydantic import model_validator
@@ -12,11 +12,9 @@ from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConceptCode
 from pipelex.core.domain import SpecialDomain
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent
@@ -31,8 +29,9 @@ from pipelex.exceptions import (
     WorkingMemoryTypeError,
 )
 from pipelex.hub import get_template
-from pipelex.job_metadata import JobCategory, JobMetadata
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
+from pipelex.mission.job_metadata import JobCategory, JobMetadata
+from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
+from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.utils.class_structure_utils import get_type_structure
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
@@ -45,7 +44,7 @@ class PipeLLMPromptOutput(PipeOutput):
 
 
 # TODO: consider adding a PipeLLMPromptFactory for consistency
-class PipeLLMPrompt(PipeAbstract):
+class PipeLLMPrompt(PipeOperator):
     adhoc_pipe_code: ClassVar[str] = "adhoc_pipe_code_for_prompt_llm"
 
     output_concept_code: str = f"{SpecialDomain.NATIVE}.{NativeConceptCode.LLM_PROMPT}"
@@ -112,8 +111,7 @@ class PipeLLMPrompt(PipeAbstract):
         return required_variables
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -135,12 +133,15 @@ class PipeLLMPrompt(PipeAbstract):
             for user_image_name in self.user_images:
                 log.debug(f"Getting user image '{user_image_name}' from context")
                 try:
-                    prompt_image_stuff_content = working_memory.get_stuff_attribute(name=user_image_name, wanted_type=ImageContent)
+                    prompt_image_content = working_memory.get_stuff_attribute(name=user_image_name, wanted_type=ImageContent)
                 except (WorkingMemoryNotFoundError, WorkingMemoryStuffNotFoundError, WorkingMemoryTypeError) as exc:
                     raise PipeInputError(f"A valid user image named '{user_image_name}' was not found in the working_memory: {exc}") from exc
 
-                image_uri = prompt_image_stuff_content.url
-                user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
+                if base_64 := prompt_image_content.base_64:
+                    user_image = PromptImageFactory.make_prompt_image(base_64=base_64)
+                else:
+                    image_uri = prompt_image_content.url
+                    user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
                 prompt_user_images.append(user_image)
 
         ############################################################
@@ -236,17 +237,25 @@ class PipeLLMPrompt(PipeAbstract):
 
             jinja2_job_metadata = job_metadata.copy_with_update(
                 updated_metadata=JobMetadata(
-                    session_id=get_config().session_id,
                     job_category=JobCategory.JINJA2_JOB,
                 )
             )
-            the_text = (
-                await pipe_jinja2.run_pipe(
-                    job_metadata=jinja2_job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=pipe_run_params,
-                )
-            ).rendered_text
+            # the_text = (
+            #     await pipe_jinja2.run_pipe(
+            #         job_metadata=jinja2_job_metadata,
+            #         working_memory=working_memory,
+            #         pipe_run_params=pipe_run_params,
+            #     )
+            # ).rendered_text
+            # TODO: restore the possibility above, without need to explicitly cast the output
+            pipe_output: PipeOutput = await pipe_jinja2.run_pipe(
+                job_metadata=jinja2_job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+            )
+            pipe_jinja2_output = cast(PipeJinja2Output, pipe_output)
+            the_text = pipe_jinja2_output.rendered_text
+
         elif text_verbatim_name:
             user_text_verbatim = get_template(
                 template_name=text_verbatim_name,

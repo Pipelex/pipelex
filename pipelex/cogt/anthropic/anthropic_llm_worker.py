@@ -12,9 +12,10 @@ from pipelex import log
 from pipelex.cogt.anthropic.anthropic_factory import AnthropicFactory
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
+from pipelex.cogt.llm.llm_job_func import llm_job_func
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract, llm_job_func
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.tools.misc.model_helpers import BaseModelType
 

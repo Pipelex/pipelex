@@ -12,7 +12,7 @@ from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory, TokenCostsByCategoryDict
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
 
 
 class LLMTokenCostReportField(StrEnum):

@@ -43,7 +43,7 @@ class TestPipeLLM:
         log.verbose(pipe_llm_output, title="stuff")
         llm_generated_text = pipe_llm_output.main_stuff_as_text
         pretty_print(llm_generated_text, title="llm_generated_text")
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()
 
     @pytest.mark.llm
     @pytest.mark.inference
@@ -79,4 +79,4 @@ class TestPipeLLM:
         log.verbose(pipe_llm_output, title="stuff")
         llm_generated_text = pipe_llm_output.main_stuff_as_text
         pretty_print(llm_generated_text, title="llm_generated_text")
-        get_report_delegate().general_report()
+        get_report_delegate().generate_report()

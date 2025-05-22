@@ -10,20 +10,19 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ListContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import MAIN_STUFF_NAME, WorkingMemory
+from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeExecutionError
-from pipelex.hub import get_pipe_router, get_required_pipe
-from pipelex.job_history import job_history
-from pipelex.job_metadata import JobMetadata
+from pipelex.hub import get_pipe_router
+from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipe_controllers.pipe_controller import PipeController
 
 
-class PipeBatch(PipeAbstract):
+class PipeBatch(PipeController):
     """Runs a PipeSequence in parallel for each item in a list."""
 
     branch_pipe_code: str
@@ -34,8 +33,7 @@ class PipeBatch(PipeAbstract):
         return set([self.branch_pipe_code])
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -49,7 +47,7 @@ class PipeBatch(PipeAbstract):
             log.debug(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
 
-        pipe_run_params.push_pipe_code(pipe_code=self.branch_pipe_code)
+        pipe_run_params.push_pipe_layer(pipe_code=self.branch_pipe_code)
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_stuff_key = batch_params.input_list_stuff_name
         input_stuff = working_memory.get_stuff(input_stuff_key)
@@ -61,14 +59,15 @@ class PipeBatch(PipeAbstract):
                 f"Input of PipeBatch must be ListContent, got {input_stuff.stuff_name or 'unnamed'} = {type(input_content)}. stuff: {input_stuff}"
             )
 
-        sub_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
-        nb_history_items_limit = get_config().pipelex.history_graph_config.applied_nb_items_limit
+        # TODO: Make commented code work when inputing images named "a.b.c"
+        # sub_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
+        nb_history_items_limit = get_config().pipelex.tracker_config.applied_nb_items_limit
         pipe_router = get_pipe_router()
         input_content = cast(ListContent[StuffContent], input_content)
         batch_output_stuff_code = shortuuid.uuid()
         tasks: List[Coroutine[Any, Any, PipeOutput]] = []
         item_stuffs: List[Stuff] = []
-        required_stuff_lists: List[List[Stuff]] = []
+        # required_stuff_lists: List[List[Stuff]] = []
         branch_output_item_codes: List[str] = []
         for branch_index, item in enumerate(input_content.items):
             branch_output_item_code = f"{batch_output_stuff_code}-branch-{branch_index}"
@@ -86,10 +85,10 @@ class PipeBatch(PipeAbstract):
             branch_memory = working_memory.make_deep_copy()
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=batch_params.input_item_stuff_name)
 
-            required_variables = sub_pipe.required_variables()
-            required_stuffs = branch_memory.get_stuffs(names=required_variables)
-            required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff_code]
-            required_stuff_lists.append(required_stuffs)
+            # required_variables = sub_pipe.required_variables()
+            # required_stuffs = branch_memory.get_stuffs(names=required_variables)
+            # required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff_code]
+            # required_stuff_lists.append(required_stuffs)
             branch_pipe_run_params = pipe_run_params.model_copy(
                 deep=True,
                 update={
@@ -124,35 +123,35 @@ class PipeBatch(PipeAbstract):
             name=output_name,
         )
 
-        for branch_index, (required_stuff_list, item_input_stuff, item_output_stuff) in enumerate(
-            zip(required_stuff_lists, item_stuffs, output_stuffs)
-        ):
-            job_history.add_batch_step(
-                from_stuff=input_stuff,
-                to_stuff=item_input_stuff,
-                to_branch_index=branch_index,
-                pipe_stack=pipe_run_params.pipe_stack,
-                comment="PipeBatch.run_pipe() in zip",
-            )
-            for required_stuff in required_stuff_list:
-                job_history.add_pipe_step(
-                    from_stuff=required_stuff,
-                    to_stuff=item_output_stuff,
-                    pipe_code=self.branch_pipe_code,
-                    pipe_stack=pipe_run_params.pipe_stack,
-                    comment="PipeBatch.run_pipe() on required_stuff_list",
-                    as_item_index=branch_index,
-                    is_with_edge=(required_stuff.stuff_name != MAIN_STUFF_NAME),
-                )
+        # for branch_index, (required_stuff_list, item_input_stuff, item_output_stuff) in enumerate(
+        #     zip(required_stuff_lists, item_stuffs, output_stuffs)
+        # ):
+        #     get_mission_tracker().add_batch_step(
+        #         from_stuff=input_stuff,
+        #         to_stuff=item_input_stuff,
+        #         to_branch_index=branch_index,
+        #         pipe_layer=pipe_run_params.pipe_layers,
+        #         comment="PipeBatch.run_pipe() in zip",
+        #     )
+        #     for required_stuff in required_stuff_list:
+        #         get_mission_tracker().add_pipe_step(
+        #             from_stuff=required_stuff,
+        #             to_stuff=item_output_stuff,
+        #             pipe_code=self.branch_pipe_code,
+        #             pipe_layer=pipe_run_params.pipe_layers,
+        #             comment="PipeBatch.run_pipe() on required_stuff_list",
+        #             as_item_index=branch_index,
+        #             is_with_edge=(required_stuff.stuff_name != MAIN_STUFF_NAME),
+        #         )
 
-        for branch_index, branch_output_stuff in enumerate(output_stuffs):
-            branch_output_item_code = branch_output_item_codes[branch_index]
-            job_history.add_aggregate_step(
-                from_stuff=branch_output_stuff,
-                to_stuff=output_stuff,
-                pipe_stack=pipe_run_params.pipe_stack,
-                comment="PipeBatch.run_pipe() on branch_index of batch",
-            )
+        # for branch_index, branch_output_stuff in enumerate(output_stuffs):
+        #     branch_output_item_code = branch_output_item_codes[branch_index]
+        #     get_mission_tracker().add_aggregate_step(
+        #         from_stuff=branch_output_stuff,
+        #         to_stuff=output_stuff,
+        #         pipe_layer=pipe_run_params.pipe_layers,
+        #         comment="PipeBatch.run_pipe() on branch_index of batch",
+        #     )
 
         working_memory.set_new_main_stuff(
             stuff=output_stuff,

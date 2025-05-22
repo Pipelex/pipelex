@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
+# SPDX-License-Identifier: Elastic-2.0
+# "Pipelex" is a trademark of Evotis S.A.S.
+
+####################################################################################################
+# LLM Deck overrides
+####################################################################################################
+
+[llm_choice_overrides]
+for_text = "disabled"
+for_object = "disabled"
+for_object_direct = "disabled"
+for_object_list = "disabled"
+for_object_list_direct = "disabled"

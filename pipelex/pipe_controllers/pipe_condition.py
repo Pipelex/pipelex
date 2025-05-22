@@ -2,28 +2,26 @@
 # SPDX-License-Identifier: Elastic-2.0
 # "Pipelex" is a trademark of Evotis S.A.S.
 
-from typing import Dict, Optional, Self, Set
+from typing import Dict, Optional, Self, Set, cast
 
 import shortuuid
 from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import get_config
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeConditionError, PipeDefinitionError, PipeExecutionError, PipeInputError, WorkingMemoryStuffNotFoundError
-from pipelex.hub import get_pipe_router
-from pipelex.job_history import job_history
-from pipelex.job_metadata import JobCategory, JobMetadata
+from pipelex.hub import get_mission_tracker, get_pipe_router
+from pipelex.mission.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
+from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
 
 
-class PipeCondition(PipeAbstract):
+class PipeCondition(PipeController):
     expression_jinja2: Optional[str]
     expression: Optional[str]
     pipe_map: Dict[str, str]
@@ -63,8 +61,7 @@ class PipeCondition(PipeAbstract):
         return set(pipe_codes)
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -73,7 +70,7 @@ class PipeCondition(PipeAbstract):
     ) -> PipeOutput:
         log.dev(f"{self.class_name} generating a '{self.output_concept_code}'")
 
-        # TODO: restore pipe_stack feature
+        # TODO: restore pipe_layer feature
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
 
         pipe_jinja2 = PipeJinja2(
@@ -83,18 +80,25 @@ class PipeCondition(PipeAbstract):
         )
         jinja2_job_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(
-                session_id=get_config().session_id,
                 job_category=JobCategory.JINJA2_JOB,
             )
         )
         log.debug(f"Jinja2 expression: {self.applied_expression_jinja2}")
-        evaluated_expression = (
-            await pipe_jinja2.run_pipe(
-                job_metadata=jinja2_job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
-            )
-        ).rendered_text.strip()
+        # evaluated_expression = (
+        #     await pipe_jinja2.run_pipe(
+        #         job_metadata=jinja2_job_metadata,
+        #         working_memory=working_memory,
+        #         pipe_run_params=pipe_run_params,
+        #     )
+        # ).rendered_text.strip()
+        # TODO: restore the possibility above, without need to explicitly cast the output
+        pipe_output_1: PipeOutput = await pipe_jinja2.run_pipe(
+            job_metadata=jinja2_job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+        )
+        pipe_jinja2_output = cast(PipeJinja2Output, pipe_output_1)
+        evaluated_expression = pipe_jinja2_output.rendered_text.strip()
 
         if not evaluated_expression or evaluated_expression == "None":
             error_msg = f"Conditional expression returned an empty string in pipe {self.code}:"
@@ -126,15 +130,15 @@ class PipeCondition(PipeAbstract):
         try:
             required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
         except WorkingMemoryStuffNotFoundError as exc:
-            error_details = f"PipeCondition '{self.code}', stack: {pipe_run_params.pipe_stack}, required_variables: {required_variables}"
+            error_details = f"PipeCondition '{self.code}', stack: {pipe_run_params.pipe_layers}, required_variables: {required_variables}"
             raise PipeInputError(f"Some required stuff(s) not found - {error_details}") from exc
 
         for required_stuff in required_stuffs:
-            job_history.add_condition_step(
+            get_mission_tracker().add_condition_step(
                 from_stuff=required_stuff,
                 to_condition=condition_details,
                 condition_expression=self.expression or self.applied_expression_jinja2,
-                pipe_stack=pipe_run_params.pipe_stack,
+                pipe_layer=pipe_run_params.pipe_layers,
                 comment="PipeCondition required for condition",
             )
 
@@ -146,10 +150,10 @@ class PipeCondition(PipeAbstract):
             pipe_run_params=pipe_run_params,
             output_name=output_name,
         )
-        job_history.add_choice_step(
+        get_mission_tracker().add_choice_step(
             from_condition=condition_details,
             to_stuff=pipe_output.main_stuff,
-            pipe_stack=pipe_run_params.pipe_stack,
+            pipe_layer=pipe_run_params.pipe_layers,
             comment="PipeCondition chosen pipe",
         )
         return pipe_output

@@ -5,6 +5,10 @@
 [pipelex]
 extra_env_files = ["secrets.env"]
 
+[pipelex.feature_config]
+# WIP feature flag (pushed back by a recent refactor)
+is_mission_tracking_enabled = false
+
 ####################################################################################################
 # Log config
 ####################################################################################################
@@ -87,8 +91,6 @@ cost_report_extension = "xlsx"
 cost_report_unit_scale = 1.0
 
 [cogt.llm_config]
-llm_integrations_path = "llm_integrations"
-
 default_max_images = 100
 
 [cogt.llm_config.instructor_config]
@@ -170,6 +172,7 @@ seed = "auto"
 
 [cogt.ocr_config]
 ocr_handles = ["mistral/mistral-ocr-latest"]
+page_output_text_file_name = "page_text.md"
 
 ####################################################################################################
 # Pipelex prompting config
@@ -201,7 +204,7 @@ structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
 # History graph config
 ####################################################################################################
 
-[pipelex.history_graph_config]
+[pipelex.tracker_config]
 is_debug_mode = false
 is_include_text_preview = false
 is_include_interactivity = false
@@ -217,3 +220,11 @@ branch_edge_style = "-...-"
 aggregate_edge_style = "-...-"
 condition_edge_style = "-----"
 choice_edge_style = "-----"
+
+####################################################################################################
+# Pipelex run config
+####################################################################################################
+
+[pipelex.pipe_run_config]
+# TODO: this config value is not applied yet
+pipe_stack_limit = 20

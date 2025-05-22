@@ -7,16 +7,16 @@ from typing import List, Optional, Set
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeRunParamsError
-from pipelex.job_metadata import JobMetadata
+from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 
 
-class PipeSequence(PipeAbstract):
+class PipeSequence(PipeController):
     pipe_steps: List[SubPipe]
 
     @override
@@ -24,8 +24,7 @@ class PipeSequence(PipeAbstract):
         return set(step.pipe_code for step in self.pipe_steps)
 
     @override
-    @update_job_metadata_for_pipe
-    async def run_pipe(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -33,7 +32,7 @@ class PipeSequence(PipeAbstract):
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         log.debug(f"run_pipe_direct: output_name={output_name}")
-        pipe_run_params.push_pipe_code(pipe_code=self.code)
+        pipe_run_params.push_pipe_layer(pipe_code=self.code)
         if pipe_run_params.is_multiple_output_required:
             raise PipeRunParamsError(
                 f"PipeSequence does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"

@@ -69,7 +69,7 @@ class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
     def load_llm_model_library_dict(cls) -> LLMModelLibraryDict:
         libraries_path = LibraryConfig.exported_llm_integrations_path
         llm_library: LLMModelLibraryDict = {}
-        for library_file_name in os.listdir(libraries_path):
+        for library_file_name in sorted(os.listdir(libraries_path)):
             library_path = os.path.join(libraries_path, library_file_name)
             llm_families: LLMModelLibraryDict = load_toml_from_path(library_path)
             llm_library.update(llm_families)

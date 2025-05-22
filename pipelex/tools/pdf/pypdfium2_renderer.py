@@ -12,6 +12,15 @@ import pypdfium2 as pdfium
 from PIL import Image
 from pypdfium2.raw import FPDFBitmap_BGRA
 
+from pipelex.tools.exceptions import ToolException
+from pipelex.tools.misc.file_fetching_helpers import fetch_file_from_url_httpx_async
+from pipelex.tools.utils.path_utils import clarify_path_or_url
+
+
+class PyPdfium2RendererError(ToolException):
+    pass
+
+
 PdfInput = str | pathlib.Path | bytes
 
 
@@ -44,7 +53,6 @@ class PyPdfium2Renderer:
                 rev_byteorder=True,  # so we get RGBA
             ).to_pil()
 
-            # pil_img.show()
             images.append(pil_img)  # pyright: ignore[reportUnknownArgumentType]
             page.close()
         pdf_doc.close()
@@ -55,6 +63,16 @@ class PyPdfium2Renderer:
         """Render *one* page and return PNG bytes."""
         async with self._pdfium_lock:
             return await asyncio.to_thread(self._render_pdf_pages_sync, pdf_input, dpi)
+
+    async def render_pdf_pages_from_uri(self, pdf_uri: str, dpi: int = 300) -> List[Image.Image]:
+        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)  # pyright: ignore
+        if pdf_url:
+            pdf_bytes = await fetch_file_from_url_httpx_async(url=pdf_url)
+            return await self.render_pdf_pages(pdf_input=pdf_bytes, dpi=dpi)
+        elif pdf_path:
+            return await self.render_pdf_pages(pdf_input=pdf_path, dpi=dpi)
+        else:
+            raise PyPdfium2RendererError(f"Invalid PDF URI: {pdf_uri}")
 
 
 pypdfium2_renderer = PyPdfium2Renderer()
