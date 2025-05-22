@@ -172,7 +172,7 @@ seed = "auto"
 
 [cogt.ocr_config]
 ocr_handles = ["mistral/mistral-ocr-latest"]
-page_output_text_file_name = "page_text.txt"
+page_output_text_file_name = "page_text.md"
 
 ####################################################################################################
 # Pipelex prompting config
