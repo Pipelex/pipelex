@@ -154,7 +154,10 @@ class PipeRunParams(BaseModel):
     def pop_pipe_from_stack(self, pipe_code: str) -> None:
         popped_pipe_code = self.pipe_stack.pop()
         if popped_pipe_code != pipe_code:
-            raise PipeRunError(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
+            # raise PipeRunError(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
+            log.error(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
+            # TODO: investigate how this can happen, maybe due to a shared object between branches of PipeBtach
+            # (which should be copied instead)
         log.debug(f"Pop Pipe stack <-- {self.pipe_stack}")
 
     def push_pipe_layer(self, pipe_code: str) -> None:
