@@ -38,11 +38,11 @@ class Page(CustomBaseModel):
     extracted_images: List[ExtractedImageFromPage] = Field(default_factory=list)
     screenshot: Optional[ExtractedImageFromPage] = None
 
-    def save_to_directory(self, directory: str):
+    def save_to_directory(self, directory: str, page_text_file_name: str):
         ensure_directory_exists(directory)
         log.debug(f"Saving page to directory: {directory}")
         if text := self.text:
-            filename = "page_text.txt"
+            filename = page_text_file_name
             save_text_to_path(text=text, path=f"{directory}/{filename}")
         for image in self.extracted_images:
             image.save_to_directory(directory=directory)
@@ -57,10 +57,10 @@ class OcrOutput(CustomBaseModel):
     def concatenated_text(self) -> str:
         return "\n".join([page.text for page in self.pages.values() if page.text])
 
-    def save_to_directory(self, directory: str):
+    def save_to_directory(self, directory: str, page_text_file_name: str):
         ensure_directory_exists(directory)
         full_text = self.concatenated_text
         save_text_to_path(text=full_text, path=f"{directory}/full_text.txt")
         for page_number, page in self.pages.items():
             directory_for_page = f"{directory}/page_{page_number}"
-            page.save_to_directory(directory=directory_for_page)
+            page.save_to_directory(directory=directory_for_page, page_text_file_name=page_text_file_name)

@@ -31,6 +31,7 @@ class CogtReportConfig(ConfigModel):
 
 class OcrConfig(ConfigModel):
     ocr_handles: List[str]
+    page_output_text_file_name: str
 
 
 class ImggConfig(ConfigModel):

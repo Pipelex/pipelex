@@ -7,7 +7,7 @@ from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import ListContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
@@ -42,7 +42,7 @@ class TestPipeBatch:
         # Run the pipe
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code="test_pipe_batch",
-            pipe_run_params=PipeRunParams(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(),
             working_memory=working_memory,
         )
 

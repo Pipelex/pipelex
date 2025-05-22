@@ -11,6 +11,7 @@ from pipelex import log, pretty_print
 from pipelex.activity_handler import ActivityHandlerForResultFiles
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunParams
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_factory import StuffBlueprint
 from pipelex.core.working_memory import WorkingMemory
@@ -41,7 +42,7 @@ class TestPipeRouter:
         working_memory = WorkingMemoryFactory.make_from_single_blueprint(blueprint=blueprint)
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParams(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(),
             working_memory=working_memory,
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
@@ -71,7 +72,7 @@ class TestPipeRouter:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParams(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(),
             working_memory=working_memory,
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
@@ -96,7 +97,7 @@ class TestPipeRouter:
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParams(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(),
             working_memory=WorkingMemory(),
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
@@ -127,7 +128,7 @@ class TestPipeRouter:
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParams(
+            pipe_run_params=PipeRunParamsFactory.make_run_params(
                 output_multiplicity=output_multiplicity,
             ),
             working_memory=WorkingMemory(),
@@ -161,7 +162,7 @@ class TestPipeRouter:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
         pipe_output: PipeOutput = await pipe_router.run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParams(
+            pipe_run_params=PipeRunParamsFactory.make_run_params(
                 batch_params=BatchParams(
                     input_list_stuff_name=input_list_stuff_name,
                     input_item_stuff_name=input_item_stuff_name,

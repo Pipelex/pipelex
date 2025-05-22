@@ -183,7 +183,7 @@ class PipeLLM(PipeOperator):
         #         pipe_run_params=llm_prompt_run_params,
         #     )
         # ).llm_prompt
-        # TODO: kludge
+        # TODO: restore the possibility above, without need to explicitly cast the output
         pipe_output: PipeOutput = await self.pipe_llm_prompt.run_pipe(
             job_metadata=prompt_job_metadata,
             working_memory=working_memory,

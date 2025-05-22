@@ -6,7 +6,8 @@ from typing import Optional, Tuple
 
 from pipelex import pretty_print
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunParams
+from pipelex.core.pipe_run_params import PipeOutputMultiplicity
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.hub import get_mission_manager, get_pipe_router, get_report_delegate, get_required_pipe
 from pipelex.mission.job_metadata import JobMetadata
@@ -29,7 +30,7 @@ async def execute_mission(
         mission_id=mission_id,
     )
 
-    pipe_run_params = PipeRunParams(
+    pipe_run_params = PipeRunParamsFactory.make_run_params(
         output_multiplicity=output_multiplicity,
         dynamic_output_concept_code=dynamic_output_concept_code,
     )

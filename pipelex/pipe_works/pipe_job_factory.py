@@ -6,6 +6,7 @@ from typing import Optional
 
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_works.pipe_job import PipeJob
@@ -24,7 +25,7 @@ class PipeJobFactory:
         job_metadata = job_metadata or JobMetadata()
         working_memory = working_memory or WorkingMemory()
         if not pipe_run_params:
-            pipe_run_params = PipeRunParams()
+            pipe_run_params = PipeRunParamsFactory.make_run_params()
         return PipeJob(
             job_metadata=job_metadata,
             working_memory=working_memory,

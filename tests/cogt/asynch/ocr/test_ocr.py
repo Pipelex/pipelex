@@ -9,6 +9,7 @@ from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobParams
 from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
+from pipelex.config import get_config
 from pipelex.hub import get_ocr_worker
 from pipelex.tools.utils.path_utils import get_incremental_directory_path
 from tests.test_data import ImageTestCases, PDFTestCases
@@ -78,4 +79,7 @@ class TestCogtOcr:
             base_path="results/test_ocr_image_save",
             base_name="ocr_output",
         )
-        ocr_output.save_to_directory(directory=directory)
+        ocr_output.save_to_directory(
+            directory=directory,
+            page_text_file_name=get_config().cogt.ocr_config.page_output_text_file_name,
+        )

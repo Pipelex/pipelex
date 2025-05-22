@@ -91,7 +91,7 @@ class PipeCondition(PipeController):
         #         pipe_run_params=pipe_run_params,
         #     )
         # ).rendered_text.strip()
-        # TODO: kludge
+        # TODO: restore the possibility above, without need to explicitly cast the output
         pipe_output_1: PipeOutput = await pipe_jinja2.run_pipe(
             job_metadata=jinja2_job_metadata,
             working_memory=working_memory,

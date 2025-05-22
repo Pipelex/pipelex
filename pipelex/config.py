@@ -23,7 +23,6 @@ class PipelexConfigError(PipelexError):
 
 
 class PipeRunConfig(ConfigModel):
-    # TODO: this config value is not applied yet
     pipe_stack_limit: int
 
 

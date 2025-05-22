@@ -106,13 +106,14 @@ class BatchParams(BaseModel):
 
 class PipeRunParams(BaseModel):
     final_stuff_code: Optional[str] = None
-    pipe_stack: List[str] = Field(default_factory=list)
-    pipe_layers: List[str] = Field(default_factory=list)
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
+    dynamic_output_concept_code: Optional[str] = None
     batch_params: Optional[BatchParams] = None
     params: Dict[str, Any] = Field(default_factory=dict)
-    dynamic_output_concept_code: Optional[str] = None
-    pipe_stack_limit: int = 20
+
+    pipe_stack_limit: int
+    pipe_stack: List[str] = Field(default_factory=list)
+    pipe_layers: List[str] = Field(default_factory=list)
 
     @field_validator("params")
     @classmethod

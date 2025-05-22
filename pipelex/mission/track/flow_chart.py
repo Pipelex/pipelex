@@ -92,7 +92,7 @@ class MissionFlowChart:
                 graph_tree.nodes_by_subgraph[sub_graph] = []
             graph_tree.nodes_by_subgraph[sub_graph].append(node)
 
-        # pretty_print(graph_tree, title="Graph tree")
+        log.verbose(graph_tree, title="Graph tree")
 
         subgraph_lines = self.generate_subgraph_lines(graph_tree)
         mermaid_code += "\n".join(subgraph_lines)

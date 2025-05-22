@@ -87,8 +87,11 @@ class MistralOcrWorker(OcrWorkerAbstract):
         if should_caption_images:
             raise OcrCapabilityError("Captioning is not implemented for Mistral OCR.")
         if should_include_screenshots:
-            # raise OcrCapabilityError("Screenshots are not implemented for Mistral OCR.")
             log.debug("Screenshots are not implemented for Mistral OCR.")
+            # TODO: use a model capability flag to check possibility before asking for it
+            # it it's asked and not available, raise
+            # the caller will be responsible to get the screenshots using other solution if needed
+            # raise OcrCapabilityError("Screenshots are not implemented for Mistral OCR.")
         pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)  # pyright: ignore
         ocr_output: OcrOutput
         if pdf_url:
