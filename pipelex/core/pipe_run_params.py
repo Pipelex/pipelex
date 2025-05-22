@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field, field_validator
 
 from pipelex import log
 from pipelex.core.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
-from pipelex.exceptions import PipeRunError
 
 
 class PipeRunParamKey(StrEnum):
