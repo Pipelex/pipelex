@@ -66,8 +66,8 @@ class TestOcr:
         ocr_job_params = OcrJobParams(
             should_include_images=True,
             should_caption_images=False,
-            should_include_screenshots=False,
-            screenshots_dpi=72,
+            should_include_page_views=False,
+            page_views_dpi=72,
         )
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(pdf_uri=file_path),

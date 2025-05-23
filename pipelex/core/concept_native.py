@@ -92,7 +92,7 @@ class NativeConceptCode(StrEnum):
                 return Concept(
                     code=ConceptFactory.make_concept_code(SpecialDomain.NATIVE, code),
                     domain=SpecialDomain.NATIVE,
-                    definition="The content of a page of a document, comprising text and linked images as well as an optional screenshot of the page",
+                    definition="The content of a page of a document, comprising text and linked images as well as an optional page view",
                     structure_class_name=NativeConceptClass.PAGE,
                 )
 
