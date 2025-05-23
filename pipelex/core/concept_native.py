@@ -79,7 +79,7 @@ class NativeConcept(Enum):
             case NativeConcept.DYNAMIC:
                 definition = "A dynamic concept"
             case NativeConcept.PAGE:
-                definition = "The content of a page of a document, comprising text and linked images as well as an optional screenshot of the page"
+                definition = "The content of a page of a document, comprising text and linked images as well as an optional page view image"
 
         return Concept(
             code=self.code,

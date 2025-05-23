@@ -520,10 +520,10 @@ class TextAndImagesContent(StuffContent):
 
 class PageContent(StructuredContent):
     text_and_images: TextAndImagesContent
-    screenshot: Optional[ImageContent] = None
+    page_view: Optional[ImageContent] = None
 
     def save_to_directory(self, directory: str):
         ensure_directory_exists(directory)
         self.text_and_images.save_to_directory(directory=directory)
-        if screenshot := self.screenshot:
-            screenshot.save_to_directory(directory=directory, base_name="screenshot")
+        if page_view := self.page_view:
+            page_view.save_to_directory(directory=directory, base_name="page_view")
