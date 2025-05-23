@@ -34,7 +34,7 @@ class TestPipeOCR:
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
-                screenshots_dpi=300,
+                page_views_dpi=300,
                 output_concept_code=NativeConcept.TEXT_AND_IMAGES.code,
             ),
             working_memory=WorkingMemoryFactory.make_from_image(
@@ -63,7 +63,7 @@ class TestPipeOCR:
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
-                screenshots_dpi=300,
+                page_views_dpi=300,
                 output_concept_code=NativeConcept.TEXT_AND_IMAGES.code,
             ),
             working_memory=WorkingMemoryFactory.make_from_pdf(

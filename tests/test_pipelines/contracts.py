@@ -15,6 +15,7 @@ class Fees(SourcedAnswer[Any]):
     class Value(StrEnum):
         PERCENTAGE = "Percentage"
         AMOUNT = "Amount"
+        INDETERMINATE = "Indeterminate"
 
     class Currency(StrEnum):
         USD = "USD"

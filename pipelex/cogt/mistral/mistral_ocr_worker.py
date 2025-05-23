@@ -56,7 +56,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
                 should_include_page_views=ocr_job.job_params.should_include_page_views,
             )
         else:
-            raise OcrInputError("No image or PDF URI provided in OcrJob")
+            raise OcrInputError("No image nor PDF URI provided in OcrJob")
         return ocr_output
 
     async def make_ocr_output_from_image(
