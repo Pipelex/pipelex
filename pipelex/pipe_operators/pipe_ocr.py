@@ -112,7 +112,7 @@ class PipeOcr(PipeOperator):
         page_contents: List[PageContent] = []
         for page_index, page in ocr_output.pages.items():
             images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
-            screenshot = screenshot_contents[page_index] if self.should_include_screenshots and pdf_uri else None
+            screenshot = screenshot_contents[page_index] if self.should_include_screenshots else None
             page_contents.append(
                 PageContent(
                     text_and_images=TextAndImagesContent(
