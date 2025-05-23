@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 from pytest import CaptureFixture
 
-from pipelex.tools.utils.pretty import pretty_print, pretty_print_in_sandbox
+from pipelex.tools.misc.pretty import pretty_print, pretty_print_in_sandbox
 
 
 class Address(BaseModel):

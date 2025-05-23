@@ -39,6 +39,22 @@ class LLMSDKError(CogtError):
     pass
 
 
+class LLMPresetNotFoundError(CogtError):
+    pass
+
+
+class LLMSettingsValidationError(CogtError):
+    pass
+
+
+class LLMDeckValidatonError(CogtError):
+    pass
+
+
+class LLMHandleNotFoundError(CogtError):
+    pass
+
+
 class LLMModelProviderError(CogtError):
     pass
 

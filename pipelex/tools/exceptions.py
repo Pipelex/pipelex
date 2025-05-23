@@ -32,3 +32,15 @@ class TracebackMessageError(RootException):
 
 class FatalError(TracebackMessageError):
     pass
+
+
+class ConfigValidationError(FatalError):
+    pass
+
+
+class ConfigNotFoundError(RootException):
+    pass
+
+
+class ConfigModelError(ValueError, FatalError):
+    pass

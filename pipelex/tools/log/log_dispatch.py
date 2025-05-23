@@ -14,7 +14,7 @@ from pipelex.tools.log.log_config import (
     CallerInfoTemplate,
     LogConfig,
 )
-from pipelex.tools.utils.json_utils import purify_json, purify_json_dict, purify_json_list
+from pipelex.tools.misc.json_utils import purify_json, purify_json_dict, purify_json_list
 
 
 class LogDispatch:

@@ -5,7 +5,7 @@
 from pydantic import BaseModel
 
 from pipelex import pretty_print
-from pipelex.tools.utils.class_structure_utils import get_type_structure
+from pipelex.tools.typing.type_inspector import get_type_structure
 
 
 class Simple(BaseModel):

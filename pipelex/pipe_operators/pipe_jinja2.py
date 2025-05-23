@@ -25,7 +25,7 @@ from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
-from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
+from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
 
 class PipeJinja2Output(PipeOutput):

@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 import toml
 
-from pipelex.tools.utils.path_utils import path_exists
+from pipelex.tools.misc.file_utils import path_exists
 
 
 def load_toml_from_path(path: str) -> Dict[str, Any]:

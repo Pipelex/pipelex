@@ -9,9 +9,9 @@ from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptTemplateInputsError
+from pipelex.tools.misc.json_utils import json_str
+from pipelex.tools.misc.string_utils import can_inject_text
 from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
-from pipelex.tools.utils.json_utils import json_str
-from pipelex.tools.utils.string_utils import can_inject_text
 
 LLMPromptTemplateInputsDict = Dict[str, Any]
 

@@ -32,8 +32,8 @@ from pipelex.mission.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.tools.templating.templating_models import PromptingStyle
-from pipelex.tools.utils.class_structure_utils import get_type_structure
-from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
+from pipelex.tools.typing.type_inspector import get_type_structure
+from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
 
 
 class PipeLLMPromptOutput(PipeOutput):

@@ -7,12 +7,12 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-from pipelex.tools.exceptions import FatalError
+from pipelex.tools.exceptions import ToolException
 
 load_dotenv(dotenv_path=".env", override=True)
 
 
-class EnvVarNotFoundError(FatalError):
+class EnvVarNotFoundError(ToolException):
     pass
 
 

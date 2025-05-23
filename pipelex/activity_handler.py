@@ -19,9 +19,8 @@ from pipelex.core.stuff_content import (
     TextContent,
 )
 from pipelex.tools.misc.file_fetching_helpers import fetch_file_from_url_httpx
-from pipelex.tools.utils.file_utils import save_text_to_path
-from pipelex.tools.utils.json_utils import save_as_json_to_path
-from pipelex.tools.utils.path_utils import ensure_path
+from pipelex.tools.misc.file_utils import ensure_path, save_text_to_path
+from pipelex.tools.misc.json_utils import save_as_json_to_path
 
 
 class ActivityHandlerForResultFiles:

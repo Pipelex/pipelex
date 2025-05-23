@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pipelex import log
 from pipelex.core.stuff_content import StuffContent
 from pipelex.exceptions import ConceptCodeError, ConceptDomainError, ConceptError, StructureClassError
-from pipelex.tools.utils.string_utils import pascal_case_to_sentence
+from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 
 
 class Concept(BaseModel):

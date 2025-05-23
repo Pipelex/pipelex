@@ -9,8 +9,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImggPromptError
+from pipelex.tools.misc.json_utils import json_str
 from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
-from pipelex.tools.utils.json_utils import json_str
 
 
 class ImggPrompt(BaseModel):

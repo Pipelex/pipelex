@@ -24,7 +24,7 @@ from pipelex.mission.track.tracker_models import (
     SubGraphClassDef,
 )
 from pipelex.tools.misc.mermaid_helpers import clean_str_for_mermaid_node_title, make_mermaid_url
-from pipelex.tools.utils.string_utils import snake_to_capitalize_first_letter
+from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
 
 
 def nice_edge_tag(edge_tag: str) -> str:

@@ -4,8 +4,8 @@
 
 from typing import Any, Dict, List
 
-from pipelex.tools.utils.json_utils import purify_json_dict
-from pipelex.tools.utils.string_utils import snake_to_capitalize_first_letter
+from pipelex.tools.misc.json_utils import purify_json_dict
+from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
 
 
 def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False) -> str:

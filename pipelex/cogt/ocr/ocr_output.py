@@ -8,8 +8,8 @@ from pydantic import Field
 
 from pipelex import log
 from pipelex.tools.misc.base_64 import save_base64_to_binary_file
-from pipelex.tools.misc.custom_base_model import CustomBaseModel
-from pipelex.tools.utils.file_utils import ensure_directory_exists, save_text_to_path
+from pipelex.tools.misc.file_utils import ensure_directory_exists, save_text_to_path
+from pipelex.tools.typing.custom_base_model import CustomBaseModel
 
 
 class ExtractedImage(CustomBaseModel):

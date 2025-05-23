@@ -22,11 +22,11 @@ from pipelex.core.pipe_blueprint import PipeSpecificFactoryProtocol
 from pipelex.core.pipe_library import PipeLibrary
 from pipelex.exceptions import ConceptLibraryError, LibraryError, LibraryParsingError, PipeFactoryError, PipeLibraryError
 from pipelex.libraries.library_config import LibraryConfig
+from pipelex.tools.misc.file_utils import copy_file_from_package, copy_folder_from_package, find_files_in_dir
+from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.model_helpers import format_pydantic_validation_error
 from pipelex.tools.misc.toml_helpers import load_toml_from_path
 from pipelex.tools.runtime_manager import runtime_manager
-from pipelex.tools.utils.json_utils import deep_update
-from pipelex.tools.utils.path_utils import find_files_in_dir
 
 
 class LibraryComponent(StrEnum):

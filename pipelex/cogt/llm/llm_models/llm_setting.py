@@ -6,10 +6,11 @@ from typing import Literal, Optional, Self, Set, Union
 
 from pydantic import Field, field_validator, model_validator
 
+from pipelex.cogt.exceptions import LLMSettingsValidationError
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
-from pipelex.tools.config.errors import ConfigValidationError, LLMSettingsValidationError
 from pipelex.tools.config.models import ConfigModel
+from pipelex.tools.exceptions import ConfigValidationError
 
 
 class LLMSetting(ConfigModel):

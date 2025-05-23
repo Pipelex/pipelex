@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from pipelex.core.pipe_run_params import BatchParams, make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.tools.utils.validation_utils import has_more_than_one_among_attributes_from_list
+from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
 
 
 class SubPipeBlueprint(BaseModel):

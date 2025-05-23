@@ -11,7 +11,7 @@ from pipelex.cogt.ocr.ocr_job_components import OcrJobParams
 from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
 from pipelex.config import get_config
 from pipelex.hub import get_ocr_worker
-from pipelex.tools.utils.path_utils import get_incremental_directory_path
+from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from tests.test_data import ImageTestCases, PDFTestCases
 
 

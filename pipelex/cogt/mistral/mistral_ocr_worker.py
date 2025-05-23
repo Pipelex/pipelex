@@ -18,7 +18,7 @@ from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract, ocr_job_func
 from pipelex.tools.misc.base_64 import load_binary_as_base64_async
-from pipelex.tools.utils.path_utils import clarify_path_or_url
+from pipelex.tools.misc.path_utils import clarify_path_or_url
 
 
 class MistralOcrWorker(OcrWorkerAbstract):

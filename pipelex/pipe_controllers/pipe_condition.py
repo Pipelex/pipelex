@@ -18,7 +18,7 @@ from pipelex.mission.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
-from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
+from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
 
 class PipeCondition(PipeController):

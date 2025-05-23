@@ -18,7 +18,7 @@ from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm import PipeLLM, StructuringMethod
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
-from pipelex.tools.utils.validation_utils import has_more_than_one_among_attributes_from_any_list
+from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_any_list
 
 
 class PipeLLMBlueprint(PipeBlueprint):

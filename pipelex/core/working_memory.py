@@ -26,7 +26,7 @@ from pipelex.core.stuff_content import (
     TextContent,
 )
 from pipelex.exceptions import WorkingMemoryError, WorkingMemoryNotFoundError, WorkingMemoryStuffNotFoundError, WorkingMemoryTypeError
-from pipelex.tools.utils.json_utils import save_as_json_to_path
+from pipelex.tools.misc.json_utils import save_as_json_to_path
 
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "_batch_item"

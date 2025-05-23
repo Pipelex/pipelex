@@ -14,8 +14,8 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from pipelex.config import get_config
 from pipelex.hub import get_template
+from pipelex.tools.misc.string_utils import is_none_or_has_text
 from pipelex.tools.templating.template_provider_abstract import TemplateProviderAbstract
-from pipelex.tools.utils.string_utils import is_none_or_has_text
 
 
 class LLMPromptTemplate(LLMPromptFactoryAbstract):

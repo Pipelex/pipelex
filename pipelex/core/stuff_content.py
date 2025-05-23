@@ -19,13 +19,13 @@ from yattag import Doc
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.ocr.ocr_output import ExtractedImage
 from pipelex.tools.misc.base_64 import save_base64_to_binary_file
-from pipelex.tools.misc.custom_base_model import CustomBaseModel
+from pipelex.tools.misc.file_utils import ensure_directory_exists, get_incremental_file_path, save_text_to_path
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.misc.markdown_helpers import convert_to_markdown
 from pipelex.tools.misc.model_helpers import clean_model_to_dict
+from pipelex.tools.misc.path_utils import InterpretedPathOrUrl, interpret_path_or_url
 from pipelex.tools.templating.templating_models import TextFormat
-from pipelex.tools.utils.file_utils import ensure_directory_exists, save_text_to_path
-from pipelex.tools.utils.filetype_utils import detect_file_type_from_base64
-from pipelex.tools.utils.path_utils import InterpretedPathOrUrl, get_incremental_file_path, interpret_path_or_url
+from pipelex.tools.typing.custom_base_model import CustomBaseModel
 
 ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")

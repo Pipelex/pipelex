@@ -5,8 +5,7 @@
 from typing import ClassVar, List
 
 from pipelex.tools.config.models import ConfigModel
-from pipelex.tools.utils.file_utils import copy_file_from_package, copy_folder_from_package
-from pipelex.tools.utils.path_utils import find_files_in_dir
+from pipelex.tools.misc.file_utils import copy_file_from_package, copy_folder_from_package, find_files_in_dir
 
 
 class LibraryConfig(ConfigModel):

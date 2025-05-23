@@ -23,7 +23,7 @@ from pipelex.core.stuff_content import (
     TextContent,
 )
 from pipelex.exceptions import StuffError
-from pipelex.tools.utils.string_utils import pascal_case_to_snake_case
+from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 
 class StuffCreationRecord(BaseModel):

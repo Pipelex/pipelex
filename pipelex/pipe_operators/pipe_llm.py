@@ -11,7 +11,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMSettingChoices
-from pipelex.cogt.llm.llm_models.llm_deck_check import check_llm_setting_with_config
+from pipelex.cogt.llm.llm_models.llm_deck_check import check_llm_setting_with_deck
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
@@ -87,7 +87,7 @@ class PipeLLM(PipeOperator):
             get_template(template_name=self.system_prompt_to_structure)
         if self.llm_choices:
             for llm_setting in self.llm_choices.list_used_presets():
-                check_llm_setting_with_config(llm_setting_or_preset_id=llm_setting)
+                check_llm_setting_with_deck(llm_setting_or_preset_id=llm_setting)
 
     @property
     def llm_setting_main(self) -> LLMSetting:

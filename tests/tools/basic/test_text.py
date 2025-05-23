@@ -4,7 +4,7 @@
 
 import pytest
 
-from pipelex.tools.utils.string_utils import has_text
+from pipelex.tools.misc.string_utils import has_text
 
 
 @pytest.mark.parametrize(

@@ -12,7 +12,7 @@ from pipelex.core.stuff_content import ImageContent, PDFContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.exceptions import WorkingMemoryError
-from pipelex.tools.utils.json_utils import load_json_dict_from_path
+from pipelex.tools.misc.json_utils import load_json_dict_from_path
 
 
 class WorkingMemoryFactory(BaseModel):

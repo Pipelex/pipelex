@@ -8,7 +8,7 @@ from typing import Union
 from pydantic import BaseModel
 from typing_extensions import override
 
-from pipelex.tools.utils.filetype_utils import FileType, detect_file_type_from_base64, detect_file_type_from_path
+from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_base64, detect_file_type_from_path
 
 
 class PromptImageTypedBytes(BaseModel):

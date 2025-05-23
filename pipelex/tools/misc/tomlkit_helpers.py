@@ -7,7 +7,7 @@ from typing import Any, Dict, cast
 import tomlkit
 
 from pipelex import pretty_print
-from pipelex.tools.utils.json_utils import remove_none_values
+from pipelex.tools.misc.json_utils import remove_none_values
 
 
 def save_as_toml_to_path(obj: Dict[str, Any], path: str):

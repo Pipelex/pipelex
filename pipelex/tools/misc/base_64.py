@@ -7,7 +7,7 @@ import base64
 
 import aiofiles
 
-from pipelex.tools.utils.file_utils import save_bytes_to_binary_file
+from pipelex.tools.misc.file_utils import save_bytes_to_binary_file
 
 
 def load_binary_as_base64(path: str) -> bytes:

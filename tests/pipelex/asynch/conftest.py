@@ -14,8 +14,8 @@ from pipelex.activity_manager import get_activity_manager
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
-from pipelex.tools.utils.json_utils import save_as_json_to_path
-from pipelex.tools.utils.path_utils import get_incremental_directory_path
+from pipelex.tools.misc.file_utils import get_incremental_directory_path
+from pipelex.tools.misc.json_utils import save_as_json_to_path
 
 
 @pytest_asyncio.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]

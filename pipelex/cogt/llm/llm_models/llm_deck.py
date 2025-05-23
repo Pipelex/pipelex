@@ -8,20 +8,20 @@ from pydantic import field_validator, model_validator
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import (
+    LLMDeckValidatonError,
+    LLMHandleNotFoundError,
+    LLMPresetNotFoundError,
+    LLMSettingsValidationError,
+)
 from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.cogt.llm.llm_models.llm_model import LLMModel
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
 from pipelex.hub import get_llm_models_provider
-from pipelex.tools.config.errors import (
-    ConfigValidationError,
-    LLMDeckValidatonError,
-    LLMHandleNotFoundError,
-    LLMPresetNotFoundError,
-    LLMSettingsValidationError,
-)
 from pipelex.tools.config.models import ConfigModel
+from pipelex.tools.exceptions import ConfigValidationError
 
 LLM_PRESET_DISABLED = "disabled"
 

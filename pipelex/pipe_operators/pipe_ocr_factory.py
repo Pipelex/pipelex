@@ -12,7 +12,7 @@ from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_ocr import PipeOcr
-from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
+from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
 
 class PipeOcrBlueprint(PipeBlueprint):

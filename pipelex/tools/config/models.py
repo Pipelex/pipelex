@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Type, TypeVar, Union
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from pipelex.tools.config.errors import ConfigModelError, ConfigValidationError
+from pipelex.tools.exceptions import ConfigModelError, ConfigValidationError
 from pipelex.tools.misc.model_helpers import format_pydantic_validation_error
 
 CONFIG_BASE_OVERRIDES_BEFORE_ENV = ["local"]

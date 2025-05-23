@@ -8,7 +8,7 @@ from typing import Any, Dict
 from pipelex.cogt.exceptions import CogtError, MissingDependencyError
 from pipelex.tools.config.models import ConfigModel
 from pipelex.tools.environment import EnvVarNotFoundError, get_required_env
-from pipelex.tools.utils.json_utils import load_json_dict_from_path
+from pipelex.tools.misc.json_utils import load_json_dict_from_path
 
 
 class VertexAICredentialsError(CogtError):

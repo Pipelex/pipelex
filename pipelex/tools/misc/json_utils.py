@@ -8,17 +8,17 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from kajson import kajson
 from pydantic import BaseModel
 
-from pipelex.tools.exceptions import FatalError
-from pipelex.tools.utils.file_utils import save_text_to_path
+from pipelex.tools.exceptions import ToolException
+from pipelex.tools.misc.file_utils import save_text_to_path
 
 JsonContent = Union[Dict[Any, Any], List[Any]]
 
 
-class ArgumentTypeError(FatalError):
+class ArgumentTypeError(ToolException):
     pass
 
 
-class JsonTypeError(FatalError):
+class JsonTypeError(ToolException):
     pass
 
 

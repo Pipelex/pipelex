@@ -14,7 +14,7 @@ from pypdfium2.raw import FPDFBitmap_BGRA
 
 from pipelex.tools.exceptions import ToolException
 from pipelex.tools.misc.file_fetching_helpers import fetch_file_from_url_httpx_async
-from pipelex.tools.utils.path_utils import clarify_path_or_url
+from pipelex.tools.misc.path_utils import clarify_path_or_url
 
 
 class PyPdfium2RendererError(ToolException):

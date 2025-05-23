@@ -12,9 +12,9 @@ from pipelex.tools.config.models import (
     CONFIG_BASE_OVERRIDES_AFTER_ENV,
     CONFIG_BASE_OVERRIDES_BEFORE_ENV,
 )
+from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_helpers import failable_load_toml_from_path
 from pipelex.tools.runtime_manager import runtime_manager
-from pipelex.tools.utils.json_utils import deep_update
 
 CONFIG_NAME = "pipelex.toml"
 

@@ -7,7 +7,7 @@ from typing import Optional, Self
 from pydantic import BaseModel, model_validator
 
 from pipelex.cogt.exceptions import CogtError
-from pipelex.tools.utils.validation_utils import has_exactly_one_among_attributes_from_list
+from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
 
 class OcrInputError(CogtError):
