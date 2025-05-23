@@ -22,8 +22,8 @@ class PipeOcrBlueprint(PipeBlueprint):
     ocr_platform: Optional[OcrPlatform] = None
     page_images: bool = False
     page_image_captions: bool = False
-    screenshots: bool = False
-    screenshots_dpi: int = 300
+    page_views: bool = False
+    page_views_dpi: int = 300
 
     @model_validator(mode="after")
     def validate_input_source(self) -> Self:
@@ -56,8 +56,8 @@ class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
             pdf_stuff_name=pipe_blueprint.pdf,
             should_include_images=pipe_blueprint.page_images,
             should_caption_images=pipe_blueprint.page_image_captions,
-            should_include_screenshots=pipe_blueprint.screenshots,
-            screenshots_dpi=pipe_blueprint.screenshots_dpi,
+            should_include_page_views=pipe_blueprint.page_views,
+            page_views_dpi=pipe_blueprint.page_views_dpi,
         )
 
     @classmethod

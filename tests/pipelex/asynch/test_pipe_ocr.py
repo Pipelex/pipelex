@@ -32,8 +32,8 @@ class TestPipeOCR:
                 image_stuff_name="page_scan",
                 should_include_images=True,
                 should_caption_images=False,
-                should_include_screenshots=True,
-                screenshots_dpi=300,
+                should_include_page_views=True,
+                page_views_dpi=300,
                 output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",
             ),
             working_memory=WorkingMemoryFactory.make_from_image(
@@ -61,8 +61,8 @@ class TestPipeOCR:
                 pdf_stuff_name="pdf",
                 should_include_images=True,
                 should_caption_images=False,
-                should_include_screenshots=True,
-                screenshots_dpi=300,
+                should_include_page_views=True,
+                page_views_dpi=300,
                 output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",
             ),
             working_memory=WorkingMemoryFactory.make_from_pdf(

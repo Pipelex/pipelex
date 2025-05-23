@@ -33,10 +33,11 @@ class PipeOcr(PipeOperator):
     ocr_engine: Optional[OcrEngine] = None
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
-    should_include_screenshots: bool
+    should_include_page_views: bool
     should_caption_images: bool
     should_include_images: bool
-    screenshots_dpi: int
+    should_include_page_views: bool
+    page_views_dpi: int
 
     @model_validator(mode="after")
     def validate_exactly_one_input_stuff_name(self) -> Self:
@@ -70,8 +71,8 @@ class PipeOcr(PipeOperator):
         ocr_job_params = OcrJobParams(
             should_include_images=self.should_include_images,
             should_caption_images=self.should_caption_images,
-            should_include_screenshots=self.should_include_screenshots,
-            screenshots_dpi=self.screenshots_dpi,
+            should_include_page_views=self.should_include_page_views,
+            page_views_dpi=self.page_views_dpi,
         )
         ocr_input = OcrInput(
             image_uri=image_uri,
@@ -86,40 +87,40 @@ class PipeOcr(PipeOperator):
         )
 
         # Build the output stuff, which is a list of page contents
-        screenshot_contents: List[ImageContent] = []
-        if self.should_include_screenshots:
+        page_view_contents: List[ImageContent] = []
+        if self.should_include_page_views:
             if pdf_uri:
                 for page in ocr_output.pages.values():
-                    if page.screenshot:
-                        screenshot_contents.append(ImageContent.make_from_extracted_image(extracted_image=page.screenshot))
-                needs_to_generate_screenshots: bool
-                if len(screenshot_contents) == 0:
-                    log.debug("No screenshots found in the OCR output")
-                    needs_to_generate_screenshots = True
-                elif len(screenshot_contents) < len(ocr_output.pages):
-                    log.warning(f"Only {len(screenshot_contents)} screenshots found in the OCR output, but {len(ocr_output.pages)} pages")
-                    needs_to_generate_screenshots = True
+                    if page.page_view:
+                        page_view_contents.append(ImageContent.make_from_extracted_image(extracted_image=page.page_view))
+                needs_to_generate_page_views: bool
+                if len(page_view_contents) == 0:
+                    log.debug("No page views found in the OCR output")
+                    needs_to_generate_page_views = True
+                elif len(page_view_contents) < len(ocr_output.pages):
+                    log.warning(f"Only {len(page_view_contents)} page found in the OCR output, but {len(ocr_output.pages)} pages")
+                    needs_to_generate_page_views = True
                 else:
-                    log.debug("All screenshots found in the OCR output")
-                    needs_to_generate_screenshots = False
+                    log.debug("All page views found in the OCR output")
+                    needs_to_generate_page_views = False
 
-                if needs_to_generate_screenshots:
-                    screenshot_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=pdf_uri, dpi=self.screenshots_dpi)
-                    screenshot_contents = [ImageContent.make_from_image(image=img) for img in screenshot_images]
+                if needs_to_generate_page_views:
+                    page_views = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=pdf_uri, dpi=self.page_views_dpi)
+                    page_view_contents = [ImageContent.make_from_image(image=img) for img in page_views]
             elif image_uri:
-                screenshot_contents = [ImageContent.make_from_str(str_value=image_uri)]
+                page_view_contents = [ImageContent.make_from_str(str_value=image_uri)]
 
         page_contents: List[PageContent] = []
         for page_index, page in ocr_output.pages.items():
             images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
-            screenshot = screenshot_contents[page_index] if self.should_include_screenshots else None
+            page_view = page_view_contents[page_index] if self.should_include_page_views else None
             page_contents.append(
                 PageContent(
                     text_and_images=TextAndImagesContent(
                         text=TextContent(text=page.text) if page.text else None,
                         images=images,
                     ),
-                    screenshot=screenshot,
+                    page_view=page_view,
                 )
             )
 
