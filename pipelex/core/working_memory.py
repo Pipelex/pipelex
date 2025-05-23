@@ -11,7 +11,6 @@ from pipelex import log, pretty_print
 from pipelex.activity_manager import get_activity_manager
 from pipelex.activity_models import ActivityReport
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_artefact import StuffArtefact
 from pipelex.core.stuff_content import (

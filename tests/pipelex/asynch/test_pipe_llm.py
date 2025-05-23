@@ -8,7 +8,6 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff import Stuff
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate

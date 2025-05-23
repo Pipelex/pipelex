@@ -11,7 +11,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.domain import SpecialDomain
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff import Stuff

@@ -13,7 +13,6 @@ from pipelex.cogt.imgg.imgg_job_components import AspectRatio, ImggJobParams
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.config import get_config
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.domain import SpecialDomain
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunParams, output_multiplicity_to_apply
 from pipelex.core.stuff_content import ImageContent, ListContent, StuffContent, TextContent

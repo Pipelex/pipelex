@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff import Stuff, StuffCreationRecord
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
 from pipelex.exceptions import PipelexError

@@ -7,7 +7,6 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff_content import PageContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.pipe_operators.pipe_ocr import PipeOcr, PipeOcrOutput
