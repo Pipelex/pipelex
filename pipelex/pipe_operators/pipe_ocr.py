@@ -33,7 +33,6 @@ class PipeOcr(PipeOperator):
     ocr_engine: Optional[OcrEngine] = None
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
-    should_include_page_views: bool
     should_caption_images: bool
     should_include_images: bool
     should_include_page_views: bool
