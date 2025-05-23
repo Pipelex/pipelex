@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Protocol, TypeVar
 from pydantic import ConfigDict, field_validator, model_validator
 from typing_extensions import Self, runtime_checkable
 
-from pipelex.core.concept_native import NativeConceptCode
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.stuff_content import StructuredContent
 
@@ -30,7 +30,7 @@ class PipeBlueprint(StructuredContent):
 
     @classmethod
     def _add_native_prefix_if_needed(cls, value: str) -> str:
-        if value in list(NativeConceptCode):
+        if value in NativeConcept.names():
             return f"native.{value}"
         return value
 

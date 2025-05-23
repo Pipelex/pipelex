@@ -7,7 +7,7 @@ from typing import List
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.core.domain import SpecialDomain
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate
@@ -27,7 +27,7 @@ class TestPipeLLM:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm",
                 domain="generic",
-                output_concept_code=f"{SpecialDomain.NATIVE}.Text",
+                output_concept_code=NativeConcept.TEXT.code,
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm",
                     domain="generic",
@@ -62,7 +62,7 @@ class TestPipeLLM:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm_image",
                 domain="generic",
-                output_concept_code=f"{SpecialDomain.NATIVE}.Text",
+                output_concept_code=NativeConcept.TEXT.code,
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm_image",
                     domain="generic",
