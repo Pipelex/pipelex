@@ -1,6 +1,11 @@
 # Changelog
 
-## [v0.2.1] - 2025-05-19
+## [v0.2.2] - 2025-05-22
+
+- Simplify the use of native concepts
+- Include "page views" in the outputs of Ocr features
+
+## [v0.2.1] - 2025-05-22
 
 - Added OcrWorkerAbstract and MistralOcrWorker, along with PipeOcr for OCR processing of images and PDFs.
 - Introduced MissionManager for managing missions, cost reports, and activity tracking.
