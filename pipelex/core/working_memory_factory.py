@@ -6,8 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
-from pipelex.core.concept_native import NativeConceptCode
-from pipelex.core.domain import SpecialDomain
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, PDFContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
@@ -21,7 +20,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_text(
         cls,
         text: str,
-        concept_code: str = NativeConceptCode.TEXT.concept_code,
+        concept_code: str = NativeConcept.TEXT.code,
         name: Optional[str] = "text",
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
@@ -35,7 +34,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_image(
         cls,
         image_url: str,
-        concept_code: str = NativeConceptCode.IMAGE.concept_code,
+        concept_code: str = NativeConcept.IMAGE.code,
         name: Optional[str] = "image",
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
@@ -49,7 +48,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_pdf(
         cls,
         pdf_url: str,
-        concept_code: str = NativeConceptCode.PDF.concept_code,
+        concept_code: str = NativeConcept.PDF.code,
         name: Optional[str] = "pdf",
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
@@ -111,7 +110,7 @@ class WorkingMemoryFactory(BaseModel):
             stuff_dict[name] = Stuff(
                 stuff_name=name,
                 stuff_code="",
-                concept_code=f"{SpecialDomain.NATIVE}.Text",
+                concept_code=NativeConcept.TEXT.code,
                 content=text_content,
             )
         return WorkingMemory(root=stuff_dict)

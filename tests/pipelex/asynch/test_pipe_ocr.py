@@ -6,7 +6,7 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.domain import SpecialDomain
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff_content import PageContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.pipe_operators.pipe_ocr import PipeOcr, PipeOcrOutput
@@ -32,9 +32,9 @@ class TestPipeOCR:
                 image_stuff_name="page_scan",
                 should_include_images=True,
                 should_caption_images=False,
-                should_include_screenshots=True,
-                screenshots_dpi=300,
-                output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",
+                should_include_page_views=True,
+                page_views_dpi=300,
+                output_concept_code=NativeConcept.TEXT_AND_IMAGES.code,
             ),
             working_memory=WorkingMemoryFactory.make_from_image(
                 image_url=image_url,
@@ -61,13 +61,13 @@ class TestPipeOCR:
                 pdf_stuff_name="pdf",
                 should_include_images=True,
                 should_caption_images=False,
-                should_include_screenshots=True,
-                screenshots_dpi=300,
-                output_concept_code=f"{SpecialDomain.NATIVE}.TextAndImage",
+                should_include_page_views=True,
+                page_views_dpi=300,
+                output_concept_code=NativeConcept.TEXT_AND_IMAGES.code,
             ),
             working_memory=WorkingMemoryFactory.make_from_pdf(
                 pdf_url=pdf_url,
-                concept_code=f"{SpecialDomain.NATIVE}.PDF",
+                concept_code=NativeConcept.PDF.code,
                 name="pdf",
             ),
         )

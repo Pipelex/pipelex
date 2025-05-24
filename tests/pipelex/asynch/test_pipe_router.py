@@ -10,7 +10,7 @@ from pytest import FixtureRequest
 from pipelex import log, pretty_print
 from pipelex.activity_handler import ActivityHandlerForResultFiles
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunParams
+from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_factory import StuffBlueprint
@@ -191,7 +191,7 @@ class TestPipeRouter:
         with pytest.raises(exception) as exc:
             await get_pipe_router().run_pipe_code(
                 pipe_code=pipe_code,
-                pipe_run_params=PipeRunParams(
+                pipe_run_params=PipeRunParamsFactory.make_run_params(
                     pipe_stack_limit=6,
                 ),
                 job_metadata=JobMetadata(

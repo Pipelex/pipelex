@@ -23,7 +23,7 @@ class PipeRouter(PipeRouterProtocol):
         pipe_job: PipeJob,
         wfid: Optional[str] = None,
     ) -> PipeOutputType:  # pyright: ignore[reportInvalidTypeVarUse]
-        log.debug("PipeRouterSimple run_pipe_job")
+        log.debug(f"PipeRouter run_pipe_job: pipe_code={pipe_job.pipe.code}")
         working_memory = pipe_job.working_memory
 
         pipe = pipe_job.pipe
@@ -35,8 +35,6 @@ class PipeRouter(PipeRouterProtocol):
             output_name=pipe_job.output_name,
             pipe_run_params=pipe_job.pipe_run_params,
         )
-
-        log.debug("Workflow complete")
         return cast(PipeOutputType, pipe_output)
 
     @override
@@ -49,7 +47,7 @@ class PipeRouter(PipeRouterProtocol):
         output_name: Optional[str] = None,
         wfid: Optional[str] = None,
     ) -> PipeOutputType:  # pyright: ignore[reportInvalidTypeVarUse]
-        log.debug(f"run_pipe_direct: output_name={output_name}")
+        log.debug(f"PipeRouter run_pipe_code: pipe_code={pipe_code}")
         pipe = get_required_pipe(pipe_code)
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,

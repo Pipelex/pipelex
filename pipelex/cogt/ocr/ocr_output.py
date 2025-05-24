@@ -36,7 +36,7 @@ class ExtractedImageFromPage(ExtractedImage):
 class Page(CustomBaseModel):
     text: Optional[str] = None
     extracted_images: List[ExtractedImageFromPage] = Field(default_factory=list)
-    screenshot: Optional[ExtractedImageFromPage] = None
+    page_view: Optional[ExtractedImageFromPage] = None
 
     def save_to_directory(self, directory: str, page_text_file_name: str):
         ensure_directory_exists(directory)
@@ -46,8 +46,8 @@ class Page(CustomBaseModel):
             save_text_to_path(text=text, path=f"{directory}/{filename}")
         for image in self.extracted_images:
             image.save_to_directory(directory=directory)
-        if screenshot := self.screenshot:
-            screenshot.save_to_directory(directory=directory)
+        if page_view := self.page_view:
+            page_view.save_to_directory(directory=directory)
 
 
 class OcrOutput(CustomBaseModel):

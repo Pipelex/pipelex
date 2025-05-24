@@ -14,7 +14,7 @@ from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_library import ConceptLibrary
-from pipelex.core.concept_native import NativeConceptCode
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.domain import Domain
 from pipelex.core.domain_library import DomainLibrary
 from pipelex.core.pipe_abstract import PipeAbstract
@@ -70,7 +70,7 @@ class LibraryManager:
             )
             library_paths += [LibraryConfig.test_pipelines_path]
 
-        native_concepts = NativeConceptCode.all_concepts()
+        native_concepts = NativeConcept.all_concepts()
         self.concept_library.add_concepts(concepts=native_concepts)
 
         self._load_combo_libraries(library_paths=library_paths)
