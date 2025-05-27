@@ -5,6 +5,10 @@ class PipelexError(RootException):
     pass
 
 
+class PipelexCLIError(PipelexError):
+    pass
+
+
 class PipelexConfigError(PipelexError):
     pass
 
