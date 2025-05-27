@@ -22,7 +22,7 @@ class AwsKeyMethod(StrEnum):
 
 class AwsConfig(ConfigModel):
     api_key_method: AwsKeyMethod = Field(strict=False)
-    aws_region: str # TODO: Confusing with aws_region_env_var_name
+    aws_region: str  # TODO: Confusing with aws_region_env_var_name
 
     aws_access_key_id_env_var_name: str
     aws_secret_access_key_env_var_name: str
