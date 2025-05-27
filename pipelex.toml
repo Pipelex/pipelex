@@ -1,15 +1,8 @@
 [pipelex.aws_config]
-api_key_method = "env"  # The possible values are "env" and "secret_provider". 
+api_key_method = "env" 
+# The possible values are "env" and "secret_provider". 
 # "env" means means that the env var are stored in your .env file. 
 # "secret_provider" means that the env var are stored in your Secret Manager (See the doc for injecting a secret provider).
-# If "env" is used, you need to set the env var in your .env file, and specify its name as "aws_<key>_env_var_name"
-# If "secret_provider" is used, you need to set the secret name as "aws_<key>_secret_name"
-aws_region = "needs_to_be_set" # This is for hardcoding the aws_region
-aws_access_key_id_env_var_name = "AWS_ACCESS_KEY_ID"
-aws_secret_access_key_env_var_name = "AWS_SECRET_ACCESS_KEY"
-aws_region_env_var_name = "AWS_REGION"
-aws_access_key_id_secret_name = "AWS_ACCESS_KEY_ID"
-aws_secret_access_key_secret_name = "AWS_SECRET_ACCESS_KEY"
 
 [cogt]
 [cogt.llm_config.preferred_platforms]
@@ -18,37 +11,24 @@ aws_secret_access_key_secret_name = "AWS_SECRET_ACCESS_KEY"
 
 [cogt.llm_config.openai_openai_config]
 api_key_method = "env"
-api_key_env_var_name = "OPENAI_API_KEY"
-api_key_secret_name = "OPENAI_API_KEY"
 
 [cogt.llm_config.azure_openai_config]
 api_key_method = "env"
-api_endpoint = "needs_to_be_set"
-api_version = "needs_to_be_set"
-api_key_env_var_name = "AZURE_OPENAI_API_KEY"
-api_key_secret_name = "AZURE_OPENAI_API_KEY"
-
-[cogt.llm_config.bedrock_config]
-client_method = "aioboto3"
-aws_region = "needs_to_be_set"
 
 [cogt.llm_config.perplexity_config]
-api_endpoint = "https://api.perplexity.ai"
 api_key_method = "env"
-api_key_env_var_name = "PERPLEXITY_API_KEY"
-api_key_secret_name = "PERPLEXITY_API_KEY"
 
 [cogt.llm_config.vertexai_config]
-project_id = "needs_to_be_set"
-region = "needs_to_be_set"
+api_key_method = "env"
 
 [cogt.llm_config.mistral_config]
-api_key_secret_name = "MISTRAL_API_KEY"
+api_key_method = "env"
 
 [cogt.llm_config.anthropic_config]
 api_key_method = "env"
-api_key_env_var_name = "ANTHROPIC_API_KEY"
-api_key_secret_name = "ANTHROPIC_API_KEY"
+
+[cogt.llm_config.bedrock_config]
+client_method = "aioboto3"
 
 ####################################################################################################
 # OCR config

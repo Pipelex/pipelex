@@ -36,20 +36,17 @@ class OpenAIFactory:
         match llm_platform:
             case LLMPlatform.AZURE_OPENAI:
                 azure_openai_config = get_config().cogt.llm_config.azure_openai_config
-                api_key = azure_openai_config.get_api_key(secrets_provider=get_secrets_provider())
-                azure_endpoint = azure_openai_config.api_endpoint
-                api_version = azure_openai_config.api_version
+                endpoint, api_version, api_key = azure_openai_config.configure(secrets_provider=get_secrets_provider())
 
-                log.verbose(f"Making AsyncAzureOpenAI client with endpoint: {azure_endpoint}, api_version: {api_version}")
+                log.verbose(f"Making AsyncAzureOpenAI client with endpoint: {endpoint}, api_version: {api_version}")
                 the_client = openai.AsyncAzureOpenAI(
-                    azure_endpoint=azure_endpoint,
+                    azure_endpoint=endpoint,
                     api_key=api_key,
                     api_version=api_version,
                 )
             case LLMPlatform.PERPLEXITY:
                 perplexity_config = get_config().cogt.llm_config.perplexity_config
-                api_key = perplexity_config.get_api_key(secrets_provider=get_secrets_provider())
-                endpoint = perplexity_config.api_endpoint
+                endpoint, api_key = perplexity_config.configure(secrets_provider=get_secrets_provider())
 
                 log.verbose(f"Making perplexity AsyncOpenAI client with endpoint: {endpoint}")
                 the_client = openai.AsyncOpenAI(
@@ -62,10 +59,7 @@ class OpenAIFactory:
                 the_client = openai.AsyncOpenAI(api_key=api_key)
             case LLMPlatform.VERTEXAI_OPENAI:
                 vertexai_config = get_config().cogt.llm_config.vertexai_config
-                project_id = vertexai_config.project_id
-                region = vertexai_config.region
-                api_key = vertexai_config.get_api_key()
-                endpoint = f"https://{region}-aiplatform.googleapis.com/v1beta1/projects/{project_id}/locations/{region}/endpoints/openapi"
+                endpoint, api_key = vertexai_config.configure(secrets_provider=get_secrets_provider())
 
                 log.verbose(f"Making vertex AsyncOpenAI client with endpoint: {endpoint}")
                 the_client = openai.AsyncOpenAI(
@@ -74,8 +68,7 @@ class OpenAIFactory:
                 )
             case LLMPlatform.CUSTOM_OPENAI:
                 custom_openai_config = get_config().cogt.llm_config.custom_openai_config
-                api_key = custom_openai_config.get_api_key(secrets_provider=get_secrets_provider())
-                base_url = custom_openai_config.base_url
+                base_url, api_key = custom_openai_config.configure(secrets_provider=get_secrets_provider())
 
                 log.verbose(f"Making custom AsyncOpenAI client with base_url: {base_url}")
                 the_client = openai.AsyncOpenAI(

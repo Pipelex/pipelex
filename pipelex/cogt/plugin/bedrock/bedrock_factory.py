@@ -6,6 +6,7 @@ from pipelex.cogt.plugin.bedrock.bedrock_client_protocol import BedrockClientPro
 from pipelex.cogt.plugin.bedrock.bedrock_config import BedrockClientMethod
 from pipelex.cogt.plugin.bedrock.bedrock_message import BedrockContentItem, BedrockImage, BedrockMessage, BedrockSource, ImageFormat
 from pipelex.config import get_config
+from pipelex.hub import get_secrets_provider
 
 
 class BedrockFactory:
@@ -16,7 +17,7 @@ class BedrockFactory:
     @classmethod
     def make_bedrock_client(cls) -> BedrockClientProtocol:
         bedrock_config = get_config().cogt.llm_config.bedrock_config
-        aws_region = bedrock_config.aws_region
+        aws_region = bedrock_config.configure(secrets_provider=get_secrets_provider())
         client_method = bedrock_config.client_method
         bedrock_async_client: BedrockClientProtocol
         log.verbose(f"Using '{client_method}' for BedrockClient")

@@ -48,3 +48,5 @@ pipelex_super.toml
 
 # temporary files
 temp/
+
+gcp_credentials.json
