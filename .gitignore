@@ -50,3 +50,5 @@ pipelex_super.toml
 temp/
 
 gcp_credentials.json
+
+./pipelex.toml

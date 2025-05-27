@@ -11,7 +11,7 @@ from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
-class CustomOpenAICredentialsError(CogtError):
+class CustomEndpointCredentialsError(CogtError):
     pass
 
 
@@ -20,11 +20,11 @@ class OpenAIKeyMethod(StrEnum):
     ENV = "env"
 
 
-CUSTOM_OPENAI_API_KEY_VAR_NAME = "CUSTOM_OPENAI_API_KEY"
-CUSTOM_OPENAI_BASE_URL_VAR_NAME = "CUSTOM_OPENAI_BASE_URL"
+CUSTOM_ENDPOINT_API_KEY_VAR_NAME = "CUSTOM_ENDPOINT_API_KEY"
+CUSTOM_ENDPOINT_BASE_URL_VAR_NAME = "CUSTOM_ENDPOINT_BASE_URL"
 
 
-class CustomOpenAIConfig(ConfigModel):
+class CustomEndpointConfig(ConfigModel):
     """Configuration for custom OpenAI-compatible endpoints (e.g., Ollama, LM Studio, etc.)"""
 
     api_key_method: OpenAIKeyMethod = Field(strict=False)
@@ -41,17 +41,17 @@ class CustomOpenAIConfig(ConfigModel):
             case OpenAIKeyMethod.ENV:
                 log.debug("Getting Custom OpenAI base URL from environment.")
                 try:
-                    return get_required_env(CUSTOM_OPENAI_BASE_URL_VAR_NAME)
+                    return get_required_env(CUSTOM_ENDPOINT_BASE_URL_VAR_NAME)
                 except EnvVarNotFoundError as exc:
-                    raise CustomOpenAICredentialsError(f"Error getting Custom OpenAI base URL from environment: {exc}") from exc
+                    raise CustomEndpointCredentialsError(f"Error getting Custom OpenAI base URL from environment: {exc}") from exc
             case OpenAIKeyMethod.SECRET_PROVIDER:
                 if not secrets_provider:
-                    raise CustomOpenAICredentialsError("Secrets provider is required when using SECRET_PROVIDER method")
+                    raise CustomEndpointCredentialsError("Secrets provider is required when using SECRET_PROVIDER method")
                 log.verbose("Getting Custom OpenAI base URL from secrets provider.")
                 try:
-                    return secrets_provider.get_secret(secret_id=CUSTOM_OPENAI_BASE_URL_VAR_NAME)
+                    return secrets_provider.get_secret(secret_id=CUSTOM_ENDPOINT_BASE_URL_VAR_NAME)
                 except SecretNotFoundError as exc:
-                    raise CustomOpenAICredentialsError("Error getting Custom OpenAI base URL from secrets provider.") from exc
+                    raise CustomEndpointCredentialsError("Error getting Custom OpenAI base URL from secrets provider.") from exc
 
     def _get_api_key(self, secrets_provider: Optional[SecretsProviderAbstract] = None) -> Optional[str]:
         """Get API key if configured, otherwise return None for services that don't require authentication"""
@@ -59,16 +59,16 @@ class CustomOpenAIConfig(ConfigModel):
             case OpenAIKeyMethod.ENV:
                 log.debug("Using Custom OpenAI API key from environment.")
                 try:
-                    return get_required_env(CUSTOM_OPENAI_API_KEY_VAR_NAME)
+                    return get_required_env(CUSTOM_ENDPOINT_API_KEY_VAR_NAME)
                 except EnvVarNotFoundError:
                     log.debug("No Custom OpenAI API key found in environment - using None.")
                     return None
             case OpenAIKeyMethod.SECRET_PROVIDER:
                 if not secrets_provider:
-                    raise CustomOpenAICredentialsError("Secrets provider is required when using SECRET_PROVIDER method")
+                    raise CustomEndpointCredentialsError("Secrets provider is required when using SECRET_PROVIDER method")
                 log.verbose("Using Custom OpenAI API key from secrets provider.")
                 try:
-                    return secrets_provider.get_secret(secret_id=CUSTOM_OPENAI_API_KEY_VAR_NAME)
+                    return secrets_provider.get_secret(secret_id=CUSTOM_ENDPOINT_API_KEY_VAR_NAME)
                 except SecretNotFoundError:
                     log.debug("No Custom OpenAI API key found in secrets provider - using None.")
                     return None

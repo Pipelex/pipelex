@@ -1,0 +1,39 @@
+[pipelex.aws_config]
+api_key_method = "env" 
+# The possible values are "env" and "secret_provider". 
+# "env" means means that the env var are stored in your .env file. 
+# "secret_provider" means that the env var are stored in your Secret Manager (See the doc for injecting a secret provider).
+
+[cogt]
+[cogt.llm_config.preferred_platforms]
+# This overrrides the defaults set for any llm handle
+"gpt-4o-mini" = "openai"
+
+[cogt.llm_config.openai_openai_config]
+api_key_method = "env"
+
+[cogt.llm_config.azure_openai_config]
+api_key_method = "env"
+
+[cogt.llm_config.perplexity_config]
+api_key_method = "env"
+
+[cogt.llm_config.vertexai_config]
+api_key_method = "env"
+
+[cogt.llm_config.mistral_config]
+api_key_method = "env"
+
+[cogt.llm_config.anthropic_config]
+api_key_method = "env"
+
+[cogt.llm_config.bedrock_config]
+client_method = "aioboto3"
+
+####################################################################################################
+# OCR config
+####################################################################################################
+
+[cogt.ocr_config]
+ocr_handles = ["mistral/mistral-ocr-latest"]
+page_output_text_file_name = "page_text.md"

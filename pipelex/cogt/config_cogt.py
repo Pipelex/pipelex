@@ -10,7 +10,7 @@ from pipelex.cogt.plugin.anthropic.anthropic_config import AnthropicConfig
 from pipelex.cogt.plugin.bedrock.bedrock_config import BedrockConfig
 from pipelex.cogt.plugin.mistral.mistral_config import MistralConfig
 from pipelex.cogt.plugin.openai.azure_openai_config import AzureOpenAIConfig
-from pipelex.cogt.plugin.openai.custom_openai_config import CustomOpenAIConfig
+from pipelex.cogt.plugin.openai.custom_endpoint_config import CustomEndpointConfig
 from pipelex.cogt.plugin.openai.openai_config import OpenAIOpenAIConfig
 from pipelex.cogt.plugin.openai.perplexity_config import PerplexityConfig
 from pipelex.cogt.plugin.openai.vertexai_config import VertexAIConfig
@@ -55,7 +55,7 @@ class LLMConfig(ConfigModel):
     mistral_config: MistralConfig
     openai_openai_config: OpenAIOpenAIConfig
     perplexity_config: PerplexityConfig
-    custom_openai_config: CustomOpenAIConfig
+    custom_endpoint_config: CustomEndpointConfig
 
     instructor_config: InstructorConfig
     llm_job_config: LLMJobConfig

@@ -123,7 +123,7 @@ client_method = "aioboto3"
 [cogt.llm_config.anthropic_config]
 api_key_method = "env"
 
-[cogt.llm_config.custom_openai_config]
+[cogt.llm_config.custom_endpoint_config]
 api_key_method = "env"
 
 ####################################################################################################

@@ -67,8 +67,8 @@ class OpenAIFactory:
                     base_url=endpoint,
                 )
             case LLMPlatform.CUSTOM_OPENAI:
-                custom_openai_config = get_config().cogt.llm_config.custom_openai_config
-                base_url, api_key = custom_openai_config.configure(secrets_provider=get_secrets_provider())
+                custom_endpoint_config = get_config().cogt.llm_config.custom_endpoint_config
+                base_url, api_key = custom_endpoint_config.configure(secrets_provider=get_secrets_provider())
 
                 log.verbose(f"Making custom AsyncOpenAI client with base_url: {base_url}")
                 the_client = openai.AsyncOpenAI(
