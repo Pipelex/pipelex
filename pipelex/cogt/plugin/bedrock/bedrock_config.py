@@ -1,5 +1,4 @@
 from enum import StrEnum
-from typing import Tuple
 
 from pydantic import Field
 
