@@ -23,6 +23,7 @@ class AzureOpenAIConfig(ConfigModel):
     api_endpoint: str
     api_version: str
     api_key_method: AzureOpenAIKeyMethod = Field(strict=False)
+    # TODO: Are we sure to have 2 different key name for env/secret_provider ? the name of the key in the .env is easily modified.
     api_key_env_var_name: str
     api_key_secret_name: str
 

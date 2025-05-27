@@ -1,4 +1,6 @@
 from typing import Annotated, Optional
+import os
+import shutil
 
 import typer
 from click import Command, Context
@@ -37,7 +39,24 @@ def init(
     if overwrite:
         typer.echo("Overwriting existing pipelex library files.")
 
-    # Duplicate pipelines and other libraries from the base library
+    # Get the path to the default pipelex.toml in the package
+    package_config_path = os.path.join(config_manager.pipelex_root_dir, "pipelex_init.toml")
+    target_config_path = os.path.join(config_manager.local_root_dir, "pipelex.toml")
+
+    # Check if target file exists and handle overwrite
+    if os.path.exists(target_config_path) and not overwrite:
+        typer.echo("Error: pipelex.toml already exists. Use --overwrite to force creation.", err=True)
+        raise typer.Exit(1)
+
+    # Copy the default config file
+    try:
+        shutil.copy2(package_config_path, target_config_path)
+        typer.echo(f"Created pipelex.toml at {target_config_path}")
+    except Exception as e:
+        typer.echo(f"Error creating pipelex.toml: {e}", err=True)
+        raise typer.Exit(1)
+
+    # Duplicate pipelines and other libraries
     LibraryConfig.export_libraries(overwrite=overwrite)
 
 
