@@ -35,7 +35,7 @@ dependencies = [
     "rich>=13.8.1",
     "shortuuid>=1.0.13",
     "toml>=0.10.2",
-    "typer>=0.12.5",
+    "typer>=0.16.0",
     "typing-extensions>=4.12.2",
     "yattag>=1.15.2"
 ]
