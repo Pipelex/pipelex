@@ -51,4 +51,4 @@ temp/
 
 gcp_credentials.json
 
-./pipelex.toml
+/pipelex.toml
