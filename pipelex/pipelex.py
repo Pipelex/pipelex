@@ -104,7 +104,7 @@ class Pipelex:
             project_name=get_config().project_name or "unknown_project",
             log_config=get_config().pipelex.log_config,
         )
-        log.info("Logs are configured")
+        log.debug("Logs are configured")
 
         # tools
         self.template_provider = template_provider or TemplateLibrary()
@@ -149,7 +149,7 @@ class Pipelex:
         self.pipelex_hub.set_activity_manager(activity_manager=self.activity_manager)
 
         Pipelex._pipelex_instance = self
-        log.info(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
     def setup(
         self,
@@ -232,5 +232,5 @@ class Pipelex:
         pipelex_instance = cls()
         pipelex_instance.setup(structure_classes=structure_classes)
         pipelex_instance.finish_setup()
-        log.info(f"Boot sequence completed for {get_config().project_name} and session id {get_config().session_id}")
+        log.info(f"Pipelex initialized with version {PACKAGE_VERSION}")
         return pipelex_instance
