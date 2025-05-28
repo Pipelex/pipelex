@@ -6,10 +6,7 @@ VIRTUAL_ENV := $(CURDIR)/.venv
 LOCAL_PYTHON := $(VIRTUAL_ENV)/bin/python3.11
 PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"/\1/')
 
-LOCAL_MYPY := $(VIRTUAL_ENV)/bin/mypy
 LOCAL_PYTEST := $(VIRTUAL_ENV)/bin/pytest
-LOCAL_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
-LOCAL_RUFF := $(VIRTUAL_ENV)/bin/ruff
 
 define GET_UV_VERSION
 $(shell awk '/^\[tool.uv\]/{f=1;next} f==1&&/^required-version/{print $$3;exit}' pyproject.toml | tr -d '"')
@@ -106,6 +103,17 @@ check-uv:
 		echo "UV version $$UV_VERSION is already installed"; \
 	fi
 
+CURRENT_VERSION := $(shell grep '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+NEXT_VERSION := $(shell echo $(CURRENT_VERSION) | awk -F. '{$$NF = $$NF + 1;} 1' | sed 's/ /./g')
+
+get-uv-version:
+	@UV_VERSION=$(GET_UV_VERSION); \
+	if [ -z "$$UV_VERSION" ]; then \
+		echo "Error: UV version not found in pyproject.toml" >&2; \
+		exit 1; \
+	fi; \
+	echo "$$UV_VERSION"
+
 env: check-uv
 	$(call PRINT_TITLE,"Creating virtual environment")
 	@if [ ! -d $(VIRTUAL_ENV) ]; then \
@@ -122,7 +130,7 @@ init: env
 install: env
 	$(call PRINT_TITLE,"Installing dependencies")
 	@. $(VIRTUAL_ENV)/bin/activate && \
-	uv sync --extra anthropic --extra google --extra mistralai --extra bedrock --extra fal --extra dev && \
+	uv sync --all-extras && \
 	pipelex init --overwrite && \
 	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras and initialized Pipelex";
 
@@ -134,7 +142,7 @@ lock: env
 update: env
 	$(call PRINT_TITLE,"Updating all dependencies")
 	@uv lock --upgrade && \
-	uv sync --extra anthropic --extra google --extra mistralai --extra bedrock --extra fal --extra dev && \
+	uv sync --all-extras && \
 	echo "Updated dependencies in ${VIRTUAL_ENV}";
 
 run-setup: env
@@ -267,20 +275,20 @@ tg: test-imgg
 
 format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	@$(LOCAL_RUFF) format .
+	uv run ruff format .
 
 lint: env
 	$(call PRINT_TITLE,"Linting with ruff")
-	@$(LOCAL_RUFF) check . --fix
+	uv run ruff check . --fix
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	@$(LOCAL_PYRIGHT) --pythonpath $(LOCAL_PYTHON)  && \
+	uv run pyright --pythonpath $(LOCAL_PYTHON)  && \
 	echo "Done typechecking with pyright — disregard warning about latest version, it's giving us false positives"
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	@$(LOCAL_PYTHON) $(LOCAL_MYPY)
+	uv run mypy
 
 
 ##########################################################################################
@@ -334,15 +342,3 @@ check-TODOs: env
 fix-unused-imports: env
 	$(call PRINT_TITLE,"Fixing unused imports")
 	uv run ruff check --select=F401 --fix -v .
-
-CURRENT_VERSION := $(shell grep '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-NEXT_VERSION := $(shell echo $(CURRENT_VERSION) | awk -F. '{$$NF = $$NF + 1;} 1' | sed 's/ /./g')
-
-get-uv-version:
-	@UV_VERSION=$(GET_UV_VERSION); \
-	if [ -z "$$UV_VERSION" ]; then \
-		echo "Error: UV version not found in pyproject.toml" >&2; \
-		exit 1; \
-	fi; \
-	echo "$$UV_VERSION"
-
