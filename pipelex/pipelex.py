@@ -82,7 +82,6 @@ class Pipelex:
         mission_tracker: Optional[MissionTracker] = None,
         activity_manager: Optional[ActivityManagerProtocol] = None,
     ) -> None:
-        print(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init started...", flush=True)
         self.pipelex_hub = pipelex_hub or PipelexHub()
         set_pipelex_hub(self.pipelex_hub)
 
