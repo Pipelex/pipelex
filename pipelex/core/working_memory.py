@@ -274,6 +274,10 @@ class WorkingMemory(BaseModel):
         """
         return self.get_stuff(name=name).as_list_of_fixed_content_type(item_type=item_type)
 
+    def get_stuff_as_first_list_item(self, name: str, item_type: Type[StuffContentType]) -> StuffContentType:
+        """Get stuff content as ListContent with items of type StuffContentType then return the first item."""
+        return self.get_stuff_as_list(name=name, item_type=item_type).items[0]
+
     def get_stuff_as_text(self, name: str) -> TextContent:
         """Get stuff content as TextContent if applicable."""
         return self.get_stuff(name=name).as_text
@@ -316,6 +320,10 @@ class WorkingMemory(BaseModel):
         If the items are of possibly various types, use item_type=StuffContent.
         """
         return self.get_stuff_as_list(name=MAIN_STUFF_NAME, item_type=item_type)
+
+    def main_stuff_as_first_list_item(self, item_type: Type[StuffContentType]) -> StuffContentType:
+        """Get main stuff content as first list item of type StuffContentType."""
+        return self.get_stuff_as_first_list_item(name=MAIN_STUFF_NAME, item_type=item_type)
 
     @property
     def main_stuff_as_text(self) -> TextContent:
