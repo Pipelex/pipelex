@@ -36,6 +36,7 @@ app = typer.Typer(
 def init(
     overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
 ) -> None:
+    print("ddsjqdoiqjosj")
     """Initialize pipelex configuration in the current directory."""
     pipelex_init_path = os.path.join(config_manager.pipelex_root_dir, "pipelex_init.toml")
     target_config_path = os.path.join(config_manager.local_root_dir, "pipelex.toml")
@@ -50,6 +51,9 @@ def init(
         raise PipelexCLIError(f"Failed to create pipelex.toml: {e}")
 
     LibraryConfig.export_libraries(overwrite=overwrite)
+    from pathlib import Path
+    print("jqdisjoqj", f"{config_manager.local_root_dir}/pipelex_libraries /__init__.py")
+    (Path(config_manager.local_root_dir) / "pipelex_libraries" / "__init__.py").touch(exist_ok=True)
 
 
 @app.command()
