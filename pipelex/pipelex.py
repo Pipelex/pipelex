@@ -232,5 +232,5 @@ class Pipelex:
         pipelex_instance = cls()
         pipelex_instance.setup(structure_classes=structure_classes)
         pipelex_instance.finish_setup()
-        log.info(f"Pipelex initialized with version {PACKAGE_VERSION}")
+        log.info(f"Pipelex {PACKAGE_VERSION} initialized.")
         return pipelex_instance
