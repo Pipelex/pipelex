@@ -279,7 +279,6 @@ class LogDispatch:
                         break
                 finally:
                     del frame_info
-
             logger = logging.getLogger(log_origin_name)
             logger.log(level=severity, msg=message, stacklevel=5)
         finally:

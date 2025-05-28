@@ -19,7 +19,7 @@ class LogLevel(StrEnum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
-    OFF = "OFF"
+    NOTSET = "NOTSET"
 
     @property
     def int_logging_level(self) -> int:
@@ -38,8 +38,8 @@ class LogLevel(StrEnum):
                 return logging.ERROR
             case LogLevel.CRITICAL:
                 return logging.CRITICAL
-            case LogLevel.OFF:
-                return int(logging.CRITICAL) + 1
+            case LogLevel.NOTSET:
+                return logging.NOTSET
 
     @staticmethod
     def from_int(logging_level: int) -> "LogLevel":
@@ -47,7 +47,7 @@ class LogLevel(StrEnum):
             return LogLevel.VERBOSE
         elif logging_level == LOGGING_LEVEL_DEV:
             return LogLevel.DEV
-        elif logging_level > int(logging.CRITICAL):
-            return LogLevel.OFF
+        elif logging_level > int(logging.CRITICAL) or logging_level < 0 or logging_level == logging.NOTSET:
+            return LogLevel.NOTSET
         else:
             return LogLevel(logging.getLevelName(logging_level))

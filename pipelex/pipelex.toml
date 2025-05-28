@@ -27,6 +27,9 @@ poor_loggers = [
     "kajson.decoder.sandbox",
     "kajson.encoder.sandbox",
     "class_registry.sandbox",
+    "kajson.decoder",
+    "kajson.encoder",
+    "kajson",
 ]
 generic_poor_logger = "#sandbox"
 
@@ -34,6 +37,7 @@ generic_poor_logger = "#sandbox"
 # for logger names, the dots "." have been replaced by "-" to avoid toml parsing issues
 # TODO: use quotes to re-enable names with dots
 anthropic = "INFO"
+cogt = "INFO"
 asyncio = "INFO"
 botocore = "INFO"
 botocore-credentials = "WARNING"
@@ -45,11 +49,7 @@ instructor = "INFO"
 urllib3-connectionpool = "INFO"
 urllib3-util-retry = "INFO"
 
-kajson = "INFO"
-kajson-decoder-sandbox = "INFO"
-kajson-encoder-sandbox = "INFO"
-
-pipelex = "INFO"
+pipelex = "NOTSET"
 
 
 [pipelex.log_config.rich_log_config]
