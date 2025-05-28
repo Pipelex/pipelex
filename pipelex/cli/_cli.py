@@ -37,19 +37,20 @@ def init(
     overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
 ) -> None:
     """Initialize pipelex configuration in the current directory."""
+    LibraryConfig.export_libraries(overwrite=overwrite)
+
     pipelex_init_path = os.path.join(config_manager.pipelex_root_dir, "pipelex_init.toml")
     target_config_path = os.path.join(config_manager.local_root_dir, "pipelex.toml")
 
     if os.path.exists(target_config_path) and not overwrite:
-        raise PipelexCLIError("pipelex.toml already exists. Use --overwrite to force creation.")
+        typer.echo("Warning: pipelex.toml already exists. Use --overwrite to force creation.")
+        return
 
     try:
         shutil.copy2(pipelex_init_path, target_config_path)
         typer.echo(f"Created pipelex.toml at {target_config_path}")
     except Exception as e:
         raise PipelexCLIError(f"Failed to create pipelex.toml: {e}")
-
-    LibraryConfig.export_libraries(overwrite=overwrite)
 
 
 @app.command()
