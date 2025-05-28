@@ -50,7 +50,7 @@ class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
                     llm_model = LLMModel.model_validate(complete_llm_model_dict)
                     self.root.append(llm_model)
 
-        log.info(f"Loaded {len(self.root)} llm models")
+        log.debug(f"Loaded {len(self.root)} llm models")
 
     @override
     def teardown(self):

@@ -7,7 +7,7 @@ from pipelex.tools.log.log_config import (
 )
 from pipelex.tools.log.log_dispatch import LogDispatch
 from pipelex.tools.log.log_formatter import EmojiLogFormatter, LevelAndEmojiLogFormatter
-from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_VERBOSE
+from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, LOGGING_LEVEL_VERBOSE
 
 
 class Log:
@@ -108,7 +108,6 @@ class Log:
         self.poor_handler.setFormatter(LevelAndEmojiLogFormatter())
         poor_loggers = set(log_config.poor_loggers + [log_config.generic_poor_logger])
         for logger_name in poor_loggers:
-            # print(f"Configuring poor logger: {logger_name}")
             logger = logging.getLogger(logger_name)
             logger.setLevel(log_config.default_log_level.int_logging_level)
             logger.addHandler(self.poor_handler)
@@ -118,17 +117,6 @@ class Log:
 
         self.verbose("Logs configured")
         self.verbose(f"Config set for {project_name}")
-
-    def set_rich_log_formatter(self, formatter: logging.Formatter):
-        """
-        Set the formatter for the rich log handler.
-
-        Args:
-            formatter (logging.Formatter): The formatter to use for rich logging.
-        """
-        if self.rich_handler is None:
-            raise RuntimeError("Rich log handler is not set.")
-        self.rich_handler.setFormatter(formatter)
 
     def set_poor_log_formatter(self, formatter: logging.Formatter):
         """
@@ -176,11 +164,10 @@ class Log:
         Args:
             level_name (str): The name of the log level.
         """
-        print(f"Setting default logs to '{level_name=}'")
         if level_name.upper() == LogLevel.DEV:
             level = LOGGING_LEVEL_DEV
         elif level_name.upper() == LogLevel.OFF:
-            level = LOGGING_LEVEL_DEV
+            level = LOGGING_LEVEL_OFF
         else:
             level = getattr(logging, level_name.upper())
         self.set_level_by_int(level)
@@ -188,7 +175,6 @@ class Log:
     def set_level(self, level: LogLevel):
         """
         Set the default log level for all loggers.
-
         Args:
             level (LogLevel): The log level to set.
         """
@@ -204,7 +190,6 @@ class Log:
             level (LogLevel): The log level to set for the package.
         """
         logger_name = package_name.replace("-", ".")
-        # print(f"Setting {logger_name=} to {level=}")
         logging.getLogger(logger_name).setLevel(level.int_logging_level)
 
     def set_levels_for_packages(self, package_log_levels: Dict[str, LogLevel]):

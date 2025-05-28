@@ -45,10 +45,6 @@ instructor = "INFO"
 urllib3-connectionpool = "INFO"
 urllib3-util-retry = "INFO"
 
-kajson = "INFO"
-kajson-decoder-sandbox = "INFO"
-kajson-encoder-sandbox = "INFO"
-
 pipelex = "INFO"
 
 
