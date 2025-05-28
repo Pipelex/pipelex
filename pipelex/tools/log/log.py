@@ -172,6 +172,15 @@ class Log:
             level = getattr(logging, level_name.upper())
         self.set_level_by_int(level)
 
+    def set_level(self, level: LogLevel):
+        """
+        Set the default log level for all loggers.
+        Args:
+            level (LogLevel): The log level to set.
+        """
+        # print(f"Setting default logs to {level=}")
+        self.set_level_by_int(level_int=level.int_logging_level)
+
     def set_level_for_package(self, package_name: str, level: LogLevel):
         """
         Set the log level for a specific package.
