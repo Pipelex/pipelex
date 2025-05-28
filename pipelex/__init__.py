@@ -12,4 +12,4 @@ __all__ = [
 
 from ._bootstrap_user_libs import activate as _px_bootstrap_user_libs
 
-_px_bootstrap_user_libs()
+# _px_bootstrap_user_libs()
