@@ -51,6 +51,7 @@ def init(
 
     LibraryConfig.export_libraries(overwrite=overwrite)
     from pathlib import Path
+
     (Path(config_manager.local_root_dir) / "pipelex_libraries" / "__init__.py").touch(exist_ok=True)
 
 
