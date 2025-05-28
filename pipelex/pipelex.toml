@@ -34,7 +34,6 @@ generic_poor_logger = "#sandbox"
 # for logger names, the dots "." have been replaced by "-" to avoid toml parsing issues
 # TODO: use quotes to re-enable names with dots
 anthropic = "INFO"
-cogt = "INFO"
 asyncio = "INFO"
 botocore = "INFO"
 botocore-credentials = "WARNING"
