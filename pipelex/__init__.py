@@ -7,9 +7,9 @@ __all__ = [
 ]
 
 # ------------------------------------------------------------
-# Keep <project>/pipelex_libraries on sys.path for every installer
+# Keep <project>/pipelex_libraries on sys.path for every installer (Fix for uv)
 # ------------------------------------------------------------
 
 from ._bootstrap_user_libs import activate as _px_bootstrap_user_libs
 
-# _px_bootstrap_user_libs()
+_px_bootstrap_user_libs()
