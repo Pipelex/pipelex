@@ -49,7 +49,7 @@ instructor = "INFO"
 urllib3-connectionpool = "INFO"
 urllib3-util-retry = "INFO"
 
-pipelex = "NOTSET"
+pipelex = "INFO"
 
 
 [pipelex.log_config.rich_log_config]

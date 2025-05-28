@@ -7,7 +7,7 @@ from pipelex.tools.log.log_config import (
 )
 from pipelex.tools.log.log_dispatch import LogDispatch
 from pipelex.tools.log.log_formatter import EmojiLogFormatter, LevelAndEmojiLogFormatter
-from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_VERBOSE
+from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, LOGGING_LEVEL_VERBOSE
 
 
 class Log:
@@ -118,7 +118,6 @@ class Log:
         self.verbose("Logs configured")
         self.verbose(f"Config set for {project_name}")
 
-    
     def set_poor_log_formatter(self, formatter: logging.Formatter):
         """
         Set the formatter for the poor log handler.
@@ -167,8 +166,8 @@ class Log:
         """
         if level_name.upper() == LogLevel.DEV:
             level = LOGGING_LEVEL_DEV
-        elif level_name.upper() == LogLevel.NOTSET:
-            level = logging.NOTSET
+        elif level_name.upper() == LogLevel.OFF:
+            level = LOGGING_LEVEL_OFF
         else:
             level = getattr(logging, level_name.upper())
         self.set_level_by_int(level)
