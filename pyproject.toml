@@ -246,3 +246,14 @@ select = [
 [tool.uv]
 required-version = "0.7.2"
 
+[tool.hatch.build.targets.wheel]
+packages = ["pipelex"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"pyproject.toml" = "pipelex/pyproject.toml"
+
+[tool.hatch.build.targets.sdist]
+packages = ["pipelex"]
+
+[tool.hatch.build.targets.sdist.force-include]
+"pyproject.toml" = "pipelex/pyproject.toml"
