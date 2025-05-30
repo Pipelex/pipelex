@@ -178,22 +178,22 @@ cleanall: cleanderived cleanenv cleanlibraries
 runtests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
 	@echo "• Running unit tests (excluding inference, and gha_disabled)"
-	$(LOCAL_PYTEST) -s --exitfirst --quiet -m "not inference and not gha_disabled" || [ $$? = 5 ]
+	$(LOCAL_PYTEST) --exitfirst --quiet -m "not inference and not gha_disabled" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
 	@echo "• Running all unit tests"
-	$(LOCAL_PYTEST) -s --exitfirst --quiet
+	$(LOCAL_PYTEST) --exitfirst --quiet
 
 run-manual-trigger-gha-tests: env
 	$(call PRINT_TITLE,"Running GHA tests")
 	@echo "• Running GHA unit tests for inference, llm, and not gha_disabled"
-	$(LOCAL_PYTEST) -s --exitfirst --quiet -m "not gha_disabled and (inference or llm)" || [ $$? = 5 ]
+	$(LOCAL_PYTEST) --exitfirst --quiet -m "not gha_disabled and (inference or llm)" || [ $$? = 5 ]
 
 run-gha_disabled-tests: env
 	$(call PRINT_TITLE,"Running GHA disabled tests")
 	@echo "• Running GHA disabled unit tests"
-	$(LOCAL_PYTEST) -s --exitfirst --quiet -m "gha_disabled" || [ $$? = 5 ]
+	$(LOCAL_PYTEST) --exitfirst --quiet -m "gha_disabled" || [ $$? = 5 ]
 
 test: env
 	$(call PRINT_TITLE,"Unit testing without prints but displaying logs via pytest for WARNING level and above")
