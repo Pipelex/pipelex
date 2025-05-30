@@ -10,6 +10,7 @@ VENV_PYTEST := $(VIRTUAL_ENV)/bin/pytest
 VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
 VENV_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
 VENV_MYPY := $(VIRTUAL_ENV)/bin/mypy
+VENV_PIPELEX := $(VIRTUAL_ENV)/bin/pipelex
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -112,14 +113,14 @@ env: check-uv
 	fi
 
 init: env
-	$(call PRINT_TITLE,"Running `pipelex init`")
-	pipelex init
+	$(call PRINT_TITLE,"Running pipelex init")
+	$(VENV_PIPELEX) init
 
 install: env
 	$(call PRINT_TITLE,"Installing dependencies")
 	@. $(VIRTUAL_ENV)/bin/activate && \
 	uv sync --all-extras && \
-	pipelex init && \
+	$(VENV_PIPELEX) init && \
 	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras and initialized Pipelex";
 
 lock: env
@@ -135,7 +136,7 @@ update: env
 
 validate: env
 	$(call PRINT_TITLE,"Running setup sequence")
-	pipelex validate
+	$(VENV_PIPELEX) validate
 
 build: env
 	$(call PRINT_TITLE,"Building the wheels")

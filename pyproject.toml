@@ -218,7 +218,16 @@ exclude_lines = [
 ]
 
 [tool.ruff]
-exclude = [".mypy_cache", ".ruff_cache", ".venv", ".vscode", "trigger_pipeline"]
+exclude = [
+    ".cursor",
+    ".git",
+    ".github",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    ".vscode",
+    "trigger_pipeline",
+]
 line-length = 150
 target-version = "py311"
 
