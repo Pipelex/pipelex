@@ -38,7 +38,7 @@ make env                      - Create python virtual env
 make lock                     - Refresh uv.lock without updating anything
 make install                  - Create local virtualenv & install all dependencies
 make update                   - Upgrade dependencies via uv
-make validate                 - Run the setup sequence
+make validate                 - Run the setup sequence to validate the config and libraries
 make build                    - Build the wheels
 
 make format                   - format with ruff format
