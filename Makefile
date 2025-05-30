@@ -3,10 +3,13 @@ include .env
 export
 endif
 VIRTUAL_ENV := $(CURDIR)/.venv
-LOCAL_PYTHON := $(VIRTUAL_ENV)/bin/python3.11
 PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"/\1/')
 
-LOCAL_PYTEST := $(VIRTUAL_ENV)/bin/pytest
+LOCAL_PYTHON := uv run python3.11
+LOCAL_PYTEST := uv run pytest
+
+
+UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
 define GET_UV_VERSION
 $(shell awk '/^\[tool.uv\]/{f=1;next} f==1&&/^required-version/{print $$3;exit}' pyproject.toml | tr -d '"')
@@ -75,7 +78,7 @@ make fix-unused-imports       - Fix unused imports with ruff
 endef
 export HELP
 
-.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv run-setup s runtests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version check-uv get-uv-version
+.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv run-setup s runtests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version check-uv
 
 all help:
 	@echo "$$HELP"
@@ -86,33 +89,15 @@ all help:
 ##########################################################################################
 
 check-uv:
-	$(call PRINT_TITLE,"Checking UV version")
-	@UV_VERSION=$(GET_UV_VERSION); \
-	if [ -z "$$UV_VERSION" ]; then \
-		echo "Error: UV version not found in pyproject.toml"; \
-		exit 1; \
-	fi; \
-	echo "UV_VERSION: $$UV_VERSION"; \
-	if ! command -v uv >/dev/null 2>&1; then \
-		echo "Installing UV version $$UV_VERSION"; \
-		curl -LsSf https://astral.sh/uv/$$UV_VERSION/install.sh | sh; \
-	elif [ "$$(uv --version | cut -d ' ' -f 2)" != "$$UV_VERSION" ]; then \
-		echo "Updating UV to version $$UV_VERSION"; \
-		curl -LsSf https://astral.sh/uv/$$UV_VERSION/install.sh | sh; \
-	else \
-		echo "UV version $$UV_VERSION is already installed"; \
-	fi
+	$(call PRINT_TITLE,"Ensuring uv ≥ $(UV_MIN_VERSION)")
+	@command -v uv >/dev/null 2>&1 || { \
+		echo "uv not found – installing latest …"; \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	}
+	@uv self update >/dev/null 2>&1 || true
 
 CURRENT_VERSION := $(shell grep '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
 NEXT_VERSION := $(shell echo $(CURRENT_VERSION) | awk -F. '{$$NF = $$NF + 1;} 1' | sed 's/ /./g')
-
-get-uv-version:
-	@UV_VERSION=$(GET_UV_VERSION); \
-	if [ -z "$$UV_VERSION" ]; then \
-		echo "Error: UV version not found in pyproject.toml" >&2; \
-		exit 1; \
-	fi; \
-	echo "$$UV_VERSION"
 
 env: check-uv
 	$(call PRINT_TITLE,"Creating virtual environment")
@@ -226,7 +211,7 @@ test: env
 
 test-with-prints: env
 	$(call PRINT_TITLE,"Unit testing with prints and our rich logs")
-	@echo "• Running unit tests"
+	@echo "• Running unit tests using `$(LOCAL_PYTEST)`"
 	@if [ -n "$(TEST)" ]; then \
 		$(LOCAL_PYTEST) -s -k "$(TEST)" $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	else \

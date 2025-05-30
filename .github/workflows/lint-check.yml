@@ -19,14 +19,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Get UV version
-        id: uv-version
-        run: echo "UV_VERSION=$(make get-uv-version)" >> $GITHUB_ENV
-
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/${{ env.UV_VERSION }}/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Check UV installation
+        run: make check-uv
 
       - name: Verify UV installation
         run: uv --version
