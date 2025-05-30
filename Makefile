@@ -30,7 +30,7 @@ make env                      - Create python virtual env
 make lock                     - Refresh uv.lock without updating anything
 make install                  - Create local virtualenv & install all dependencies
 make update                   - Upgrade dependencies via uv
-make run-setup                - Run the setup sequence
+make validate                 - Run the setup sequence
 make build                    - Build the wheels
 
 make format                   - format with ruff format
@@ -50,7 +50,7 @@ make merge-check-mypy         - Run mypy merge check without updating files
 make merge-check-pyright	  - Run pyright merge check without updating files
 
 make rl                       - Shorthand -> reinitlibraries
-make s                        - Shorthand -> run-setup
+make v                        - Shorthand -> validate
 make init                     - Run pipelex init
 make runtests		          - Run tests for github actions (exit on first failure) (no inference)
 make test                     - Run unit tests (no inference)
@@ -73,7 +73,7 @@ make fix-unused-imports       - Fix unused imports with ruff
 endef
 export HELP
 
-.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv run-setup s runtests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version check-uv
+.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv validate v runtests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version check-uv
 
 all help:
 	@echo "$$HELP"
@@ -125,9 +125,9 @@ update: env
 	uv sync --all-extras && \
 	echo "Updated dependencies in ${VIRTUAL_ENV}";
 
-run-setup: env
+validate: env
 	$(call PRINT_TITLE,"Running setup sequence")
-	pipelex run-setup
+	pipelex validate
 
 build: env
 	$(call PRINT_TITLE,"Building the wheels")
@@ -314,8 +314,8 @@ cc: init cleanderived c
 check: cc check-unused-imports
 	@echo "> done: check"
 
-s: init run-setup
-	@echo "> done: s = run-setup"
+v: init validate
+	@echo "> done: v = validate"
 
 li: lock install
 	@echo "> done: lock install"

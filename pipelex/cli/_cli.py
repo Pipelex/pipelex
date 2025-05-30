@@ -58,11 +58,11 @@ def init(
 
 
 @app.command()
-def run_setup() -> None:
+def validate() -> None:
     """Run the setup sequence."""
     LibraryConfig.export_libraries()
     Pipelex.make()
-    log.info("Running setup sequence passed OK.")
+    log.info("Setup sequence passed OK, config and pipelines are validated.")
 
 
 @app.command()

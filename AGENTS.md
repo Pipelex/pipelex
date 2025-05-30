@@ -20,8 +20,8 @@ This python 3.11 code is in the `pipelex` directory.
 
 ## Testing
 
-- Always test with `make runtests` -> it runs pytest on our `tests/` directory using proper sttings
-- If all unit tests pass, run `make run-setup` -> it runs a minimal version of our app with just the inits and data loading
+- Always test with `make codex-tests` -> it runs pytest on our `tests/` directory using proper settings
+- If all unit tests pass, run `make validate` -> it runs a minimal version of our app with just the inits and data loading
 
 ## PR Instructions
 

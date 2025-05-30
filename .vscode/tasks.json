@@ -14,11 +14,11 @@
             }
         },
         {
-            "label": "make run-setup",
+            "label": "make validate",
             "type": "shell",
             "command": "make",
             "args": [
-                "run-setup",
+                "validate",
             ],
             "group": {
                 "kind": "test",
