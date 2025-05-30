@@ -72,10 +72,6 @@ We are open to contributions in all areas of our core Pipelex library:
 - Fill in required credentials (OPENAI_API_KEY, AWS_ACCESS_KEY_ID, etc.)
 - Never commit `.env`
 
-## For Maintainers
-
-- Use `make bump-version` to update version in pyproject.toml
-
 ## License
 
 * **CLA** – The first time you open a PR, the CLA-assistant bot will guide you through signing the Contributor License Agreement. The process signature uses the [CLA assistant lite](https://github.com/marketplace/actions/cla-assistant-lite).
