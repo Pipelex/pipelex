@@ -6,7 +6,6 @@ from typing import Annotated, Dict, Optional
 import typer
 from click import Command, Context
 from rich import box
-from rich.console import Console
 from rich.table import Table
 from typer.core import TyperGroup
 from typing_extensions import override

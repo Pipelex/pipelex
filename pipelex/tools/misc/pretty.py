@@ -3,7 +3,6 @@ from typing import Any, List, Optional, Union
 
 from kajson.sandbox_manager import sandbox_manager
 from rich import print as rich_print
-from rich.console import Console
 from rich.panel import Panel
 from rich.pretty import Pretty
 from rich.style import StyleType
