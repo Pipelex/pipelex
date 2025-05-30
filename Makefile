@@ -11,15 +11,19 @@ LOCAL_PYTEST := $(VIRTUAL_ENV)/bin/pytest
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
 define PRINT_TITLE
-    $(eval PADDED_PROJECT_NAME := $(shell printf '%-15s' "[$(PROJECT_NAME)] " | sed 's/ /=/g'))
-    $(eval PADDED_TARGET_NAME := $(shell printf '%-15s' "($@) " | sed 's/ /=/g'))
-    $(if $(1),\
-		$(eval TITLE := $(shell printf '%s' "=== $(PADDED_PROJECT_NAME) $(PADDED_TARGET_NAME)" | sed 's/[[:space:]]/ /g')$(shell echo " $(1) " | sed 's/[[:space:]]/ /g')),\
-		$(eval TITLE := $(shell printf '%s' "=== $(PADDED_PROJECT_NAME) $(PADDED_TARGET_NAME)" | sed 's/[[:space:]]/ /g'))\
-	)
-	$(eval PADDED_TITLE := $(shell printf '%-126s' "$(TITLE)" | sed 's/ /=/g'))
-	@echo ""
-	@echo "$(PADDED_TITLE)"
+    $(eval PROJECT_PART := [$(PROJECT_NAME)])
+    $(eval TARGET_PART := ($@))
+    $(eval MESSAGE_PART := $(1))
+    $(if $(MESSAGE_PART),\
+        $(eval FULL_TITLE := === $(PROJECT_PART) ===== $(TARGET_PART) ====== $(MESSAGE_PART) ),\
+        $(eval FULL_TITLE := === $(PROJECT_PART) ===== $(TARGET_PART) ====== )\
+    )
+    $(eval TITLE_LENGTH := $(shell echo -n "$(FULL_TITLE)" | wc -c | tr -d ' '))
+    $(eval PADDING_LENGTH := $(shell echo $$((126 - $(TITLE_LENGTH)))))
+    $(eval PADDING := $(shell printf '%*s' $(PADDING_LENGTH) '' | tr ' ' '='))
+    $(eval PADDED_TITLE := $(FULL_TITLE)$(PADDING))
+    @echo ""
+    @echo "$(PADDED_TITLE)"
 endef
 
 define HELP
