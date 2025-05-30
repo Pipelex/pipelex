@@ -19,16 +19,6 @@ from pipelex.pipelex import Pipelex
 from pipelex.tools.config.manager import config_manager
 
 
-def format_concept_code(concept_code: Optional[str], current_domain: str) -> str:
-    """Format concept code by removing domain prefix if it matches current domain."""
-    if not concept_code:
-        return ""
-    parts = concept_code.split(".")
-    if len(parts) == 2 and parts[0] == current_domain:
-        return parts[1]
-    return concept_code
-
-
 class PipelexCLI(TyperGroup):
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Optional[Command]:
@@ -90,6 +80,16 @@ def show_config() -> None:
 def list_pipes() -> None:
     """List all available pipes."""
     Pipelex.make()
+
+    def _format_concept_code(concept_code: Optional[str], current_domain: str) -> str:
+        """Format concept code by removing domain prefix if it matches current domain."""
+        if not concept_code:
+            return ""
+        parts = concept_code.split(".")
+        if len(parts) == 2 and parts[0] == current_domain:
+            return parts[1]
+        return concept_code
+
     try:
         pipe_provider = get_pipe_provider()
         pipes = pipe_provider.get_pipes()
@@ -97,19 +97,11 @@ def list_pipes() -> None:
         # Sort pipes by domain and code
         ordered_items = sorted(pipes, key=lambda x: (x.domain or "", x.code or ""))
 
-        # Group pipes by domain
-        console = Console()
-        console.print("\n[bold blue]Available Pipes[/]\n")
-
         # Create dictionary for return value
         pipes_dict: Dict[str, Dict[str, Dict[str, str]]] = {}
 
         # Group by domain and create separate tables
         for domain, domain_pipes in groupby(ordered_items, key=lambda x: x.domain):
-            if not domain:  # Skip if domain is None
-                continue
-
-            # Create table for this domain
             table = Table(
                 title=f"[bold magenta]domain = {domain}[/]",
                 show_header=True,
@@ -119,21 +111,17 @@ def list_pipes() -> None:
                 border_style="blue",
             )
 
-            # Add columns with styles
             table.add_column("Code", style="green")
             table.add_column("Definition", style="white")
             table.add_column("Input", style="yellow")
             table.add_column("Output", style="yellow")
 
-            # Initialize domain in dictionary
             pipes_dict[domain] = {}
 
-            # Add rows
             for pipe in domain_pipes:
-                if pipe.code:  # Only add if code is not None
-                    # Format input and output by removing domain prefix if it matches current domain
-                    input_code = format_concept_code(pipe.input_concept_code, domain)
-                    output_code = format_concept_code(pipe.output_concept_code, domain)
+                if pipe.code:
+                    input_code = _format_concept_code(pipe.input_concept_code, domain)
+                    output_code = _format_concept_code(pipe.output_concept_code, domain)
 
                     table.add_row(
                         pipe.code,
@@ -142,16 +130,13 @@ def list_pipes() -> None:
                         output_code,
                     )
 
-                    # Add to dictionary (keep full paths in the dictionary)
                     pipes_dict[domain][pipe.code] = {
                         "definition": pipe.definition or "",
                         "input": pipe.input_concept_code or "",
                         "output": pipe.output_concept_code or "",
                     }
 
-            # Print table with spacing
-            console.print(table)
-            console.print("\n")  # Add space between tables
+            pretty_print(table)
 
     except Exception as e:
         raise PipelexCLIError(f"Failed to list pipes: {e}")
