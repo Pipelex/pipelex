@@ -1,4 +1,3 @@
-import inspect
 
 from pipelex import pretty_print
 from pipelex.tools.config.manager import config_manager

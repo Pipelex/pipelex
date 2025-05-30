@@ -29,6 +29,7 @@ This python 3.11 code is in the `pipelex` directory.
 
 ## PR Instructions
 
+- Run `make fix-unused-imports` -> removes unused imports, required to validate PR
 - Re-run checks in one call with `make check` -> formatting and linting with Ruff, type-checking with Pyright and Mypy
 - Re-run `make codex-tests`
 - Write a one-line summary of the changes.
