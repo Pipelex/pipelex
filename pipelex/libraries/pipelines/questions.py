@@ -60,12 +60,6 @@ class ThoughtfulAnswer(StructuredContent):
     the_lesson: str
     the_answer: str
 
-    def pretty_print(self):
-        pretty_print(self.the_trap, title="The trap", border_style="bright_red")
-        pretty_print(self.the_counter, title="The counter", border_style="bright_yellow")
-        pretty_print(self.the_lesson, title="The lesson", border_style="blue")
-        pretty_print(self.the_answer, title="The answer", border_style="green")
-
 
 T = TypeVar("T")
 

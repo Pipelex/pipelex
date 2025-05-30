@@ -74,8 +74,6 @@ def preprocess_template(template: str) -> str:
         processed_template = new_template
 
     if changes_made:
-        # pretty_print(template, "Original template")
-        # pretty_print(processed_template, "Processed template")
         pass
 
     return processed_template
