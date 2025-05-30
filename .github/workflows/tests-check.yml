@@ -54,4 +54,4 @@ jobs:
         run: make install
 
       - name: Run tests
-        run: make runtests
+        run: make gha-tests

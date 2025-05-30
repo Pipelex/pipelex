@@ -9,16 +9,14 @@ This rule explains how to build pipes.
 
 ## The pipelines/ directory
 
-- Pipelines and structures are defined in the `pipelex/pipelex_libraries/pipelines/` directory
+- Pipelines and structures are defined in the `pipelex/libraries/` directory
 
-pipelex/pipelex_libraries
+pipelex/libraries
 └── pipelines
-    ├── structures
-    └── toml
 
 ## Pipeline file naming
 
-- Pipeline TOML files should be placed in the `pipelex/pipelex_libraries/pipelines/toml/` directory or a subdirectory of it
+- Pipeline TOML files should be placed in the `pipelex/libraries/pipelines/` directory or a subdirectory of it
 - The file name should be descriptive, in snake_case and end with `.toml`
 - The file should contain both concepts and pipes definitions
 

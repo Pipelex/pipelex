@@ -21,7 +21,7 @@ We are open to contributions in all areas of our core Pipelex library:
 - Clone the repository locally
 - Install dependencies: `make install` (creates .venv and installs dependencies)
 - Copy `.env.example` to `.env` and fill in required API keys (at least OpenAI)
-- Run checks to make sure all is good: `make check` & `make runtests`
+- Run checks to make sure all is good: `make check` & `make test`
 - Create a branch with the format user_name/category/short_slug where category is one of: `feature`, `fix`, `refactor`, `doc`, `cicd` or `chore`
 - Make and commit changes
 - Push your local branch to your fork
@@ -52,14 +52,14 @@ We are open to contributions in all areas of our core Pipelex library:
 - Clone the repository locally
 - Install dependencies: `make install` (creates .venv and installs dependencies)
 - Copy `.env.example` to `.env` and fill in required API keys (at least OpenAI)
-- Run checks to make sure all is good: `make check` & `make runtests`
+- Run checks to make sure all is good: `make check` & `make test`
 - Create a branch for your feature/bug-fix with the format user_name/feature/some_feature or user_name/fix/some_bugfix
 - Make and commit changes
 - Push your local branch to your fork
-- When it's ready, run quality tests:
+- When it's ready, re-run quality tests:
 - Run `make fix-unused-imports` to removed unused imports
 - Run `make check` for formatting & linting with Ruff, and type-checking with Pyright and Mypy
-- Run `make runtests` for test suite
+- Run `make test` for test suite
 - Open a PR that [links to an existing Issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue) including a PR title and description
 - Mark as Draft until CI passes
 - Maintainers will review the code
