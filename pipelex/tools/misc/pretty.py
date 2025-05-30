@@ -6,6 +6,7 @@ from rich import print as rich_print
 from rich.panel import Panel
 from rich.pretty import Pretty
 from rich.style import StyleType
+from rich.table import Table
 from rich.text import Text, TextType
 
 from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor
@@ -39,6 +40,15 @@ def pretty_print_using_rich(
             content = Text(content, style="link " + content, no_wrap=True)
         else:
             content = Text(str(content))  # Treat all other strings as plain text
+    elif isinstance(content, Table):
+        # For tables, print directly without a panel
+        if title:
+            rich_print(f"\n[bold blue]{title}[/]\n")
+        rich_print(content)
+        rich_print("\n")
+        if subtitle:
+            rich_print(f"\n[dim]{subtitle}[/]")
+        return
     else:
         content = Pretty(content)
     panel = Panel(

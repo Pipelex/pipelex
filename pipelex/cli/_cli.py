@@ -1,14 +1,18 @@
 import os
 import shutil
-from typing import Annotated, Optional
+from itertools import groupby
+from typing import Annotated, Dict, Optional
 
 import typer
 from click import Command, Context
+from rich import box
+from rich.table import Table
 from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex import log, pretty_print
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
+from pipelex.hub import get_pipe_provider
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.pipelex import Pipelex
 from pipelex.tools.config.manager import config_manager
@@ -69,6 +73,72 @@ def show_config() -> None:
         pretty_print(final_config, title=f"Pipelex configuration for project: {config_manager.get_project_name()}")
     except Exception as e:
         raise PipelexConfigError(f"Error loading configuration: {e}")
+
+
+@app.command()
+def list_pipes() -> None:
+    """List all available pipes."""
+    Pipelex.make()
+
+    def _format_concept_code(concept_code: Optional[str], current_domain: str) -> str:
+        """Format concept code by removing domain prefix if it matches current domain."""
+        if not concept_code:
+            return ""
+        parts = concept_code.split(".")
+        if len(parts) == 2 and parts[0] == current_domain:
+            return parts[1]
+        return concept_code
+
+    try:
+        pipe_provider = get_pipe_provider()
+        pipes = pipe_provider.get_pipes()
+
+        # Sort pipes by domain and code
+        ordered_items = sorted(pipes, key=lambda x: (x.domain or "", x.code or ""))
+
+        # Create dictionary for return value
+        pipes_dict: Dict[str, Dict[str, Dict[str, str]]] = {}
+
+        # Group by domain and create separate tables
+        for domain, domain_pipes in groupby(ordered_items, key=lambda x: x.domain):
+            table = Table(
+                title=f"[bold magenta]domain = {domain}[/]",
+                show_header=True,
+                show_lines=True,
+                header_style="bold cyan",
+                box=box.SQUARE_DOUBLE_HEAD,
+                border_style="blue",
+            )
+
+            table.add_column("Code", style="green")
+            table.add_column("Definition", style="white")
+            table.add_column("Input", style="yellow")
+            table.add_column("Output", style="yellow")
+
+            pipes_dict[domain] = {}
+
+            for pipe in domain_pipes:
+                if pipe.code:
+                    input_code = _format_concept_code(pipe.input_concept_code, domain)
+                    output_code = _format_concept_code(pipe.output_concept_code, domain)
+
+                    table.add_row(
+                        pipe.code,
+                        pipe.definition or "",
+                        input_code,
+                        output_code,
+                    )
+
+                    pipes_dict[domain][pipe.code] = {
+                        "definition": pipe.definition or "",
+                        "input": pipe.input_concept_code or "",
+                        "output": pipe.output_concept_code or "",
+                    }
+
+            pretty_print(table)
+
+    except Exception as e:
+        raise PipelexCLIError(f"Failed to list pipes: {e}")
 
 
 def main() -> None:

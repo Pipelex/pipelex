@@ -64,7 +64,6 @@ async def render_jinja2(
         undeclared_variables.discard("preliminary_text")
         if undeclared_variables:
             log.verbose(undeclared_variables, "Jinja2 undeclared_variables")
-            # pretty_print(undeclared_variables, title="Jinja2 undeclared_variables")
     temlating_context = temlating_context.copy()
     if prompting_style:
         _add_to_templating_context(
