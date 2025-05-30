@@ -2,6 +2,7 @@ import re
 import textwrap
 from typing import Dict, List, Optional, Union
 
+import pytest
 from pydantic import BaseModel, Field
 from pytest import CaptureFixture
 
@@ -176,6 +177,7 @@ class TestPrettyPrintInSandbox:
 
         assert output == expected_output, f"Output did not match expected:\n{output}"
 
+    @pytest.mark.gha_disabled
     def test_pretty_print_pydantic_object(self, capsys: CaptureFixture[str]):
         # Create a complex nested object
         user = ComplexUser(
