@@ -7,6 +7,9 @@ PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"
 
 VENV_PYTHON := $(VIRTUAL_ENV)/bin/python3.11
 VENV_PYTEST := $(VIRTUAL_ENV)/bin/pytest
+VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
+VENV_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
+VENV_MYPY := $(VIRTUAL_ENV)/bin/mypy
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -181,7 +184,7 @@ cleanall: cleanderived cleanenv cleanlibraries
 ##########################################################################################
 
 codex-tests: env
-	$(call PRINT_TITLE,"Unit testing for github actions")
+	$(call PRINT_TITLE,"Unit testing for Codex")
 	@echo "• Running unit tests (excluding inference, and codex_disabled)"
 	$(VENV_PYTEST) --exitfirst --quiet -m "not inference and not codex_disabled" || [ $$? = 5 ]
 
@@ -265,20 +268,20 @@ tg: test-imgg
 
 format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	uv run ruff format .
+	$(VENV_RUFF) format .
 
 lint: env
 	$(call PRINT_TITLE,"Linting with ruff")
-	uv run ruff check . --fix
+	$(VENV_RUFF) check . --fix
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	uv run pyright --pythonpath $(VENV_PYTHON)  && \
+	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON)  && \
 	echo "Done typechecking with pyright — disregard warning about latest version, it's giving us false positives"
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	uv run mypy
+	$(VENV_MYPY)
 
 
 ##########################################################################################
@@ -287,20 +290,20 @@ mypy: env
 
 merge-check-ruff-format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	uv run ruff format --check -v .
+	$(VENV_RUFF) format --check -v .
 
 merge-check-ruff-lint: env check-unused-imports
 	$(call PRINT_TITLE,"Linting with ruff without fixing files")
-	uv run ruff check -v .
+	$(VENV_RUFF) check -v .
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	uv run pyright -p pyproject.toml
+	$(VENV_PYRIGHT) -p pyproject.toml
 
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	uv run mypy --version && \
-	uv run mypy --config-file pyproject.toml
+	$(VENV_MYPY) --version && \
+	$(VENV_MYPY) --config-file pyproject.toml
 
 ##########################################################################################
 ### SHORTHANDS
@@ -308,7 +311,7 @@ merge-check-mypy: env
 
 check-unused-imports: env
 	$(call PRINT_TITLE,"Checking for unused imports without fixing")
-	uv run ruff check --select=F401 --no-fix .
+	$(VENV_RUFF) check --select=F401 --no-fix .
 
 c: init format lint pyright mypy
 	@echo "> done: c = check"
@@ -327,8 +330,8 @@ li: lock install
 
 check-TODOs: env
 	$(call PRINT_TITLE,"Checking for TODOs")
-	uv run ruff check --select=TD -v .
+	$(VENV_RUFF) check --select=TD -v .
 
 fix-unused-imports: env
 	$(call PRINT_TITLE,"Fixing unused imports")
-	uv run ruff check --select=F401 --fix -v .
+	$(VENV_RUFF) check --select=F401 --fix -v .
