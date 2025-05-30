@@ -82,7 +82,7 @@ make fix-unused-imports       - Fix unused imports with ruff
 endef
 export HELP
 
-.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv validate v gha-tests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name bump-version check-uv
+.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv validate v gha-tests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name check-uv
 
 all help:
 	@echo "$$HELP"
