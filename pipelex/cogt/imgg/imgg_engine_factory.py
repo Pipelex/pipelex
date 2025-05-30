@@ -15,11 +15,11 @@ class ImggEngineFactory:
     ) -> ImggEngine:
         if "/" not in imgg_handle:
             raise ImggEngineFactoryError(f"Invalid Imgg handle: {imgg_handle}. Expected format: platform/model_name")
-            
+
         parts = imgg_handle.split("/", 1)
         if len(parts) != 2:
             raise ImggEngineFactoryError(f"Invalid Imgg handle: {imgg_handle}. Expected format: platform/model_name")
-        
+
         try:
             imgg_platform = ImggPlatform(parts[0])
         except ValueError:
