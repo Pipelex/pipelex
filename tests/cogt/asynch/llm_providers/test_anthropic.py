@@ -11,6 +11,7 @@ from pipelex.cogt.plugin.anthropic.anthropic_llms import anthropic_list_anthropi
 # make t VERBOSE=2 TEST=TestAnthropic
 @pytest.mark.llm
 @pytest.mark.gha_disabled
+@pytest.mark.codex_disabled
 @pytest.mark.asyncio(loop_scope="class")
 class TestAnthropic:
     # pytest -k test_anthropic_list_models -s -vv

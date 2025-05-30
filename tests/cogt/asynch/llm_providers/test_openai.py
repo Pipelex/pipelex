@@ -11,6 +11,7 @@ from pipelex.hub import get_secrets_provider
 # make t VERBOSE=2 TEST=TestOpenAI
 @pytest.mark.llm
 @pytest.mark.gha_disabled
+@pytest.mark.codex_disabled
 @pytest.mark.asyncio(loop_scope="class")
 class TestOpenAI:
     async def test_openai_api_key(self):

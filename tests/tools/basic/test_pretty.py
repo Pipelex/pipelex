@@ -178,6 +178,7 @@ class TestPrettyPrintInSandbox:
         assert output == expected_output, f"Output did not match expected:\n{output}"
 
     @pytest.mark.gha_disabled
+    @pytest.mark.codex_disabled
     def test_pretty_print_pydantic_object(self, capsys: CaptureFixture[str]):
         # Create a complex nested object
         user = ComplexUser(

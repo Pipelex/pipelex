@@ -175,6 +175,11 @@ cleanall: cleanderived cleanenv cleanlibraries
 ### TESTING
 ##########################################################################################
 
+codex-tests: env
+	$(call PRINT_TITLE,"Unit testing for github actions")
+	@echo "• Running unit tests (excluding inference, and codex_disabled)"
+	$(LOCAL_PYTEST) --exitfirst --quiet -m "not inference and not codex_disabled" || [ $$? = 5 ]
+
 runtests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
 	@echo "• Running unit tests (excluding inference, and gha_disabled)"

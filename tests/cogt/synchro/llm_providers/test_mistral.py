@@ -10,6 +10,7 @@ from pipelex.cogt.plugin.mistral.mistral_llms import list_mistral_models
 # make t VERBOSE=2 TEST=TestMistral
 @pytest.mark.llm
 @pytest.mark.gha_disabled
+@pytest.mark.codex_disabled
 class TestMistral:
     # pytest -k test_mistral_list_models -s -vv
     # make t VERBOSE=2 TEST=test_mistral_list_models

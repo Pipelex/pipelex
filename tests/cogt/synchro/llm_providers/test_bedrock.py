@@ -10,6 +10,7 @@ from rich.table import Table
 # make t VERBOSE=2 TEST=TestBedrock
 @pytest.mark.llm
 @pytest.mark.gha_disabled
+@pytest.mark.codex_disabled
 class TestBedrock:
     # pytest -k test_bedrock_list_available_models -s -vv
     def test_bedrock_list_available_models(
