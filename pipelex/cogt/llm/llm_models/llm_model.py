@@ -35,11 +35,15 @@ class LLMModel(BaseModel):
 
     @property
     def name_and_version(self) -> str:
-        return f"{self.llm_name}:{self.version}"
+        return f"{self.llm_name}/{self.version}"
 
     @property
     def name_and_version_and_platform(self) -> str:
-        return f"{self.llm_name}:{self.version}:{self.default_platform}"
+        return f"{self.llm_name}/{self.version}/{self.default_platform}"
+
+    @property
+    def desc(self) -> str:
+        return f"{self.llm_family}/{self.llm_name}/{self.version}/{self.default_platform}"
 
     @property
     def is_system_prompt_supported(self) -> bool:

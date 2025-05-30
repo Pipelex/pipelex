@@ -119,8 +119,9 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                 ):
                     raise OpenAIWorkerError(f"LLM family {self.llm_engine.llm_model.llm_family} is not supported by OpenAILLMWorker")
         except NotFoundError as not_found_error:
+            # TODO: record llm config so it can be displayed here
             raise OpenAIWorkerModelNotFoundError(
-                f"OpenAI model or deployment '{self.llm_engine.llm_id}' not found: {not_found_error}"
+                f"OpenAI model or deployment not found:\n{self.llm_engine.desc}\nmodel: {self.llm_engine.llm_model.desc}\n{not_found_error}"
             ) from not_found_error
         except APIConnectionError as api_connection_error:
             raise OpenAIWorkerError(f"OpenAI API connection error: {api_connection_error}") from api_connection_error
