@@ -9,6 +9,7 @@
 gpt-4o-2024-08-06 = { llm_name = "gpt-4o", llm_version = "2024-08-06" }
 best-claude = "claude-3-7-sonnet"
 best-gemini = "gemini-2.5-pro"
+best-mistral = "mistral-large"
 
 ####################################################################################################
 # LLM Presets

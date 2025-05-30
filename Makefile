@@ -3,17 +3,12 @@ include .env
 export
 endif
 VIRTUAL_ENV := $(CURDIR)/.venv
+LOCAL_PYTHON := $(VIRTUAL_ENV)/bin/python3.11
 PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"/\1/')
 
-LOCAL_PYTHON := uv run python3.11
-LOCAL_PYTEST := uv run pytest
-
+LOCAL_PYTEST := $(VIRTUAL_ENV)/bin/pytest
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
-
-define GET_UV_VERSION
-$(shell awk '/^\[tool.uv\]/{f=1;next} f==1&&/^required-version/{print $$3;exit}' pyproject.toml | tr -d '"')
-endef
 
 define PRINT_TITLE
     $(eval PADDED_PROJECT_NAME := $(shell printf '%-15s' "[$(PROJECT_NAME)] " | sed 's/ /=/g'))
@@ -211,7 +206,7 @@ test: env
 
 test-with-prints: env
 	$(call PRINT_TITLE,"Unit testing with prints and our rich logs")
-	@echo "• Running unit tests using `$(LOCAL_PYTEST)`"
+	@echo "• Running unit tests"
 	@if [ -n "$(TEST)" ]; then \
 		$(LOCAL_PYTEST) -s -k "$(TEST)" $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	else \
