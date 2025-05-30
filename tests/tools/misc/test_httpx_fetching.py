@@ -4,6 +4,7 @@ from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx, fetch
 from tests.tools.test_data import TestURLs
 
 
+@pytest.mark.codex_disabled
 class TestHttpxFetching:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("url", TestURLs.PUBLIC_URLS)
