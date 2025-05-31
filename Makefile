@@ -5,7 +5,7 @@ endif
 VIRTUAL_ENV := $(CURDIR)/.venv
 PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"/\1/')
 
-PYTHON_VERSION ?= 3.11
+PYTHON_VERSION ?= 3.13
 VENV_PYTHON := $(VIRTUAL_ENV)/bin/python$(PYTHON_VERSION)
 VENV_PYTEST := $(VIRTUAL_ENV)/bin/pytest
 VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
