@@ -8,19 +8,13 @@ on:
       - "release/v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
-  test:
-    name: Tests checks
+  matrix-test:
+    name: Tests check
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - python-version: "3.11"
-            group: "Python 3.11"
-          - python-version: "3.12"
-            group: "Python 3.12"
-          - python-version: "3.13"
-            group: "Python 3.13"
+        python-version: ["3.11", "3.12", "3.13"]
     permissions:
       contents: read
       id-token: write
