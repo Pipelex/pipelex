@@ -59,7 +59,7 @@ dev = [
     "pandas-stubs>=2.2.3.241126",
     "pytest>=8.3.3",
     "pytest-cov>=6.1.1",
-    "pytest-pretty==1.2.0",
+    "pytest-sugar>=1.0.0",
     "pytest-asyncio>=0.24.0",
     "ruff>=0.6.8",
     "types-aioboto3[bedrock,bedrock-runtime]>=13.4.0",
