@@ -84,7 +84,16 @@ make fix-unused-imports       - Fix unused imports with ruff
 endef
 export HELP
 
-.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv validate v gha-tests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name check-uv print-python-path
+.PHONY: \
+	all help env lock install update build \
+	format lint pyright mypy \
+	cleanderived cleanenv cleanlibraries cleanall \
+	test test-with-prints t test-inference ti \
+	test-imgg tg test-ocr to codex-tests gha-tests \
+	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
+	validate v check c cc \
+	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
+	li check-unused-imports fix-unused-imports check-uv check-TODOs
 
 all help:
 	@echo "$$HELP"
@@ -102,8 +111,6 @@ check-uv:
 	}
 	@uv self update >/dev/null 2>&1 || true
 
-CURRENT_VERSION := $(shell grep '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-NEXT_VERSION := $(shell echo $(CURRENT_VERSION) | awk -F. '{$$NF = $$NF + 1;} 1' | sed 's/ /./g')
 
 env: check-uv
 	$(call PRINT_TITLE,"Creating virtual environment")
