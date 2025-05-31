@@ -139,7 +139,7 @@ class IMGGTestCases:
     IMGG_PROMPT_3 = """
 Woman typing on a laptop. On the laptop screen you see python code to generate code to write a prompt for an AI model.
 """
-    IMGG_PROMPT_4 = "a girl with a dragon tatoo, coding LLM pipelines with Pipelex on a laptop"
+    IMGG_PROMPT_4 = "a girl with a dragon tatoo, coding in python"
 
     IMAGE_DESC: ClassVar[List[Tuple[str, str]]] = [  # topic, imgg_prompt_text
         # (IMGG_PROMPT_1, IMGG_PROMPT_1),
