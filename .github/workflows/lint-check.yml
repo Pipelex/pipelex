@@ -32,9 +32,14 @@ jobs:
         run: |
           PYTHON_VERSION=${{ matrix.python-version }} make install
 
-      - name: Run all checks
-        run: |
-          make merge-check-ruff-format
-          make merge-check-ruff-lint
-          make merge-check-pyright
-          make merge-check-mypy
+      - name: Check formatting
+        run: make merge-check-ruff-format
+
+      - name: Check linting
+        run: make merge-check-ruff-lint
+
+      - name: Check types with pyright
+        run: make merge-check-pyright
+
+      - name: Check types with mypy
+        run: make merge-check-mypy

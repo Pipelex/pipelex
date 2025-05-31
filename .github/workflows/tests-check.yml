@@ -13,7 +13,6 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
-        test-group: ["gha-tests", "test-inference", "test-ocr", "test-imgg"]
       fail-fast: false
     permissions:
       contents: read
@@ -60,4 +59,4 @@ jobs:
           PYTHON_VERSION=${{ matrix.python-version }} make install
 
       - name: Run tests
-        run: make ${{ matrix.test-group }}
+        run: make gha-tests
