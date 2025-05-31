@@ -292,11 +292,11 @@ mypy: env
 
 merge-check-ruff-format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	$(VENV_RUFF) format --check -v .
+	$(VENV_RUFF) format --check .
 
 merge-check-ruff-lint: env check-unused-imports
 	$(call PRINT_TITLE,"Linting with ruff without fixing files")
-	$(VENV_RUFF) check -v .
+	$(VENV_RUFF) check .
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
@@ -304,7 +304,6 @@ merge-check-pyright: env
 
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY) --version && \
 	$(VENV_MYPY) --config-file pyproject.toml
 
 ##########################################################################################
