@@ -112,6 +112,7 @@ env: check-uv
 	else \
 		echo "Python virtual env already exists in \`${VIRTUAL_ENV}\`"; \
 	fi
+	@echo "Using Python: $$($(VIRTUAL_ENV)/bin/python3 --version) from $$(which $$(readlink -f $(VIRTUAL_ENV)/bin/python3))"
 
 init: env
 	$(call PRINT_TITLE,"Running pipelex init")
