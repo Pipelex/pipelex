@@ -3,7 +3,7 @@ from typing import List
 from anthropic import AsyncAnthropic
 from anthropic.types import ModelInfo
 
-from pipelex.cogt.exceptions import LLMSDKError
+from pipelex.cogt.exceptions import LLMModelProviderError, LLMSDKError
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.plugin.anthropic.anthropic_factory import AnthropicFactory
 
@@ -22,8 +22,8 @@ async def anthropic_list_anthropic_models(llm_platform: LLMPlatform) -> List[Mod
         raise LLMSDKError("We only support the standard Anthropic client for listing models")
     models_response = await anthropic_client.models.list()
     if not models_response:
-        raise ValueError("No models found")
+        raise LLMModelProviderError("No models found")
     models_list = models_response.data
     if not models_list:
-        raise ValueError("No models found")
+        raise LLMModelProviderError("No models found")
     return sorted(models_list, key=lambda model: model.created_at)

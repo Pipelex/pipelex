@@ -2,12 +2,12 @@ from typing import Any, Optional, Type
 
 import instructor
 import openai
-from openai import NOT_GIVEN, APIConnectionError, NotFoundError
+from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError
 from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_func import llm_job_func
@@ -15,7 +15,6 @@ from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.cogt.plugin.openai.openai_errors import OpenAIWorkerError, OpenAIWorkerModelNotFoundError
 from pipelex.cogt.plugin.openai.openai_factory import OpenAIFactory
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -116,14 +115,18 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                     | LLMFamily.BEDROCK_META_LLAMA_3
                     | LLMFamily.BEDROCK_AMAZON_NOVA
                 ):
-                    raise OpenAIWorkerError(f"LLM family {self.llm_engine.llm_model.llm_family} is not supported by OpenAILLMWorker")
+                    raise LLMEngineParameterError(f"LLM family {self.llm_engine.llm_model.llm_family} is not supported by OpenAILLMWorker")
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here
-            raise OpenAIWorkerModelNotFoundError(
+            raise LLMModelNotFoundError(
                 f"OpenAI model or deployment not found:\n{self.llm_engine.desc}\nmodel: {self.llm_engine.llm_model.desc}\n{not_found_error}"
             ) from not_found_error
         except APIConnectionError as api_connection_error:
-            raise OpenAIWorkerError(f"OpenAI API connection error: {api_connection_error}") from api_connection_error
+            raise LLMCompletionError(f"OpenAI API connection error: {api_connection_error}") from api_connection_error
+        except BadRequestError as bad_request_error:
+            raise LLMCompletionError(
+                f"OpenAI bad request error with model: {self.llm_engine.llm_model.desc}:\n{bad_request_error}"
+            ) from bad_request_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message
         response_text = openai_message.content
@@ -212,9 +215,13 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                     | LLMFamily.BEDROCK_META_LLAMA_3
                     | LLMFamily.BEDROCK_AMAZON_NOVA
                 ):
-                    raise OpenAIWorkerError(f"LLM family {self.llm_engine.llm_model.llm_family} is not supported by OpenAILLMWorker")
+                    raise LLMEngineParameterError(f"LLM family {self.llm_engine.llm_model.llm_family} is not supported by OpenAILLMWorker")
         except NotFoundError as exc:
-            raise OpenAIWorkerError(f"OpenAI model or deployment '{self.llm_engine.llm_id}' not found: {exc}") from exc
+            raise LLMCompletionError(f"OpenAI model or deployment '{self.llm_engine.llm_id}' not found: {exc}") from exc
+        except BadRequestError as bad_request_error:
+            raise LLMCompletionError(
+                f"OpenAI bad request error with model: {self.llm_engine.llm_model.desc}:\n{bad_request_error}"
+            ) from bad_request_error
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)

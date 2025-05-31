@@ -182,7 +182,7 @@ def imgg_handle(request: pytest.FixtureRequest) -> ImggHandle:
     params=[
         LLMJobParams(
             temperature=0.5,
-            max_tokens=8192,
+            max_tokens=None,
             seed=None,
         ),
     ]
