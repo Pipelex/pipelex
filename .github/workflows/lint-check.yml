@@ -8,16 +8,26 @@ on:
       - "release/v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
-  lint-check:
+# --------------------------------------------------------------------------
+# 1.  Matrix job — one runner *per* Python version
+# --------------------------------------------------------------------------
+  lint:
+    name: Lint (${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
+
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python
-        uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Check UV installation
         run: make check-uv
@@ -26,7 +36,7 @@ jobs:
         run: uv --version
 
       - name: Install dependencies
-        run: make install
+        run: PYTHON_VERSION=${{ matrix.python-version }} make install
 
       - name: Run ruff format merge check
         run: make merge-check-ruff-format
@@ -39,3 +49,21 @@ jobs:
 
       - name: Run mypy merge check
         run: make merge-check-mypy
+
+# --------------------------------------------------------------------------
+# 2.  Aggregator job — the *single* required status check
+# --------------------------------------------------------------------------
+  lint-all:
+    name: Lint (all versions)
+    runs-on: ubuntu-latest
+    needs: lint        # wait for every matrix leg
+    if: always()       # run even if one leg already failed
+
+    steps:
+      - name: Fail if any matrix leg failed
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ]; then
+            echo "::error::At least one Python version failed linting."
+            exit 1
+          fi
+          echo "✅ All Python versions passed lint checks."

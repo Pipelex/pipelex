@@ -8,41 +8,26 @@ on:
       - "release/v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
-  tests-check:
+  matrix-test:
+    name: Tests check
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     permissions:
       contents: read
       id-token: write
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev
-      GOOGLE_ENCRYPTED_CREDENTIALS_KEY: ${{ secrets.GOOGLE_ENCRYPTED_CREDENTIALS_KEY }}
-      GOOGLE_ENCRYPTED_CREDENTIALS_PATH: ${{ secrets.GOOGLE_ENCRYPTED_CREDENTIALS_PATH }}
-      COLUMNS: 120
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
         with:
-          workload_identity_provider: "projects/634168471546/locations/global/workloadIdentityPools/github-wif/providers/githuboidc"
-          service_account: "github-actions@evotis-foundation.iam.gserviceaccount.com"
-
-      - name: "Get secret from Secret Manager"
-        id: get_secret
-        uses: "google-github-actions/get-secretmanager-secrets@v2"
-        with:
-          secrets: |-
-            GOOGLE_ENCRYPTED_CREDENTIALS:projects/634168471546/secrets/GOOGLE_ENCRYPTED_CREDENTIALS/versions/1
-
-      - name: "Create encrypted_credentials.txt file"
-        run: |
-          echo "${{ steps.get_secret.outputs.GOOGLE_ENCRYPTED_CREDENTIALS }}" > encrypted_credentials.txt
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Check UV installation
         run: make check-uv
@@ -50,8 +35,8 @@ jobs:
       - name: Verify UV installation
         run: uv --version
 
-      - name: Install virtual env and dependencies
-        run: make install
+      - name: Install dependencies
+        run: PYTHON_VERSION=${{ matrix.python-version }} make install
 
       - name: Run tests
         run: make gha-tests
