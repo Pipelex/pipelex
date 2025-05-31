@@ -38,9 +38,7 @@ class BedrockLLMWorker(LLMWorkerAbstract):
         if default_max_tokens := llm_engine.llm_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise LLMEngineParameterError(
-                f"No max_tokens provided for llm model '{llm_engine.llm_model}', but it must be provided for Bedrock models"
-            )
+            raise LLMEngineParameterError(f"No max_tokens provided for llm model '{self.llm_engine.llm_model.desc}', but it is required for Bedrock")
         self.bedrock_client_for_text = sdk_instance
 
     @override
@@ -71,4 +69,5 @@ class BedrockLLMWorker(LLMWorkerAbstract):
         llm_job: LLMJob,
         schema: Type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
+        # TODO: try with the newest instructor release
         raise LLMCapabilityError(f"It is not possible to generate objects with a {self.__class__.__name__}.")

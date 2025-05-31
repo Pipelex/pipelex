@@ -5,6 +5,7 @@ from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, SdkTypeError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_func import llm_job_func
@@ -35,16 +36,18 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         if default_max_tokens := llm_engine.llm_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise ValueError("max_tokens is None, which is required for Anthropic models")
+            raise LLMEngineParameterError(
+                f"No max_tokens provided for llm model '{self.llm_engine.llm_model.desc}', but it is required for Anthropic"
+            )
 
         # Verify if the sdk_instance is compatible with the current LLM platform
         if isinstance(sdk_instance, (AsyncAnthropic, AsyncAnthropicBedrock)):
             if llm_engine.llm_platform == LLMPlatform.ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropic)):
-                raise ValueError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
+                raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
             elif llm_engine.llm_platform == LLMPlatform.BEDROCK_ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropicBedrock)):
-                raise ValueError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
+                raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
         else:
-            raise ValueError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
+            raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
 
         self.anthropic_async_client = sdk_instance
         if structure_method:
@@ -85,12 +88,12 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
 
         single_content_block = response.content[0]
         if single_content_block.type != "text":
-            raise ValueError(f"Unexpected content block type: {single_content_block.type}")
+            raise LLMCompletionError(f"Unexpected content block type: {single_content_block.type}\nmodel: {self.llm_engine.llm_model.desc}")
         full_reply_content = single_content_block.text
 
         single_content_block = response.content[0]
         if single_content_block.type != "text":
-            raise ValueError(f"Unexpected content block type: {single_content_block.type}")
+            raise LLMCompletionError(f"Unexpected content block type: {single_content_block.type}\nmodel: {self.llm_engine.llm_model.desc}")
         full_reply_content = single_content_block.text
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):

@@ -7,7 +7,7 @@ from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import SdkTypeError
+from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_func import llm_job_func
@@ -129,7 +129,7 @@ class OpenAILLMWorker(LLMWorkerAbstract):
         response_text = openai_message.content
         if response_text is None:
             print("This helper does not support tools, if we don't get content, something is wrong.")
-            raise ValueError(f"OpenAI response message content is None: {response}")
+            raise LLMCompletionError(f"OpenAI response message content is None: {response}\nmodel: {self.llm_engine.llm_model.desc}")
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
             llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)

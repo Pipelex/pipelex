@@ -33,9 +33,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
         if default_max_tokens := llm_engine.llm_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise LLMEngineParameterError(
-                f"No max_tokens provided for llm model '{llm_engine.llm_model}', but it must be provided for Mistral models"
-            )
+            raise LLMEngineParameterError(f"No max_tokens provided for llm model '{self.llm_engine.llm_model.desc}', but it is required for Mistral")
         self.mistral_client_for_text: Mistral = sdk_instance
 
         if structure_method:
