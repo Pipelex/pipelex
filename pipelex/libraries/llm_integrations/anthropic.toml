@@ -46,7 +46,6 @@ default_platform = "anthropic"
 
 ["claude-4".claude-4-sonnet.latest]
 max_tokens = 64000
-# max_tokens = 8192
 is_gen_object_supported = true
 is_vision_supported = true
 max_prompt_images = 100
@@ -57,7 +56,6 @@ default_platform = "anthropic"
 
 ["claude-4".claude-4-opus.latest]
 max_tokens = 32000
-# max_tokens = 8192
 is_gen_object_supported = true
 is_vision_supported = true
 max_prompt_images = 100

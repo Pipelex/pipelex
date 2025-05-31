@@ -86,6 +86,7 @@ class LLMVisionTestCases:
 
 class LLMTestConstants:
     USER_TEXT_SHORT = "In one sentence, who is Bill Gates?"
+    # USER_TEXT_SHORT = "What's the biggest football match tonight in Europe?"
     PROMPT_TEMPLATE_TEXT = "Can you give one example of flower which is {color} in color ?"
     PROMPT_COLOR_EXAMPLES: ClassVar[List[str]] = [
         "red",

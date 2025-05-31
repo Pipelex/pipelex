@@ -85,6 +85,10 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                     | LLMFamily.GPT_4O
                     | LLMFamily.CUSTOM_LLAMA_4
                     | LLMFamily.CUSTOM_GEMMA_3
+                    | LLMFamily.PERPLEXITY_SEARCH
+                    | LLMFamily.PERPLEXITY_RESEARCH
+                    | LLMFamily.PERPLEXITY_REASONING
+                    | LLMFamily.PERPLEXITY_DEEPSEEK
                 ):
                     response = await self.openai_client_for_text.chat.completions.create(
                         model=self.llm_engine.llm_id,
@@ -111,10 +115,6 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                     | LLMFamily.BEDROCK_ANTHROPIC_CLAUDE
                     | LLMFamily.BEDROCK_META_LLAMA_3
                     | LLMFamily.BEDROCK_AMAZON_NOVA
-                    | LLMFamily.PERPLEXITY_SEARCH
-                    | LLMFamily.PERPLEXITY_RESEARCH
-                    | LLMFamily.PERPLEXITY_REASONING
-                    | LLMFamily.PERPLEXITY_DEEPSEEK
                 ):
                     raise OpenAIWorkerError(f"LLM family {self.llm_engine.llm_model.llm_family} is not supported by OpenAILLMWorker")
         except NotFoundError as not_found_error:
@@ -179,6 +179,10 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                     | LLMFamily.GPT_4O
                     | LLMFamily.CUSTOM_LLAMA_4
                     | LLMFamily.CUSTOM_GEMMA_3
+                    | LLMFamily.PERPLEXITY_SEARCH
+                    | LLMFamily.PERPLEXITY_RESEARCH
+                    | LLMFamily.PERPLEXITY_REASONING
+                    | LLMFamily.PERPLEXITY_DEEPSEEK
                 ):
                     result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                         model=self.llm_engine.llm_id,
@@ -207,10 +211,6 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                     | LLMFamily.BEDROCK_ANTHROPIC_CLAUDE
                     | LLMFamily.BEDROCK_META_LLAMA_3
                     | LLMFamily.BEDROCK_AMAZON_NOVA
-                    | LLMFamily.PERPLEXITY_SEARCH
-                    | LLMFamily.PERPLEXITY_RESEARCH
-                    | LLMFamily.PERPLEXITY_REASONING
-                    | LLMFamily.PERPLEXITY_DEEPSEEK
                 ):
                     raise OpenAIWorkerError(f"LLM family {self.llm_engine.llm_model.llm_family} is not supported by OpenAILLMWorker")
         except NotFoundError as exc:
