@@ -103,6 +103,10 @@ class ImggPromptError(CogtError):
     pass
 
 
+class ImggGenerationError(CogtError):
+    pass
+
+
 class MissingDependencyError(CogtError):
     """Raised when a required dependency is not installed."""
 

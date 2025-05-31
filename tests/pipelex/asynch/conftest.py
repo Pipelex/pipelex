@@ -12,6 +12,7 @@ from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, remove_folder
 from pipelex.tools.misc.json_utils import save_as_json_to_path
+from tests.conftest import TEST_OUTPUTS_DIR
 
 
 @pytest_asyncio.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
@@ -38,7 +39,7 @@ async def pipe_result_handler(request: FixtureRequest) -> AsyncIterator[tuple[st
     if not isinstance(pipe_code, str):
         raise RuntimeError(f"pipe_code is not a string: {pipe_code}")
     result_dir_path = get_incremental_directory_path(
-        base_path="temp/unit_test_results",
+        base_path=TEST_OUTPUTS_DIR,
         base_name=pipe_code,
     )
     activity_handler = ActivityHandlerForResultFiles(result_dir_path=result_dir_path)
