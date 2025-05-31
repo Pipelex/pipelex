@@ -5,7 +5,8 @@ endif
 VIRTUAL_ENV := $(CURDIR)/.venv
 PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"/\1/')
 
-VENV_PYTHON := $(VIRTUAL_ENV)/bin/python3.11
+PYTHON_VERSION ?= 3.11
+VENV_PYTHON := $(VIRTUAL_ENV)/bin/python$(PYTHON_VERSION)
 VENV_PYTEST := $(VIRTUAL_ENV)/bin/pytest
 VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
 VENV_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
@@ -107,7 +108,7 @@ env: check-uv
 	$(call PRINT_TITLE,"Creating virtual environment")
 	@if [ ! -d $(VIRTUAL_ENV) ]; then \
 		echo "Creating Python virtual env in \`${VIRTUAL_ENV}\`"; \
-		uv venv $(VIRTUAL_ENV) --python 3.11; \
+		uv venv $(VIRTUAL_ENV) --python $(PYTHON_VERSION); \
 	else \
 		echo "Python virtual env already exists in \`${VIRTUAL_ENV}\`"; \
 	fi

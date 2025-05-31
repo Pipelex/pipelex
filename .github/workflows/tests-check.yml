@@ -10,6 +10,11 @@ on:
 jobs:
   tests-check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+        test-group: ["gha-tests", "test-inference", "test-ocr", "test-imgg"]
+      fail-fast: false
     permissions:
       contents: read
       id-token: write
@@ -39,10 +44,10 @@ jobs:
         run: |
           echo "${{ steps.get_secret.outputs.GOOGLE_ENCRYPTED_CREDENTIALS }}" > encrypted_credentials.txt
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Check UV installation
         run: make check-uv
@@ -51,7 +56,8 @@ jobs:
         run: uv --version
 
       - name: Install virtual env and dependencies
-        run: make install
+        run: |
+          PYTHON_VERSION=${{ matrix.python-version }} make install
 
       - name: Run tests
-        run: make gha-tests
+        run: make ${{ matrix.test-group }}

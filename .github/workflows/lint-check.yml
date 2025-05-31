@@ -8,16 +8,19 @@ on:
       - "release/v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
-  lint-check:
+  ruff-format:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Check UV installation
         run: make check-uv
@@ -26,16 +29,63 @@ jobs:
         run: uv --version
 
       - name: Install dependencies
-        run: make install
+        run: |
+          PYTHON_VERSION=${{ matrix.python-version }} make install
 
       - name: Run ruff format merge check
         run: make merge-check-ruff-format
 
+  ruff-lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Check UV installation
+        run: make check-uv
+
+      - name: Verify UV installation
+        run: uv --version
+
+      - name: Install dependencies
+        run: |
+          PYTHON_VERSION=${{ matrix.python-version }} make install
+
       - name: Run ruff lint merge check
         run: make merge-check-ruff-lint
 
-      - name: Run pyright merge check
-        run: make merge-check-pyright
+  type-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+        type-checker: ["pyright", "mypy"]
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
 
-      - name: Run mypy merge check
-        run: make merge-check-mypy
+      - name: Check UV installation
+        run: make check-uv
+
+      - name: Verify UV installation
+        run: uv --version
+
+      - name: Install dependencies
+        run: |
+          PYTHON_VERSION=${{ matrix.python-version }} make install
+
+      - name: Run ${{ matrix.type-checker }} merge check
+        run: make merge-check-${{ matrix.type-checker }}
