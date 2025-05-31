@@ -479,7 +479,7 @@ wheels = [
 
 [[package]]
 name = "instructor"
-version = "1.7.2"
+version = "1.8.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -494,9 +494,9 @@ dependencies = [
     { name = "tenacity" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/63/ba/692739c76959191aa7e5f0fccda871b36548355f4a09c8733687e64e62b0/instructor-1.7.2.tar.gz", hash = "sha256:6c01b2b159766df24865dc81f7bf8457cbda88a3c0bbc810da3467d19b185ed2", size = 66200177, upload-time = "2024-12-26T09:04:57.209Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a9/54/927c2093dc5e532195baf849f7ff1376ad673222b5d37be19e4e73af618e/instructor-1.8.3.tar.gz", hash = "sha256:04d64ebc0d6e5eee104f4715b18fac1a02c21757ae6ce76efa65d38cbd536b0b", size = 69265823, upload-time = "2025-05-22T16:44:02.409Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c5/82/fd319382c1a33d7021cf151007b4cbd5daddf09d9ca5fb670e476668f9fc/instructor-1.7.2-py3-none-any.whl", hash = "sha256:cb43d27f6d7631c31762b936b2fcb44d2a3f9d8a020430a0f4d3484604ffb95b", size = 71353, upload-time = "2024-12-26T09:04:51.023Z" },
+    { url = "https://files.pythonhosted.org/packages/07/76/0e198373f182020559b0886d0d61dd2ddca109ab7a9eddf5458ff759d51a/instructor-1.8.3-py3-none-any.whl", hash = "sha256:a2c5066458132dc50ec6faa87cab9a2dd6b11b3f45c0e563a2ef704892286945", size = 94619, upload-time = "2025-05-22T16:43:58.529Z" },
 ]
 
 [[package]]
@@ -921,7 +921,7 @@ requires-dist = [
     { name = "filetype", specifier = ">=1.2.0" },
     { name = "google-auth-oauthlib", marker = "extra == 'google'", specifier = ">=1.2.1" },
     { name = "httpx", specifier = ">=0.27.0" },
-    { name = "instructor", specifier = "==1.7.2" },
+    { name = "instructor", specifier = ">=1.8.3" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
     { name = "kajson", specifier = "==0.1.4" },

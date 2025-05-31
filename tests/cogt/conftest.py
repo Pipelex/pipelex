@@ -81,10 +81,12 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
 @pytest.fixture(
     params=[
         # LLMFamily.GPT_4,
-        # LLMFamily.GPT_4_1,
         LLMFamily.GPT_4O,
         # LLMFamily.GPT_4_5,
+        # LLMFamily.GPT_4_1,
         # LLMFamily.O_SERIES,
+        # LLMFamily.CLAUDE_3_7,
+        # LLMFamily.CLAUDE_4,
         # LLMFamily.PERPLEXITY_SEARCH,
         # LLMFamily.PERPLEXITY_REASONING,
         # LLMFamily.PERPLEXITY_RESEARCH,
@@ -171,7 +173,7 @@ def imgg_handle(request: pytest.FixtureRequest) -> ImggHandle:
     params=[
         LLMJobParams(
             temperature=0.5,
-            max_tokens=None,
+            max_tokens=8192,
             seed=None,
         ),
     ]

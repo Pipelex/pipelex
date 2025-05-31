@@ -117,6 +117,7 @@ api_key_method = "env"
 client_method = "aioboto3"
 
 [cogt.llm_config.anthropic_config]
+claude_4_reduced_tokens_limit = 8192  # use "unlimited" to enable the full 32/64K tokens Opus/Sonet but it raises streaming/timeout issues
 api_key_method = "env"
 
 [cogt.llm_config.custom_endpoint_config]

@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import Literal, Optional, Union
 
 from pydantic import Field
 
@@ -23,7 +24,14 @@ ANTHROPIC_API_KEY_VAR_NAME = "ANTHROPIC_API_KEY"
 
 
 class AnthropicConfig(ConfigModel):
+    claude_4_reduced_tokens_limit: Union[int, Literal["unlimited"]] = Field(default="unlimited")
     api_key_method: AnthropicKeyMethod = Field(strict=False)
+
+    @property
+    def claude_4_tokens_limit(self) -> Optional[int]:
+        if self.claude_4_reduced_tokens_limit == "unlimited":
+            return None
+        return self.claude_4_reduced_tokens_limit
 
     def configure(self, secrets_provider: SecretsProviderAbstract) -> str:
         return self.get_api_key(secrets_provider=secrets_provider)

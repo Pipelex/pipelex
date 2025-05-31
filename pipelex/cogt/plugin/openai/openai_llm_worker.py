@@ -97,8 +97,7 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                     LLMFamily.CLAUDE_3
                     | LLMFamily.CLAUDE_3_5
                     | LLMFamily.CLAUDE_3_7
-                    | LLMFamily.CLAUDE_2
-                    | LLMFamily.CLAUDE_INSTANT
+                    | LLMFamily.CLAUDE_4
                     | LLMFamily.MISTRAL_7B
                     | LLMFamily.MISTRAL_8X7B
                     | LLMFamily.MISTRAL_LARGE
@@ -194,8 +193,7 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                     LLMFamily.CLAUDE_3
                     | LLMFamily.CLAUDE_3_5
                     | LLMFamily.CLAUDE_3_7
-                    | LLMFamily.CLAUDE_2
-                    | LLMFamily.CLAUDE_INSTANT
+                    | LLMFamily.CLAUDE_4
                     | LLMFamily.MISTRAL_7B
                     | LLMFamily.MISTRAL_8X7B
                     | LLMFamily.MISTRAL_LARGE

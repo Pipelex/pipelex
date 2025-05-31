@@ -50,18 +50,17 @@ class LLMCreator(StrEnum):
 
 
 class LLMFamily(StrEnum):
-    GPT_4 = "gpt-4"
-    GPT_3_5 = "gpt-3.5"
     GPT_3 = "gpt-3"
+    GPT_3_5 = "gpt-3.5"
+    GPT_4 = "gpt-4"
+    GPT_4O = "gpt-4o"
     GPT_4_5 = "gpt-4.5"
     GPT_4_1 = "gpt-4.1"
-    GPT_4O = "gpt-4o"
     O_SERIES = "o"
     CLAUDE_3 = "claude-3"
     CLAUDE_3_5 = "claude-3.5"
     CLAUDE_3_7 = "claude-3.7"
-    CLAUDE_2 = "claude-2"
-    CLAUDE_INSTANT = "claude-instant"
+    CLAUDE_4 = "claude-4"
     MISTRAL_7B = "mistral-7b"
     MISTRAL_8X7B = "mistral-8x7b"
     MISTRAL_LARGE = "mistral-large"
@@ -92,7 +91,7 @@ class LLMFamily(StrEnum):
                 LLMFamily.GPT_4 | LLMFamily.GPT_3_5 | LLMFamily.GPT_3 | LLMFamily.O_SERIES | LLMFamily.GPT_4_5 | LLMFamily.GPT_4_1 | LLMFamily.GPT_4O
             ):
                 return LLMCreator.OPENAI
-            case LLMFamily.CLAUDE_3 | LLMFamily.CLAUDE_3_5 | LLMFamily.CLAUDE_2 | LLMFamily.CLAUDE_INSTANT | LLMFamily.CLAUDE_3_7:
+            case LLMFamily.CLAUDE_3 | LLMFamily.CLAUDE_3_5 | LLMFamily.CLAUDE_3_7 | LLMFamily.CLAUDE_4:
                 return LLMCreator.ANTHROPIC
             case LLMFamily.BEDROCK_ANTHROPIC_CLAUDE:
                 return LLMCreator.ANTHROPIC
