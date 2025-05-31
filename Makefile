@@ -5,8 +5,9 @@ endif
 VIRTUAL_ENV := $(CURDIR)/.venv
 PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"/\1/')
 
+# The "?" is used to make the variable optional, so that it can be overridden by the user.
 PYTHON_VERSION ?= 3.11
-VENV_PYTHON := $(VIRTUAL_ENV)/bin/python$(PYTHON_VERSION)
+VENV_PYTHON := $(VIRTUAL_ENV)/bin/python
 VENV_PYTEST := $(VIRTUAL_ENV)/bin/pytest
 VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
 VENV_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
@@ -83,7 +84,7 @@ make fix-unused-imports       - Fix unused imports with ruff
 endef
 export HELP
 
-.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv validate v gha-tests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name check-uv
+.PHONY: all help env lock install update format lint pyright mypy build cleanderived cleanenv validate v gha-tests test test-with-prints t test-inference ti test-imgg tg test-ocr to check cc li merge-check-ruff-lint merge-check-ruff-format merge-check-mypy check-unused-imports fix-unused-imports test-name check-uv print-python-path
 
 all help:
 	@echo "$$HELP"
@@ -112,7 +113,7 @@ env: check-uv
 	else \
 		echo "Python virtual env already exists in \`${VIRTUAL_ENV}\`"; \
 	fi
-	@echo "Using Python: $$($(VIRTUAL_ENV)/bin/python3 --version) from $$(which $$(readlink -f $(VIRTUAL_ENV)/bin/python3))"
+	@echo "Using Python: $$($(VENV_PYTHON) --version) from $$(which $$(readlink -f $(VENV_PYTHON)))"
 
 init: env
 	$(call PRINT_TITLE,"Running pipelex init")
