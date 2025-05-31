@@ -5,7 +5,7 @@ endif
 VIRTUAL_ENV := $(CURDIR)/.venv
 PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"/\1/')
 
-PYTHON_VERSION ?= 3.13
+PYTHON_VERSION ?= 3.11
 VENV_PYTHON := $(VIRTUAL_ENV)/bin/python$(PYTHON_VERSION)
 VENV_PYTEST := $(VIRTUAL_ENV)/bin/pytest
 VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
@@ -278,7 +278,7 @@ lint: env
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON)  && \
+	$(VENV_PYRIGHT) --pythonpath $(VIRTUAL_ENV)/bin/python3  && \
 	echo "Done typechecking with pyright — disregard warning about latest version, it's giving us false positives"
 
 mypy: env
@@ -300,7 +300,7 @@ merge-check-ruff-lint: env check-unused-imports
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON)
+	$(VENV_PYRIGHT) --pythonpath $(VIRTUAL_ENV)/bin/python3
 
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
