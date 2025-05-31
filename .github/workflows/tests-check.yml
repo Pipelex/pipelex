@@ -8,12 +8,19 @@ on:
       - "release/v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
-  tests-checks:
-    name: Tests checks (Python ${{ matrix.python-version }})
+  test:
+    name: Tests checks
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        include:
+          - python-version: "3.11"
+            group: "Python 3.11"
+          - python-version: "3.12"
+            group: "Python 3.12"
+          - python-version: "3.13"
+            group: "Python 3.13"
     permissions:
       contents: read
       id-token: write
@@ -24,7 +31,12 @@ jobs:
       GOOGLE_ENCRYPTED_CREDENTIALS_PATH: ${{ secrets.GOOGLE_ENCRYPTED_CREDENTIALS_PATH }}
       COLUMNS: 120
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: "Authenticate to Google Cloud"
         uses: "google-github-actions/auth@v1"
@@ -43,20 +55,14 @@ jobs:
         run: |
           echo "${{ steps.get_secret.outputs.GOOGLE_ENCRYPTED_CREDENTIALS }}" > encrypted_credentials.txt
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: Check UV installation
         run: make check-uv
 
       - name: Verify UV installation
         run: uv --version
 
-      - name: Install virtual env and dependencies
-        run: |
-          PYTHON_VERSION=${{ matrix.python-version }} make install
+      - name: Install dependencies
+        run: PYTHON_VERSION=${{ matrix.python-version }} make install
 
       - name: Run tests
         run: make gha-tests
