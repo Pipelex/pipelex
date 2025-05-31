@@ -14,6 +14,7 @@ from pipelex.cogt.plugin.openai.custom_endpoint_config import CustomEndpointConf
 from pipelex.cogt.plugin.openai.openai_config import OpenAIOpenAIConfig
 from pipelex.cogt.plugin.openai.perplexity_config import PerplexityConfig
 from pipelex.cogt.plugin.openai.vertexai_config import VertexAIConfig
+from pipelex.cogt.plugin.openai.xai_config import XaiConfig
 from pipelex.tools.config.models import ConfigModel
 
 
@@ -55,6 +56,7 @@ class LLMConfig(ConfigModel):
     mistral_config: MistralConfig
     openai_openai_config: OpenAIOpenAIConfig
     perplexity_config: PerplexityConfig
+    xai_config: XaiConfig
     custom_endpoint_config: CustomEndpointConfig
 
     instructor_config: InstructorConfig

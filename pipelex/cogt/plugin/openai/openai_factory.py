@@ -62,6 +62,15 @@ class OpenAIFactory:
                     api_key=api_key,
                     base_url=endpoint,
                 )
+            case LLMPlatform.XAI:
+                xai_config = get_config().cogt.llm_config.xai_config
+                endpoint, api_key = xai_config.configure(secrets_provider=get_secrets_provider())
+
+                log.verbose(f"Making Xai AsyncOpenAI client with endpoint: {endpoint}")
+                the_client = openai.AsyncOpenAI(
+                    api_key=api_key,
+                    base_url=endpoint,
+                )
             case LLMPlatform.CUSTOM_OPENAI:
                 custom_endpoint_config = get_config().cogt.llm_config.custom_endpoint_config
                 base_url, api_key = custom_endpoint_config.configure(secrets_provider=get_secrets_provider())

@@ -124,12 +124,13 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
         # LLMPlatform.ANTHROPIC,
         # LLMPlatform.AZURE_OPENAI,
         # LLMPlatform.BEDROCK,
-        LLMPlatform.BEDROCK_ANTHROPIC,
+        # LLMPlatform.BEDROCK_ANTHROPIC,
         # LLMPlatform.MISTRAL,
         # LLMPlatform.OPENAI,
         # LLMPlatform.PERPLEXITY,
         # LLMPlatform.VERTEXAI_OPENAI,
         # LLMPlatform.CUSTOM_OPENAI,
+        LLMPlatform.XAI,
     ]
 )
 def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:

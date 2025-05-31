@@ -107,6 +107,9 @@ api_key_method = "env"
 [cogt.llm_config.perplexity_config]
 api_key_method = "env"
 
+[cogt.llm_config.xai_config]
+api_key_method = "env"
+
 [cogt.llm_config.vertexai_config]
 api_key_method = "env"
 

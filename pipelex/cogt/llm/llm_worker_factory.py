@@ -21,7 +21,7 @@ class LLMWorkerFactory:
         plugin_manager = get_plugin_manager()
         llm_worker: LLMWorkerAbstract
         match llm_engine.llm_platform:
-            case LLMPlatform.OPENAI | LLMPlatform.AZURE_OPENAI | LLMPlatform.PERPLEXITY:
+            case LLMPlatform.OPENAI | LLMPlatform.AZURE_OPENAI | LLMPlatform.PERPLEXITY | LLMPlatform.XAI:
                 from pipelex.cogt.plugin.openai.openai_factory import OpenAIFactory
 
                 structure_method: Optional[StructureMethod] = None
