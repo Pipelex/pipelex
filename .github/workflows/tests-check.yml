@@ -8,7 +8,8 @@ on:
       - "release/v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
-  tests-check:
+  tests-checks:
+    name: Tests checks (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
