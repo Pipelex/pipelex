@@ -56,6 +56,8 @@ class PluginHandle(StrEnum):
         match imgg_platform:
             case ImggPlatform.FAL_AI:
                 return PluginHandle.FAL_ASYNC
+            case ImggPlatform.OPENAI:
+                return PluginHandle.OPENAI_ASYNC
 
 
 PluginManagerRoot = Dict[str, Any]
