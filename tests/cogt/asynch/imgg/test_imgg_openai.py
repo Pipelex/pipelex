@@ -8,12 +8,6 @@ from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from tests.cogt.test_data import IMGGTestCases
 from tests.conftest import TEST_OUTPUTS_DIR
 
-# output_format: Optional[Literal["png", "jpeg", "webp"]] | NotGiven = NOT_GIVEN,
-# quality: Optional[Literal["standard", "hd", "low", "medium", "high", "auto"]] | NotGiven = NOT_GIVEN,
-# size: Optional[
-#     Literal["auto", "1024x1024", "1536x1024", "1024x1536", "256x256", "512x512", "1792x1024", "1024x1792"]
-# ]
-
 
 @pytest.mark.imgg
 @pytest.mark.inference

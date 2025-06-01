@@ -11,6 +11,7 @@ from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract, imgg_job_func
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
+from pipelex.cogt.plugin.openai.openai_imgg_factory import OpenAIImggFactory
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_path
 
@@ -48,15 +49,21 @@ class OpenAIImggWorker(ImggWorkerAbstract):
         imgg_job: ImggJob,
         nb_images: int,
     ) -> List[GeneratedImage]:
+        image_size = OpenAIImggFactory.image_size_for_gpt_image_1(aspect_ratio=imgg_job.job_params.aspect_ratio)
+        output_format = OpenAIImggFactory.output_format_for_gpt_image_1(output_format=imgg_job.job_params.output_format)
+        moderation = OpenAIImggFactory.moderation_for_gpt_image_1(is_moderated=imgg_job.job_params.is_moderated)
+        background = OpenAIImggFactory.background_for_gpt_image_1(background=imgg_job.job_params.background)
+        quality = OpenAIImggFactory.quality_for_gpt_image_1(quality=imgg_job.job_params.quality)
+        output_compression = 100
         result = await self.openai_client.images.generate(
             prompt=imgg_job.imgg_prompt.positive_text,
             model=self.imgg_engine.imgg_model_name,
-            moderation="low",
-            background="opaque",
-            quality="high",
-            size="1024x1024",
-            output_format="png",
-            # output_compression=100,
+            moderation=moderation,
+            background=background,
+            quality=quality,
+            size=image_size,
+            output_format=output_format,
+            output_compression=output_compression,
             n=nb_images,
         )
         if not result.data:

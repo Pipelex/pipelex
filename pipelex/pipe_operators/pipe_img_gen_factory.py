@@ -10,11 +10,13 @@ from pipelex.pipe_operators.pipe_img_gen import PipeImgGen
 
 
 class PipeImgGenBlueprint(PipeBlueprint):
+    imgg_prompt: Optional[str] = None
+    imgg_prompt_stuff_name: Optional[str] = None
     imgg_handle: Optional[ImggHandle] = None
     aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
     nb_steps: Optional[int] = Field(default=None, gt=0)
     guidance_scale: Optional[float] = Field(default=None, gt=0)
-    is_safety_checker_enabled: Optional[bool] = None
+    is_moderated: Optional[bool] = None
     safety_tolerance: Optional[int] = Field(default=None, ge=1, le=6)
     is_raw: Optional[bool] = None
     seed: Optional[Union[int, Literal["auto"]]] = None
@@ -38,11 +40,13 @@ class PipeImgGenFactory(PipeSpecificFactoryProtocol[PipeImgGenBlueprint, PipeImg
             input_concept_code=pipe_blueprint.input,
             output_concept_code=pipe_blueprint.output,
             output_multiplicity=output_multiplicity,
+            imgg_prompt=pipe_blueprint.imgg_prompt,
+            imgg_prompt_stuff_name=pipe_blueprint.imgg_prompt_stuff_name,
             imgg_handle=pipe_blueprint.imgg_handle,
             aspect_ratio=pipe_blueprint.aspect_ratio,
             nb_steps=pipe_blueprint.nb_steps,
             guidance_scale=pipe_blueprint.guidance_scale,
-            is_safety_checker_enabled=pipe_blueprint.is_safety_checker_enabled,
+            is_moderated=pipe_blueprint.is_moderated,
             safety_tolerance=pipe_blueprint.safety_tolerance,
             is_raw=pipe_blueprint.is_raw,
             seed=pipe_blueprint.seed,

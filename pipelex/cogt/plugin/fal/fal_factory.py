@@ -1,20 +1,12 @@
 from typing import Any, Dict, List
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError
+from pipelex.cogt.exceptions import ImggGeneratedTypeError, ImggParameterError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, OutputFormat
-
-
-class FalFactoryTypeError(CogtError):
-    pass
-
-
-class FalParameterError(CogtError):
-    pass
 
 
 class FalFactory:
@@ -39,6 +31,8 @@ class FalFactory:
                 return "portrait_16_9"
             case AspectRatio.PORTRAIT_9_21:
                 return "portrait_21_9"
+            case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
+                raise ImggParameterError(f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1 image generation model")
 
     @classmethod
     def aspect_ratio_for_flux_1_1_ultra(cls, aspect_ratio: AspectRatio) -> str:
@@ -57,6 +51,8 @@ class FalFactory:
                 return "9:16"
             case AspectRatio.PORTRAIT_9_21:
                 return "9:21"
+            case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
+                raise ImggParameterError(f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1.1 Ultra image generation model")
 
     @classmethod
     def output_format_for_flux(cls, output_format: OutputFormat) -> str:
@@ -66,7 +62,7 @@ class FalFactory:
             case OutputFormat.JPG:
                 return "jpeg"
             case OutputFormat.WEBP:
-                raise FalParameterError("Output format WebP is not supported for Flux")
+                raise ImggParameterError("Output format WebP is not supported for Flux")
 
     @classmethod
     def make_fal_arguments(
@@ -85,7 +81,7 @@ class FalFactory:
                     "num_inference_steps": params.nb_steps,
                     "guidance_scale": params.guidance_scale,
                     "num_images": nb_images,
-                    "enable_safety_checker": params.is_safety_checker_enabled,
+                    "enable_safety_checker": params.is_moderated,
                     "safety_tolerance": params.safety_tolerance,
                     "seed": params.seed,
                     "output_format": cls.output_format_for_flux(params.output_format),
@@ -96,7 +92,7 @@ class FalFactory:
                     "prompt": imgg_job.imgg_prompt.positive_text,
                     "aspect_ratio": cls.aspect_ratio_for_flux_1_1_ultra(params.aspect_ratio),
                     "num_images": nb_images,
-                    "enable_safety_checker": params.is_safety_checker_enabled,
+                    "enable_safety_checker": params.is_moderated,
                     "safety_tolerance": params.safety_tolerance,
                     "raw": params.is_raw,
                     "seed": params.seed,
@@ -119,7 +115,7 @@ class FalFactory:
                     "sync_mode": imgg_job.job_config.is_sync_mode,
                 }
             case _:
-                raise FalParameterError(f"Invalid fal application: '{fal_application}'")
+                raise ImggParameterError(f"Invalid fal application: '{fal_application}'")
 
         return args_dict
 
@@ -129,15 +125,15 @@ class FalFactory:
         fal_image_dict = images[0]
         image_url = fal_image_dict["url"]
         if not isinstance(image_url, str):
-            raise FalFactoryTypeError("Image url is not a string")
+            raise ImggGeneratedTypeError("Image url is not a string")
         # TODO: if the url is actual image data, send it to cloud storage?
 
         width = fal_image_dict["width"]
         if not isinstance(width, int):
-            raise FalFactoryTypeError("Image width is not an integer")
+            raise ImggGeneratedTypeError("Image width is not an integer")
         height = fal_image_dict["height"]
         if not isinstance(height, int):
-            raise FalFactoryTypeError("Image height is not an integer")
+            raise ImggGeneratedTypeError("Image height is not an integer")
 
         generated_image = GeneratedImage(
             url=image_url,
@@ -154,14 +150,14 @@ class FalFactory:
         for fal_image_dict in fal_image_dicts:
             image_url = fal_image_dict["url"]
             if not isinstance(image_url, str):
-                raise FalFactoryTypeError("Image url is not a string")
+                raise ImggGeneratedTypeError("Image url is not a string")
 
             width = fal_image_dict["width"]
             if not isinstance(width, int):
-                raise FalFactoryTypeError("Image width is not an integer")
+                raise ImggGeneratedTypeError("Image width is not an integer")
             height = fal_image_dict["height"]
             if not isinstance(height, int):
-                raise FalFactoryTypeError("Image height is not an integer")
+                raise ImggGeneratedTypeError("Image height is not an integer")
 
             generated_image = GeneratedImage(
                 url=image_url,

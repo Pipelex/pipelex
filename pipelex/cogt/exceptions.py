@@ -103,7 +103,15 @@ class ImggPromptError(CogtError):
     pass
 
 
+class ImggParameterError(CogtError):
+    pass
+
+
 class ImggGenerationError(CogtError):
+    pass
+
+
+class ImggGeneratedTypeError(ImggGenerationError):
     pass
 
 

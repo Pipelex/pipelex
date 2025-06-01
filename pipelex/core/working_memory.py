@@ -282,6 +282,10 @@ class WorkingMemory(BaseModel):
         """Get stuff content as TextContent if applicable."""
         return self.get_stuff(name=name).as_text
 
+    def get_stuff_as_str(self, name: str) -> str:
+        """Get stuff content as string if applicable."""
+        return self.get_stuff_as_text(name=name).text
+
     def get_stuff_as_image(self, name: str) -> ImageContent:
         """Get stuff content as ImageContent if applicable."""
         return self.get_stuff(name=name).as_image
