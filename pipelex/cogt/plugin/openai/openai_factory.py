@@ -13,7 +13,7 @@ from openai.types.chat.chat_completion_content_part_image_param import ImageURL
 from openai.types.completion_usage import CompletionUsage
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCompletionError, LLMEngineParameterError, LLMPromptParameterError, SdkTypeError
+from pipelex.cogt.exceptions import LLMEngineParameterError, LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine

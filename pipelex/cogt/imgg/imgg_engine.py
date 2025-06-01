@@ -9,4 +9,4 @@ class ImggEngine(BaseModel):
 
     @property
     def desc(self) -> str:
-        return f"Imgg Engine {self.imgg_platform}/{self.imgg_model_name}"
+        return f"Imgg Engine '{self.imgg_platform}/{self.imgg_model_name}'"

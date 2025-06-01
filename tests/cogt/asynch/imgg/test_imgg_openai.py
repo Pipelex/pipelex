@@ -1,10 +1,5 @@
-import base64
-import os
-
 import pytest
-from openai import AsyncOpenAI
 
-from pipelex import pretty_print
 from pipelex.cogt.exceptions import ImggGenerationError
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.plugin.openai.openai_factory import OpenAIFactory
@@ -27,7 +22,7 @@ class TestImggByOpenAIGpt:
     @pytest.mark.parametrize("topic, image_desc", IMGGTestCases.IMAGE_DESC)
     async def test_gpt_image_generation(self, topic: str, image_desc: str):
         client = OpenAIFactory.make_openai_client(LLMPlatform.OPENAI)
-        result1 = await client.images.generate(
+        result = await client.images.generate(
             prompt=image_desc,
             model="gpt-image-1",
             moderation="low",
@@ -38,10 +33,10 @@ class TestImggByOpenAIGpt:
             output_compression=100,
             n=2,
         )
-        if not result1.data:
+        if not result.data:
             raise ImggGenerationError("No result from OpenAI")
 
-        for image_index, image_data in enumerate(result1.data):
+        for image_index, image_data in enumerate(result.data):
             image_base64 = image_data.b64_json
             if not image_base64:
                 raise ImggGenerationError("No base64 image data received from OpenAI")

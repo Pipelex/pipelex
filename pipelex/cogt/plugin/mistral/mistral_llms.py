@@ -2,7 +2,7 @@ from typing import List
 
 from mistralai.models import Data
 
-from pipelex.cogt.exceptions import LLMModelProviderError, LLMSDKError
+from pipelex.cogt.exceptions import LLMModelProviderError
 from pipelex.cogt.plugin.mistral.mistral_factory import MistralFactory
 
 
