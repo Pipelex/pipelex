@@ -9,7 +9,7 @@ from tests.cogt.test_data import IMGGTestCases
 @pytest.mark.imgg
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestCogtImgg:
+class TestImageGeneration:
     @pytest.mark.parametrize("topic, imgg_prompt_text", IMGGTestCases.IMAGE_DESC)
     async def test_imgg_using_handle(self, imgg_handle: str, topic: str, imgg_prompt_text: str):
         pretty_print(imgg_prompt_text, title=topic)

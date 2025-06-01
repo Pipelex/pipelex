@@ -49,7 +49,7 @@ class PipeImgGen(PipeOperator):
     guidance_scale: Optional[float] = Field(default=None, gt=0)
     is_moderated: Optional[bool] = None
     background: Optional[Background] = None
-    quality: Optional[Quality] = None
+    quality: Optional[Quality] = Field(default=None, strict=False)
     safety_tolerance: Optional[int] = Field(default=None, ge=1, le=6)
     is_raw: Optional[bool] = None
     seed: Optional[Union[int, Literal["auto"]]] = None
@@ -93,10 +93,10 @@ class PipeImgGen(PipeOperator):
 
         # TODO: refacto this as a model update
         imgg_job_params = ImggJobParams(
-            nb_steps=self.nb_steps or imgg_param_defaults.nb_steps,
             aspect_ratio=self.aspect_ratio or imgg_param_defaults.aspect_ratio,
             background=self.background or imgg_param_defaults.background,
             quality=self.quality or imgg_param_defaults.quality,
+            nb_steps=self.nb_steps or imgg_param_defaults.nb_steps,
             guidance_scale=self.guidance_scale or imgg_param_defaults.guidance_scale,
             is_moderated=self.is_moderated or imgg_param_defaults.is_moderated,
             safety_tolerance=self.safety_tolerance or imgg_param_defaults.safety_tolerance,

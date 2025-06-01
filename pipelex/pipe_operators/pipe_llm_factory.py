@@ -14,7 +14,7 @@ from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm import PipeLLM, StructuringMethod
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
-from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_any_list
+from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
 
 
 class PipeLLMBlueprint(PipeBlueprint):
@@ -45,7 +45,7 @@ class PipeLLMBlueprint(PipeBlueprint):
 
     @model_validator(mode="after")
     def validate_multiple_output(self) -> Self:
-        if attributes_list := has_more_than_one_among_attributes_from_any_list(
+        if excess_attributes_list := has_more_than_one_among_attributes_from_lists(
             self,
             attributes_lists=[
                 ["nb_output", "multiple_output"],
@@ -53,7 +53,7 @@ class PipeLLMBlueprint(PipeBlueprint):
                 ["prompt", "prompt_name", "prompt_template", "template_name"],
             ],
         ):
-            raise PipeDefinitionError(f"PipeLLMBlueprint should have no more than one of {attributes_list} among them")
+            raise PipeDefinitionError(f"PipeLLMBlueprint should have no more than one of {excess_attributes_list} among them")
         return self
 
 

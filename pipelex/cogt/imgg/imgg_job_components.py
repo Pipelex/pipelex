@@ -39,8 +39,8 @@ class Background(StrEnum):
 class ImggJobParams(BaseModel):
     aspect_ratio: AspectRatio = Field(strict=False)
     background: Background = Field(strict=False)
-    quality: Quality = Field(strict=False)
-    nb_steps: int = Field(..., gt=0)
+    quality: Optional[Quality] = Field(default=None, strict=False)
+    nb_steps: Optional[int] = Field(default=None, gt=0)
     guidance_scale: float = Field(..., gt=0)
     is_moderated: bool
     safety_tolerance: int = Field(..., ge=1, le=6)
@@ -52,8 +52,8 @@ class ImggJobParams(BaseModel):
 class ImggJobParamsDefaults(ConfigModel):
     aspect_ratio: AspectRatio = Field(strict=False)
     background: Background = Field(strict=False)
-    quality: Quality = Field(strict=False)
-    nb_steps: int = Field(..., gt=0)
+    quality: Optional[Quality] = Field(default=None, strict=False)
+    nb_steps: Optional[int] = Field(default=None, gt=0)
     guidance_scale: float = Field(..., gt=0)
     is_moderated: bool
     safety_tolerance: int = Field(..., ge=1, le=6)

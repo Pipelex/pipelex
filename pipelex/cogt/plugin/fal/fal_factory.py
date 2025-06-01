@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImggGeneratedTypeError, ImggParameterError
@@ -6,7 +6,7 @@ from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job import ImggJob
-from pipelex.cogt.imgg.imgg_job_components import AspectRatio, OutputFormat
+from pipelex.cogt.imgg.imgg_job_components import AspectRatio, OutputFormat, Quality
 
 
 class FalFactory:
@@ -15,7 +15,27 @@ class FalFactory:
         return f"{imgg_engine.imgg_platform}/{imgg_engine.imgg_model_name}"
 
     @classmethod
-    def image_size_for_flux_1(cls, aspect_ratio: AspectRatio) -> str:
+    def make_nb_steps_from_quality_for_flux_pro(cls, quality: Quality) -> int:
+        match quality:
+            case Quality.LOW:
+                return 14
+            case Quality.MEDIUM:
+                return 28
+            case Quality.HIGH:
+                return 56
+
+    @classmethod
+    def make_nb_steps_from_quality_for_sdxl_lightning(cls, quality: Quality) -> int:
+        match quality:
+            case Quality.LOW:
+                return 2
+            case Quality.MEDIUM:
+                return 4
+            case Quality.HIGH:
+                return 8
+
+    @classmethod
+    def make_image_size_for_flux_1(cls, aspect_ratio: AspectRatio) -> str:
         match aspect_ratio:
             case AspectRatio.SQUARE:
                 return "square_hd"
@@ -35,7 +55,7 @@ class FalFactory:
                 raise ImggParameterError(f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1 image generation model")
 
     @classmethod
-    def aspect_ratio_for_flux_1_1_ultra(cls, aspect_ratio: AspectRatio) -> str:
+    def make_aspect_ratio_for_flux_1_1_ultra(cls, aspect_ratio: AspectRatio) -> str:
         match aspect_ratio:
             case AspectRatio.SQUARE:
                 return "1:1"
@@ -55,7 +75,7 @@ class FalFactory:
                 raise ImggParameterError(f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1.1 Ultra image generation model")
 
     @classmethod
-    def output_format_for_flux(cls, output_format: OutputFormat) -> str:
+    def make_output_format_for_flux(cls, output_format: OutputFormat) -> str:
         match output_format:
             case OutputFormat.PNG:
                 return "png"
@@ -73,45 +93,52 @@ class FalFactory:
     ) -> Dict[str, Any]:
         params = imgg_job.job_params
         args_dict: Dict[str, Any]
+        num_inference_steps: Optional[int]
         match fal_application:
             case ImggHandle.FLUX_1_PRO_LEGACY | ImggHandle.FLUX_1_1_PRO:
+                num_inference_steps = params.nb_steps
+                if not num_inference_steps and (quality := params.quality):
+                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux_pro(quality=quality)
+
                 args_dict = {
                     "prompt": imgg_job.imgg_prompt.positive_text,
-                    "image_size": cls.image_size_for_flux_1(params.aspect_ratio),
-                    "num_inference_steps": params.nb_steps,
+                    "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
+                    "num_inference_steps": num_inference_steps,
                     "guidance_scale": params.guidance_scale,
                     "num_images": nb_images,
                     "enable_safety_checker": params.is_moderated,
                     "safety_tolerance": params.safety_tolerance,
                     "seed": params.seed,
-                    "output_format": cls.output_format_for_flux(params.output_format),
+                    "output_format": cls.make_output_format_for_flux(params.output_format),
                     "sync_mode": imgg_job.job_config.is_sync_mode,
                 }
             case ImggHandle.FLUX_1_1_ULTRA:
                 args_dict = {
                     "prompt": imgg_job.imgg_prompt.positive_text,
-                    "aspect_ratio": cls.aspect_ratio_for_flux_1_1_ultra(params.aspect_ratio),
+                    "aspect_ratio": cls.make_aspect_ratio_for_flux_1_1_ultra(params.aspect_ratio),
                     "num_images": nb_images,
                     "enable_safety_checker": params.is_moderated,
                     "safety_tolerance": params.safety_tolerance,
                     "raw": params.is_raw,
                     "seed": params.seed,
-                    "output_format": cls.output_format_for_flux(params.output_format),
+                    "output_format": cls.make_output_format_for_flux(params.output_format),
                     "sync_mode": imgg_job.job_config.is_sync_mode,
                 }
             case ImggHandle.SDXL_LIGHTNING:
                 num_inference_steps = params.nb_steps
+                if not num_inference_steps and (quality := params.quality):
+                    num_inference_steps = cls.make_nb_steps_from_quality_for_sdxl_lightning(quality=quality)
                 acceptable_steps = [1, 2, 4, 8]
                 if num_inference_steps not in acceptable_steps:
                     log.warning(f"Number of inference steps {num_inference_steps}' for SDXL Lightning must be one of {acceptable_steps}")
                     num_inference_steps = 8
                 args_dict = {
                     "prompt": imgg_job.imgg_prompt.positive_text,
-                    "image_size": cls.image_size_for_flux_1(params.aspect_ratio),
+                    "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
                     "num_inference_steps": num_inference_steps,
                     "num_images": nb_images,
                     "seed": params.seed,
-                    "output_format": cls.output_format_for_flux(params.output_format),
+                    "output_format": cls.make_output_format_for_flux(params.output_format),
                     "sync_mode": imgg_job.job_config.is_sync_mode,
                 }
             case _:

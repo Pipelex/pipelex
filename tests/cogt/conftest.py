@@ -171,8 +171,8 @@ def llm_id(request: pytest.FixtureRequest) -> str:
         # ImggHandle.FLUX_1_PRO_LEGACY,
         # ImggHandle.FLUX_1_1_PRO,
         # ImggHandle.FLUX_1_1_ULTRA,
-        # ImggHandle.SDXL_LIGHTNING,
-        ImggHandle.OPENAI_GPT_IMAGE_1,
+        ImggHandle.SDXL_LIGHTNING,
+        # ImggHandle.OPENAI_GPT_IMAGE_1,
     ]
 )
 def imgg_handle(request: pytest.FixtureRequest) -> ImggHandle:
