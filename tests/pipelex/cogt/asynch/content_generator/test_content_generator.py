@@ -17,7 +17,7 @@ from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.hub import get_llm_deck
 from pipelex.mission.job_metadata import JobMetadata
-from tests.cogt.test_data import Employee
+from tests.pipelex.cogt.test_data import Employee
 from tests.test_data import ImageTestCases
 
 USER_TEXT_FOR_BASE = """

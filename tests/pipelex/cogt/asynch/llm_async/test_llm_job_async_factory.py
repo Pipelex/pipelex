@@ -7,7 +7,7 @@ from pipelex.cogt.llm.llm_job import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.hub import get_llm_worker
-from tests.cogt.test_data import LLMTestConstants
+from tests.pipelex.cogt.test_data import LLMTestConstants
 
 
 @pytest.mark.asyncio(loop_scope="class")

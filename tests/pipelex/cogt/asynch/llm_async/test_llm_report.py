@@ -6,7 +6,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.hub import get_llm_deck, get_llm_worker, get_report_delegate
-from tests.cogt.test_data import LLMTestCases
+from tests.pipelex.cogt.test_data import LLMTestCases
 
 
 @pytest.mark.asyncio

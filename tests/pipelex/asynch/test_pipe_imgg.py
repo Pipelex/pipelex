@@ -6,21 +6,7 @@ from pipelex.core.concept_native import NativeConcept
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_img_gen import PipeImgGen, PipeImgGenOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
-from tests.cogt.test_data import IMGGTestCases
-
-
-@pytest.fixture(
-    params=[
-        ImggHandle.FLUX_1_PRO_LEGACY,
-        ImggHandle.FLUX_1_1_PRO,
-        ImggHandle.FLUX_1_1_ULTRA,
-        ImggHandle.SDXL_LIGHTNING,
-        ImggHandle.OPENAI_GPT_IMAGE_1,
-    ]
-)
-def imgg_handle(request: pytest.FixtureRequest) -> ImggHandle:
-    assert isinstance(request.param, ImggHandle)
-    return request.param
+from tests.pipelex.cogt.test_data import IMGGTestCases
 
 
 @pytest.mark.imgg

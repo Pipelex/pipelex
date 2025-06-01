@@ -8,7 +8,7 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.hub import get_llm_deck, get_llm_worker, get_report_delegate
-from tests.cogt.test_data import LLMTestCases
+from tests.pipelex.cogt.test_data import LLMTestCases
 
 
 def get_async_worker_and_job(llm_preset_id: str, user_text: str):
