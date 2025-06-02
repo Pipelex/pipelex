@@ -15,7 +15,7 @@ from tests.pipelex.test_data import PipeTestCases
 @pytest.mark.ocr
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestSimplePipeRun:
+class TestPipeRun:
     async def test_pipe_run(self):
         working_memory = WorkingMemoryFactory.make_from_text(
             text=PipeTestCases.USER_TEXT_COLORS,
