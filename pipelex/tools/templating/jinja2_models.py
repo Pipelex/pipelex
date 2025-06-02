@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from enum import StrEnum
 from typing import Any, Optional, Tuple
 
 from jinja2.runtime import Context
+
+from pipelex.types import StrEnum
 
 
 class Jinja2FilterName(StrEnum):

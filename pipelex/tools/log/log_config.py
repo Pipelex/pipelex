@@ -1,4 +1,4 @@
-from enum import Enum, StrEnum
+from enum import Enum
 from typing import Dict, List, cast
 
 from pydantic import Field, field_validator
@@ -7,6 +7,7 @@ from rich.logging import RichHandler
 
 from pipelex.tools.config.models import ConfigModel
 from pipelex.tools.log.log_levels import LogLevel
+from pipelex.types import StrEnum
 
 
 class HighlighterName(StrEnum):

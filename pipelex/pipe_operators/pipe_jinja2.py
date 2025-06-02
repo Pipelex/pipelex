@@ -1,9 +1,9 @@
-from typing import Any, ClassVar, Dict, Optional, Self, Set
+from typing import Any, ClassVar, Dict, Optional, Set
 
 import shortuuid
 from jinja2 import TemplateSyntaxError
 from pydantic import ConfigDict, model_validator
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.core.concept_native import NativeConcept

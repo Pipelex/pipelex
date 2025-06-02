@@ -1,6 +1,7 @@
-from typing import Optional, Self, Union
+from typing import Optional, Union
 
 from pydantic import BaseModel, ConfigDict, model_validator
+from typing_extensions import Self
 
 from pipelex.core.pipe_run_params import BatchParams, make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError

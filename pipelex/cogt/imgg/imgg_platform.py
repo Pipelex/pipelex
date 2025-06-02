@@ -1,4 +1,4 @@
-from enum import StrEnum
+from pipelex.types import StrEnum
 
 
 class ImggPlatform(StrEnum):

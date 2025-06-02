@@ -1,10 +1,11 @@
 from importlib.metadata import metadata
-from typing import Any, ClassVar, List, Optional, Self, Type
+from typing import Any, ClassVar, List, Optional, Type
 
 from dotenv import load_dotenv
 from kajson.class_registry import class_registry
 from pydantic import ValidationError
 from rich import print
+from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator import ContentGenerator

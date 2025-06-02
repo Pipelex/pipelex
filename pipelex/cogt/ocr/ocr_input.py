@@ -1,6 +1,7 @@
-from typing import Optional, Self
+from typing import Optional
 
 from pydantic import BaseModel, model_validator
+from typing_extensions import Self
 
 from pipelex.cogt.exceptions import CogtError
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list

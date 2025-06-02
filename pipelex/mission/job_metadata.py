@@ -1,10 +1,10 @@
 from datetime import datetime
-from enum import StrEnum
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.mission.mission_models import SpecialMissionId
+from pipelex.types import StrEnum
 
 
 class JobCategory(StrEnum):

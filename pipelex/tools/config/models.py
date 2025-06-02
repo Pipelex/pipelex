@@ -1,10 +1,10 @@
-from enum import StrEnum
 from typing import Any, Dict, Optional, Type, TypeVar, Union
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from pipelex.tools.exceptions import ConfigModelError, ConfigValidationError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.types import StrEnum
 
 CONFIG_BASE_OVERRIDES_BEFORE_ENV = ["local"]
 CONFIG_BASE_OVERRIDES_AFTER_ENV = ["super"]

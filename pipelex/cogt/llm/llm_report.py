@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import Any, Dict
 
 from pydantic import BaseModel
@@ -9,6 +8,7 @@ from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory, TokenCostsByCategoryDict
 from pipelex.mission.job_metadata import JobMetadata
+from pipelex.types import StrEnum
 
 
 class LLMTokenCostReportField(StrEnum):

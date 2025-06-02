@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import Any, Callable, Dict, Optional
 
 from jinja2.runtime import Context
@@ -6,6 +5,7 @@ from jinja2.runtime import Context
 from pipelex.tools.templating.jinja2_filters import tag, text_format
 from pipelex.tools.templating.jinja2_models import Jinja2FilterName
 from pipelex.tools.templating.templating_models import TextFormat
+from pipelex.types import StrEnum
 
 
 class Jinja2TemplateCategory(StrEnum):

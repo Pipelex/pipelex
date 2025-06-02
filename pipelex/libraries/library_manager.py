@@ -1,4 +1,3 @@
-from enum import StrEnum
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Type
 
@@ -23,6 +22,7 @@ from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.types import StrEnum
 
 
 class LibraryComponent(StrEnum):

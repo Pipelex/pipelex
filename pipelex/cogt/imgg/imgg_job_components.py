@@ -1,9 +1,9 @@
-from enum import StrEnum
 from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 from pipelex.tools.config.models import ConfigModel
+from pipelex.types import StrEnum
 
 
 class AspectRatio(StrEnum):

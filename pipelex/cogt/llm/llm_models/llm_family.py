@@ -1,7 +1,6 @@
-from enum import StrEnum
-
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
+from pipelex.types import StrEnum
 
 
 class LLMCreator(StrEnum):

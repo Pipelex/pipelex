@@ -1,9 +1,10 @@
-from enum import StrEnum
 from typing import Any, ClassVar, Dict, List, Optional, Sequence, Set, TypeVar, Union
 
 from pydantic import BaseModel, ValidationError
 from rich.repr import Result as RichReprResult
 from typing_extensions import override
+
+from pipelex.types import StrEnum
 
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
 

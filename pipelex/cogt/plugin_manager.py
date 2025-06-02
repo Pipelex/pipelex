@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import Any, Dict, Optional
 
 from pydantic import Field, RootModel
@@ -6,6 +5,7 @@ from pydantic import Field, RootModel
 from pipelex.cogt.imgg.imgg_platform import ImggPlatform
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
+from pipelex.types import StrEnum
 
 
 class PluginHandle(StrEnum):

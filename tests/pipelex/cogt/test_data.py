@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import Any, ClassVar, Dict, List, Tuple
 
 from pydantic import BaseModel, Field, field_validator
@@ -7,6 +6,7 @@ from pipelex.cogt.image.prompt_image import PromptImagePath
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
+from pipelex.types import StrEnum
 from tests.pipelex.test_data import PipeTestCases
 
 

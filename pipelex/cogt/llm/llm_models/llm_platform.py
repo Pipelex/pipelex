@@ -1,5 +1,6 @@
-from enum import StrEnum
 from typing import Literal, Union
+
+from pipelex.types import StrEnum
 
 DEFAULT_PLATFORM_INDICATOR = "default"
 

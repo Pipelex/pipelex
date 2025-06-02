@@ -1,9 +1,8 @@
-from enum import StrEnum
-from typing import List, Optional, Self, Set, Type, cast
+from typing import List, Optional, Set, Type, cast
 
 from kajson.class_registry import class_registry
 from pydantic import model_validator
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMSettingChoices
@@ -41,6 +40,7 @@ from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_operators.piped_llm_prompt_factory import PipedLLMPromptFactory
+from pipelex.types import StrEnum
 
 
 class StructuringMethod(StrEnum):
