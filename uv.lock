@@ -179,7 +179,7 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "0.52.1"
+version = "0.52.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -190,9 +190,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0c/6b/7d632b680556812f36b663891ccab8f5bf71b61913a3c7332aa7aa2822be/anthropic-0.52.1.tar.gz", hash = "sha256:da4a7c3aeac0170cb45a42dc3369ca1fcf2b3238edf845cb056505d4b0c42fcf", size = 241807, upload-time = "2025-05-28T13:13:40.851Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/63/84/95126ee8df1acedd60bd03fe368d6335d65fe92e2c97581a81a82e8f576b/anthropic-0.52.2.tar.gz", hash = "sha256:9047bc960e8513950579c9cb730c16a84af3fcb56341ad7dc730772f83757050", size = 306204, upload-time = "2025-06-02T11:27:59.308Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/e7/36ad2dc22811ea004e1f511b2f5604fe71a56bdfd3b969b265892d45affa/anthropic-0.52.1-py3-none-any.whl", hash = "sha256:807cee7ebc5503753da0403a77932decf5a4c036041ddda58b4edcdb2a3da551", size = 286076, upload-time = "2025-05-28T13:13:39.052Z" },
+    { url = "https://files.pythonhosted.org/packages/77/3b/6f67f4e061d73cfaffc44dd41cbbe8b09efe1ec37b8135a2bcc043736d62/anthropic-0.52.2-py3-none-any.whl", hash = "sha256:00d52555f503e81e21aff0103db04cd93979cdf87ce8dd43c660ca6deae83ac6", size = 286262, upload-time = "2025-06-02T11:27:57.536Z" },
 ]
 
 [[package]]
@@ -226,6 +226,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5a/b0/1367933a8532ee6ff8d63537de4f1177af4bff9f3e829baf7331f595bb24/attrs-25.3.0.tar.gz", hash = "sha256:75d7cefc7fb576747b2c81b4442d4d4a1ce0900973527c011d1030fd3bf4af1b", size = 812032, upload-time = "2025-03-13T11:10:22.779Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/77/06/bb80f5f86020c4551da315d78b3ab75e8228f89f0162f2c3a819e407941a/attrs-25.3.0-py3-none-any.whl", hash = "sha256:427318ce031701fea540783410126f03899a97ffc6f61596ad581ac2e40e3bc3", size = 63815, upload-time = "2025-03-13T11:10:21.14Z" },
+]
+
+[[package]]
+name = "backports-strenum"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/c7/2ed54c32fed313591ffb21edbd48db71e68827d43a61938e5a0bc2b6ec91/backports_strenum-1.3.1.tar.gz", hash = "sha256:77c52407342898497714f0596e86188bb7084f89063226f4ba66863482f42414", size = 7257, upload-time = "2023-12-09T14:36:40.937Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/50/56cf20e2ee5127b603b81d5a69580a1a325083e2b921aa8f067da83927c0/backports_strenum-1.3.1-py3-none-any.whl", hash = "sha256:cdcfe36dc897e2615dc793b7d3097f54d359918fc448754a517e6f23044ccf83", size = 8304, upload-time = "2023-12-09T14:36:39.905Z" },
 ]
 
 [[package]]
@@ -1421,6 +1430,9 @@ bedrock = [
     { name = "aioboto3" },
     { name = "boto3" },
 ]
+compat = [
+    { name = "backports-strenum", marker = "python_full_version < '3.11'" },
+]
 dev = [
     { name = "boto3-stubs" },
     { name = "mypy" },
@@ -1457,6 +1469,7 @@ requires-dist = [
     { name = "aioboto3", marker = "extra == 'bedrock'", specifier = ">=13.4.0" },
     { name = "aiofiles", specifier = "<24.0" },
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.49.0" },
+    { name = "backports-strenum", marker = "python_full_version < '3.11' and extra == 'compat'", specifier = ">=1.3.0" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.34.131" },
     { name = "boto3-stubs", marker = "extra == 'dev'", specifier = ">=1.35.24" },
     { name = "fal-client", marker = "extra == 'fal'", specifier = ">=0.4.1" },
@@ -1503,7 +1516,7 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.13.2" },
     { name = "yattag", specifier = ">=1.15.2" },
 ]
-provides-extras = ["anthropic", "bedrock", "fal", "google", "mistralai", "dev"]
+provides-extras = ["anthropic", "bedrock", "fal", "google", "mistralai", "compat", "dev"]
 
 [[package]]
 name = "pluggy"
@@ -2240,11 +2253,11 @@ wheels = [
 
 [[package]]
 name = "types-openpyxl"
-version = "3.1.5.20250516"
+version = "3.1.5.20250602"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a4/a8/d3fad3b084b477cb1eb8896de3dc7307f930e890f95099a4dc9d9f26cb8a/types_openpyxl-3.1.5.20250516.tar.gz", hash = "sha256:691339abe141a5713f115558cc39023ebdda6298bfa875d575cc5a961a3c5523", size = 100626, upload-time = "2025-05-16T03:07:16.386Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bc/d4/33cc2f331cde82206aa4ec7d8db408beca65964785f438c6d2505d828178/types_openpyxl-3.1.5.20250602.tar.gz", hash = "sha256:d19831482022fc933780d6e9d6990464c18c2ec5f14786fea862f72c876980b5", size = 100608, upload-time = "2025-06-02T03:14:40.625Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/62/69/bb48b9be23ce6ceae6583621d9494d47e7b1165eeee2b9feb1954bfadfee/types_openpyxl-3.1.5.20250516-py3-none-any.whl", hash = "sha256:87c6b04b30fd1cbab85dc93cbe4f57ce1eb3df5d2911f742a1a0e3bf94314dfc", size = 165927, upload-time = "2025-05-16T03:07:15.219Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/69/5b924a20a4d441ec2160e94085b9fa9358dc27edde10080d71209c59101d/types_openpyxl-3.1.5.20250602-py3-none-any.whl", hash = "sha256:1f82211e086902318f6a14b5d8d865102362fda7cb82f3d63ac4dff47a1f164b", size = 165922, upload-time = "2025-06-02T03:14:39.226Z" },
 ]
 
 [[package]]
@@ -2267,14 +2280,14 @@ wheels = [
 
 [[package]]
 name = "types-requests"
-version = "2.32.0.20250515"
+version = "2.32.0.20250602"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/06/c1/cdc4f9b8cfd9130fbe6276db574f114541f4231fcc6fb29648289e6e3390/types_requests-2.32.0.20250515.tar.gz", hash = "sha256:09c8b63c11318cb2460813871aaa48b671002e59fda67ca909e9883777787581", size = 23012, upload-time = "2025-05-15T03:04:31.817Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/48/b0/5321e6eeba5d59e4347fcf9bf06a5052f085c3aa0f4876230566d6a4dc97/types_requests-2.32.0.20250602.tar.gz", hash = "sha256:ee603aeefec42051195ae62ca7667cd909a2f8128fdf8aad9e8a5219ecfab3bf", size = 23042, upload-time = "2025-06-02T03:15:02.958Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fe/0f/68a997c73a129287785f418c1ebb6004f81e46b53b3caba88c0e03fcd04a/types_requests-2.32.0.20250515-py3-none-any.whl", hash = "sha256:f8eba93b3a892beee32643ff836993f15a785816acca21ea0ffa006f05ef0fb2", size = 20635, upload-time = "2025-05-15T03:04:30.5Z" },
+    { url = "https://files.pythonhosted.org/packages/da/18/9b782980e575c6581d5c0c1c99f4c6f89a1d7173dad072ee96b2756c02e6/types_requests-2.32.0.20250602-py3-none-any.whl", hash = "sha256:f4f335f87779b47ce10b8b8597b409130299f6971ead27fead4fe7ba6ea3e726", size = 20638, upload-time = "2025-06-02T03:15:01.959Z" },
 ]
 
 [[package]]

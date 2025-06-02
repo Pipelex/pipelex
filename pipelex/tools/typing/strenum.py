@@ -1,8 +1,8 @@
-from enum import Enum
+import sys
 
+if sys.version_info >= (3, 11):  # real std-lib
+    from enum import StrEnum
+else:  # back-port
+    from backports.strenum import StrEnum
 
-# Not natively available in Python <3.11
-class StrEnum(str, Enum):
-    """
-    A string enum class that inherits from str and Enum.
-    """
+__all__ = ["StrEnum"]
