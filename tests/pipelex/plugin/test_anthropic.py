@@ -9,7 +9,6 @@ from pipelex.plugin.anthropic.anthropic_llms import anthropic_list_anthropic_mod
 
 
 # make t VERBOSE=2 TEST=TestAnthropic
-@pytest.mark.llm
 @pytest.mark.gha_disabled
 @pytest.mark.codex_disabled
 @pytest.mark.asyncio(loop_scope="class")

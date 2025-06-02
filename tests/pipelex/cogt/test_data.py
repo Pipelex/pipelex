@@ -137,21 +137,6 @@ How tall do you think he was when he was 12? and at 15?
     ]
 
 
-class IMGGTestCases:
-    IMGG_PROMPT_1 = "woman wearing marino cargo pants"
-    IMGG_PROMPT_2 = "wide legged denim pants with hippy addition"
-    IMGG_PROMPT_3 = """
-Woman typing on a laptop. On the laptop screen you see python code to generate code to write a prompt for an AI model.
-"""
-
-    IMAGE_DESC: ClassVar[List[Tuple[str, str]]] = [  # topic, imgg_prompt_text
-        # (IMGG_PROMPT_1, IMGG_PROMPT_1),
-        # (IMGG_PROMPT_2, IMGG_PROMPT_2),
-        # (IMGG_PROMPT_3, IMGG_PROMPT_3),
-        ("coding girl", "a girl with a dragon tatoo, coding in python"),
-    ]
-
-
 class SerDeTestLLMCases:
     """Constants and example objects used for SerDe unit tests."""
 

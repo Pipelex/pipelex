@@ -3,7 +3,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.cogt.imgg.imgg_job_factory import ImggJobFactory
 from pipelex.hub import get_imgg_worker
-from tests.pipelex.cogt.test_data import IMGGTestCases
+from tests.pipelex.test_data import IMGGTestCases
 
 
 @pytest.mark.imgg

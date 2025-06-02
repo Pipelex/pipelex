@@ -6,7 +6,7 @@ from pipelex.core.concept_native import NativeConcept
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_img_gen import PipeImgGen, PipeImgGenOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
-from tests.pipelex.cogt.test_data import IMGGTestCases
+from tests.pipelex.test_data import IMGGTestCases
 
 
 @pytest.mark.imgg

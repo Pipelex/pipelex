@@ -1,3 +1,4 @@
+import warnings
 from typing import Any, Dict, List
 
 import boto3
@@ -6,9 +7,16 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
+warnings.filterwarnings(
+    "ignore",
+    message=r".*datetime\.datetime\.utcnow\(\).*",
+    category=DeprecationWarning,
+)
+# Apply pytest-level filter to ensure the warning is suppressed during test collection and execution
+pytestmark = pytest.mark.filterwarnings("ignore:.*datetime\\.datetime\\.utcnow\\(\\).*:DeprecationWarning")
+
 
 # make t VERBOSE=2 TEST=TestBedrock
-@pytest.mark.llm
 @pytest.mark.gha_disabled
 @pytest.mark.codex_disabled
 class TestBedrock:

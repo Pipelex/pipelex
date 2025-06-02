@@ -51,6 +51,12 @@ Write a haiku about the meaning of life
 """
 
 
+# The ContentGenerator has features that xork without inference (jinja2) or with LLM, Image generation, OCR
+# So to run them all you need to bypass the marker restrictions defined in the pyproject.toml pytest section
+# like this:
+# pytest -m "" -k TestContentGenerator
+# and if you cant more prints:
+# pytest -m "" -k TestContentGenerator -s -vv
 @pytest.mark.asyncio(loop_scope="class")
 class TestContentGenerator:
     @pytest.mark.llm

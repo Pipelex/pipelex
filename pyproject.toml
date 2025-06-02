@@ -193,9 +193,10 @@ strictSetInference = true
 typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
-addopts = "--import-mode=importlib -ra -m 'not inference and not llm and not imgg and not ocr'"
+addopts = "--import-mode=importlib -ra -m 'not inference and not llm and not imgg and not ocr and not needs_output'"
 asyncio_default_fixture_loop_scope = "session"
 markers = [
+    "needs_output: tests that need output to be displayed",
     "inference: slow and costly due to inference calls",
     "llm: slow and costly due to llm inference calls",
     "imgg: slow and costly due to imgg inference calls",

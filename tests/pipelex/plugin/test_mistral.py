@@ -8,7 +8,6 @@ from pipelex.plugin.mistral.mistral_llms import list_mistral_models
 
 
 # make t VERBOSE=2 TEST=TestMistral
-@pytest.mark.llm
 @pytest.mark.gha_disabled
 @pytest.mark.codex_disabled
 class TestMistral:

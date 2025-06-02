@@ -9,7 +9,6 @@ from pipelex.plugin.openai.openai_llms import openai_list_available_models
 
 
 # make t VERBOSE=2 TEST=TestOpenAI
-@pytest.mark.llm
 @pytest.mark.gha_disabled
 @pytest.mark.codex_disabled
 @pytest.mark.asyncio(loop_scope="class")
