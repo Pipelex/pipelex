@@ -10,7 +10,7 @@ from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract, imgg_job_func
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
-from pipelex.cogt.plugin.fal.fal_factory import FalFactory
+from pipelex.plugin.fal.fal_factory import FalFactory
 
 
 class FalImggWorker(ImggWorkerAbstract):

@@ -5,7 +5,7 @@ from rich.table import Table
 
 from pipelex.cogt.exceptions import LLMSDKError
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.plugin.anthropic.anthropic_llms import anthropic_list_anthropic_models
+from pipelex.plugin.anthropic.anthropic_llms import anthropic_list_anthropic_models
 
 
 # make t VERBOSE=2 TEST=TestAnthropic

@@ -6,8 +6,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.cogt.plugin.bedrock.bedrock_client_protocol import BedrockClientProtocol
-from pipelex.cogt.plugin.bedrock.bedrock_message import BedrockMessageDictList
+from pipelex.plugin.bedrock.bedrock_client_protocol import BedrockClientProtocol
+from pipelex.plugin.bedrock.bedrock_message import BedrockMessageDictList
 
 
 class BedrockClientAioboto3(BedrockClientProtocol):

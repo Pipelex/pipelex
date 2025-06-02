@@ -3,9 +3,9 @@ import pytest
 from pipelex import pretty_print
 from pipelex.cogt.exceptions import LLMSDKError
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.plugin.openai.openai_llms import openai_list_available_models
 from pipelex.config import get_config
 from pipelex.hub import get_secrets_provider
+from pipelex.plugin.openai.openai_llms import openai_list_available_models
 
 
 # make t VERBOSE=2 TEST=TestOpenAI

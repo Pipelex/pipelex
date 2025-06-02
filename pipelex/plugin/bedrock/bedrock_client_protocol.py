@@ -1,7 +1,7 @@
 from typing import Optional, Protocol, Tuple, runtime_checkable
 
 from pipelex.cogt.llm.token_category import NbTokensByCategoryDict
-from pipelex.cogt.plugin.bedrock.bedrock_message import BedrockMessageDictList
+from pipelex.plugin.bedrock.bedrock_message import BedrockMessageDictList
 
 
 @runtime_checkable

@@ -10,8 +10,8 @@ from pipelex.cogt.llm.llm_job_func import llm_job_func
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.cogt.plugin.bedrock.bedrock_client_protocol import BedrockClientProtocol
-from pipelex.cogt.plugin.bedrock.bedrock_factory import BedrockFactory
+from pipelex.plugin.bedrock.bedrock_client_protocol import BedrockClientProtocol
+from pipelex.plugin.bedrock.bedrock_factory import BedrockFactory
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 

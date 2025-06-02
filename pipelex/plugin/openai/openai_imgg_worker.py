@@ -12,7 +12,7 @@ from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.imgg.imgg_job_components import Quality
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract, imgg_job_func
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
-from pipelex.cogt.plugin.openai.openai_imgg_factory import OpenAIImggFactory
+from pipelex.plugin.openai.openai_imgg_factory import OpenAIImggFactory
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_path
 

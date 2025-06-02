@@ -4,7 +4,7 @@ from openai.types import Model
 
 from pipelex.cogt.exceptions import LLMSDKError
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.plugin.openai.openai_factory import OpenAIFactory
+from pipelex.plugin.openai.openai_factory import OpenAIFactory
 
 
 async def openai_list_available_models(llm_platform: LLMPlatform) -> List[Model]:

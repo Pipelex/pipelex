@@ -13,8 +13,8 @@ from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.cogt.plugin.anthropic.anthropic_factory import AnthropicFactory
 from pipelex.config import get_config
+from pipelex.plugin.anthropic.anthropic_factory import AnthropicFactory
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
