@@ -13,7 +13,7 @@
 **Major Model Additions** - Claude 4 (Opus & Sonnet), Grok-3, and GPT-4 image generation are now in the house.
 
 ### Pipeline Base Library update
-- **New pipe** - `extract_page_contents_and_views_from_pdf` transfered from cookbook to base library (congrats on the promotion!). This pipe extracts text, linked images, **AND** page_view images (rendered pages) - it's very useful if you want to use Vision in follow-up pipes
+- **New pipe** - `extract_page_contents_and_views_from_pdf` transferred from cookbook to base library (congrats on the promotion!). This pipe extracts text, linked images, **AND** page_view images (rendered pages) - it's very useful if you want to use Vision in follow-up pipes
 
 ### Added
 
@@ -56,7 +56,7 @@
 
 - Include `pyproject.toml` inside the project build.
 - Fix `ImggEngineFactory`: image generation (imgg) handle required format is `platform/model_name`
-- pipelex cli: Added `list-pipes` method that can list all the availables pipes with descriptions.
+- pipelex cli: Added `list-pipes` method that can list all the available pipes along with their descriptions.
 - Use a minimum version for `uv` instead of a fixed version
 - Implement `AGENTS.md` for Codex
 - Add tests for some of the `tools.misc`
@@ -64,8 +64,8 @@
 
 ## [v0.2.8] - 2025-05-28
 
-- Defaults to `uv`
-- Simplify llm provider config: All the API keys, urls, and regions are to be set in `.env`.
+- Replaced `poetry` by `uv` for dependency management.
+- Simplify llm provider config: All the API keys, urls, and regions now live in the `.env`.
 - Added logging level `OFF`, prevents any log from hitting the console
 
 ## [v0.2.7] - 2025-05-26
