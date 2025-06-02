@@ -4,7 +4,7 @@
 
 ### Highlights
 
-**Python Support Expansion** - We're no longer tied to Python 3.11! Now supporting Python 3.11, 3.12, and 3.13 with full CI coverage across all versions.
+**Python Support Expansion** - We're no longer tied to Python 3.11! Now supporting Python 3.10, 3.11, 3.12, and 3.13 with full CI coverage across all versions.
 
 **Major Model Additions** - Claude 4 (Opus & Sonnet), Grok-3, and GPT-4 image generation are now in the house.
 
@@ -38,7 +38,7 @@
 - Added **pytest-xdist** to run unit tests in parallel on multiple CPUs. Not yet integrated into the Makefile, so run it manually with `pytest -n auto` (without inference) or `pytest -n auto -m "inference"` (inference only). 
 - Swapped pytest-pretty for pytest-sugar - because readable test names > pretty tables
 - Updated instructor to v1.8.3
-- All dependencies tested against Python 3.11, 3.12, and 3.13
+- All dependencies tested against Python 3.10, 3.11, 3.12, and 3.13
 
 ### Tests
 
