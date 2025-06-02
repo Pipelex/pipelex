@@ -6,7 +6,7 @@ from pipelex import log, pretty_print
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_report_delegate
+from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.pipe_llm import PipeLLM, PipeLLMOutput
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -18,7 +18,7 @@ from tests.pipelex.test_data import PipeTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeLLM:
-    async def test_pipe_llm(self, pipe_router: PipeRouterProtocol):
+    async def test_pipe_llm(self):
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm",
@@ -32,7 +32,7 @@ class TestPipeLLM:
                 ),
             ),
         )
-        pipe_llm_output: PipeLLMOutput = await pipe_router.run_pipe_job(
+        pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,
         )
 
@@ -47,7 +47,6 @@ class TestPipeLLM:
     @pytest.mark.parametrize("stuff, attribute_paths", PipeTestCases.STUFFS_IMAGE_ATTRIBUTES)
     async def test_pipe_llm_attribute_image(
         self,
-        pipe_router: PipeRouterProtocol,
         stuff: Stuff,
         attribute_paths: List[str],
     ):
@@ -68,7 +67,7 @@ class TestPipeLLM:
                 ),
             ),
         )
-        pipe_llm_output: PipeLLMOutput = await pipe_router.run_pipe_job(
+        pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,
         )
 

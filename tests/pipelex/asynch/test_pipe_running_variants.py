@@ -32,11 +32,10 @@ class TestPipeRouter:
         topic: str,
         blueprint: StuffBlueprint,
         pipe_code: str,
-        pipe_router: PipeRouterProtocol,
     ):
         log.verbose(blueprint, title=f"{topic}: start from '{blueprint.name}', run pipe '{pipe_code}'")
         working_memory = WorkingMemoryFactory.make_from_single_blueprint(blueprint=blueprint)
-        pipe_output: PipeOutput = await pipe_router.run_pipe_code(
+        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(),
             working_memory=working_memory,
@@ -62,11 +61,10 @@ class TestPipeRouter:
         topic: str,
         stuff: Stuff,
         pipe_code: str,
-        pipe_router: PipeRouterProtocol,
     ):
         log.verbose(stuff, title=f"{topic}: start from '{stuff.stuff_name}', run pipe '{pipe_code}'")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
-        pipe_output: PipeOutput = await pipe_router.run_pipe_code(
+        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(),
             working_memory=working_memory,
@@ -88,10 +86,9 @@ class TestPipeRouter:
         save_working_memory: Any,
         topic: str,
         pipe_code: str,
-        pipe_router: PipeRouterProtocol,
     ):
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
-        pipe_output: PipeOutput = await pipe_router.run_pipe_code(
+        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(),
             working_memory=WorkingMemory(),
@@ -114,7 +111,6 @@ class TestPipeRouter:
     async def test_pipe_batch_no_input(
         self,
         request: FixtureRequest,
-        pipe_router: PipeRouterProtocol,
         pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
         topic: str,
@@ -122,7 +118,7 @@ class TestPipeRouter:
         output_multiplicity: Optional[PipeOutputMultiplicity],
     ):
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
-        pipe_output: PipeOutput = await pipe_router.run_pipe_code(
+        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(
                 output_multiplicity=output_multiplicity,
@@ -149,14 +145,13 @@ class TestPipeRouter:
         request: FixtureRequest,
         pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
-        pipe_router: PipeRouterProtocol,
         pipe_code: str,
         stuff: Stuff,
         input_list_stuff_name: str,
         input_item_stuff_name: str,
     ):
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
-        pipe_output: PipeOutput = await pipe_router.run_pipe_code(
+        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(
                 batch_params=BatchParams(

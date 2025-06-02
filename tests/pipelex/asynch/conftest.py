@@ -16,17 +16,6 @@ from tests.conftest import TEST_OUTPUTS_DIR
 
 
 @pytest_asyncio.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
-async def pipe_router(request: FixtureRequest) -> AsyncGenerator[PipeRouterProtocol, None]:
-    # Code to run before each PipeRouter
-    print("\n[magenta]PipeRouter setup[/magenta]")
-    the_pipe_router = PipeRouter()
-    # Return it for use in tests
-    yield the_pipe_router
-    # Code to run after each test
-    print("\n[magenta]PipeRouter teardown[/magenta]")
-
-
-@pytest_asyncio.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
 async def pipe_result_handler(request: FixtureRequest) -> AsyncIterator[tuple[str, ActivityHandlerForResultFiles]]:
     """
     This fixture is used to handle the result of a pipe run in unit tests.

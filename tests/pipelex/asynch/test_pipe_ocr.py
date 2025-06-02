@@ -4,6 +4,7 @@ from pipelex import pretty_print
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff_content import PageContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_ocr import PipeOcr, PipeOcrOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
@@ -17,7 +18,6 @@ class TestPipeOCR:
     @pytest.mark.parametrize("image_url", PipeOcrTestCases.PIPE_OCR_IMAGE_TEST_CASES)
     async def test_pipe_ocr_image(
         self,
-        pipe_router: PipeRouterProtocol,
         image_url: str,
     ):
         pipe_job = PipeJobFactory.make_pipe_job(
@@ -37,7 +37,7 @@ class TestPipeOCR:
                 name="page_scan",
             ),
         )
-        pipe_ocr_output: PipeOcrOutput = await pipe_router.run_pipe_job(
+        pipe_ocr_output: PipeOcrOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,
         )
         ocr_text = pipe_ocr_output.main_stuff_as_list(item_type=PageContent)
@@ -46,7 +46,6 @@ class TestPipeOCR:
     @pytest.mark.parametrize("pdf_url", PipeOcrTestCases.PIPE_OCR_PDF_TEST_CASES)
     async def test_pipe_ocr_pdf(
         self,
-        pipe_router: PipeRouterProtocol,
         pdf_url: str,
     ):
         pipe_job = PipeJobFactory.make_pipe_job(
@@ -66,7 +65,7 @@ class TestPipeOCR:
                 name="pdf",
             ),
         )
-        pipe_ocr_output: PipeOcrOutput = await pipe_router.run_pipe_job(
+        pipe_ocr_output: PipeOcrOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,
         )
         ocr_text = pipe_ocr_output.main_stuff_as_list(item_type=PageContent)
