@@ -99,3 +99,26 @@ Optional notes:
         template = "The price is $ 10M and the budget is $ 1000.50"
         result = preprocess_template(template)
         assert result == template
+
+    def test_at_with_numbers_not_processed(self):
+        """Test that @ patterns followed by numbers are not processed."""
+        template = "The version is @1.0 and the build is @2.3.4"
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_optional_at_with_numbers_not_processed(self):
+        """Test that @? patterns followed by numbers are not processed."""
+        template = "The version is @?1.0 and the build is @?2.3.4"
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_mixed_at_patterns_with_numbers(self):
+        """Test mixing @ patterns with numbers and valid variables."""
+        template = "Version @1.0, build @?2.3.4, and @valid_var with @?optional_var"
+        result = preprocess_template(template)
+        expected = (
+            "Version @1.0, build @?2.3.4, and "
+            '{{ valid_var|tag("valid_var") }} with '
+            '{% if optional_var %}{{ optional_var|tag("optional_var") }}{% endif %}'
+        )
+        assert result == expected

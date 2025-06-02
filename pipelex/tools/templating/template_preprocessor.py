@@ -69,13 +69,13 @@ def preprocess_template(template: str) -> str:
     # TODO: allow escape patterns
 
     # Replace @?variable patterns (optional insertion) - must come before @variable
-    new_template = re.sub(r"@\?([a-zA-Z0-9_.]+)", replace_optional_at_variable, processed_template)
+    new_template = re.sub(r"@\?(?![0-9])([a-zA-Z0-9_.]+)", replace_optional_at_variable, processed_template)
     if new_template != processed_template:
         changes_made = True
         processed_template = new_template
 
     # Replace @variable patterns
-    new_template = re.sub(r"@([a-zA-Z0-9_.]+)", replace_at_variable, processed_template)
+    new_template = re.sub(r"@(?![0-9])([a-zA-Z0-9_.]+)", replace_at_variable, processed_template)
     if new_template != processed_template:
         changes_made = True
         processed_template = new_template
