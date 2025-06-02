@@ -148,8 +148,13 @@ class TestPrettyPrint:
 
         assert output == expected_output, f"Output did not match expected:\n{output}"
 
+    # This test needs output to be displayed, so we disabled it by default in pyproject.toml
+    # So to run it you must bypass the marker restrictions defined in the pyproject.toml pytest section
+    # and make sure you turn on outputs with -s like this:
+    # pytest -m "" -k test_pretty_print_pydantic_object -s
     @pytest.mark.gha_disabled
     @pytest.mark.codex_disabled
+    @pytest.mark.needs_output
     def test_pretty_print_pydantic_object(self, capsys: CaptureFixture[str]):
         # Create a complex nested object
         user = ComplexUser(

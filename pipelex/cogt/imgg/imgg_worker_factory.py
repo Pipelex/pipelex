@@ -6,9 +6,9 @@ from pipelex.cogt.imgg.imgg_platform import ImggPlatform
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.plugin.openai.openai_imgg_worker import OpenAIImggWorker
 from pipelex.cogt.plugin_manager import PluginHandle
 from pipelex.hub import get_plugin_manager, get_secret
+from pipelex.plugin.openai.openai_imgg_worker import OpenAIImggWorker
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 
 
@@ -39,7 +39,7 @@ class ImggWorkerFactory:
                         "fal-client", "fal", "The fal-client SDK is required to use FAL models (generation of images)."
                     ) from exc
 
-                from pipelex.cogt.plugin.fal.fal_imgg_worker import FalImggWorker
+                from pipelex.plugin.fal.fal_imgg_worker import FalImggWorker
 
                 imgg_sdk_instance = plugin_manager.get_imgg_sdk_instance(imgg_sdk_handle=imgg_sdk_handle) or plugin_manager.set_imgg_sdk_instance(
                     imgg_sdk_handle=imgg_sdk_handle,
@@ -52,7 +52,7 @@ class ImggWorkerFactory:
                     report_delegate=report_delegate,
                 )
             case ImggPlatform.OPENAI:
-                from pipelex.cogt.plugin.openai.openai_factory import OpenAIFactory
+                from pipelex.plugin.openai.openai_factory import OpenAIFactory
 
                 imgg_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=imgg_sdk_handle) or plugin_manager.set_llm_sdk_instance(
                     llm_sdk_handle=imgg_sdk_handle,

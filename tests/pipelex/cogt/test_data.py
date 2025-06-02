@@ -1,8 +1,12 @@
 from enum import StrEnum
-from typing import ClassVar, List, Tuple
+from typing import Any, ClassVar, Dict, List, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 
+from pipelex.cogt.image.prompt_image import PromptImagePath
+from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
+from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from tests.pipelex.test_data import PipeTestCases
 
 
@@ -133,16 +137,59 @@ How tall do you think he was when he was 12? and at 15?
     ]
 
 
-class IMGGTestCases:
-    IMGG_PROMPT_1 = "woman wearing marino cargo pants"
-    IMGG_PROMPT_2 = "wide legged denim pants with hippy addition"
-    IMGG_PROMPT_3 = """
-Woman typing on a laptop. On the laptop screen you see python code to generate code to write a prompt for an AI model.
-"""
+class SerDeTestLLMCases:
+    """Constants and example objects used for SerDe unit tests."""
 
-    IMAGE_DESC: ClassVar[List[Tuple[str, str]]] = [  # topic, imgg_prompt_text
-        # (IMGG_PROMPT_1, IMGG_PROMPT_1),
-        # (IMGG_PROMPT_2, IMGG_PROMPT_2),
-        # (IMGG_PROMPT_3, IMGG_PROMPT_3),
-        ("coding girl", "a girl with a dragon tatoo, coding in python"),
+    # Base building blocks -------------------------------------------------
+    PROTO_PROMPT: ClassVar[LLMPrompt] = LLMPrompt(
+        user_text="Some user text in the template",
+    )
+
+    BASE_TEMPLATE_INPUTS_1: ClassVar[LLMPromptTemplateInputs] = LLMPromptTemplateInputs(
+        root={"foo": "bar"},
+    )
+    MY_PROMPT_TEMPLATE_MODEL_1: ClassVar[LLMPromptTemplate] = LLMPromptTemplate(
+        proto_prompt=PROTO_PROMPT,
+        base_template_inputs=BASE_TEMPLATE_INPUTS_1,
+    )
+
+    BASE_TEMPLATE_INPUTS_2: ClassVar[LLMPromptTemplateInputs] = LLMPromptTemplateInputs(
+        root={},
+    )
+    MY_PROMPT_TEMPLATE_MODEL_2: ClassVar[LLMPromptTemplate] = LLMPromptTemplate(
+        proto_prompt=PROTO_PROMPT,
+        base_template_inputs=BASE_TEMPLATE_INPUTS_2,
+    )
+
+    # Dictionary representation example ------------------------------------
+    DICT_1: ClassVar[Dict[str, Any]] = {
+        "proto_prompt": LLMPrompt(
+            system_text=None,
+            user_text="Some user text in the template",
+            user_images=[],
+        ),
+        "base_template_inputs": LLMPromptTemplateInputs(root={}),
+        "source_system_template_name": None,
+        "source_user_template_name": "markdown_reordering_vision_claude3_5_sonnet",
+    }
+
+    # Prompt containing an image path --------------------------------------
+    PROMPT_WITH_IMAGE_PATH: ClassVar[LLMPrompt] = LLMPrompt(
+        system_text="Some system text",
+        user_text="Some user text",
+        user_images=[
+            PromptImagePath(file_path="some_file_path"),
+        ],
+    )
+
+    # Group constants for parametrization ----------------------------------
+    PYDANTIC_EXAMPLES: ClassVar[List[BaseModel]] = [
+        MY_PROMPT_TEMPLATE_MODEL_1,
+        MY_PROMPT_TEMPLATE_MODEL_2,
+    ]
+    PYDANTIC_EXAMPLES_USING_SUBCLASS: ClassVar[List[BaseModel]] = [
+        PROMPT_WITH_IMAGE_PATH,
+    ]
+    PYDANTIC_EXAMPLES_DICT: ClassVar[List[Dict[str, Any]]] = [
+        DICT_1,
     ]

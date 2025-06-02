@@ -60,9 +60,10 @@ dev = [
     "pyright==1.1.398",
     "pandas-stubs>=2.2.3.241126",
     "pytest>=8.3.3",
+    "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.1.1",
     "pytest-sugar>=1.0.0",
-    "pytest-asyncio>=0.24.0",
+    "pytest-xdist>= 3.6.1",
     "ruff>=0.6.8",
     "types-aioboto3[bedrock,bedrock-runtime]>=13.4.0",
     "types-aiofiles>=24.1.0.20240626",
@@ -193,9 +194,10 @@ strictSetInference = true
 typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
-addopts = "--import-mode=importlib -ra -m 'not inference and not llm and not imgg and not ocr'"
+addopts = "--import-mode=importlib -ra -m 'not inference and not llm and not imgg and not ocr and not needs_output'"
 asyncio_default_fixture_loop_scope = "session"
 markers = [
+    "needs_output: tests that need output to be displayed",
     "inference: slow and costly due to inference calls",
     "llm: slow and costly due to llm inference calls",
     "imgg: slow and costly due to imgg inference calls",
