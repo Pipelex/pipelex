@@ -4,9 +4,9 @@ from pipelex.cogt.image.prompt_image import PromptImageBytes
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.config import get_config
 from pipelex.hub import get_secrets_provider
-from pipelex.plugin.bedrock.bedrock_client_protocol import BedrockClientProtocol
-from pipelex.plugin.bedrock.bedrock_config import BedrockClientMethod
-from pipelex.plugin.bedrock.bedrock_message import BedrockContentItem, BedrockImage, BedrockMessage, BedrockSource, ImageFormat
+from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
+from pipelex.plugins.bedrock.bedrock_config import BedrockClientMethod
+from pipelex.plugins.bedrock.bedrock_message import BedrockContentItem, BedrockImage, BedrockMessage, BedrockSource, ImageFormat
 
 
 class BedrockFactory:
@@ -16,18 +16,18 @@ class BedrockFactory:
 
     @classmethod
     def make_bedrock_client(cls) -> BedrockClientProtocol:
-        bedrock_config = get_config().cogt.llm_config.bedrock_config
+        bedrock_config = get_config().plugins.bedrock_config
         aws_region = bedrock_config.configure(secrets_provider=get_secrets_provider())
         client_method = bedrock_config.client_method
         bedrock_async_client: BedrockClientProtocol
         log.verbose(f"Using '{client_method}' for BedrockClient")
         match client_method:
             case BedrockClientMethod.AIBOTO3:
-                from pipelex.plugin.bedrock.bedrock_client_aioboto3 import BedrockClientAioboto3
+                from pipelex.plugins.bedrock.bedrock_client_aioboto3 import BedrockClientAioboto3
 
                 bedrock_async_client = BedrockClientAioboto3(aws_region=aws_region)
             case BedrockClientMethod.BOTO3:
-                from pipelex.plugin.bedrock.bedrock_client_boto3 import BedrockClientBoto3
+                from pipelex.plugins.bedrock.bedrock_client_boto3 import BedrockClientBoto3
 
                 bedrock_async_client = BedrockClientBoto3(aws_region=aws_region)
 

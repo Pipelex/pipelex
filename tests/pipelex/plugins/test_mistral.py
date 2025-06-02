@@ -4,7 +4,7 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex import pretty_print
-from pipelex.plugin.mistral.mistral_llms import list_mistral_models
+from pipelex.plugins.mistral.mistral_llms import list_mistral_models
 
 
 # make t VERBOSE=2 TEST=TestMistral

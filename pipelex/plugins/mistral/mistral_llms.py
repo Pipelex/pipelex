@@ -3,7 +3,7 @@ from typing import List
 from mistralai.models import Data
 
 from pipelex.cogt.exceptions import LLMModelProviderError
-from pipelex.plugin.mistral.mistral_factory import MistralFactory
+from pipelex.plugins.mistral.mistral_factory import MistralFactory
 
 
 def list_mistral_models() -> List[Data]:

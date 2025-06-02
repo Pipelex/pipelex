@@ -6,15 +6,15 @@ from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams, ImggJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.plugin.anthropic.anthropic_config import AnthropicConfig
-from pipelex.plugin.bedrock.bedrock_config import BedrockConfig
-from pipelex.plugin.mistral.mistral_config import MistralConfig
-from pipelex.plugin.openai.azure_openai_config import AzureOpenAIConfig
-from pipelex.plugin.openai.custom_endpoint_config import CustomEndpointConfig
-from pipelex.plugin.openai.openai_config import OpenAIOpenAIConfig
-from pipelex.plugin.openai.perplexity_config import PerplexityConfig
-from pipelex.plugin.openai.vertexai_config import VertexAIConfig
-from pipelex.plugin.openai.xai_config import XaiConfig
+from pipelex.plugins.anthropic.anthropic_config import AnthropicConfig
+from pipelex.plugins.bedrock.bedrock_config import BedrockConfig
+from pipelex.plugins.mistral.mistral_config import MistralConfig
+from pipelex.plugins.openai.azure_openai_config import AzureOpenAIConfig
+from pipelex.plugins.openai.custom_endpoint_config import CustomEndpointConfig
+from pipelex.plugins.openai.openai_config import OpenAIConfig
+from pipelex.plugins.openai.perplexity_config import PerplexityConfig
+from pipelex.plugins.openai.vertexai_config import VertexAIConfig
+from pipelex.plugins.openai.xai_config import XaiConfig
 from pipelex.tools.config.models import ConfigModel
 
 
@@ -48,17 +48,6 @@ class InstructorConfig(ConfigModel):
 
 class LLMConfig(ConfigModel):
     preferred_platforms: Dict[str, LLMPlatform]
-
-    anthropic_config: AnthropicConfig
-    azure_openai_config: AzureOpenAIConfig
-    bedrock_config: BedrockConfig
-    vertexai_config: VertexAIConfig
-    mistral_config: MistralConfig
-    openai_openai_config: OpenAIOpenAIConfig
-    perplexity_config: PerplexityConfig
-    xai_config: XaiConfig
-    custom_endpoint_config: CustomEndpointConfig
-
     instructor_config: InstructorConfig
     llm_job_config: LLMJobConfig
 

@@ -43,7 +43,7 @@ class AnthropicFactory:
         # TODO: also support Anthropic with VertexAI
         match llm_platform:
             case LLMPlatform.ANTHROPIC:
-                anthropic_config = get_config().cogt.llm_config.anthropic_config
+                anthropic_config = get_config().plugins.anthropic_config
                 api_key = anthropic_config.get_api_key(secrets_provider=get_secrets_provider())
                 return AsyncAnthropic(api_key=api_key)
             case LLMPlatform.BEDROCK_ANTHROPIC:

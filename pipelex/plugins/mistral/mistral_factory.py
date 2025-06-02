@@ -26,7 +26,7 @@ from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategor
 from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
 from pipelex.config import get_config
 from pipelex.hub import get_secrets_provider
-from pipelex.plugin.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.openai.openai_factory import OpenAIFactory
 from pipelex.tools.misc.base_64_utils import encode_to_base64, load_binary_as_base64
 
 
@@ -38,7 +38,7 @@ class MistralFactory:
     @classmethod
     def make_mistral_client(cls) -> Mistral:
         return Mistral(
-            api_key=get_config().cogt.llm_config.mistral_config.api_key(secrets_provider=get_secrets_provider()),
+            api_key=get_config().plugins.mistral_config.api_key(secrets_provider=get_secrets_provider()),
         )
 
     #########################################################

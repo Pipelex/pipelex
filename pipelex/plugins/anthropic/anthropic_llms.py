@@ -5,7 +5,7 @@ from anthropic.types import ModelInfo
 
 from pipelex.cogt.exceptions import LLMModelProviderError, LLMSDKError
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.plugin.anthropic.anthropic_factory import AnthropicFactory
+from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
 
 
 async def anthropic_list_anthropic_models(llm_platform: LLMPlatform) -> List[ModelInfo]:

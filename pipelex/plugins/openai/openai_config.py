@@ -22,7 +22,7 @@ class OpenAIKeyMethod(StrEnum):
 OPENAI_API_KEY_VAR_NAME = "OPENAI_API_KEY"
 
 
-class OpenAIOpenAIConfig(ConfigModel):
+class OpenAIConfig(ConfigModel):
     api_key_method: OpenAIKeyMethod = Field(strict=False)
 
     def get_api_key(self, secrets_provider: SecretsProviderAbstract) -> str:

@@ -2,7 +2,7 @@ import pytest
 
 from pipelex.cogt.exceptions import ImggGenerationError
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.plugin.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.openai.openai_factory import OpenAIFactory
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from tests.conftest import TEST_OUTPUTS_DIR

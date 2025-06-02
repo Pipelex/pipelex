@@ -11,8 +11,8 @@ from pipelex.cogt.ocr.ocr_input import OcrInputError
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract, ocr_job_func
-from pipelex.plugin.mistral.mistral_factory import MistralFactory
-from pipelex.plugin.mistral.mistral_utils import upload_file_for_ocr
+from pipelex.plugins.mistral.mistral_factory import MistralFactory
+from pipelex.plugins.mistral.mistral_utils import upload_file_for_ocr
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 
