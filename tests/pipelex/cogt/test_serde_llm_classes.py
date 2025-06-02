@@ -6,12 +6,11 @@ from pydantic import BaseModel
 
 from pipelex import pretty_print
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
-
-from .conftest import SerDeTestCases
+from tests.pipelex.cogt.test_data import SerDeTestLLMCases
 
 
 class TestSerDeLLMClasses:
-    @pytest.mark.parametrize("test_obj", SerDeTestCases.PYDANTIC_EXAMPLES + SerDeTestCases.PYDANTIC_EXAMPLES_USING_SUBCLASS)
+    @pytest.mark.parametrize("test_obj", SerDeTestLLMCases.PYDANTIC_EXAMPLES + SerDeTestLLMCases.PYDANTIC_EXAMPLES_USING_SUBCLASS)
     def test_serde_by_str(self, test_obj: Any):
         # Serialize the model to a json string
         serialized_str: str = kajson.dumps(test_obj, indent=4)  # pyright: ignore[reportUnknownMemberType]
@@ -22,7 +21,7 @@ class TestSerDeLLMClasses:
         # Assertions to ensure the process worked correctly
         assert test_obj == deserialized
 
-    @pytest.mark.parametrize("test_obj", SerDeTestCases.PYDANTIC_EXAMPLES)
+    @pytest.mark.parametrize("test_obj", SerDeTestLLMCases.PYDANTIC_EXAMPLES)
     def test_serde_by_dump(
         self,
         test_obj: BaseModel,
@@ -40,7 +39,7 @@ class TestSerDeLLMClasses:
 
         assert test_obj == deserialized
 
-    @pytest.mark.parametrize("test_dict", SerDeTestCases.PYDANTIC_EXAMPLES_DICT)
+    @pytest.mark.parametrize("test_dict", SerDeTestLLMCases.PYDANTIC_EXAMPLES_DICT)
     def test_serde_model_validate_from_dict(
         self,
         test_dict: Dict[str, Any],
@@ -61,7 +60,7 @@ class TestSerDeLLMClasses:
 
         assert the_obj == deserialized
 
-    @pytest.mark.parametrize("test_dict", SerDeTestCases.PYDANTIC_EXAMPLES_DICT)
+    @pytest.mark.parametrize("test_dict", SerDeTestLLMCases.PYDANTIC_EXAMPLES_DICT)
     def test_serde_instantiate_from_kwargs(
         self,
         test_dict: Dict[str, Any],
