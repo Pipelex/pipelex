@@ -2,7 +2,7 @@
 
 ## 📋 Prerequisites
 
-Pipelex requires `python ≥3.11`, and access to LLM api keys, if you want to run pipelines locally, or an API key provided by Pipelex to use our cloud-hosted service.
+Pipelex requires `python ≥3.10`, and access to LLM api keys, if you want to run pipelines locally, or an API key provided by Pipelex to use our cloud-hosted service.
 
 ## 🧭 Getting Started
 

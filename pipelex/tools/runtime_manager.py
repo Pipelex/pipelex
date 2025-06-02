@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from pipelex.tools.environment import get_optional_env
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 RUN_MODE_ENV_VAR_KEY = "RUN_MODE"
 

@@ -4,7 +4,7 @@ from pydantic import BaseModel, ValidationError
 from rich.repr import Result as RichReprResult
 from typing_extensions import override
 
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
 

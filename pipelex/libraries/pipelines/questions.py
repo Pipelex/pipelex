@@ -5,7 +5,7 @@ from pydantic import Field, model_validator
 from typing_extensions import Self, override
 
 from pipelex.core.stuff_content import StructuredContent
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class QuestionCategoryEnum(StrEnum):

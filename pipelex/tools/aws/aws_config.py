@@ -8,7 +8,7 @@ from pipelex.tools.config.models import ConfigModel
 from pipelex.tools.environment import EnvVarNotFoundError, get_required_env
 from pipelex.tools.exceptions import ToolException
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class AwsCredentialsError(ToolException):

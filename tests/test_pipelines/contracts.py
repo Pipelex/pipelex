@@ -3,7 +3,7 @@ from typing import Any, List, Literal, Optional, Union
 from pydantic import Field, model_validator
 from typing_extensions import Self, override
 
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 from pipelex_libraries.pipelines.base_library.questions import BaseAnswer, MultipleChoiceAnswer, SourcedAnswer
 
 

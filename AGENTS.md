@@ -3,7 +3,7 @@
 ## Repo structure
 
 Pipelex is a framework to run low-code AI workflows for repeatable processes.
-This python 3.11 code is in the `pipelex` directory.
+This python >=3.10 code is in the `pipelex` directory.
 
 ## Code Style & formatting
 

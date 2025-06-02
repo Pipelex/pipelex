@@ -9,7 +9,7 @@ from pipelex.tools.environment import EnvVarNotFoundError, get_required_env
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class VertexAICredentialsError(CogtError):

@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 # Commented stuff below corresponds to untested stuff because Vision models are not available on Bedrock yet
 

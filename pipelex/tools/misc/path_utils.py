@@ -2,7 +2,7 @@ import os
 import urllib.parse
 from typing import Optional, Tuple
 
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class InterpretedPathOrUrl(StrEnum):

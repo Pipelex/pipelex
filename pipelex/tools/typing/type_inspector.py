@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Set, Type, Union, get_type_hints
 
 from pydantic import BaseModel
 
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 def pretty_type(tp: object) -> str:

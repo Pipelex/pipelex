@@ -40,7 +40,7 @@ from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_operators.piped_llm_prompt_factory import PipedLLMPromptFactory
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class StructuringMethod(StrEnum):

@@ -3,7 +3,7 @@ from typing import Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from pipelex.tools.config.models import ConfigModel
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class AspectRatio(StrEnum):

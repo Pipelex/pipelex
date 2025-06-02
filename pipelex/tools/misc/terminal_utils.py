@@ -1,4 +1,4 @@
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 BOLD_FONT = "\033[1m"
 RESET_FONT = "\033[0m"

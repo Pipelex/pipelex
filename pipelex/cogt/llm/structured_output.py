@@ -1,6 +1,6 @@
 from instructor.mode import Mode as InstructorMode
 
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class StructureMethod(StrEnum):

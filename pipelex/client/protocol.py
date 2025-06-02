@@ -7,7 +7,7 @@ from typing_extensions import runtime_checkable
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class PipeState(StrEnum):

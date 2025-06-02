@@ -1,6 +1,6 @@
 from typing import Literal, Union
 
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 DEFAULT_PLATFORM_INDICATOR = "default"
 

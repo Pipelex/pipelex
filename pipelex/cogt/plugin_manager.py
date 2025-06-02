@@ -5,7 +5,7 @@ from pydantic import Field, RootModel
 from pipelex.cogt.imgg.imgg_platform import ImggPlatform
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class PluginHandle(StrEnum):

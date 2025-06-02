@@ -4,7 +4,7 @@ from typing import List
 from pipelex.core.concept import Concept
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.domain import SpecialDomain
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class NativeConceptClass(StrEnum):

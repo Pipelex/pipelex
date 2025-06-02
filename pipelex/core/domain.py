@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 from typing_extensions import Self, override
 
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class SpecialDomain(StrEnum):

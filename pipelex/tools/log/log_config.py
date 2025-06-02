@@ -7,7 +7,7 @@ from rich.logging import RichHandler
 
 from pipelex.tools.config.models import ConfigModel
 from pipelex.tools.log.log_levels import LogLevel
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class HighlighterName(StrEnum):

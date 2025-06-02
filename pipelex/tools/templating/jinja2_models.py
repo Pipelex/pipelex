@@ -3,7 +3,7 @@ from typing import Any, Optional, Tuple
 
 from jinja2.runtime import Context
 
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class Jinja2FilterName(StrEnum):

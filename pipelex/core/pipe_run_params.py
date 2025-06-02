@@ -5,7 +5,7 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
-from pipelex.tools.typing.strenum import StrEnum
+from pipelex.types import StrEnum
 
 
 class PipeRunParamKey(StrEnum):

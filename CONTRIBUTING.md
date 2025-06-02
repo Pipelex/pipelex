@@ -33,7 +33,7 @@ We are open to contributions in all areas of our core Pipelex library:
 
 ## Requirements
 
-- Python ≥3.11
+- Python ≥3.10
 - uv ≥ 0.7.2
 
 ## Development Setup

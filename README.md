@@ -61,7 +61,7 @@ Follow these steps to get started:
 
 ### Prerequisites
 
-- Python ≥3.11
+- Python ≥3.10
 - [pip](https://pip.pypa.io/en/stable/), [poetry](https://python-poetry.org/), or [uv](https://github.com/astral-sh/uv) package manager
 
 ### Install the package
