@@ -20,12 +20,14 @@
 - **Gemini update** - Added latest `gemini-2.5-pro` to the lineup
 - **Image generation enhancements** - Better quality controls, improved background handling options, auto-adapts to different models: Flux, SDXL and now gpt-image-1
 
-### Changed
+### Refactored
 
-- **Error handling** - Strengthened throughout inference flows with better error messages across template preprocessing
-- **Test organization** - Migrated cogt tests to `tests/pipelex` for shared fixtures (especially imgg_handle)
-- **Development tooling** - Swapped pytest-pretty for pytest-sugar - because readable test names > pretty tables
-- **Python support** - Expanded from Python 3.11-only to Python 3.11, 3.12, and 3.13
+- Moved subpackage `plugin` to the same level as `cogt` within **pipelex** for better visibility
+- Major cleanup in the unit tests, hierarchy significantly flattened
+- Strengthened error handling throughout inference flows and template preprocessing
+- Added `make test-quiet` (shorthand `tq`) to Makefile to run tests without capturing outputs (i.e. without pytest `-s` option)
+- Stopped using Fixtures for `pipe_router` and `content_generator`: we're now always getting the singleton from `pipelex.hub`
+
 
 ### Fixed
 
@@ -33,8 +35,18 @@
 
 ### Dependencies
 
+- Added **pytest-xdist** to run unit tests in parallel on multiple CPUs. Not yet integrated into the Makefile, so run it manually with `pytest -n auto` (without inference) or `pytest -n auto -m "inference"` (inference only). 
+- Swapped pytest-pretty for pytest-sugar - because readable test names > pretty tables
 - Updated instructor to v1.8.3
 - All dependencies tested against Python 3.11, 3.12, and 3.13
+
+### Tests
+
+- TestTemplatePreprocessor
+- TestImggByOpenAIGpt
+- TestImageGeneration
+- TestPipeImgg
+
 
 ## [v0.2.9] - 2025-05-30
 

@@ -63,6 +63,10 @@ keywords_to_hilight = []
 [pipelex.aws_config]
 api_key_method = "env"
 
+####################################################################################################
+# Cogt inference config
+####################################################################################################
+
 [cogt]
 
 [cogt.inference_manager_config]
@@ -88,43 +92,9 @@ is_openai_structured_output_enabled = false
 max_retries = 3
 is_streaming_enabled = false
 
-####################################################################################################
-# Config to use LLM Platforms
-####################################################################################################
-
 [cogt.llm_config.preferred_platforms]
 # These overrride the defaults set for any llm handle
 # "gpt-4o-mini" = "openai"
-
-[cogt.llm_config.openai_openai_config]
-api_key_method = "env"
-
-[cogt.llm_config.azure_openai_config]
-api_key_method = "env"
-
-# TODO: handle multiple azure openai accounts with different resource groups and account names for various llm model
-
-[cogt.llm_config.perplexity_config]
-api_key_method = "env"
-
-[cogt.llm_config.xai_config]
-api_key_method = "env"
-
-[cogt.llm_config.vertexai_config]
-api_key_method = "env"
-
-[cogt.llm_config.mistral_config]
-api_key_method = "env"
-
-[cogt.llm_config.bedrock_config]
-client_method = "aioboto3"
-
-[cogt.llm_config.anthropic_config]
-claude_4_reduced_tokens_limit = 8192  # use "unlimited" to enable the full 32/64K tokens Opus/Sonet but it raises streaming/timeout issues
-api_key_method = "env"
-
-[cogt.llm_config.custom_endpoint_config]
-api_key_method = "env"
 
 ####################################################################################################
 # Image generation config
@@ -138,9 +108,10 @@ default_imgg_handle = "fal-ai/flux-pro/v1.1-ultra"  # use "fal-ai/fast-lightning
 is_sync_mode = false
 
 [cogt.imgg_config.imgg_param_defaults]
-aspect_ratio = "square"  # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
-# nb_steps = 1  # 28 for Flux, one of [1,2,4,8] for SDXL Lightning
+# quality and nb_steps cannot be set at the same time
+# nb_steps = 1  # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
 quality = "low"
+aspect_ratio = "square"  # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
 guidance_scale = 3.5
 background = "auto"
 is_moderated = true
@@ -148,7 +119,6 @@ safety_tolerance = 5
 is_raw = false
 output_format = "jpg"
 seed = "auto"
-# seed = 1
 
 ####################################################################################################
 # OCR config
@@ -157,6 +127,47 @@ seed = "auto"
 [cogt.ocr_config]
 ocr_handles = ["mistral/mistral-ocr-latest"]
 page_output_text_file_name = "page_text.md"
+
+####################################################################################################
+# Plugins config
+####################################################################################################
+
+[plugins]
+
+[plugins.openai_config]
+image_output_compression = 100
+api_key_method = "env"
+
+[plugins.azure_openai_config]
+api_key_method = "env"
+
+# TODO: handle multiple azure openai accounts with different resource groups and account names for various llm model
+
+[plugins.perplexity_config]
+api_key_method = "env"
+
+[plugins.xai_config]
+api_key_method = "env"
+
+[plugins.vertexai_config]
+api_key_method = "env"
+
+[plugins.mistral_config]
+api_key_method = "env"
+
+[plugins.bedrock_config]
+client_method = "aioboto3"
+
+[plugins.anthropic_config]
+claude_4_reduced_tokens_limit = 8192  # use "unlimited" to enable the full 32/64K tokens Opus/Sonet but it raises streaming/timeout issues
+api_key_method = "env"
+
+[plugins.custom_endpoint_config]
+api_key_method = "env"
+
+[plugins.fal_config]
+flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
+sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
 
 ####################################################################################################
 # Pipelex prompting config
