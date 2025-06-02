@@ -135,6 +135,7 @@ page_output_text_file_name = "page_text.md"
 [plugins]
 
 [plugins.openai_config]
+image_output_compression = 100
 api_key_method = "env"
 
 [plugins.azure_openai_config]
@@ -163,6 +164,10 @@ api_key_method = "env"
 
 [plugins.custom_endpoint_config]
 api_key_method = "env"
+
+[plugins.fal_config]
+flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
+sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
 
 ####################################################################################################
 # Pipelex prompting config

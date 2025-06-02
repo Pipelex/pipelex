@@ -8,6 +8,7 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.plugins.anthropic.anthropic_config import AnthropicConfig
 from pipelex.plugins.bedrock.bedrock_config import BedrockConfig
+from pipelex.plugins.fal.fal_config import FalConfig
 from pipelex.plugins.mistral.mistral_config import MistralConfig
 from pipelex.plugins.openai.azure_openai_config import AzureOpenAIConfig
 from pipelex.plugins.openai.custom_endpoint_config import CustomEndpointConfig
@@ -28,3 +29,4 @@ class PluginsConfig(ConfigModel):
     perplexity_config: PerplexityConfig
     xai_config: XaiConfig
     custom_endpoint_config: CustomEndpointConfig
+    fal_config: FalConfig

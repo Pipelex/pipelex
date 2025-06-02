@@ -23,6 +23,7 @@ OPENAI_API_KEY_VAR_NAME = "OPENAI_API_KEY"
 
 
 class OpenAIConfig(ConfigModel):
+    image_output_compression: int = Field(ge=1, le=100)
     api_key_method: OpenAIKeyMethod = Field(strict=False)
 
     def get_api_key(self, secrets_provider: SecretsProviderAbstract) -> str:

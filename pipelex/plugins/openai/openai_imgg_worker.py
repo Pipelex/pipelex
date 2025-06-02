@@ -12,6 +12,7 @@ from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.imgg.imgg_job_components import Quality
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract, imgg_job_func
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
+from pipelex.config import get_config
 from pipelex.plugins.openai.openai_imgg_factory import OpenAIImggFactory
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_path
@@ -55,7 +56,7 @@ class OpenAIImggWorker(ImggWorkerAbstract):
         moderation = OpenAIImggFactory.moderation_for_gpt_image_1(is_moderated=imgg_job.job_params.is_moderated)
         background = OpenAIImggFactory.background_for_gpt_image_1(background=imgg_job.job_params.background)
         quality = OpenAIImggFactory.quality_for_gpt_image_1(quality=imgg_job.job_params.quality or Quality.LOW)
-        output_compression = 100
+        output_compression = get_config().plugins.openai_config.image_output_compression
         result = await self.openai_client.images.generate(
             prompt=imgg_job.imgg_prompt.positive_text,
             model=self.imgg_engine.imgg_model_name,
