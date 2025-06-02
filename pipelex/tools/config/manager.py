@@ -123,14 +123,6 @@ class ConfigManager:
         #################### 1. Load pipelex config ####################
         pipelex_config = self.get_pipelex_config()
 
-        if specific_config_path:
-            config = failable_load_toml_from_path(specific_config_path)
-            if config:
-                deep_update(pipelex_config, config)
-            else:
-                # not value error, create a config exception
-                raise ConfigException(f"Failed to load specific config from {specific_config_path}")
-
         #################### 2. Load inheritance config for internal use ####################
         # TODO: Undocumented feature, soon to be removed.
         self.load_inheritance_config(pipelex_config)
@@ -153,6 +145,14 @@ class ConfigManager:
                     override_path = os.path.join(self.local_root_dir, "pipelex" if self.is_in_pipelex_config else "", f"pipelex_{override}.toml")
                 if override_dict := failable_load_toml_from_path(override_path):
                     deep_update(pipelex_config, override_dict)
+
+        #################### 5. Load specific config ####################
+        if specific_config_path:
+            config = failable_load_toml_from_path(specific_config_path)
+            if config:
+                deep_update(pipelex_config, config)
+            else:
+                raise ConfigException(f"Failed to load specific config from {specific_config_path}")
 
         return pipelex_config
 
