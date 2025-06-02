@@ -40,6 +40,14 @@
 - Updated instructor to v1.8.3
 - All dependencies tested against Python 3.11, 3.12, and 3.13
 
+### Tests
+
+- TestTemplatePreprocessor
+- TestImggByOpenAIGpt
+- TestImageGeneration
+- TestPipeImgg
+
+
 ## [v0.2.9] - 2025-05-30
 
 - Include `pyproject.toml` inside the project build.
