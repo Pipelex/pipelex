@@ -80,3 +80,22 @@ Optional notes:
         result = preprocess_template(template)
         expected = '{% if optional %}{{ optional|tag("optional") }}{% endif %} {{ required|tag("required") }}'
         assert result == expected
+
+    def test_dollar_amounts_not_processed(self):
+        """Test that dollar amounts are not processed as variables."""
+        template = "The price is $10M and the budget is $1000.50"
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_mixed_dollar_amounts_and_variables(self):
+        """Test mixing dollar amounts with dollar variables."""
+        template = "The price is $10M and the budget is $budget_amount"
+        result = preprocess_template(template)
+        expected = "The price is $10M and the budget is {{ budget_amount|format() }}"
+        assert result == expected
+
+    def test_dollar_amounts_with_spaces(self):
+        """Test dollar amounts with spaces after the dollar sign."""
+        template = "The price is $ 10M and the budget is $ 1000.50"
+        result = preprocess_template(template)
+        assert result == template

@@ -81,7 +81,7 @@ def preprocess_template(template: str) -> str:
         processed_template = new_template
 
     # Replace $variable patterns
-    new_template = re.sub(r"\$([a-zA-Z0-9_.]+)", replace_dollar_variable, processed_template)
+    new_template = re.sub(r"\$(?![0-9])([a-zA-Z0-9_.]+)", replace_dollar_variable, processed_template)
     if new_template != processed_template:
         changes_made = True
         processed_template = new_template
