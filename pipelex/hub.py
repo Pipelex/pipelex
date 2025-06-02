@@ -82,14 +82,14 @@ class PipelexHub:
 
     # tools
 
-    def setup_config(self, config_cls: Type[ConfigRoot]):
+    def setup_config(self, config_cls: Type[ConfigRoot], specific_config_path: Optional[str] = None):
         """
         Set the global configuration instance.
 
         # Args:
         #     config (Config): The configuration instance to set.
         """
-        config = config_manager.load_config()
+        config = config_manager.load_config(specific_config_path)
         config["project_name"] = config_manager.get_project_name()
         self.set_config(config=config_cls.model_validate(config))
 

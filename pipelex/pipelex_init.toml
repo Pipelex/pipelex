@@ -9,26 +9,38 @@ api_key_method = "env"
 # This overrrides the defaults set for any llm handle
 "gpt-4o-mini" = "openai"
 
-[cogt.llm_config.openai_openai_config]
+[plugins]
+
+[plugins.openai_config]
+image_output_compression = 100
 api_key_method = "env"
 
-[cogt.llm_config.azure_openai_config]
+[plugins.azure_openai_config]
 api_key_method = "env"
 
-[cogt.llm_config.perplexity_config]
+# TODO: handle multiple azure openai accounts with different resource groups and account names for various llm model
+
+[plugins.perplexity_config]
 api_key_method = "env"
 
-[cogt.llm_config.vertexai_config]
+[plugins.xai_config]
 api_key_method = "env"
 
-[cogt.llm_config.mistral_config]
+[plugins.vertexai_config]
 api_key_method = "env"
 
-[cogt.llm_config.anthropic_config]
+[plugins.mistral_config]
 api_key_method = "env"
 
-[cogt.llm_config.bedrock_config]
+[plugins.bedrock_config]
 client_method = "aioboto3"
+
+[plugins.anthropic_config]
+claude_4_reduced_tokens_limit = 8192  # use "unlimited" to enable the full 32/64K tokens Opus/Sonet but it raises streaming/timeout issues
+api_key_method = "env"
+
+[plugins.custom_endpoint_config]
+api_key_method = "env"
 
 ####################################################################################################
 # OCR config

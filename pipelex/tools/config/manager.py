@@ -15,6 +15,10 @@ from pipelex.tools.runtime_manager import runtime_manager
 CONFIG_NAME = "pipelex.toml"
 
 
+class ConfigException(Exception):
+    pass
+
+
 class ConfigManager:
     @property
     def is_in_pipelex_config(self) -> bool:
@@ -100,7 +104,7 @@ class ConfigManager:
                         if config:
                             deep_update(the_pipelex_config, config)
 
-    def load_config(self) -> Dict[str, Any]:
+    def load_config(self, specific_config_path: Optional[str] = None) -> Dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
 
         The configuration is loaded and merged in the following order:
@@ -115,8 +119,17 @@ class ConfigManager:
         Returns:
             Dict[str, Any]: The merged configuration dictionary
         """
+
         #################### 1. Load pipelex config ####################
         pipelex_config = self.get_pipelex_config()
+
+        if specific_config_path:
+            config = failable_load_toml_from_path(specific_config_path)
+            if config:
+                deep_update(pipelex_config, config)
+            else:
+                # not value error, create a config exception
+                raise ConfigException(f"Failed to load specific config from {specific_config_path}")
 
         #################### 2. Load inheritance config for internal use ####################
         # TODO: Undocumented feature, soon to be removed.
