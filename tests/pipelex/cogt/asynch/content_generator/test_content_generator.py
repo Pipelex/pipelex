@@ -15,7 +15,7 @@ from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.hub import get_llm_deck
+from pipelex.hub import get_content_generator, get_llm_deck
 from pipelex.mission.job_metadata import JobMetadata
 from tests.pipelex.cogt.test_data import Employee
 from tests.test_data import ImageTestCases
@@ -61,10 +61,10 @@ Write a haiku about the meaning of life
 class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_llm_text_only(self, request: FixtureRequest, content_generator: ContentGenerator):
+    async def test_make_llm_text_only(self, request: FixtureRequest):
         llm_setting_main = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_text")
 
-        text: str = await content_generator.make_llm_text(
+        text: str = await get_content_generator().make_llm_text(
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
@@ -77,10 +77,10 @@ class TestContentGenerator:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_object_direct(self, request: FixtureRequest, content_generator: ContentGenerator):
+    async def test_make_object_direct(self, request: FixtureRequest):
         llm_setting_for_object = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
 
-        person_direct: Employee = await content_generator.make_object_direct(
+        person_direct: Employee = await get_content_generator().make_object_direct(
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
@@ -94,10 +94,10 @@ class TestContentGenerator:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_object_list_direct(self, request: FixtureRequest, content_generator: ContentGenerator):
+    async def test_make_object_list_direct(self, request: FixtureRequest):
         llm_setting_for_object = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
 
-        person_list_direct: List[Employee] = await content_generator.make_object_list_direct(
+        person_list_direct: List[Employee] = await get_content_generator().make_object_list_direct(
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
@@ -112,8 +112,8 @@ class TestContentGenerator:
 
     @pytest.mark.imgg
     @pytest.mark.inference
-    async def test_make_image(self, request: FixtureRequest, content_generator: ContentGenerator):
-        image: GeneratedImage = await content_generator.make_single_image(
+    async def test_make_image(self, request: FixtureRequest):
+        image: GeneratedImage = await get_content_generator().make_single_image(
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
@@ -125,12 +125,12 @@ class TestContentGenerator:
         pretty_print(image, title="make_image")
         assert isinstance(image, GeneratedImage)
 
-    async def test_make_jinja2_text(self, request: FixtureRequest, content_generator: ContentGenerator):
+    async def test_make_jinja2_text(self, request: FixtureRequest):
         context = {
             "the_answer": "elementary, my dear Watson",
         }
 
-        jinja2_text: str = await content_generator.make_jinja2_text(
+        jinja2_text: str = await get_content_generator().make_jinja2_text(
             context=context,
             jinja2="The answer is: {{ the_answer }}",
         )
@@ -140,8 +140,8 @@ class TestContentGenerator:
 
     @pytest.mark.ocr
     @pytest.mark.inference
-    async def test_make_ocr_extract_pages(self, request: FixtureRequest, content_generator: ContentGenerator):
-        ocr_output = await content_generator.make_ocr_extract_pages(
+    async def test_make_ocr_extract_pages(self, request: FixtureRequest):
+        ocr_output = await get_content_generator().make_ocr_extract_pages(
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
@@ -155,11 +155,11 @@ class TestContentGenerator:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_llm_text_with_error(self, request: FixtureRequest, content_generator: ContentGenerator):
+    async def test_make_llm_text_with_error(self, request: FixtureRequest):
         BAD_HANDLE_TO_TEST_FAILURE = "bad_handle_to_test_failure"
         llm_setting_main = LLMSetting(llm_handle=BAD_HANDLE_TO_TEST_FAILURE, temperature=0.5, max_tokens=100)
         with pytest.raises(LLMHandleNotFoundError) as excinfo:
-            await content_generator.make_llm_text(
+            await get_content_generator().make_llm_text(
                 job_metadata=JobMetadata(
                     top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
                 ),
