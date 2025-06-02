@@ -173,7 +173,7 @@ class ConfigManager:
         pyproject_path = os.path.join(self.local_root_dir, "pyproject.toml")
         try:
             pyproject = toml.load(pyproject_path)
-            if project_name := pyproject.get("project", {}).get("name"):
+            if project_name := pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name"):
                 if isinstance(project_name, str):
                     return project_name
         except FileNotFoundError as exc:
