@@ -16,3 +16,11 @@ output = "PageContent"
 pdf = "pdf"
 page_images = true
 page_views = false
+
+[pipe.extract_page_contents_and_views_from_pdf]
+PipeOcr = "Extract page contents from a PDF document as well aspage views"
+input = "PDF"
+output = "PageContent"
+pdf = "pdf"
+page_images = true
+page_views = true

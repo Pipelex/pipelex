@@ -29,8 +29,8 @@ class OcrWorkerFactory:
                         "The mistralai SDK is required to use Mistral OCR models through the mistralai client.",
                     ) from exc
 
-                from pipelex.cogt.plugin.mistral.mistral_factory import MistralFactory
-                from pipelex.cogt.plugin.mistral.mistral_ocr_worker import MistralOcrWorker
+                from pipelex.plugin.mistral.mistral_factory import MistralFactory
+                from pipelex.plugin.mistral.mistral_ocr_worker import MistralOcrWorker
 
                 ocr_sdk_instance = plugin_manager.get_ocr_sdk_instance(ocr_sdk_handle=ocr_sdk_handle) or plugin_manager.set_ocr_sdk_instance(
                     ocr_sdk_handle=ocr_sdk_handle,

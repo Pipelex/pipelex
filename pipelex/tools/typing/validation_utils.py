@@ -39,12 +39,19 @@ def has_more_than_one_among_attributes_from_list(obj: Any, attributes_list: List
     return len(provided_attributes) > 1
 
 
-def has_more_than_one_among_attributes_from_any_list(obj: Any, attributes_lists: List[List[str]]) -> Optional[List[str]]:
+def has_more_than_one_among_attributes_from_lists(obj: Any, attributes_lists: List[List[str]]) -> Optional[List[str]]:
     """
-    Checks if more than one attribute from any list of attributes is non-None in an object.
+    Checks if more than one attribute from lists (plural) of attributes is non-None in an object.
 
     This function is useful for detecting conflicts in configurations or data models
     where attributes are supposed to be mutually exclusive.
+
+    Args:
+        obj (Any): The object to check attributes on. Must support getattr().
+        attributes_lists (List[List[str]]): List of lists of attribute names to check.
+
+    Returns:
+        Optional[List[str]]: The list of attributes that are non-None if more than one, None otherwise.
     """
     for attributes_list in attributes_lists:
         if has_more_than_one_among_attributes_from_list(obj, attributes_list):

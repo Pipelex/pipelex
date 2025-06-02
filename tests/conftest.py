@@ -14,6 +14,8 @@ pytest_plugins = [
     "pipelex.test_extras.shared_pytest_plugins",
 ]
 
+TEST_OUTPUTS_DIR = "temp/test_outputs"
+
 
 @pytest.fixture(scope="module", autouse=True)
 def reset_pipelex_config_fixture():

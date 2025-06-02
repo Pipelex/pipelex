@@ -12,6 +12,7 @@ class LLMCreator(StrEnum):
     META = "Meta"
     MISTRAL = "Mistral"
     PERPLEXITY = "Perplexity"
+    XAI = "XAI"
 
     @property
     def prompting_target(self) -> LLMPromptingTarget:
@@ -24,7 +25,7 @@ class LLMCreator(StrEnum):
                 return LLMPromptingTarget.MISTRAL
             case LLMCreator.GOOGLE:
                 return LLMPromptingTarget.GEMINI
-            case LLMCreator.AMAZON | LLMCreator.PERPLEXITY | LLMCreator.META | LLMCreator.DEEPSEEK:
+            case LLMCreator.AMAZON | LLMCreator.PERPLEXITY | LLMCreator.META | LLMCreator.DEEPSEEK | LLMCreator.XAI:
                 return LLMPromptingTarget.OPENAI
 
     @property
@@ -46,21 +47,24 @@ class LLMCreator(StrEnum):
                 return "purple"
             case LLMCreator.DEEPSEEK:
                 return "red"
+            case LLMCreator.XAI:
+                return "green"
 
 
 class LLMFamily(StrEnum):
-    GPT_4 = "gpt-4"
-    GPT_3_5 = "gpt-3.5"
     GPT_3 = "gpt-3"
+    GPT_3_5 = "gpt-3.5"
+    GPT_4 = "gpt-4"
+    GPT_4O = "gpt-4o"
     GPT_4_5 = "gpt-4.5"
     GPT_4_1 = "gpt-4.1"
-    GPT_4O = "gpt-4o"
     O_SERIES = "o"
+
     CLAUDE_3 = "claude-3"
     CLAUDE_3_5 = "claude-3.5"
     CLAUDE_3_7 = "claude-3.7"
-    CLAUDE_2 = "claude-2"
-    CLAUDE_INSTANT = "claude-instant"
+    CLAUDE_4 = "claude-4"
+
     MISTRAL_7B = "mistral-7b"
     MISTRAL_8X7B = "mistral-8x7b"
     MISTRAL_LARGE = "mistral-large"
@@ -68,9 +72,12 @@ class LLMFamily(StrEnum):
     MISTRAL_CODESTRAL = "mistral-codestral"
     MINISTRAL = "ministral"
     PIXTRAL = "pixtral"
+
     LLAMA_3 = "llama-3"
     LLAMA_3_1 = "llama-3.1"
+
     GEMINI = "gemini"
+
     BEDROCK_MISTRAL_LARGE = "bedrock-mistral-large"
     BEDROCK_ANTHROPIC_CLAUDE = "bedrock-anthropic-claude"
     BEDROCK_META_LLAMA_3 = "bedrock-meta-llama-3"
@@ -80,6 +87,8 @@ class LLMFamily(StrEnum):
     PERPLEXITY_RESEARCH = "perplexity-research"
     PERPLEXITY_REASONING = "perplexity-reasoning"
     PERPLEXITY_DEEPSEEK = "perplexity-deepseek"
+
+    GROK_3 = "grok-3"
 
     CUSTOM_LLAMA_4 = "custom-llama-4"
     CUSTOM_GEMMA_3 = "custom-gemma-3"
@@ -91,7 +100,7 @@ class LLMFamily(StrEnum):
                 LLMFamily.GPT_4 | LLMFamily.GPT_3_5 | LLMFamily.GPT_3 | LLMFamily.O_SERIES | LLMFamily.GPT_4_5 | LLMFamily.GPT_4_1 | LLMFamily.GPT_4O
             ):
                 return LLMCreator.OPENAI
-            case LLMFamily.CLAUDE_3 | LLMFamily.CLAUDE_3_5 | LLMFamily.CLAUDE_2 | LLMFamily.CLAUDE_INSTANT | LLMFamily.CLAUDE_3_7:
+            case LLMFamily.CLAUDE_3 | LLMFamily.CLAUDE_3_5 | LLMFamily.CLAUDE_3_7 | LLMFamily.CLAUDE_4:
                 return LLMCreator.ANTHROPIC
             case LLMFamily.BEDROCK_ANTHROPIC_CLAUDE:
                 return LLMCreator.ANTHROPIC
@@ -119,6 +128,8 @@ class LLMFamily(StrEnum):
                 return LLMCreator.PERPLEXITY
             case LLMFamily.PERPLEXITY_DEEPSEEK:
                 return LLMCreator.DEEPSEEK
+            case LLMFamily.GROK_3:
+                return LLMCreator.XAI
             case LLMFamily.CUSTOM_LLAMA_4 | LLMFamily.CUSTOM_GEMMA_3:
                 return LLMCreator.META
 

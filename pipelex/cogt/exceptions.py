@@ -63,6 +63,10 @@ class LLMModelDefinitionError(CogtError):
     pass
 
 
+class LLMModelNotFoundError(CogtError):
+    pass
+
+
 class LLMCapabilityError(CogtError):
     pass
 
@@ -83,7 +87,7 @@ class LLMPromptTemplateInputsError(CogtError):
     pass
 
 
-class LLMPromptError(CogtError):
+class LLMPromptParameterError(CogtError):
     pass
 
 
@@ -96,6 +100,18 @@ class PromptImageFormatError(CogtError):
 
 
 class ImggPromptError(CogtError):
+    pass
+
+
+class ImggParameterError(CogtError):
+    pass
+
+
+class ImggGenerationError(CogtError):
+    pass
+
+
+class ImggGeneratedTypeError(ImggGenerationError):
     pass
 
 

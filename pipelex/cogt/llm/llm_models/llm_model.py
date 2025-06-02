@@ -19,6 +19,7 @@ class LLMModel(BaseModel):
     version: str
     is_gen_object_supported: bool
     is_vision_supported: bool = False
+    # TODO: add skill regarding live online data access
     cost_per_million_tokens_usd: Optional[TokenCostsByCategoryDict] = None
     platform_llm_id: Dict[LLMPlatform, str] = Field(..., min_length=1)
     max_tokens: Optional[int] = None

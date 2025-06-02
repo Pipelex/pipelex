@@ -18,6 +18,7 @@ class LLMPlatform(StrEnum):
     OPENAI = "openai"
     PERPLEXITY = "perplexity"
     VERTEXAI_OPENAI = "vertexai_openai"
+    XAI = "xai"
     CUSTOM_OPENAI = "custom_openai"
 
     @staticmethod
@@ -27,6 +28,8 @@ class LLMPlatform(StrEnum):
             LLMPlatform.AZURE_OPENAI,
             LLMPlatform.VERTEXAI_OPENAI,
             LLMPlatform.PERPLEXITY,
+            LLMPlatform.XAI,
+            LLMPlatform.CUSTOM_OPENAI,
         ]
 
     @staticmethod
@@ -48,6 +51,7 @@ class LLMPlatform(StrEnum):
                 | LLMPlatform.ANTHROPIC
                 | LLMPlatform.MISTRAL
                 | LLMPlatform.BEDROCK_ANTHROPIC
+                | LLMPlatform.XAI
                 | LLMPlatform.CUSTOM_OPENAI
             ):
                 return True
@@ -73,6 +77,8 @@ class LLMPlatform(StrEnum):
                 return "gray"
             case LLMPlatform.VERTEXAI_OPENAI:
                 return "deep_sky_blue"
+            case LLMPlatform.XAI:
+                return "green"
             case LLMPlatform.CUSTOM_OPENAI:
                 return "white"
 

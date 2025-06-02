@@ -1,0 +1,25 @@
+
+[grok-3.grok-3.latest]
+is_gen_object_supported = true
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 3, output = 15 }
+platform_llm_id = { xai = "grok-3-latest" }
+
+[grok-3.grok-3-mini.latest]
+is_gen_object_supported = true
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 0.3, output = 0.5 }
+platform_llm_id = { xai = "grok-3-mini-latest" }
+
+[grok-3.grok-3-fast.latest]
+is_gen_object_supported = true
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 5, output = 25 }
+platform_llm_id = { xai = "grok-3-fast-latest" }
+
+
+[grok-3.grok-3-mini-fast.latest]
+is_gen_object_supported = true
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 0.15, output = 4 }
+platform_llm_id = { xai = "grok-3-mini-fast-latest" }

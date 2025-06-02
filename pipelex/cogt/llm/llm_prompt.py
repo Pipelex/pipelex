@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMPromptError
+from pipelex.cogt.exceptions import LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.tools.misc.string_utils import is_none_or_has_text, is_not_none_and_has_text
 from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
@@ -25,9 +25,9 @@ class LLMPrompt(BaseModel):
                     if self.system_text == "":
                         log.warning(f"system_text should be None or contain text. system_text = '{self.system_text}'")
                     else:
-                        raise LLMPromptError("system_text should be None or contain text")
+                        raise LLMPromptParameterError("system_text should be None or contain text")
                 if not is_not_none_and_has_text(text=self.user_text):
-                    raise LLMPromptError("user_text should contain text")
+                    raise LLMPromptParameterError("user_text should contain text")
             case ProblemReaction.LOG:
                 if not is_none_or_has_text(text=self.system_text):
                     if self.system_text == "":

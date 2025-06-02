@@ -107,6 +107,9 @@ api_key_method = "env"
 [cogt.llm_config.perplexity_config]
 api_key_method = "env"
 
+[cogt.llm_config.xai_config]
+api_key_method = "env"
+
 [cogt.llm_config.vertexai_config]
 api_key_method = "env"
 
@@ -117,6 +120,7 @@ api_key_method = "env"
 client_method = "aioboto3"
 
 [cogt.llm_config.anthropic_config]
+claude_4_reduced_tokens_limit = 8192  # use "unlimited" to enable the full 32/64K tokens Opus/Sonet but it raises streaming/timeout issues
 api_key_method = "env"
 
 [cogt.llm_config.custom_endpoint_config]
@@ -135,9 +139,11 @@ is_sync_mode = false
 
 [cogt.imgg_config.imgg_param_defaults]
 aspect_ratio = "square"  # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
-nb_steps = 1  # 28 for Flux, one of [1,2,4,8] for SDXL Lightning
+# nb_steps = 1  # 28 for Flux, one of [1,2,4,8] for SDXL Lightning
+quality = "low"
 guidance_scale = 3.5
-is_safety_checker_enabled = true
+background = "auto"
+is_moderated = true
 safety_tolerance = 5
 is_raw = false
 output_format = "jpg"

@@ -16,14 +16,13 @@ class ImggEngineFactory:
         if "/" not in imgg_handle:
             raise ImggEngineFactoryError(f"Invalid Imgg handle: {imgg_handle}. Expected format: platform/model_name")
 
+        # split at the first "/"
         parts = imgg_handle.split("/", 1)
-        if len(parts) != 2:
-            raise ImggEngineFactoryError(f"Invalid Imgg handle: {imgg_handle}. Expected format: platform/model_name")
 
         try:
             imgg_platform = ImggPlatform(parts[0])
         except ValueError:
-            raise ImggEngineFactoryError(f"Invalid Imgg platform: {parts[0]}")
+            raise ImggEngineFactoryError(f"Unknown Imgg platform:' {parts[0]}' extracted from handle '{imgg_handle}'")
 
         imgg_model_name = parts[1]
 

@@ -11,10 +11,12 @@ These rules apply when writing unit tests.
 - Name test files with `test_` prefix
 - Use descriptive names that match the functionality being tested
 - Place test files in the appropriate subdirectory of `tests/`:
-    - `tests/cogt/` for tests related to sub-package `pipelex.cogt`
     - `tests/tools/` for tests related to sub-package `pipelex.tools`
-    - `tests/pipelex/` for tests related to `pipelex`and not its sub-packages
-- More precisely, for `pipelex` and `pipelex.cogt` place the tests inside subdirectories named either `asynch` for async test functions and `synchro` for normal non-async test functions
+    - `tests/pipelex/` for tests related to `pipelex`and its sub-packages
+    - `tests/pipelex/cogt/` for tests related to sub-package `pipelex.cogt`
+- More precisely, for `pipelex` and `pipelex.cogt` the async tests are placed inside subdirectories named `cogt_asynch` and `pipelex_asynch`
+- Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
+- Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `tests.pipelex.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
 
 ## Markers
 

@@ -17,6 +17,7 @@ class PluginHandle(StrEnum):
     BEDROCK_ASYNC = "bedrock_async"
     PERPLEXITY_ASYNC = "perplexity_async"
     VERTEXAI_OPENAI_ASYNC = "vertexai_openai_async"
+    XAI_OPENAI_ASYNC = "xai_openai_async"
     CUSTOM_OPENAI_ASYNC = "custom_openai_async"
     FAL_ASYNC = "fal_async"
 
@@ -39,6 +40,8 @@ class PluginHandle(StrEnum):
                 return PluginHandle.PERPLEXITY_ASYNC
             case LLMPlatform.VERTEXAI_OPENAI:
                 return PluginHandle.VERTEXAI_OPENAI_ASYNC
+            case LLMPlatform.XAI:
+                return PluginHandle.XAI_OPENAI_ASYNC
             case LLMPlatform.CUSTOM_OPENAI:
                 return PluginHandle.CUSTOM_OPENAI_ASYNC
 
@@ -53,6 +56,8 @@ class PluginHandle(StrEnum):
         match imgg_platform:
             case ImggPlatform.FAL_AI:
                 return PluginHandle.FAL_ASYNC
+            case ImggPlatform.OPENAI:
+                return PluginHandle.OPENAI_ASYNC
 
 
 PluginManagerRoot = Dict[str, Any]

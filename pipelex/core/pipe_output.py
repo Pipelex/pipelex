@@ -50,6 +50,11 @@ class PipeOutput(BaseModel):
         return self.working_memory.main_stuff_as_text
 
     @property
+    def main_stuff_as_str(self) -> str:
+        """Get main stuff content as TextContent if applicable and return the text."""
+        return self.working_memory.main_stuff_as_text.text
+
+    @property
     def main_stuff_as_image(self) -> ImageContent:
         """Get main stuff content as ImageContent if applicable."""
         return self.working_memory.main_stuff_as_image

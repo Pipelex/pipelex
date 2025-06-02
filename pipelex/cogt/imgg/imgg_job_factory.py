@@ -39,7 +39,7 @@ class ImggJobFactory:
     @classmethod
     def make_imgg_job_from_prompt_contents(
         cls,
-        positive_text: Optional[str] = None,
+        positive_text: str,
         imgg_job_params: Optional[ImggJobParams] = None,
         imgg_job_config: Optional[ImggJobConfig] = None,
         job_metadata: Optional[JobMetadata] = None,

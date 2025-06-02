@@ -33,6 +33,28 @@ In this example, the expense data and the invoices data are obviously made of se
 **DO NOT write things like "Here is the expense: @expense".**
 **DO write simply "@expense" alone in an isolated line.**
 
+## Insert stuff inside a tagged block only if it exists (optional)
+
+If you want to conditionally insert a block only when the variable exists and is not empty, use the "@?" prefix. This is useful for optional fields that may or may not be present in your data.
+
+Example template:
+```python
+prompt_template = """
+User Profile:
+
+@name
+
+@?bio
+
+@?contact_info
+
+Please summarize this profile.
+"""
+```
+In this example, the bio and contact_info will only be inserted if they exist. If they don't exist or are empty, those sections will be completely omitted from the rendered template.
+
+**DO use "@?optional_field" when the field might not always be present.**
+**DO NOT use "@optional_field" for fields that might be missing - this would cause an error.**
 
 ## Insert stuff inline
 

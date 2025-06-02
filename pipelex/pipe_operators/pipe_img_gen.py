@@ -1,40 +1,55 @@
-from typing import List, Literal, Optional, Union, cast
+from typing import List, Literal, Optional, Union
 
 from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job_components import AspectRatio, ImggJobParams
+from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, ImggJobParams, Quality
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.config import get_config
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunParams, output_multiplicity_to_apply
-from pipelex.core.stuff_content import ImageContent, ListContent, StuffContent, TextContent
+from pipelex.core.stuff_content import ImageContent, ListContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeRunParamsError
+from pipelex.exceptions import PipeDefinitionError, PipeInputError, PipeRunParamsError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_content_generator
 from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+
+# TODO: refacto this as part of the PipeImgGen blueprint/params
+IMGG_PROMPT_NAME = "imgg_prompt"
 
 
 class PipeImgGenOutput(PipeOutput):
     @property
     def image_urls(self) -> List[str]:
-        items = self.main_stuff_as_items(item_type=ImageContent)
-        return [item.url for item in items]
+        the_urls: List[str] = []
+        content = self.main_stuff.content
+        if isinstance(content, ListContent):
+            items = self.main_stuff_as_items(item_type=ImageContent)
+            the_urls = [item.url for item in items]
+        elif isinstance(content, ImageContent):
+            the_urls = [content.url]
+        else:
+            raise PipeRunParamsError(f"PipeImgGen output should be a ListContent or an ImageContent, got {type(content)}")
+        return the_urls
 
 
 class PipeImgGen(PipeOperator):
     output_concept_code: str = NativeConcept.IMAGE.code
+    imgg_prompt: Optional[str] = None
+    imgg_prompt_stuff_name: Optional[str] = None
     # TODO: wrap this up in imgg llm_presets like for llm
     imgg_handle: Optional[ImggHandle] = None
     aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
     nb_steps: Optional[int] = Field(default=None, gt=0)
     guidance_scale: Optional[float] = Field(default=None, gt=0)
-    is_safety_checker_enabled: Optional[bool] = None
+    is_moderated: Optional[bool] = None
+    background: Optional[Background] = None
+    quality: Optional[Quality] = Field(default=None, strict=False)
     safety_tolerance: Optional[int] = Field(default=None, ge=1, le=6)
     is_raw: Optional[bool] = None
     seed: Optional[Union[int, Literal["auto"]]] = None
@@ -49,7 +64,7 @@ class PipeImgGen(PipeOperator):
         output_name: Optional[str] = None,
     ) -> PipeImgGenOutput:
         if not self.output_concept_code:
-            raise ValueError("PipeImgGen should have a non-None output_concept_code")
+            raise PipeDefinitionError("PipeImgGen should have a non-None output_concept_code")
 
         applied_output_multiplicity, _, _ = output_multiplicity_to_apply(
             output_multiplicity_base=self.output_multiplicity or False,
@@ -57,11 +72,15 @@ class PipeImgGen(PipeOperator):
         )
 
         log.debug("Getting image generation prompt from context")
-        imgg_prompt_stuff = working_memory.get_stuff("imgg_prompt")
-        if not imgg_prompt_stuff:
-            raise ValueError("imgg_prompt not found in context")
+        if self.imgg_prompt:
+            imgg_prompt_text = self.imgg_prompt
+        else:
+            stuff_name = self.imgg_prompt_stuff_name or IMGG_PROMPT_NAME
+            try:
+                imgg_prompt_text = working_memory.get_stuff_as_str(stuff_name)
+            except WorkingMemoryStuffNotFoundError as exc:
+                raise PipeInputError(f"Could not find a valid user image named '{stuff_name}' in the working_memory: {exc}") from exc
 
-        imgg_prompt_text = cast(TextContent, imgg_prompt_stuff.content).text
         imgg_config = get_config().cogt.imgg_config
         imgg_param_defaults = imgg_config.imgg_param_defaults
 
@@ -72,11 +91,14 @@ class PipeImgGen(PipeOperator):
         else:
             seed = seed_setting
 
+        # TODO: refacto this as a model update
         imgg_job_params = ImggJobParams(
-            nb_steps=self.nb_steps or imgg_param_defaults.nb_steps,
             aspect_ratio=self.aspect_ratio or imgg_param_defaults.aspect_ratio,
+            background=self.background or imgg_param_defaults.background,
+            quality=self.quality or imgg_param_defaults.quality,
+            nb_steps=self.nb_steps or imgg_param_defaults.nb_steps,
             guidance_scale=self.guidance_scale or imgg_param_defaults.guidance_scale,
-            is_safety_checker_enabled=self.is_safety_checker_enabled or imgg_param_defaults.is_safety_checker_enabled,
+            is_moderated=self.is_moderated or imgg_param_defaults.is_moderated,
             safety_tolerance=self.safety_tolerance or imgg_param_defaults.safety_tolerance,
             is_raw=self.is_raw or imgg_param_defaults.is_raw,
             output_format=imgg_param_defaults.output_format,
