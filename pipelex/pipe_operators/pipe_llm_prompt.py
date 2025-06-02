@@ -1,8 +1,8 @@
-from typing import ClassVar, List, Optional, Self, Set, cast
+from typing import ClassVar, List, Optional, Set, cast
 
 from kajson.class_registry import class_registry
 from pydantic import model_validator
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImage

@@ -1,7 +1,8 @@
 from operator import attrgetter
-from typing import Any, Dict, List, Optional, Self, Set, Type, TypeVar
+from typing import Any, Dict, List, Optional, Set, Type, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Self
 
 from pipelex import log, pretty_print
 from pipelex.core.concept_native import NativeConcept

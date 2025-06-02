@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, List, Tuple, Dict
+from typing import Any, ClassVar, Dict, List, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 

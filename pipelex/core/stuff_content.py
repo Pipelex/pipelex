@@ -2,14 +2,14 @@ import base64
 import json
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Any, Dict, Generic, List, Optional, Self, Type, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
 import markdown
 from json2html import json2html
 from kajson import kajson
 from PIL import Image
 from pydantic import BaseModel
-from typing_extensions import override
+from typing_extensions import Self, override
 from yattag import Doc
 
 from pipelex.cogt.llm.llm_prompt import LLMPrompt

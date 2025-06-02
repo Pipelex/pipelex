@@ -1,7 +1,7 @@
-from typing import Any, Dict, List, Optional, Self
+from typing import Any, Dict, List, Optional
 
 from pydantic import model_validator
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from pipelex.cogt.llm.llm_models.llm_deck import LLMSettingChoices
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingOrPresetId

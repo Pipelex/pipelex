@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Self
+from typing import Dict, Optional
 
 from pydantic import Field
+from typing_extensions import Self
 
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_model import LLMModel

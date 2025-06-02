@@ -1,7 +1,7 @@
-from typing import Optional, Self
+from typing import Optional
 
 from pydantic import BaseModel
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from pipelex.tools.typing.strenum import StrEnum
 

@@ -1,8 +1,8 @@
-from typing import Dict, Optional, Self, Set, cast
+from typing import Dict, Optional, Set, cast
 
 import shortuuid
 from pydantic import model_validator
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.core.pipe_output import PipeOutput

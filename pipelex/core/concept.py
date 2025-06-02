@@ -1,8 +1,9 @@
 import re
-from typing import List, Self, Tuple
+from typing import List, Tuple
 
 from kajson.class_registry import class_registry
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.stuff_content import StuffContent

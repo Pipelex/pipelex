@@ -1,8 +1,8 @@
-from typing import List, Optional, Self, Set, Type, cast
+from typing import List, Optional, Set, Type, cast
 
 from kajson.class_registry import class_registry
 from pydantic import model_validator
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMSettingChoices
