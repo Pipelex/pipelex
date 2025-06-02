@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.2.11] - 2025-06-02
+
+- HotFix for v0.2.10 👇 regarding the new pipelex/pipelex_init.toml`
+
 ## [v0.2.10] - 2025-06-02
 
 ### Highlights
