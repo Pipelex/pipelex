@@ -1,6 +1,6 @@
-from typing import Dict, List, Optional, cast
+from typing import Dict
 
-from pydantic import Field, field_validator
+from pydantic import field_validator
 
 from pipelex.cogt.imgg.imgg_job_components import Quality
 from pipelex.tools.config.models import ConfigModel
