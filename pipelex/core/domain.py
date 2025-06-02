@@ -1,8 +1,9 @@
-from enum import StrEnum
 from typing import Optional, Self
 
 from pydantic import BaseModel
 from typing_extensions import override
+
+from pipelex.tools.typing.strenum import StrEnum
 
 
 class SpecialDomain(StrEnum):

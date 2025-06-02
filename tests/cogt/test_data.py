@@ -1,8 +1,8 @@
-from enum import StrEnum
 from typing import ClassVar, List, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 
+from pipelex.tools.typing.strenum import StrEnum
 from tests.pipelex.test_data import PipeTestCases
 
 

@@ -1,7 +1,8 @@
 import os
 import urllib.parse
-from enum import StrEnum
 from typing import Optional, Tuple
+
+from pipelex.tools.typing.strenum import StrEnum
 
 
 class InterpretedPathOrUrl(StrEnum):

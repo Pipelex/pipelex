@@ -1,10 +1,10 @@
-from enum import StrEnum
 from typing import Any, Dict, List, Optional, Self, Tuple, Union
 
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex import log
 from pipelex.core.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
+from pipelex.tools.typing.strenum import StrEnum
 
 
 class PipeRunParamKey(StrEnum):

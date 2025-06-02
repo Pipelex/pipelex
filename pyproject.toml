@@ -6,7 +6,7 @@ authors = [{ name = "Evotis S.A.S.", email = "evotis@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
 license = "MIT"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -38,7 +38,7 @@ dependencies = [
     "shortuuid>=1.0.13",
     "toml>=0.10.2",
     "typer>=0.16.0",
-    "typing-extensions>=4.12.2",
+    "typing-extensions>=4.13.2",
     "yattag>=1.15.2",
 ]
 

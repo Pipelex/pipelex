@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import Tuple
 
 from pydantic import Field
@@ -9,6 +8,7 @@ from pipelex.tools.config.models import ConfigModel
 from pipelex.tools.environment import EnvVarNotFoundError, get_required_env
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
+from pipelex.tools.typing.strenum import StrEnum
 
 
 class PerplexityCredentialsError(CogtError):

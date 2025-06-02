@@ -1,5 +1,6 @@
-from enum import StrEnum
 from typing import Dict
+
+from pipelex.tools.typing.strenum import StrEnum
 
 
 class TokenCategory(StrEnum):

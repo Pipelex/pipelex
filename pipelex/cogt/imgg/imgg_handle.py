@@ -1,4 +1,4 @@
-from enum import StrEnum
+from pipelex.tools.typing.strenum import StrEnum
 
 
 # List of classic Img generation preset handles, for convenience

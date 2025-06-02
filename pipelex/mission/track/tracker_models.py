@@ -1,7 +1,8 @@
-from enum import StrEnum
 from typing import Dict, List
 
 from pydantic import BaseModel
+
+from pipelex.tools.typing.strenum import StrEnum
 
 
 class NodeCategory(StrEnum):
