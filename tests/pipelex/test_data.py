@@ -298,7 +298,7 @@ class LibraryTestCases:
     KNOWN_CONCEPTS_AND_PIPES: ClassVar[List[Tuple[str, str]]] = [  # concept, pipe
         ("cars.CarDescription", "generate_car_description"),
         ("animals.AnimalDescription", "generate_animal_description"),
-        ("gpu.GPUDescription", "generate_gpu_description"),
+        ("flowers.FlowerDescription", "generate_flower_description"),
     ]
 
 
