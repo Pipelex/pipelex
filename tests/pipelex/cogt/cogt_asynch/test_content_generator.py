@@ -4,7 +4,6 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.exceptions import LLMHandleNotFoundError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_handle import ImggHandle

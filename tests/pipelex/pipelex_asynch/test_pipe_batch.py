@@ -1,5 +1,4 @@
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.pipe_output import PipeOutput
@@ -8,7 +7,6 @@ from pipelex.core.stuff_content import ListContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_mission_tracker, get_pipe_router, get_report_delegate
-from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 
 
 @pytest.mark.llm

@@ -10,7 +10,6 @@ from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.pipe_llm import PipeLLM, PipeLLMOutput
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from tests.pipelex.test_data import PipeTestCases
 
 
