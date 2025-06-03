@@ -31,7 +31,7 @@ def _indent_line(line: str, indent: int) -> str:
     return f"{'    ' * indent}{line}"
 
 
-class MissionFlowChart:
+class PipelineFlowChart:
     def __init__(self, nx_graph: nx.DiGraph, start_node: str, tracker_config: TrackerConfig):
         self.nx_graph = nx_graph
         self._tracker_config = tracker_config

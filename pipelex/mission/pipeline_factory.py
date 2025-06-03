@@ -1,0 +1,11 @@
+import shortuuid
+
+from pipelex.mission.pipeline import Pipeline
+
+
+class PipelineFactory:
+    @classmethod
+    def make_mission(cls) -> Pipeline:
+        return Pipeline(
+            pipeline_run_id=shortuuid.uuid(),
+        )

@@ -11,7 +11,7 @@ from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
-from pipelex.mission.mission_models import SpecialMissionId
+from pipelex.mission.pipeline_models import SpecialPipelineId
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 
 LLMUsageRegistryRoot = List[LLMTokensUsage]
@@ -38,7 +38,7 @@ class InferenceReportManager(InferenceReportDelegate):
 
     def setup(self):
         self._usage_registries.clear()
-        self._usage_registries[SpecialMissionId.UNTITLED] = UsageRegistry()
+        self._usage_registries[SpecialPipelineId.UNTITLED] = UsageRegistry()
 
     def teardown(self):
         self._usage_registries.clear()
@@ -92,7 +92,7 @@ class InferenceReportManager(InferenceReportDelegate):
 
     @override
     def generate_report(self, mission_id: Optional[str] = None):
-        mission_id = mission_id or SpecialMissionId.UNTITLED
+        mission_id = mission_id or SpecialPipelineId.UNTITLED
         cost_report_file_path: Optional[str] = None
         if self._report_config.is_generate_cost_report_file_enabled:
             ensure_path(self._report_config.cost_report_dir_path)

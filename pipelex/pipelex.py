@@ -22,9 +22,9 @@ from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.mission.activity.activity_manager import ActivityManager
 from pipelex.mission.activity.activity_manager_protocol import ActivityManagerNoOp, ActivityManagerProtocol
-from pipelex.mission.mission_manager import MissionManager
-from pipelex.mission.track.mission_tracker import MissionTracker
-from pipelex.mission.track.mission_tracker_protocol import MissionTrackerNoOp, MissionTrackerProtocol
+from pipelex.mission.pipeline_manager import PipelineManager
+from pipelex.mission.track.pipeline_tracker import PipelineTracker
+from pipelex.mission.track.pipeline_tracker_protocol import PipelineTrackerNoOp, PipelineTrackerProtocol
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
@@ -53,8 +53,8 @@ class Pipelex:
         llm_model_provider: Optional[LLMModelLibrary] = None,
         plugin_manager: Optional[PluginManager] = None,
         inference_manager: Optional[InferenceManager] = None,
-        mission_manager: Optional[MissionManager] = None,
-        mission_tracker: Optional[MissionTracker] = None,
+        mission_manager: Optional[PipelineManager] = None,
+        mission_tracker: Optional[PipelineTracker] = None,
         activity_manager: Optional[ActivityManagerProtocol] = None,
     ) -> Self:
         if cls._pipelex_instance is not None:
@@ -79,8 +79,8 @@ class Pipelex:
         llm_model_provider: Optional[LLMModelLibrary] = None,
         plugin_manager: Optional[PluginManager] = None,
         inference_manager: Optional[InferenceManager] = None,
-        mission_manager: Optional[MissionManager] = None,
-        mission_tracker: Optional[MissionTracker] = None,
+        mission_manager: Optional[PipelineManager] = None,
+        mission_tracker: Optional[PipelineTracker] = None,
         activity_manager: Optional[ActivityManagerProtocol] = None,
     ) -> None:
         self.pipelex_hub = pipelex_hub or PipelexHub()
@@ -129,15 +129,15 @@ class Pipelex:
         self.pipelex_hub.set_pipe_provider(pipe_provider=self.library_manager.pipe_library)
 
         # pipelex mission
-        self.mission_tracker: MissionTrackerProtocol
+        self.mission_tracker: PipelineTrackerProtocol
         if mission_tracker:
             self.mission_tracker = mission_tracker
         elif get_config().pipelex.feature_config.is_mission_tracking_enabled:
-            self.mission_tracker = MissionTracker(tracker_config=get_config().pipelex.tracker_config)
+            self.mission_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
         else:
-            self.mission_tracker = MissionTrackerNoOp()
+            self.mission_tracker = PipelineTrackerNoOp()
         self.pipelex_hub.set_mission_tracker(mission_tracker=self.mission_tracker)
-        self.mission_manager = mission_manager or MissionManager()
+        self.mission_manager = mission_manager or PipelineManager()
         self.pipelex_hub.set_mission_manager(mission_manager=self.mission_manager)
 
         self.activity_manager: ActivityManagerProtocol
