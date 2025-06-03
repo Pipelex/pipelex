@@ -1,21 +1,28 @@
+from datetime import datetime, timezone
 from typing import Optional
+
+from typing_extensions import override
 
 from pipelex.client.api_client import PipelexApiClient
 from pipelex.client.protocol import (
-    PipeRequest,
+    ApiResponse,
+    PipelexProtocol,
     PipeStartResponse,
     PipeState,
     PipeStatus,
 )
+from pipelex.core.pipe_run_params import PipeOutputMultiplicity
+from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import ClientAuthenticationError
-from pipelex.run import run_pipe_code
+from pipelex.pipeline.execute import execute_pipeline as execute_pipeline
+from pipelex.pipeline.start import start_pipeline as start_pipeline
 
 
-class PipelexClient:
+class PipelexClient(PipelexProtocol):
     """
-    A high-level client for interacting with Pipelex pipes.
+    A high-level client for interacting with Pipelex pipelines.
 
-    This client provides a user-friendly interface for executing pipes either locally
+    This client provides a user-friendly interface for executing pipelines either locally
     or through the remote API, with automatic handling of both modes.
     """
 
@@ -23,115 +30,101 @@ class PipelexClient:
         self,
         api_token: Optional[str] = None,
     ):
-        """
-        Initialize the PipelexClient.
-
-        Args:
-            api_token: Authentication token for the API
-        """
         self.api_token = api_token
         self.api_client: Optional[PipelexApiClient] = None
 
     async def start_api_client(self) -> PipelexApiClient:
-        """
-        Start the API client.
-        """
         if not self.api_token:
             raise ClientAuthenticationError("API token is required for API execution")
 
-        self.api_client = PipelexApiClient(api_token=self.api_token).start_client()
+        self.api_client = PipelexApiClient(api_token=self.api_token)
         return self.api_client
 
     async def close_api_client(self):
-        """
-        Close the API client.
-        """
         if self.api_client:
             await self.api_client.close()
             self.api_client = None
 
-    async def execute_pipe(
+    @override
+    async def execute_pipeline(
         self,
         pipe_code: str,
-        pipe_execute_request: PipeRequest,
+        working_memory: Optional[WorkingMemory] = None,
+        output_name: Optional[str] = None,
+        output_multiplicity: Optional[PipeOutputMultiplicity] = None,
+        dynamic_output_concept_code: Optional[str] = None,
         use_local_execution: bool = True,
     ) -> PipeStatus:
-        """
-        Execute a pipe with the given request and wait for completion.
-
-        Args:
-            pipe_code: The code of the pipe to execute
-            pipe_execute_request: The request containing memory and output concept
-            use_local_execution: Whether to execute locally (True) or via API (False)
-
-        Returns:
-            PipeStatus with execution results and pipe output
-        """
         # Local execution
         if use_local_execution:
-            pipe_output = await run_pipe_code(
+            pipe_output, pipeline_run_id = await execute_pipeline(
                 pipe_code=pipe_code,
-                working_memory=pipe_execute_request.memory,
-                dynamic_output_concept_code=pipe_execute_request.dynamic_output_concept,
+                working_memory=working_memory,
+                output_name=output_name,
+                output_multiplicity=output_multiplicity,
+                dynamic_output_concept_code=dynamic_output_concept_code,
             )
             return PipeStatus(
-                pipe_execution_id="local",
+                pipe_execution_id=pipeline_run_id,
                 pipe_code=pipe_code,
                 state=PipeState.COMPLETED,
                 pipe_output=pipe_output,
             )
-        # api_client = await self.start_api_client()
-        # return await api_client.execute_pipe(pipe_code, pipe_execute_request)
-        raise NotImplementedError("Pipelex API functionality is coming soon!")
 
-    async def start_pipe(
+        # API execution
+        api_client = await self.start_api_client()
+        return await api_client.execute_pipeline(
+            pipe_code=pipe_code,
+            working_memory=working_memory,
+            output_name=output_name,
+            output_multiplicity=output_multiplicity,
+            dynamic_output_concept_code=dynamic_output_concept_code,
+        )
+
+    @override
+    async def start_pipeline(
         self,
         pipe_code: str,
-        pipe_execute_request: PipeRequest,
+        working_memory: Optional[WorkingMemory] = None,
+        output_name: Optional[str] = None,
+        output_multiplicity: Optional[PipeOutputMultiplicity] = None,
+        dynamic_output_concept_code: Optional[str] = None,
+        use_local_execution: bool = True,
     ) -> PipeStartResponse:
-        """
-        Start a pipe execution in the background without waiting for completion.
+        # Local execution
+        if use_local_execution:
+            pipeline_run_id, _ = await start_pipeline(
+                pipe_code=pipe_code,
+                working_memory=working_memory,
+                output_name=output_name,
+                output_multiplicity=output_multiplicity,
+                dynamic_output_concept_code=dynamic_output_concept_code,
+            )
 
-        This is a non-blocking operation that returns immediately with an execution ID.
-        The execution will continue in the background, and the status can be checked
-        using get_pipe_status. Note that this method always uses API execution.
+            created_at = datetime.now(timezone.utc).isoformat()
 
-        Args:
-            pipe_code: The code of the pipe to execute
-            pipe_execute_request: The request containing memory and output concept
+            return PipeStartResponse(
+                status="success",
+                pipe_execution_id=pipeline_run_id,
+                created_at=created_at,
+            )
 
-        Returns:
-            PipeStartResponse with the pipe_execution_id and created_at timestamp
+        # API execution
+        api_client = await self.start_api_client()
+        return await api_client.start_pipeline(
+            pipe_code=pipe_code,
+            working_memory=working_memory,
+            output_name=output_name,
+            output_multiplicity=output_multiplicity,
+            dynamic_output_concept_code=dynamic_output_concept_code,
+        )
 
-        Raises:
-            ValueError: If API token is not provided
-            HTTPException: If the API request fails
-        """
-        # api_client = await self.start_api_client()
-        # return await api_client.start_pipe(pipe_code, pipe_execute_request)
-        raise NotImplementedError("Pipelex API functionality is coming soon!")
+    @override
+    async def cancel_pipeline(self, pipeline_run_id: str) -> ApiResponse:
+        api_client = await self.start_api_client()
+        return await api_client.cancel_pipeline(pipeline_run_id)
 
-    async def get_pipe_status(
-        self,
-        pipe_execution_id: str,
-    ) -> PipeStatus:
-        """
-        Get the current status of a pipe execution.
-
-        This method allows checking the current status of a pipe execution
-        that was started with start_pipe. Note that this method always uses
-        API execution.
-
-        Args:
-            pipe_execution_id: The unique identifier for the pipe execution
-
-        Returns:
-            PipeStatus with the current execution status and pipe output if completed
-
-        Raises:
-            ValueError: If API token is not provided
-            HTTPException: If the API request fails or the execution ID is invalid
-        """
-        # api_client = await self.start_api_client()
-        # return await api_client.get_pipe_status(pipe_execution_id)
-        raise NotImplementedError("Pipelex API functionality is coming soon!")
+    @override
+    async def get_pipeline_status(self, pipeline_run_id: str) -> PipeStatus:
+        api_client = await self.start_api_client()
+        return await api_client.get_pipeline_status(pipeline_run_id)

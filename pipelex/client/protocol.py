@@ -82,37 +82,39 @@ class PipeStartResponse(ApiResponse):
     created_at: str
 
 
-class PipeRequest(BaseModel):
-    """
-    Request model for executing a pipe.
-    """
-
-    memory: WorkingMemory = Field(..., description="Input memory for the pipe")
-    dynamic_output_concept: Optional[str] = Field(default=None, description="Concept code of the output stuff")
-    output_multiplicity: Optional[PipeOutputMultiplicity] = Field(default=None, description="Multiplicity of the output stuff")
-
-
 @runtime_checkable
 class PipelexProtocol(Protocol):
     """
     Protocol defining the contract for the Pipelex API.
 
     This protocol specifies the interface that any Pipelex API implementation must adhere to.
-    The protocol includes methods for executing pipes both synchronously and asynchronously,
+    The protocol includes methods for executing pipelines both synchronously and asynchronously,
     as well as cancelling running executions.
     """
 
-    @abstractmethod
-    async def execute_pipe(self, pipe_code: str, request: PipeRequest) -> PipeStatus:
-        """
-        Execute a pipe with the given memory and wait for completion.
+    api_token: Optional[str] = None
 
-        This is a blocking operation that does not return until the pipe execution
-        is complete. For long-running pipes, consider using start_pipe instead.
+    @abstractmethod
+    async def execute_pipeline(
+        self,
+        pipe_code: str,
+        working_memory: Optional[WorkingMemory] = None,
+        output_name: Optional[str] = None,
+        output_multiplicity: Optional[PipeOutputMultiplicity] = None,
+        dynamic_output_concept_code: Optional[str] = None,
+    ) -> PipeStatus:
+        """
+        Execute a pipeline and wait for its completion.
+
+        This is a blocking operation that does not return until the pipeline execution
+        is complete. For long-running pipelines, consider using start_pipeline instead.
 
         Args:
-            pipe_code: The unique identifier for the pipe to execute
-            request: PipeRequest containing the input instances required by the pipe
+            pipe_code: The code of the pipeline to execute
+            working_memory: Optional WorkingMemory instance passed to the pipeline
+            output_name: Name of the output slot to write to
+            output_multiplicity: Output multiplicity
+            dynamic_output_concept_code: Override the dynamic output concept code
 
         Returns:
             PipeStatus with the final execution status including complete results.
@@ -123,15 +125,25 @@ class PipelexProtocol(Protocol):
         ...
 
     @abstractmethod
-    async def start_pipe(self, pipe_code: str, request: PipeRequest) -> PipeStartResponse:
+    async def start_pipeline(
+        self,
+        pipe_code: str,
+        working_memory: Optional[WorkingMemory] = None,
+        output_name: Optional[str] = None,
+        output_multiplicity: Optional[PipeOutputMultiplicity] = None,
+        dynamic_output_concept_code: Optional[str] = None,
+    ) -> PipeStartResponse:
         """
-        Start a pipe execution in the background without waiting for completion.
+        Start a pipeline execution in the background without waiting for completion.
 
         This is a non-blocking operation that returns immediately with an execution ID.
 
         Args:
-            pipe_code: The unique identifier for the pipe to execute
-            request: PipeRequest containing the input instances required by the pipe
+            pipe_code: The code of the pipeline to execute
+            working_memory: Optional WorkingMemory instance passed to the pipeline
+            output_name: Name of the output slot to write to
+            output_multiplicity: Output multiplicity
+            dynamic_output_concept_code: Override the dynamic output concept code
 
         Returns:
             PipeStartResponse with the pipe_execution_id and created_at timestamp.
@@ -142,15 +154,15 @@ class PipelexProtocol(Protocol):
         ...
 
     @abstractmethod
-    async def cancel_pipe(self, pipe_execution_id: str) -> ApiResponse:
+    async def cancel_pipeline(self, pipeline_run_id: str) -> ApiResponse:
         """
-        Cancel a running pipe execution.
+        Cancel a running pipeline execution.
 
-        This method allows clients to stop a pipe execution that is currently in progress.
-        Once cancelled, a pipe cannot be resumed and must be started again if needed.
+        This method allows clients to stop a pipeline execution that is currently in progress.
+        Once cancelled, a pipeline cannot be resumed and must be started again if needed.
 
         Args:
-            pipe_execution_id: The unique identifier for the pipe execution
+            pipeline_run_id: The unique identifier for the pipeline execution
 
         Returns:
             ApiResponse indicating success or failure of the cancellation
@@ -161,15 +173,15 @@ class PipelexProtocol(Protocol):
         ...
 
     @abstractmethod
-    async def get_pipe_status(self, pipe_execution_id: str) -> PipeStatus:
+    async def get_pipeline_status(self, pipeline_run_id: str) -> PipeStatus:
         """
-        Get the current status of a pipe execution.
+        Get the current status of a pipeline execution.
 
-        This method allows clients to check the current status of a pipe execution
-        that was started with start_pipe.
+        This method allows clients to check the current status of a pipeline execution
+        that was started with start_pipeline.
 
         Args:
-            pipe_execution_id: The unique identifier for the pipe execution
+            pipeline_run_id: The unique identifier for the pipeline execution
 
         Returns:
             PipeStatus with the current execution status

@@ -1,13 +1,11 @@
-import os
 from typing import List
-
 import pytest
 from pydantic import BaseModel
 
 from pipelex.client.client import PipelexClient
-from pipelex.client.protocol import PipeRequest, PipeState
+from pipelex.client.protocol import PipeState
 from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ImageContent, TextContent
+from pipelex.core.stuff_content import TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 
@@ -156,16 +154,12 @@ This amendment applies only to transactions originating from DataAnalytics Corp'
             for stuff in example.memory:
                 memory.add_new_stuff(name=stuff.stuff_name or stuff.concept_code, stuff=stuff)
 
-            pipe_execute_request = PipeRequest(
-                memory=memory,
-                dynamic_output_concept=example.dynamic_output_concept,
-            )
-
             # Execute pipe
             client = PipelexClient()
-            result = await client.execute_pipe(
+            result = await client.execute_pipeline(
                 pipe_code=example.pipe_code,
-                pipe_execute_request=pipe_execute_request,
+                working_memory=memory,
+                dynamic_output_concept_code=example.dynamic_output_concept,
                 use_local_execution=True,
             )
             pretty_print(result)
