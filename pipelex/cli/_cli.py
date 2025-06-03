@@ -23,6 +23,7 @@ class PipelexCLI(TyperGroup):
     def get_command(self, ctx: Context, cmd_name: str) -> Optional[Command]:
         cmd = super().get_command(ctx, cmd_name)
         if cmd is None:
+            typer.echo(f"Unknown command: {cmd_name}")
             typer.echo(ctx.get_help())
             ctx.exit(1)
         return cmd

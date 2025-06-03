@@ -253,16 +253,16 @@ wheels = [
 
 [[package]]
 name = "boto3-stubs"
-version = "1.38.27"
+version = "1.38.28"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore-stubs" },
     { name = "types-s3transfer" },
     { name = "typing-extensions", marker = "python_full_version < '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e5/f1/e917a83c6c86a42fa09f1e20d2d4f9af2de8fedcf88a5f2297ae11236e4a/boto3_stubs-1.38.27.tar.gz", hash = "sha256:8a45f32b83d29ec3db28b37ea68ea5f179b141863211497ef92ba18e2a896aec", size = 99063, upload-time = "2025-05-30T19:42:34.374Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/dc/c4b318bdf66ff4973d3cbf0f218e47bdf558b94d921c8ff27d401e8ca4f9/boto3_stubs-1.38.28.tar.gz", hash = "sha256:fae8e009ea4d810b77e49d88247183b5d8d153bf268ebde8b4abdf58a701802f", size = 99065, upload-time = "2025-06-02T19:42:51.659Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ae/70/3d8921e287660757d60b023fd18887950b6ddd44ce48c0ffd9f6632c1ac3/boto3_stubs-1.38.27-py3-none-any.whl", hash = "sha256:87e6c47b76173df91f55387a91fd1f382f130821e4492e14748fe49d46598bc5", size = 68668, upload-time = "2025-05-30T19:42:29.384Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/4a/d70ef76080e0d37e45d07d65801a6680f5bc1d156333a4e5d0ca6103d45f/boto3_stubs-1.38.28-py3-none-any.whl", hash = "sha256:accd8c0943a8d960c5c2d4a7aa661fd43e842893e76adf1b5b163c02f4f62537", size = 68668, upload-time = "2025-06-02T19:42:43.426Z" },
 ]
 
 [[package]]
@@ -281,14 +281,14 @@ wheels = [
 
 [[package]]
 name = "botocore-stubs"
-version = "1.38.27"
+version = "1.38.28"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "types-awscrt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/9c/9db9fc6099d866bcbc891ed9e41782003cba0662acb598f2ab6e8fb0c7c1/botocore_stubs-1.38.27.tar.gz", hash = "sha256:58315d1318b79d8f8bd2888b1587d90fa4ffa6100a58b610946110e88570b995", size = 42317, upload-time = "2025-05-30T20:17:56.477Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bc/0e/a47d392ee3fbd444a628f1b7257affc0a13c45e8742de4eb31fa4e2758f2/botocore_stubs-1.38.28.tar.gz", hash = "sha256:b9549050b81051bdbb91966323d6a2b6c5c78ca8dcc328e16dfc44b765be39be", size = 42312, upload-time = "2025-06-02T20:18:13.928Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c7/cb/c7789395e7e7dc6da0e963d83286818960870250f2073acb374f78d453fb/botocore_stubs-1.38.27-py3-none-any.whl", hash = "sha256:408158a72199d0611b6c91043e3d654171e974b89b94007cc10488f192e0a20f", size = 65627, upload-time = "2025-05-30T20:17:54.311Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/3d/26c1a62b379f0dd401798f9f8f9331ac40f3c3917c34b5eed3ed0b85e2b0/botocore_stubs-1.38.28-py3-none-any.whl", hash = "sha256:9151ced682edb44b28202d268f4dc5ef5534be8b592b87e07ce4c99650818bce", size = 65629, upload-time = "2025-06-02T20:18:11.886Z" },
 ]
 
 [[package]]
@@ -1210,7 +1210,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "1.82.1"
+version = "1.83.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1222,9 +1222,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5e/53/fd5318cd79202744711c120f008d9bd987eacc063b15910a820bc9b9f40e/openai-1.82.1.tar.gz", hash = "sha256:ffc529680018e0417acac85f926f92aa0bbcbc26e82e2621087303c66bc7f95d", size = 461322, upload-time = "2025-05-29T16:15:14.526Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1f/5b/b9390060fa75c41281f30a139a9362be591337febde996400021aa8751fd/openai-1.83.0.tar.gz", hash = "sha256:dfb421837962d9e8078929d8fc7e36e51c2a110b23a777a14e27f579d1afd6b6", size = 465976, upload-time = "2025-06-02T19:39:56.991Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a8/d9/7ec61c010f0d0b0bc57dab8b8dff398f84230d269e8bfa068ad542ff050c/openai-1.82.1-py3-none-any.whl", hash = "sha256:334eb5006edf59aa464c9e932b9d137468d810b2659e5daea9b3a8c39d052395", size = 720466, upload-time = "2025-05-29T16:15:12.531Z" },
+    { url = "https://files.pythonhosted.org/packages/67/f5/dd04dec85c5c711e4d402dd05c8a2aee759e43067f52d12a3aaab3ed4523/openai-1.83.0-py3-none-any.whl", hash = "sha256:d15ec58ba52537d4abc7b744890ecc4ab3cffb0fdaa8e5389830f6e1a2f7f128", size = 723387, upload-time = "2025-06-02T19:39:54.886Z" },
 ]
 
 [[package]]
@@ -1397,7 +1397,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.2.10"
+version = "0.2.12"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1774,7 +1774,7 @@ wheels = [
 
 [[package]]
 name = "pytest"
-version = "8.3.5"
+version = "8.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -1782,11 +1782,12 @@ dependencies = [
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
+    { name = "pygments" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ae/3c/c9d525a414d506893f0cd8a8d0de7706446213181570cdbd766691164e40/pytest-8.3.5.tar.gz", hash = "sha256:f4efe70cc14e511565ac476b57c279e12a855b11f48f212af1080ef2263d3845", size = 1450891, upload-time = "2025-03-02T12:54:54.503Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fb/aa/405082ce2749be5398045152251ac69c0f3578c7077efc53431303af97ce/pytest-8.4.0.tar.gz", hash = "sha256:14d920b48472ea0dbf68e45b96cd1ffda4705f33307dcc86c676c1b5104838a6", size = 1515232, upload-time = "2025-06-02T17:36:30.03Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/30/3d/64ad57c803f1fa1e963a7946b6e0fea4a70df53c1a7fed304586539c2bac/pytest-8.3.5-py3-none-any.whl", hash = "sha256:c69214aa47deac29fad6c2a4f590b9c4a9fdb16a403176fe154b79c0b4d4d820", size = 343634, upload-time = "2025-03-02T12:54:52.069Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/de/afa024cbe022b1b318a3d224125aa24939e99b4ff6f22e0ba639a2eaee47/pytest-8.4.0-py3-none-any.whl", hash = "sha256:f40f825768ad76c0977cbacdf1fd37c6f7a468e460ea6a0636078f8972d4517e", size = 363797, upload-time = "2025-06-02T17:36:27.859Z" },
 ]
 
 [[package]]
