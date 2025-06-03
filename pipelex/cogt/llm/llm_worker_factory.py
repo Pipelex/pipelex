@@ -41,7 +41,7 @@ class LLMWorkerFactory:
                     structure_method=structure_method,
                     report_delegate=report_delegate,
                 )
-            case LLMPlatform.VERTEXAI_OPENAI:
+            case LLMPlatform.VERTEXAI:
                 try:
                     import google.auth  # noqa: F401
                 except ImportError as exc:
@@ -61,7 +61,7 @@ class LLMWorkerFactory:
                     structure_method=StructureMethod.INSTRUCTOR_VERTEX_JSON,
                     report_delegate=report_delegate,
                 )
-            case LLMPlatform.CUSTOM_OPENAI:
+            case LLMPlatform.CUSTOM_LLM:
                 from pipelex.plugins.openai.openai_factory import OpenAIFactory
                 from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker
 

@@ -127,10 +127,10 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
         # LLMPlatform.BEDROCK,
         # LLMPlatform.BEDROCK_ANTHROPIC,
         # LLMPlatform.MISTRAL,
-        # LLMPlatform.OPENAI,
+        LLMPlatform.OPENAI,
         # LLMPlatform.PERPLEXITY,
         # LLMPlatform.VERTEXAI_OPENAI,
-        LLMPlatform.CUSTOM_OPENAI,
+        # LLMPlatform.CUSTOM_LLM,
         # LLMPlatform.XAI,
     ]
 )
@@ -141,7 +141,7 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
 
 @pytest.fixture(
     params=[
-        # "gpt-4o-mini",
+        "gpt-4o-mini",
         # "open-mixtral-8x7b",
         # "google/gemini-2.0-flash",
         # "google/gemini-2.5-pro-preview-05-06",
@@ -160,7 +160,7 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
         # "sonar-pro",
         # "gemma3:4b",
         # "llama4:scout",
-        "mistral-small3.1:24b",
+        # "mistral-small3.1:24b",
         # "qwen3:8b",
     ]
 )

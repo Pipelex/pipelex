@@ -53,7 +53,7 @@ class OpenAIFactory:
                 openai_openai_config = get_config().plugins.openai_config
                 api_key = openai_openai_config.get_api_key(secrets_provider=get_secrets_provider())
                 the_client = openai.AsyncOpenAI(api_key=api_key)
-            case LLMPlatform.VERTEXAI_OPENAI:
+            case LLMPlatform.VERTEXAI:
                 vertexai_config = get_config().plugins.vertexai_config
                 endpoint, api_key = vertexai_config.configure(secrets_provider=get_secrets_provider())
 
@@ -71,7 +71,7 @@ class OpenAIFactory:
                     api_key=api_key,
                     base_url=endpoint,
                 )
-            case LLMPlatform.CUSTOM_OPENAI:
+            case LLMPlatform.CUSTOM_LLM:
                 custom_endpoint_config = get_config().plugins.custom_endpoint_config
                 base_url, api_key = custom_endpoint_config.configure(secrets_provider=get_secrets_provider())
 

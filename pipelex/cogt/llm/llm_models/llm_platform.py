@@ -17,19 +17,19 @@ class LLMPlatform(StrEnum):
     MISTRAL = "mistral"
     OPENAI = "openai"
     PERPLEXITY = "perplexity"
-    VERTEXAI_OPENAI = "vertexai_openai"
+    VERTEXAI = "vertexai"
     XAI = "xai"
-    CUSTOM_OPENAI = "custom_openai"
+    CUSTOM_LLM = "custom_llm"
 
     @staticmethod
     def list_openai_related() -> list["LLMPlatform"]:
         return [
             LLMPlatform.OPENAI,
             LLMPlatform.AZURE_OPENAI,
-            LLMPlatform.VERTEXAI_OPENAI,
+            LLMPlatform.VERTEXAI,
             LLMPlatform.PERPLEXITY,
             LLMPlatform.XAI,
-            LLMPlatform.CUSTOM_OPENAI,
+            LLMPlatform.CUSTOM_LLM,
         ]
 
     @staticmethod
@@ -46,13 +46,13 @@ class LLMPlatform(StrEnum):
             case (
                 LLMPlatform.OPENAI
                 | LLMPlatform.AZURE_OPENAI
-                | LLMPlatform.VERTEXAI_OPENAI
+                | LLMPlatform.VERTEXAI
                 | LLMPlatform.PERPLEXITY
                 | LLMPlatform.ANTHROPIC
                 | LLMPlatform.MISTRAL
                 | LLMPlatform.BEDROCK_ANTHROPIC
                 | LLMPlatform.XAI
-                | LLMPlatform.CUSTOM_OPENAI
+                | LLMPlatform.CUSTOM_LLM
             ):
                 return True
             case LLMPlatform.BEDROCK:
@@ -75,11 +75,11 @@ class LLMPlatform(StrEnum):
                 return "spring_green2"
             case LLMPlatform.PERPLEXITY:
                 return "gray"
-            case LLMPlatform.VERTEXAI_OPENAI:
+            case LLMPlatform.VERTEXAI:
                 return "deep_sky_blue"
             case LLMPlatform.XAI:
                 return "green"
-            case LLMPlatform.CUSTOM_OPENAI:
+            case LLMPlatform.CUSTOM_LLM:
                 return "white"
 
 
