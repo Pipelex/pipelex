@@ -61,7 +61,7 @@ make merge-check-pyright	  - Run pyright merge check without updating files
 
 make rl                       - Shorthand -> reinitlibraries
 make v                        - Shorthand -> validate
-make init                     - Run `pipelex init libraries` and `pipelex init config`
+make init                     - Run `pipelex init-libraries` and `pipelex init-config`
 make codex-tests              - Run tests for Codex (exit on first failure) (no inference, no codex_disabled)
 make gha-tests		          - Run tests for github actions (exit on first failure) (no inference, no gha_disabled)
 make test                     - Run unit tests (no inference)
@@ -128,8 +128,8 @@ env: check-uv
 
 init: env
 	$(call PRINT_TITLE,"Running pipelex init")
-	$(VENV_PIPELEX) init libraries
-	$(VENV_PIPELEX) init config
+	$(VENV_PIPELEX) init-libraries
+	$(VENV_PIPELEX) init-config
 
 install: env
 	$(call PRINT_TITLE,"Installing dependencies")

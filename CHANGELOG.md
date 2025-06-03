@@ -2,7 +2,7 @@
 
 ## [v0.2.12] - 2025-06-03
 
-- pipelex cli: Split `pipelex init` into 2 separate functions: `pipelex init libraries` and `pipelex init config`
+- pipelex cli: Split `pipelex init` into 2 separate functions: `pipelex init-libraries` and `pipelex init-config`
 - Fixed the inheritance config manager method
 - Rename Mission to Pipeline
 - Enable to start a pipeline and let in run in the background, getting it's run id, but not waiting for the output
