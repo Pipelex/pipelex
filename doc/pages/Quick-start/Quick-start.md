@@ -208,7 +208,7 @@ Your task is to extract specific data from the following description.
 
 ```python
 from pipelex.core.stuff_factory import StuffFactory
-from pipelex.run import run_pipe_code
+from pipelex.client.client import PipelexClient
 from pipelex_libraries.pipeline.characters import Character, CharacterMetadata
 
 async def process_existing_character():
@@ -236,7 +236,8 @@ async def process_existing_character():
         stuff=character_stuff,
     )
     # Run the pipe identified by its pipe_code (it's the name of the pipe)
-    pipe_output = await run_pipe_code(
+    pipelex_client = PipelexClient()
+    pipe_output = await pipelex_client.execute_pipeline(
         pipe_code="extract_character_1",
         working_memory=working_memory,
     )
