@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.2.12] - 2025-06-03
+
+- pipelex cli: Split `pipelex init` into 2 separate functions: `pipelex init libraries` and `pipelex init config`
+- Fixed the inheritance config manager method
+- Rename Mission to Pipeline
+- Enable to start a pipeline and let in run in the background, getting it's run id, but not waiting for the output
+- `Makefile`: avoid defaulting pytest to verbose. Setup target `make test-xdist` = Run unit tests with `xdist`, make it the default for shorthand `make t`. The old `make t` is now `make tp` (test-with-prints)
+- Added `mistral-small-3.1` and `qwen3:8b`
+- Fix template pre-processor: don't try and substitute a dollar numerical like $10 or @25
+- Refactor with less "OpenAI" naming for non-openai stuff that just uses the OpenAI SDK
+
 ## [v0.2.11] - 2025-06-02
 
 - HotFix for v0.2.10 👇 regarding the new pipelex/pipelex_init.toml`
