@@ -127,7 +127,7 @@ env: check-uv
 	@echo "Using Python: $$($(VENV_PYTHON) --version) from $$(which $$(readlink -f $(VENV_PYTHON)))"
 
 init: env
-	$(call PRINT_TITLE,"Running pipelex init")
+	$(call PRINT_TITLE,"Running pipelex init-libraries and init-config")
 	$(VENV_PIPELEX) init-libraries
 	$(VENV_PIPELEX) init-config
 
@@ -135,8 +135,8 @@ install: env
 	$(call PRINT_TITLE,"Installing dependencies")
 	@. $(VIRTUAL_ENV)/bin/activate && \
 	uv sync --all-extras && \
-	$(VENV_PIPELEX) init libraries && \
-	$(VENV_PIPELEX) init config && \
+	$(VENV_PIPELEX) init-libraries && \
+	$(VENV_PIPELEX) init-config && \
 	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras and initialized Pipelex";
 
 lock: env
