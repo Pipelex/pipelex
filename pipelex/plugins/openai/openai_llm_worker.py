@@ -84,6 +84,8 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                     | LLMFamily.GPT_4O
                     | LLMFamily.CUSTOM_LLAMA_4
                     | LLMFamily.CUSTOM_GEMMA_3
+                    | LLMFamily.CUSTOM_MISTRAL_SMALL_3_1
+                    | LLMFamily.CUSTOM_QWEN_3
                     | LLMFamily.PERPLEXITY_SEARCH
                     | LLMFamily.PERPLEXITY_RESEARCH
                     | LLMFamily.PERPLEXITY_REASONING
@@ -183,6 +185,8 @@ class OpenAILLMWorker(LLMWorkerAbstract):
                     | LLMFamily.GPT_4O
                     | LLMFamily.CUSTOM_LLAMA_4
                     | LLMFamily.CUSTOM_GEMMA_3
+                    | LLMFamily.CUSTOM_MISTRAL_SMALL_3_1
+                    | LLMFamily.CUSTOM_QWEN_3
                     | LLMFamily.PERPLEXITY_SEARCH
                     | LLMFamily.PERPLEXITY_RESEARCH
                     | LLMFamily.PERPLEXITY_REASONING

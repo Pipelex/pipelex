@@ -13,6 +13,7 @@ class LLMCreator(StrEnum):
     MISTRAL = "Mistral"
     PERPLEXITY = "Perplexity"
     XAI = "XAI"
+    ALIBABA = "Alibaba"
 
     @property
     def prompting_target(self) -> LLMPromptingTarget:
@@ -25,7 +26,7 @@ class LLMCreator(StrEnum):
                 return LLMPromptingTarget.MISTRAL
             case LLMCreator.GOOGLE:
                 return LLMPromptingTarget.GEMINI
-            case LLMCreator.AMAZON | LLMCreator.PERPLEXITY | LLMCreator.META | LLMCreator.DEEPSEEK | LLMCreator.XAI:
+            case LLMCreator.AMAZON | LLMCreator.PERPLEXITY | LLMCreator.META | LLMCreator.DEEPSEEK | LLMCreator.XAI | LLMCreator.ALIBABA:
                 return LLMPromptingTarget.OPENAI
 
     @property
@@ -49,6 +50,8 @@ class LLMCreator(StrEnum):
                 return "red"
             case LLMCreator.XAI:
                 return "green"
+            case LLMCreator.ALIBABA:
+                return "yellow"
 
 
 class LLMFamily(StrEnum):
@@ -92,6 +95,8 @@ class LLMFamily(StrEnum):
 
     CUSTOM_LLAMA_4 = "custom-llama-4"
     CUSTOM_GEMMA_3 = "custom-gemma-3"
+    CUSTOM_MISTRAL_SMALL_3_1 = "custom-mistral-small3.1"
+    CUSTOM_QWEN_3 = "custom-qwen3"
 
     @property
     def creator(self) -> LLMCreator:
@@ -112,6 +117,7 @@ class LLMFamily(StrEnum):
                 | LLMFamily.MISTRAL_CODESTRAL
                 | LLMFamily.MINISTRAL
                 | LLMFamily.PIXTRAL
+                | LLMFamily.CUSTOM_MISTRAL_SMALL_3_1
             ):
                 return LLMCreator.MISTRAL
             case LLMFamily.BEDROCK_MISTRAL_LARGE:
@@ -132,6 +138,8 @@ class LLMFamily(StrEnum):
                 return LLMCreator.XAI
             case LLMFamily.CUSTOM_LLAMA_4 | LLMFamily.CUSTOM_GEMMA_3:
                 return LLMCreator.META
+            case LLMFamily.CUSTOM_QWEN_3:
+                return LLMCreator.ALIBABA
 
     @property
     def prompting_target(self) -> LLMPromptingTarget:
