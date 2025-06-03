@@ -41,7 +41,7 @@ def init_libraries(
     overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
 ) -> None:
     """Initialize pipelex libraries in the current directory.
-    
+
     If overwrite is False, only create files that don't exist yet.
     If overwrite is True, all files will be overwritten even if they exist.
     """
