@@ -92,7 +92,7 @@ export HELP
 	all help env lock install update build \
 	format lint pyright mypy \
 	cleanderived cleanenv cleanlibraries cleanall \
-	test test-quiet tq test-with-prints t test-inference ti \
+	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-imgg tg test-ocr to codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc \
