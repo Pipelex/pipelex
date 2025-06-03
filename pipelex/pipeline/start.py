@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional, Tuple
 
 from pipelex import pretty_print
@@ -10,18 +11,19 @@ from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
-async def execute_pipeline(
+async def start_pipeline(
     pipe_code: str,
     working_memory: Optional[WorkingMemory] = None,
     output_name: Optional[str] = None,
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
     dynamic_output_concept_code: Optional[str] = None,
-) -> Tuple[PipeOutput, str]:
-    """Execute a pipeline and wait for its completion.
+) -> Tuple[str, asyncio.Task[PipeOutput]]:
+    """Start a pipeline in the background.
 
-    This function executes a pipe and returns its output along with the pipeline run ID.
-    Unlike *start_pipeline*, this function waits for the pipe execution to complete
-    before returning, and it returns the output in addition to the pipeline run ID.
+    This function mirrors *execute_pipeline* but returns immediately with the
+    ``pipeline_run_id`` instead of waiting for the pipe run to complete. The
+    actual execution is scheduled on the current event-loop using
+    :pyfunc:`asyncio.create_task`.
 
     Parameters
     ----------
@@ -38,9 +40,11 @@ async def execute_pipeline(
 
     Returns
     -------
-    Tuple[PipeOutput, str]
-        A tuple containing the pipe output and the pipeline run ID.
+    Tuple[str, asyncio.Task[PipeOutput]]
+        The ``pipeline_run_id`` of the newly started pipeline and a task that
+        can be awaited to get the pipe output.
     """
+
     pipeline = get_pipeline_manager().add_new_pipeline()
     pipeline_run_id = pipeline.pipeline_run_id
     get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
@@ -55,7 +59,7 @@ async def execute_pipeline(
         dynamic_output_concept_code=dynamic_output_concept_code,
     )
 
-    pretty_print(pipe, title=f"Running pipe '{pipe_code}'")
+    pretty_print(pipe, title=f"Starting pipe '{pipe_code}' (background)")
     if working_memory:
         working_memory.pretty_print_summary()
 
@@ -67,4 +71,7 @@ async def execute_pipeline(
         output_name=output_name,
     )
 
-    return await get_pipe_router().run_pipe_job(pipe_job), pipeline_run_id
+    # Launch execution without awaiting the result.
+    task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run_pipe_job(pipe_job))
+
+    return pipeline_run_id, task
