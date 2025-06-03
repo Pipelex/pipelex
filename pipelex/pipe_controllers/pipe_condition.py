@@ -10,10 +10,10 @@ from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeConditionError, PipeDefinitionError, PipeExecutionError, PipeInputError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_mission_tracker, get_pipe_router
-from pipelex.mission.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
+from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
 

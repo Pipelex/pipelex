@@ -8,9 +8,9 @@ from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, Pi
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeInputError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_mission_tracker, get_pipe_router, get_required_pipe
-from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_controllers.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.pipe_condition import PipeCondition
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 # TODO: decide if SubPipe should be a PipeAbstract (it's probably the case)

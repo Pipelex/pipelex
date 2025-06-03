@@ -4,8 +4,8 @@ from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.mission.activity.activity_manager_protocol import ActivityManagerProtocol
-from pipelex.mission.activity.activity_models import ActivityCallback, ActivityReport
+from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerProtocol
+from pipelex.pipeline.activity.activity_models import ActivityCallback, ActivityReport
 from pipelex.tools.exceptions import RootException
 
 

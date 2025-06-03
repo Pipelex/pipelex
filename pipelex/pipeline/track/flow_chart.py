@@ -10,8 +10,8 @@ import yaml
 
 from pipelex import log
 from pipelex.exceptions import JobHistoryError
-from pipelex.mission.track.tracker_config import TrackerConfig
-from pipelex.mission.track.tracker_models import (
+from pipelex.pipeline.track.tracker_config import TrackerConfig
+from pipelex.pipeline.track.tracker_models import (
     EdgeAttributeKey,
     EdgeCategory,
     GraphTree,

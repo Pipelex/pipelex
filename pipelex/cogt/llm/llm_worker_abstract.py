@@ -9,7 +9,7 @@ from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbst
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.mission.job_metadata import UnitJobId
+from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from pipelex.types import StrEnum
 

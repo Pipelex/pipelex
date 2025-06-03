@@ -10,7 +10,7 @@ from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
-from pipelex.mission.job_metadata import UnitJobId
+from pipelex.pipeline.job_metadata import UnitJobId
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 

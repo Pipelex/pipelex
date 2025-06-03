@@ -10,7 +10,7 @@ from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbst
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.mission.job_metadata import UnitJobId
+from pipelex.pipeline.job_metadata import UnitJobId
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 

@@ -20,13 +20,13 @@ from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
-from pipelex.mission.activity.activity_manager import ActivityManager
-from pipelex.mission.activity.activity_manager_protocol import ActivityManagerNoOp, ActivityManagerProtocol
-from pipelex.mission.pipeline_manager import PipelineManager
-from pipelex.mission.track.pipeline_tracker import PipelineTracker
-from pipelex.mission.track.pipeline_tracker_protocol import PipelineTrackerNoOp, PipelineTrackerProtocol
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+from pipelex.pipeline.activity.activity_manager import ActivityManager
+from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerNoOp, ActivityManagerProtocol
+from pipelex.pipeline.pipeline_manager import PipelineManager
+from pipelex.pipeline.track.pipeline_tracker import PipelineTracker
+from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerNoOp, PipelineTrackerProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
 from pipelex.tools.config.models import ConfigRoot
 from pipelex.tools.func_registry import func_registry

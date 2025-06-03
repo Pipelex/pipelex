@@ -16,8 +16,8 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError, PipeInputError, PipeRunParamsError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_content_generator
-from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipeline.job_metadata import JobMetadata
 
 # TODO: refacto this as part of the PipeImgGen blueprint/params
 IMGG_PROMPT_NAME = "imgg_prompt"

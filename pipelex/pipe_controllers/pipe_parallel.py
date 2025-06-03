@@ -12,9 +12,9 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_mission_tracker
-from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeParallel(PipeController):

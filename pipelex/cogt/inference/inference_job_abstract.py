@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel
 
-from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class InferenceJobAbstract(ABC, BaseModel):

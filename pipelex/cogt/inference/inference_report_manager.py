@@ -11,7 +11,7 @@ from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
-from pipelex.mission.pipeline_models import SpecialPipelineId
+from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 
 LLMUsageRegistryRoot = List[LLMTokensUsage]

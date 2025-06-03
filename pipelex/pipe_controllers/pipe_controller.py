@@ -7,7 +7,7 @@ from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeController(PipeAbstract):

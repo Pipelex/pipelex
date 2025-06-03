@@ -18,11 +18,11 @@ from pipelex.core.domain import Domain
 from pipelex.core.domain_provider_abstract import DomainProviderAbstract
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_provider_abstract import PipeProviderAbstract
-from pipelex.mission.activity.activity_manager_protocol import ActivityManagerProtocol
-from pipelex.mission.pipeline import Pipeline
-from pipelex.mission.pipeline_manager_abstract import PipelineManagerAbstract
-from pipelex.mission.track.pipeline_tracker_protocol import PipelineTrackerProtocol
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerProtocol
+from pipelex.pipeline.pipeline import Pipeline
+from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
+from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigRoot
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract

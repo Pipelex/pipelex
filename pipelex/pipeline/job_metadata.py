@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.mission.pipeline_models import SpecialPipelineId
+from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.types import StrEnum
 
 

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from pipelex.mission.pipeline import Pipeline
+from pipelex.pipeline.pipeline import Pipeline
 
 
 class PipelineManagerAbstract(ABC):

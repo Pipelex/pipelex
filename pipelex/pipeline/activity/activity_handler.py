@@ -13,7 +13,7 @@ from pipelex.core.stuff_content import (
     StructuredContent,
     TextContent,
 )
-from pipelex.mission.activity.activity_models import ActivityReport
+from pipelex.pipeline.activity.activity_models import ActivityReport
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.file_utils import ensure_path, save_text_to_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path

@@ -1,6 +1,6 @@
 import shortuuid
 
-from pipelex.mission.pipeline import Pipeline
+from pipelex.pipeline.pipeline import Pipeline
 
 
 class PipelineFactory:

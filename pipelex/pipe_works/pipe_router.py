@@ -7,9 +7,9 @@ from pipelex.core.pipe_output import PipeOutputType
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.hub import get_required_pipe
-from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_works.pipe_router_protocol import PipeJob, PipeRouterProtocol
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeRouter(PipeRouterProtocol):
