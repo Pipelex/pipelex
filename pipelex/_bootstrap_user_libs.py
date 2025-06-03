@@ -16,7 +16,7 @@ def activate() -> None:
     # 2) If a pipelex_libraries folder already exists, also touch __init__.py
     #    (helps IDE & static type-checkers) and ensure the *exact* folder is
     #    on sys.path.  When it does **not** exist yet, nothing else to do —
-    #    as soon as the user runs `pipelex init`, the directory will be
+    #    as soon as the user runs `pipelex init-libraries`, the directory will be
     #    created *inside* <root>, which is already import-able thanks to (1).
     for parent in (root, *root.parents):
         lib_dir = parent / "pipelex_libraries"

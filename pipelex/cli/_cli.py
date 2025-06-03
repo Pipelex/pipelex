@@ -23,6 +23,7 @@ class PipelexCLI(TyperGroup):
     def get_command(self, ctx: Context, cmd_name: str) -> Optional[Command]:
         cmd = super().get_command(ctx, cmd_name)
         if cmd is None:
+            typer.echo(f"Unknown command: {cmd_name}")
             typer.echo(ctx.get_help())
             ctx.exit(1)
         return cmd
@@ -35,26 +36,28 @@ app = typer.Typer(
     cls=PipelexCLI,
 )
 
-init_app = typer.Typer(
-    help="Initialize pipelex components. Use one of the following subcommands",
-    no_args_is_help=True,
-)
-app.add_typer(init_app, name="init")
 
-
-@init_app.command("libraries")
+@app.command("init-libraries")
 def init_libraries(
     overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
 ) -> None:
-    """Initialize pipelex libraries in the current directory."""
+    """Initialize pipelex libraries in the current directory.
+
+    If overwrite is False, only create files that don't exist yet.
+    If overwrite is True, all files will be overwritten even if they exist.
+    """
     try:
+        # TODO: Have a more proper print message regarding the overwrited files (e.g. list of files that were overwritten or not)
         LibraryConfig.export_libraries(overwrite=overwrite)
-        typer.echo("Successfully initialized pipelex libraries")
+        if overwrite:
+            typer.echo("Successfully initialized pipelex libraries (all files overwritten)")
+        else:
+            typer.echo("Successfully initialized pipelex libraries (only created non-existing files)")
     except Exception as e:
         raise PipelexCLIError(f"Failed to initialize libraries: {e}")
 
 
-@init_app.command("config")
+@app.command("init-config")
 def init_config(
     reset: Annotated[bool, typer.Option("--reset", "-r", help="Warning: If set, existing files will be overwritten.")] = False,
 ) -> None:

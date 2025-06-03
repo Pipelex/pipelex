@@ -40,7 +40,7 @@ Thumbs.db
 reports/
 results/
 
-# Pipelex libraries, duplicated from pipelex/libraries/ by `pipelex init`
+# Pipelex libraries, duplicated from pipelex/libraries/ by `pipelex init-libraries`
 pipelex_libraries/
 
 # personnal pipelex config file that overrides the default one
