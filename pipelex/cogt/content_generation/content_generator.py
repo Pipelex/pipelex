@@ -30,7 +30,7 @@ from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.config import get_config
-from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_environment import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar

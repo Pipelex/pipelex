@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from pipelex.mission.mission import Mission
+from pipelex.pipeline.pipeline import Pipeline
 
 
-class MissionManagerAbstract(ABC):
+class PipelineManagerAbstract(ABC):
     @abstractmethod
     def setup(self) -> None:
         pass
@@ -14,13 +14,13 @@ class MissionManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_optional_mission(self, mission_id: str) -> Optional[Mission]:
+    def get_optional_pipeline(self, pipeline_run_id: str) -> Optional[Pipeline]:
         pass
 
     @abstractmethod
-    def get_mission(self, mission_id: str) -> Mission:
+    def get_pipeline(self, pipeline_run_id: str) -> Pipeline:
         pass
 
     @abstractmethod
-    def add_new_mission(self) -> Mission:
+    def add_new_pipeline(self) -> Pipeline:
         pass

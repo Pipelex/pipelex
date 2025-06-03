@@ -11,9 +11,9 @@ from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_factory import StuffBlueprint
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_mission_tracker, get_pipe_router, get_report_delegate
-from pipelex.mission.activity.activity_handler import ActivityHandlerForResultFiles
-from pipelex.mission.job_metadata import JobMetadata
+from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_report_delegate
+from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.pipelex.test_data import PipeTestCases
 
 
@@ -166,7 +166,7 @@ class TestPipeRouter:
         pretty_print(pipe_output, title=f"run pipe '{pipe_code}'")
         get_report_delegate().generate_report()
 
-        get_mission_tracker().output_flowchart(is_detailed=True)
+        get_pipeline_tracker().output_flowchart(is_detailed=True)
 
     @pytest.mark.parametrize("pipe_code, exception, expected_error_message", PipeTestCases.FAILURE_PIPES)
     async def test_pipe_infinite_loop(

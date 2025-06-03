@@ -35,23 +35,39 @@ app = typer.Typer(
     cls=PipelexCLI,
 )
 
+init_app = typer.Typer(
+    help="Initialize pipelex components. Use one of the following subcommands",
+    no_args_is_help=True,
+)
+app.add_typer(init_app, name="init")
 
-@app.command()
-def init(
+
+@init_app.command("libraries")
+def init_libraries(
     overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
 ) -> None:
-    """Initialize pipelex configuration in the current directory."""
-    LibraryConfig.export_libraries(overwrite=overwrite)
+    """Initialize pipelex libraries in the current directory."""
+    try:
+        LibraryConfig.export_libraries(overwrite=overwrite)
+        typer.echo("Successfully initialized pipelex libraries")
+    except Exception as e:
+        raise PipelexCLIError(f"Failed to initialize libraries: {e}")
 
-    pipelex_init_path = os.path.join(config_manager.pipelex_root_dir, "pipelex_init.toml")
+
+@init_app.command("config")
+def init_config(
+    reset: Annotated[bool, typer.Option("--reset", "-r", help="Warning: If set, existing files will be overwritten.")] = False,
+) -> None:
+    """Initialize pipelex configuration in the current directory."""
+    pipelex_template_path = os.path.join(config_manager.pipelex_root_dir, "pipelex_template.toml")
     target_config_path = os.path.join(config_manager.local_root_dir, "pipelex.toml")
 
-    if os.path.exists(target_config_path) and not overwrite:
-        typer.echo("Warning: pipelex.toml already exists. Use --overwrite to force creation.")
+    if os.path.exists(target_config_path) and not reset:
+        typer.echo("Warning: pipelex.toml already exists. Use --reset to force creation.")
         return
 
     try:
-        shutil.copy2(pipelex_init_path, target_config_path)
+        shutil.copy2(pipelex_template_path, target_config_path)
         typer.echo(f"Created pipelex.toml at {target_config_path}")
     except Exception as e:
         raise PipelexCLIError(f"Failed to create pipelex.toml: {e}")

@@ -1,5 +1,5 @@
 from pipelex.types import StrEnum
 
 
-class SpecialMissionId(StrEnum):
+class SpecialPipelineId(StrEnum):
     UNTITLED = "untitled"

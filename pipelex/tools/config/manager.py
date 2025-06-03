@@ -75,17 +75,14 @@ class ConfigManager:
         if "tool" in pyproject and "pipelex" in pyproject["tool"] and "config_inheritance" in pyproject["tool"]["pipelex"]:
             for config_name in pyproject["tool"]["pipelex"]["config_inheritance"]:
                 print(f"Loading config inheritance for {config_name}")
-                # First check if it's a local dependency
+                # First check if it's a local dependency in poetry
                 package_path: Optional[str] = None
-                if "project" in pyproject and "dependencies" in pyproject["project"]:
-                    # Try to find path in dependencies list
-                    dependencies = pyproject["project"]["dependencies"]
-                    for dep in dependencies:
-                        if isinstance(dep, str) and dep.startswith(f"{config_name} @ file://"):
-                            # Extract local path from file:// URL
-                            local_path = dep.split("file://", 1)[1]
-                            package_path = os.path.abspath(os.path.join(self.local_root_dir, local_path))
-                            break
+                if "tool" in pyproject and "poetry" in pyproject["tool"] and "dependencies" in pyproject["tool"]["poetry"]:
+                    dep_config: Dict[str, Any] = pyproject["tool"]["poetry"]["dependencies"].get(config_name, {})
+                    if "path" in dep_config:
+                        # It's a local path
+                        local_path: str = str(dep_config["path"])
+                        package_path = os.path.abspath(os.path.join(self.local_root_dir, local_path))
 
                 if not package_path:
                     # Try to find in .venv

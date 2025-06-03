@@ -8,8 +8,8 @@ from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.func_registry import func_registry
 
 

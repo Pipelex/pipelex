@@ -8,8 +8,8 @@ from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipedLLMPromptFactory(LLMPromptFactoryAbstract):

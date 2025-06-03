@@ -7,7 +7,7 @@ from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
 from pipelex.exceptions import PipelexError
 from pipelex.hub import get_required_config
 from pipelex.libraries.library_config import LibraryConfig
-from pipelex.mission.track.tracker_config import TrackerConfig
+from pipelex.pipeline.track.tracker_config import TrackerConfig
 from pipelex.plugins.plugins_config import PluginsConfig
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.config.models import ConfigModel, ConfigRoot
@@ -44,7 +44,7 @@ class PromptingConfig(ConfigModel):
 
 
 class FeatureConfig(ConfigModel):
-    is_mission_tracking_enabled: bool
+    is_pipeline_tracking_enabled: bool
     is_activity_tracking_enabled: bool
 
 

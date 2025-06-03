@@ -10,7 +10,7 @@ from pipelex.core.stuff import Stuff
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 
 
-class MissionTrackerProtocol(Protocol):
+class PipelineTrackerProtocol(Protocol):
     def setup(self): ...
 
     def teardown(self): ...
@@ -69,9 +69,9 @@ class MissionTrackerProtocol(Protocol):
     ): ...
 
 
-class MissionTrackerNoOp(MissionTrackerProtocol):
-    """A no-operation implementation of MissionTrackerProtocol that does nothing.
-    This is useful when mission tracking needs to be disabled.
+class PipelineTrackerNoOp(PipelineTrackerProtocol):
+    """A no-operation implementation of PipelineTrackerProtocol that does nothing.
+    This is useful when pipeline tracking needs to be disabled.
     """
 
     @override

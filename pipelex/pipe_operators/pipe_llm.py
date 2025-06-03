@@ -35,11 +35,11 @@ from pipelex.hub import (
     get_required_pipe,
     get_template,
 )
-from pipelex.mission.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_operators.piped_llm_prompt_factory import PipedLLMPromptFactory
+from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.types import StrEnum
 
 

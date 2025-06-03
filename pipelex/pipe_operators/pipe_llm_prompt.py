@@ -24,9 +24,9 @@ from pipelex.exceptions import (
     WorkingMemoryTypeError,
 )
 from pipelex.hub import get_template
-from pipelex.mission.job_metadata import JobCategory, JobMetadata
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.type_inspector import get_type_structure
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list

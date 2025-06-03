@@ -2,7 +2,7 @@ from typing import Protocol
 
 from typing_extensions import override
 
-from pipelex.mission.activity.activity_models import ActivityCallback, ActivityReport
+from pipelex.pipeline.activity.activity_models import ActivityCallback, ActivityReport
 
 
 class ActivityManagerProtocol(Protocol):

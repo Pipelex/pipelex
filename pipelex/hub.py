@@ -18,11 +18,11 @@ from pipelex.core.domain import Domain
 from pipelex.core.domain_provider_abstract import DomainProviderAbstract
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_provider_abstract import PipeProviderAbstract
-from pipelex.mission.activity.activity_manager_protocol import ActivityManagerProtocol
-from pipelex.mission.mission import Mission
-from pipelex.mission.mission_manager_abstract import MissionManagerAbstract
-from pipelex.mission.track.mission_tracker_protocol import MissionTrackerProtocol
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerProtocol
+from pipelex.pipeline.pipeline import Pipeline
+from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
+from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigRoot
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -57,9 +57,9 @@ class PipelexHub:
         self._pipe_provider: Optional[PipeProviderAbstract] = None
         self._pipe_router: Optional[PipeRouterProtocol] = None
 
-        # mission
-        self._mission_tracker: Optional[MissionTrackerProtocol] = None
-        self._mission_manager: Optional[MissionManagerAbstract] = None
+        # pipeline
+        self._pipeline_tracker: Optional[PipelineTrackerProtocol] = None
+        self._pipeline_manager: Optional[PipelineManagerAbstract] = None
         self._activity_manager: Optional[ActivityManagerProtocol] = None
 
     ############################################################
@@ -146,11 +146,11 @@ class PipelexHub:
     def set_pipe_router(self, pipe_router: PipeRouterProtocol):
         self._pipe_router = pipe_router
 
-    def set_mission_tracker(self, mission_tracker: MissionTrackerProtocol):
-        self._mission_tracker = mission_tracker
+    def set_pipeline_tracker(self, pipeline_tracker: PipelineTrackerProtocol):
+        self._pipeline_tracker = pipeline_tracker
 
-    def set_mission_manager(self, mission_manager: MissionManagerAbstract):
-        self._mission_manager = mission_manager
+    def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
+        self._pipeline_manager = pipeline_manager
 
     def set_activity_manager(self, activity_manager: ActivityManagerProtocol):
         self._activity_manager = activity_manager
@@ -246,15 +246,15 @@ class PipelexHub:
             raise RuntimeError("PipeRouter is not initialized")
         return self._pipe_router
 
-    def get_mission_tracker(self) -> MissionTrackerProtocol:
-        if self._mission_tracker is None:
-            raise RuntimeError("MissionTracker is not initialized")
-        return self._mission_tracker
+    def get_pipeline_tracker(self) -> PipelineTrackerProtocol:
+        if self._pipeline_tracker is None:
+            raise RuntimeError("PipelineTracker is not initialized")
+        return self._pipeline_tracker
 
-    def get_required_mission_manager(self) -> MissionManagerAbstract:
-        if self._mission_manager is None:
-            raise RuntimeError("MissionManager is not initialized")
-        return self._mission_manager
+    def get_required_pipeline_manager(self) -> PipelineManagerAbstract:
+        if self._pipeline_manager is None:
+            raise RuntimeError("PipelineManager is not initialized")
+        return self._pipeline_manager
 
     def get_activity_manager(self) -> ActivityManagerProtocol:
         if self._activity_manager is None:
@@ -410,17 +410,17 @@ def get_pipe_router() -> PipeRouterProtocol:
     return get_pipelex_hub().get_required_pipe_router()
 
 
-def get_mission_tracker() -> MissionTrackerProtocol:
-    return get_pipelex_hub().get_mission_tracker()
+def get_pipeline_tracker() -> PipelineTrackerProtocol:
+    return get_pipelex_hub().get_pipeline_tracker()
 
 
-def get_mission_manager() -> MissionManagerAbstract:
-    return get_pipelex_hub().get_required_mission_manager()
+def get_pipeline_manager() -> PipelineManagerAbstract:
+    return get_pipelex_hub().get_required_pipeline_manager()
 
 
 def get_activity_manager() -> ActivityManagerProtocol:
     return get_pipelex_hub().get_activity_manager()
 
 
-def get_mission(mission_id: str) -> Mission:
-    return get_mission_manager().get_mission(mission_id=mission_id)
+def get_pipeline(pipeline_run_id: str) -> Pipeline:
+    return get_pipeline_manager().get_pipeline(pipeline_run_id=pipeline_run_id)

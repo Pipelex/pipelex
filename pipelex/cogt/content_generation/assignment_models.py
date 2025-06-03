@@ -16,7 +16,7 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
-from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_environment import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
 

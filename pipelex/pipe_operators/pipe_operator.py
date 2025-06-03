@@ -8,8 +8,8 @@ from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.hub import get_activity_manager
-from pipelex.mission.activity.activity_models import ActivityReport
-from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipeline.activity.activity_models import ActivityReport
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeOperator(PipeAbstract):

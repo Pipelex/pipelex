@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.mission.mission_models import SpecialMissionId
+from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.types import StrEnum
 
 
@@ -26,7 +26,7 @@ class UnitJobId(StrEnum):
 class JobMetadata(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    mission_id: str = Field(default=SpecialMissionId.UNTITLED)
+    pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
     top_job_id: Optional[str] = None
     pipe_job_ids: Optional[List[str]] = None
     content_generation_job_id: Optional[str] = None

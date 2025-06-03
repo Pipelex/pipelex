@@ -15,7 +15,7 @@ from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.hub import get_content_generator, get_llm_deck
-from pipelex.mission.job_metadata import JobMetadata
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.pipelex.cogt.test_data import Employee
 from tests.test_data import ImageTestCases
 

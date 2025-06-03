@@ -11,23 +11,23 @@ from pipelex import log
 from pipelex.core.concept import Concept
 from pipelex.core.stuff import Stuff
 from pipelex.exceptions import JobHistoryError
-from pipelex.mission.track.flow_chart import MissionFlowChart
-from pipelex.mission.track.mission_tracker_protocol import MissionTrackerProtocol
-from pipelex.mission.track.tracker_config import TrackerConfig
-from pipelex.mission.track.tracker_models import (
+from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
+from pipelex.pipeline.track.flow_chart import PipelineFlowChart
+from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
+from pipelex.pipeline.track.tracker_config import TrackerConfig
+from pipelex.pipeline.track.tracker_models import (
     EdgeAttributeKey,
     EdgeCategory,
     NodeAttributeKey,
     NodeCategory,
     SpecialNodeName,
 )
-from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.tools.misc.mermaid_utils import print_mermaid_url
 
 
-# TODO: manage a separate graph for each mission_id
+# TODO: manage a separate graph for each pipeline_run_id
 # TODO: restore disabled tracking functionality in PipeBatch
-class MissionTracker(MissionTrackerProtocol):
+class PipelineTracker(PipelineTrackerProtocol):
     def __init__(self, tracker_config: TrackerConfig):
         self._tracker_config = tracker_config
         self._is_debug_mode = tracker_config.is_debug_mode
@@ -320,11 +320,11 @@ class MissionTracker(MissionTrackerProtocol):
 
     def _print_mermaid_flowchart_code_and_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
         if not self.nx_graph.nodes:
-            log.info("No nodes in the mission tracker")
+            log.info("No nodes in the pipeline tracker")
             return
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")
-        flowchart = MissionFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, tracker_config=self._tracker_config)
+        flowchart = PipelineFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, tracker_config=self._tracker_config)
         mermaid_code, url = flowchart.generate_mermaid_flowchart(title=title, subtitle=subtitle)
         print(mermaid_code)
         title_to_print = "Mermaid flowchart URL"
@@ -334,11 +334,11 @@ class MissionTracker(MissionTrackerProtocol):
 
     def _print_mermaid_flowchart_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
         if not self.nx_graph.nodes:
-            log.info("No nodes in the mission tracker")
+            log.info("No nodes in the pipeline tracker")
             return
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")
-        flowchart = MissionFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, tracker_config=self._tracker_config)
+        flowchart = PipelineFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, tracker_config=self._tracker_config)
         _, url = flowchart.generate_mermaid_flowchart(title=title, subtitle=subtitle)
         title_to_print = "Mermaid flowchart URL"
         if title:

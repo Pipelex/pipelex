@@ -6,7 +6,7 @@ from pytest import FixtureRequest
 
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.hub import get_activity_manager
-from pipelex.mission.activity.activity_handler import ActivityHandlerForResultFiles
+from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, remove_folder
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 from tests.conftest import TEST_OUTPUTS_DIR

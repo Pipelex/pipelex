@@ -7,8 +7,8 @@ from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunParams
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.hub import get_pipe_router, get_required_pipe
-from pipelex.mission.job_metadata import JobMetadata
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 async def run_pipe_code(
