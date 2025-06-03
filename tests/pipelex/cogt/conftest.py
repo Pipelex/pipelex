@@ -57,7 +57,7 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
         # "o1",
         # "o3-mini",
         # "gpt-4o",
-        # "gpt-4o-mini",
+        "gpt-4o-mini",
         # "gpt-4-5-preview",
         # "claude-3-haiku",
         # "claude-3-5-sonnet",
@@ -71,7 +71,7 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
         # "gemini-2-5-pro",
         # "gemini-2-5-flash",
         # "mistral-small3.1",
-        "qwen3:8b",
+        # "qwen3:8b",
     ]
 )
 def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:

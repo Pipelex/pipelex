@@ -9,55 +9,55 @@ from pipelex.types import StrEnum
 
 
 class PluginHandle(StrEnum):
-    OPENAI_ASYNC = "openai_async"
-    AZURE_OPENAI_ASYNC = "azure_openai_async"
-    ANTHROPIC_ASYNC = "anthropic_async"
-    BEDROCK_ANTHROPIC_ASYNC = "bedrock_anthropic_async"
-    MISTRAL_ASYNC = "mistral_async"
-    BEDROCK_ASYNC = "bedrock_async"
-    PERPLEXITY_ASYNC = "perplexity_async"
-    VERTEXAI_OPENAI_ASYNC = "vertexai_async"
-    XAI_OPENAI_ASYNC = "xai_openai_async"
-    CUSTOM_OPENAI_ASYNC = "custom_llm_async"
-    FAL_ASYNC = "fal_async"
+    OPENAI_SDK = "openai_sdk"
+    AZURE_OPENAI_SDK = "azure_openai_sdk"
+    ANTHROPIC_SDK = "anthropic_sdk"
+    BEDROCK_ANTHROPIC_SDK = "bedrock_anthropic_sdk"
+    MISTRAL_SDK = "mistral_sdk"
+    BEDROCK_SDK = "bedrock_sdk"
+    PERPLEXITY_OPENAI_SDK = "perplexity_openai_sdk"
+    VERTEXAI_OPENAI_SDK = "vertexai_openai_sdk"
+    XAI_OPENAI_SDK = "xai_openai_sdk"
+    CUSTOM_LLM_OPENAI_SDK = "custom_llm_openai_sdk"
+    FAL_SDK = "fal_sdk"
 
     @staticmethod
     def get_for_llm_platform(llm_platform: LLMPlatform) -> "PluginHandle":
         match llm_platform:
             case LLMPlatform.OPENAI:
-                return PluginHandle.OPENAI_ASYNC
+                return PluginHandle.OPENAI_SDK
             case LLMPlatform.AZURE_OPENAI:
-                return PluginHandle.AZURE_OPENAI_ASYNC
+                return PluginHandle.AZURE_OPENAI_SDK
             case LLMPlatform.ANTHROPIC:
-                return PluginHandle.ANTHROPIC_ASYNC
+                return PluginHandle.ANTHROPIC_SDK
             case LLMPlatform.MISTRAL:
-                return PluginHandle.MISTRAL_ASYNC
+                return PluginHandle.MISTRAL_SDK
             case LLMPlatform.BEDROCK:
-                return PluginHandle.BEDROCK_ASYNC
+                return PluginHandle.BEDROCK_SDK
             case LLMPlatform.BEDROCK_ANTHROPIC:
-                return PluginHandle.BEDROCK_ANTHROPIC_ASYNC
+                return PluginHandle.BEDROCK_ANTHROPIC_SDK
             case LLMPlatform.PERPLEXITY:
-                return PluginHandle.PERPLEXITY_ASYNC
+                return PluginHandle.PERPLEXITY_OPENAI_SDK
             case LLMPlatform.VERTEXAI:
-                return PluginHandle.VERTEXAI_OPENAI_ASYNC
+                return PluginHandle.VERTEXAI_OPENAI_SDK
             case LLMPlatform.XAI:
-                return PluginHandle.XAI_OPENAI_ASYNC
+                return PluginHandle.XAI_OPENAI_SDK
             case LLMPlatform.CUSTOM_LLM:
-                return PluginHandle.CUSTOM_OPENAI_ASYNC
+                return PluginHandle.CUSTOM_LLM_OPENAI_SDK
 
     @staticmethod
     def get_for_ocr_engine(ocr_platform: OcrPlatform) -> "PluginHandle":
         match ocr_platform:
             case OcrPlatform.MISTRAL:
-                return PluginHandle.MISTRAL_ASYNC
+                return PluginHandle.MISTRAL_SDK
 
     @staticmethod
     def get_for_imgg_engine(imgg_platform: ImggPlatform) -> "PluginHandle":
         match imgg_platform:
             case ImggPlatform.FAL_AI:
-                return PluginHandle.FAL_ASYNC
+                return PluginHandle.FAL_SDK
             case ImggPlatform.OPENAI:
-                return PluginHandle.OPENAI_ASYNC
+                return PluginHandle.OPENAI_SDK
 
 
 PluginManagerRoot = Dict[str, Any]
