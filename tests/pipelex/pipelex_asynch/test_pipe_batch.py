@@ -6,7 +6,7 @@ from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import ListContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_mission_tracker, get_pipe_router, get_report_delegate
+from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_report_delegate
 
 
 @pytest.mark.llm
@@ -45,4 +45,4 @@ class TestPipeBatch:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
 
-        get_mission_tracker().output_flowchart()
+        get_pipeline_tracker().output_flowchart()

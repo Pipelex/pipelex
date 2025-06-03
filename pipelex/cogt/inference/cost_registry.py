@@ -28,13 +28,13 @@ class CostRegistry(RootModel[CostRegistryRoot]):
     @classmethod
     def generate_report(
         cls,
-        mission_id: str,
+        pipeline_run_id: str,
         llm_tokens_usages: List[LLMTokensUsage],
         unit_scale: float,
         cost_report_file_path: Optional[str] = None,
     ):
         if not llm_tokens_usages:
-            log.warning(f"No report to generate for mission '{mission_id}'")
+            log.warning(f"No report to generate for pipeline '{pipeline_run_id}'")
             return
         cost_registry = CostRegistry()
         for llm_tokens_usage in llm_tokens_usages:
@@ -77,7 +77,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
 
         console = Console()
         title = "Costs by LLM model"
-        title += f" for mission '{mission_id}'"
+        title += f" for pipeline '{pipeline_run_id}'"
         table = Table(title=title, box=box.ROUNDED)
 
         scale_str: str

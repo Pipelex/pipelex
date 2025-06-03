@@ -23,22 +23,22 @@ class PipelineManager(PipelineManagerAbstract, RootModel[PipelineManagerRoot]):
         self.root.clear()
 
     @override
-    def get_optional_mission(self, mission_id: str) -> Optional[Pipeline]:
-        return self.root.get(mission_id)
+    def get_optional_pipeline(self, pipeline_run_id: str) -> Optional[Pipeline]:
+        return self.root.get(pipeline_run_id)
 
     @override
-    def get_mission(self, mission_id: str) -> Pipeline:
-        mission = self.get_optional_mission(mission_id=mission_id)
-        if mission is None:
-            raise PipelineManagerNotFoundError(f"Pipeline {mission_id} not found")
-        return mission
+    def get_pipeline(self, pipeline_run_id: str) -> Pipeline:
+        pipeline = self.get_optional_pipeline(pipeline_run_id=pipeline_run_id)
+        if pipeline is None:
+            raise PipelineManagerNotFoundError(f"Pipeline {pipeline_run_id} not found")
+        return pipeline
 
-    def _set_mission(self, mission_id: str, mission: Pipeline) -> Pipeline:
-        self.root[mission_id] = mission
-        return mission
+    def _set_pipeline(self, pipeline_run_id: str, pipeline: Pipeline) -> Pipeline:
+        self.root[pipeline_run_id] = pipeline
+        return pipeline
 
     @override
-    def add_new_mission(self) -> Pipeline:
-        mission = PipelineFactory.make_mission()
-        self._set_mission(mission_id=mission.pipeline_run_id, mission=mission)
-        return mission
+    def add_new_pipeline(self) -> Pipeline:
+        pipeline = PipelineFactory.make_pipeline()
+        self._set_pipeline(pipeline_run_id=pipeline.pipeline_run_id, pipeline=pipeline)
+        return pipeline

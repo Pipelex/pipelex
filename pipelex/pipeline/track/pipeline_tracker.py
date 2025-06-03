@@ -25,7 +25,7 @@ from pipelex.pipeline.track.tracker_models import (
 from pipelex.tools.misc.mermaid_utils import print_mermaid_url
 
 
-# TODO: manage a separate graph for each mission_id
+# TODO: manage a separate graph for each pipeline_run_id
 # TODO: restore disabled tracking functionality in PipeBatch
 class PipelineTracker(PipelineTrackerProtocol):
     def __init__(self, tracker_config: TrackerConfig):
@@ -320,7 +320,7 @@ class PipelineTracker(PipelineTrackerProtocol):
 
     def _print_mermaid_flowchart_code_and_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
         if not self.nx_graph.nodes:
-            log.info("No nodes in the mission tracker")
+            log.info("No nodes in the pipeline tracker")
             return
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")
@@ -334,7 +334,7 @@ class PipelineTracker(PipelineTrackerProtocol):
 
     def _print_mermaid_flowchart_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
         if not self.nx_graph.nodes:
-            log.info("No nodes in the mission tracker")
+            log.info("No nodes in the pipeline tracker")
             return
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")

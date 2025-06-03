@@ -122,7 +122,7 @@ class PipeBatch(PipeController):
         # for branch_index, (required_stuff_list, item_input_stuff, item_output_stuff) in enumerate(
         #     zip(required_stuff_lists, item_stuffs, output_stuffs)
         # ):
-        #     get_mission_tracker().add_batch_step(
+        #     get_pipeline_tracker().add_batch_step(
         #         from_stuff=input_stuff,
         #         to_stuff=item_input_stuff,
         #         to_branch_index=branch_index,
@@ -130,7 +130,7 @@ class PipeBatch(PipeController):
         #         comment="PipeBatch.run_pipe() in zip",
         #     )
         #     for required_stuff in required_stuff_list:
-        #         get_mission_tracker().add_pipe_step(
+        #         get_pipeline_tracker().add_pipe_step(
         #             from_stuff=required_stuff,
         #             to_stuff=item_output_stuff,
         #             pipe_code=self.branch_pipe_code,
@@ -142,7 +142,7 @@ class PipeBatch(PipeController):
 
         # for branch_index, branch_output_stuff in enumerate(output_stuffs):
         #     branch_output_item_code = branch_output_item_codes[branch_index]
-        #     get_mission_tracker().add_aggregate_step(
+        #     get_pipeline_tracker().add_aggregate_step(
         #         from_stuff=branch_output_stuff,
         #         to_stuff=output_stuff,
         #         pipe_layer=pipe_run_params.pipe_layers,

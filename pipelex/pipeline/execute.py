@@ -5,7 +5,7 @@ from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.hub import get_mission_manager, get_pipe_router, get_report_delegate, get_required_pipe
+from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -17,13 +17,13 @@ async def execute_pipeline(
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
     dynamic_output_concept_code: Optional[str] = None,
 ) -> Tuple[PipeOutput, str]:
-    mission = get_mission_manager().add_new_mission()
-    pipeline_run_id = mission.pipeline_run_id
-    get_report_delegate().open_registry(mission_id=pipeline_run_id)
+    pipeline = get_pipeline_manager().add_new_pipeline()
+    pipeline_run_id = pipeline.pipeline_run_id
+    get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
     pipe = get_required_pipe(pipe_code=pipe_code)
 
     job_metadata = JobMetadata(
-        mission_id=pipeline_run_id,
+        pipeline_run_id=pipeline_run_id,
     )
 
     pipe_run_params = PipeRunParamsFactory.make_run_params(

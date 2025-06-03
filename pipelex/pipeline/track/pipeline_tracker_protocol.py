@@ -71,7 +71,7 @@ class PipelineTrackerProtocol(Protocol):
 
 class PipelineTrackerNoOp(PipelineTrackerProtocol):
     """A no-operation implementation of PipelineTrackerProtocol that does nothing.
-    This is useful when mission tracking needs to be disabled.
+    This is useful when pipeline tracking needs to be disabled.
     """
 
     @override

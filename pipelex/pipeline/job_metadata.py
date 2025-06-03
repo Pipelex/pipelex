@@ -26,7 +26,7 @@ class UnitJobId(StrEnum):
 class JobMetadata(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    mission_id: str = Field(default=SpecialPipelineId.UNTITLED)
+    pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
     top_job_id: Optional[str] = None
     pipe_job_ids: Optional[List[str]] = None
     content_generation_job_id: Optional[str] = None

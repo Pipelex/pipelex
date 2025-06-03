@@ -14,13 +14,13 @@ class PipelineManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_optional_mission(self, mission_id: str) -> Optional[Pipeline]:
+    def get_optional_pipeline(self, pipeline_run_id: str) -> Optional[Pipeline]:
         pass
 
     @abstractmethod
-    def get_mission(self, mission_id: str) -> Pipeline:
+    def get_pipeline(self, pipeline_run_id: str) -> Pipeline:
         pass
 
     @abstractmethod
-    def add_new_mission(self) -> Pipeline:
+    def add_new_pipeline(self) -> Pipeline:
         pass

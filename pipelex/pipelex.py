@@ -53,8 +53,8 @@ class Pipelex:
         llm_model_provider: Optional[LLMModelLibrary] = None,
         plugin_manager: Optional[PluginManager] = None,
         inference_manager: Optional[InferenceManager] = None,
-        mission_manager: Optional[PipelineManager] = None,
-        mission_tracker: Optional[PipelineTracker] = None,
+        pipeline_manager: Optional[PipelineManager] = None,
+        pipeline_tracker: Optional[PipelineTracker] = None,
         activity_manager: Optional[ActivityManagerProtocol] = None,
     ) -> Self:
         if cls._pipelex_instance is not None:
@@ -79,8 +79,8 @@ class Pipelex:
         llm_model_provider: Optional[LLMModelLibrary] = None,
         plugin_manager: Optional[PluginManager] = None,
         inference_manager: Optional[InferenceManager] = None,
-        mission_manager: Optional[PipelineManager] = None,
-        mission_tracker: Optional[PipelineTracker] = None,
+        pipeline_manager: Optional[PipelineManager] = None,
+        pipeline_tracker: Optional[PipelineTracker] = None,
         activity_manager: Optional[ActivityManagerProtocol] = None,
     ) -> None:
         self.pipelex_hub = pipelex_hub or PipelexHub()
@@ -128,17 +128,17 @@ class Pipelex:
         self.pipelex_hub.set_concept_provider(concept_provider=self.library_manager.concept_library)
         self.pipelex_hub.set_pipe_provider(pipe_provider=self.library_manager.pipe_library)
 
-        # pipelex mission
-        self.mission_tracker: PipelineTrackerProtocol
-        if mission_tracker:
-            self.mission_tracker = mission_tracker
-        elif get_config().pipelex.feature_config.is_mission_tracking_enabled:
-            self.mission_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
+        # pipelex pipeline
+        self.pipeline_tracker: PipelineTrackerProtocol
+        if pipeline_tracker:
+            self.pipeline_tracker = pipeline_tracker
+        elif get_config().pipelex.feature_config.is_pipeline_tracking_enabled:
+            self.pipeline_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
         else:
-            self.mission_tracker = PipelineTrackerNoOp()
-        self.pipelex_hub.set_mission_tracker(mission_tracker=self.mission_tracker)
-        self.mission_manager = mission_manager or PipelineManager()
-        self.pipelex_hub.set_mission_manager(mission_manager=self.mission_manager)
+            self.pipeline_tracker = PipelineTrackerNoOp()
+        self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
+        self.pipeline_manager = pipeline_manager or PipelineManager()
+        self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
 
         self.activity_manager: ActivityManagerProtocol
         if activity_manager:
@@ -176,9 +176,9 @@ class Pipelex:
 
         self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter())
 
-        # mission
-        self.mission_tracker.setup()
-        self.mission_manager.setup()
+        # pipeline
+        self.pipeline_tracker.setup()
+        self.pipeline_manager.setup()
 
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}")
 
@@ -206,8 +206,8 @@ class Pipelex:
 
     def teardown(self):
         # pipelex
-        self.mission_manager.teardown()
-        self.mission_tracker.teardown()
+        self.pipeline_manager.teardown()
+        self.pipeline_tracker.teardown()
         self.library_manager.teardown()
         self.template_provider.teardown()
         self.activity_manager.teardown()
