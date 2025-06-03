@@ -21,7 +21,7 @@ class PipelexClient:
 
     def __init__(
         self,
-        api_token: Optional[str] = None,
+        # api_token: Optional[str] = None, # Coming soon
     ):
         """
         Initialize the PipelexClient.
@@ -29,26 +29,28 @@ class PipelexClient:
         Args:
             api_token: Authentication token for the API
         """
-        self.api_token = api_token
-        self.api_client: Optional[PipelexApiClient] = None
+        # self.api_token = api_token
+        # self.api_client: Optional[PipelexApiClient] = None
 
     async def start_api_client(self) -> PipelexApiClient:
         """
         Start the API client.
         """
-        if not self.api_token:
-            raise ClientAuthenticationError("API token is required for API execution")
+        raise NotImplementedError("Pipelex API functionality is coming soon!")
+        # if not self.api_token:
+        #     raise ClientAuthenticationError("API token is required for API execution")
 
-        self.api_client = PipelexApiClient(api_token=self.api_token).start_client()
-        return self.api_client
+        # self.api_client = PipelexApiClient(api_token=self.api_token).start_client()
+        # return self.api_client
 
-    async def close_api_client(self):
+    async def close_api_client(self) -> None:
         """
         Close the API client.
         """
-        if self.api_client:
-            await self.api_client.close()
-            self.api_client = None
+        raise NotImplementedError("Pipelex API functionality is coming soon!")
+        # if self.api_client:
+        #     await self.api_client.close()
+        #     self.api_client = None
 
     async def execute_pipe(
         self,
@@ -71,7 +73,7 @@ class PipelexClient:
         if use_local_execution:
             pipe_output = await run_pipe_code(
                 pipe_code=pipe_code,
-                working_memory=pipe_execute_request.memory,
+                working_memory=pipe_execute_request.working_memory,
                 dynamic_output_concept_code=pipe_execute_request.dynamic_output_concept,
             )
             return PipeStatus(

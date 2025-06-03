@@ -87,7 +87,7 @@ class PipeRequest(BaseModel):
     Request model for executing a pipe.
     """
 
-    memory: WorkingMemory = Field(..., description="Input memory for the pipe")
+    working_memory: WorkingMemory = Field(..., description="Input memory for the pipe")
     dynamic_output_concept: Optional[str] = Field(default=None, description="Concept code of the output stuff")
     output_multiplicity: Optional[PipeOutputMultiplicity] = Field(default=None, description="Multiplicity of the output stuff")
 
