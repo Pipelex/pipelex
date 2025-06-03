@@ -12,4 +12,4 @@ class TestConfigManager:
 
     def test_load_pipelex_init_config(self):
         hub = get_pipelex_hub()
-        hub.setup_config(config_cls=PipelexConfig, specific_config_path="pipelex/pipelex_init.toml")
+        hub.setup_config(config_cls=PipelexConfig, specific_config_path="pipelex/pipelex_template.toml")
