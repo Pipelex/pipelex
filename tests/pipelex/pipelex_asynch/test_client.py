@@ -152,12 +152,12 @@ This amendment applies only to transactions originating from DataAnalytics Corp'
         # ruff: noqa
         for example in examples:
             # Create working memory from example data
-            memory = WorkingMemory()
+            working_memory = WorkingMemory()
             for stuff in example.memory:
-                memory.add_new_stuff(name=stuff.stuff_name or stuff.concept_code, stuff=stuff)
+                working_memory.add_new_stuff(name=stuff.stuff_name or stuff.concept_code, stuff=stuff)
 
             pipe_execute_request = PipeRequest(
-                memory=memory,
+                working_memory=working_memory,
                 dynamic_output_concept=example.dynamic_output_concept,
             )
 
