@@ -54,6 +54,7 @@ llm_to_engineer = { llm_handle = "best-claude", temperature = 0.5 }
 llm_to_write_imgg_prompt = { llm_handle = "best-claude", temperature = 0.2 }
 llm_to_describe_img = { llm_handle = "best-claude", temperature = 0.5 }
 llm_to_design_fashion = { llm_handle = "best-claude", temperature = 0.7 }
+llm_for_img_to_text = { llm_handle = "best-claude", temperature = 0.1 }
 
 # Extraction skills
 llm_to_extract_diagram = { llm_handle = "best-claude", temperature = 0.5 }
@@ -62,8 +63,6 @@ llm_to_extract_invoice_from_scan = { llm_handle = "best-claude", temperature = 0
 llm_to_extract_legal_terms = { llm_handle = "best-claude", temperature = 0.1 }
 llm_to_extract_tables = { llm_handle = "best-claude", temperature = 0.1 }
 
-# OCR skills
-llm_for_ocr = { llm_handle = "best-claude", temperature = 0.1 }
 
 ####################################################################################################
 # LLM Choices
