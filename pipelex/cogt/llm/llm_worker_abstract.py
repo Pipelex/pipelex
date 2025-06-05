@@ -4,12 +4,12 @@ from typing import Optional, Type
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import LLMCapabilityError
-from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.pipeline.job_metadata import UnitJobId
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from pipelex.types import StrEnum
 
@@ -24,7 +24,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         self,
         llm_engine: LLMEngine,
         structure_method: Optional[StructureMethod],
-        report_delegate: Optional[InferenceReportDelegate] = None,
+        report_delegate: Optional[ReportingProtocol] = None,
     ):
         """
         Initialize the LLMWorker.
@@ -32,7 +32,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         Args:
             llm_engine (LLMEngine): The LLM engine to be used by the worker.
             structure_method (Optional[StructureMethod]): The structure method to be used by the worker.
-            report_delegate (Optional[InferenceReportDelegate]): An optional report delegate for reporting unit jobs.
+            report_delegate (Optional[ReportingProtocol]): An optional report delegate for reporting unit jobs.
         """
         InferenceWorkerAbstract.__init__(self, report_delegate=report_delegate)
         self.llm_engine = llm_engine

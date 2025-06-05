@@ -5,7 +5,6 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
-from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_model_provider_abstract import LLMModelProviderAbstract
@@ -23,6 +22,7 @@ from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerP
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigRoot
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -48,7 +48,7 @@ class PipelexHub:
         self._llm_deck_provider: Optional[LLMDeckAbstract] = None
         self._plugin_manager: Optional[PluginManager] = None
         self._inference_manager: InferenceManagerProtocol
-        self._report_delegate: InferenceReportDelegate
+        self._report_delegate: ReportingProtocol
         self._content_generator: Optional[ContentGeneratorProtocol] = None
 
         # pipelex
@@ -126,7 +126,7 @@ class PipelexHub:
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
 
-    def set_report_delegate(self, report_delegate: InferenceReportDelegate):
+    def set_report_delegate(self, report_delegate: ReportingProtocol):
         self._report_delegate = report_delegate
 
     def set_content_generator(self, content_generator: ContentGeneratorProtocol):
@@ -210,7 +210,7 @@ class PipelexHub:
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
 
-    def get_report_delegate(self) -> InferenceReportDelegate:
+    def get_report_delegate(self) -> ReportingProtocol:
         return self._report_delegate
 
     def get_required_content_generator(self) -> ContentGeneratorProtocol:
@@ -335,7 +335,7 @@ def get_ocr_worker(
     return get_inference_manager().get_ocr_worker(ocr_handle=ocr_handle)
 
 
-def get_report_delegate() -> InferenceReportDelegate:
+def get_report_delegate() -> ReportingProtocol:
     return get_pipelex_hub().get_report_delegate()
 
 

@@ -4,11 +4,11 @@ from pipelex.cogt.exceptions import CogtError, MissingDependencyError
 from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_platform import ImggPlatform
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
-from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.plugin_manager import PluginHandle
 from pipelex.hub import get_plugin_manager, get_secret
 from pipelex.plugins.openai.openai_imgg_worker import OpenAIImggWorker
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 
 
@@ -20,7 +20,7 @@ class ImggWorkerFactory:
     def make_imgg_worker(
         self,
         imgg_engine: ImggEngine,
-        report_delegate: Optional[InferenceReportDelegate] = None,
+        report_delegate: Optional[ReportingProtocol] = None,
     ) -> ImggWorkerAbstract:
         imgg_sdk_handle = PluginHandle.get_for_imgg_engine(imgg_platform=imgg_engine.imgg_platform)
         plugin_manager = get_plugin_manager()

@@ -7,13 +7,13 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, SdkTypeError
-from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_func import llm_job_func
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -23,7 +23,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
         sdk_instance: Any,
         llm_engine: LLMEngine,
         structure_method: Optional[StructureMethod] = None,
-        report_delegate: Optional[InferenceReportDelegate] = None,
+        report_delegate: Optional[ReportingProtocol] = None,
     ):
         super().__init__(llm_engine=llm_engine, structure_method=structure_method, report_delegate=report_delegate)
 

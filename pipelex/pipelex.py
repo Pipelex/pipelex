@@ -11,7 +11,6 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.inference.inference_manager import InferenceManager
-from pipelex.cogt.inference.inference_report_manager import InferenceReportManager
 from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
 from pipelex.cogt.plugin_manager import PluginManager
@@ -27,6 +26,7 @@ from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerN
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.track.pipeline_tracker import PipelineTracker
 from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerNoOp, PipelineTrackerProtocol
+from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
 from pipelex.tools.config.models import ConfigRoot
 from pipelex.tools.func_registry import func_registry
@@ -56,6 +56,7 @@ class Pipelex:
         pipeline_manager: Optional[PipelineManager] = None,
         pipeline_tracker: Optional[PipelineTracker] = None,
         activity_manager: Optional[ActivityManagerProtocol] = None,
+        reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> Self:
         if cls._pipelex_instance is not None:
             raise RuntimeError(
@@ -82,6 +83,7 @@ class Pipelex:
         pipeline_manager: Optional[PipelineManager] = None,
         pipeline_tracker: Optional[PipelineTracker] = None,
         activity_manager: Optional[ActivityManagerProtocol] = None,
+        reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> None:
         self.pipelex_hub = pipelex_hub or PipelexHub()
         set_pipelex_hub(self.pipelex_hub)
@@ -119,8 +121,8 @@ class Pipelex:
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
-        self.report_manager = InferenceReportManager(report_config=get_config().cogt.cogt_report_config)
-        self.pipelex_hub.set_report_delegate(self.report_manager)
+        self.reporting_delegate = reporting_delegate or ReportingNoOp()
+        self.pipelex_hub.set_report_delegate(self.reporting_delegate)
 
         # pipelex libraries
         self.library_manager = LibraryManager()
@@ -164,7 +166,7 @@ class Pipelex:
 
         # cogt
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
-        self.report_manager.setup()
+        self.reporting_delegate.setup()
         class_registry.register_classes(PipelexRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
             log.debug("Registering test models for unit testing")
@@ -214,7 +216,7 @@ class Pipelex:
 
         # cogt
         self.inference_manager.teardown()
-        self.report_manager.teardown()
+        self.reporting_delegate.teardown()
         self.llm_model_provider.teardown()
 
         # tools

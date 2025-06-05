@@ -5,7 +5,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import OcrCapabilityError, SdkTypeError
-from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_input import OcrInputError
 from pipelex.cogt.ocr.ocr_job import OcrJob
@@ -13,6 +12,7 @@ from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract, ocr_job_func
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.plugins.mistral.mistral_utils import upload_file_for_ocr
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 
@@ -22,7 +22,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         self,
         sdk_instance: Any,
         ocr_engine: OcrEngine,
-        report_delegate: Optional[InferenceReportDelegate] = None,
+        report_delegate: Optional[ReportingProtocol] = None,
     ):
         super().__init__(ocr_engine=ocr_engine, report_delegate=report_delegate)
 

@@ -5,13 +5,13 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.config_cogt import CogtReportConfig
-from pipelex.cogt.exceptions import InferenceReportManagerError
+from pipelex.cogt.exceptions import ReportingManagerError
 from pipelex.cogt.inference.cost_registry import CostRegistry
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
-from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 
 LLMUsageRegistryRoot = List[LLMTokensUsage]
@@ -27,7 +27,7 @@ class UsageRegistry(RootModel[LLMUsageRegistryRoot]):
         self.root.append(llm_tokens_usage)
 
 
-class InferenceReportManager(InferenceReportDelegate):
+class ReportingManager(ReportingProtocol):
     def __init__(self, report_config: CogtReportConfig):
         self._usage_registries: Dict[str, UsageRegistry] = {}
         self._report_config = report_config
@@ -36,10 +36,12 @@ class InferenceReportManager(InferenceReportDelegate):
     # Manager lifecycle
     ############################################################
 
+    @override
     def setup(self):
         self._usage_registries.clear()
         self._usage_registries[SpecialPipelineId.UNTITLED] = UsageRegistry()
 
+    @override
     def teardown(self):
         self._usage_registries.clear()
 
@@ -49,7 +51,7 @@ class InferenceReportManager(InferenceReportDelegate):
 
     def _get_registry(self, pipeline_run_id: str) -> UsageRegistry:
         if pipeline_run_id not in self._usage_registries:
-            raise InferenceReportManagerError(f"Registry for pipeline '{pipeline_run_id}' does not exist")
+            raise ReportingManagerError(f"Registry for pipeline '{pipeline_run_id}' does not exist")
         return self._usage_registries[pipeline_run_id]
 
     def _report_llm_job(self, llm_job: LLMJob):
@@ -71,13 +73,13 @@ class InferenceReportManager(InferenceReportDelegate):
             log.verbose(llm_token_cost_report, title="Token Cost report")
 
     ############################################################
-    # InferenceReportDelegate
+    # ReportingProtocol
     ############################################################
 
     @override
     def open_registry(self, pipeline_run_id: str):
         if pipeline_run_id in self._usage_registries:
-            raise InferenceReportManagerError(f"Registry for pipeline '{pipeline_run_id}' already exists")
+            raise ReportingManagerError(f"Registry for pipeline '{pipeline_run_id}' already exists")
         self._usage_registries[pipeline_run_id] = UsageRegistry()
 
     @override

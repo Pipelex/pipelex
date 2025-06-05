@@ -1,19 +1,19 @@
 from typing import Optional
 
 from pipelex.cogt.exceptions import MissingDependencyError
-from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.cogt.plugin_manager import PluginHandle
 from pipelex.hub import get_plugin_manager
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
 class OcrWorkerFactory:
     def make_ocr_worker(
         self,
         ocr_engine: OcrEngine,
-        report_delegate: Optional[InferenceReportDelegate] = None,
+        report_delegate: Optional[ReportingProtocol] = None,
     ) -> OcrWorkerAbstract:
         ocr_sdk_handle = PluginHandle.get_for_ocr_engine(ocr_platform=ocr_engine.ocr_platform)
         plugin_manager = get_plugin_manager()

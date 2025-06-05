@@ -1,7 +1,6 @@
 from typing import Optional
 
 from pipelex.cogt.exceptions import MissingDependencyError
-from pipelex.cogt.inference.inference_report_delegate import InferenceReportDelegate
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
@@ -9,13 +8,14 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.plugin_manager import PluginHandle
 from pipelex.config import get_config
 from pipelex.hub import get_plugin_manager
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
 class LLMWorkerFactory:
     @staticmethod
     def make_llm_worker(
         llm_engine: LLMEngine,
-        report_delegate: Optional[InferenceReportDelegate] = None,
+        report_delegate: Optional[ReportingProtocol] = None,
     ) -> LLMWorkerAbstract:
         llm_sdk_handle = PluginHandle.get_for_llm_platform(llm_platform=llm_engine.llm_platform)
         plugin_manager = get_plugin_manager()

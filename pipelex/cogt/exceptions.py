@@ -15,7 +15,7 @@ class CostRegistryError(CogtError):
     pass
 
 
-class InferenceReportManagerError(CogtError):
+class ReportingManagerError(CogtError):
     pass
 
 
