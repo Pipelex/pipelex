@@ -61,6 +61,23 @@ class PipeStatus(BaseModel):
     pipe_output: Optional[PipeOutput] = None
 
 
+class PipelineRequest(BaseModel):
+    """
+    Request for executing a pipeline.
+
+    Attributes:
+        working_memory: WorkingMemory instance passed to the pipeline
+        output_name: Name of the output slot to write to
+        output_multiplicity: Output multiplicity
+        dynamic_output_concept_code: Override the dynamic output concept code
+    """
+
+    working_memory: Optional[WorkingMemory] = None
+    output_name: Optional[str] = None
+    output_multiplicity: Optional[PipeOutputMultiplicity] = None
+    dynamic_output_concept_code: Optional[str] = None
+
+
 class PipeStartResponse(ApiResponse):
     """
     Response for pipe execution requests when starting a pipe in non-blocking mode.
