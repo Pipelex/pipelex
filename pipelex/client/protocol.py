@@ -15,12 +15,12 @@ class PipelineState(StrEnum):
     Enum representing the possible states of a pipe execution.
     """
 
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-    ERROR = "error"
-    STARTED = "started"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    ERROR = "ERROR"
+    STARTED = "STARTED"
 
 
 class ApiResponse(BaseModel):
@@ -106,12 +106,12 @@ class PipelexProtocol(Protocol):
             output_name (Optional[str]): Target output slot name
             output_multiplicity (Optional[PipeOutputMultiplicity]): Output multiplicity setting
             dynamic_output_concept_code (Optional[str]): Override for dynamic output concept
-
         Returns:
             PipelineResponse: Complete execution results including pipeline state and output
 
         Raises:
             HTTPException: On execution failure or error
+            ClientAuthenticationError: If API token is missing for API execution
         """
         ...
 
@@ -139,6 +139,7 @@ class PipelexProtocol(Protocol):
 
         Raises:
             HTTPException: On pipeline start failure
+            ClientAuthenticationError: If API token is missing for API execution
         """
         ...
 
@@ -155,6 +156,7 @@ class PipelexProtocol(Protocol):
 
         Raises:
             HTTPException: On cancellation failure or invalid pipeline_run_id
+            ClientAuthenticationError: If API token is missing
         """
         ...
 
@@ -171,5 +173,6 @@ class PipelexProtocol(Protocol):
 
         Raises:
             HTTPException: On state check failure or invalid pipeline_run_id
+            ClientAuthenticationError: If API token is missing
         """
         ...
