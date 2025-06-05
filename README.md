@@ -84,26 +84,29 @@ We **highly** recommend installing an extension for TOML files into your IDE of 
 
 ### Optional Features
 
-The package supports additional features that can be installed separately:
+The package supports the following additional features:
+
+- `anthropic`: Anthropic/Claude support
+- `google`: Google models (Vertex) support
+- `mistralai`: Mistral AI support
+- `bedrock`: AWS Bedrock support
+- `fal`: Image generation with Black Forest Labs "FAL" service
+
+Install any combination of features using `uv` (or else):
 
 ```bash
-# Using pip
-pip install "pipelex[anthropic]"    # For Anthropic/Claude support
-pip install "pipelex[google]"       # For Google API support
-pip install "pipelex[mistralai]"    # For Mistral AI support
-pip install "pipelex[bedrock]"      # For AWS Bedrock support
-pip install "pipelex[fal]"          # For image generation with Black Forest Labs "FAL" service
-
-# Using poetry
-poetry add "pipelex[anthropic,google,mistralai,bedrock,fal]"  # Install all features
-
-# Using uv
 uv pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
 ```
 
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to get started, including development setup and testing information.
+
+## 👥 Join the Community
+
+Join our vibrant Discord community to connect with other developers, share your experiences, and get help with your Pipelex projects!
+
+[![Discord](https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/SReshKQjWt)
 
 ## 💬 Support
 
@@ -114,10 +117,6 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 ## ⭐ Star Us!
 
 If you find Pipelex helpful, please consider giving us a star! It helps us reach more developers and continue improving the tool.
-
-## 👥 Contributors
-
-Contributions are welcome, check out our [Contributing to Pipelex](CONTRIBUTING.md) guide.
 
 ## 📝 License
 

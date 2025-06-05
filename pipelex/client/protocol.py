@@ -20,6 +20,7 @@ class PipeState(StrEnum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     ERROR = "error"
+    STARTED = "started"
 
 
 class ApiResponse(BaseModel):

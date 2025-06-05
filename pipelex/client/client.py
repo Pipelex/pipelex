@@ -14,8 +14,8 @@ from pipelex.client.protocol import (
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import ClientAuthenticationError
-from pipelex.pipeline.execute import execute_pipeline as execute_pipeline
-from pipelex.pipeline.start import start_pipeline as start_pipeline
+from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.start import start_pipeline
 
 
 class PipelexClient(PipelexProtocol):
@@ -104,7 +104,7 @@ class PipelexClient(PipelexProtocol):
             created_at = datetime.now(timezone.utc).isoformat()
 
             return PipeStartResponse(
-                status="success",
+                status=PipeState.STARTED,
                 pipe_execution_id=pipeline_run_id,
                 created_at=created_at,
             )
