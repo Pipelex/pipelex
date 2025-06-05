@@ -4,7 +4,7 @@ import httpx
 from kajson import kajson
 from typing_extensions import override
 
-from pipelex.client.protocol import ApiResponse, PipelexProtocol, PipelineRequest, PipeStartResponse, PipeStatus
+from pipelex.client.protocol import ApiResponse, PipelexProtocol, PipelineRequest, PipelineResponse, PipelineState
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.tools.environment import get_required_env
@@ -51,7 +51,7 @@ class PipelexApiClient(PipelexProtocol):
         output_name: Optional[str] = None,
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
-    ) -> PipeStatus:
+    ) -> PipelineResponse:
         """
         Execute a pipe with the given request and wait for completion.
         This is a blocking operation that does not return until the pipe execution
@@ -71,7 +71,7 @@ class PipelexApiClient(PipelexProtocol):
             dynamic_output_concept_code=dynamic_output_concept_code,
         )
         response = await self._make_api_call(f"pipelex/v1/pipes/{pipe_code}/execute", request=kajson.dumps(pipeline_request))
-        return cast(PipeStatus, kajson.loads(response))
+        return cast(PipelineResponse, kajson.loads(response))
         # raise NotImplementedError("Pipelex API functionality is coming soon!")
 
     @override
@@ -82,7 +82,7 @@ class PipelexApiClient(PipelexProtocol):
         output_name: Optional[str] = None,
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
-    ) -> PipeStartResponse:
+    ) -> PipelineResponse:
         raise NotImplementedError("Pipelex API functionality is coming soon!")
 
     @override
@@ -105,10 +105,10 @@ class PipelexApiClient(PipelexProtocol):
         return ApiResponse(**response)
 
     @override
-    async def get_pipeline_status(
+    async def get_pipeline_state(
         self,
         pipeline_run_id: str,
-    ) -> PipeStatus:
+    ) -> PipelineState:
         """
         Get the current status of a pipe execution.
         This method allows checking the current status of a pipe execution
@@ -121,5 +121,5 @@ class PipelexApiClient(PipelexProtocol):
             HTTPException: If the request fails or returns a non-200 status code
         """
         response = await self._make_api_call(f"pipelex/v1/pipeline/{pipeline_run_id}/status", request=None)
-        return cast(PipeStatus, kajson.loads(response))
+        return cast(PipelineState, kajson.loads(response))
         # raise NotImplementedError("Pipelex API functionality is coming soon!")

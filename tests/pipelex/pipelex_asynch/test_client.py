@@ -3,7 +3,7 @@ import pytest
 from pydantic import BaseModel
 
 from pipelex.client.client import PipelexClient
-from pipelex.client.protocol import PipeState
+from pipelex.client.protocol import PipelineState
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import TextContent
 from pipelex.core.stuff_factory import StuffFactory
@@ -165,6 +165,6 @@ This amendment applies only to transactions originating from DataAnalytics Corp'
             pretty_print(result)
 
             # Verify result
-            assert result.pipe_code == example.pipe_code
-            assert result.state == PipeState.COMPLETED
+            assert result.pipeline_run_id == example.pipe_code
+            assert result.pipeline_state == PipelineState.COMPLETED
             assert result.pipe_output is not None

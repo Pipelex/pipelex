@@ -7,9 +7,8 @@ from pipelex.client.api_client import PipelexApiClient
 from pipelex.client.protocol import (
     ApiResponse,
     PipelexProtocol,
-    PipeStartResponse,
-    PipeState,
-    PipeStatus,
+    PipelineResponse,
+    PipelineState,
 )
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
@@ -54,8 +53,9 @@ class PipelexClient(PipelexProtocol):
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
         use_local_execution: bool = True,
-    ) -> PipeStatus:
+    ) -> PipelineResponse:
         # Local execution
+        created_at = datetime.now(timezone.utc).isoformat()
         if use_local_execution:
             pipe_output, pipeline_run_id = await execute_pipeline(
                 pipe_code=pipe_code,
@@ -64,10 +64,10 @@ class PipelexClient(PipelexProtocol):
                 output_multiplicity=output_multiplicity,
                 dynamic_output_concept_code=dynamic_output_concept_code,
             )
-            return PipeStatus(
-                pipe_execution_id=pipeline_run_id,
-                pipe_code=pipe_code,
-                state=PipeState.COMPLETED,
+            return PipelineResponse(
+                pipeline_run_id=pipeline_run_id,
+                created_at=created_at,
+                pipeline_state=PipelineState.COMPLETED,
                 pipe_output=pipe_output,
             )
 
@@ -90,7 +90,7 @@ class PipelexClient(PipelexProtocol):
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
         use_local_execution: bool = True,
-    ) -> PipeStartResponse:
+    ) -> PipelineResponse:
         # Local execution
         if use_local_execution:
             pipeline_run_id, _ = await start_pipeline(
@@ -103,9 +103,9 @@ class PipelexClient(PipelexProtocol):
 
             created_at = datetime.now(timezone.utc).isoformat()
 
-            return PipeStartResponse(
-                status=PipeState.STARTED,
-                pipe_execution_id=pipeline_run_id,
+            return PipelineResponse(
+                pipeline_run_id=pipeline_run_id,
+                pipeline_state=PipelineState.STARTED,
                 created_at=created_at,
             )
 
@@ -125,6 +125,6 @@ class PipelexClient(PipelexProtocol):
         return await api_client.cancel_pipeline(pipeline_run_id)
 
     @override
-    async def get_pipeline_status(self, pipeline_run_id: str) -> PipeStatus:
+    async def get_pipeline_state(self, pipeline_run_id: str) -> PipelineState:
         api_client = await self.start_api_client()
-        return await api_client.get_pipeline_status(pipeline_run_id)
+        return await api_client.get_pipeline_state(pipeline_run_id)
