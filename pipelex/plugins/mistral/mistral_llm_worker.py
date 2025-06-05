@@ -23,9 +23,9 @@ class MistralLLMWorker(LLMWorkerAbstract):
         sdk_instance: Any,
         llm_engine: LLMEngine,
         structure_method: Optional[StructureMethod] = None,
-        report_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        super().__init__(llm_engine=llm_engine, structure_method=structure_method, report_delegate=report_delegate)
+        super().__init__(llm_engine=llm_engine, structure_method=structure_method, reporting_delegate=reporting_delegate)
 
         if not isinstance(sdk_instance, Mistral):
             raise SdkTypeError(f"Provided LLM sdk_instance for {self.__class__.__name__} is not of type Mistral: it's a '{type(sdk_instance)}'")

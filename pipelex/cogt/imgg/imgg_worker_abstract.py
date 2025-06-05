@@ -43,8 +43,8 @@ def imgg_job_func(func: F) -> F:
 
         # Report job
         imgg_job.imgg_job_after_complete()
-        if self.report_delegate:
-            self.report_delegate.report_inference_job(inference_job=imgg_job)
+        if self.reporting_delegate:
+            self.reporting_delegate.report_inference_job(inference_job=imgg_job)
 
         return result
 
@@ -55,9 +55,9 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
     def __init__(
         self,
         imgg_engine: ImggEngine,
-        report_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        InferenceWorkerAbstract.__init__(self, report_delegate=report_delegate)
+        InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
         self.imgg_engine = imgg_engine
 
     #########################################################

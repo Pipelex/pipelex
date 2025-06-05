@@ -24,7 +24,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         self,
         llm_engine: LLMEngine,
         structure_method: Optional[StructureMethod],
-        report_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: Optional[ReportingProtocol] = None,
     ):
         """
         Initialize the LLMWorker.
@@ -32,9 +32,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         Args:
             llm_engine (LLMEngine): The LLM engine to be used by the worker.
             structure_method (Optional[StructureMethod]): The structure method to be used by the worker.
-            report_delegate (Optional[ReportingProtocol]): An optional report delegate for reporting unit jobs.
+            reporting_delegate (Optional[ReportingProtocol]): An optional report delegate for reporting unit jobs.
         """
-        InferenceWorkerAbstract.__init__(self, report_delegate=report_delegate)
+        InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
         self.llm_engine = llm_engine
         self.structure_method = structure_method
 

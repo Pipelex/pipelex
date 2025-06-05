@@ -43,8 +43,8 @@ def ocr_job_func(func: F) -> F:
 
         # Report job
         ocr_job.ocr_job_after_complete()
-        if self.report_delegate:
-            self.report_delegate.report_inference_job(inference_job=ocr_job)
+        if self.reporting_delegate:
+            self.reporting_delegate.report_inference_job(inference_job=ocr_job)
 
         return result
 
@@ -55,9 +55,9 @@ class OcrWorkerAbstract(InferenceWorkerAbstract):
     def __init__(
         self,
         ocr_engine: OcrEngine,
-        report_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        InferenceWorkerAbstract.__init__(self, report_delegate=report_delegate)
+        InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
         self.ocr_engine = ocr_engine
 
     #########################################################

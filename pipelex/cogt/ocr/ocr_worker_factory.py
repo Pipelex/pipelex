@@ -13,7 +13,7 @@ class OcrWorkerFactory:
     def make_ocr_worker(
         self,
         ocr_engine: OcrEngine,
-        report_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> OcrWorkerAbstract:
         ocr_sdk_handle = PluginHandle.get_for_ocr_engine(ocr_platform=ocr_engine.ocr_platform)
         plugin_manager = get_plugin_manager()
@@ -40,7 +40,7 @@ class OcrWorkerFactory:
                 ocr_worker = MistralOcrWorker(
                     sdk_instance=ocr_sdk_instance,
                     ocr_engine=ocr_engine,
-                    report_delegate=report_delegate,
+                    reporting_delegate=reporting_delegate,
                 )
 
         return ocr_worker

@@ -67,8 +67,8 @@ def llm_job_func(func: F) -> F:
 
         # Report job
         llm_job.llm_job_after_complete()
-        if self.report_delegate:
-            self.report_delegate.report_inference_job(inference_job=llm_job)
+        if self.reporting_delegate:
+            self.reporting_delegate.report_inference_job(inference_job=llm_job)
 
         return result
 

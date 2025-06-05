@@ -72,7 +72,7 @@ class InferenceManager(InferenceManagerProtocol):
         llm_engine = LLMEngineFactory.make_llm_engine(llm_engine_blueprint=llm_engine_blueprint)
         llm_worker = LLMWorkerFactory.make_llm_worker(
             llm_engine=llm_engine,
-            report_delegate=get_report_delegate(),
+            reporting_delegate=get_report_delegate(),
         )
         self.llm_workers[llm_handle] = llm_worker
         return llm_worker
@@ -118,7 +118,7 @@ class InferenceManager(InferenceManagerProtocol):
         log.verbose(imgg_engine.desc, title=f"Setting up ImgEngine for '{imgg_handle}'")
         imgg_worker = self.imgg_worker_factory.make_imgg_worker(
             imgg_engine=imgg_engine,
-            report_delegate=get_report_delegate(),
+            reporting_delegate=get_report_delegate(),
         )
         self.imgg_workers[imgg_handle] = imgg_worker
         return imgg_worker
@@ -154,7 +154,7 @@ class InferenceManager(InferenceManagerProtocol):
         log.verbose(ocr_engine.desc, title=f"Setting up OcrEngine for '{ocr_handle}'")
         ocr_worker = self.ocr_worker_factory.make_ocr_worker(
             ocr_engine=ocr_engine,
-            report_delegate=get_report_delegate(),
+            reporting_delegate=get_report_delegate(),
         )
         self.ocr_workers[ocr_handle] = ocr_worker
         return ocr_worker

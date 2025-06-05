@@ -22,9 +22,9 @@ class MistralOcrWorker(OcrWorkerAbstract):
         self,
         sdk_instance: Any,
         ocr_engine: OcrEngine,
-        report_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        super().__init__(ocr_engine=ocr_engine, report_delegate=report_delegate)
+        super().__init__(ocr_engine=ocr_engine, reporting_delegate=reporting_delegate)
 
         if not isinstance(sdk_instance, Mistral):
             raise SdkTypeError(f"Provided OCR sdk_instance for {self.__class__.__name__} is not of type Mistral: it's a '{type(sdk_instance)}'")

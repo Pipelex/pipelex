@@ -57,7 +57,7 @@ class TestLLMEngines:
             )
             llm_worker = llm_worker_factory.make_llm_worker(
                 llm_engine=llm_engine,
-                report_delegate=get_report_delegate(),
+                reporting_delegate=get_report_delegate(),
             )
             llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
                 system_text=None,
@@ -125,7 +125,7 @@ class TestLLMEngines:
             )
             llm_worker = llm_worker_factory.make_llm_worker(
                 llm_engine=llm_engine,
-                report_delegate=get_report_delegate(),
+                reporting_delegate=get_report_delegate(),
             )
             llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
                 system_text=None,

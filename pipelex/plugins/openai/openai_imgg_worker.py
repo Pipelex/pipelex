@@ -25,9 +25,9 @@ class OpenAIImggWorker(ImggWorkerAbstract):
         self,
         sdk_instance: Any,
         imgg_engine: ImggEngine,
-        report_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        super().__init__(imgg_engine=imgg_engine, report_delegate=report_delegate)
+        super().__init__(imgg_engine=imgg_engine, reporting_delegate=reporting_delegate)
 
         if not isinstance(sdk_instance, openai.AsyncOpenAI):
             raise SdkTypeError(f"Provided Imgg sdk_instance is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'")

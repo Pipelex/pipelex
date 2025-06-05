@@ -21,13 +21,13 @@ class BedrockLLMWorker(LLMWorkerAbstract):
         sdk_instance: Any,
         llm_engine: LLMEngine,
         structure_method: Optional[StructureMethod] = None,
-        report_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: Optional[ReportingProtocol] = None,
     ):
         LLMWorkerAbstract.__init__(
             self,
             llm_engine=llm_engine,
             structure_method=structure_method,
-            report_delegate=report_delegate,
+            reporting_delegate=reporting_delegate,
         )
 
         if not isinstance(sdk_instance, BedrockClientProtocol):

@@ -126,8 +126,8 @@ class PipelexHub:
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
 
-    def set_report_delegate(self, report_delegate: ReportingProtocol):
-        self._report_delegate = report_delegate
+    def set_report_delegate(self, reporting_delegate: ReportingProtocol):
+        self._report_delegate = reporting_delegate
 
     def set_content_generator(self, content_generator: ContentGeneratorProtocol):
         self._content_generator = content_generator
