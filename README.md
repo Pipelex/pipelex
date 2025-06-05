@@ -92,8 +92,19 @@ The package supports the following additional features:
 - `bedrock`: AWS Bedrock support
 - `fal`: Image generation with Black Forest Labs "FAL" service
 
-Install any combination of features using `uv` (or else):
+Install all extras:
 
+Using `pip`:
+```bash
+pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
+```
+
+Using `poetry`:
+```bash
+poetry add "pipelex[anthropic,google,mistralai,bedrock,fal]"
+```
+
+Using `uv`:
 ```bash
 uv pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
 ```
