@@ -84,9 +84,11 @@ class PipelexProtocol(Protocol):
 
     Attributes:
         api_token (Optional[str]): Authentication token for API access
+        api_base_url (Optional[str]): Base URL for the API
     """
 
-    api_token: Optional[str] = None
+    api_token: str
+    api_base_url: str
 
     @abstractmethod
     async def execute_pipeline(
@@ -140,39 +142,5 @@ class PipelexProtocol(Protocol):
         Raises:
             HTTPException: On pipeline start failure
             ClientAuthenticationError: If API token is missing for API execution
-        """
-        ...
-
-    @abstractmethod
-    async def cancel_pipeline(self, pipeline_run_id: str) -> ApiResponse:
-        """
-        Cancel a running pipeline execution.
-
-        Args:
-            pipeline_run_id (str): Unique identifier of the pipeline execution to cancel
-
-        Returns:
-            ApiResponse: Response indicating cancellation success or failure
-
-        Raises:
-            HTTPException: On cancellation failure or invalid pipeline_run_id
-            ClientAuthenticationError: If API token is missing
-        """
-        ...
-
-    @abstractmethod
-    async def get_pipeline_state(self, pipeline_run_id: str) -> PipelineState:
-        """
-        Get the current state of a pipeline execution.
-
-        Args:
-            pipeline_run_id (str): Unique identifier of the pipeline execution to check
-
-        Returns:
-            PipelineState: Current state of the pipeline execution
-
-        Raises:
-            HTTPException: On state check failure or invalid pipeline_run_id
-            ClientAuthenticationError: If API token is missing
         """
         ...

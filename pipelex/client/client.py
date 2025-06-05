@@ -4,7 +4,7 @@ import httpx
 from kajson import kajson
 from typing_extensions import override
 
-from pipelex.client.protocol import ApiResponse, PipelexProtocol, PipelineRequest, PipelineResponse, PipelineState
+from pipelex.client.protocol import PipelexProtocol, PipelineRequest, PipelineResponse
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import ClientAuthenticationError
@@ -78,25 +78,6 @@ class PipelexClient(PipelexProtocol):
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
     ) -> PipelineResponse:
-        """
-        Execute a pipeline with the given request and wait for completion.
-        This is a blocking operation that does not return until the pipeline execution
-        is complete. For long-running pipelines, consider using start_pipeline instead.
-
-        Args:
-            pipe_code: The unique identifier for the pipeline to execute
-            working_memory: Memory context passed to the pipeline
-            output_name: Target output slot name
-            output_multiplicity: Output multiplicity setting
-            dynamic_output_concept_code: Override for dynamic output concept
-
-        Returns:
-            PipelineResponse: Complete execution results including pipeline state and output
-
-        Raises:
-            HTTPException: If the API request fails or returns a non-200 status code
-            ClientAuthenticationError: If API token is missing for API execution
-        """
         pipeline_request = PipelineRequest(
             working_memory=working_memory,
             output_name=output_name,
@@ -115,23 +96,6 @@ class PipelexClient(PipelexProtocol):
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
     ) -> PipelineResponse:
-        """
-        Start a pipeline execution asynchronously without waiting for completion.
-
-        Args:
-            pipe_code: The unique identifier for the pipeline to execute
-            working_memory: Memory context passed to the pipeline
-            output_name: Target output slot name
-            output_multiplicity: Output multiplicity setting
-            dynamic_output_concept_code: Override for dynamic output concept
-
-        Returns:
-            PipelineResponse: Initial response with pipeline_run_id and created_at timestamp
-
-        Raises:
-            HTTPException: On pipeline start failure
-            ClientAuthenticationError: If API token is missing for API execution
-        """
         pipeline_request = PipelineRequest(
             working_memory=working_memory,
             output_name=output_name,
@@ -140,49 +104,3 @@ class PipelexClient(PipelexProtocol):
         )
         response = await self._make_api_call(f"pipelex/v1/pipeline/{pipe_code}/start", request=kajson.dumps(pipeline_request))
         return cast(PipelineResponse, kajson.loads(response))
-
-    @override
-    async def cancel_pipeline(
-        self,
-        pipeline_run_id: str,
-    ) -> ApiResponse:
-        """
-        Cancel a running pipeline execution.
-        This method attempts to cancel a pipeline execution that is currently in progress.
-        Once cancelled, a pipeline cannot be resumed and must be started again if needed.
-
-        Args:
-            pipeline_run_id: The unique identifier for the pipeline execution
-
-        Returns:
-            ApiResponse indicating success or failure of the cancellation
-
-        Raises:
-            HTTPException: If the request fails or returns a non-200 status code
-            ClientAuthenticationError: If API token is missing
-        """
-        response = await self._make_api_call(f"pipelex/v1/pipeline/{pipeline_run_id}/cancel", request=None)
-        return ApiResponse(**response)
-
-    @override
-    async def get_pipeline_state(
-        self,
-        pipeline_run_id: str,
-    ) -> PipelineState:
-        """
-        Get the current status of a pipeline execution.
-        This method allows checking the current status of a pipeline execution
-        that was started with start_pipeline.
-
-        Args:
-            pipeline_run_id: The unique identifier for the pipeline execution
-
-        Returns:
-            PipelineState with the current execution status
-
-        Raises:
-            HTTPException: If the request fails or returns a non-200 status code
-            ClientAuthenticationError: If API token is missing
-        """
-        response = await self._make_api_call(f"pipelex/v1/pipeline/{pipeline_run_id}/status", request=None)
-        return cast(PipelineState, kajson.loads(response))
