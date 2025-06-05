@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Optional, Protocol
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing_extensions import runtime_checkable
 
 from pipelex.core.pipe_output import PipeOutput
