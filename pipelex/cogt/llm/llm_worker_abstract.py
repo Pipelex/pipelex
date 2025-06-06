@@ -13,12 +13,6 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-from pipelex.types import StrEnum
-
-
-class LLMWorkerJobFuncName(StrEnum):
-    GEN_TEXT = "gen_text"
-    GEN_OBJECT = "gen_object"
 
 
 class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):

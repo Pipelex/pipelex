@@ -1,8 +1,7 @@
 from abc import abstractmethod
-from functools import wraps
-from typing import Any, Callable, Optional, TypeVar, cast
+from typing import Optional
 
-from typing_extensions import Awaitable, override
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
