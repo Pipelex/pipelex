@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Type
 
@@ -23,6 +24,10 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import StrEnum
+
+
+class LLMDeckNotFoundError(LibraryError):
+    pass
 
 
 class LibraryComponent(StrEnum):
@@ -74,8 +79,12 @@ class LibraryManager:
     def load_deck(self) -> LLMDeck:
         llm_deck_paths = LibraryConfig.get_llm_deck_paths()
         full_llm_deck_dict: Dict[str, Any] = {}
+        if not llm_deck_paths:
+            raise LLMDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
 
         for llm_deck_path in llm_deck_paths:
+            if not os.path.exists(llm_deck_path):
+                raise LLMDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
             llm_deck_dict = load_toml_from_path(path=llm_deck_path)
             log.debug(f"Loaded LLM deck from {llm_deck_path}")
             log.verbose(llm_deck_dict)
@@ -88,7 +97,6 @@ class LibraryManager:
         log.debug("LibraryManager loading combo libraries")
         # Find all .toml files in the directories and their subdirectories
         toml_file_paths: List[Path] = []
-
         for libraries_path in library_paths:
             # Use the existing utility function specifically for TOML files
             found_file_paths = find_files_in_dir(

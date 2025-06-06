@@ -199,6 +199,7 @@ class Pipelex:
             self.library_manager.load_libraries()
             if self.library_manager.llm_deck is None:
                 raise PipelexSetupError("LLM deck is not loaded")
+
             self.pipelex_hub.set_llm_deck_provider(llm_deck_provider=self.library_manager.llm_deck)
             self.library_manager.validate_libraries()
         except ValidationError as exc:
