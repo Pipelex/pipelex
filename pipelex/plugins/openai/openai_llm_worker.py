@@ -9,7 +9,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_job_func import llm_job_func
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
@@ -45,8 +44,7 @@ class OpenAILLMWorker(LLMWorkerAbstract):
     #########################################################
 
     @override
-    @llm_job_func
-    async def gen_text(
+    async def _gen_text(
         self,
         llm_job: LLMJob,
     ) -> str:
@@ -142,8 +140,7 @@ class OpenAILLMWorker(LLMWorkerAbstract):
         return response_text
 
     @override
-    @llm_job_func
-    async def gen_object(
+    async def _gen_object(
         self,
         llm_job: LLMJob,
         schema: Type[BaseModelTypeVar],

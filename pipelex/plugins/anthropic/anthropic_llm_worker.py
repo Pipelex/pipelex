@@ -7,7 +7,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_job_func import llm_job_func
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
@@ -71,8 +70,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         return max_tokens
 
     @override
-    @llm_job_func
-    async def gen_text(
+    async def _gen_text(
         self,
         llm_job: LLMJob,
     ) -> str:
@@ -102,8 +100,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         return full_reply_content
 
     @override
-    @llm_job_func
-    async def gen_object(
+    async def _gen_object(
         self,
         llm_job: LLMJob,
         schema: Type[BaseModelTypeVar],

@@ -27,7 +27,7 @@ def get_async_worker_and_job(llm_preset_id: str, user_text: str):
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestAsyncCogtLLMGenObject:
+class TestLLMGenObject:
     @pytest.mark.parametrize("user_text, expected_instance", LLMTestCases.SINGLE_OBJECT)
     async def test_gen_object_async_using_handle(self, llm_job_params: LLMJobParams, llm_handle: str, user_text: str, expected_instance: BaseModel):
         llm_worker = get_llm_worker(llm_handle=llm_handle)
