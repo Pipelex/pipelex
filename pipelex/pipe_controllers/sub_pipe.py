@@ -13,8 +13,6 @@ from pipelex.pipe_controllers.pipe_condition import PipeCondition
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
-# TODO: decide if SubPipe should be a PipeAbstract (it's probably the case)
-# TODO: update job metadata
 class SubPipe(BaseModel):
     pipe_code: str
     output_name: Optional[str] = None

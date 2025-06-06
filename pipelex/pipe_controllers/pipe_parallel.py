@@ -47,9 +47,9 @@ class PipeParallel(PipeController):
 
         tasks: List[Coroutine[Any, Any, PipeOutput]] = []
 
-        for parallel_sub_pipe in self.parallel_sub_pipes:
+        for sub_pipe in self.parallel_sub_pipes:
             tasks.append(
-                parallel_sub_pipe.run(
+                sub_pipe.run(
                     job_metadata=job_metadata,
                     working_memory=working_memory.make_deep_copy(),
                     sub_pipe_run_params=pipe_run_params.make_deep_copy(),
