@@ -64,6 +64,8 @@ class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
     @classmethod
     def load_llm_model_library_dict(cls) -> LLMModelLibraryDict:
         libraries_path = LibraryConfig.exported_llm_integrations_path
+        if not os.path.exists(libraries_path):
+            raise LLMModelLibraryError(f"LLM model library path `{libraries_path}` not found. Please run `pipelex init-libraries` to create it.")
         llm_library: LLMModelLibraryDict = {}
         for library_file_name in sorted(os.listdir(libraries_path)):
             library_path = os.path.join(libraries_path, library_file_name)
