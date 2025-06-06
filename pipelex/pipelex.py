@@ -26,6 +26,7 @@ from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerN
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.track.pipeline_tracker import PipelineTracker
 from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerNoOp, PipelineTrackerProtocol
+from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
 from pipelex.tools.config.models import ConfigRoot
@@ -121,7 +122,11 @@ class Pipelex:
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
-        self.reporting_delegate = reporting_delegate or ReportingNoOp()
+        self.reporting_delegate: ReportingProtocol
+        if get_config().pipelex.feature_config.is_reporting_enabled:
+            self.reporting_delegate = reporting_delegate or ReportingManager(report_config=get_config().cogt.cogt_report_config)
+        else:
+            self.reporting_delegate = ReportingNoOp()
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
 
         # pipelex libraries

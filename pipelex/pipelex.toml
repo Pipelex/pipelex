@@ -7,6 +7,7 @@ extra_env_files = []
 # WIP/Experimental feature flags
 is_pipeline_tracking_enabled = false
 is_activity_tracking_enabled = false
+is_reporting_enabled = true
 
 ####################################################################################################
 # Log config
