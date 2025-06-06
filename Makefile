@@ -303,6 +303,17 @@ test-imgg: env
 tg: test-imgg
 	@echo "> done: tg = test-imgg"
 
+test-pipelex-api: env
+	$(call PRINT_TITLE,"Unit testing")
+	@if [ -n "$(TEST)" ]; then \
+		$(VENV_PYTEST) --exitfirst -m "pipelex_api" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+	else \
+		$(VENV_PYTEST) --exitfirst -m "pipelex_api" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+	fi
+
+ta: test-pipelex-api
+	@echo "> done: ta = test-pipelex-api"
+
 ############################################################################################
 ############################               Linting              ############################
 ############################################################################################
