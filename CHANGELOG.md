@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.2.14] - 2025-06-06
+
+- Added a feature flag for the `ReportingManager` in the config: 
+```bash
+[pipelex]
+[pipelex.feature_config]
+is_reporting_enabled = true
+```
+
 ## [v0.2.13] - 2025-06-06
 
 - Added Discord badge on the Readme. Join the community! -> https://discord.gg/SReshKQjWt
