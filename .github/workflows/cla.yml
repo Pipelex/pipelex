@@ -25,7 +25,7 @@ jobs:
           path-to-signatures: "signatures/version1/cla.json"
           path-to-document: "https://github.com/Pipelex/pipelex/blob/main/CLA.md"
           branch: main
-          allowlist: lchoquel,thomashebrard,antoinepipelex,bot*
+          allowlist: lchoquel,thomashebrard,bot*
           remote-organization-name: Pipelex
           remote-repository-name: cla-signatures
           signed-commit-message: "$contributorName has signed the CLA in $owner/$repo#$pullRequestNo"
