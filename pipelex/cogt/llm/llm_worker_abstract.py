@@ -49,6 +49,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     def desc(self) -> str:
         return f"LLM Worker using:\n{self.llm_engine.desc}"
 
+    def _check_can_perform_job(self, llm_job: LLMJob):
+        # This can be overridden by subclasses for specific checks
+        self._check_vision_support(llm_job=llm_job)
+
     def _check_vision_support(self, llm_job: LLMJob):
         if llm_job.llm_prompt.user_images:
             if not self.llm_engine.llm_model.is_vision_supported:
@@ -71,7 +75,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         llm_job.validate_before_execution()
 
         # Verify feasibility
-        self._check_vision_support(llm_job=llm_job)
+        self._check_can_perform_job(llm_job=llm_job)
 
         # TODO: Fix printing prompts that contain image bytes
         # log.verbose(llm_job.llm_prompt.desc, title="llm_prompt")
@@ -117,7 +121,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Verify feasibility
         if not self.llm_engine.is_gen_object_supported:
             raise LLMCapabilityError(f"LLM Engine '{self.llm_engine.tag}' does not support object generation.")
-        self._check_vision_support(llm_job=llm_job)
+        self._check_can_perform_job(llm_job=llm_job)
 
         # TODO: Fix printing prompts that contain image bytes
         # log.verbose(llm_job.llm_prompt.desc, title="llm_prompt")

@@ -9,7 +9,7 @@ from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_input import OcrInputError
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract, ocr_job_func
+from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.plugins.mistral.mistral_utils import upload_file_for_ocr
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -32,8 +32,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         self.mistral_client: Mistral = sdk_instance
 
     @override
-    @ocr_job_func
-    async def ocr_extract_pages(
+    async def _ocr_extract_pages(
         self,
         ocr_job: OcrJob,
     ) -> OcrOutput:

@@ -31,7 +31,8 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
     def desc(self) -> str:
         return f"Img Worker using:\n{self.imgg_engine.desc}"
 
-    def check_can_perform_job(self, imgg_job: ImggJob):
+    def _check_can_perform_job(self, imgg_job: ImggJob):
+        # This can be overridden by subclasses for specific checks
         pass
 
     async def gen_image(
@@ -44,7 +45,7 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
         imgg_job.validate_before_execution()
 
         # Verify feasibility
-        self.check_can_perform_job(imgg_job=imgg_job)
+        self._check_can_perform_job(imgg_job=imgg_job)
 
         # metadata
         imgg_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
@@ -80,7 +81,7 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
         imgg_job.validate_before_execution()
 
         # Verify feasibility
-        self.check_can_perform_job(imgg_job=imgg_job)
+        self._check_can_perform_job(imgg_job=imgg_job)
 
         # metadata
         imgg_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
