@@ -9,6 +9,14 @@ is_pipeline_tracking_enabled = false
 is_activity_tracking_enabled = false
 is_reporting_enabled = true
 
+[pipelex.reporting_config]
+is_log_costs_to_console = false
+is_generate_cost_report_file_enabled = true
+cost_report_dir_path = "reports"
+cost_report_base_name = "cost_report"
+cost_report_extension = "xlsx"
+cost_report_unit_scale = 1.0
+
 ####################################################################################################
 # Log config
 ####################################################################################################
@@ -74,14 +82,6 @@ api_key_method = "env"
 is_auto_setup_preset_llm = true
 is_auto_setup_preset_imgg = true
 is_auto_setup_preset_ocr = true
-
-[cogt.cogt_report_config]
-is_log_costs_to_console = false
-is_generate_cost_report_file_enabled = true
-cost_report_dir_path = "reports"
-cost_report_base_name = "cost_report"
-cost_report_extension = "xlsx"
-cost_report_unit_scale = 1.0
 
 [cogt.llm_config]
 default_max_images = 100

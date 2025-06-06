@@ -9,15 +9,6 @@ from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.tools.config.models import ConfigModel
 
 
-class CogtReportConfig(ConfigModel):
-    is_log_costs_to_console: bool
-    is_generate_cost_report_file_enabled: bool
-    cost_report_dir_path: str
-    cost_report_base_name: str
-    cost_report_extension: str
-    cost_report_unit_scale: float
-
-
 class OcrConfig(ConfigModel):
     ocr_handles: List[str]
     page_output_text_file_name: str
@@ -70,7 +61,6 @@ class InferenceManagerConfig(ConfigModel):
 
 class Cogt(ConfigModel):
     inference_manager_config: InferenceManagerConfig
-    cogt_report_config: CogtReportConfig
     llm_config: LLMConfig
     imgg_config: ImggConfig
     ocr_config: OcrConfig

@@ -4,12 +4,12 @@ from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.config_cogt import CogtReportConfig
 from pipelex.cogt.exceptions import ReportingManagerError
 from pipelex.cogt.inference.cost_registry import CostRegistry
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
+from pipelex.config import ReportingConfig
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
@@ -28,9 +28,9 @@ class UsageRegistry(RootModel[LLMUsageRegistryRoot]):
 
 
 class ReportingManager(ReportingProtocol):
-    def __init__(self, report_config: CogtReportConfig):
+    def __init__(self, reporting_config: ReportingConfig):
         self._usage_registries: Dict[str, UsageRegistry] = {}
-        self._report_config = report_config
+        self._reporting_config = reporting_config
 
     ############################################################
     # Manager lifecycle
@@ -63,13 +63,13 @@ class ReportingManager(ReportingProtocol):
 
         llm_token_cost_report: Optional[LLMTokenCostReport] = None
 
-        if self._report_config.is_log_costs_to_console:
+        if self._reporting_config.is_log_costs_to_console:
             llm_token_cost_report = CostRegistry.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
 
         pipeline_run_id = llm_job.job_metadata.pipeline_run_id
         self._get_registry(pipeline_run_id).add_tokens_usage(llm_tokens_usage)
 
-        if self._report_config.is_log_costs_to_console:
+        if self._reporting_config.is_log_costs_to_console:
             log.verbose(llm_token_cost_report, title="Token Cost report")
 
     ############################################################
@@ -96,19 +96,19 @@ class ReportingManager(ReportingProtocol):
     def generate_report(self, pipeline_run_id: Optional[str] = None):
         pipeline_run_id = pipeline_run_id or SpecialPipelineId.UNTITLED
         cost_report_file_path: Optional[str] = None
-        if self._report_config.is_generate_cost_report_file_enabled:
-            ensure_path(self._report_config.cost_report_dir_path)
+        if self._reporting_config.is_generate_cost_report_file_enabled:
+            ensure_path(self._reporting_config.cost_report_dir_path)
             cost_report_file_path = get_incremental_file_path(
-                base_path=self._report_config.cost_report_dir_path,
-                base_name=self._report_config.cost_report_base_name,
-                extension=self._report_config.cost_report_extension,
+                base_path=self._reporting_config.cost_report_dir_path,
+                base_name=self._reporting_config.cost_report_base_name,
+                extension=self._reporting_config.cost_report_extension,
             )
 
         registry = self._get_registry(pipeline_run_id)
         CostRegistry.generate_report(
             pipeline_run_id=pipeline_run_id,
             llm_tokens_usages=registry.get_current_tokens_usage(),
-            unit_scale=self._report_config.cost_report_unit_scale,
+            unit_scale=self._reporting_config.cost_report_unit_scale,
             cost_report_file_path=cost_report_file_path,
         )
 
