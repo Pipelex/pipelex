@@ -120,6 +120,9 @@ class PipeRunParams(BaseModel):
                 raise ValueError(f"Parameter key '{key}' must start with an underscore '_'")
         return v
 
+    def make_deep_copy(self) -> Self:
+        return self.model_copy(deep=True)
+
     @classmethod
     def copy_by_injecting_multiplicity(
         cls,
