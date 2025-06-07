@@ -2,7 +2,6 @@ from typing import List, Optional, Set
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
