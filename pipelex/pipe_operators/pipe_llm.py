@@ -14,6 +14,7 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.domain import Domain, SpecialDomain
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import (
     PipeOutputMultiplicity,
@@ -63,49 +64,52 @@ class PipeLLM(PipeOperator):
     system_prompt_to_structure: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
 
-    @model_validator(mode="after")
-    def validate_inputs(self) -> Self:
-        static_validation_config = get_config().pipelex.static_validation_config
-        default_reaction = static_validation_config.default_reaction
-        reactions = static_validation_config.reactions
+    def needed_inputs(self) -> PipeInputSpec:
+        return self.pipe_llm_prompt.needed_inputs()
 
-        required_variables = self.required_variables()
-        # check all required variables are in the inputs
-        for required_variable in required_variables:
-            if required_variable.startswith("_"):
-                # variables starting with _ are run parameters, not inputs
-                continue
-            if required_variable not in self.inputs.variables:
-                missing_input_declaration_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.MISSING_INPUT_DECLARATION,
-                    domain_code=self.domain,
-                    pipe_code=self.code,
-                    variable_name=required_variable,
-                )
-                match reactions.get(StaticValidationErrorType.MISSING_INPUT_DECLARATION, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(missing_input_declaration_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise missing_input_declaration_error
-        # check that all inputs are in the required variables
-        for input_name in self.inputs.variables:
-            if input_name not in required_variables:
-                extraneous_input_declaration_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_DECLARATION,
-                    domain_code=self.domain,
-                    pipe_code=self.code,
-                    variable_name=input_name,
-                )
-                match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_DECLARATION, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(extraneous_input_declaration_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise extraneous_input_declaration_error
-        return self
+    # @model_validator(mode="after")
+    # def validate_inputs(self) -> Self:
+    #     static_validation_config = get_config().pipelex.static_validation_config
+    #     default_reaction = static_validation_config.default_reaction
+    #     reactions = static_validation_config.reactions
+
+    #     required_variables = self.required_variables()
+    #     # check all required variables are in the inputs
+    #     for required_variable in required_variables:
+    #         if required_variable.startswith("_"):
+    #             # variables starting with _ are run parameters, not inputs
+    #             continue
+    #         if required_variable not in self.inputs.variables:
+    #             missing_input_var_error = StaticValidationError(
+    #                 error_type=StaticValidationErrorType.MISSING_INPUT_DECLARATION,
+    #                 domain_code=self.domain,
+    #                 pipe_code=self.code,
+    #                 variable_name=required_variable,
+    #             )
+    #             match reactions.get(StaticValidationErrorType.MISSING_INPUT_DECLARATION, default_reaction):
+    #                 case StaticValidationReaction.IGNORE:
+    #                     pass
+    #                 case StaticValidationReaction.LOG:
+    #                     log.error(missing_input_var_error.desc())
+    #                 case StaticValidationReaction.RAISE:
+    #                     raise missing_input_var_error
+    #     # check that all inputs are in the required variables
+    #     for input_name in self.inputs.variables:
+    #         if input_name not in required_variables:
+    #             extraneous_input_var_error = StaticValidationError(
+    #                 error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_DECLARATION,
+    #                 domain_code=self.domain,
+    #                 pipe_code=self.code,
+    #                 variable_name=input_name,
+    #             )
+    #             match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_DECLARATION, default_reaction):
+    #                 case StaticValidationReaction.IGNORE:
+    #                     pass
+    #                 case StaticValidationReaction.LOG:
+    #                     log.error(extraneous_input_var_error.desc())
+    #                 case StaticValidationReaction.RAISE:
+    #                     raise extraneous_input_var_error
+    #     return self
 
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:

@@ -7,6 +7,7 @@ definition = "Generic image-related domain"
 ImggPrompt = "Prompt to generate an image"
 VisualDescription = "Visual description of something"
 SpecificImageAnalysis = "Specific analysis of an image"
+Tata = "test"
 
 [concept.Photo]
 Concept = "Photo"
@@ -17,11 +18,23 @@ refines = ["native.Image"]
 
 [pipe.describe_image]
 PipeLLM = "Describe an image"
-inputs = { image = "native.Image" }
+inputs = { image = "Image" }
 output = "VisualDescription"
 system_prompt = "You are a very good observer."
 images = ["image"]
 llm = "llm_to_describe_img"
 prompt_template = """
 Describe the provided image in great detail.
+"""
+
+
+[pipe.describe_photo]
+PipeLLM = "Describe a photo"
+inputs = { photo = "Text" }
+output = "VisualDescription"
+system_prompt = "You are a very good observer."
+images = ["photo"]
+llm = "llm_to_describe_img"
+prompt_template = """
+Describe the provided photo and how it was shot: scene, lighting, camera, etc.
 """

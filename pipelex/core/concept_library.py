@@ -6,6 +6,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.concept import Concept
 from pipelex.core.concept_factory import ConceptFactory
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 
@@ -87,6 +88,8 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def is_compatible_by_concept_code(self, tested_concept_code: str, wanted_concept_code: str) -> bool:
+        if wanted_concept_code == NativeConcept.ANYTHING.code:
+            return True
         tested_concept = self.get_required_concept(concept_code=tested_concept_code)
         wanted_concept = self.get_required_concept(concept_code=wanted_concept_code)
         if tested_concept.code == wanted_concept.code:

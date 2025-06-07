@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Optional, Set, cast
+from typing import ClassVar, Dict, List, Optional, Set, cast
 
 from kajson.class_registry import class_registry
 from pydantic import model_validator
@@ -8,8 +8,10 @@ from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent
@@ -19,11 +21,13 @@ from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,
     PipeRunParamsError,
+    StaticValidationError,
+    StaticValidationErrorType,
     WorkingMemoryNotFoundError,
     WorkingMemoryStuffNotFoundError,
     WorkingMemoryTypeError,
 )
-from pipelex.hub import get_template
+from pipelex.hub import get_concept_provider, get_template
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
@@ -93,6 +97,92 @@ class PipeLLMPrompt(PipeOperator):
             self.user_pipe_jinja2.validate_with_libraries()
         if self.system_prompt_pipe_jinja2:
             self.system_prompt_pipe_jinja2.validate_with_libraries()
+
+    def needed_inputs(self) -> PipeInputSpec:
+        conceptless_required_variables: Set[str] = set()
+        if self.user_pipe_jinja2:
+            conceptless_required_variables.update(self.user_pipe_jinja2.required_variables())
+        if self.system_prompt_pipe_jinja2:
+            conceptless_required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
+
+        pipe_input_spec = PipeInputSpec(root={})
+        for conceptless_required_variable in conceptless_required_variables:
+            pipe_input_spec.add_new_variable(variable_name=conceptless_required_variable, concept_code=NativeConcept.ANYTHING.code)
+
+        if self.user_images:
+            # user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
+            # conceptless_required_variables.update(user_images_top_object_name)
+            for user_image in self.user_images:
+                pipe_input_spec.add_new_variable(variable_name=user_image, concept_code=NativeConcept.IMAGE.code)
+
+        return pipe_input_spec
+
+    @model_validator(mode="after")
+    def validate_inputs(self) -> Self:
+        concept_provider = get_concept_provider()
+        static_validation_config = get_config().pipelex.static_validation_config
+        default_reaction = static_validation_config.default_reaction
+        reactions = static_validation_config.reactions
+
+        the_needed_inputs = self.needed_inputs()
+        # check all required variables are in the inputs
+        for variable_name, concept_code in the_needed_inputs.items:
+            if variable_name.startswith("_"):
+                # variables starting with _ are run parameters, not inputs
+                continue
+            if variable_name not in self.inputs.variables:
+                missing_input_var_error = StaticValidationError(
+                    error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    variable_name=variable_name,
+                )
+                match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
+                    case StaticValidationReaction.IGNORE:
+                        pass
+                    case StaticValidationReaction.LOG:
+                        log.error(missing_input_var_error.desc())
+                    case StaticValidationReaction.RAISE:
+                        raise missing_input_var_error
+
+            # there is one case where the needed input is of specific concept: the user_images
+            if concept_code == NativeConcept.IMAGE.code:
+                concept_code_of_declared_input = self.inputs.get(variable_name=variable_name)
+                if not concept_provider.is_compatible_by_concept_code(
+                    tested_concept_code=concept_code_of_declared_input,
+                    wanted_concept_code=concept_code,
+                ):
+                    inadequate_input_concept_error = StaticValidationError(
+                        error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
+                        domain_code=self.domain,
+                        pipe_code=self.code,
+                        variable_name=variable_name,
+                        concept_codes=[concept_code_of_declared_input, concept_code],
+                    )
+                    match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
+                        case StaticValidationReaction.IGNORE:
+                            pass
+                        case StaticValidationReaction.LOG:
+                            log.error(inadequate_input_concept_error.desc())
+                        case StaticValidationReaction.RAISE:
+                            raise inadequate_input_concept_error
+        # check that all inputs are in the required variables
+        for input_name in self.inputs.variables:
+            if input_name not in the_needed_inputs.variables:
+                extraneous_input_var_error = StaticValidationError(
+                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    variable_name=input_name,
+                )
+                match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, default_reaction):
+                    case StaticValidationReaction.IGNORE:
+                        pass
+                    case StaticValidationReaction.LOG:
+                        log.error(extraneous_input_var_error.desc())
+                    case StaticValidationReaction.RAISE:
+                        raise extraneous_input_var_error
+        return self
 
     @override
     def required_variables(self) -> Set[str]:

@@ -21,6 +21,7 @@ class NativeConceptClass(StrEnum):
 # Exceptionally, we use an Enum here (and not our usual StrEnum) to avoid confusion with
 # the concept_code with must have the form "native.ConceptName"
 class NativeConcept(Enum):
+    ANYTHING = "Anything"
     DYNAMIC = "Dynamic"
     TEXT = "Text"
     IMAGE = "Image"
@@ -57,6 +58,8 @@ class NativeConcept(Enum):
                 return NativeConceptClass.DYNAMIC
             case NativeConcept.PAGE:
                 return NativeConceptClass.PAGE
+            case NativeConcept.ANYTHING:
+                raise RuntimeError("NativeConcept.ANYTHING cannot be used as a content class name")
 
     def make_concept(self) -> Concept:
         definition: str
@@ -77,6 +80,8 @@ class NativeConcept(Enum):
                 definition = "A dynamic concept"
             case NativeConcept.PAGE:
                 definition = "The content of a page of a document, comprising text and linked images as well as an optional page view image"
+            case NativeConcept.ANYTHING:
+                raise RuntimeError("NativeConcept.ANYTHING cannot be used as a concept")
 
         return Concept(
             code=self.code,
@@ -89,5 +94,7 @@ class NativeConcept(Enum):
     def all_concepts(cls) -> List[Concept]:
         concepts: List[Concept] = []
         for code in cls:
+            if code == cls.ANYTHING:
+                continue
             concepts.append(code.make_concept())
         return concepts

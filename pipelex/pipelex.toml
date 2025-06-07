@@ -205,8 +205,9 @@ structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
 default_reaction = "raise"
 
 [pipelex.static_validation_config.reactions]
-# missing_input_declaration = "raise"
-# extraneous_input_declaration = "raise"
+# missing_input_variable = "log"
+# extraneous_input_variable = "log"
+# inadequate_input_concept = "log"
 
 ####################################################################################################
 # History graph config

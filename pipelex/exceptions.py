@@ -12,8 +12,9 @@ class PipelexError(RootException):
 
 
 class StaticValidationErrorType(StrEnum):
-    MISSING_INPUT_DECLARATION = "missing_input_declaration"
-    EXTRANEOUS_INPUT_DECLARATION = "extraneous_input_declaration"
+    MISSING_INPUT_VARIABLE = "missing_input_variable"
+    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
+    INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
 
 
 class StaticValidationError(Exception):

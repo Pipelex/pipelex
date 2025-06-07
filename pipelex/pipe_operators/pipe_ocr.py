@@ -79,19 +79,19 @@ class PipeOcr(PipeOperator):
         if count_applicable_inputs > 1:
             raise PipeDefinitionError("Only one image or pdf input can be provided")
         elif count_applicable_inputs == 0:
-            missing_input_declaration_error = StaticValidationError(
-                error_type=StaticValidationErrorType.MISSING_INPUT_DECLARATION,
+            missing_input_var_error = StaticValidationError(
+                error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
                 domain_code=self.domain,
                 pipe_code=self.code,
                 concept_codes=[NativeConcept.IMAGE.code, NativeConcept.PDF.code],
             )
-            match reactions.get(StaticValidationErrorType.MISSING_INPUT_DECLARATION, default_reaction):
+            match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
                 case StaticValidationReaction.IGNORE:
                     pass
                 case StaticValidationReaction.LOG:
-                    log.error(missing_input_declaration_error.desc())
+                    log.error(missing_input_var_error.desc())
                 case StaticValidationReaction.RAISE:
-                    raise missing_input_declaration_error
+                    raise missing_input_var_error
         return self
 
     @override
