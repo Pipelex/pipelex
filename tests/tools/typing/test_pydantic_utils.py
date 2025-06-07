@@ -100,7 +100,8 @@ def test_custom_base_model_truncates_repr() -> None:
         url: str
         other: str
 
-    TestModel.truncate_length = 10
+    TestModel.base_64_truncate_length = 10
+    TestModel.url_truncate_length = 10
     model = TestModel(
         base_64="b" * 20,
         url="data:image/png;base64," + "x" * 20,
