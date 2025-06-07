@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, List, Optional, Sequence, Set, TypeVar, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, TypeVar, Union
 
 from pydantic import BaseModel, ValidationError
 from rich.repr import Result as RichReprResult

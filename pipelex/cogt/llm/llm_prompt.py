@@ -6,7 +6,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage
-from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.string_utils import is_none_or_has_text, is_not_none_and_has_text
 from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
 
