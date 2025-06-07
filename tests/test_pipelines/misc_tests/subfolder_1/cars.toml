@@ -11,7 +11,7 @@ CarDescription = "A detailed description of a car model"
 [pipe]
 [pipe.generate_car_description]
 PipeLLM = "Generate a description of a car"
-input = "Car"
+inputs = { car = "Car" }
 output = "CarDescription"
 prompt_template = """
 Given the reference to a car, generate a description of the car.

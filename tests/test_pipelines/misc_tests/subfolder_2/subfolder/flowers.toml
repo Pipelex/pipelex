@@ -9,7 +9,7 @@ FlowerDescription = "A detailed description of a flower"
 [pipe]
 [pipe.generate_flower_description]
 PipeLLM = "Generate a description of a flower"
-input = "Flower"
+inputs = { flower = "Flower" }
 output = "FlowerDescription"
 prompt_template = """
 Given the reference to a flower, generate a description of the flower.
