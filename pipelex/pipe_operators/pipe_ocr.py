@@ -54,6 +54,10 @@ class PipeOcr(PipeOperator):
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
+        self._validate_inputs()
+        return self
+
+    def _validate_inputs(self):
         concept_provider = get_concept_provider()
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
@@ -92,7 +96,6 @@ class PipeOcr(PipeOperator):
                     log.error(missing_input_var_error.desc())
                 case StaticValidationReaction.RAISE:
                     raise missing_input_var_error
-        return self
 
     @override
     async def _run_operator_pipe(
