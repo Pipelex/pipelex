@@ -123,6 +123,9 @@ class PipeRunParams(BaseModel):
     def make_deep_copy(self) -> Self:
         return self.model_copy(deep=True)
 
+    def deep_copy_with_final_stuff_code(self, final_stuff_code: str) -> Self:
+        return self.model_copy(deep=True, update={"final_stuff_code": final_stuff_code})
+
     @classmethod
     def copy_by_injecting_multiplicity(
         cls,

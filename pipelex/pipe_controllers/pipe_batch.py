@@ -12,7 +12,7 @@ from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ListContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeExecutionError
+from pipelex.exceptions import PipeExecutionError, PipeInputError
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -36,7 +36,7 @@ class PipeBatch(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        """Run a sequence of steps in batch for each item in the input list."""
+        """Run a pipe in batch mode for each item in the input list."""
         if not self.input_concept_code:
             raise PipeExecutionError(f"Missing input concept code for pipe '{self.code}' but it is required for PipeBatch")
         if pipe_run_params.final_stuff_code:
@@ -45,29 +45,28 @@ class PipeBatch(PipeController):
 
         pipe_run_params.push_pipe_layer(pipe_code=self.branch_pipe_code)
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
-        input_stuff_key = batch_params.input_list_stuff_name
-        input_stuff = working_memory.get_stuff(input_stuff_key)
+        input_stuff = working_memory.get_stuff(batch_params.input_list_stuff_name)
         input_stuff_code = input_stuff.stuff_code
         input_content = input_stuff.content
 
         if not isinstance(input_content, ListContent):
-            raise ValueError(
+            raise PipeInputError(
                 f"Input of PipeBatch must be ListContent, got {input_stuff.stuff_name or 'unnamed'} = {type(input_content)}. stuff: {input_stuff}"
             )
+        input_content = cast(ListContent[StuffContent], input_content)
 
+        pipe_router = get_pipe_router()
         # TODO: Make commented code work when inputing images named "a.b.c"
         # sub_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
         nb_history_items_limit = get_config().pipelex.tracker_config.applied_nb_items_limit
-        pipe_router = get_pipe_router()
-        input_content = cast(ListContent[StuffContent], input_content)
         batch_output_stuff_code = shortuuid.uuid()
         tasks: List[Coroutine[Any, Any, PipeOutput]] = []
         item_stuffs: List[Stuff] = []
         # required_stuff_lists: List[List[Stuff]] = []
-        branch_output_item_codes: List[str] = []
+        # branch_output_item_codes: List[str] = []
         for branch_index, item in enumerate(input_content.items):
             branch_output_item_code = f"{batch_output_stuff_code}-branch-{branch_index}"
-            branch_output_item_codes.append(branch_output_item_code)
+            # branch_output_item_codes.append(branch_output_item_code)
             if nb_history_items_limit and branch_index >= nb_history_items_limit:
                 break
             branch_input_item_code = f"{input_stuff_code}-branch-{branch_index}"
@@ -85,12 +84,7 @@ class PipeBatch(PipeController):
             # required_stuffs = branch_memory.get_stuffs(names=required_variables)
             # required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff_code]
             # required_stuff_lists.append(required_stuffs)
-            branch_pipe_run_params = pipe_run_params.model_copy(
-                deep=True,
-                update={
-                    "final_stuff_code": branch_output_item_code,
-                },
-            )
+            branch_pipe_run_params = pipe_run_params.deep_copy_with_final_stuff_code(final_stuff_code=branch_output_item_code)
             tasks.append(
                 pipe_router.run_pipe_code(
                     pipe_code=self.branch_pipe_code,
