@@ -20,7 +20,7 @@ output = "QuestionAnalysis"
 llm = "llm_to_reason"
 prompt_template = """
 Here is a question for an LLM:
-{{ question|tag }}
+@question
 
 Do you think it's tricky, or maybe even a deceptive trap?
 Does it assume things that are not necessarily true?
@@ -37,10 +37,10 @@ output = "ThoughtfulAnswer"
 llm = "llm_to_reason"
 prompt_template = """
 A question was asked:
-{{ question|tag }}
+@question
 
 A thoughtful analysis was given:
-{{ question_analysis|tag }}
+@question_analysis
 
 If the question was tricky or deceptive, don't get fooled!
 Answer in 4 parts:
@@ -63,7 +63,7 @@ steps = [
 PipeJinja2 = "Conclude a thoughtful answer"
 inputs = { thoughtful_answer = "ThoughtfulAnswer" }
 output = "ThoughtfulAnswerConclusion"
-jinja2 = "After analyzing the question, here is my answer: {{ thoughtful_answer.content.the_answer }}"
+jinja2 = "After analyzing the question, here is my answer: $thoughtful_answer.the_answer"
 
 
 [pipe.conclude_tricky_question_by_steps]
