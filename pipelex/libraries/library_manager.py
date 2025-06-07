@@ -16,7 +16,16 @@ from pipelex.core.domain_library import DomainLibrary
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_blueprint import PipeSpecificFactoryProtocol
 from pipelex.core.pipe_library import PipeLibrary
-from pipelex.exceptions import ConceptLibraryError, LibraryError, LibraryParsingError, PipeFactoryError, PipeLibraryError
+from pipelex.exceptions import (
+    ConceptLibraryError,
+    LibraryError,
+    LibraryParsingError,
+    PipeDefinitionError,
+    PipeFactoryError,
+    PipeLibraryError,
+    StaticValidationError,
+    StaticValidationErrorType,
+)
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.json_utils import deep_update
@@ -214,12 +223,15 @@ class LibraryManager:
                 pass
             elif isinstance(pipe_obj, dict):
                 pipe_obj_dict: Dict[str, Any] = pipe_obj.copy()
-                pipe = LibraryManager.make_pipe_from_details_dict(
-                    domain_code=domain_code,
-                    pipe_code=pipe_code,
-                    details_dict=pipe_obj_dict,
-                )
-                self.pipe_library.add_new_pipe(pipe=pipe)
+                try:
+                    pipe = LibraryManager.make_pipe_from_details_dict(
+                        domain_code=domain_code,
+                        pipe_code=pipe_code,
+                        details_dict=pipe_obj_dict,
+                    )
+                    self.pipe_library.add_new_pipe(pipe=pipe)
+                except StaticValidationError as static_validation_error:
+                    log.error(f"Static validation error for pipe '{pipe_code}': {static_validation_error}")
 
     def validate_libraries(self):
         log.debug("LibraryManager validating libraries")
@@ -265,7 +277,6 @@ class LibraryManager:
 
         details_dict["definition"] = pipe_definition
         details_dict["domain"] = domain_code
-
         pipe_from_blueprint: PipeAbstract = pipe_factory.make_pipe_from_details_dict(
             domain_code=domain_code,
             pipe_code=pipe_code,

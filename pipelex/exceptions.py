@@ -1,10 +1,45 @@
+from typing import Optional
+
 from click import ClickException
+from typing_extensions import override
 
 from pipelex.tools.exceptions import RootException
+from pipelex.types import StrEnum
 
 
 class PipelexError(RootException):
     pass
+
+
+class StaticValidationErrorType(StrEnum):
+    MISSING_INPUT_DECLARATION = "missing_input_declaration"
+    EXTRANEOUS_INPUT_DECLARATION = "extraneous_input_declaration"
+
+
+class StaticValidationError(PipelexError):
+    def __init__(
+        self,
+        error_type: StaticValidationErrorType,
+        domain_code: str,
+        message: str,
+        pipe_code: Optional[str] = None,
+        variable_name: Optional[str] = None,
+    ):
+        self.error_type = error_type
+        self.domain_code = domain_code
+        self.pipe_code = pipe_code
+        self.variable_name = variable_name
+        super().__init__(message)
+
+    def desc(self) -> str:
+        msg = f"StaticValidationError: {self.error_type} in domain '{self.domain_code}'"
+        if self.pipe_code:
+            msg += f" • pipe='{self.pipe_code}'"
+        if self.variable_name:
+            msg += f" • variable='{self.variable_name}'"
+
+        msg += f"\n{self.message}"
+        return msg
 
 
 class PipelexCLIError(PipelexError, ClickException):

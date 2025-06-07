@@ -24,7 +24,16 @@ from pipelex.core.pipe_run_params import (
 from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError
+from pipelex.exceptions import (
+    ConceptLibraryError,
+    LibraryError,
+    LibraryParsingError,
+    PipeDefinitionError,
+    PipeFactoryError,
+    PipeLibraryError,
+    StaticValidationError,
+    StaticValidationErrorType,
+)
 from pipelex.hub import (
     get_content_generator,
     get_llm_deck,
@@ -58,6 +67,36 @@ class PipeLLM(PipeOperator):
     prompt_template_to_structure: Optional[str] = None
     system_prompt_to_structure: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
+
+    @model_validator(mode="after")
+    def validate_inputs(self) -> Self:
+        required_variables = self.pipe_llm_prompt.required_variables()
+        # check all required variables are in the inputs
+        for required_variable in required_variables:
+            if required_variable.startswith("_"):
+                # variables starting with _ are run parameters, not inputs
+                continue
+            if required_variable not in self.inputs:
+                missing_input_declaration_error = StaticValidationError(
+                    error_type=StaticValidationErrorType.MISSING_INPUT_DECLARATION,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    variable_name=required_variable,
+                    message=f"Required variable '{required_variable}' is not declared in the inputs",
+                )
+                log.error(missing_input_declaration_error.desc())
+        # check that all inputs are in the required variables
+        for input_name in self.inputs.keys():
+            if input_name not in required_variables:
+                extraneous_input_declaration_error = StaticValidationError(
+                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_DECLARATION,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    variable_name=input_name,
+                    message=f"Input '{input_name}' is not in the required variables",
+                )
+                log.error(extraneous_input_declaration_error.desc())
+        return self
 
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
