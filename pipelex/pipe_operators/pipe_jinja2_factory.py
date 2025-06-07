@@ -41,7 +41,7 @@ class PipeJinja2Factory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeJin
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            input_concept_code=pipe_blueprint.input,
+            input_concept_codes=pipe_blueprint.inputs or {},
             output_concept_code=pipe_blueprint.output,
             jinja2_name=pipe_blueprint.jinja2_name,
             jinja2=preprocessed_template,

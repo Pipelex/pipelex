@@ -23,7 +23,7 @@ class PipeFuncFactory(PipeSpecificFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            input_concept_code=pipe_blueprint.input,
+            input_concept_codes=pipe_blueprint.inputs or {},
             output_concept_code=pipe_blueprint.output,
             function_name=pipe_blueprint.function_name,
         )

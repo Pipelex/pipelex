@@ -70,12 +70,13 @@ class PipeLLM(PipeOperator):
 
     @override
     def validate_with_libraries(self):
-        if self.input_concept_code and get_concept_provider().is_compatible_by_concept_code(
-            tested_concept_code=self.input_concept_code,
-            wanted_concept_code=NativeConcept.IMAGE.code,
-        ):
-            if not self.pipe_llm_prompt.user_images:
-                raise PipeDefinitionError(f"No user images provided for concept '{self.input_concept_code}' but it's required")
+        # TODO: implement image validation for #NewPipeInputSpec
+        # if self.input_concept_code and get_concept_provider().is_compatible_by_concept_code(
+        #     tested_concept_code=self.input_concept_code,
+        #     wanted_concept_code=NativeConcept.IMAGE.code,
+        # ):
+        #     if not self.pipe_llm_prompt.user_images:
+        #         raise PipeDefinitionError(f"No user images provided for concept '{self.input_concept_code}' but it's required")
         self.pipe_llm_prompt.validate_with_libraries()
         if self.prompt_template_to_structure:
             get_template(template_name=self.prompt_template_to_structure)
@@ -190,17 +191,18 @@ class PipeLLM(PipeOperator):
         )
         llm_prompt_1 = cast(PipeLLMPromptOutput, pipe_output).llm_prompt
 
-        if input_concept_code := self.input_concept_code:
-            if (
-                get_concept_provider().is_compatible_by_concept_code(
-                    tested_concept_code=input_concept_code,
-                    wanted_concept_code=NativeConcept.IMAGE.code,
-                )
-                and not llm_prompt_1.user_images
-            ):
-                raise PipeExecutionError(
-                    f"No user images provided in the prompt with input concept '{input_concept_code}' but it's required for pipe '{self.code}'"
-                )
+        # TODO: implement image validation for #NewPipeInputSpec, but maybe not here, it must have been checked earlier
+        # if input_concept_code := self.input_concept_code:
+        #     if (
+        #         get_concept_provider().is_compatible_by_concept_code(
+        #             tested_concept_code=input_concept_code,
+        #             wanted_concept_code=NativeConcept.IMAGE.code,
+        #         )
+        #         and not llm_prompt_1.user_images
+        #     ):
+        #         raise PipeExecutionError(
+        #             f"No user images provided in the prompt with input concept '{input_concept_code}' but it's required for pipe '{self.code}'"
+        #         )
 
         the_content: StuffContent
         if output_concept.structure_class_name == NativeConceptClass.TEXT and not is_multiple_output:

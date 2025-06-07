@@ -1,8 +1,6 @@
 from typing import Any, ClassVar
 
 
-
-
 class AttributePolisher:
     base_64_truncate_length: ClassVar[int] = 64
     url_truncate_length: ClassVar[int] = 128

@@ -1,6 +1,6 @@
-from typing import Any, Dict, Optional, Protocol, TypeVar
+from typing import Any, Dict, Optional, Protocol, TypeVar, Union
 
-from pydantic import ConfigDict, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self, runtime_checkable
 
 from pipelex.core.concept_native import NativeConcept
@@ -12,14 +12,18 @@ class PipeBlueprint(StructuredContent):
     model_config = ConfigDict(extra="forbid")
 
     definition: Optional[str] = None
-    input: Optional[str] = None
+    inputs: Optional[Dict[str, str]] = None
     output: str
     domain: str
 
     @model_validator(mode="after")
     def add_domain_prefix(self) -> Self:
-        if self.input and "." not in self.input:
-            self.input = f"{self.domain}.{self.input}"
+        # if self.input and "." not in self.input:
+        #     self.input = f"{self.domain}.{self.input}"
+        if self.inputs:
+            for input_name, input_concept_code in self.inputs.items():
+                if "." not in input_concept_code:
+                    self.inputs[input_name] = f"{self.domain}.{input_concept_code}"
         if self.output and "." not in self.output:
             self.output = f"{self.domain}.{self.output}"
         return self

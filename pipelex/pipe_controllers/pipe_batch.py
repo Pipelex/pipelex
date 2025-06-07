@@ -37,14 +37,18 @@ class PipeBatch(PipeController):
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         """Run a pipe in batch mode for each item in the input list."""
-        if not self.input_concept_code:
-            raise PipeExecutionError(f"Missing input concept code for pipe '{self.code}' but it is required for PipeBatch")
+        batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
+        input_item_stuff_name = batch_params.input_item_stuff_name
+        input_item_concept_code = self.input_concept_codes.get(input_item_stuff_name)
+        if not input_item_concept_code:
+            raise PipeExecutionError(
+                f"Batch input item stuff named '{input_item_stuff_name}' is not in the batch's input spec: {self.input_concept_codes}"
+            )
         if pipe_run_params.final_stuff_code:
             log.debug(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
 
         pipe_run_params.push_pipe_layer(pipe_code=self.branch_pipe_code)
-        batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_stuff = working_memory.get_stuff(batch_params.input_list_stuff_name)
         input_stuff_code = input_stuff.stuff_code
         input_content = input_stuff.content
@@ -72,13 +76,13 @@ class PipeBatch(PipeController):
             branch_input_item_code = f"{input_stuff_code}-branch-{branch_index}"
             item_input_stuff = StuffFactory.make_stuff(
                 code=branch_input_item_code,
-                concept_code=self.input_concept_code,
+                concept_code=input_item_concept_code,
                 content=item,
-                name=batch_params.input_item_stuff_name,
+                name=input_item_stuff_name,
             )
             item_stuffs.append(item_input_stuff)
             branch_memory = working_memory.make_deep_copy()
-            branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=batch_params.input_item_stuff_name)
+            branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
             required_variables = sub_pipe.required_variables()
             required_stuffs = branch_memory.get_existing_stuffs(names=required_variables)
