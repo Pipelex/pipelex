@@ -31,7 +31,7 @@ class PipeBatchFactory(PipeSpecificFactoryProtocol[PipeBatchBlueprint, PipeBatch
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            input_concept_codes=pipe_blueprint.inputs or {},
+            inputs=pipe_blueprint.inputs or {},
             output_concept_code=pipe_blueprint.output,
             branch_pipe_code=pipe_blueprint.branch_pipe_code,
             batch_params=batch_params,

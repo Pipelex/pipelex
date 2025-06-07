@@ -39,12 +39,12 @@ class SubPipe(BaseModel):
             output_concept_code = pipe.output_concept_code
 
             sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
-            pipe_batch_inputs = sub_pipe.input_concept_codes
+            pipe_batch_inputs = sub_pipe.inputs
             pipe_batch_inputs[batch_params.input_list_stuff_name] = input_concept_code
             pipe_batch = PipeBatch(
                 domain=pipe.domain,
                 code=self.pipe_code,
-                input_concept_codes=pipe_batch_inputs,
+                inputs=pipe_batch_inputs,
                 output_concept_code=output_concept_code,
                 branch_pipe_code=self.pipe_code,
             )

@@ -42,7 +42,7 @@ def pretty_print_all_pipes(
             pipe.code,
             pipe.definition,
             pipe.__class__.__name__,
-            ", ".join([f"{name}: {concept_code}" for name, concept_code in pipe.input_concept_codes.items()]),
+            ", ".join([f"{name}: {concept_code}" for name, concept_code in pipe.inputs.items()]),
             pipe.output_concept_code,
         )
 

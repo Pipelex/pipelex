@@ -137,7 +137,7 @@ def list_pipes() -> None:
             pipes_dict[domain] = {}
 
             for pipe in domain_pipes:
-                inputs = pipe.input_concept_codes
+                inputs = pipe.inputs
                 formatted_inputs = [f"{name}: {_format_concept_code(concept_code, domain)}" for name, concept_code in inputs.items()]
                 formatted_inputs_str = ", ".join(formatted_inputs)
                 output_code = _format_concept_code(pipe.output_concept_code, domain)

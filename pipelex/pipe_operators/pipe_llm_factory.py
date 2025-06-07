@@ -141,7 +141,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            input_concept_codes=pipe_blueprint.inputs or {},
+            inputs=pipe_blueprint.inputs or {},
             output_concept_code=pipe_blueprint.output,
             pipe_llm_prompt=pipe_llm_prompt,
             llm_choices=llm_settings,

@@ -20,7 +20,7 @@ class PipeAbstract(ABC, BaseModel):
 
     definition: Optional[str] = None
     # TODO: support auto (implicit) input, it makes sense for pipe controllers
-    input_concept_codes: Dict[str, str] = Field(default_factory=dict)
+    inputs: Dict[str, str] = Field(default_factory=dict)
     output_concept_code: str
 
     @property
@@ -37,7 +37,7 @@ class PipeAbstract(ABC, BaseModel):
 
     def concept_dependencies(self) -> Set[str]:
         required_concepts = set([self.output_concept_code])
-        required_concepts.update(self.input_concept_codes.values())
+        required_concepts.update(self.inputs.values())
         return required_concepts
 
     # Required variables
