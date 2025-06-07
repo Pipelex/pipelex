@@ -25,12 +25,7 @@ from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import (
-    ConceptLibraryError,
-    LibraryError,
-    LibraryParsingError,
     PipeDefinitionError,
-    PipeFactoryError,
-    PipeLibraryError,
     StaticValidationError,
     StaticValidationErrorType,
 )
@@ -86,7 +81,6 @@ class PipeLLM(PipeOperator):
                     domain_code=self.domain,
                     pipe_code=self.code,
                     variable_name=required_variable,
-                    # message=f"Required variable '{required_variable}' is not declared in the inputs",
                 )
                 match reactions.get(StaticValidationErrorType.MISSING_INPUT_DECLARATION, default_reaction):
                     case StaticValidationReaction.IGNORE:
@@ -103,7 +97,6 @@ class PipeLLM(PipeOperator):
                     domain_code=self.domain,
                     pipe_code=self.code,
                     variable_name=input_name,
-                    # message=f"Input '{input_name}' is not in the required variables",
                 )
                 match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_DECLARATION, default_reaction):
                     case StaticValidationReaction.IGNORE:

@@ -41,13 +41,6 @@ class PipeAbstract(ABC, BaseModel):
         return required_concepts
 
     # Required variables
-
-    # @property
-    # def required_input_concept_code(self) -> str:
-    #     if self.input_concept_code is None:
-    #         raise RuntimeError("input_concept_code is required")
-    #     return self.input_concept_code
-
     def required_variables(self) -> Set[str]:
         return set()
 

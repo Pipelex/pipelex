@@ -23,7 +23,9 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_image",
                 domain="generic",
-                image_stuff_name="page_scan",
+                inputs={
+                    "page_scan": "native.Image",
+                },
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
@@ -51,7 +53,9 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_pdf",
                 domain="generic",
-                pdf_stuff_name="pdf",
+                inputs={
+                    "pdf": "native.PDF",
+                },
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,

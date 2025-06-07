@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
@@ -8,17 +8,27 @@ from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
+from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.core.pipe_run_params import (
+    PipeRunParams,
+)
 from pipelex.core.stuff_content import ImageContent, ListContent, PageContent, TextAndImagesContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError
-from pipelex.hub import get_content_generator
+from pipelex.exceptions import (
+    PipeDefinitionError,
+    StaticValidationError,
+    StaticValidationErrorType,
+)
+from pipelex.hub import (
+    get_concept_provider,
+    get_content_generator,
+)
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
-from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
 
 class PipeOcrOutput(PipeOutput):
@@ -27,17 +37,61 @@ class PipeOcrOutput(PipeOutput):
 
 class PipeOcr(PipeOperator):
     ocr_engine: Optional[OcrEngine] = None
-    image_stuff_name: Optional[str] = None
-    pdf_stuff_name: Optional[str] = None
     should_caption_images: bool
     should_include_images: bool
     should_include_page_views: bool
     page_views_dpi: int
 
+    image_stuff_name: Optional[str] = None
+    pdf_stuff_name: Optional[str] = None
+
+    @field_validator("image_stuff_name", "pdf_stuff_name")
+    @classmethod
+    def validate_input_stuff_name_not_provided_as_attribute(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            raise PipeDefinitionError("image_stuff_name and pdf_stuff_name must be None before input validation")
+        return v
+
     @model_validator(mode="after")
-    def validate_exactly_one_input_stuff_name(self) -> Self:
-        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["image_stuff_name", "pdf_stuff_name"]):
-            raise PipeDefinitionError("Exactly one of 'image_stuff_name' or 'pdf_stuff_name' must be provided")
+    def validate_inputs(self) -> Self:
+        concept_provider = get_concept_provider()
+        static_validation_config = get_config().pipelex.static_validation_config
+        default_reaction = static_validation_config.default_reaction
+        reactions = static_validation_config.reactions
+        # check that we have either an image or a pdf in inputs, at most one of them and nothing else
+        count_applicable_inputs = 0
+        for input_name, input_concept_code in self.inputs.items():
+            log.debug(f"Validating input '{input_name}' with concept code '{input_concept_code}'")
+            if concept_provider.is_compatible_by_concept_code(
+                tested_concept_code=input_concept_code,
+                wanted_concept_code=NativeConcept.IMAGE.code,
+            ):
+                self.image_stuff_name = input_name
+                count_applicable_inputs += 1
+            elif concept_provider.is_compatible_by_concept_code(
+                tested_concept_code=input_concept_code,
+                wanted_concept_code=NativeConcept.PDF.code,
+            ):
+                self.pdf_stuff_name = input_name
+                count_applicable_inputs += 1
+            else:
+                raise PipeDefinitionError(f"Input '{input_name}' with concept code '{input_concept_code}' is neither a valid image nor pdf")
+        if count_applicable_inputs > 1:
+            raise PipeDefinitionError("Only one image or pdf input can be provided")
+        elif count_applicable_inputs == 0:
+            missing_input_declaration_error = StaticValidationError(
+                error_type=StaticValidationErrorType.MISSING_INPUT_DECLARATION,
+                domain_code=self.domain,
+                pipe_code=self.code,
+                concept_codes=[NativeConcept.IMAGE.code, NativeConcept.PDF.code],
+            )
+            match reactions.get(StaticValidationErrorType.MISSING_INPUT_DECLARATION, default_reaction):
+                case StaticValidationReaction.IGNORE:
+                    pass
+                case StaticValidationReaction.LOG:
+                    log.error(missing_input_declaration_error.desc())
+                case StaticValidationReaction.RAISE:
+                    raise missing_input_declaration_error
         return self
 
     @override

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from click import ClickException
 from typing_extensions import override
@@ -23,12 +23,14 @@ class StaticValidationError(Exception):
         domain_code: str,
         pipe_code: Optional[str] = None,
         variable_name: Optional[str] = None,
+        concept_codes: Optional[List[str]] = None,
         file_path: Optional[str] = None,
     ):
         self.error_type = error_type
         self.domain_code = domain_code
         self.pipe_code = pipe_code
         self.variable_name = variable_name
+        self.concept_codes = concept_codes
         self.file_path = file_path
         super().__init__()
 
@@ -38,6 +40,8 @@ class StaticValidationError(Exception):
             msg += f" • pipe='{self.pipe_code}'"
         if self.variable_name:
             msg += f" • variable='{self.variable_name}'"
+        if self.concept_codes:
+            msg += f" • concept_codes='{self.concept_codes}'"
         if self.file_path:
             msg += f" • file='{self.file_path}'"
 
@@ -70,14 +74,6 @@ class DomainDefinitionError(PipelexError):
     pass
 
 
-class DomainLibraryError(PipelexError):
-    pass
-
-
-class ConceptLibraryError(PipelexError):
-    pass
-
-
 class ConceptLibraryConceptNotFoundError(PipelexError):
     pass
 
@@ -86,11 +82,23 @@ class ConceptFactoryError(PipelexError):
     pass
 
 
-class PipeLibraryError(PipelexError):
+class LibraryError(PipelexError):
     pass
 
 
-class PipeLibraryPipeNotFoundError(PipelexError):
+class DomainLibraryError(LibraryError):
+    pass
+
+
+class ConceptLibraryError(LibraryError):
+    pass
+
+
+class PipeLibraryError(LibraryError):
+    pass
+
+
+class PipeLibraryPipeNotFoundError(PipeLibraryError):
     pass
 
 
@@ -98,11 +106,7 @@ class PipeFactoryError(PipelexError):
     pass
 
 
-class LibraryError(PipelexError):
-    pass
-
-
-class LibraryParsingError(PipelexError):
+class LibraryParsingError(LibraryError):
     pass
 
 

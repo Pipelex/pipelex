@@ -102,7 +102,8 @@ class PipeLLMPrompt(PipeOperator):
         if self.system_prompt_pipe_jinja2:
             required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
         if self.user_images:
-            required_variables.update(self.user_images)
+            user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
+            required_variables.update(user_images_top_object_name)
         return required_variables
 
     @override
