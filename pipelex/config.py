@@ -1,10 +1,11 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 
 import shortuuid
+from pydantic import Field, field_validator
 
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
-from pipelex.exceptions import PipelexError
+from pipelex.exceptions import PipelexError, StaticValidationErrorType
 from pipelex.hub import get_required_config
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
@@ -13,6 +14,30 @@ from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.config.models import ConfigModel, ConfigRoot
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.templating.templating_models import PromptingStyle
+from pipelex.types import StrEnum
+
+
+class StaticValidationReaction(StrEnum):
+    RAISE = "raise"
+    LOG = "log"
+    IGNORE = "ignore"
+
+
+class StaticValidationConfig(ConfigModel):
+    default_reaction: StaticValidationReaction = Field(strict=False)
+    reactions: Dict[StaticValidationErrorType, StaticValidationReaction]
+
+    @field_validator("reactions", mode="before")
+    def validate_reactions(cls, value: Dict[str, str]) -> Dict[StaticValidationErrorType, StaticValidationReaction]:
+        the_dict = cast(
+            Dict[StaticValidationErrorType, StaticValidationReaction],
+            ConfigModel.transform_dict_str_to_enum(
+                input_dict=value,
+                key_enum_cls=StaticValidationErrorType,
+                value_enum_cls=StaticValidationReaction,
+            ),
+        )
+        return the_dict
 
 
 class PipelexConfigError(PipelexError):
@@ -65,6 +90,7 @@ class Pipelex(ConfigModel):
     aws_config: AwsConfig
 
     library_config: LibraryConfig
+    static_validation_config: StaticValidationConfig
     generic_template_names: GenericTemplateNames
     tracker_config: TrackerConfig
     structure_config: StructureConfig

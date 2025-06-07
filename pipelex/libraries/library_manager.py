@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
+from pipelex.config import get_config
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_library import ConceptLibrary
 from pipelex.core.concept_native import NativeConcept
@@ -156,7 +157,12 @@ class LibraryManager:
             nb_pipes_before = len(self.pipe_library.root)
             library_dict = load_toml_from_path(path=str(toml_path))
             library_name = toml_path.stem
-            self._load_library_dict(library_name=library_name, library_dict=library_dict, component_type=LibraryComponent.PIPE)
+            try:
+                self._load_library_dict(library_name=library_name, library_dict=library_dict, component_type=LibraryComponent.PIPE)
+            except StaticValidationError as static_validation_error:
+                static_validation_error.file_path = str(toml_path)
+                log.error(static_validation_error.desc())
+                raise static_validation_error
             nb_pipes_loaded = len(self.pipe_library.root) - nb_pipes_before
             log.verbose(f"Loaded {nb_pipes_loaded} pipes from '{toml_path.name}'")
 
@@ -223,15 +229,12 @@ class LibraryManager:
                 pass
             elif isinstance(pipe_obj, dict):
                 pipe_obj_dict: Dict[str, Any] = pipe_obj.copy()
-                try:
-                    pipe = LibraryManager.make_pipe_from_details_dict(
-                        domain_code=domain_code,
-                        pipe_code=pipe_code,
-                        details_dict=pipe_obj_dict,
-                    )
-                    self.pipe_library.add_new_pipe(pipe=pipe)
-                except StaticValidationError as static_validation_error:
-                    log.error(f"Static validation error for pipe '{pipe_code}': {static_validation_error}")
+                pipe = LibraryManager.make_pipe_from_details_dict(
+                    domain_code=domain_code,
+                    pipe_code=pipe_code,
+                    details_dict=pipe_obj_dict,
+                )
+                self.pipe_library.add_new_pipe(pipe=pipe)
 
     def validate_libraries(self):
         log.debug("LibraryManager validating libraries")

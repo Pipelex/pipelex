@@ -10,7 +10,7 @@ from pipelex.cogt.llm.llm_models.llm_deck_check import check_llm_setting_with_de
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
-from pipelex.config import get_config
+from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.domain import Domain, SpecialDomain
@@ -70,6 +70,10 @@ class PipeLLM(PipeOperator):
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
+        static_validation_config = get_config().pipelex.static_validation_config
+        default_reaction = static_validation_config.default_reaction
+        reactions = static_validation_config.reactions
+
         required_variables = self.pipe_llm_prompt.required_variables()
         # check all required variables are in the inputs
         for required_variable in required_variables:
@@ -82,9 +86,15 @@ class PipeLLM(PipeOperator):
                     domain_code=self.domain,
                     pipe_code=self.code,
                     variable_name=required_variable,
-                    message=f"Required variable '{required_variable}' is not declared in the inputs",
+                    # message=f"Required variable '{required_variable}' is not declared in the inputs",
                 )
-                log.error(missing_input_declaration_error.desc())
+                match reactions.get(StaticValidationErrorType.MISSING_INPUT_DECLARATION, default_reaction):
+                    case StaticValidationReaction.IGNORE:
+                        pass
+                    case StaticValidationReaction.LOG:
+                        log.error(missing_input_declaration_error.desc())
+                    case StaticValidationReaction.RAISE:
+                        raise missing_input_declaration_error
         # check that all inputs are in the required variables
         for input_name in self.inputs.keys():
             if input_name not in required_variables:
@@ -93,9 +103,15 @@ class PipeLLM(PipeOperator):
                     domain_code=self.domain,
                     pipe_code=self.code,
                     variable_name=input_name,
-                    message=f"Input '{input_name}' is not in the required variables",
+                    # message=f"Input '{input_name}' is not in the required variables",
                 )
-                log.error(extraneous_input_declaration_error.desc())
+                match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_DECLARATION, default_reaction):
+                    case StaticValidationReaction.IGNORE:
+                        pass
+                    case StaticValidationReaction.LOG:
+                        log.error(extraneous_input_declaration_error.desc())
+                    case StaticValidationReaction.RAISE:
+                        raise extraneous_input_declaration_error
         return self
 
     @model_validator(mode="after")

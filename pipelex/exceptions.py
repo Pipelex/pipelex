@@ -16,30 +16,36 @@ class StaticValidationErrorType(StrEnum):
     EXTRANEOUS_INPUT_DECLARATION = "extraneous_input_declaration"
 
 
-class StaticValidationError(PipelexError):
+class StaticValidationError(Exception):
     def __init__(
         self,
         error_type: StaticValidationErrorType,
         domain_code: str,
-        message: str,
         pipe_code: Optional[str] = None,
         variable_name: Optional[str] = None,
+        file_path: Optional[str] = None,
     ):
         self.error_type = error_type
         self.domain_code = domain_code
         self.pipe_code = pipe_code
         self.variable_name = variable_name
-        super().__init__(message)
+        self.file_path = file_path
+        super().__init__()
 
     def desc(self) -> str:
-        msg = f"StaticValidationError: {self.error_type} in domain '{self.domain_code}'"
+        msg = f"{self.error_type} • domain='{self.domain_code}'"
         if self.pipe_code:
             msg += f" • pipe='{self.pipe_code}'"
         if self.variable_name:
             msg += f" • variable='{self.variable_name}'"
+        if self.file_path:
+            msg += f" • file='{self.file_path}'"
 
-        msg += f"\n{self.message}"
         return msg
+
+    @override
+    def __str__(self) -> str:
+        return self.desc()
 
 
 class PipelexCLIError(PipelexError, ClickException):
