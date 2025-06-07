@@ -38,7 +38,7 @@ class TestLLMVision:
     @pytest.mark.parametrize("topic, image_path", LLMVisionTestCases.IMAGE_PATHS)
     async def test_gen_text_from_vision_by_bytes(self, llm_handle_for_vision: str, topic: str, image_path: str):
         image_bytes = load_binary_as_base64(path=image_path)
-        prompt_image = PromptImageBytes(b64_image_bytes=image_bytes)
+        prompt_image = PromptImageBytes(base_64=image_bytes)
         llm_worker = get_llm_worker(llm_handle=llm_handle_for_vision)
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_USER_TEXT_2,

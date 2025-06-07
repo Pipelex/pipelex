@@ -74,7 +74,7 @@ class MistralFactory:
             # TODO: use actual image type
             return ImageURLChunk(image_url=f"data:image/png;base64,{image_bytes}")
         elif isinstance(prompt_image, PromptImageBytes):
-            image_bytes = encode_to_base64(prompt_image.b64_image_bytes).decode("utf-8")
+            image_bytes = encode_to_base64(prompt_image.base_64).decode("utf-8")
             # TODO: use actual image type
             return ImageURLChunk(image_url=f"data:image/png;base64,{image_bytes}")
         else:

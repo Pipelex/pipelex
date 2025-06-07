@@ -1,10 +1,11 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
+from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.json_utils import purify_json_dict
 from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
 
 
-def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False) -> str:
+def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key: Optional[str] = None) -> str:
     """
     Convert arbitrary JSON-compatible Python data to a Markdown string
     without needing to specify the markdown type explicitly.
@@ -22,7 +23,7 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False) -> s
                 converted_line = f"{heading_prefix} {key}"
             # Convert the value recursively, increasing the heading level
             # dict_result_lines.append(convert_to_markdown(data=value, level=level + 1))
-            converted_value = convert_to_markdown(data=value, level=level + 1)
+            converted_value = convert_to_markdown(data=value, level=level + 1, key=key)
             converted_value_nb_lines = len(converted_value.split("\n"))
             if converted_value_nb_lines > 1:
                 dict_result_lines.append(converted_line)
@@ -54,7 +55,10 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False) -> s
     elif isinstance(data, (str, int, float, bool)):
         # Simple scalar types become paragraphs (strings) or inline text
         # If it's a string with multiple lines, just output them as-is.
-        return str(data)
+        str_value = str(data)
+        if key and AttributePolisher.should_truncate(name=key, value=str_value):
+            return AttributePolisher.get_truncated_value(name=key, value=str_value)
+        return str_value
 
     elif data is None:
         # No value

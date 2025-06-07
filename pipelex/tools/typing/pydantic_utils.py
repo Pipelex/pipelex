@@ -4,6 +4,7 @@ from pydantic import BaseModel, ValidationError
 from rich.repr import Result as RichReprResult
 from typing_extensions import override
 
+from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.types import StrEnum
 
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
@@ -175,34 +176,6 @@ def serialize_model(
 
 
 class CustomBaseModel(BaseModel):
-    base_64_truncate_length: ClassVar[int] = 64
-    url_truncate_length: ClassVar[int] = 128
-    truncate_suffix: ClassVar[str] = "…"
-
-    def _truncate_string(self, value: str, max_length: int) -> str:
-        """Truncate a string to the specified maximum length and append the truncate suffix."""
-        if len(value) > max_length:
-            return value[:max_length] + self.truncate_suffix
-        return value
-
-    def _should_truncate(self, name: str, value: Any) -> bool:
-        if not isinstance(value, str):
-            return False
-
-        if name == "base_64" and len(value) > self.base_64_truncate_length:
-            return True
-        elif name == "url" and value.startswith("data:image/") and len(value) > self.url_truncate_length:
-            return True
-        return False
-
-    def _get_truncated_value(self, name: str, value: str) -> str:
-        """Get the truncated value based on the field name and value type."""
-        if name == "base_64":
-            return self._truncate_string(value, self.base_64_truncate_length)
-        elif name == "url" and value.startswith("data:image/"):
-            return self._truncate_string(value, self.url_truncate_length)
-        return value
-
     @override
     def __rich_repr__(self) -> RichReprResult:  # type: ignore
         for item in super().__rich_repr__():  # type: ignore
@@ -211,8 +184,8 @@ class CustomBaseModel(BaseModel):
                 if len(tuple_item) >= 2:
                     name = tuple_item[0]
                     value = tuple_item[1]
-                    if self._should_truncate(name=name, value=value):
-                        truncated_value = self._get_truncated_value(name, value)
+                    if AttributePolisher.should_truncate(name=name, value=value):
+                        truncated_value = AttributePolisher.get_truncated_value(name, value)
                         if len(tuple_item) == 3:
                             yield name, truncated_value, tuple_item[2]
                         else:
@@ -226,8 +199,8 @@ class CustomBaseModel(BaseModel):
     def __repr_args__(self) -> Sequence[tuple[Optional[str], Any]]:
         processed_args: list[tuple[Optional[str], Any]] = []
         for name, value in super().__repr_args__():
-            if name and self._should_truncate(name=name, value=value):
-                truncated_value = self._get_truncated_value(name, value)
+            if name and AttributePolisher.should_truncate(name=name, value=value):
+                truncated_value = AttributePolisher.get_truncated_value(name, value)
                 processed_args.append((name, truncated_value))
             else:
                 processed_args.append((name, value))

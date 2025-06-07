@@ -87,7 +87,6 @@ class LibraryManager:
                 raise LLMDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
             llm_deck_dict = load_toml_from_path(path=llm_deck_path)
             log.debug(f"Loaded LLM deck from {llm_deck_path}")
-            log.verbose(llm_deck_dict)
             deep_update(full_llm_deck_dict, llm_deck_dict)
 
         self.llm_deck = LLMDeck.model_validate(full_llm_deck_dict)

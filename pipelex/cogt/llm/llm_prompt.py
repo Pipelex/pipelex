@@ -6,6 +6,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage
+from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.string_utils import is_none_or_has_text, is_not_none_and_has_text
 from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
 
@@ -42,6 +43,14 @@ class LLMPrompt(BaseModel):
         # return json_str(self, title="llm_prompt", is_spaced=True)
         return self.desc
         # return "test"
+
+    @override
+    def __repr__(self) -> str:
+        return self.desc
+
+    @override
+    def __format__(self, format_spec: str) -> str:
+        return self.desc
 
     @property
     def desc(self) -> str:
