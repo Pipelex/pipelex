@@ -5,6 +5,7 @@ from typing_extensions import override
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory, OcrPlatform
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_operators.pipe_ocr import PipeOcr
 
 
@@ -37,7 +38,7 @@ class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
             definition=pipe_blueprint.definition,
             ocr_engine=ocr_engine,
             output_concept_code=pipe_blueprint.output,
-            inputs=pipe_blueprint.inputs or {},
+            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
             should_include_images=pipe_blueprint.page_images,
             should_caption_images=pipe_blueprint.page_image_captions,
             should_include_page_views=pipe_blueprint.page_views,

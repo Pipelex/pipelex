@@ -6,6 +6,7 @@ from typing_extensions import Self, override
 from pipelex.cogt.llm.llm_models.llm_deck import LLMSettingChoices
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingOrPresetId
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_optional_domain
@@ -115,6 +116,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         pipe_llm_prompt = PipeLLMPrompt(
             code="adhoc_for_pipe_llm_prompt",
             domain=domain_code,
+            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
             system_prompt_pipe_jinja2=system_prompt_pipe_jinja2,
             system_prompt_verbatim_name=pipe_blueprint.system_prompt_name,
             system_prompt=pipe_blueprint.system_prompt or system_prompt,
@@ -142,7 +144,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=pipe_blueprint.inputs or {},
+            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             pipe_llm_prompt=pipe_llm_prompt,
             llm_choices=llm_settings,

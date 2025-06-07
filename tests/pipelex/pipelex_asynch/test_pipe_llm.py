@@ -4,6 +4,7 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.stuff import Stuff
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
@@ -49,6 +50,9 @@ class TestPipeLLM:
         stuff: Stuff,
         attribute_paths: List[str],
     ):
+        stuff_name = stuff.stuff_name
+        if not stuff_name:
+            pytest.fail(f"Cannot use nameless stuff in this test: {stuff}")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         pipe_job = PipeJobFactory.make_pipe_job(
@@ -56,6 +60,7 @@ class TestPipeLLM:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm_image",
                 domain="generic",
+                inputs=PipeInputSpec(root={stuff_name: stuff.concept_code}),
                 output_concept_code=NativeConcept.TEXT.code,
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm_image",

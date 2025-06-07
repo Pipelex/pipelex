@@ -69,13 +69,13 @@ class PipeLLM(PipeOperator):
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
 
-        required_variables = self.pipe_llm_prompt.required_variables()
+        required_variables = self.required_variables()
         # check all required variables are in the inputs
         for required_variable in required_variables:
             if required_variable.startswith("_"):
                 # variables starting with _ are run parameters, not inputs
                 continue
-            if required_variable not in self.inputs:
+            if required_variable not in self.inputs.variables:
                 missing_input_declaration_error = StaticValidationError(
                     error_type=StaticValidationErrorType.MISSING_INPUT_DECLARATION,
                     domain_code=self.domain,
@@ -90,7 +90,7 @@ class PipeLLM(PipeOperator):
                     case StaticValidationReaction.RAISE:
                         raise missing_input_declaration_error
         # check that all inputs are in the required variables
-        for input_name in self.inputs.keys():
+        for input_name in self.inputs.variables:
             if input_name not in required_variables:
                 extraneous_input_declaration_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_DECLARATION,

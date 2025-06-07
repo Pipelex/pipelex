@@ -2,6 +2,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.stuff_content import PageContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router
@@ -23,9 +24,11 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_image",
                 domain="generic",
-                inputs={
-                    "page_scan": "native.Image",
-                },
+                inputs=PipeInputSpec(
+                    root={
+                        "page_scan": "native.Image",
+                    }
+                ),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
@@ -53,9 +56,11 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_pdf",
                 domain="generic",
-                inputs={
-                    "pdf": "native.PDF",
-                },
+                inputs=PipeInputSpec(
+                    root={
+                        "pdf": "native.PDF",
+                    }
+                ),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,

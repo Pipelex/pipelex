@@ -60,7 +60,7 @@ class PipeOcr(PipeOperator):
         reactions = static_validation_config.reactions
         # check that we have either an image or a pdf in inputs, at most one of them and nothing else
         count_applicable_inputs = 0
-        for input_name, input_concept_code in self.inputs.items():
+        for input_name, input_concept_code in self.inputs.items:
             log.debug(f"Validating input '{input_name}' with concept code '{input_concept_code}'")
             if concept_provider.is_compatible_by_concept_code(
                 tested_concept_code=input_concept_code,

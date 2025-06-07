@@ -3,13 +3,12 @@ from typing import Dict, Optional, Set, Type
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
-
-# from pipelex.core.pipe_input_spec import PipeInputSpec
 
 
 class PipeAbstract(ABC, BaseModel):
@@ -20,7 +19,7 @@ class PipeAbstract(ABC, BaseModel):
 
     definition: Optional[str] = None
     # TODO: support auto (implicit) input, it makes sense for pipe controllers
-    inputs: Dict[str, str] = Field(default_factory=dict)
+    inputs: PipeInputSpec = Field(default_factory=PipeInputSpec)
     output_concept_code: str
 
     @property
@@ -37,7 +36,7 @@ class PipeAbstract(ABC, BaseModel):
 
     def concept_dependencies(self) -> Set[str]:
         required_concepts = set([self.output_concept_code])
-        required_concepts.update(self.inputs.values())
+        required_concepts.update(self.inputs.concepts)
         return required_concepts
 
     # Required variables

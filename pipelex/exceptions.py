@@ -214,3 +214,7 @@ class ConceptDomainError(ConceptError):
 
 class PipelineManagerNotFoundError(PipelexError):
     pass
+
+
+class PipeInputSpecError(PipelexError):
+    pass
