@@ -8,11 +8,12 @@ Color = "A color"
 
 [pipe.extract_colors]
 PipeLLM = "Extract Colors"
+inputs = { text = "Text" }
 output = "Color"
 prompt_template = """
 Extract colors from the following text:
 
-{{ text|tag }}
+@text
 """
 multiple_output = true
 
@@ -56,7 +57,7 @@ Output only the word, nothing else.
 
 [pipe.capitalize_last_letter]
 PipeLLM = "Capitalize Last Letter"
-inputs = { color = "Color" }
+inputs = { capitalized_color = "Color" }
 output = "Color"
 prompt_template = """
 Put the last letter of a word that represents a color as a capital letter.

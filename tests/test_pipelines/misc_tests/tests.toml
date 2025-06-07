@@ -48,19 +48,6 @@ Create a short synopsis for a story about:
 Be concise: 3 sentences max.
 """
 
-
-# TODO: fix testing implict concept
-[pipe.test_implicit_concept]
-PipeLLM = "Implicit concept"
-output = "RandomConceptCodeThatDoesNotExist"
-prompt_template = """
-This is is a test prompt.
-
-Output what is here:
-
-{{ a123|tag }}
-"""
-
 [pipe.test_no_input]
 PipeLLM = "No Input"
 output = "native.Text"
