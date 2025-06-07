@@ -5,7 +5,7 @@ definition = "This library is intended for testing errors"
 
 # [pipe.jinja2_syntax_error]
 # PipeLLM = "Jinja2 syntax error (on purpose, for testing): bad curly braces"
-# input = "native.Text"
+# inputs = { text = "native.Text" }
 # output = "native.Text"
 # prompt_template = """
 # {{ a123|tag }
@@ -13,7 +13,7 @@ definition = "This library is intended for testing errors"
 
 # [pipe.jinja2_dummy_filter1]
 # PipeLLM = "Jinja2 undefined filter (on purpose, for testing)"
-# input = "native.Text"
+# inputs = { text = "native.Text" }
 # output = "native.Text"
 # prompt_template = """
 # {{ foobar|dummy_filter1 }}
@@ -21,7 +21,7 @@ definition = "This library is intended for testing errors"
 
 # [pipe.jinja2_dummy_filter2]
 # PipeLLM = "Jinja2 undefined filter (on purpose, for testing)"
-# input = "native.Text"
+# inputs = { text = "native.Text" }
 # output = "native.Text"
 # prompt_template = """
 # {{ foobar|dummy_filter2() }}
@@ -29,7 +29,7 @@ definition = "This library is intended for testing errors"
 
 # [pipe.jinja2_dummy_filter3]
 # PipeLLM = "Jinja2 undefined filter (on purpose, for testing)"
-# input = "native.Text"
+# inputs = { text = "native.Text" }
 # output = "native.Text"
 # prompt_template = """
 # {{ foobar|dummy_filter3("param") }}
@@ -38,7 +38,7 @@ definition = "This library is intended for testing errors"
 
 # [pipe.jinja2_dummy_filter4]
 # PipeLLM = "Jinja2 undefined filter (on purpose, for testing)"
-# input = "native.Text"
+# inputs = { text = "native.Text" }
 # output = "native.Text"
 # prompt_template = """
 # {{ foobar|dummy_filter4(param1, param2) }}

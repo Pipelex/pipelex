@@ -62,8 +62,9 @@ class PipeOcr(PipeOperator):
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
+
         # check that we have either an image or a pdf in inputs, at most one of them and nothing else
-        count_applicable_inputs = 0
+        candidate_prompt_var_names: List[str] = []
         for input_name, input_concept_code in self.inputs.items:
             log.debug(f"Validating input '{input_name}' with concept code '{input_concept_code}'")
             if concept_provider.is_compatible_by_concept_code(
@@ -71,23 +72,50 @@ class PipeOcr(PipeOperator):
                 wanted_concept_code=NativeConcept.IMAGE.code,
             ):
                 self.image_stuff_name = input_name
-                count_applicable_inputs += 1
+                candidate_prompt_var_names.append(input_name)
             elif concept_provider.is_compatible_by_concept_code(
                 tested_concept_code=input_concept_code,
                 wanted_concept_code=NativeConcept.PDF.code,
             ):
                 self.pdf_stuff_name = input_name
-                count_applicable_inputs += 1
+                candidate_prompt_var_names.append(input_name)
             else:
-                raise PipeDefinitionError(f"Input '{input_name}' with concept code '{input_concept_code}' is neither a valid image nor pdf")
-        if count_applicable_inputs > 1:
-            raise PipeDefinitionError("Only one image or pdf input can be provided")
-        elif count_applicable_inputs == 0:
+                inadequate_input_concept_error = StaticValidationError(
+                    error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[input_name],
+                    provided_concept_code=input_concept_code,
+                    explanation="For OCR you must provide either a pdf or an image or a concept that refines them",
+                )
+                match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
+                    case StaticValidationReaction.IGNORE:
+                        pass
+                    case StaticValidationReaction.LOG:
+                        log.error(inadequate_input_concept_error.desc())
+                    case StaticValidationReaction.RAISE:
+                        raise inadequate_input_concept_error
+        if len(candidate_prompt_var_names) > 1:
+            too_many_candidate_inputs_error = StaticValidationError(
+                error_type=StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS,
+                domain_code=self.domain,
+                pipe_code=self.code,
+                variable_names=candidate_prompt_var_names,
+                explanation="Only one image or pdf can be provided for OCR",
+            )
+            match reactions.get(StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS, default_reaction):
+                case StaticValidationReaction.IGNORE:
+                    pass
+                case StaticValidationReaction.LOG:
+                    log.error(too_many_candidate_inputs_error.desc())
+                case StaticValidationReaction.RAISE:
+                    raise too_many_candidate_inputs_error
+        elif len(candidate_prompt_var_names) == 0:
             missing_input_var_error = StaticValidationError(
                 error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
                 domain_code=self.domain,
                 pipe_code=self.code,
-                concept_codes=[NativeConcept.IMAGE.code, NativeConcept.PDF.code],
+                explanation="For OCR you must provide either a pdf or an image or a concept that refines them",
             )
             match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
                 case StaticValidationReaction.IGNORE:

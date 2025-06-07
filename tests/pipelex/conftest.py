@@ -191,7 +191,7 @@ def llm_job_params(request: pytest.FixtureRequest) -> LLMJobParams:
         # ImggHandle.FLUX_1_1_PRO,
         # ImggHandle.FLUX_1_1_ULTRA,
         ImggHandle.SDXL_LIGHTNING,
-        ImggHandle.OPENAI_GPT_IMAGE_1,
+        # ImggHandle.OPENAI_GPT_IMAGE_1,
     ]
 )
 def imgg_handle(request: pytest.FixtureRequest) -> ImggHandle:

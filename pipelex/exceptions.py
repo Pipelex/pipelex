@@ -15,6 +15,7 @@ class StaticValidationErrorType(StrEnum):
     MISSING_INPUT_VARIABLE = "missing_input_variable"
     EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
     INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
+    TOO_MANY_CANDIDATE_INPUTS = "too_many_candidate_inputs"
 
 
 class StaticValidationError(Exception):
@@ -23,29 +24,32 @@ class StaticValidationError(Exception):
         error_type: StaticValidationErrorType,
         domain_code: str,
         pipe_code: Optional[str] = None,
-        variable_name: Optional[str] = None,
-        concept_codes: Optional[List[str]] = None,
+        variable_names: Optional[List[str]] = None,
+        provided_concept_code: Optional[str] = None,
         file_path: Optional[str] = None,
+        explanation: Optional[str] = None,
     ):
         self.error_type = error_type
         self.domain_code = domain_code
         self.pipe_code = pipe_code
-        self.variable_name = variable_name
-        self.concept_codes = concept_codes
+        self.variable_names = variable_names
+        self.provided_concept_code = provided_concept_code
         self.file_path = file_path
+        self.explanation = explanation
         super().__init__()
 
     def desc(self) -> str:
         msg = f"{self.error_type} • domain='{self.domain_code}'"
         if self.pipe_code:
             msg += f" • pipe='{self.pipe_code}'"
-        if self.variable_name:
-            msg += f" • variable='{self.variable_name}'"
-        if self.concept_codes:
-            msg += f" • concept_codes='{self.concept_codes}'"
+        if self.variable_names:
+            msg += f" • variable='{self.variable_names}'"
+        if self.provided_concept_code:
+            msg += f" • provided_concept_code='{self.provided_concept_code}'"
         if self.file_path:
             msg += f" • file='{self.file_path}'"
-
+        if self.explanation:
+            msg += f" • explanation='{self.explanation}'"
         return msg
 
     @override
@@ -112,6 +116,10 @@ class LibraryParsingError(LibraryError):
 
 
 class PipeDefinitionError(PipelexError):
+    pass
+
+
+class UnexpectedPipeDefinitionError(PipeDefinitionError):
     pass
 
 

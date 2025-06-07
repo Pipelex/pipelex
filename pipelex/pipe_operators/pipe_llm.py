@@ -90,7 +90,7 @@ class PipeLLM(PipeOperator):
                     error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
                     domain_code=self.domain,
                     pipe_code=self.code,
-                    variable_name=variable_name,
+                    variable_names=[variable_name],
                 )
                 match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
                     case StaticValidationReaction.IGNORE:
@@ -111,8 +111,9 @@ class PipeLLM(PipeOperator):
                         error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
                         domain_code=self.domain,
                         pipe_code=self.code,
-                        variable_name=variable_name,
-                        concept_codes=[concept_code_of_declared_input, concept_code],
+                        variable_names=[variable_name],
+                        provided_concept_code=concept_code_of_declared_input,
+                        explanation="The input provided for LLM Vision must be an image or a concept that refines image",
                     )
                     match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
                         case StaticValidationReaction.IGNORE:
@@ -128,7 +129,7 @@ class PipeLLM(PipeOperator):
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
                     domain_code=self.domain,
                     pipe_code=self.code,
-                    variable_name=input_name,
+                    variable_names=[input_name],
                 )
                 match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, default_reaction):
                     case StaticValidationReaction.IGNORE:

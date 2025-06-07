@@ -65,7 +65,7 @@ Tell me a short story about a red baloon.
 """
 
 [pipe.generate_3_images]
-PipeImgGen = "Generate 3 AI images"
-inputs = { imgg_prompt = "images.ImggPrompt" }
+PipeImgGen = "Generate 3 images"
+inputs = { prompt = "images.ImgGenPrompt" }
 output = "native.Image"
 nb_output = 3
