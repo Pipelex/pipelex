@@ -55,10 +55,15 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
     def get(self, variable_name: str) -> str:
         return self.root[variable_name]
 
+    def add_variable(self, variable_name: str, concept_code: str):
+        transformed_key: str = variable_name.split(".", 1)[0]
+        self.root[transformed_key] = concept_code
+
     def add_new_variable(self, variable_name: str, concept_code: str):
-        if variable_name in self.root:
+        transformed_key: str = variable_name.split(".", 1)[0]
+        if transformed_key in self.root:
             raise PipeInputSpecError(f"Variable {variable_name} already exists in the input spec")
-        self.root[variable_name] = concept_code
+        self.root[transformed_key] = concept_code
 
     @property
     def items(self) -> List[Tuple[str, str]]:

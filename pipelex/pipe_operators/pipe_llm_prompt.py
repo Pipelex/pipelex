@@ -107,13 +107,11 @@ class PipeLLMPrompt(PipeOperator):
 
         pipe_input_spec = PipeInputSpec(root={})
         for conceptless_required_variable in conceptless_required_variables:
-            pipe_input_spec.add_new_variable(variable_name=conceptless_required_variable, concept_code=NativeConcept.ANYTHING.code)
+            pipe_input_spec.add_variable(variable_name=conceptless_required_variable, concept_code=NativeConcept.ANYTHING.code)
 
         if self.user_images:
-            # user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
-            # conceptless_required_variables.update(user_images_top_object_name)
             for user_image in self.user_images:
-                pipe_input_spec.add_new_variable(variable_name=user_image, concept_code=NativeConcept.IMAGE.code)
+                pipe_input_spec.add_variable(variable_name=user_image, concept_code=NativeConcept.IMAGE.code)
 
         return pipe_input_spec
 

@@ -30,7 +30,7 @@ Describe the provided image in great detail.
 
 [pipe.describe_photo]
 PipeLLM = "Describe a photo"
-inputs = { photo = "Text" }
+inputs = { photo = "Photo" }
 output = "VisualDescription"
 system_prompt = "You are a very good observer."
 images = ["photo"]
