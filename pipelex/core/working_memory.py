@@ -127,6 +127,13 @@ class WorkingMemory(BaseModel):
             the_stuffs.append(self.get_stuff(name=name))
         return the_stuffs
 
+    def get_existing_stuffs(self, names: Set[str]) -> List[Stuff]:
+        the_stuffs: List[Stuff] = []
+        for name in names:
+            if stuff := self.get_optional_stuff(name=name):
+                the_stuffs.append(stuff)
+        return the_stuffs
+
     def get_stuff_by_stuff_code(self, stuff_code: str) -> Stuff:
         matching_stuffs: List[Stuff] = []
         for stuff in self.root.values():
