@@ -21,7 +21,7 @@ from tests.pipelex.test_data import PipeTestCases
 @pytest.mark.ocr
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipeRouter:
+class TestPipeRunningVariants:
     @pytest.mark.parametrize("topic, blueprint, pipe_code", PipeTestCases.BLUEPRINT_AND_PIPE)
     async def test_pipe_from_blueprint(
         self,

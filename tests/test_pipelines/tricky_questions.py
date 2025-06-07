@@ -1,11 +1,7 @@
-from datetime import datetime
-from typing import Generic, List, Literal, Optional, TypeVar, Union
 
-from pydantic import Field, model_validator
-from typing_extensions import Self, override
+from pydantic import Field
 
 from pipelex.core.stuff_content import StructuredContent
-from pipelex.types import StrEnum
 
 
 class QuestionAnalysis(StructuredContent):

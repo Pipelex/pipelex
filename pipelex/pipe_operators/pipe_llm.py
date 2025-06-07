@@ -24,9 +24,8 @@ from pipelex.core.pipe_run_params import (
 from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError, PipeExecutionError
+from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import (
-    get_concept_provider,
     get_content_generator,
     get_llm_deck,
     get_optional_pipe,

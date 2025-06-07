@@ -1,6 +1,6 @@
-from typing import Any, Dict, Optional, Protocol, TypeVar, Union
+from typing import Any, Dict, Optional, Protocol, TypeVar
 
-from pydantic import ConfigDict, Field, field_validator, model_validator
+from pydantic import ConfigDict, field_validator, model_validator
 from typing_extensions import Self, runtime_checkable
 
 from pipelex.core.concept_native import NativeConcept
