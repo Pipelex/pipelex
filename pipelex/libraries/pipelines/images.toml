@@ -17,7 +17,7 @@ refines = ["native.Image"]
 
 [pipe.describe_image]
 PipeLLM = "Describe an image"
-input = "native.Image"
+inputs = { image = "native.Image" }
 output = "VisualDescription"
 system_prompt = "You are a very good observer."
 images = ["image"]

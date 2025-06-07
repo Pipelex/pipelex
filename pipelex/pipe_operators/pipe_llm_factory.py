@@ -43,6 +43,7 @@ class PipeLLMBlueprint(PipeBlueprint):
     nb_output: Optional[int] = None
     multiple_output: Optional[bool] = None
 
+    # TODO: chack that the listed images are listed in the inputs
     @model_validator(mode="after")
     def validate_multiple_output(self) -> Self:
         if excess_attributes_list := has_more_than_one_among_attributes_from_lists(

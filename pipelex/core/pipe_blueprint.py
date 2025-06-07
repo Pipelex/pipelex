@@ -34,11 +34,11 @@ class PipeBlueprint(StructuredContent):
             return f"native.{value}"
         return value
 
-    @field_validator("input")
+    @field_validator("inputs")
     @classmethod
-    def validate_input(cls, value: Optional[str]) -> Optional[str]:
+    def validate_inputs(cls, value: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
         if value:
-            return cls._add_native_prefix_if_needed(value)
+            return {name: cls._add_native_prefix_if_needed(concept_code) for name, concept_code in value.items()}
         return value
 
     @field_validator("output")
