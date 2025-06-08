@@ -24,7 +24,7 @@ from pipelex.exceptions import WorkingMemoryError, WorkingMemoryNotFoundError, W
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 
 MAIN_STUFF_NAME = "main_stuff"
-BATCH_ITEM_STUFF_NAME = "_batch_item"
+BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
 
 StuffDict = Dict[str, Stuff]
 StuffArtefactDict = Dict[str, StuffArtefact]

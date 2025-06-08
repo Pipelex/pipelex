@@ -114,7 +114,7 @@ class PipeLLM(PipeOperator):
                         input_concept = concept_provider.get_required_concept(concept_code=concept_code_of_declared_input)
                         input_concept_class_name = input_concept.structure_class_name
                         input_concept_class = class_registry.get_required_subclass(name=input_concept_class_name, base_class=StuffContent)
-                        if not issubclass(input_concept_class, StructuredContent):
+                        if issubclass(input_concept_class, StructuredContent):
                             continue
                     inadequate_input_concept_error = StaticValidationError(
                         error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
