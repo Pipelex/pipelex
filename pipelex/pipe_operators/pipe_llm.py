@@ -14,7 +14,7 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.domain import Domain, SpecialDomain
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe_input_details import PipeInputDetails
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import (
     PipeOutputMultiplicity,
@@ -22,7 +22,7 @@ from pipelex.core.pipe_run_params import (
     PipeRunParams,
     output_multiplicity_to_apply,
 )
-from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
+from pipelex.core.stuff_content import ListContent, StructuredContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import (
@@ -65,7 +65,7 @@ class PipeLLM(PipeOperator):
     system_prompt_to_structure: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
 
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self) -> PipeInputDetails:
         return self.pipe_llm_prompt.needed_inputs()
 
     @model_validator(mode="after")
@@ -81,16 +81,16 @@ class PipeLLM(PipeOperator):
 
         the_needed_inputs = self.needed_inputs()
         # check all required variables are in the inputs
-        for variable_name, concept_code in the_needed_inputs.items:
-            if variable_name.startswith("_"):
-                # variables starting with _ are run parameters, not inputs
-                continue
-            if variable_name not in self.inputs.variables:
+        for required_variable_name, requirement_expression, concept_code in the_needed_inputs.detailed_requirements:
+            # if variable_name.startswith("_"):
+            #     # variables starting with _ are run parameters, not inputs
+            #     continue
+            if required_variable_name not in self.inputs.variables:
                 missing_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
                     domain_code=self.domain,
                     pipe_code=self.code,
-                    variable_names=[variable_name],
+                    variable_names=[required_variable_name],
                 )
                 match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
                     case StaticValidationReaction.IGNORE:
@@ -102,16 +102,25 @@ class PipeLLM(PipeOperator):
 
             # there is one case where the needed input is of specific concept: the user_images
             if concept_code == NativeConcept.IMAGE.code:
-                concept_code_of_declared_input = self.inputs.get(variable_name=variable_name)
+                concept_code_of_declared_input = self.inputs.get(variable_name=required_variable_name)
                 if not concept_provider.is_compatible_by_concept_code(
                     tested_concept_code=concept_code_of_declared_input,
                     wanted_concept_code=concept_code,
                 ):
+                    if required_variable_name != requirement_expression:
+                        # the required_input is a sub-attribute of the required variable
+                        # TODO: check that the sub-attribute is compatible with the concept code
+                        # let's check at least that the input is a structured concept
+                        input_concept = concept_provider.get_required_concept(concept_code=concept_code_of_declared_input)
+                        input_concept_class_name = input_concept.structure_class_name
+                        input_concept_class = class_registry.get_required_subclass(name=input_concept_class_name, base_class=StuffContent)
+                        if not issubclass(input_concept_class, StructuredContent):
+                            continue
                     inadequate_input_concept_error = StaticValidationError(
                         error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
                         domain_code=self.domain,
                         pipe_code=self.code,
-                        variable_names=[variable_name],
+                        variable_names=[required_variable_name],
                         provided_concept_code=concept_code_of_declared_input,
                         explanation="The input provided for LLM Vision must be an image or a concept that refines image",
                     )
@@ -124,7 +133,7 @@ class PipeLLM(PipeOperator):
                             raise inadequate_input_concept_error
         # check that all inputs are in the required variables
         for input_name in self.inputs.variables:
-            if input_name not in the_needed_inputs.variables:
+            if input_name not in the_needed_inputs.required_names:
                 extraneous_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
                     domain_code=self.domain,

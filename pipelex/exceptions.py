@@ -227,3 +227,7 @@ class PipelineManagerNotFoundError(PipelexError):
 
 class PipeInputSpecError(PipelexError):
     pass
+
+
+class PipeInputDetailsError(PipelexError):
+    pass

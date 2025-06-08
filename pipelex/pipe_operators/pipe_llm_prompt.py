@@ -11,7 +11,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe_input_details import PipeInputDetails
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent
@@ -98,20 +98,23 @@ class PipeLLMPrompt(PipeOperator):
         if self.system_prompt_pipe_jinja2:
             self.system_prompt_pipe_jinja2.validate_with_libraries()
 
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self) -> PipeInputDetails:
         conceptless_required_variables: Set[str] = set()
         if self.user_pipe_jinja2:
             conceptless_required_variables.update(self.user_pipe_jinja2.required_variables())
         if self.system_prompt_pipe_jinja2:
             conceptless_required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
 
-        pipe_input_spec = PipeInputSpec(root={})
+        pipe_input_spec = PipeInputDetails(root={})
         for conceptless_required_variable in conceptless_required_variables:
-            pipe_input_spec.add_variable(variable_name=conceptless_required_variable, concept_code=NativeConcept.ANYTHING.code)
+            if conceptless_required_variable.startswith("_"):
+                # variables starting with _ are run parameters, not inputs
+                continue
+            pipe_input_spec.add_requirement(variable_name=conceptless_required_variable, concept_code=NativeConcept.ANYTHING.code)
 
         if self.user_images:
             for user_image in self.user_images:
-                pipe_input_spec.add_variable(variable_name=user_image, concept_code=NativeConcept.IMAGE.code)
+                pipe_input_spec.add_requirement(variable_name=user_image, concept_code=NativeConcept.IMAGE.code)
 
         return pipe_input_spec
 
