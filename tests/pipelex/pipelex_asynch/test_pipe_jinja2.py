@@ -15,13 +15,32 @@ from tests.pipelex.test_data import JINJA2TestCases
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeJinja2:
+    @pytest.mark.parametrize("jinja2", JINJA2TestCases.JINJA2_FOR_ANY)
+    async def test_pipe_jinja2_for_any(
+        self,
+        pipe_run_mode: PipeRunMode,
+        jinja2: str,
+    ):
+        pipe_job = PipeJobFactory.make_pipe_job(
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            pipe=PipeJinja2(
+                code="adhoc_for_test_pipe_jinja2_for_any",
+                domain="generic",
+                jinja2=jinja2,
+                extra_context={"place_holder": "[some text from test_pipe_jinja2_for_any]"},
+            ),
+        )
+        pipe_jinja2_output: PipeJinja2Output = await get_pipe_router().run_pipe_job(pipe_job=pipe_job)
+        rendered_text = pipe_jinja2_output.rendered_text
+        pretty_print(rendered_text)
+
     @pytest.mark.parametrize("jinja2", JINJA2TestCases.JINJA2_FOR_STUFF)
     async def test_pipe_jinja2_for_stuff(
         self,
         pipe_run_mode: PipeRunMode,
         jinja2: str,
     ):
-        working_memory = WorkingMemoryFactory.make_from_text(text="some text from test_pipe_jinja2_any", name="place_holder")
+        working_memory = WorkingMemoryFactory.make_from_text(text="[some text from test_pipe_jinja2_for_stuff]", name="place_holder")
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -30,27 +49,6 @@ class TestPipeJinja2:
                 domain="generic",
                 jinja2=jinja2,
                 prompting_style=PromptingStyle(tag_style=TagStyle.TICKS, text_format=TextFormat.MARKDOWN),
-            ),
-            working_memory=working_memory,
-        )
-        pipe_jinja2_output: PipeJinja2Output = await get_pipe_router().run_pipe_job(pipe_job=pipe_job)
-        rendered_text = pipe_jinja2_output.rendered_text
-        pretty_print(rendered_text)
-
-    @pytest.mark.parametrize("jinja2", JINJA2TestCases.JINJA2_FOR_ANY)
-    async def test_pipe_jinja2_for_any(
-        self,
-        pipe_run_mode: PipeRunMode,
-        jinja2: str,
-    ):
-        working_memory = WorkingMemoryFactory.make_empty()
-
-        pipe_job = PipeJobFactory.make_pipe_job(
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            pipe=PipeJinja2(
-                code="adhoc_for_test_pipe_jinja2_for_any",
-                domain="generic",
-                jinja2=jinja2,
             ),
             working_memory=working_memory,
         )

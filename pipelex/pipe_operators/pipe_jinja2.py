@@ -42,6 +42,7 @@ class PipeJinja2(PipeOperator):
     jinja2: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
+    extra_context: Optional[Dict[str, Any]] = None
 
     @model_validator(mode="after")
     def validate_jinja2(self) -> Self:
@@ -99,6 +100,8 @@ class PipeJinja2(PipeOperator):
         context: Dict[str, Any] = working_memory.generate_stuff_artefact_dict()
         if pipe_run_params:
             context.update(**pipe_run_params.params)
+        if self.extra_context:
+            context.update(**self.extra_context)
 
         jinja2_text = await content_generator.make_jinja2_text(
             context=context,
