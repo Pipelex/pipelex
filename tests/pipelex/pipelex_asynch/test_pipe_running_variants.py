@@ -5,7 +5,7 @@ from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity
+from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_factory import StuffBlueprint
@@ -15,6 +15,8 @@ from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_report_delega
 from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.pipelex.test_data import PipeTestCases
+
+PIPE_RUN_MODE = PipeRunMode.DRY
 
 
 @pytest.mark.llm
@@ -36,7 +38,7 @@ class TestPipeRunningVariants:
         working_memory = WorkingMemoryFactory.make_from_single_blueprint(blueprint=blueprint)
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PIPE_RUN_MODE),
             working_memory=working_memory,
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # type: ignore

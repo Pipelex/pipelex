@@ -5,6 +5,8 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.llm.llm_models.llm_deck import LLMSettingChoices
 from pipelex.cogt.llm.llm_models.llm_deck_check import check_llm_setting_with_deck
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
@@ -201,7 +203,9 @@ class PipeLLM(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        content_generator: Optional[ContentGeneratorProtocol] = None,
     ) -> PipeLLMOutput:
+        content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {self.code}")
         if self.output_concept_code == ConceptFactory.make_concept_code(
@@ -276,7 +280,7 @@ class PipeLLM(PipeOperator):
         the_content: StuffContent
         if output_concept.structure_class_name == NativeConceptClass.TEXT and not is_multiple_output:
             log.debug(f"PipeLLM generating a single text output: {self.class_name}_gen_text")
-            generated_text: str = await get_content_generator().make_llm_text(
+            generated_text: str = await content_generator.make_llm_text(
                 job_metadata=job_metadata,
                 llm_prompt_for_text=llm_prompt_1,
                 llm_setting_main=self.llm_setting_main,
@@ -346,6 +350,7 @@ class PipeLLM(PipeOperator):
                 output_class_name=output_concept.structure_class_name,
                 llm_prompt_1=llm_prompt_1,
                 llm_prompt_2_factory=llm_prompt_2_factory,
+                content_generator=content_generator,
             )
 
         output_stuff = StuffFactory.make_stuff_using_concept(
@@ -372,6 +377,7 @@ class PipeLLM(PipeOperator):
         output_class_name: str,
         llm_prompt_1: LLMPrompt,
         llm_prompt_2_factory: Optional[LLMPromptFactoryAbstract],
+        content_generator: ContentGeneratorProtocol,
     ) -> StuffContent:
         content_class: Type[StuffContent] = class_registry.get_required_subclass(name=output_class_name, base_class=StuffContent)
         task_desc: str
@@ -390,7 +396,7 @@ class PipeLLM(PipeOperator):
                 method_desc = "text_then_object"
                 log.dev(f"{task_desc} by {method_desc}")
 
-                generated_objects = await get_content_generator().make_text_then_object_list(
+                generated_objects = await content_generator.make_text_then_object_list(
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_text=llm_prompt_1,
@@ -403,7 +409,7 @@ class PipeLLM(PipeOperator):
                 # We're generating a list of objects directly
                 method_desc = "object_direct"
                 log.dev(f"{task_desc} by {method_desc}, content_class={content_class.__name__}")
-                generated_objects = await get_content_generator().make_object_list_direct(
+                generated_objects = await content_generator.make_object_list_direct(
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_object_list=llm_prompt_1,
@@ -420,7 +426,7 @@ class PipeLLM(PipeOperator):
                 # We're generating a single object using preliminary text
                 method_desc = "text_then_object"
                 log.verbose(f"{task_desc} by {method_desc}")
-                generated_object = await get_content_generator().make_text_then_object(
+                generated_object = await content_generator.make_text_then_object(
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_text=llm_prompt_1,
@@ -433,7 +439,7 @@ class PipeLLM(PipeOperator):
                 # We're generating a single object directly
                 method_desc = "object_direct"
                 log.verbose(f"{task_desc} by {method_desc}, content_class={content_class.__name__}")
-                generated_object = await get_content_generator().make_object_direct(
+                generated_object = await content_generator.make_object_direct(
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_object=llm_prompt_1,
@@ -443,3 +449,22 @@ class PipeLLM(PipeOperator):
             the_content = generated_object
 
         return the_content
+
+    @override
+    async def _dry_run_operator_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        log.warning(f"PipeLLM: dry run operator pipe: {self.code}")
+        content_generator_dry = ContentGeneratorDry()
+        pipe_output = await self._run_operator_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            content_generator=content_generator_dry,
+        )
+        return pipe_output

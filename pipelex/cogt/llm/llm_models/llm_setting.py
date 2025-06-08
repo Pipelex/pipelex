@@ -43,6 +43,10 @@ class LLMSetting(ConfigModel):
             seed=None,
         )
 
+    def desc(self) -> str:
+        return f"LLMSetting(llm_handle={self.llm_handle}, temperature={self.temperature}, \
+            max_tokens={self.max_tokens}, prompting_target={self.prompting_target})"
+
 
 LLMSettingOrPresetId = Union[LLMSetting, str]
 

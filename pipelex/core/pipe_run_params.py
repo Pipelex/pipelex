@@ -13,6 +13,11 @@ class PipeRunParamKey(StrEnum):
     NB_OUTPUT = "_nb_output"
 
 
+class PipeRunMode(StrEnum):
+    LIVE = "live"
+    DRY = "dry"
+
+
 PipeOutputMultiplicity = Union[bool, int]
 
 
@@ -102,6 +107,7 @@ class BatchParams(BaseModel):
 
 
 class PipeRunParams(BaseModel):
+    run_mode: PipeRunMode = PipeRunMode.LIVE
     final_stuff_code: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
     dynamic_output_concept_code: Optional[str] = None
