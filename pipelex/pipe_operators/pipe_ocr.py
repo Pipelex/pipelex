@@ -4,6 +4,8 @@ from pydantic import field_validator, model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
@@ -132,7 +134,9 @@ class PipeOcr(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        content_generator: Optional[ContentGeneratorProtocol] = None,
     ) -> PipeOcrOutput:
+        content_generator = content_generator or get_content_generator()
         if not self.output_concept_code:
             raise PipeDefinitionError("PipeOcr should have a non-None output_concept_code")
 
@@ -158,7 +162,7 @@ class PipeOcr(PipeOperator):
             image_uri=image_uri,
             pdf_uri=pdf_uri,
         )
-        ocr_output = await get_content_generator().make_ocr_extract_pages(
+        ocr_output = await content_generator.make_ocr_extract_pages(
             ocr_input=ocr_input,
             ocr_handle=ocr_handle,
             job_metadata=job_metadata,
@@ -169,10 +173,12 @@ class PipeOcr(PipeOperator):
         # Build the output stuff, which is a list of page contents
         page_view_contents: List[ImageContent] = []
         if self.should_include_page_views:
+            log.debug(f"should_include_page_views: {self.should_include_page_views}, pdf_uri: {pdf_uri}, image_uri: {image_uri}")
             if pdf_uri:
                 for page in ocr_output.pages.values():
                     if page.page_view:
                         page_view_contents.append(ImageContent.make_from_extracted_image(extracted_image=page.page_view))
+                log.debug(f"page_view_contents: {page_view_contents}")
                 needs_to_generate_page_views: bool
                 if len(page_view_contents) == 0:
                     log.debug("No page views found in the OCR output")
@@ -193,7 +199,8 @@ class PipeOcr(PipeOperator):
         page_contents: List[PageContent] = []
         for page_index, page in ocr_output.pages.items():
             images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
-            page_view = page_view_contents[page_index] if self.should_include_page_views else None
+            log.debug(f"images: {images}, page_view_contents: {page_view_contents}, index: {page_index}")
+            page_view = page_view_contents[page_index - 1] if self.should_include_page_views else None
             page_contents.append(
                 PageContent(
                     text_and_images=TextAndImagesContent(
@@ -219,5 +226,24 @@ class PipeOcr(PipeOperator):
 
         pipe_output = PipeOcrOutput(
             working_memory=working_memory,
+        )
+        return pipe_output
+
+    @override
+    async def _dry_run_operator_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        log.warning(f"PipeLLM: dry run operator pipe: {self.code}")
+        content_generator_dry = ContentGeneratorDry()
+        pipe_output = await self._run_operator_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            content_generator=content_generator_dry,
         )
         return pipe_output

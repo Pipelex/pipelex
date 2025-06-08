@@ -29,7 +29,7 @@ from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
-from pipelex.cogt.ocr.ocr_output import OcrOutput, Page
+from pipelex.cogt.ocr.ocr_output import ExtractedImage, ExtractedImageFromPage, OcrOutput, Page
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_environment import Jinja2TemplateCategory
@@ -216,17 +216,35 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> OcrOutput:
         func_name = "make_ocr_extract_pages"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        ocr_page_1 = Page(
-            text="DRY RUN: OCR text",
-            extracted_images=[],
-            page_view=None,
-        )
-        ocr_page_2 = Page(
-            text="DRY RUN: OCR text",
-            extracted_images=[],
-            page_view=None,
-        )
-        ocr_output = OcrOutput(
-            pages={1: ocr_page_1, 2: ocr_page_2},
-        )
+        if ocr_input.image_uri:
+            ocr_image_as_page = Page(
+                text="DRY RUN: OCR text",
+                extracted_images=[],
+                page_view=None,
+            )
+            ocr_output = OcrOutput(
+                pages={1: ocr_image_as_page},
+            )
+        else:
+            ocr_page_1 = Page(
+                text="DRY RUN: OCR text",
+                extracted_images=[],
+                page_view=ExtractedImageFromPage(
+                    image_id="page_view_1",
+                    base_64="",
+                    caption="DRY RUN: OCR text",
+                ),
+            )
+            ocr_page_2 = Page(
+                text="DRY RUN: OCR text",
+                extracted_images=[],
+                page_view=ExtractedImageFromPage(
+                    image_id="page_view_2",
+                    base_64="",
+                    caption="DRY RUN: OCR text",
+                ),
+            )
+            ocr_output = OcrOutput(
+                pages={1: ocr_page_1, 2: ocr_page_2},
+            )
         return ocr_output

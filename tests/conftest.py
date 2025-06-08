@@ -1,6 +1,7 @@
 from typing import Any
 
 import pytest
+from pytest import FixtureRequest, Parser
 from rich import print
 from rich.console import Console
 from rich.traceback import Traceback
@@ -9,12 +10,29 @@ import pipelex.config
 import pipelex.pipelex
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.core.pipe_run_params import PipeRunMode
 
 pytest_plugins = [
     "pipelex.test_extras.shared_pytest_plugins",
 ]
 
 TEST_OUTPUTS_DIR = "temp/test_outputs"
+
+
+def pytest_addoption(parser: Parser):
+    parser.addoption(
+        "--pipe-run-mode",
+        action="store",
+        default="dry",
+        help="Pipe run mode: 'live' or 'dry'",
+        choices=("live", "dry"),
+    )
+
+
+@pytest.fixture
+def pipe_run_mode(request: FixtureRequest) -> PipeRunMode:
+    mode_str = request.config.getoption("--pipe-run-mode")
+    return PipeRunMode(mode_str)
 
 
 @pytest.fixture(scope="module", autouse=True)

@@ -16,8 +16,6 @@ from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultF
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.pipelex.test_data import PipeTestCases
 
-PIPE_RUN_MODE = PipeRunMode.DRY
-
 
 @pytest.mark.llm
 @pytest.mark.ocr
@@ -27,6 +25,7 @@ class TestPipeRunningVariants:
     @pytest.mark.parametrize("topic, blueprint, pipe_code", PipeTestCases.BLUEPRINT_AND_PIPE)
     async def test_pipe_from_blueprint(
         self,
+        pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
         pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
@@ -38,7 +37,7 @@ class TestPipeRunningVariants:
         working_memory = WorkingMemoryFactory.make_from_single_blueprint(blueprint=blueprint)
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PIPE_RUN_MODE),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # type: ignore

@@ -4,6 +4,8 @@ from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, ImggJobParams, Quality
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
@@ -147,7 +149,9 @@ class PipeImgGen(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        content_generator: Optional[ContentGeneratorProtocol] = None,
     ) -> PipeImgGenOutput:
+        content_generator = content_generator or get_content_generator()
         if not self.output_concept_code:
             raise PipeDefinitionError("PipeImgGen should have a non-None output_concept_code")
 
@@ -211,7 +215,7 @@ class PipeImgGen(PipeOperator):
             nb_images = 1
 
         if nb_images > 1:
-            generated_image_list = await get_content_generator().make_image_list(
+            generated_image_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
                 imgg_handle=imgg_handle,
                 imgg_prompt=ImggPrompt(
@@ -236,7 +240,7 @@ class PipeImgGen(PipeOperator):
             )
             log.verbose(the_content, title="List of image contents")
         else:
-            generated_image = await get_content_generator().make_single_image(
+            generated_image = await content_generator.make_single_image(
                 job_metadata=job_metadata,
                 imgg_handle=imgg_handle,
                 imgg_prompt=ImggPrompt(
@@ -269,5 +273,24 @@ class PipeImgGen(PipeOperator):
 
         pipe_output = PipeImgGenOutput(
             working_memory=working_memory,
+        )
+        return pipe_output
+
+    @override
+    async def _dry_run_operator_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        log.warning(f"PipeLLM: dry run operator pipe: {self.code}")
+        content_generator_dry = ContentGeneratorDry()
+        pipe_output = await self._run_operator_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            content_generator=content_generator_dry,
         )
         return pipe_output
