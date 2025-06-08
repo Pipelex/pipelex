@@ -1,23 +1,10 @@
-from typing import Any, Dict, List, Optional, Type, cast
+from typing import Any, Dict, List, Optional, Type
 
 from polyfactory.factories.pydantic_factory import ModelFactory
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.assignment_models import (
-    ImggAssignment,
-    Jinja2Assignment,
-    LLMAssignment,
-    LLMAssignmentFactory,
-    ObjectAssignment,
-    OcrAssignment,
-    TextThenObjectAssignment,
-)
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
-from pipelex.cogt.content_generation.imgg_generate import imgg_gen_image_list, imgg_gen_single_image
-from pipelex.cogt.content_generation.jinja2_generate import jinja2_gen_text
-from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
-from pipelex.cogt.content_generation.ocr_generate import ocr_gen_extract_pages
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams
@@ -25,12 +12,10 @@ from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
-from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
-from pipelex.cogt.ocr.ocr_output import ExtractedImage, ExtractedImageFromPage, OcrOutput, Page
-from pipelex.config import get_config
+from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_environment import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle

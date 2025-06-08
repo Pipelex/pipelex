@@ -3,8 +3,6 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import TextContent
-from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Set, Type
+from typing import Optional, Set, Type
 
 from pydantic import BaseModel, ConfigDict, Field
 
