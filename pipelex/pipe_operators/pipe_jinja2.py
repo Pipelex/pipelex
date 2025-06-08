@@ -6,6 +6,8 @@ from pydantic import ConfigDict, model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
@@ -84,7 +86,9 @@ class PipeJinja2(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        content_generator: Optional[ContentGeneratorProtocol] = None,
     ) -> PipeJinja2Output:
+        content_generator = content_generator or get_content_generator()
         if pipe_run_params.is_multiple_output_required:
             raise PipeRunParamsError(
                 f"PipeJinja2 does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
@@ -96,7 +100,7 @@ class PipeJinja2(PipeOperator):
         if pipe_run_params:
             context.update(**pipe_run_params.params)
 
-        jinja2_text = await get_content_generator().make_jinja2_text(
+        jinja2_text = await content_generator.make_jinja2_text(
             context=context,
             jinja2_name=self.jinja2_name,
             jinja2=self.jinja2,
@@ -123,4 +127,23 @@ class PipeJinja2(PipeOperator):
             working_memory=working_memory,
         )
 
+        return pipe_output
+
+    @override
+    async def _dry_run_operator_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        log.warning(f"PipeLLM: dry run operator pipe: {self.code}")
+        content_generator_dry = ContentGeneratorDry()
+        pipe_output = await self._run_operator_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            content_generator=content_generator_dry,
+        )
         return pipe_output
