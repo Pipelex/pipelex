@@ -11,7 +11,7 @@ from pipelex.core.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ListContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import MAIN_STUFF_NAME, WorkingMemory
+from pipelex.core.working_memory import MAIN_STUFF_NAME, WorkingMemory, WorkingMemoryStuffNotFoundError
 from pipelex.exceptions import PipeExecutionError, PipeInputError, PipeInputNotFoundError
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -51,7 +51,12 @@ class PipeBatch(PipeController):
             pipe_run_params.final_stuff_code = None
 
         pipe_run_params.push_pipe_layer(pipe_code=self.branch_pipe_code)
-        input_stuff = working_memory.get_stuff(batch_params.input_list_stuff_name)
+        try:
+            input_stuff = working_memory.get_stuff(batch_params.input_list_stuff_name)
+        except WorkingMemoryStuffNotFoundError as exc:
+            raise PipeInputError(
+                f"Input list stuff named '{batch_params.input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory"
+            ) from exc
         input_stuff_code = input_stuff.stuff_code
         input_content = input_stuff.content
 

@@ -25,21 +25,21 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
                     found_concept = self.root.get(f"{domain}.{concept_code}", None)
                     if not found_concept:
                         raise ConceptLibraryError(
-                            f"Concept '{concept.code}' refines '{domain_concept_code}' but no concept \
-                                with the code '{concept_code}' and domain '{domain}' exists"
+                            f"Concept '{concept.code}' refines '{domain_concept_code}' but no concept "
+                            f"with the code '{concept_code}' and domain '{domain}' exists"
                         )
                 else:
                     current_domain = concept.domain
                     found_concept = self.root.get(f"{current_domain}.{domain_concept_code}", None)
                     if not found_concept:
                         raise ConceptLibraryError(
-                            f"Concept '{concept.code}' refines '{domain_concept_code}' but no concept \
-                                with the code '{domain_concept_code}' and domain '{current_domain}' exists"
+                            f"Concept '{concept.code}' refines '{domain_concept_code}' but no concept "
+                            f"with the code '{domain_concept_code}' and domain '{current_domain}' exists"
                         )
                     if found_concept.domain != current_domain:
                         raise ConceptLibraryError(
-                            f"Concept '{concept.code}' refines '{domain_concept_code}' but the concept \
-                                exists in domain '{found_concept.domain}' and not in the same domain '{current_domain}'"
+                            f"Concept '{concept.code}' refines '{domain_concept_code}' but the concept "
+                            f"exists in domain '{found_concept.domain}' and not in the same domain '{current_domain}'"
                         )
 
                 self.get_required_concept(concept_code=domain_concept_code)

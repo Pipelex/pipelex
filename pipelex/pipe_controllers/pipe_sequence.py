@@ -45,6 +45,7 @@ class PipeSequence(PipeController):
             else:
                 sub_pipe_run_params = pipe_run_params.model_copy(update=({"final_stuff_code": None}))
             pipe_output = await sub_pipe.run(
+                calling_pipe_code=self.code,
                 working_memory=current_memory,
                 job_metadata=job_metadata,
                 sub_pipe_run_params=sub_pipe_run_params,

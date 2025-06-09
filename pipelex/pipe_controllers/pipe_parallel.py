@@ -50,6 +50,7 @@ class PipeParallel(PipeController):
         for sub_pipe in self.parallel_sub_pipes:
             tasks.append(
                 sub_pipe.run(
+                    calling_pipe_code=self.code,
                     job_metadata=job_metadata,
                     working_memory=working_memory.make_deep_copy(),
                     sub_pipe_run_params=pipe_run_params.make_deep_copy(),

@@ -83,9 +83,11 @@ class LLMWorkerFactory:
                     raise MissingDependencyError(
                         "anthropic",
                         "anthropic",
-                        "The anthropic SDK is required to use Anthropic models via the anthropic client. \
-                        However, you can use Anthropic models through bedrock directly by using the 'bedrock-anthropic-claude' llm family.\
-                        (eg: bedrock-anthropic-claude)",
+                        (
+                            "The anthropic SDK is required to use Anthropic models via the anthropic client. "
+                            "However, you can use Anthropic models through bedrock directly "
+                            "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
+                        ),
                     ) from exc
 
                 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
@@ -109,9 +111,11 @@ class LLMWorkerFactory:
                     raise MissingDependencyError(
                         "mistralai",
                         "mistral",
-                        "The mistralai SDK is required to use Mistral models through the mistralai client. \
-                        However, you can use Mistral models through bedrock directly by using the 'bedrock-mistral' llm family. \
-                        (eg: bedrock-mistral-large)",
+                        (
+                            "The mistralai SDK is required to use Mistral models through the mistralai client. "
+                            "However, you can use Mistral models through bedrock directly "
+                            "by using the 'bedrock-mistral' llm family. (eg: bedrock-mistral-large)"
+                        ),
                     ) from exc
 
                 from pipelex.plugins.mistral.mistral_factory import MistralFactory

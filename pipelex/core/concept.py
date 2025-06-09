@@ -28,8 +28,8 @@ class Concept(BaseModel):
         domain, code = Concept.extract_domain_and_concept_from_definition(concept_code=self.code)
         if domain != self.domain:
             raise ConceptDomainError(
-                f"Left part of code must match the domain field for concept with \
-                    code '{self.code}' and domain '{self.domain}': {domain} != {self.domain}"
+                f"Left part of code must match the domain field for concept with "
+                f"code '{self.code}' and domain '{self.domain}': {domain} != {self.domain}"
             )
 
         self.validate_domain_syntax(domain, self.code, self.domain)
@@ -41,16 +41,16 @@ class Concept(BaseModel):
     def validate_domain_syntax(cls, domain: str, code: str, domain_field: str) -> None:
         if not re.match(r"^[a-z][a-z0-9_]*$", domain):
             raise ConceptDomainError(
-                f"Domain must be snake_case (lowercase letters, numbers, and underscores only) \
-                    for concept with code '{code}' and domain '{domain_field}': {domain}"
+                f"Domain must be snake_case (lowercase letters, numbers, and underscores only) "
+                f"for concept with code '{code}' and domain '{domain_field}': {domain}"
             )
 
     @classmethod
     def validate_concept_code_syntax(cls, code: str, concept_code: str, domain_field: str) -> None:
         if not re.match(r"^[A-Z][a-zA-Z0-9]*$", code):
             raise ConceptCodeError(
-                f"Code must be PascalCase (letters and numbers only, starting with uppercase) \
-                    for concept with code '{concept_code}' and domain '{domain_field}': {code}"
+                f"Code must be PascalCase (letters and numbers only, starting with uppercase) "
+                f"for concept with code '{concept_code}' and domain '{domain_field}': {code}"
             )
 
     @field_validator("refines")

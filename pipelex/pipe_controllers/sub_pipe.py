@@ -21,6 +21,7 @@ class SubPipe(BaseModel):
 
     async def run(
         self,
+        calling_pipe_code: str,
         working_memory: WorkingMemory,
         job_metadata: JobMetadata,
         sub_pipe_run_params: PipeRunParams,
@@ -34,7 +35,13 @@ class SubPipe(BaseModel):
         pipe_output: PipeOutput
         sub_pipe_run_params.batch_params = self.batch_params
         if batch_params := self.batch_params:
-            input_list_stuff = working_memory.get_stuff(name=batch_params.input_list_stuff_name)
+            try:
+                input_list_stuff = working_memory.get_stuff(name=batch_params.input_list_stuff_name)
+            except WorkingMemoryStuffNotFoundError as exc:
+                raise PipeInputError(
+                    f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
+                    f"of pipe '{calling_pipe_code}' not found in working memory"
+                ) from exc
             input_concept_code = input_list_stuff.concept_code
             output_concept_code = pipe.output_concept_code
 

@@ -197,8 +197,10 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         func_name = "make_jinja2_text"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         jinja2_truncated = jinja2[: self._text_gen_truncate_length] if jinja2 else None
-        jinja2_text = f"DRY RUN: {func_name} • context={context} • jinja2_name={jinja2_name} • jinja2={jinja2_truncated} • \
-            prompting_style={prompting_style} • template_category={template_category}"
+        jinja2_text = (
+            f"DRY RUN: {func_name} • context={context} • jinja2_name={jinja2_name} • "
+            f"jinja2={jinja2_truncated} • prompting_style={prompting_style} • template_category={template_category}"
+        )
         return jinja2_text
 
     @override
