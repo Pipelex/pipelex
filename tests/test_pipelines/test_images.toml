@@ -1,0 +1,22 @@
+
+
+domain = "test_images"
+definition = "Test domain for images"
+
+[concept]
+
+[pipe]
+
+
+[pipe.generate_cutie_image]
+PipeImgGen = "Generate an image of a cutie"
+output = "Image"
+nb_steps = 2
+img_gen_prompt = "Cartoon image of a cutie that likes to play with pipes"
+
+
+[pipe.generate_cutie_photo]
+PipeImgGen = "Generate a photo of a cutie"
+output = "images.Photo"
+nb_steps = 8
+img_gen_prompt = "Realistic photo of a cutie that likes to play with pipes"

@@ -10,6 +10,7 @@ from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent
@@ -19,9 +20,7 @@ from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,
     PipeRunParamsError,
-    WorkingMemoryNotFoundError,
-    WorkingMemoryStuffNotFoundError,
-    WorkingMemoryTypeError,
+    WorkingMemoryVariableError,
 )
 from pipelex.hub import get_template
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
@@ -94,6 +93,26 @@ class PipeLLMPrompt(PipeOperator):
         if self.system_prompt_pipe_jinja2:
             self.system_prompt_pipe_jinja2.validate_with_libraries()
 
+    def needed_inputs(self) -> PipeInputSpec:
+        conceptless_required_variables: Set[str] = set()
+        if self.user_pipe_jinja2:
+            conceptless_required_variables.update(self.user_pipe_jinja2.required_variables())
+        if self.system_prompt_pipe_jinja2:
+            conceptless_required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
+
+        pipe_input_spec = PipeInputSpec(root={})
+        for conceptless_required_variable in conceptless_required_variables:
+            if conceptless_required_variable.startswith("_"):
+                # variables starting with _ are run parameters, not inputs
+                continue
+            pipe_input_spec.add_requirement(variable_name=conceptless_required_variable, concept_code=NativeConcept.ANYTHING.code)
+
+        if self.user_images:
+            for user_image in self.user_images:
+                pipe_input_spec.add_requirement(variable_name=user_image, concept_code=NativeConcept.IMAGE.code)
+
+        return pipe_input_spec
+
     @override
     def required_variables(self) -> Set[str]:
         required_variables: Set[str] = set()
@@ -102,7 +121,8 @@ class PipeLLMPrompt(PipeOperator):
         if self.system_prompt_pipe_jinja2:
             required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
         if self.user_images:
-            required_variables.update(self.user_images)
+            user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
+            required_variables.update(user_images_top_object_name)
         return required_variables
 
     @override
@@ -117,8 +137,6 @@ class PipeLLMPrompt(PipeOperator):
             raise PipeRunParamsError(
                 f"PipeLLMPrompt does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
             )
-        if not self.output_concept_code:
-            raise PipeRunParamsError("PipeLLMPrompt must have a fixed non-None output_concept_code")
 
         ############################################################
         # User images
@@ -128,8 +146,8 @@ class PipeLLMPrompt(PipeOperator):
             for user_image_name in self.user_images:
                 log.debug(f"Getting user image '{user_image_name}' from context")
                 try:
-                    prompt_image_content = working_memory.get_stuff_attribute(name=user_image_name, wanted_type=ImageContent)
-                except (WorkingMemoryNotFoundError, WorkingMemoryStuffNotFoundError, WorkingMemoryTypeError) as exc:
+                    prompt_image_content = working_memory.get_stuff_or_attribute(name=user_image_name, wanted_type=ImageContent)
+                except WorkingMemoryVariableError as exc:
                     raise PipeInputError(f"Could not find a valid user image named '{user_image_name}' in the working_memory: {exc}") from exc
 
                 if base_64 := prompt_image_content.base_64:

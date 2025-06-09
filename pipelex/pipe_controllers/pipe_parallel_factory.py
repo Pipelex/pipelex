@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 from typing_extensions import override
 
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -36,7 +37,7 @@ class PipeParallelFactory(PipeSpecificFactoryProtocol[PipeParallelBlueprint, Pip
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            input_concept_code=pipe_blueprint.input,
+            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             parallel_sub_pipes=parallel_sub_pipes,
             add_each_output=pipe_blueprint.add_each_output,

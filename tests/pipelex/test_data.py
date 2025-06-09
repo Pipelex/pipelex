@@ -159,11 +159,11 @@ class PipeTestCases:
         ),
     ]
     STUFF_AND_PIPE: ClassVar[List[Tuple[str, Stuff, str]]] = [  # topic, stuff, pipe_code
-        # (
-        #     "Process Simple Image",
-        #     SIMPLE_STUFF_IMAGE,
-        #     "simple_llm_test_from_image",
-        # ),
+        (
+            "Process Simple Image",
+            SIMPLE_STUFF_IMAGE,
+            "simple_llm_test_from_image",
+        ),
         (
             "Extract page contents from PDF",
             SIMPLE_STUFF_PDF,

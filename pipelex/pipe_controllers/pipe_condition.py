@@ -126,8 +126,10 @@ class PipeCondition(PipeController):
         try:
             required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
         except WorkingMemoryStuffNotFoundError as exc:
-            error_details = f"PipeCondition '{self.code}', stack: {pipe_run_params.pipe_layers}, required_variables: {required_variables}"
-            raise PipeInputError(f"Some required stuff(s) not found - {error_details}") from exc
+            pipe_condition_path = pipe_run_params.pipe_layers + [self.code]
+            pipe_condition_path_str = ".".join(pipe_condition_path)
+            error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
+            raise PipeInputError(f"Some required stuff(s) not found: {error_details}") from exc
 
         for required_stuff in required_stuffs:
             get_pipeline_tracker().add_condition_step(

@@ -3,6 +3,8 @@ import pytest
 from pipelex import pretty_print
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.pipe_run_params import PipeRunMode
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_img_gen import PipeImgGen, PipeImgGenOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -16,6 +18,7 @@ class TestPipeImgg:
     @pytest.mark.parametrize("topic, image_desc", IMGGTestCases.IMAGE_DESC)
     async def test_pipe_img_gen(
         self,
+        pipe_run_mode: PipeRunMode,
         imgg_handle: ImggHandle,
         topic: str,
         image_desc: str,
@@ -29,6 +32,7 @@ class TestPipeImgg:
                 output_concept_code=NativeConcept.IMAGE.code,
                 output_multiplicity=False,
             ),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
         pipe_imgg_output: PipeImgGenOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,

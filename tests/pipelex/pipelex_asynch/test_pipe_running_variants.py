@@ -5,7 +5,7 @@ from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity
+from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_factory import StuffBlueprint
@@ -21,10 +21,11 @@ from tests.pipelex.test_data import PipeTestCases
 @pytest.mark.ocr
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipeRouter:
+class TestPipeRunningVariants:
     @pytest.mark.parametrize("topic, blueprint, pipe_code", PipeTestCases.BLUEPRINT_AND_PIPE)
     async def test_pipe_from_blueprint(
         self,
+        pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
         pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
@@ -36,7 +37,7 @@ class TestPipeRouter:
         working_memory = WorkingMemoryFactory.make_from_single_blueprint(blueprint=blueprint)
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
@@ -54,6 +55,7 @@ class TestPipeRouter:
     @pytest.mark.parametrize("topic, stuff, pipe_code", PipeTestCases.STUFF_AND_PIPE)
     async def test_pipe_from_stuff(
         self,
+        pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
         pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
@@ -65,7 +67,7 @@ class TestPipeRouter:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
@@ -80,6 +82,7 @@ class TestPipeRouter:
     @pytest.mark.parametrize("topic, pipe_code", PipeTestCases.NO_INPUT)
     async def test_pipe_no_input(
         self,
+        pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
         pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
@@ -89,7 +92,7 @@ class TestPipeRouter:
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemory(),
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
@@ -109,6 +112,7 @@ class TestPipeRouter:
     @pytest.mark.parametrize("topic, pipe_code, output_multiplicity", PipeTestCases.NO_INPUT_PARALLEL1)
     async def test_pipe_batch_no_input(
         self,
+        pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
         pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
@@ -120,6 +124,7 @@ class TestPipeRouter:
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(
+                pipe_run_mode=pipe_run_mode,
                 output_multiplicity=output_multiplicity,
             ),
             working_memory=WorkingMemory(),
@@ -141,6 +146,7 @@ class TestPipeRouter:
     @pytest.mark.parametrize("pipe_code, stuff, input_list_stuff_name, input_item_stuff_name", PipeTestCases.BATCH_TEST)
     async def test_pipe_batch_with_list_content(
         self,
+        pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
         pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
@@ -156,7 +162,8 @@ class TestPipeRouter:
                 batch_params=BatchParams(
                     input_list_stuff_name=input_list_stuff_name,
                     input_item_stuff_name=input_item_stuff_name,
-                )
+                ),
+                pipe_run_mode=pipe_run_mode,
             ),
             working_memory=working_memory,
             job_metadata=JobMetadata(
@@ -171,6 +178,7 @@ class TestPipeRouter:
     @pytest.mark.parametrize("pipe_code, exception, expected_error_message", PipeTestCases.FAILURE_PIPES)
     async def test_pipe_infinite_loop(
         self,
+        pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
         pipe_code: str,
         exception: Type[Exception],
@@ -183,6 +191,7 @@ class TestPipeRouter:
                 pipe_code=pipe_code,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(
                     pipe_stack_limit=6,
+                    pipe_run_mode=pipe_run_mode,
                 ),
                 job_metadata=JobMetadata(
                     top_job_id=cast(str, request.node.originalname),  # type: ignore

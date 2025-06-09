@@ -4,20 +4,19 @@ domain = "test_pipe_batch"
 definition = "Pipelines to test Pipe Batch"
 
 [concept]
-[concept.Random]
-Concept = "TestPipeBatchItem"
+TestPipeBatchItem = "Could be anything"
 
 [pipe.test_pipe_batch_item]
 PipeLLM = "Test Pipe Batch"
-input = "TestPipeBatchItem"
+inputs = { BATCH_ITEM = "TestPipeBatchItem" }
 output = "TestPipeBatchItem"
 prompt_template = """
 Output this "item" and add "Hello" at the beginning of the output.
-{{  _batch_item|tag("item") }}
+{{  BATCH_ITEM|tag("item") }}
 """
 
 [pipe.test_pipe_batch]
 PipeBatch = "Test Pipe Batch 2"
-input = "TestPipeBatchItem"
+inputs = { BATCH_ITEM = "TestPipeBatchItem" }
 output = "TestPipeBatchItem"
 branch_pipe_code = "test_pipe_batch_item"

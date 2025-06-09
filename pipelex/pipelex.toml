@@ -198,6 +198,19 @@ structure_from_preliminary_text_system = "structure_from_preliminary_text_system
 structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
 
 ####################################################################################################
+# Static validation config
+####################################################################################################
+
+[pipelex.static_validation_config]
+default_reaction = "raise"
+
+[pipelex.static_validation_config.reactions]
+# enable one of these to tolerate some static validation errors, like you would for pyright or some linters
+# missing_input_variable = "log"
+# extraneous_input_variable = "log"
+# inadequate_input_concept = "log"
+
+####################################################################################################
 # History graph config
 ####################################################################################################
 
@@ -224,3 +237,11 @@ choice_edge_style = "-----"
 
 [pipelex.pipe_run_config]
 pipe_stack_limit = 20
+
+####################################################################################################
+# Dry run config
+####################################################################################################
+
+[pipelex.dry_run_config]
+apply_to_jinja2_rendering = false
+text_gen_truncate_length = 256

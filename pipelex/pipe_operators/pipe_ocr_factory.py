@@ -1,31 +1,21 @@
 from typing import Any, Dict, Optional
 
-from pydantic import model_validator
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory, OcrPlatform
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
-from pipelex.exceptions import PipeDefinitionError
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_operators.pipe_ocr import PipeOcr
-from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
 
 class PipeOcrBlueprint(PipeBlueprint):
     definition: Optional[str] = None
-    image: Optional[str] = None
-    pdf: Optional[str] = None
     ocr_platform: Optional[OcrPlatform] = None
     page_images: bool = False
     page_image_captions: bool = False
     page_views: bool = False
     page_views_dpi: int = 300
-
-    @model_validator(mode="after")
-    def validate_input_source(self) -> Self:
-        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["image", "pdf"]):
-            raise PipeDefinitionError("Either 'image' or 'pdf' must be provided")
-        return self
 
 
 class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
@@ -48,8 +38,7 @@ class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
             definition=pipe_blueprint.definition,
             ocr_engine=ocr_engine,
             output_concept_code=pipe_blueprint.output,
-            image_stuff_name=pipe_blueprint.image,
-            pdf_stuff_name=pipe_blueprint.pdf,
+            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
             should_include_images=pipe_blueprint.page_images,
             should_caption_images=pipe_blueprint.page_image_captions,
             should_include_page_views=pipe_blueprint.page_views,

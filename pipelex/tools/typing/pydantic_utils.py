@@ -1,9 +1,10 @@
-from typing import Any, ClassVar, Dict, List, Optional, Sequence, Set, TypeVar, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, TypeVar, Union
 
 from pydantic import BaseModel, ValidationError
 from rich.repr import Result as RichReprResult
 from typing_extensions import override
 
+from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.types import StrEnum
 
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
@@ -175,9 +176,6 @@ def serialize_model(
 
 
 class CustomBaseModel(BaseModel):
-    truncate_length: ClassVar[int] = 50
-    truncate_suffix: ClassVar[str] = "…"
-
     @override
     def __rich_repr__(self) -> RichReprResult:  # type: ignore
         for item in super().__rich_repr__():  # type: ignore
@@ -186,11 +184,8 @@ class CustomBaseModel(BaseModel):
                 if len(tuple_item) >= 2:
                     name = tuple_item[0]
                     value = tuple_item[1]
-                    should_truncate = (name == "base_64" and isinstance(value, str) and len(value) > self.truncate_length) or (
-                        name == "url" and isinstance(value, str) and value.startswith("data:image/") and len(value) > self.truncate_length
-                    )
-                    if should_truncate:
-                        truncated_value = value[: self.truncate_length] + self.truncate_suffix
+                    if AttributePolisher.should_truncate(name=name, value=value):
+                        truncated_value = AttributePolisher.get_truncated_value(name, value)
                         if len(tuple_item) == 3:
                             yield name, truncated_value, tuple_item[2]
                         else:
@@ -204,11 +199,9 @@ class CustomBaseModel(BaseModel):
     def __repr_args__(self) -> Sequence[tuple[Optional[str], Any]]:
         processed_args: list[tuple[Optional[str], Any]] = []
         for name, value in super().__repr_args__():
-            should_truncate = (name == "base_64" and isinstance(value, str) and len(value) > self.truncate_length) or (
-                name == "url" and isinstance(value, str) and value.startswith("data:image/") and len(value) > self.truncate_length
-            )
-            if should_truncate:
-                processed_args.append((name, value[: self.truncate_length] + self.truncate_suffix))
+            if name and AttributePolisher.should_truncate(name=name, value=value):
+                truncated_value = AttributePolisher.get_truncated_value(name, value)
+                processed_args.append((name, truncated_value))
             else:
                 processed_args.append((name, value))
         return processed_args

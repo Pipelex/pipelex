@@ -137,22 +137,23 @@ def list_pipes() -> None:
             pipes_dict[domain] = {}
 
             for pipe in domain_pipes:
-                if pipe.code:
-                    input_code = _format_concept_code(pipe.input_concept_code, domain)
-                    output_code = _format_concept_code(pipe.output_concept_code, domain)
+                inputs = pipe.inputs
+                formatted_inputs = [f"{name}: {_format_concept_code(concept_code, domain)}" for name, concept_code in inputs.items]
+                formatted_inputs_str = ", ".join(formatted_inputs)
+                output_code = _format_concept_code(pipe.output_concept_code, domain)
 
-                    table.add_row(
-                        pipe.code,
-                        pipe.definition or "",
-                        input_code,
-                        output_code,
-                    )
+                table.add_row(
+                    pipe.code,
+                    pipe.definition or "",
+                    formatted_inputs_str,
+                    output_code,
+                )
 
-                    pipes_dict[domain][pipe.code] = {
-                        "definition": pipe.definition or "",
-                        "input": pipe.input_concept_code or "",
-                        "output": pipe.output_concept_code or "",
-                    }
+                pipes_dict[domain][pipe.code] = {
+                    "definition": pipe.definition or "",
+                    "inputs": formatted_inputs_str,
+                    "output": pipe.output_concept_code,
+                }
 
             pretty_print(table)
 

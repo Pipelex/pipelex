@@ -8,7 +8,7 @@ from pipelex.cogt.exceptions import SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_job import ImggJob
-from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract, imgg_job_func
+from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.plugins.fal.fal_factory import FalFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -28,8 +28,7 @@ class FalImggWorker(ImggWorkerAbstract):
         self.fal_async_client = sdk_instance
 
     @override
-    @imgg_job_func
-    async def gen_image(
+    async def _gen_image(
         self,
         imgg_job: ImggJob,
     ) -> GeneratedImage:
@@ -61,8 +60,7 @@ class FalImggWorker(ImggWorkerAbstract):
         return generated_image
 
     @override
-    @imgg_job_func
-    async def gen_image_list(
+    async def _gen_image_list(
         self,
         imgg_job: ImggJob,
         nb_images: int,

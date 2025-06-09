@@ -6,6 +6,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.concept import Concept
 from pipelex.core.concept_factory import ConceptFactory
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 
@@ -19,26 +20,26 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         for concept in self.root.values():
             for domain_concept_code in concept.refines:
                 if "." in domain_concept_code:
-                    domain, concept_code = Concept.extract_domain_and_concept_from_definition(concept_code=domain_concept_code)
+                    domain, concept_code = Concept.extract_domain_and_concept_from_str(concept_str=domain_concept_code)
 
                     found_concept = self.root.get(f"{domain}.{concept_code}", None)
                     if not found_concept:
                         raise ConceptLibraryError(
-                            f"Concept '{concept.code}' refines '{domain_concept_code}' but no concept \
-                                with the code '{concept_code}' and domain '{domain}' exists"
+                            f"Concept '{concept.code}' refines '{domain_concept_code}' but no concept "
+                            f"with the code '{concept_code}' and domain '{domain}' exists"
                         )
                 else:
                     current_domain = concept.domain
                     found_concept = self.root.get(f"{current_domain}.{domain_concept_code}", None)
                     if not found_concept:
                         raise ConceptLibraryError(
-                            f"Concept '{concept.code}' refines '{domain_concept_code}' but no concept \
-                                with the code '{domain_concept_code}' and domain '{current_domain}' exists"
+                            f"Concept '{concept.code}' refines '{domain_concept_code}' but no concept "
+                            f"with the code '{domain_concept_code}' and domain '{current_domain}' exists"
                         )
                     if found_concept.domain != current_domain:
                         raise ConceptLibraryError(
-                            f"Concept '{concept.code}' refines '{domain_concept_code}' but the concept \
-                                exists in domain '{found_concept.domain}' and not in the same domain '{current_domain}'"
+                            f"Concept '{concept.code}' refines '{domain_concept_code}' but the concept "
+                            f"exists in domain '{found_concept.domain}' and not in the same domain '{current_domain}'"
                         )
 
                 self.get_required_concept(concept_code=domain_concept_code)
@@ -59,7 +60,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return list(self.root.values())
 
     def _list_concept_names(self) -> List[str]:
-        return [Concept.extract_domain_and_concept_from_definition(c.code)[1] for c in self.list_concepts()]
+        return [Concept.extract_domain_and_concept_from_str(c.code)[1] for c in self.list_concepts()]
 
     @override
     def list_concepts_by_domain(self, domain: str) -> List[Concept]:
@@ -87,6 +88,8 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def is_compatible_by_concept_code(self, tested_concept_code: str, wanted_concept_code: str) -> bool:
+        if wanted_concept_code == NativeConcept.ANYTHING.code:
+            return True
         tested_concept = self.get_required_concept(concept_code=tested_concept_code)
         wanted_concept = self.get_required_concept(concept_code=wanted_concept_code)
         if tested_concept.code == wanted_concept.code:
@@ -109,7 +112,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
                 # TODO: replace this with a concept factory method make_implicit_concept
                 return ConceptFactory.make_concept_from_definition(
                     domain_code="implicit",
-                    code=Concept.extract_domain_and_concept_from_definition(concept_code=concept_code)[1],
+                    code=Concept.extract_domain_and_concept_from_str(concept_str=concept_code)[1],
                     definition=concept_code,
                 )
             else:

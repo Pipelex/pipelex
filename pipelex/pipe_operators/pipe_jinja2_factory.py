@@ -4,6 +4,7 @@ from typing_extensions import override
 
 from pipelex.config import get_config
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
 from pipelex.tools.templating.jinja2_environment import Jinja2TemplateCategory
@@ -41,7 +42,7 @@ class PipeJinja2Factory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeJin
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            input_concept_code=pipe_blueprint.input,
+            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             jinja2_name=pipe_blueprint.jinja2_name,
             jinja2=preprocessed_template,

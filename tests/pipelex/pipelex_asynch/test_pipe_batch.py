@@ -2,6 +2,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.core.pipe_output import PipeOutput
+from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import ListContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
@@ -13,7 +14,10 @@ from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_report_delega
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeBatch:
-    async def test_pipe_batch_basic(self):
+    async def test_pipe_batch_basic(
+        self,
+        pipe_run_mode: PipeRunMode,
+    ):
         # Create Stuff objects
         invoice_list_stuff = StuffFactory.make_stuff(
             concept_code="test_pipe_batch.TestPipeBatchItem",
@@ -32,7 +36,7 @@ class TestPipeBatch:
         # Run the pipe
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="test_pipe_batch",
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
         )
 

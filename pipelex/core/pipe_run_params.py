@@ -13,6 +13,11 @@ class PipeRunParamKey(StrEnum):
     NB_OUTPUT = "_nb_output"
 
 
+class PipeRunMode(StrEnum):
+    LIVE = "live"
+    DRY = "dry"
+
+
 PipeOutputMultiplicity = Union[bool, int]
 
 
@@ -102,6 +107,7 @@ class BatchParams(BaseModel):
 
 
 class PipeRunParams(BaseModel):
+    run_mode: PipeRunMode = PipeRunMode.LIVE
     final_stuff_code: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
     dynamic_output_concept_code: Optional[str] = None
@@ -119,6 +125,12 @@ class PipeRunParams(BaseModel):
             if not key.startswith("_"):
                 raise ValueError(f"Parameter key '{key}' must start with an underscore '_'")
         return v
+
+    def make_deep_copy(self) -> Self:
+        return self.model_copy(deep=True)
+
+    def deep_copy_with_final_stuff_code(self, final_stuff_code: str) -> Self:
+        return self.model_copy(deep=True, update={"final_stuff_code": final_stuff_code})
 
     @classmethod
     def copy_by_injecting_multiplicity(

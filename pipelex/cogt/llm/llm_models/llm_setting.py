@@ -31,8 +31,10 @@ class LLMSetting(ConfigModel):
     @model_validator(mode="after")
     def validate_temperature(self) -> Self:
         if self.llm_handle.startswith("gemini") and self.temperature > 1:
-            error_msg = f"Gemini LLMs such as '{self.llm_handle}' support temperatures up to 2 but we normalize between 0 and 1, \
-                so you can't set a temperature of {self.temperature}"
+            error_msg = (
+                f"Gemini LLMs such as '{self.llm_handle}' support temperatures up to 2 but we normalize between 0 and 1, "
+                f"so you can't set a temperature of {self.temperature}"
+            )
             raise LLMSettingsValidationError(error_msg)
         return self
 
@@ -41,6 +43,12 @@ class LLMSetting(ConfigModel):
             temperature=self.temperature,
             max_tokens=self.max_tokens,
             seed=None,
+        )
+
+    def desc(self) -> str:
+        return (
+            f"LLMSetting(llm_handle={self.llm_handle}, temperature={self.temperature}, "
+            f"max_tokens={self.max_tokens}, prompting_target={self.prompting_target})"
         )
 
 

@@ -20,11 +20,16 @@ from pipelex.core.stuff_content import (
     TextAndImagesContent,
     TextContent,
 )
-from pipelex.exceptions import WorkingMemoryError, WorkingMemoryNotFoundError, WorkingMemoryStuffNotFoundError, WorkingMemoryTypeError
+from pipelex.exceptions import (
+    WorkingMemoryConsistencyError,
+    WorkingMemoryStuffAttributeNotFoundError,
+    WorkingMemoryStuffNotFoundError,
+    WorkingMemoryTypeError,
+)
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 
 MAIN_STUFF_NAME = "main_stuff"
-BATCH_ITEM_STUFF_NAME = "_batch_item"
+BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
 
 StuffDict = Dict[str, Stuff]
 StuffArtefactDict = Dict[str, StuffArtefact]
@@ -92,11 +97,17 @@ class WorkingMemory(BaseModel):
         if alias := self.aliases.get(name):
             stuff = self.root.get(alias)
             if stuff is None:
-                raise WorkingMemoryStuffNotFoundError(f"Alias '{alias}' points to a non-existent stuff '{name}'")
+                raise WorkingMemoryStuffNotFoundError(
+                    variable_name=alias,
+                    message=f"Alias '{alias}' points to a non-existent stuff '{name}'",
+                )
             return stuff
-        raise WorkingMemoryStuffNotFoundError(f"Stuff '{name}' not found in working memory, valid keys are: {self.list_keys()}")
+        raise WorkingMemoryStuffNotFoundError(
+            variable_name=name,
+            message=f"Stuff '{name}' not found in working memory, valid keys are: {self.list_keys()}",
+        )
 
-    def get_stuff_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
+    def get_stuff_or_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
         if "." in name:
             parts = name.split(".", 1)  # Split only at the first dot
             base_name = parts[0]
@@ -107,17 +118,26 @@ class WorkingMemory(BaseModel):
             try:
                 stuff_content = attrgetter(attr_path_str)(base_stuff.content)
             except AttributeError as exc:
-                raise WorkingMemoryNotFoundError(f"Stuff attribute not found in attribute path '{name}': {exc}") from exc
+                raise WorkingMemoryStuffAttributeNotFoundError(
+                    variable_name=name,
+                    message=f"Stuff attribute not found in attribute path '{name}': {exc}",
+                ) from exc
 
             if wanted_type is not None and not isinstance(stuff_content, wanted_type):
-                raise WorkingMemoryTypeError(f"Content at '{name}' is of type {type(stuff_content).__name__}, it should be {wanted_type.__name__}")
+                raise WorkingMemoryTypeError(
+                    variable_name=name,
+                    message=f"Content at '{name}' is of type {type(stuff_content).__name__}, it should be {wanted_type.__name__}",
+                )
 
             return stuff_content
         else:
             content = self.get_stuff(name).content
 
             if wanted_type is not None and not isinstance(content, wanted_type):
-                raise WorkingMemoryTypeError(f"Content of '{name}' is of type {type(content).__name__}, it should be {wanted_type.__name__}")
+                raise WorkingMemoryTypeError(
+                    variable_name=name,
+                    message=f"Content of '{name}' is of type {type(content).__name__}, it should be {wanted_type.__name__}",
+                )
 
             return content
 
@@ -127,16 +147,12 @@ class WorkingMemory(BaseModel):
             the_stuffs.append(self.get_stuff(name=name))
         return the_stuffs
 
-    def get_stuff_by_stuff_code(self, stuff_code: str) -> Stuff:
-        matching_stuffs: List[Stuff] = []
-        for stuff in self.root.values():
-            if stuff.concept_code == stuff_code:
-                matching_stuffs.append(stuff)
-        if len(matching_stuffs) == 0:
-            raise WorkingMemoryError(f"Stuff code '{stuff_code}' not found in working memory")
-        elif len(matching_stuffs) > 1:
-            raise WorkingMemoryError(f"Stuff code '{stuff_code}' is used by multiple stuffs: {matching_stuffs}")
-        return matching_stuffs[0]
+    def get_existing_stuffs(self, names: Set[str]) -> List[Stuff]:
+        the_stuffs: List[Stuff] = []
+        for name in names:
+            if stuff := self.get_optional_stuff(name=name):
+                the_stuffs.append(stuff)
+        return the_stuffs
 
     def is_stuff_code_used(self, stuff_code: str) -> bool:
         for stuff in self.root.values():
@@ -160,7 +176,7 @@ class WorkingMemory(BaseModel):
     def add_new_stuff(self, name: str, stuff: Stuff, aliases: Optional[List[str]] = None):
         log.debug(f"Adding new stuff '{name}' to WorkingMemory with aliases: {aliases}")
         if self.is_stuff_code_used(stuff_code=stuff.stuff_code):
-            raise WorkingMemoryError(f"Stuff code '{stuff.stuff_code}' is already used by another stuff")
+            raise WorkingMemoryConsistencyError(f"Stuff code '{stuff.stuff_code}' is already used by another stuff")
         if name in self.root or name in self.aliases:
             existing_stuff = self.get_stuff(name=name)
             if existing_stuff == stuff:
@@ -191,16 +207,16 @@ class WorkingMemory(BaseModel):
     def set_alias(self, alias: str, target: str) -> None:
         """Add an alias pointing to a target name."""
         if alias == target:
-            raise WorkingMemoryError(f"Cannot create alias '{alias}' pointing to itself")
+            raise WorkingMemoryConsistencyError(f"Cannot create alias '{alias}' pointing to itself")
         if target not in self.root:
-            raise WorkingMemoryError(f"Cannot create alias to non-existent target '{target}'")
+            raise WorkingMemoryConsistencyError(f"Cannot create alias to non-existent target '{target}'")
         log.debug(f"Setting alias '{alias}' pointing to target '{target}'")
         self.aliases[alias] = target
 
     def add_alias(self, alias: str, target: str) -> None:
         """Add an alias pointing to a target name."""
         if alias in self.root:
-            raise WorkingMemoryError(f"Cannot add alias '{alias}' as it already exists")
+            raise WorkingMemoryConsistencyError(f"Cannot add alias '{alias}' as it already exists")
         self.set_alias(alias=alias, target=target)
         log.debug(f"Added alias '{alias}' pointing to target '{target}'")
 

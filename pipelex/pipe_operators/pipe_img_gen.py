@@ -1,26 +1,32 @@
 from typing import List, Literal, Optional, Union
 
-from pydantic import Field
-from typing_extensions import override
+from pydantic import Field, field_validator, model_validator
+from typing_extensions import Self, override
 
 from pipelex import log
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, ImggJobParams, Quality
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
-from pipelex.config import get_config
+from pipelex.config import StaticValidationErrorType, StaticValidationReaction, get_config
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunParams, output_multiplicity_to_apply
 from pipelex.core.stuff_content import ImageContent, ListContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError, PipeInputError, PipeRunParamsError, WorkingMemoryStuffNotFoundError
-from pipelex.hub import get_content_generator
+from pipelex.exceptions import (
+    PipeDefinitionError,
+    PipeInputError,
+    PipeRunParamsError,
+    StaticValidationError,
+    UnexpectedPipeDefinitionError,
+    WorkingMemoryStuffNotFoundError,
+)
+from pipelex.hub import get_concept_provider, get_content_generator
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
-
-# TODO: refacto this as part of the PipeImgGen blueprint/params
-IMGG_PROMPT_NAME = "imgg_prompt"
 
 
 class PipeImgGenOutput(PipeOutput):
@@ -41,7 +47,6 @@ class PipeImgGenOutput(PipeOutput):
 class PipeImgGen(PipeOperator):
     output_concept_code: str = NativeConcept.IMAGE.code
     imgg_prompt: Optional[str] = None
-    imgg_prompt_stuff_name: Optional[str] = None
     # TODO: wrap this up in imgg llm_presets like for llm
     imgg_handle: Optional[ImggHandle] = None
     aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
@@ -55,6 +60,88 @@ class PipeImgGen(PipeOperator):
     seed: Optional[Union[int, Literal["auto"]]] = None
     output_multiplicity: PipeOutputMultiplicity
 
+    img_gen_prompt_var_name: Optional[str] = None
+
+    @field_validator("img_gen_prompt_var_name")
+    @classmethod
+    def validate_input_var_name_not_provided_as_attribute(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            raise PipeDefinitionError("img_gen_prompt_var_name must be None before input validation")
+        return v
+
+    @model_validator(mode="after")
+    def validate_inputs(self) -> Self:
+        self._validate_inputs()
+        return self
+
+    def _validate_inputs(self):
+        concept_provider = get_concept_provider()
+        static_validation_config = get_config().pipelex.static_validation_config
+        default_reaction = static_validation_config.default_reaction
+        reactions = static_validation_config.reactions
+        # check that we have either an imgg_prompt passed as attribute or as a single text input
+        if self.imgg_prompt:
+            if self.inputs.items:
+                raise PipeDefinitionError("img_gen_prompt_var_name must be None if imgg_prompt is provided")
+            else:
+                # we're good with the prompt provided as attribute
+                return
+
+        candidate_prompt_var_names: List[str] = []
+        for input_name, input_concept_code in self.inputs.items:
+            log.debug(f"Validating input '{input_name}' with concept code '{input_concept_code}'")
+            if concept_provider.is_compatible_by_concept_code(
+                tested_concept_code=input_concept_code,
+                wanted_concept_code=NativeConcept.TEXT.code,
+            ):
+                self.img_gen_prompt_var_name = input_name
+                candidate_prompt_var_names.append(input_name)
+            else:
+                inadequate_input_concept_error = StaticValidationError(
+                    error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[input_name],
+                    provided_concept_code=input_concept_code,
+                    explanation="Only a text input can be provided for image gen prompt",
+                )
+                match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
+                    case StaticValidationReaction.IGNORE:
+                        pass
+                    case StaticValidationReaction.LOG:
+                        log.error(inadequate_input_concept_error.desc())
+                    case StaticValidationReaction.RAISE:
+                        raise inadequate_input_concept_error
+        if len(candidate_prompt_var_names) > 1:
+            too_many_candidate_inputs_error = StaticValidationError(
+                error_type=StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS,
+                domain_code=self.domain,
+                pipe_code=self.code,
+                variable_names=candidate_prompt_var_names,
+                explanation="Only one text input can be provided for image gen prompt",
+            )
+            match reactions.get(StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS, default_reaction):
+                case StaticValidationReaction.IGNORE:
+                    pass
+                case StaticValidationReaction.LOG:
+                    log.error(too_many_candidate_inputs_error.desc())
+                case StaticValidationReaction.RAISE:
+                    raise too_many_candidate_inputs_error
+        elif len(candidate_prompt_var_names) == 0:
+            missing_input_var_error = StaticValidationError(
+                error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
+                domain_code=self.domain,
+                pipe_code=self.code,
+                explanation="You must provide an image gen prompt either as attribute of the pipe or as a single text input",
+            )
+            match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
+                case StaticValidationReaction.IGNORE:
+                    pass
+                case StaticValidationReaction.LOG:
+                    log.error(missing_input_var_error.desc())
+                case StaticValidationReaction.RAISE:
+                    raise missing_input_var_error
+
     @override
     async def _run_operator_pipe(
         self,
@@ -62,9 +149,9 @@ class PipeImgGen(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        content_generator: Optional[ContentGeneratorProtocol] = None,
     ) -> PipeImgGenOutput:
-        if not self.output_concept_code:
-            raise PipeDefinitionError("PipeImgGen should have a non-None output_concept_code")
+        content_generator = content_generator or get_content_generator()
 
         applied_output_multiplicity, _, _ = output_multiplicity_to_apply(
             output_multiplicity_base=self.output_multiplicity or False,
@@ -74,12 +161,13 @@ class PipeImgGen(PipeOperator):
         log.debug("Getting image generation prompt from context")
         if self.imgg_prompt:
             imgg_prompt_text = self.imgg_prompt
-        else:
-            stuff_name = self.imgg_prompt_stuff_name or IMGG_PROMPT_NAME
+        elif stuff_name := self.img_gen_prompt_var_name:
             try:
                 imgg_prompt_text = working_memory.get_stuff_as_str(stuff_name)
             except WorkingMemoryStuffNotFoundError as exc:
                 raise PipeInputError(f"Could not find a valid user image named '{stuff_name}' in the working_memory: {exc}") from exc
+        else:
+            raise UnexpectedPipeDefinitionError("You must provide an image gen prompt either as attribute of the pipe or as a single text input")
 
         imgg_config = get_config().cogt.imgg_config
         imgg_param_defaults = imgg_config.imgg_param_defaults
@@ -125,7 +213,7 @@ class PipeImgGen(PipeOperator):
             nb_images = 1
 
         if nb_images > 1:
-            generated_image_list = await get_content_generator().make_image_list(
+            generated_image_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
                 imgg_handle=imgg_handle,
                 imgg_prompt=ImggPrompt(
@@ -150,7 +238,7 @@ class PipeImgGen(PipeOperator):
             )
             log.verbose(the_content, title="List of image contents")
         else:
-            generated_image = await get_content_generator().make_single_image(
+            generated_image = await content_generator.make_single_image(
                 job_metadata=job_metadata,
                 imgg_handle=imgg_handle,
                 imgg_prompt=ImggPrompt(
@@ -183,5 +271,24 @@ class PipeImgGen(PipeOperator):
 
         pipe_output = PipeImgGenOutput(
             working_memory=working_memory,
+        )
+        return pipe_output
+
+    @override
+    async def _dry_run_operator_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        log.warning(f"PipeImgGen: dry run operator pipe: {self.code}")
+        content_generator_dry = ContentGeneratorDry()
+        pipe_output = await self._run_operator_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            content_generator=content_generator_dry,
         )
         return pipe_output

@@ -33,8 +33,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
 
     def add_new_pipe(self, pipe: PipeAbstract):
         name = pipe.code
-        if pipe.input_concept_code and "." not in pipe.input_concept_code:
-            pipe.input_concept_code = f"{pipe.domain}.{pipe.input_concept_code}"
+        pipe.inputs.set_default_domain(domain=pipe.domain)
         if pipe.output_concept_code and "." not in pipe.output_concept_code:
             pipe.output_concept_code = f"{pipe.domain}.{pipe.output_concept_code}"
         if name in self.root:

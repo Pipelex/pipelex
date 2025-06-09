@@ -10,7 +10,7 @@ Complex = "A complex object"
 
 [pipe.simple_llm_test_from_text]
 PipeLLM = "Simple LLM test from text"
-input = "native.Text"
+inputs = { text = "native.Text" }
 output = "native.Text"
 prompt_template = """
 This is a simple test prompt:
@@ -18,7 +18,7 @@ This is a simple test prompt:
 """
 [pipe.simple_llm_test_from_image]
 PipeLLM = "Simple LLM test from image"
-input = "native.Image"
+inputs = { image = "native.Image" }
 output = "native.Text"
 prompt_template = """
 Describe the using rap lyrics, including puns and references to the image.
@@ -37,7 +37,7 @@ multiple_output = true
 
 [pipe.create_synopsis]
 PipeLLM = "Create Synopsis"
-input = "native.Text"
+inputs = { text = "native.Text" }
 output = "native.Text"
 llm = "llm_for_creative_writing"
 prompt_template = """
@@ -46,42 +46,6 @@ Create a short synopsis for a story about:
 @text
 
 Be concise: 3 sentences max.
-"""
-
-
-# TODO: fix testing implict concept
-[pipe.test_implicit_concept]
-PipeLLM = "Implicit concept"
-output = "RandomConceptCodeThatDoesNotExist"
-prompt_template = """
-This is is a test prompt.
-
-Output what is here:
-
-{{ a123|tag }}
-"""
-
-[pipe.is_article_critic_reasonable]
-PipeLLM = "Article Critic Evaluator"
-input = "ArticleAndCritic"
-output = "native.Text"
-prompt_template = """
-You are an expert at evaluating article critiques. Your task is to determine if the given critique of an article is reasonable and valuable.
-Article to evaluate:
-
-{{ my_article|tag }}
-
-Critique to evaluate:
-
-{{ critic|tag }}
-
-Evaluate if this critique is reasonable and valuable. Consider the following aspects:
-1. Is the critique specific and detailed?
-2. Does it provide constructive feedback?
-3. Is it supported by examples from the article?
-4. Is the tone professional?
-5. Does it focus on the content rather than personal attacks?
-Output only 'true' if the critique is reasonable and valuable, or 'false' if it is not.
 """
 
 [pipe.test_no_input]
@@ -101,7 +65,7 @@ Tell me a short story about a red baloon.
 """
 
 [pipe.generate_3_images]
-PipeImgGen = "Generate 3 AI images"
-input = "images.ImggPrompt"
+PipeImgGen = "Generate 3 images"
+inputs = { prompt = "images.ImgGenPrompt" }
 output = "native.Image"
 nb_output = 3

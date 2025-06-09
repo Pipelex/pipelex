@@ -120,11 +120,11 @@ class OpenAIFactory:
             openai_image_url = ImageURL(url=url, detail="high")
         elif isinstance(prompt_image, PromptImageBytes):
             # TODO: manage image type
-            url_with_bytes: str = f"data:image/jpeg;base64,{prompt_image.b64_image_bytes.decode('utf-8')}"
+            url_with_bytes: str = f"data:image/jpeg;base64,{prompt_image.base_64.decode('utf-8')}"
             openai_image_url = ImageURL(url=url_with_bytes, detail="high")
         elif isinstance(prompt_image, PromptImagePath):
             image_bytes = load_binary_as_base64(path=prompt_image.file_path)
-            return cls.make_openai_image_url(PromptImageBytes(b64_image_bytes=image_bytes))
+            return cls.make_openai_image_url(PromptImageBytes(base_64=image_bytes))
         else:
             raise LLMPromptParameterError(f"prompt_image of type {type(prompt_image)} is not supported")
         return openai_image_url

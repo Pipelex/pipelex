@@ -12,14 +12,18 @@ class PipeBlueprint(StructuredContent):
     model_config = ConfigDict(extra="forbid")
 
     definition: Optional[str] = None
-    input: Optional[str] = None
+    inputs: Optional[Dict[str, str]] = None
     output: str
     domain: str
 
     @model_validator(mode="after")
     def add_domain_prefix(self) -> Self:
-        if self.input and "." not in self.input:
-            self.input = f"{self.domain}.{self.input}"
+        # if self.input and "." not in self.input:
+        #     self.input = f"{self.domain}.{self.input}"
+        if self.inputs:
+            for input_name, input_concept_code in self.inputs.items():
+                if "." not in input_concept_code:
+                    self.inputs[input_name] = f"{self.domain}.{input_concept_code}"
         if self.output and "." not in self.output:
             self.output = f"{self.domain}.{self.output}"
         return self
@@ -30,11 +34,11 @@ class PipeBlueprint(StructuredContent):
             return f"native.{value}"
         return value
 
-    @field_validator("input")
+    @field_validator("inputs")
     @classmethod
-    def validate_input(cls, value: Optional[str]) -> Optional[str]:
+    def validate_inputs(cls, value: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
         if value:
-            return cls._add_native_prefix_if_needed(value)
+            return {name: cls._add_native_prefix_if_needed(concept_code) for name, concept_code in value.items()}
         return value
 
     @field_validator("output")

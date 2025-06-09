@@ -17,8 +17,7 @@ class Example(BaseModel):
     memory: List[Stuff]
 
 
-@pytest.mark.llm
-@pytest.mark.inference
+@pytest.mark.pipelex_api
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipelexApiClient:
     @pytest.fixture

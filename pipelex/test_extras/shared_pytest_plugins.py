@@ -1,5 +1,7 @@
 import pytest
+from pytest import FixtureRequest, Parser
 
+from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.tools.runtime_manager import RunMode, runtime_manager
 
@@ -23,3 +25,19 @@ def manage_pipelex_libraries_with_overwrite():
     yield
     # TODO: make it safe to erase/replace standard libraries in client projects without touching custom stuff
     # LibraryConfig.remove_libraries()
+
+
+def pytest_addoption(parser: Parser):
+    parser.addoption(
+        "--pipe-run-mode",
+        action="store",
+        default="dry",
+        help="Pipe run mode: 'live' or 'dry'",
+        choices=("live", "dry"),
+    )
+
+
+@pytest.fixture
+def pipe_run_mode(request: FixtureRequest) -> PipeRunMode:
+    mode_str = request.config.getoption("--pipe-run-mode")
+    return PipeRunMode(mode_str)

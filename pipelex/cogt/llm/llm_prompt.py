@@ -40,22 +40,41 @@ class LLMPrompt(BaseModel):
     @override
     def __str__(self) -> str:
         # return json_str(self, title="llm_prompt", is_spaced=True)
-        return self.desc
+        return self.desc()
         # return "test"
 
-    @property
-    def desc(self) -> str:
+    @override
+    def __repr__(self) -> str:
+        return self.desc()
+
+    @override
+    def __format__(self, format_spec: str) -> str:
+        return self.desc()
+
+    def desc(self, truncate_text_length: Optional[int] = None) -> str:
         description = "LLM Prompt:"
-        if self.system_text:
-            description += f"""
-system_text:
-{self.system_text}
-"""
-        if self.user_text:
-            description += f"""
-user_text:
-{self.user_text}
-"""
+        if truncate_text_length:
+            if self.system_text:
+                description += f"""
+    system_text:
+    {self.system_text[:truncate_text_length]}
+    """
+            if self.user_text:
+                description += f"""
+    user_text:
+    {self.user_text[:truncate_text_length]}
+    """
+        else:
+            if self.system_text:
+                description += f"""
+    system_text:
+    {self.system_text}
+    """
+            if self.user_text:
+                description += f"""
+    user_text:
+    {self.user_text}
+    """
         if self.user_images:
             user_images_desc: str = "\n".join([f"  {image}" for image in self.user_images])
 

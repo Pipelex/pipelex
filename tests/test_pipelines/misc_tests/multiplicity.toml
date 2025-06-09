@@ -1,6 +1,6 @@
 
 
-domain = "multiplicity"
+domain = "test_multiplicity"
 definition = "Test library about multiplicity"
 
 [concept]
@@ -28,7 +28,7 @@ llm = "llm_for_creative_writing"
 
 [pipe.imagine_nature_product]
 PipeLLM = "Imagine a product of nature"
-input = "Color"
+inputs = { color = "Color" }
 output = "ProductOfNature"
 prompt_template = """
 Propose a product of nature of this color: {{ color|format("plain") }}.
@@ -37,7 +37,7 @@ Just state what it is in a single sentence.
 
 [pipe.imagine_fantasy_scene_including_products_of_nature]
 PipeLLM = "Imagine a fantasy scene including products of nature"
-input = "ProductOfNature"
+inputs = { product_of_nature = "ProductOfNature" }
 output = "FantasyScene"
 prompt_template = """
 Imagine a fantasy scene including the following products of nature:
@@ -54,7 +54,7 @@ steps = [
     { pipe = "choose_colors", result = "color", nb_output = 3 },
     { pipe = "imagine_nature_product", result = "product_of_nature" },
     { pipe = "imagine_fantasy_scene_including_products_of_nature", result = "imgg_prompt" },
-    { pipe = "generate_image", result = "image" },
+    # { pipe = "generate_image", result = "image" },
 ]
 
 [pipe.imagine_nature_scene_of_original_power_rangers_colors]

@@ -25,11 +25,11 @@ class Concept(BaseModel):
         if not Concept.concept_str_contains_domain(self.code):
             raise ConceptCodeError(f"Code must contain a dot (.) for concept with code '{self.code}' and domain '{self.domain}'")
 
-        domain, code = Concept.extract_domain_and_concept_from_definition(concept_code=self.code)
+        domain, code = Concept.extract_domain_and_concept_from_str(concept_str=self.code)
         if domain != self.domain:
             raise ConceptDomainError(
-                f"Left part of code must match the domain field for concept with \
-                    code '{self.code}' and domain '{self.domain}': {domain} != {self.domain}"
+                f"Left part of code must match the domain field for concept with "
+                f"code '{self.code}' and domain '{self.domain}': {domain} != {self.domain}"
             )
 
         self.validate_domain_syntax(domain, self.code, self.domain)
@@ -41,16 +41,16 @@ class Concept(BaseModel):
     def validate_domain_syntax(cls, domain: str, code: str, domain_field: str) -> None:
         if not re.match(r"^[a-z][a-z0-9_]*$", domain):
             raise ConceptDomainError(
-                f"Domain must be snake_case (lowercase letters, numbers, and underscores only) \
-                    for concept with code '{code}' and domain '{domain_field}': {domain}"
+                f"Domain must be snake_case (lowercase letters, numbers, and underscores only) "
+                f"for concept with code '{code}' and domain '{domain_field}': {domain}"
             )
 
     @classmethod
     def validate_concept_code_syntax(cls, code: str, concept_code: str, domain_field: str) -> None:
         if not re.match(r"^[A-Z][a-zA-Z0-9]*$", code):
             raise ConceptCodeError(
-                f"Code must be PascalCase (letters and numbers only, starting with uppercase) \
-                    for concept with code '{concept_code}' and domain '{domain_field}': {code}"
+                f"Code must be PascalCase (letters and numbers only, starting with uppercase) "
+                f"for concept with code '{concept_code}' and domain '{domain_field}': {code}"
             )
 
     @field_validator("refines")
@@ -60,7 +60,7 @@ class Concept(BaseModel):
             if not cls.concept_str_contains_domain(code):
                 raise ConceptCodeError(f"Each inherited code must contain a dot (.), got: {code}")
 
-            domain, code = Concept.extract_domain_and_concept_from_definition(concept_code=code)
+            domain, code = Concept.extract_domain_and_concept_from_str(concept_str=code)
             cls.validate_concept_code_syntax(code=code, concept_code=code, domain_field=code)
             cls.validate_domain_syntax(domain=domain, code=code, domain_field=code)
         return value
@@ -82,20 +82,26 @@ class Concept(BaseModel):
             return False
 
     @classmethod
-    def extract_domain_and_concept_from_definition(cls, concept_code: str) -> Tuple[str, str]:
-        if "." in concept_code:
-            domain, concept = concept_code.split(".")
-            return domain, concept
-        raise ConceptError(f"No extraction of domain and concept from concept code '{concept_code}'")
+    def check_possible_concept_from_str(cls, concept_str: str):
+        parts = concept_str.split(".")
+        if len(parts) > 2:
+            raise ConceptError(f"Concept code '{concept_str}' contains more than one dot")
+
+    @classmethod
+    def extract_domain_and_concept_from_str(cls, concept_str: str) -> Tuple[str, str]:
+        if "." in concept_str:
+            domain_code, concept_code = concept_str.split(".")
+            return domain_code, concept_code
+        raise ConceptError(f"No extraction of domain and concept from concept code '{concept_str}'")
 
     @classmethod
     def extract_concept_name_from_str(cls, concept_str: str) -> str:
-        _, concept = cls.extract_domain_and_concept_from_definition(concept_code=concept_str)
+        _, concept = cls.extract_domain_and_concept_from_str(concept_str=concept_str)
         return concept
 
     @classmethod
     def extract_domain_from_str(cls, concept_str: str) -> str:
-        domain, _ = cls.extract_domain_and_concept_from_definition(concept_code=concept_str)
+        domain, _ = cls.extract_domain_and_concept_from_str(concept_str=concept_str)
         return domain
 
     @classmethod

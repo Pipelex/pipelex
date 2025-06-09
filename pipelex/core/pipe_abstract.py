@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Set, Type
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
@@ -17,7 +18,8 @@ class PipeAbstract(ABC, BaseModel):
     domain: str
 
     definition: Optional[str] = None
-    input_concept_code: Optional[str] = None
+    # TODO: support auto (implicit) input, it makes sense for pipe controllers
+    inputs: PipeInputSpec = Field(default_factory=PipeInputSpec)
     output_concept_code: str
 
     @property
@@ -34,18 +36,10 @@ class PipeAbstract(ABC, BaseModel):
 
     def concept_dependencies(self) -> Set[str]:
         required_concepts = set([self.output_concept_code])
-        if self.input_concept_code:
-            required_concepts.add(self.input_concept_code)
+        required_concepts.update(self.inputs.concepts)
         return required_concepts
 
     # Required variables
-
-    @property
-    def required_input_concept_code(self) -> str:
-        if self.input_concept_code is None:
-            raise RuntimeError("input_concept_code is required")
-        return self.input_concept_code
-
     def required_variables(self) -> Set[str]:
         return set()
 

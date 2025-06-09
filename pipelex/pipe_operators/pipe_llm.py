@@ -5,15 +5,18 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.llm.llm_models.llm_deck import LLMSettingChoices
 from pipelex.cogt.llm.llm_models.llm_deck_check import check_llm_setting_with_deck
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
-from pipelex.config import get_config
+from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.domain import Domain, SpecialDomain
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import (
     PipeOutputMultiplicity,
@@ -21,10 +24,16 @@ from pipelex.core.pipe_run_params import (
     PipeRunParams,
     output_multiplicity_to_apply,
 )
-from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
+from pipelex.core.stuff_content import ListContent, StructuredContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError, PipeExecutionError
+from pipelex.exceptions import (
+    PipeDefinitionError,
+    PipeInputError,
+    PipeInputNotFoundError,
+    StaticValidationError,
+    StaticValidationErrorType,
+)
 from pipelex.hub import (
     get_concept_provider,
     get_content_generator,
@@ -60,6 +69,91 @@ class PipeLLM(PipeOperator):
     system_prompt_to_structure: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
 
+    def needed_inputs(self) -> PipeInputSpec:
+        return self.pipe_llm_prompt.needed_inputs()
+
+    @model_validator(mode="after")
+    def validate_inputs(self) -> Self:
+        self._validate_inputs()
+        return self
+
+    def _validate_inputs(self):
+        concept_provider = get_concept_provider()
+        static_validation_config = get_config().pipelex.static_validation_config
+        default_reaction = static_validation_config.default_reaction
+        reactions = static_validation_config.reactions
+
+        the_needed_inputs = self.needed_inputs()
+        # check all required variables are in the inputs
+        for required_variable_name, requirement_expression, concept_code in the_needed_inputs.detailed_requirements:
+            if required_variable_name not in self.inputs.variables:
+                missing_input_var_error = StaticValidationError(
+                    error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[required_variable_name],
+                )
+                match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
+                    case StaticValidationReaction.IGNORE:
+                        pass
+                    case StaticValidationReaction.LOG:
+                        log.error(missing_input_var_error.desc())
+                    case StaticValidationReaction.RAISE:
+                        raise missing_input_var_error
+
+            # there is one case where the needed input is of specific concept: the user_images
+            if concept_code == NativeConcept.IMAGE.code:
+                try:
+                    concept_code_of_declared_input = self.inputs.get_required_concept_code(variable_name=required_variable_name)
+                except PipeInputNotFoundError as exc:
+                    raise PipeInputError(
+                        f"Input variable '{required_variable_name}' is not in this PipeLLM '{self.code}' input spec: {self.inputs}"
+                    ) from exc
+                if not concept_provider.is_compatible_by_concept_code(
+                    tested_concept_code=concept_code_of_declared_input,
+                    wanted_concept_code=concept_code,
+                ):
+                    if required_variable_name != requirement_expression:
+                        # the required_input is a sub-attribute of the required variable
+                        # TODO: check that the sub-attribute is compatible with the concept code
+                        # let's check at least that the input is a structured concept
+                        input_concept = concept_provider.get_required_concept(concept_code=concept_code_of_declared_input)
+                        input_concept_class_name = input_concept.structure_class_name
+                        input_concept_class = class_registry.get_required_subclass(name=input_concept_class_name, base_class=StuffContent)
+                        if issubclass(input_concept_class, StructuredContent):
+                            continue
+                    inadequate_input_concept_error = StaticValidationError(
+                        error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
+                        domain_code=self.domain,
+                        pipe_code=self.code,
+                        variable_names=[required_variable_name],
+                        provided_concept_code=concept_code_of_declared_input,
+                        explanation="The input provided for LLM Vision must be an image or a concept that refines image",
+                    )
+                    match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
+                        case StaticValidationReaction.IGNORE:
+                            pass
+                        case StaticValidationReaction.LOG:
+                            log.error(inadequate_input_concept_error.desc())
+                        case StaticValidationReaction.RAISE:
+                            raise inadequate_input_concept_error
+        # check that all inputs are in the required variables
+        for input_name in self.inputs.variables:
+            if input_name not in the_needed_inputs.required_names:
+                extraneous_input_var_error = StaticValidationError(
+                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[input_name],
+                )
+                match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, default_reaction):
+                    case StaticValidationReaction.IGNORE:
+                        pass
+                    case StaticValidationReaction.LOG:
+                        log.error(extraneous_input_var_error.desc())
+                    case StaticValidationReaction.RAISE:
+                        raise extraneous_input_var_error
+
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
         if self.structuring_method is not None:
@@ -70,12 +164,7 @@ class PipeLLM(PipeOperator):
 
     @override
     def validate_with_libraries(self):
-        if self.input_concept_code and get_concept_provider().is_compatible_by_concept_code(
-            tested_concept_code=self.input_concept_code,
-            wanted_concept_code=NativeConcept.IMAGE.code,
-        ):
-            if not self.pipe_llm_prompt.user_images:
-                raise PipeDefinitionError(f"No user images provided for concept '{self.input_concept_code}' but it's required")
+        self._validate_inputs()
         self.pipe_llm_prompt.validate_with_libraries()
         if self.prompt_template_to_structure:
             get_template(template_name=self.prompt_template_to_structure)
@@ -118,7 +207,9 @@ class PipeLLM(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        content_generator: Optional[ContentGeneratorProtocol] = None,
     ) -> PipeLLMOutput:
+        content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {self.code}")
         if self.output_concept_code == ConceptFactory.make_concept_code(
@@ -190,22 +281,10 @@ class PipeLLM(PipeOperator):
         )
         llm_prompt_1 = cast(PipeLLMPromptOutput, pipe_output).llm_prompt
 
-        if input_concept_code := self.input_concept_code:
-            if (
-                get_concept_provider().is_compatible_by_concept_code(
-                    tested_concept_code=input_concept_code,
-                    wanted_concept_code=NativeConcept.IMAGE.code,
-                )
-                and not llm_prompt_1.user_images
-            ):
-                raise PipeExecutionError(
-                    f"No user images provided in the prompt with input concept '{input_concept_code}' but it's required for pipe '{self.code}'"
-                )
-
         the_content: StuffContent
         if output_concept.structure_class_name == NativeConceptClass.TEXT and not is_multiple_output:
             log.debug(f"PipeLLM generating a single text output: {self.class_name}_gen_text")
-            generated_text: str = await get_content_generator().make_llm_text(
+            generated_text: str = await content_generator.make_llm_text(
                 job_metadata=job_metadata,
                 llm_prompt_for_text=llm_prompt_1,
                 llm_setting_main=self.llm_setting_main,
@@ -275,6 +354,7 @@ class PipeLLM(PipeOperator):
                 output_class_name=output_concept.structure_class_name,
                 llm_prompt_1=llm_prompt_1,
                 llm_prompt_2_factory=llm_prompt_2_factory,
+                content_generator=content_generator,
             )
 
         output_stuff = StuffFactory.make_stuff_using_concept(
@@ -301,6 +381,7 @@ class PipeLLM(PipeOperator):
         output_class_name: str,
         llm_prompt_1: LLMPrompt,
         llm_prompt_2_factory: Optional[LLMPromptFactoryAbstract],
+        content_generator: ContentGeneratorProtocol,
     ) -> StuffContent:
         content_class: Type[StuffContent] = class_registry.get_required_subclass(name=output_class_name, base_class=StuffContent)
         task_desc: str
@@ -319,7 +400,7 @@ class PipeLLM(PipeOperator):
                 method_desc = "text_then_object"
                 log.dev(f"{task_desc} by {method_desc}")
 
-                generated_objects = await get_content_generator().make_text_then_object_list(
+                generated_objects = await content_generator.make_text_then_object_list(
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_text=llm_prompt_1,
@@ -332,7 +413,7 @@ class PipeLLM(PipeOperator):
                 # We're generating a list of objects directly
                 method_desc = "object_direct"
                 log.dev(f"{task_desc} by {method_desc}, content_class={content_class.__name__}")
-                generated_objects = await get_content_generator().make_object_list_direct(
+                generated_objects = await content_generator.make_object_list_direct(
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_object_list=llm_prompt_1,
@@ -349,7 +430,7 @@ class PipeLLM(PipeOperator):
                 # We're generating a single object using preliminary text
                 method_desc = "text_then_object"
                 log.verbose(f"{task_desc} by {method_desc}")
-                generated_object = await get_content_generator().make_text_then_object(
+                generated_object = await content_generator.make_text_then_object(
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_text=llm_prompt_1,
@@ -362,7 +443,7 @@ class PipeLLM(PipeOperator):
                 # We're generating a single object directly
                 method_desc = "object_direct"
                 log.verbose(f"{task_desc} by {method_desc}, content_class={content_class.__name__}")
-                generated_object = await get_content_generator().make_object_direct(
+                generated_object = await content_generator.make_object_direct(
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_object=llm_prompt_1,
@@ -372,3 +453,22 @@ class PipeLLM(PipeOperator):
             the_content = generated_object
 
         return the_content
+
+    @override
+    async def _dry_run_operator_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        log.warning(f"PipeLLM: dry run operator pipe: {self.code}")
+        content_generator_dry = ContentGeneratorDry()
+        pipe_output = await self._run_operator_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            content_generator=content_generator_dry,
+        )
+        return pipe_output

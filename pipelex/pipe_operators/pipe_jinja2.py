@@ -6,6 +6,9 @@ from pydantic import ConfigDict, model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.config import get_config
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
@@ -40,6 +43,7 @@ class PipeJinja2(PipeOperator):
     jinja2: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
+    extra_context: Optional[Dict[str, Any]] = None
 
     @model_validator(mode="after")
     def validate_jinja2(self) -> Self:
@@ -84,19 +88,21 @@ class PipeJinja2(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        content_generator: Optional[ContentGeneratorProtocol] = None,
     ) -> PipeJinja2Output:
+        content_generator = content_generator or get_content_generator()
         if pipe_run_params.is_multiple_output_required:
             raise PipeRunParamsError(
                 f"PipeJinja2 does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
             )
-        if not self.output_concept_code:
-            raise PipeRunParamsError("PipeJinja2 must have an output_concept_code")
 
         context: Dict[str, Any] = working_memory.generate_stuff_artefact_dict()
         if pipe_run_params:
             context.update(**pipe_run_params.params)
+        if self.extra_context:
+            context.update(**self.extra_context)
 
-        jinja2_text = await get_content_generator().make_jinja2_text(
+        jinja2_text = await content_generator.make_jinja2_text(
             context=context,
             jinja2_name=self.jinja2_name,
             jinja2=self.jinja2,
@@ -123,4 +129,28 @@ class PipeJinja2(PipeOperator):
             working_memory=working_memory,
         )
 
+        return pipe_output
+
+    @override
+    async def _dry_run_operator_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        content_generator_used: ContentGeneratorProtocol
+        if get_config().pipelex.dry_run_config.apply_to_jinja2_rendering:
+            log.warning(f"PipeJinja2: using dry run operator pipe for jinja2 rendering: {self.code}")
+            content_generator_used = ContentGeneratorDry()
+        else:
+            log.warning(f"PipeJinja2: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
+            content_generator_used = get_content_generator()
+        pipe_output = await self._run_operator_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            content_generator=content_generator_used,
+        )
         return pipe_output

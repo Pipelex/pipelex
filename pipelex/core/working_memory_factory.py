@@ -7,7 +7,7 @@ from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, PDFContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
-from pipelex.exceptions import WorkingMemoryError
+from pipelex.exceptions import WorkingMemoryFactoryError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
 
 
@@ -69,7 +69,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_single_stuff(cls, stuff: Stuff) -> WorkingMemory:
         name = stuff.stuff_name
         if not name:
-            raise WorkingMemoryError(f"Cannot make_from_single_stuff because stuff has no name: {stuff}")
+            raise WorkingMemoryFactoryError(f"Cannot make_from_single_stuff because stuff has no name: {stuff}")
         return cls.make_from_stuff_and_name(stuff=stuff, name=name)
 
     @classmethod
@@ -86,7 +86,7 @@ class WorkingMemoryFactory(BaseModel):
                 if is_ignore_unnamed:
                     continue
                 else:
-                    raise WorkingMemoryError(f"Stuff {stuff} has no name")
+                    raise WorkingMemoryFactoryError(f"Stuff {stuff} has no name")
             stuff_dict[name] = stuff
         aliases: Dict[str, str] = {}
         if stuff_dict:

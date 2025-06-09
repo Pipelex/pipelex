@@ -3,6 +3,7 @@ from typing import Any, Dict, cast
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.typing.pydantic_utils import (
     CustomBaseModel,
     ExtraFieldAttribute,
@@ -100,7 +101,8 @@ def test_custom_base_model_truncates_repr() -> None:
         url: str
         other: str
 
-    TestModel.truncate_length = 10
+    AttributePolisher.base_64_truncate_length = 10
+    AttributePolisher.url_truncate_length = 10
     model = TestModel(
         base_64="b" * 20,
         url="data:image/png;base64," + "x" * 20,

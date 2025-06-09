@@ -8,11 +8,12 @@ Color = "A color"
 
 [pipe.extract_colors]
 PipeLLM = "Extract Colors"
+inputs = { text = "Text" }
 output = "Color"
 prompt_template = """
 Extract colors from the following text:
 
-{{ text|tag }}
+@text
 """
 multiple_output = true
 
@@ -27,7 +28,7 @@ llm = "llm_for_creative_writing"
 
 [pipe.sequence_for_batch_test]
 PipeSequence = "Sequence for parallel test"
-input = "Color"
+inputs = { color = "Color" }
 output = "Color"
 steps = [
     { pipe = "capitalize_color", result = "capitalized_color" },
@@ -37,13 +38,13 @@ steps = [
 
 [pipe.batch_test]
 PipeBatch = "Batch Test"
-input = "Color"
+inputs = { color = "Color" }
 output = "Color"
 branch_pipe_code = "sequence_for_batch_test"
 
 [pipe.capitalize_color]
 PipeLLM = "Capitalize Colors"
-input = "Color"
+inputs = { color = "Color" }
 output = "Color"
 prompt_template = """
 Put the first letter of a word that represents a color as a capital letter.
@@ -56,7 +57,7 @@ Output only the word, nothing else.
 
 [pipe.capitalize_last_letter]
 PipeLLM = "Capitalize Last Letter"
-input = "Color"
+inputs = { capitalized_color = "Color" }
 output = "Color"
 prompt_template = """
 Put the last letter of a word that represents a color as a capital letter.
@@ -69,7 +70,7 @@ Output only the word, nothing else.
 
 [pipe.reverse_letters]
 PipeLLM = "Reverse Letters"
-input = "Color"
+inputs = { color = "Color" }
 output = "Color"
 prompt_template = """
 Reverse the letters of this word:

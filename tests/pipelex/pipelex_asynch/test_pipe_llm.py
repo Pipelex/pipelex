@@ -4,6 +4,9 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe_run_params import PipeRunMode
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff import Stuff
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
@@ -17,7 +20,10 @@ from tests.pipelex.test_data import PipeTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeLLM:
-    async def test_pipe_llm(self):
+    async def test_pipe_llm(
+        self,
+        pipe_run_mode: PipeRunMode,
+    ):
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm",
@@ -30,6 +36,7 @@ class TestPipeLLM:
                     user_text=PipeTestCases.USER_PROMPT,
                 ),
             ),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
         pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,
@@ -48,7 +55,11 @@ class TestPipeLLM:
         self,
         stuff: Stuff,
         attribute_paths: List[str],
+        pipe_run_mode: PipeRunMode,
     ):
+        stuff_name = stuff.stuff_name
+        if not stuff_name:
+            pytest.fail(f"Cannot use nameless stuff in this test: {stuff}")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         pipe_job = PipeJobFactory.make_pipe_job(
@@ -56,6 +67,7 @@ class TestPipeLLM:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm_image",
                 domain="generic",
+                inputs=PipeInputSpec(root={stuff_name: stuff.concept_code}),
                 output_concept_code=NativeConcept.TEXT.code,
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm_image",
@@ -65,6 +77,7 @@ class TestPipeLLM:
                     user_images=attribute_paths,
                 ),
             ),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
         pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,

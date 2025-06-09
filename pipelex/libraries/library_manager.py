@@ -16,7 +16,14 @@ from pipelex.core.domain_library import DomainLibrary
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_blueprint import PipeSpecificFactoryProtocol
 from pipelex.core.pipe_library import PipeLibrary
-from pipelex.exceptions import ConceptLibraryError, LibraryError, LibraryParsingError, PipeFactoryError, PipeLibraryError
+from pipelex.exceptions import (
+    ConceptLibraryError,
+    LibraryError,
+    LibraryParsingError,
+    PipeFactoryError,
+    PipeLibraryError,
+    StaticValidationError,
+)
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.json_utils import deep_update
@@ -33,6 +40,14 @@ class LLMDeckNotFoundError(LibraryError):
 class LibraryComponent(StrEnum):
     CONCEPT = "concept"
     PIPE = "pipe"
+
+    @property
+    def error_class(self) -> Type[LibraryError]:
+        match self:
+            case LibraryComponent.CONCEPT:
+                return ConceptLibraryError
+            case LibraryComponent.PIPE:
+                return PipeLibraryError
 
 
 class LibraryManager:
@@ -87,7 +102,6 @@ class LibraryManager:
                 raise LLMDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
             llm_deck_dict = load_toml_from_path(path=llm_deck_path)
             log.debug(f"Loaded LLM deck from {llm_deck_path}")
-            log.verbose(llm_deck_dict)
             deep_update(full_llm_deck_dict, llm_deck_dict)
 
         self.llm_deck = LLMDeck.model_validate(full_llm_deck_dict)
@@ -114,7 +128,7 @@ class LibraryManager:
             library_name = toml_path.stem
             domain_code = library_dict.get("domain")
             if domain_code is None:
-                raise LibraryParsingError(f"Library '{library_name}' has no domain set")
+                raise LibraryParsingError(f"Error loafing library '{library_name}' which has no domain set at '{toml_path}'")
             domain_definition = library_dict.get("definition")
             if domain_definition is None:
                 # we skip the domain without definition, it must be defined one and only one time in the domain library
@@ -138,8 +152,8 @@ class LibraryManager:
             library_name = toml_path.stem
             try:
                 self._load_library_dict(library_name=library_name, library_dict=library_dict, component_type=LibraryComponent.CONCEPT)
-            except LibraryParsingError as exc:
-                raise LibraryError(f"Error parsing library '{library_name}' at '{toml_path}': {exc}") from exc
+            except ConceptLibraryError as exc:
+                raise LibraryError(f"Error loading concepts from library '{library_name}' at '{toml_path}': {exc}") from exc
             nb_concepts_loaded = len(self.concept_library.root) - nb_concepts_before
             log.verbose(f"Loaded {nb_concepts_loaded} concepts from '{toml_path.name}'")
 
@@ -148,22 +162,40 @@ class LibraryManager:
             nb_pipes_before = len(self.pipe_library.root)
             library_dict = load_toml_from_path(path=str(toml_path))
             library_name = toml_path.stem
-            self._load_library_dict(library_name=library_name, library_dict=library_dict, component_type=LibraryComponent.PIPE)
+            try:
+                self._load_library_dict(library_name=library_name, library_dict=library_dict, component_type=LibraryComponent.PIPE)
+            except StaticValidationError as static_validation_error:
+                static_validation_error.file_path = str(toml_path)
+                log.error(static_validation_error.desc())
+                raise static_validation_error
+            except PipeLibraryError as pipe_library_error:
+                raise LibraryError(
+                    f"Error loading pipes from library '{library_name}' at '{toml_path}': {pipe_library_error}"
+                ) from pipe_library_error
             nb_pipes_loaded = len(self.pipe_library.root) - nb_pipes_before
             log.verbose(f"Loaded {nb_pipes_loaded} pipes from '{toml_path.name}'")
 
-    def _load_library_dict(self, library_name: str, library_dict: Dict[str, Any], component_type: str):
+    def _load_library_dict(self, library_name: str, library_dict: Dict[str, Any], component_type: LibraryComponent):
         if domain_code := library_dict.pop("domain", None):
             if not self.domain_library.get_domain(domain_code=domain_code):
                 raise LibraryParsingError(
                     f"Domain '{domain_code}' is has not been defined in the domain libraryn make sure it has exactlyone definition"
                 )
             # domain is set at the root of the library
-            self._load_library_components_from_recursive_dict(domain_code=domain_code, recursive_dict=library_dict, component_type=component_type)
+            self._load_library_components_from_recursive_dict(
+                domain_code=domain_code,
+                recursive_dict=library_dict,
+                component_type=component_type,
+            )
         else:
             raise LibraryParsingError(f"Library '{library_name}' has no domain set")
 
-    def _load_library_components_from_recursive_dict(self, domain_code: str, recursive_dict: Dict[str, Any], component_type: str):
+    def _load_library_components_from_recursive_dict(
+        self,
+        domain_code: str,
+        recursive_dict: Dict[str, Any],
+        component_type: LibraryComponent,
+    ):
         for key, obj in recursive_dict.items():
             # root of domain
             if not isinstance(obj, dict):
@@ -176,17 +208,12 @@ class LibraryManager:
             # definitions within the domain
             obj_dict: Dict[str, Any] = obj
             if key == component_type:
-                try:
-                    if key == LibraryComponent.CONCEPT:
-                        self._load_concepts(domain_code=domain_code, obj_dict=obj_dict)
-                    elif key == LibraryComponent.PIPE:
-                        self._load_pipes(domain_code=domain_code, obj_dict=obj_dict)
-                    else:
-                        continue
-                except ValidationError as exc:
-                    error_msg = format_pydantic_validation_error(exc)
-                    error_class = ConceptLibraryError if component_type == LibraryComponent.CONCEPT else PipeLibraryError
-                    raise error_class(f"Error loading a {component_type} from domain '{domain_code}' because of: {error_msg}") from exc
+                if key == LibraryComponent.CONCEPT:
+                    self._load_concepts(domain_code=domain_code, obj_dict=obj_dict)
+                elif key == LibraryComponent.PIPE:
+                    self._load_pipes(domain_code=domain_code, obj_dict=obj_dict)
+                else:
+                    continue
             elif key not in [LibraryComponent.CONCEPT, LibraryComponent.PIPE]:
                 # Not a concept but a subdomain
                 self._load_library_components_from_recursive_dict(domain_code=domain_code, recursive_dict=obj_dict, component_type=component_type)
@@ -203,7 +230,13 @@ class LibraryManager:
             elif isinstance(concept_obj, dict):
                 # blueprint dict definition
                 concept_obj_dict: Dict[str, Any] = concept_obj
-                concept_from_dict = ConceptFactory.make_from_details_dict(domain_code=domain_code, code=concept_code, details_dict=concept_obj_dict)
+                try:
+                    concept_from_dict = ConceptFactory.make_from_details_dict(
+                        domain_code=domain_code, code=concept_code, details_dict=concept_obj_dict
+                    )
+                except ValidationError as exc:
+                    error_msg = format_pydantic_validation_error(exc)
+                    raise ConceptLibraryError(f"Error loading concept '{concept_code}' because of: {error_msg}") from exc
                 self.concept_library.add_new_concept(concept=concept_from_dict)
             else:
                 raise ConceptLibraryError(f"Unexpected type for concept_code '{concept_code}' in domain '{domain_code}': {type(concept_obj)}")
@@ -215,11 +248,15 @@ class LibraryManager:
                 pass
             elif isinstance(pipe_obj, dict):
                 pipe_obj_dict: Dict[str, Any] = pipe_obj.copy()
-                pipe = LibraryManager.make_pipe_from_details_dict(
-                    domain_code=domain_code,
-                    pipe_code=pipe_code,
-                    details_dict=pipe_obj_dict,
-                )
+                try:
+                    pipe = LibraryManager.make_pipe_from_details_dict(
+                        domain_code=domain_code,
+                        pipe_code=pipe_code,
+                        details_dict=pipe_obj_dict,
+                    )
+                except ValidationError as exc:
+                    error_msg = format_pydantic_validation_error(exc)
+                    raise PipeLibraryError(f"Error loading pipe '{pipe_code}' because of: {error_msg}") from exc
                 self.pipe_library.add_new_pipe(pipe=pipe)
 
     def validate_libraries(self):
@@ -266,7 +303,6 @@ class LibraryManager:
 
         details_dict["definition"] = pipe_definition
         details_dict["domain"] = domain_code
-
         pipe_from_blueprint: PipeAbstract = pipe_factory.make_pipe_from_details_dict(
             domain_code=domain_code,
             pipe_code=pipe_code,

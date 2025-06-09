@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 
 from pipelex import pretty_print
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeOutputMultiplicity
+from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
@@ -16,6 +16,7 @@ async def execute_pipeline(
     output_name: Optional[str] = None,
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
     dynamic_output_concept_code: Optional[str] = None,
+    pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
 ) -> Tuple[PipeOutput, str]:
     """Execute a pipeline and wait for its completion.
 
@@ -35,6 +36,8 @@ async def execute_pipeline(
         Output multiplicity.
     dynamic_output_concept_code:
         Override the dynamic output concept code.
+    pipe_run_mode:
+        Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``.
 
     Returns
     -------
@@ -53,6 +56,7 @@ async def execute_pipeline(
     pipe_run_params = PipeRunParamsFactory.make_run_params(
         output_multiplicity=output_multiplicity,
         dynamic_output_concept_code=dynamic_output_concept_code,
+        pipe_run_mode=pipe_run_mode,
     )
 
     pretty_print(pipe, title=f"Running pipe '{pipe_code}'")

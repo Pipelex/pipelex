@@ -65,9 +65,11 @@ class VertexAIConfig(ConfigModel):
             raise MissingDependencyError(
                 "google-auth-oauthlib",
                 "google",
-                "The google-auth-oauthlib SDK is required to use Google connection. \
-                You can install it with 'pip install pipelex[google]', or use this model via another provider \
-                (such as Azure OpenAI, OpenAI, anthropic or bedrock).",
+                (
+                    "The google-auth-oauthlib SDK is required to use Google connection. "
+                    "You can install it with 'pip install pipelex[google]', or use this model via another provider "
+                    "(such as Azure OpenAI, OpenAI, anthropic or bedrock)."
+                ),
             ) from exc
 
         match self.api_key_method:

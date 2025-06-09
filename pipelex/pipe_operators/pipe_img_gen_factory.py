@@ -6,14 +6,14 @@ from typing_extensions import Self, override
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Quality
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_img_gen import PipeImgGen
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
 
 
 class PipeImgGenBlueprint(PipeBlueprint):
-    imgg_prompt: Optional[str] = None
-    imgg_prompt_stuff_name: Optional[str] = None
+    img_gen_prompt: Optional[str] = None
     imgg_handle: Optional[ImggHandle] = None
     aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
     quality: Optional[Quality] = Field(default=None, strict=False)
@@ -30,7 +30,6 @@ class PipeImgGenBlueprint(PipeBlueprint):
         if excess_attributes_list := has_more_than_one_among_attributes_from_lists(
             self,
             [
-                ["imgg_prompt", "imgg_prompt_stuff_name"],
                 ["quality", "nb_steps"],
             ],
         ):
@@ -52,11 +51,10 @@ class PipeImgGenFactory(PipeSpecificFactoryProtocol[PipeImgGenBlueprint, PipeImg
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            input_concept_code=pipe_blueprint.input,
+            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             output_multiplicity=output_multiplicity,
-            imgg_prompt=pipe_blueprint.imgg_prompt,
-            imgg_prompt_stuff_name=pipe_blueprint.imgg_prompt_stuff_name,
+            imgg_prompt=pipe_blueprint.img_gen_prompt,
             imgg_handle=pipe_blueprint.imgg_handle,
             aspect_ratio=pipe_blueprint.aspect_ratio,
             nb_steps=pipe_blueprint.nb_steps,

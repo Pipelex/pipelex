@@ -28,9 +28,6 @@ class PipeFunc(PipeOperator):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeFuncOutput:
-        if not self.output_concept_code:
-            raise ValueError("PipeFunc should have a non-None output_concept_code")
-
         log.debug(f"Applying function '{self.function_name}'")
 
         function = func_registry.get_required_function(self.function_name)
