@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import field_validator, model_validator
+from pydantic import ValidationInfo, field_validator, model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
@@ -47,13 +47,6 @@ class PipeOcr(PipeOperator):
     image_stuff_name: Optional[str] = None
     pdf_stuff_name: Optional[str] = None
 
-    @field_validator("image_stuff_name", "pdf_stuff_name")
-    @classmethod
-    def validate_input_stuff_name_not_provided_as_attribute(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            raise PipeDefinitionError("image_stuff_name and pdf_stuff_name must be None before input validation")
-        return v
-
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
         self._validate_inputs()
@@ -88,7 +81,7 @@ class PipeOcr(PipeOperator):
                     pipe_code=self.code,
                     variable_names=[input_name],
                     provided_concept_code=input_concept_code,
-                    explanation="For OCR you must provide either a pdf or an image or a concept that refines them",
+                    explanation="For OCR you must provide either a pdf or an image or a concept that refines one of them",
                 )
                 match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
                     case StaticValidationReaction.IGNORE:
@@ -117,7 +110,7 @@ class PipeOcr(PipeOperator):
                 error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
                 domain_code=self.domain,
                 pipe_code=self.code,
-                explanation="For OCR you must provide either a pdf or an image or a concept that refines them",
+                explanation="For OCR you must provide either a pdf or an image or a concept that refines one of them",
             )
             match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
                 case StaticValidationReaction.IGNORE:
