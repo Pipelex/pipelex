@@ -24,7 +24,6 @@ class TestPipeOCR:
         image_url: str,
     ):
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_image",
                 domain="generic",
@@ -39,6 +38,7 @@ class TestPipeOCR:
                 page_views_dpi=300,
                 output_concept_code=NativeConcept.TEXT_AND_IMAGES.code,
             ),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_image(
                 image_url=image_url,
                 concept_code="ocr.PageScan",
@@ -58,7 +58,6 @@ class TestPipeOCR:
         pdf_url: str,
     ):
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_pdf",
                 domain="generic",
@@ -73,6 +72,7 @@ class TestPipeOCR:
                 page_views_dpi=300,
                 output_concept_code=NativeConcept.TEXT_AND_IMAGES.code,
             ),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_pdf(
                 pdf_url=pdf_url,
                 concept_code=NativeConcept.PDF.code,

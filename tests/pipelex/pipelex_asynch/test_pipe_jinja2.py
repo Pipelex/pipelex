@@ -20,13 +20,13 @@ class TestPipeJinja2:
         jinja2: str,
     ):
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             pipe=PipeJinja2(
                 code="adhoc_for_test_pipe_jinja2_for_any",
                 domain="generic",
                 jinja2=jinja2,
                 extra_context={"place_holder": "[some text from test_pipe_jinja2_for_any]"},
             ),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
         pipe_jinja2_output: PipeJinja2Output = await get_pipe_router().run_pipe_job(pipe_job=pipe_job)
         rendered_text = pipe_jinja2_output.rendered_text
@@ -41,13 +41,13 @@ class TestPipeJinja2:
         working_memory = WorkingMemoryFactory.make_from_text(text="[some text from test_pipe_jinja2_for_stuff]", name="place_holder")
 
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             pipe=PipeJinja2(
                 code="adhoc_for_test_pipe_jinja2",
                 domain="generic",
                 jinja2=jinja2,
                 prompting_style=PromptingStyle(tag_style=TagStyle.TICKS, text_format=TextFormat.MARKDOWN),
             ),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
         )
         pipe_jinja2_output: PipeJinja2Output = await get_pipe_router().run_pipe_job(pipe_job=pipe_job)

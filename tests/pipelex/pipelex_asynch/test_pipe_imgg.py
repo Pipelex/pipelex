@@ -24,7 +24,6 @@ class TestPipeImgg:
         image_desc: str,
     ):
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             pipe=PipeImgGen(
                 code="adhoc_for_test_pipe_img_gen",
                 domain="generic",
@@ -33,6 +32,7 @@ class TestPipeImgg:
                 output_concept_code=NativeConcept.IMAGE.code,
                 output_multiplicity=False,
             ),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
         pipe_imgg_output: PipeImgGenOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,
