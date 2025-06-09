@@ -244,4 +244,4 @@ pipe_stack_limit = 20
 
 [pipelex.dry_run_config]
 apply_to_jinja2_rendering = false
-text_gen_truncate_length = 1000
+text_gen_truncate_length = 256
