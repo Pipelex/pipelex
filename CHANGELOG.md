@@ -1,5 +1,30 @@
 # Changelog
 
+## [v0.3.0] - 2025-06-10
+
+### Breaking Changes
+
+- **Multiple Inputs for Pipes**: Pipes now support multiple named inputs, replacing the single `input_concept_code`. This is a fundamental change to how pipes are defined and used.
+  - `PipeAbstract` now uses `inputs: PipeInputSpec` instead of `input_concept_code: str`.
+  - Pipe blueprints (`.pl.toml` files) now use an `[inputs]` table (e.g., `[inputs] \n my_input = "native.Text"`) instead of a single `input` key.
+  - The CLI `pipelex list-pipes` now displays multiple inputs.
+
+### Added
+
+- **Dry-Run Mode for Content Generation**: A new `ContentGeneratorDry` is introduced, allowing for testing pipelines without making actual calls to LLM, image generation, or OCR services. This is controlled by the `dry_run` setting in the configuration.
+- **`native.Anything` Concept**: A new native concept `native.Anything` has been added. It is compatible with any other concept, providing more flexibility in pipe definitions.
+- **New `test-pipelex-api` make target**: Added a new `make` target `test-pipelex-api` to run tests for the Pipelex API.
+
+### Changed
+
+- **Refactored Cognitive Workers**: The abstraction for cognitive workers (`LLM`, `Imgg`, `Ocr`) has been significantly refactored. The decorator-based approach (`llm_job_func`, `imgg_job_func`, `ocr_job_func`) has been removed, and the logic is now part of the worker base classes. This simplifies the implementation of new workers and improves clarity.
+- **Improved Error Messages and Logging**: Various improvements to error messages and logging across the codebase.
+- **`PromptImageBytes` field rename**: The field `b64_image_bytes` in `PromptImageBytes` has been renamed to `base_64` for consistency.
+
+### Removed
+
+- **Removed `llm_job_func.py`**: The file `pipelex/cogt/llm/llm_job_func.py` and the `llm_job_func` decorator have been removed as part of the cognitive worker refactoring.
+
 ## [v0.2.14] - 2025-06-06
 
 - Added a feature flag for the `ReportingManager` in the config: 
