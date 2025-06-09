@@ -10,6 +10,7 @@ from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_report_delegate
 
 
+@pytest.mark.dry_runable
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
