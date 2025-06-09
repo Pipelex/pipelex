@@ -6,7 +6,7 @@
 
 - **Multiple Inputs for Pipes**: Pipes now support multiple named inputs, replacing the single `input_concept_code`. This is a fundamental change to how pipes are defined and used.
   - `PipeAbstract` now uses `inputs: PipeInputSpec` instead of `input_concept_code: str`.
-  - Pipe blueprints (`.pl.toml` files) now use an `[inputs]` table (e.g., `[inputs] \n my_input = "native.Text"`) instead of a single `input` key.
+  - Pipe blueprints (in `.toml` files) now use an `inputs` dictionary (variable_name -> concept_code) instead of a single `input` key.
   - The CLI `pipelex list-pipes` now displays multiple inputs.
 
 ### Added
