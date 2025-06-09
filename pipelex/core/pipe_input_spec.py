@@ -3,7 +3,8 @@ from typing import Callable, Dict, List, Set, Tuple
 from pydantic import Field, RootModel, field_validator
 
 from pipelex import log
-from pipelex.exceptions import PipeInputNotFoundError, PipeInputSpecError
+from pipelex.core.concept import Concept
+from pipelex.exceptions import ConceptError, PipeInputNotFoundError, PipeInputSpecError
 
 PipeInputSpecRoot = Dict[str, str]
 
@@ -24,23 +25,23 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
 
         # Now we can transform and validate the keys and values
         transformed_dict: Dict[str, str] = {}
-        for key, value in validated_dict.items():
+        for required_input, concept_str in validated_dict.items():
             # in case of sub-attribute, the variable name is the object name, before the 1st dot
-            transformed_key: str = key.split(".", 1)[0]
-            if transformed_key != key:
-                log.warning(f"Sub-attribute {key} detected, using {transformed_key} as variable name")
+            transformed_key: str = required_input.split(".", 1)[0]
+            if transformed_key != required_input:
+                log.warning(f"Sub-attribute {required_input} detected, using {transformed_key} as variable name")
 
-            # Validate value
-            if not value:
-                raise PipeInputSpecError(f"Invalid concept code: {value}")
-            if value.count(".") > 1:
-                raise PipeInputSpecError(f"Concept code {value} contains more than one dot")
+            # Validate concept_code
+            try:
+                Concept.check_possible_concept_from_str(concept_str=concept_str)
+            except ConceptError as exc:
+                raise PipeInputSpecError(f"Invalid concept code: {concept_str}") from exc
 
-            if transformed_key in transformed_dict and transformed_dict[transformed_key] != value:
+            if transformed_key in transformed_dict and transformed_dict[transformed_key] != concept_str:
                 log.warning(
-                    f"Variable {transformed_key} already exists with a different concept code: {transformed_dict[transformed_key]} -> {value}"
+                    f"Variable {transformed_key} already exists with a different concept code: {transformed_dict[transformed_key]} -> {concept_str}"
                 )
-            transformed_dict[transformed_key] = value
+            transformed_dict[transformed_key] = concept_str
 
         return transformed_dict
 

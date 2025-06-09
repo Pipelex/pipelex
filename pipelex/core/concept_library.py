@@ -20,7 +20,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         for concept in self.root.values():
             for domain_concept_code in concept.refines:
                 if "." in domain_concept_code:
-                    domain, concept_code = Concept.extract_domain_and_concept_from_definition(concept_code=domain_concept_code)
+                    domain, concept_code = Concept.extract_domain_and_concept_from_str(concept_str=domain_concept_code)
 
                     found_concept = self.root.get(f"{domain}.{concept_code}", None)
                     if not found_concept:
@@ -60,7 +60,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return list(self.root.values())
 
     def _list_concept_names(self) -> List[str]:
-        return [Concept.extract_domain_and_concept_from_definition(c.code)[1] for c in self.list_concepts()]
+        return [Concept.extract_domain_and_concept_from_str(c.code)[1] for c in self.list_concepts()]
 
     @override
     def list_concepts_by_domain(self, domain: str) -> List[Concept]:
@@ -112,7 +112,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
                 # TODO: replace this with a concept factory method make_implicit_concept
                 return ConceptFactory.make_concept_from_definition(
                     domain_code="implicit",
-                    code=Concept.extract_domain_and_concept_from_definition(concept_code=concept_code)[1],
+                    code=Concept.extract_domain_and_concept_from_str(concept_str=concept_code)[1],
                     definition=concept_code,
                 )
             else:
