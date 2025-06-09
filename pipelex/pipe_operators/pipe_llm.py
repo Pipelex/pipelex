@@ -14,7 +14,7 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.domain import Domain, SpecialDomain
-from pipelex.core.pipe_input_details import PipeInputDetails
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import (
     PipeOutputMultiplicity,
@@ -65,7 +65,7 @@ class PipeLLM(PipeOperator):
     system_prompt_to_structure: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
 
-    def needed_inputs(self) -> PipeInputDetails:
+    def needed_inputs(self) -> PipeInputSpec:
         return self.pipe_llm_prompt.needed_inputs()
 
     @model_validator(mode="after")
@@ -102,7 +102,7 @@ class PipeLLM(PipeOperator):
 
             # there is one case where the needed input is of specific concept: the user_images
             if concept_code == NativeConcept.IMAGE.code:
-                concept_code_of_declared_input = self.inputs.get(variable_name=required_variable_name)
+                concept_code_of_declared_input = self.inputs.get_required_concept_code(variable_name=required_variable_name)
                 if not concept_provider.is_compatible_by_concept_code(
                     tested_concept_code=concept_code_of_declared_input,
                     wanted_concept_code=concept_code,
