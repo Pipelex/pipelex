@@ -364,12 +364,10 @@ check-unused-imports: env
 	$(call PRINT_TITLE,"Checking for unused imports without fixing")
 	$(VENV_RUFF) check --select=F401 --no-fix .
 
-# c: init format lint pyright mypy
-c: format lint pyright mypy
+c: init format lint pyright mypy
 	@echo "> done: c = check"
 
-# cc: init cleanderived c
-cc: cleanderived c
+cc: init cleanderived c
 	@echo "> done: cc = init cleanderived init format lint pyright mypy"
 
 check: cc check-unused-imports
