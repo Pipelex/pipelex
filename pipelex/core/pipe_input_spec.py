@@ -9,6 +9,11 @@ PipeInputSpecRoot = Dict[str, str]
 
 
 class PipeInputSpec(RootModel[PipeInputSpecRoot]):
+    """
+    A PipeInputSpec is a dictionary of variable names and their corresponding concept codes.
+    It's meant to hold the required input variables declared by a pipe.
+    """
+
     root: PipeInputSpecRoot = Field(default_factory=dict)
 
     @field_validator("root", mode="wrap")
@@ -39,6 +44,21 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
 
         return transformed_dict
 
+    def set_default_domain(self, domain: str):
+        for input_name, input_concept_code in self.root.items():
+            if "." not in input_concept_code:
+                self.root[input_name] = f"{domain}.{input_concept_code}"
+
+    def get_required_concept_code(self, variable_name: str) -> str:
+        return self.root[variable_name]
+
+    def add_requirement(self, variable_name: str, concept_code: str):
+        self.root[variable_name] = concept_code
+
+    @property
+    def items(self) -> List[Tuple[str, str]]:
+        return list(self.root.items())
+
     @property
     def concepts(self) -> Set[str]:
         return set(self.root.values())
@@ -47,24 +67,18 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
     def variables(self) -> List[str]:
         return list(self.root.keys())
 
-    def set_default_domain(self, domain: str):
-        for input_name, input_concept_code in self.root.items():
-            if "." not in input_concept_code:
-                self.root[input_name] = f"{domain}.{input_concept_code}"
-
-    def get(self, variable_name: str) -> str:
-        return self.root[variable_name]
-
-    def add_variable(self, variable_name: str, concept_code: str):
-        transformed_key: str = variable_name.split(".", 1)[0]
-        self.root[transformed_key] = concept_code
-
-    def add_new_variable(self, variable_name: str, concept_code: str):
-        transformed_key: str = variable_name.split(".", 1)[0]
-        if transformed_key in self.root:
-            raise PipeInputSpecError(f"Variable {variable_name} already exists in the input spec")
-        self.root[transformed_key] = concept_code
+    @property
+    def required_names(self) -> List[str]:
+        the_required_names: List[str] = []
+        for requirement_expression in self.root.keys():
+            required_variable_name = requirement_expression.split(".", 1)[0]
+            the_required_names.append(required_variable_name)
+        return the_required_names
 
     @property
-    def items(self) -> List[Tuple[str, str]]:
-        return list(self.root.items())
+    def detailed_requirements(self) -> List[Tuple[str, str, str]]:
+        the_requirements: List[Tuple[str, str, str]] = []
+        for requirement_expression, concept_code in self.root.items():
+            required_variable_name = requirement_expression.split(".", 1)[0]
+            the_requirements.append((required_variable_name, requirement_expression, concept_code))
+        return the_requirements

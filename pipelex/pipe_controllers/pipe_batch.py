@@ -39,7 +39,7 @@ class PipeBatch(PipeController):
         """Run a pipe in batch mode for each item in the input list."""
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_item_stuff_name = batch_params.input_item_stuff_name
-        input_item_concept_code = self.inputs.get(input_item_stuff_name)
+        input_item_concept_code = self.inputs.get_required_concept_code(input_item_stuff_name)
         if not input_item_concept_code:
             raise PipeExecutionError(f"Batch input item stuff named '{input_item_stuff_name}' is not in the batch's input spec: {self.inputs}")
         if pipe_run_params.final_stuff_code:

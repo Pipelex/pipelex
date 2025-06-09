@@ -10,7 +10,7 @@ from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_input_details import PipeInputDetails
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent
@@ -95,14 +95,14 @@ class PipeLLMPrompt(PipeOperator):
         if self.system_prompt_pipe_jinja2:
             self.system_prompt_pipe_jinja2.validate_with_libraries()
 
-    def needed_inputs(self) -> PipeInputDetails:
+    def needed_inputs(self) -> PipeInputSpec:
         conceptless_required_variables: Set[str] = set()
         if self.user_pipe_jinja2:
             conceptless_required_variables.update(self.user_pipe_jinja2.required_variables())
         if self.system_prompt_pipe_jinja2:
             conceptless_required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
 
-        pipe_input_spec = PipeInputDetails(root={})
+        pipe_input_spec = PipeInputSpec(root={})
         for conceptless_required_variable in conceptless_required_variables:
             if conceptless_required_variable.startswith("_"):
                 # variables starting with _ are run parameters, not inputs
