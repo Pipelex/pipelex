@@ -40,7 +40,7 @@ class SubPipe(BaseModel):
             except WorkingMemoryStuffNotFoundError as exc:
                 raise PipeInputError(
                     f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
-                    f"of pipe '{calling_pipe_code}' not found in working memory"
+                    f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
                 ) from exc
             input_concept_code = input_list_stuff.concept_code
             output_concept_code = pipe.output_concept_code
@@ -77,7 +77,8 @@ class SubPipe(BaseModel):
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
             except WorkingMemoryStuffNotFoundError as exc:
                 sub_pipe_path = sub_pipe_run_params.pipe_layers + [self.pipe_code]
-                error_details = f"sub_pipe {sub_pipe_path}, required_variables: {required_variables}"
+                sub_pipe_path_str = ".".join(sub_pipe_path)
+                error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
                 raise PipeInputError(f"Some required stuff(s) not found: {error_details}") from exc
             log.debug(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
             pipe_output = await get_pipe_router().run_pipe_code(

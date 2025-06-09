@@ -55,7 +55,7 @@ class PipeBatch(PipeController):
             input_stuff = working_memory.get_stuff(batch_params.input_list_stuff_name)
         except WorkingMemoryStuffNotFoundError as exc:
             raise PipeInputError(
-                f"Input list stuff named '{batch_params.input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory"
+                f"Input list stuff '{batch_params.input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory: {exc}"
             ) from exc
         input_stuff_code = input_stuff.stuff_code
         input_content = input_stuff.content

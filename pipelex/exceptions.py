@@ -57,6 +57,36 @@ class StaticValidationError(Exception):
         return self.desc()
 
 
+class WorkingMemoryFactoryError(PipelexError):
+    pass
+
+
+class WorkingMemoryError(PipelexError):
+    pass
+
+
+class WorkingMemoryConsistencyError(WorkingMemoryError):
+    pass
+
+
+class WorkingMemoryVariableError(WorkingMemoryError):
+    def __init__(self, variable_name: str, message: str, *args: object, **kwargs: object) -> None:
+        self.variable_name = variable_name
+        super().__init__(message, *args, **kwargs)
+
+
+class WorkingMemoryTypeError(WorkingMemoryVariableError):
+    pass
+
+
+class WorkingMemoryStuffAttributeNotFoundError(WorkingMemoryVariableError):
+    pass
+
+
+class WorkingMemoryStuffNotFoundError(WorkingMemoryVariableError):
+    pass
+
+
 class PipelexCLIError(PipelexError, ClickException):
     """Raised when there's an error in CLI usage or operation."""
 
@@ -120,22 +150,6 @@ class PipeDefinitionError(PipelexError):
 
 
 class UnexpectedPipeDefinitionError(PipeDefinitionError):
-    pass
-
-
-class WorkingMemoryError(PipelexError):
-    pass
-
-
-class WorkingMemoryTypeError(WorkingMemoryError):
-    pass
-
-
-class WorkingMemoryNotFoundError(WorkingMemoryError):
-    pass
-
-
-class WorkingMemoryStuffNotFoundError(WorkingMemoryNotFoundError):
     pass
 
 
