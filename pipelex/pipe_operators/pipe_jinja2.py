@@ -8,6 +8,7 @@ from typing_extensions import Self, override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.config import get_config
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
@@ -140,13 +141,18 @@ class PipeJinja2(PipeOperator):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        log.warning(f"PipeLLM: dry run operator pipe: {self.code}")
-        content_generator_dry = ContentGeneratorDry()
+        content_generator_used: ContentGeneratorProtocol
+        if get_config().pipelex.dry_run_config.apply_to_jinja2_rendering:
+            log.warning(f"PipeJinja2: using dry run operator pipe for jinja2 rendering: {self.code}")
+            content_generator_used = ContentGeneratorDry()
+        else:
+            log.warning(f"PipeJinja2: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
+            content_generator_used = get_content_generator()
         pipe_output = await self._run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
-            content_generator=content_generator_dry,
+            content_generator=content_generator_used,
         )
         return pipe_output

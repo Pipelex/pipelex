@@ -16,6 +16,7 @@ from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
+from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_environment import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
@@ -23,6 +24,15 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
 class ContentGeneratorDry(ContentGeneratorProtocol):
+    """
+    This class is used to generate mock content for testing purposes.
+    It does not use any inference.
+    """
+
+    @property
+    def _text_gen_truncate_length(self) -> int:
+        return get_config().pipelex.dry_run_config.text_gen_truncate_length
+
     @override
     @update_job_metadata
     async def make_llm_text(  # pyright: ignore[reportIncompatibleMethodOverride]
@@ -34,7 +44,8 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> str:
         func_name = "make_llm_text"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        generated_text = f"DRY RUN: {func_name} • llm_setting_main={llm_setting_main.desc()} • llm_prompt_for_text={llm_prompt_for_text}"
+        prompt_truncated = llm_prompt_for_text.desc(truncate_text_length=self._text_gen_truncate_length)
+        generated_text = f"DRY RUN: {func_name} • llm_setting={llm_setting_main.desc()} • prompt={prompt_truncated}"
         return generated_text
 
     @override
@@ -185,7 +196,8 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> str:
         func_name = "make_jinja2_text"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        jinja2_text = f"DRY RUN: {func_name} • context={context} • jinja2_name={jinja2_name} • jinja2={jinja2} • \
+        jinja2_truncated = jinja2[: self._text_gen_truncate_length] if jinja2 else None
+        jinja2_text = f"DRY RUN: {func_name} • context={context} • jinja2_name={jinja2_name} • jinja2={jinja2_truncated} • \
             prompting_style={prompting_style} • template_category={template_category}"
         return jinja2_text
 

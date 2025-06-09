@@ -48,6 +48,11 @@ class PipeRunConfig(ConfigModel):
     pipe_stack_limit: int
 
 
+class DryRunConfig(ConfigModel):
+    apply_to_jinja2_rendering: bool
+    text_gen_truncate_length: int
+
+
 class GenericTemplateNames(ConfigModel):
     structure_from_preliminary_text_user: str
     structure_from_preliminary_text_system: str
@@ -96,6 +101,7 @@ class Pipelex(ConfigModel):
     structure_config: StructureConfig
     prompting_config: PromptingConfig
 
+    dry_run_config: DryRunConfig
     pipe_run_config: PipeRunConfig
     reporting_config: ReportingConfig
 

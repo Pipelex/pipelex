@@ -237,3 +237,11 @@ choice_edge_style = "-----"
 
 [pipelex.pipe_run_config]
 pipe_stack_limit = 20
+
+####################################################################################################
+# Dry run config
+####################################################################################################
+
+[pipelex.dry_run_config]
+apply_to_jinja2_rendering = false
+text_gen_truncate_length = 1000
