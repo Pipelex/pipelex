@@ -9,6 +9,11 @@ PipeInputDetailsRoot = Dict[str, str]
 
 
 class PipeInputDetails(RootModel[PipeInputDetailsRoot]):
+    """
+    A PipeInputDetails is a dictionary of variable names and their corresponding concept codes.
+    It's meant to hold the required input variables declared by a pipe.
+    """
+
     root: PipeInputDetailsRoot = Field(default_factory=dict)
 
     @field_validator("root", mode="wrap")
@@ -57,10 +62,6 @@ class PipeInputDetails(RootModel[PipeInputDetailsRoot]):
     @property
     def concepts(self) -> Set[str]:
         return set(self.root.values())
-
-    # @property
-    # def variables(self) -> List[str]:
-    #     return list(self.root.keys())
 
     @property
     def required_names(self) -> List[str]:
