@@ -95,8 +95,6 @@ class PipeJinja2(PipeOperator):
             raise PipeRunParamsError(
                 f"PipeJinja2 does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
             )
-        if not self.output_concept_code:
-            raise PipeRunParamsError("PipeJinja2 must have an output_concept_code")
 
         context: Dict[str, Any] = working_memory.generate_stuff_artefact_dict()
         if pipe_run_params:

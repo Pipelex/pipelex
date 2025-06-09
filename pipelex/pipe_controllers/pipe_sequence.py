@@ -32,9 +32,6 @@ class PipeSequence(PipeController):
                 f"PipeSequence does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
             )
 
-        if not self.output_concept_code:
-            raise ValueError("No output concept code")
-
         current_memory = working_memory
 
         for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):

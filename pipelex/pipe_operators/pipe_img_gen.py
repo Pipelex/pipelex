@@ -152,8 +152,6 @@ class PipeImgGen(PipeOperator):
         content_generator: Optional[ContentGeneratorProtocol] = None,
     ) -> PipeImgGenOutput:
         content_generator = content_generator or get_content_generator()
-        if not self.output_concept_code:
-            raise PipeDefinitionError("PipeImgGen should have a non-None output_concept_code")
 
         applied_output_multiplicity, _, _ = output_multiplicity_to_apply(
             output_multiplicity_base=self.output_multiplicity or False,

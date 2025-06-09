@@ -139,8 +139,6 @@ class PipeLLMPrompt(PipeOperator):
             raise PipeRunParamsError(
                 f"PipeLLMPrompt does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
             )
-        if not self.output_concept_code:
-            raise PipeRunParamsError("PipeLLMPrompt must have a fixed non-None output_concept_code")
 
         ############################################################
         # User images

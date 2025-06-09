@@ -137,8 +137,6 @@ class PipeOcr(PipeOperator):
         content_generator: Optional[ContentGeneratorProtocol] = None,
     ) -> PipeOcrOutput:
         content_generator = content_generator or get_content_generator()
-        if not self.output_concept_code:
-            raise PipeDefinitionError("PipeOcr should have a non-None output_concept_code")
 
         image_uri: Optional[str] = None
         pdf_uri: Optional[str] = None
