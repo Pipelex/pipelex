@@ -2,28 +2,41 @@
 
 ## [v0.3.0] - 2025-06-10
 
-### Breaking Changes
+### Highlights
 
-- **Multiple Inputs for Pipes**: Pipes now support multiple named inputs, replacing the single `input_concept_code`. This is a fundamental change to how pipes are defined and used.
-  - `PipeAbstract` now uses `inputs: PipeInputSpec` instead of `input_concept_code: str`.
-  - Pipe blueprints (in `.toml` files) now use an `inputs` dictionary (variable_name -> concept_code) instead of a single `input` key.
-  - The CLI `pipelex list-pipes` now displays multiple inputs.
+- **Structured Input Specifications**: Pipe inputs are now defined as a dictionary mapping a required variable name to a concept code (`required_variable` -> `concept_code`). This replaces the previous single `input` field and allows for multiple, named inputs, making pipes more powerful and explicit. This is a **breaking change**.
+- **Static Validation for Inference Pipes**: You can now catch configuration and input mistakes in your pipelines *before* running any operations. This static validation checks `PipeLLM`, `PipeOcr`, and `PipeImgGen`.
+    - Configure the behavior for different error types using the `static_validation_config` section in your settings. For each error type, choose to `raise`, `log`, or `ignore`.
+- **Dry Run Mode for Zero-Cost Pipeline Validation**: A powerful dry-run mode allows you to test entire pipelines without making any actual inference calls. It's fast, costs nothing, works offline, and is perfect for linting and validating pipeline logic.
+    - The new `dry_run_config` lets you control settings, like disabling Jinja2 rendering during a dry run.
+    - This feature leverages `polyfactory` to generate mock Pydantic models for simulated outputs.
+    - Error handling for bad inputs during `run_pipe` has been improved and is fully effective in dry-run mode.
+    - One limitation: currently, dry running doesn't work when the pipeline uses a PipeCondition. This will be fixed in a future release.
 
 ### Added
 
-- **Dry-Run Mode for Content Generation**: A new `ContentGeneratorDry` is introduced, allowing for testing pipelines without making actual calls to LLM, image generation, or OCR services. This is controlled by the `dry_run` setting in the configuration.
-- **`native.Anything` Concept**: A new native concept `native.Anything` has been added. It is compatible with any other concept, providing more flexibility in pipe definitions.
-- **New `test-pipelex-api` make target**: Added a new `make` target `test-pipelex-api` to run tests for the Pipelex API.
+- **`native.Anything` Concept**: A new flexible native concept that is compatible with any other concept, simplifying pipe definitions where input types can vary.
+- Added dependency on `polyfactory` for mock Pydantic model generation in dry-run mode.
 
 ### Changed
 
-- **Refactored Cognitive Workers**: The abstraction for cognitive workers (`LLM`, `Imgg`, `Ocr`) has been significantly refactored. The decorator-based approach (`llm_job_func`, `imgg_job_func`, `ocr_job_func`) has been removed, and the logic is now part of the worker base classes. This simplifies the implementation of new workers and improves clarity.
-- **Improved Error Messages and Logging**: Various improvements to error messages and logging across the codebase.
-- **`PromptImageBytes` field rename**: The field `b64_image_bytes` in `PromptImageBytes` has been renamed to `base_64` for consistency.
+- **Refactored Cognitive Workers**: The abstraction for `LLM`, `Imgg`, and `Ocr` workers has been elegantly simplified. The old decorator-based approach (`..._job_func`) has been replaced with a more robust pattern: a public base method now handles pre- and post-execution logic while calling a private abstract method that each worker implements.
+- The `b64_image_bytes` field in `PromptImageBytes` was renamed to `base_64` for better consistency.
+
+### Fixed
+
+- Resolved a logged error related to the pipe stack when using `PipeParallel`.
+- The pipe tracker functionality has been restored. It no longer crashes when using nested object attributes (e.g., `my_object.attribute`) as pipe inputs.
+
+### Tests
+
+- A new pytest command-line option `--pipe-run-mode` has been added to switch between `live` and `dry` runs (default is `dry`). All pipe tests now respect this mode.
+- Introduced the `pipelex_api` pytest marker for tests related to the Pipelex API client, separating them from general `inference` or `llm` tests.
+- Added a `make test-pipelex-api` target (shorthand: `make ta`) to exclusively run these new API client tests.
 
 ### Removed
 
-- **Removed `llm_job_func.py`**: The file `pipelex/cogt/llm/llm_job_func.py` and the `llm_job_func` decorator have been removed as part of the cognitive worker refactoring.
+- The `llm_job_func.py` file and the associated decorators have been removed as part of the cognitive worker refactoring.
 
 ## [v0.2.14] - 2025-06-06
 
