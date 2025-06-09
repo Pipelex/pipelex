@@ -22,7 +22,6 @@ from pipelex.core.stuff_content import (
 )
 from pipelex.exceptions import (
     WorkingMemoryConsistencyError,
-    WorkingMemoryError,
     WorkingMemoryStuffAttributeNotFoundError,
     WorkingMemoryStuffNotFoundError,
     WorkingMemoryTypeError,
