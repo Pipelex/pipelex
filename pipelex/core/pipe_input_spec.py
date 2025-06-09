@@ -1,6 +1,6 @@
-from typing import Any, Callable, Dict, List, Set, Tuple, Type, TypeVar
+from typing import Callable, Dict, List, Set, Tuple
 
-from pydantic import BaseModel, Field, RootModel, field_validator
+from pydantic import Field, RootModel, field_validator
 
 from pipelex import log
 from pipelex.exceptions import PipeInputSpecError

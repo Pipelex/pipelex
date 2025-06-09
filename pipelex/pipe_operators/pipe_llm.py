@@ -82,9 +82,6 @@ class PipeLLM(PipeOperator):
         the_needed_inputs = self.needed_inputs()
         # check all required variables are in the inputs
         for required_variable_name, requirement_expression, concept_code in the_needed_inputs.detailed_requirements:
-            # if variable_name.startswith("_"):
-            #     # variables starting with _ are run parameters, not inputs
-            #     continue
             if required_variable_name not in self.inputs.variables:
                 missing_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,

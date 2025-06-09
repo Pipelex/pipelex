@@ -1,4 +1,4 @@
-from typing import ClassVar, Dict, List, Optional, Set, cast
+from typing import ClassVar, List, Optional, Set, cast
 
 from kajson.class_registry import class_registry
 from pydantic import model_validator
@@ -8,7 +8,6 @@ from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_input_spec import PipeInputSpec
@@ -21,13 +20,11 @@ from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,
     PipeRunParamsError,
-    StaticValidationError,
-    StaticValidationErrorType,
     WorkingMemoryNotFoundError,
     WorkingMemoryStuffNotFoundError,
     WorkingMemoryTypeError,
 )
-from pipelex.hub import get_concept_provider, get_template
+from pipelex.hub import get_template
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
