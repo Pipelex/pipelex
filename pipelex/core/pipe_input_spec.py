@@ -60,10 +60,6 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
     def get(self, variable_name: str) -> str:
         return self.root[variable_name]
 
-    def add_variable(self, variable_name: str, concept_code: str):
-        transformed_key: str = variable_name.split(".", 1)[0]
-        self.root[transformed_key] = concept_code
-
     def add_new_variable(self, variable_name: str, concept_code: str):
         transformed_key: str = variable_name.split(".", 1)[0]
         if transformed_key in self.root:
