@@ -29,6 +29,8 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import (
     PipeDefinitionError,
+    PipeInputError,
+    PipeInputNotFoundError,
     StaticValidationError,
     StaticValidationErrorType,
 )
@@ -101,7 +103,12 @@ class PipeLLM(PipeOperator):
 
             # there is one case where the needed input is of specific concept: the user_images
             if concept_code == NativeConcept.IMAGE.code:
-                concept_code_of_declared_input = self.inputs.get_required_concept_code(variable_name=required_variable_name)
+                try:
+                    concept_code_of_declared_input = self.inputs.get_required_concept_code(variable_name=required_variable_name)
+                except PipeInputNotFoundError as exc:
+                    raise PipeInputError(
+                        f"Input variable '{required_variable_name}' is not in this PipeLLM '{self.code}' input spec: {self.inputs}"
+                    ) from exc
                 if not concept_provider.is_compatible_by_concept_code(
                     tested_concept_code=concept_code_of_declared_input,
                     wanted_concept_code=concept_code,

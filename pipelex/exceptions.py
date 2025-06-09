@@ -229,5 +229,9 @@ class PipeInputSpecError(PipelexError):
     pass
 
 
+class PipeInputNotFoundError(PipelexError):
+    pass
+
+
 class PipeInputDetailsError(PipelexError):
     pass

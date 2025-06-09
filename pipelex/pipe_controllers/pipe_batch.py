@@ -12,7 +12,7 @@ from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ListContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, WorkingMemory
-from pipelex.exceptions import PipeExecutionError, PipeInputError
+from pipelex.exceptions import PipeExecutionError, PipeInputError, PipeInputNotFoundError
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -39,9 +39,13 @@ class PipeBatch(PipeController):
         """Run a pipe in batch mode for each item in the input list."""
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_item_stuff_name = batch_params.input_item_stuff_name
-        input_item_concept_code = self.inputs.get_required_concept_code(input_item_stuff_name)
-        if not input_item_concept_code:
-            raise PipeExecutionError(f"Batch input item stuff named '{input_item_stuff_name}' is not in the batch's input spec: {self.inputs}")
+        try:
+            input_item_concept_code = self.inputs.get_required_concept_code(input_item_stuff_name)
+        except PipeInputNotFoundError as exc:
+            raise PipeInputError(
+                f"Batch input item stuff named '{input_item_stuff_name}' is not in this PipeBatch '{self.code}' input spec: {self.inputs}"
+            ) from exc
+
         if pipe_run_params.final_stuff_code:
             log.debug(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None

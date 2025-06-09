@@ -3,7 +3,7 @@ from typing import Callable, Dict, List, Set, Tuple
 from pydantic import Field, RootModel, field_validator
 
 from pipelex import log
-from pipelex.exceptions import PipeInputSpecError
+from pipelex.exceptions import PipeInputNotFoundError, PipeInputSpecError
 
 PipeInputSpecRoot = Dict[str, str]
 
@@ -50,7 +50,10 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
                 self.root[input_name] = f"{domain}.{input_concept_code}"
 
     def get_required_concept_code(self, variable_name: str) -> str:
-        return self.root[variable_name]
+        concept_code = self.root.get(variable_name)
+        if not concept_code:
+            raise PipeInputNotFoundError(f"Variable '{variable_name}' not found in input spec")
+        return concept_code
 
     def add_requirement(self, variable_name: str, concept_code: str):
         self.root[variable_name] = concept_code
