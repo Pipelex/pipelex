@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import ValidationInfo, field_validator, model_validator
+from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
