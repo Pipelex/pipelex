@@ -4,7 +4,7 @@ from kajson.class_registry import class_registry
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -177,7 +177,7 @@ class PipeLLMPrompt(PipeOperator):
         else:
             user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=self.output_concept_code)
 
-        pretty_print(user_text)
+        log.verbose(f"User text with {self.output_concept_code=}:\n {user_text}")
 
         ############################################################
         # System text
@@ -232,6 +232,7 @@ class PipeLLMPrompt(PipeOperator):
             f"\n\n---\nRequested output format: The output should be the following class: {class_name}\n"
             f"{chr(10).join(class_structure)}\n"
             "You do NOT need to output a formatted JSON object, another LLM will take care of that. "
+            "If you cannot find a value that is Optional, output None for that field."
             "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
         )
         return output_structure_prompt
