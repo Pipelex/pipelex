@@ -4,7 +4,7 @@ from kajson.class_registry import class_registry
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex import log
+from pipelex import log, pretty_print
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -174,6 +174,10 @@ class PipeLLMPrompt(PipeOperator):
         # Append output structure prompt if needed
         if pipe_run_params.dynamic_output_concept_code:
             user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=pipe_run_params.dynamic_output_concept_code)
+        else:
+            user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=self.output_concept_code)
+
+        pretty_print(user_text)
 
         ############################################################
         # System text
