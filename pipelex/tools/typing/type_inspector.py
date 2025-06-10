@@ -27,9 +27,12 @@ def pretty_type(tp: object) -> str:
         values: List[str] = []
         for arg in args:
             if isinstance(arg, Enum) or isinstance(arg, StrEnum):
-                values.append(f"'{arg.value}'")
+                values.append(f'"{arg.value}"')
             else:
                 values.append(repr(arg))
+        # Return multi-line format for Literal fields
+        if len(values) > 1:
+            return "Literal[\n        " + ",\n        ".join(values) + ",\n    ]"
         return f"Literal[{', '.join(values)}]"
 
     if (origin is list or origin is List) and args:
@@ -77,6 +80,28 @@ def get_type_structure(
             if len(non_none) == 1:
                 return f"Optional[{format_type(non_none[0])}]"
             return f"Union[{', '.join(format_type(a) for a in non_none)}]"
+
+        if str(origin).endswith("Literal") and args:  # Handle both typing.Literal and typing_extensions.Literal
+            # For enum values, just get their values
+            values: List[str] = []
+            enum_type = None
+            for arg in args:
+                if isinstance(arg, Enum) or isinstance(arg, StrEnum):
+                    values.append(arg.value)
+                    if enum_type is None:
+                        enum_type = type(arg)
+                else:
+                    values.append(str(arg))
+            # Add enum type to collected_enums if found
+            if enum_type is not None:
+                collected_enums[enum_type.__name__] = enum_type
+            # Return multi-line format for Literal fields
+            if len(values) > 1:
+                lines: List[str] = []
+                for value in values:
+                    lines.append(f'"{value}"')
+                return "Literal[\n        " + ",\n        ".join(lines) + ",\n    ]"
+            return f"Literal[{', '.join(values)}]"
 
         if origin in (list, List):
             return f"List[{format_type(args[0])}]"
@@ -258,7 +283,12 @@ def get_type_structure(
                     if field_description:
                         field_line += f"  # {field_description}"
 
-                    output.append(field_line)
+                    # Split multi-line field lines
+                    if "\n" in field_line:
+                        lines = field_line.split("\n")
+                        output.extend(lines)
+                    else:
+                        output.append(field_line)
                     continue
 
             # If no fields were output, show inheritance comment
@@ -275,6 +305,10 @@ def get_type_structure(
         if output:
             output.append("")
         output.append(f"class {enum_name}({enum_type.__bases__[0].__name__}):")
+        # Add enum docstring if available
+        if enum_type.__doc__:
+            doc = enum_type.__doc__.strip()
+            output.append(f'    """{doc}"""')
         for member in enum_type:
             output.append(f'    {member.name} = "{member.value}"')
 

@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 from pytest import FixtureRequest
@@ -19,11 +19,33 @@ class Priority(StrEnum):
     LOW = "LOW"
 
 
+class MusicGenre(StrEnum):
+    """Available music genres."""
+
+    CLASSICAL = "classical"
+    JAZZ = "jazz"
+    ROCK = "rock"
+    ELECTRONIC = "electronic"
+    WORLD = "world"
+
+
 # Simple Content Classes
 class SimpleTextContent(TextContent):
     """A simple text content class"""
 
     pass
+
+
+class MusicCategoryContent(StructuredContent):
+    """A content class with a Literal field for music genres."""
+
+    category: Literal[
+        MusicGenre.CLASSICAL,
+        MusicGenre.JAZZ,
+        MusicGenre.ROCK,
+        MusicGenre.ELECTRONIC,
+        MusicGenre.WORLD,
+    ] = Field(description="The genre of music")
 
 
 class SimpleStructuredContent(StructuredContent):
@@ -220,5 +242,29 @@ class TestTypeInspector:
             "    title: str  # The title of the task",
             "    description: str  # Detailed description of what needs to be done",
             "    is_completed: bool = False  # Whether the task is completed",
+        ]
+        assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
+
+    def test_literal_field_content(self, request: FixtureRequest):
+        """Test structure of content with Literal field"""
+        result = get_type_structure(MusicCategoryContent)
+        expected = [
+            "class MusicCategoryContent(StructuredContent):",
+            '    """A content class with a Literal field for music genres."""',
+            "    category: Literal[",
+            '        "classical",',
+            '        "jazz",',
+            '        "rock",',
+            '        "electronic",',
+            '        "world",',
+            "    ]  # The genre of music",
+            "",
+            "class MusicGenre(StrEnum):",
+            '    """Available music genres."""',
+            '    CLASSICAL = "classical"',
+            '    JAZZ = "jazz"',
+            '    ROCK = "rock"',
+            '    ELECTRONIC = "electronic"',
+            '    WORLD = "world"',
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
