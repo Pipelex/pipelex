@@ -16,7 +16,7 @@ VENV_PIPELEX := $(VIRTUAL_ENV)/bin/pipelex
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runable or not (inference or llm or imgg or ocr)) and not (needs_output or pipelex_api)"
+USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or imgg or ocr)) and not (needs_output or pipelex_api)"
 
 define PRINT_TITLE
     $(eval PROJECT_PART := [$(PROJECT_NAME)])
@@ -205,12 +205,12 @@ cleanall: cleanderived cleanenv cleanlibraries
 codex-tests: env
 	$(call PRINT_TITLE,"Unit testing for Codex")
 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
-	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runable or not inference) and not (needs_output or pipelex_api)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (needs_output or pipelex_api)" || [ $$? = 5 ]
 
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
-	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")

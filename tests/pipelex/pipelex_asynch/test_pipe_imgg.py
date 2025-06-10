@@ -11,7 +11,7 @@ from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from tests.pipelex.test_data import IMGGTestCases
 
 
-@pytest.mark.dry_runable
+@pytest.mark.dry_runnable
 @pytest.mark.imgg
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")

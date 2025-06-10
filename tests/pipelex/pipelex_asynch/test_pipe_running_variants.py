@@ -17,7 +17,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from tests.pipelex.test_data import PipeTestCases
 
 
-@pytest.mark.dry_runable
+@pytest.mark.dry_runnable
 @pytest.mark.llm
 @pytest.mark.ocr
 @pytest.mark.inference

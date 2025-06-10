@@ -1,6 +1,20 @@
 # Changelog
 
-## [v0.3.0] - 2025-06-10
+## [v0.3.1] - 2025-06-10
+
+### Added
+- New pytest marker `dry_runnable` for tests that can run without inference.
+- Enhanced `make` targets with dry-run capabilities for improved test coverage:
+  - `make test-xdist` (or `make t`): Runs all non-inference tests **plus inference tests** that support dry-runs - fast and resource-efficient
+  - `make test-inference` (or `make ti`): Runs tests requiring actual inference, with actual inference (slow and costly)
+- Parallel test execution using `pytest-xdist` (`-n auto`) enabled for:
+  - GitHub Actions workflows
+  - Codex test targets
+  
+### Changed
+- Domain validation is now less restrictive in pipeline TOML: the `definition` attribute is now `Optional`
+
+## [v0.3.0] - 2025-06-09
 
 ### Highlights
 

@@ -208,7 +208,7 @@ markers = [
     "ocr: slow and costly due to ocr inference calls",
     "gha_disabled: tests that should not run in GitHub Actions",
     "codex_disabled: tests that should not run in Codex",
-    "dry_runable: tests that can be run in dry-run mode",
+    "dry_runnable: tests that can be run in dry-run mode",
 ]
 minversion = "8.0"
 
