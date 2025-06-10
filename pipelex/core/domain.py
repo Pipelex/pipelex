@@ -13,7 +13,7 @@ class SpecialDomain(StrEnum):
 
 class Domain(BaseModel):
     code: str
-    definition: str
+    definition: Optional[str] = None
     system_prompt: Optional[str] = None
     system_prompt_to_structure: Optional[str] = None
     prompt_template_to_structure: Optional[str] = None
@@ -24,4 +24,4 @@ class Domain(BaseModel):
 
     @classmethod
     def make_default(cls) -> Self:
-        return cls(code=SpecialDomain.NATIVE, definition="")
+        return cls(code=SpecialDomain.NATIVE)

@@ -1,7 +1,6 @@
 
 
 domain = "failure_modes"
-definition = "This domain is for testing failure modes"
 
 [concept]
 

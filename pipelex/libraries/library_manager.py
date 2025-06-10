@@ -128,7 +128,10 @@ class LibraryManager:
             library_name = toml_path.stem
             domain_code = library_dict.get("domain")
             if domain_code is None:
-                raise LibraryParsingError(f"Error loafing library '{library_name}' which has no domain set at '{toml_path}'")
+                raise LibraryParsingError(
+                    f"Error loading library '{library_name}' which has no domain set at '{toml_path}'. "
+                    "Just write 'domain = \"my_domain\"' at the top of the file."
+                )
             domain_definition = library_dict.get("definition")
             if domain_definition is None:
                 # we skip the domain without definition, it must be defined one and only one time in the domain library
@@ -177,10 +180,6 @@ class LibraryManager:
 
     def _load_library_dict(self, library_name: str, library_dict: Dict[str, Any], component_type: LibraryComponent):
         if domain_code := library_dict.pop("domain", None):
-            if not self.domain_library.get_domain(domain_code=domain_code):
-                raise LibraryParsingError(
-                    f"Domain '{domain_code}' is has not been defined in the domain libraryn make sure it has exactlyone definition"
-                )
             # domain is set at the root of the library
             self._load_library_components_from_recursive_dict(
                 domain_code=domain_code,
