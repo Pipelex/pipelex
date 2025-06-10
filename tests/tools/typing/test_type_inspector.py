@@ -1,6 +1,7 @@
 from enum import StrEnum
 from typing import List, Optional
 
+from pydantic import BaseModel, Field
 from pytest import FixtureRequest
 
 from pipelex.core.stuff_content import ListContent, StructuredContent, TextContent
@@ -54,7 +55,7 @@ class PersonContent(StructuredContent):
 
     name: str
     age: int
-    address: AddressContent
+    address: AddressContent = Field(description="Address of the person")
     documents: List[DocumentTypeContent]
     priority: Optional[Priority] = None
 
@@ -113,7 +114,7 @@ class TestTypeInspector:
             '    """Complex nested content with various types"""',
             "    name: str",
             "    age: int",
-            "    address: AddressContent",
+            "    address: AddressContent  # Address of the person",
             "    documents: List[DocumentTypeContent]",
             "    priority: Optional[Priority] = None",
             "",
@@ -149,7 +150,7 @@ class TestTypeInspector:
             '    """Complex nested content with various types"""',
             "    name: str",
             "    age: int",
-            "    address: AddressContent",
+            "    address: AddressContent  # Address of the person",
             "    documents: List[DocumentTypeContent]",
             "    priority: Optional[Priority] = None",
             "",
@@ -170,5 +171,54 @@ class TestTypeInspector:
             "class Priority(StrEnum):",
             '    HIGH = "HIGH"',
             '    LOW = "LOW"',
+        ]
+        assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
+
+    def test_model_with_field_description(self, request: FixtureRequest):
+        """Test structure of a model with field descriptions"""
+
+        class Person(BaseModel):
+            name: str
+            age: int
+
+        class Employee(Person):
+            job: str = Field(description="Job title, must be lowercase")
+
+        result = get_type_structure(Employee)
+        expected = [
+            "class Employee(Person):",
+            "    job: str  # Job title, must be lowercase",
+            "",
+            "class Person(BaseModel):",
+            "    name: str",
+            "    age: int",
+        ]
+        assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
+
+    def test_model_with_docstring_and_field_description(self, request: FixtureRequest):
+        """Test structure of a model with both docstring and field descriptions"""
+
+        class TaskContent(StructuredContent):
+            """A task content model that represents a single task.
+
+            This model is used to store task information including its title,
+            description, and status.
+            """
+
+            title: str = Field(description="The title of the task")
+            description: str = Field(description="Detailed description of what needs to be done")
+            is_completed: bool = Field(False, description="Whether the task is completed")
+
+        result = get_type_structure(TaskContent)
+        expected = [
+            "class TaskContent(StructuredContent):",
+            '    """A task content model that represents a single task.',
+            "",
+            "    This model is used to store task information including its title,",
+            "    description, and status.",
+            '    """',
+            "    title: str  # The title of the task",
+            "    description: str  # Detailed description of what needs to be done",
+            "    is_completed: bool = False  # Whether the task is completed",
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"

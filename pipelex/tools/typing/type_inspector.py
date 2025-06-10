@@ -114,6 +114,17 @@ def get_type_structure(
             seen_types.add(tp.__name__)
             collected_types[tp.__name__] = tp
 
+            # Only collect immediate parent class if it's a custom class
+            for base in tp.__bases__:
+                if (
+                    issubclass(base, BaseModel)
+                    and base is not BaseModel
+                    and base.__module__ != "pydantic.main"
+                    and base.__module__ != "abc"
+                    and not base.__module__.startswith("pipelex.core")
+                ):
+                    collect_types(base)
+
             try:
                 type_hints = get_type_hints(tp)
                 model_fields = getattr(tp, "model_fields", {})
@@ -152,7 +163,35 @@ def get_type_structure(
         # Class definition with docstring
         output.append(f"class {class_name}({base_class_name}):")
         if doc:
-            output.append(f'    """{doc}"""')
+            # Split docstring into lines and format each line
+            doc_lines = [line.rstrip() for line in doc.split("\n")]
+
+            # Remove empty lines from start and end
+            while doc_lines and not doc_lines[0].strip():
+                doc_lines.pop(0)
+            while doc_lines and not doc_lines[-1].strip():
+                doc_lines.pop()
+
+            if len(doc_lines) == 1:
+                # Single line docstring
+                output.append(f'    """{doc_lines[0]}"""')
+            else:
+                # Multi-line docstring
+                output.append(f'    """{doc_lines[0]}')
+
+                # Add empty line after first line if there's content
+                if doc_lines[1].strip():
+                    output.append("")
+
+                # Add remaining lines with proper indentation
+                for line in doc_lines[1:]:
+                    if line.strip():
+                        output.append(f"    {line.strip()}")
+                    else:
+                        output.append("")
+
+                # Close the docstring
+                output.append('    """')
 
         # Handle empty classes or classes that only inherit fields
         try:
@@ -179,26 +218,47 @@ def get_type_structure(
             # Output fields
             for fname, ftype in fields:
                 if fname in non_inherited_fields or (fname == "items" and "List" in base_class_name):
+                    # Initialize is_optional to False by default
+                    is_optional = False
+
                     if isinstance(ftype, type) and issubclass(ftype, BaseModel):
                         ftype_str = ftype.__name__
                     else:
-                        ftype_str = format_type(type_hints[fname])
+                        field_type = type_hints[fname]
+                        ftype_str = format_type(field_type)
+                        # Check if field is Optional
+                        field_origin = get_origin(field_type)
+                        field_args = get_args(field_type)
+                        is_optional = field_origin is Union and type(None) in field_args
 
                     # Handle default values
-                    default = getattr(class_type, fname, None)
-                    field_type = type_hints[fname]
-                    origin = get_origin(field_type)
-                    args = get_args(field_type)
+                    field_default = None
+                    field_description = None
+                    if model_fields:
+                        field_info = model_fields.get(fname)
+                        if field_info:
+                            if hasattr(field_info, "default") and field_info.default is not None:
+                                # Skip PydanticUndefined default values
+                                if str(field_info.default) != "PydanticUndefined":
+                                    field_default = field_info.default
+                            if hasattr(field_info, "description"):
+                                field_description = field_info.description
 
-                    # Check if field is Optional
-                    is_optional = origin is Union and type(None) in args
-
+                    # Build the field line
+                    field_line = f"    {fname}: {ftype_str}"
                     if is_optional:
-                        output.append(f"    {fname}: {ftype_str} = None")
-                    elif default is not None and not isinstance(default, (BaseModel, list, dict)):
-                        output.append(f"    {fname}: {ftype_str} = {repr(default)}")
-                    else:
-                        output.append(f"    {fname}: {ftype_str}")
+                        field_line += " = None"
+                    elif field_default is not None:
+                        if isinstance(field_default, bool):
+                            field_line += f" = {str(field_default)}"
+                        elif not isinstance(field_default, (BaseModel, list, dict)):
+                            field_line += f" = {repr(field_default)}"
+
+                    # Add description as a comment if available
+                    if field_description:
+                        field_line += f"  # {field_description}"
+
+                    output.append(field_line)
                     continue
 
             # If no fields were output, show inheritance comment
@@ -219,23 +279,3 @@ def get_type_structure(
             output.append(f'    {member.name} = "{member.value}"')
 
     return output
-
-
-def pretty_print_class_structure(tp: Type[Any]) -> List[str]:
-    lines: List[str] = []
-    lines.append(f"Class '{tp.__name__}':")
-    if tp.__doc__:
-        lines.append(f"{tp.__doc__}")
-    type_hints = get_type_hints(tp)
-    model_fields: Dict[str, Any] = getattr(tp, "model_fields", {})
-    if model_fields:
-        for fname, f in model_fields.items():
-            ftype = type_hints[fname]
-            line = f"- {fname} ({pretty_type(ftype)})"
-            if hasattr(f, "description") and getattr(f, "description", None):
-                line += f": {f.description}"
-            lines.append(line)
-    elif hasattr(tp, "__annotations__"):
-        for fname, ftype in type_hints.items():
-            lines.append(f"- {fname} ({str(ftype)})")
-    return lines
