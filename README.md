@@ -26,7 +26,15 @@
 </div>
 
 <div align="center">
-  <a href="https://www.pipelex.com/demo"><strong>Checkout our demo!</strong></a>
+  <h2 align="center">🚀 See Pipelex in Action</h2>
+  <p align="center">
+    <a href="https://www.pipelex.com/demo"><strong>Checkout our Demo</strong></a>
+  </p>
+  
+  <h2 align="center">📜 Discover Our Vision</h2>
+  <p align="center">
+    <a href="https://www.pipelex.com/post/the-knowledge-pipeline-manifesto"><strong>Read our Manifesto</strong></a>
+  </p>
 </div>
 
 # 📑 Table of Contents
