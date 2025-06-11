@@ -1,4 +1,4 @@
-from enum import StrEnum
+from pipelex.types import StrEnum
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
