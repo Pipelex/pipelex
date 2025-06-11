@@ -171,7 +171,7 @@ class TestPipeLLMPrompt:
             assert pipe_output.main_stuff is not None
 
             # Verify output structure is appended
-            output_structure = PipeLLMPrompt.get_output_structure_prompt(concept_code)
+            output_structure = pipe_llm_prompt.get_output_structure_prompt(concept_code)
 
             assert pipe_output.llm_prompt is not None
             assert pipe_output.llm_prompt.user_text is not None
