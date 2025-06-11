@@ -1,4 +1,3 @@
-from pipelex.types import StrEnum
 from typing import List, Literal
 
 import pytest
@@ -14,6 +13,7 @@ from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
+from pipelex.types import StrEnum
 from tests.pipelex.test_data import PipeTestCases
 
 
@@ -172,6 +172,7 @@ class TestPipeLLMPrompt:
 
             # Verify output structure is appended
             output_structure = PipeLLMPrompt.get_output_structure_prompt(concept_code)
+
             assert pipe_output.llm_prompt is not None
             assert pipe_output.llm_prompt.user_text is not None
             assert output_structure in pipe_output.llm_prompt.user_text
