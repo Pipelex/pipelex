@@ -285,8 +285,8 @@ def get_type_structure(
                         field_line += f"  # {field_description}"
                     # Then check if the field type itself has model_fields and a description
                     # This handles nested content types that have field descriptions
-                    elif hasattr(ftype, "model_fields") and fname in ftype.model_fields and hasattr(ftype.model_fields[fname], "description"): # type: ignore
-                        field_line += f"  # {ftype.model_fields[fname].description}" # type: ignore
+                    elif hasattr(ftype, "model_fields") and fname in ftype.model_fields and hasattr(ftype.model_fields[fname], "description"):  # type: ignore
+                        field_line += f"  # {ftype.model_fields[fname].description}"  # type: ignore
 
                     # Split multi-line field lines
                     if "\n" in field_line:
