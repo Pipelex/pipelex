@@ -1,87 +1,22 @@
-from typing import List, Literal
-
 import pytest
-from kajson.class_registry import class_registry
-from pydantic import Field
 
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import StructuredContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
-from pipelex.types import StrEnum
 from tests.pipelex.test_data import PipeTestCases
-
-
-class MusicGenre(StrEnum):
-    """Available music genres."""
-
-    CLASSICAL = "classical"
-    JAZZ = "jazz"
-    ROCK = "rock"
-    ELECTRONIC = "electronic"
-    WORLD = "world"
-
-
-class MusicCategoryContent(StructuredContent):
-    """A content class with a Literal field for music genres."""
-
-    category: Literal[
-        MusicGenre.CLASSICAL,
-        MusicGenre.JAZZ,
-        MusicGenre.ROCK,
-        MusicGenre.ELECTRONIC,
-        MusicGenre.WORLD,
-    ] = Field(description="The genre of music")
-
-
-class SimpleTextContent(StructuredContent):
-    """A simple text content class for testing."""
-
-    text: str = Field(description="The text content")
-
-
-class SimpleStructuredContent(StructuredContent):
-    """A structured content class with primitive types."""
-
-    name: str = Field(description="The name of the content")
-    value: int = Field(description="The numeric value")
-    is_active: bool = Field(description="Whether the content is active")
-
-
-class DocumentTypeContent(StructuredContent):
-    """A content class with enum fields."""
-
-    title: str = Field(description="The document title")
-    status: str = Field(description="The document status")
-
-
-class PersonContent(StructuredContent):
-    """A complex nested content with various types."""
-
-    name: str = Field(description="The person's name")
-    age: int = Field(description="The person's age")
-    address: str = Field(description="The person's address")
-
-
-class ComplexListContent(StructuredContent):
-    """A content class with list fields."""
-
-    items: List[str] = Field(description="List of items")
-    tags: List[str] = Field(description="List of tags")
-
-
-# Register test classes
-class_registry.register_class(SimpleTextContent)
-class_registry.register_class(SimpleStructuredContent)
-class_registry.register_class(DocumentTypeContent)
-class_registry.register_class(PersonContent)
-class_registry.register_class(ComplexListContent)
-class_registry.register_class(MusicCategoryContent)
+from tests.test_pipelines.pipe_llm_prompt import (
+    ComplexListContent,
+    DocumentTypeContent,
+    MusicCategoryContent,
+    PersonContent,
+    SimpleStructuredContent,
+    SimpleTextContent,
+)
 
 
 @pytest.mark.dry_runnable
