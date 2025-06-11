@@ -280,8 +280,13 @@ def get_type_structure(
                             field_line += f" = {repr(field_default)}"
 
                     # Add description as a comment if available
+                    # First check if there's a direct field description from model_fields
                     if field_description:
                         field_line += f"  # {field_description}"
+                    # Then check if the field type itself has model_fields and a description
+                    # This handles nested content types that have field descriptions
+                    elif hasattr(ftype, "model_fields") and fname in ftype.model_fields and hasattr(ftype.model_fields[fname], "description"): # type: ignore
+                        field_line += f"  # {ftype.model_fields[fname].description}" # type: ignore
 
                     # Split multi-line field lines
                     if "\n" in field_line:
@@ -305,8 +310,9 @@ def get_type_structure(
         if output:
             output.append("")
         output.append(f"class {enum_name}({enum_type.__bases__[0].__name__}):")
-        # Add enum docstring if available
-        if enum_type.__doc__:
+        # Add enum docstring if available, but skip Python's default "An enumeration." docstring
+        # This ensures we only include meaningful custom docstrings
+        if enum_type.__doc__ and enum_type.__doc__.strip() != "An enumeration.":
             doc = enum_type.__doc__.strip()
             output.append(f'    """{doc}"""')
         for member in enum_type:
