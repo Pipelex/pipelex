@@ -54,6 +54,9 @@ class ReportingManager(ReportingProtocol):
             raise ReportingManagerError(f"Registry for pipeline '{pipeline_run_id}' does not exist")
         return self._usage_registries[pipeline_run_id]
 
+    def _get_all_registries(self) -> Dict[str, UsageRegistry]:
+        return self._usage_registries
+
     def _report_llm_job(self, llm_job: LLMJob):
         llm_tokens_usage = llm_job.job_report.llm_tokens_usage
 
@@ -104,13 +107,21 @@ class ReportingManager(ReportingProtocol):
                 extension=self._reporting_config.cost_report_extension,
             )
 
-        registry = self._get_registry(pipeline_run_id)
-        CostRegistry.generate_report(
-            pipeline_run_id=pipeline_run_id,
-            llm_tokens_usages=registry.get_current_tokens_usage(),
-            unit_scale=self._reporting_config.cost_report_unit_scale,
-            cost_report_file_path=cost_report_file_path,
-        )
+        # Get registries to process based on pipeline_run_id
+        registries_to_process: Dict[str, UsageRegistry] = {}
+        if pipeline_run_id:
+            registries_to_process = {pipeline_run_id: self._get_registry(pipeline_run_id)}
+        else:
+            registries_to_process = self._get_all_registries()
+
+        # Generate reports for all selected registries
+        for run_id, registry in registries_to_process.items():
+            CostRegistry.generate_report(
+                pipeline_run_id=run_id,
+                llm_tokens_usages=registry.get_current_tokens_usage(),
+                unit_scale=self._reporting_config.cost_report_unit_scale,
+                cost_report_file_path=cost_report_file_path,
+            )
 
     @override
     def close_registry(self, pipeline_run_id: str):
