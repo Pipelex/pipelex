@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pytest import FixtureRequest
 
 from pipelex.core.stuff_content import ListContent, StructuredContent, TextContent
@@ -86,6 +87,38 @@ class ComplexListContent(ListContent[PersonContent]):
     """List content with complex items"""
 
     items: List[PersonContent]
+
+
+class GanttTaskDetails(StructuredContent):
+    """Do not include timezone in the dates."""
+
+    name: str
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def remove_tzinfo(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is not None:
+            return v.replace(tzinfo=None)
+        return v
+
+
+class Milestone(StructuredContent):
+    name: str
+    date: Optional[datetime]
+
+    @field_validator("date")
+    @classmethod
+    def remove_tzinfo(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is not None:
+            return v.replace(tzinfo=None)
+        return v
+
+
+class GanttChart(StructuredContent):
+    tasks: Optional[List[GanttTaskDetails]] = None
+    milestones: Optional[List[Milestone]] = None
 
 
 class TestTypeInspector:
@@ -266,5 +299,26 @@ class TestTypeInspector:
             '    ROCK = "rock"',
             '    ELECTRONIC = "electronic"',
             '    WORLD = "world"',
+        ]
+        assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
+
+    def test_gantt_chart_content(self, request: FixtureRequest):
+        """Test structure of Gantt chart content with datetime validators"""
+
+        result = get_type_structure(GanttChart, base_class=StructuredContent)
+        expected = [
+            "class GanttChart(StructuredContent):",
+            "    tasks: Optional[List[GanttTaskDetails]] = None",
+            "    milestones: Optional[List[Milestone]] = None",
+            "",
+            "class GanttTaskDetails(StructuredContent):",
+            '    """Do not include timezone in the dates."""',
+            "    name: str",
+            "    start_date: Optional[datetime] = None",
+            "    end_date: Optional[datetime] = None",
+            "",
+            "class Milestone(StructuredContent):",
+            "    name: str",
+            "    date: Optional[datetime] = None",
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"

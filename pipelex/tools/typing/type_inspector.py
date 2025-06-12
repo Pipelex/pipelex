@@ -120,12 +120,18 @@ def get_type_structure(
                 for arg in non_none:
                     if isinstance(arg, type):
                         collect_types(arg)
+                    elif hasattr(arg, "__origin__"):  # Handle nested generics
+                        collect_types(arg)
             elif origin in (list, List):
                 if isinstance(args[0], type):
+                    collect_types(args[0])
+                elif hasattr(args[0], "__origin__"):  # Handle nested generics
                     collect_types(args[0])
             elif origin in (dict, Dict):
                 for arg in args:
                     if isinstance(arg, type):
+                        collect_types(arg)
+                    elif hasattr(arg, "__origin__"):  # Handle nested generics
                         collect_types(arg)
             return
 

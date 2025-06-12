@@ -234,6 +234,7 @@ class PipeLLMPrompt(PipeOperator):
             "You do NOT need to output a formatted JSON object, another LLM will take care of that. "
             "If you cannot find a value that is Optional, output None for that field."
             "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
+            "DO NOT create information. If the information is not present, output None."
         )
         return output_structure_prompt
 
