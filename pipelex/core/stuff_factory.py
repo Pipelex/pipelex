@@ -96,12 +96,10 @@ class StuffFactory:
     def make_from_str(
         cls,
         str_value: str,
-        concept_code: Optional[str] = None,
         name: Optional[str] = None,
+        concept_code: str = NativeConcept.TEXT.code,
         pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
-        if not concept_code:
-            concept_code = NativeConcept.TEXT.code
         if not Concept.concept_str_contains_domain(concept_code):
             raise StuffFactoryError(f"Concept '{concept_code}' does not contain a domain")
         the_concept = get_required_concept(concept_code=concept_code)
