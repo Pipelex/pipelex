@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff import Stuff, StuffCreationRecord
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
 from pipelex.exceptions import PipelexError
@@ -95,11 +96,13 @@ class StuffFactory:
     @classmethod
     def make_from_str(
         cls,
-        concept_code: str,
         str_value: str,
+        concept_code: Optional[str] = None,
         name: Optional[str] = None,
         pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
+        if not concept_code:
+            concept_code = NativeConcept.TEXT.code
         if not Concept.concept_str_contains_domain(concept_code):
             raise StuffFactoryError(f"Concept '{concept_code}' does not contain a domain")
         the_concept = get_required_concept(concept_code=concept_code)
