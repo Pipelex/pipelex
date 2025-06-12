@@ -174,6 +174,10 @@ class PipeLLMPrompt(PipeOperator):
         # Append output structure prompt if needed
         if pipe_run_params.dynamic_output_concept_code:
             user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=pipe_run_params.dynamic_output_concept_code)
+        else:
+            user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=self.output_concept_code)
+
+        log.verbose(f"User text with {self.output_concept_code=}:\n {user_text}")
 
         ############################################################
         # System text
@@ -219,15 +223,16 @@ class PipeLLMPrompt(PipeOperator):
         if not output_class:
             return ""
 
-        fields = get_type_structure(output_class, base_class=StuffContent)
+        class_structure = get_type_structure(output_class, base_class=StuffContent)
 
-        if not fields:
+        if not class_structure:
             return ""
 
         output_structure_prompt = (
-            f"\n\n---\nRequested output format: The output should contain the following fields:\n"
-            f"{chr(10).join(fields)}\n"
+            f"\n\n---\nRequested output format: The output should be the following class: {class_name}\n"
+            f"{chr(10).join(class_structure)}\n"
             "You do NOT need to output a formatted JSON object, another LLM will take care of that. "
+            "If you cannot find a value that is Optional, output None for that field."
             "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
         )
         return output_structure_prompt

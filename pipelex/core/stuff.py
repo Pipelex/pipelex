@@ -136,7 +136,7 @@ class Stuff(BaseModel):
         # Validate all items are of the expected type
         for i, item in enumerate(list_content.items):
             if not isinstance(item, item_type):
-                raise TypeError(f"Item {i} in list is of type {type(item)}, not {item_type}")
+                raise TypeError(f"Item {i} in list is of type {type(item)}, not {item_type}, in {self.stuff_name=} and {self.concept_code=}")
 
         return list_content
 

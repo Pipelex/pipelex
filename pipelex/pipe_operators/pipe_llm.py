@@ -219,10 +219,13 @@ class PipeLLM(PipeOperator):
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
             output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
+
             if not output_concept_code:
                 raise RuntimeError(f"No output concept code provided for dynamic output pipe '{self.code}'")
         else:
             output_concept_code = self.output_concept_code
+
+        self.pipe_llm_prompt.output_concept_code = output_concept_code
 
         applied_output_multiplicity, is_multiple_output, fixed_nb_output = output_multiplicity_to_apply(
             output_multiplicity_base=self.output_multiplicity,
@@ -318,6 +321,7 @@ class PipeLLM(PipeOperator):
                             domain=self.domain,
                             user_pipe_jinja2=user_pipe_jinja2,
                             system_prompt=system_prompt,
+                            output_concept_code=output_concept_code,
                         )
                         llm_prompt_2_factory = PipedLLMPromptFactory(
                             pipe_llm_prompt=pipe_llm_prompt_2,
@@ -340,6 +344,7 @@ class PipeLLM(PipeOperator):
                     domain=self.domain,
                     user_pipe_jinja2=user_pipe_jinja2,
                     system_prompt=system_prompt,
+                    output_concept_code=output_concept_code,
                 )
                 llm_prompt_2_factory = PipedLLMPromptFactory(
                     pipe_llm_prompt=pipe_llm_prompt_2,

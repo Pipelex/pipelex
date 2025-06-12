@@ -107,14 +107,12 @@ class ReportingManager(ReportingProtocol):
                 extension=self._reporting_config.cost_report_extension,
             )
 
-        # Get registries to process based on pipeline_run_id
         registries_to_process: Dict[str, UsageRegistry] = {}
         if pipeline_run_id:
             registries_to_process = {pipeline_run_id: self._get_registry(pipeline_run_id)}
         else:
             registries_to_process = self._get_all_registries()
 
-        # Generate reports for all selected registries
         for run_id, registry in registries_to_process.items():
             CostRegistry.generate_report(
                 pipeline_run_id=run_id,

@@ -131,7 +131,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             result = await self._gen_object(llm_job=llm_job, schema=schema)
         except InstructorRetryException as exc:
             raise LLMCompletionError(
-                f"LLM Worker error: Instructor failed after retry with llm '{self.llm_engine.tag}': {exc}\nLLMPrompt: {llm_job.llm_prompt.desc}"
+                f"""Instructor failed to generate object: {schema} after retry with llm '{self.llm_engine.tag}'
+                Reason: {exc}
+                LLMPrompt: {llm_job.llm_prompt.desc}"""
             ) from exc
 
         # Cleanup result
