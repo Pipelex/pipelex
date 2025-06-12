@@ -108,7 +108,7 @@ class ReportingManager(ReportingProtocol):
             )
 
         registries_to_process: Dict[str, UsageRegistry] = {}
-        if pipeline_run_id:
+        if pipeline_run_id != SpecialPipelineId.UNTITLED:
             registries_to_process = {pipeline_run_id: self._get_registry(pipeline_run_id)}
         else:
             registries_to_process = self._get_all_registries()
