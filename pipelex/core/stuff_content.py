@@ -38,7 +38,7 @@ class StuffContent(ABC, CustomBaseModel):
 
     @override
     def __str__(self) -> str:
-        return self.rendered_plain()
+        return self.rendered_json()
 
     def rendered_str(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:

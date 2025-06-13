@@ -86,7 +86,7 @@ class Stuff(BaseModel):
 
     @override
     def __str__(self) -> str:
-        return f"{self.title}\n{self.content.rendered_plain()}"
+        return f"{self.title}\n{self.content.rendered_json()}"
 
     @property
     def is_list(self) -> bool:
