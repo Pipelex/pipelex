@@ -243,3 +243,9 @@ class Pipelex:
         pipelex_instance.finish_setup()
         log.info(f"Pipelex {PACKAGE_VERSION} initialized.")
         return pipelex_instance
+
+    @classmethod
+    def get_instance(cls) -> Self:
+        if cls._pipelex_instance is None:
+            raise RuntimeError("Pipelex is not initialized")
+        return cls._pipelex_instance
