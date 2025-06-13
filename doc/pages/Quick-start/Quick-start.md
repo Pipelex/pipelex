@@ -1,6 +1,6 @@
 # Quick-start
 
-In this section, we introduce the basics of Pipelex for the simplest use-cases: LLM calling and structured outputs.
+This guide shows the basics of Pipelex **v0.3** (2025) for the simplest use-cases: LLM calling and structured outputs.
 
 You can **run the following examples** directly from the [Getting-started repository](https://github.com/Pipelex/ev-getting-started).
 No need to create files in the getting-started repo, they are already there.
@@ -8,12 +8,13 @@ No need to create files in the getting-started repo, they are already there.
 ## Your first LLM call with Pipelex
 
 Let's start by running your very first LLM call using the Pipelex framework.
-For illustration purposes, let's build **a character generator.**
+For illustration purposes, let's build **a character generator**. Each example relies on asynchronous execution and typed models for reliable prompts.
 
 ### **🖊️ Write your first Pipelex script:**
 
 You have to create a `TOML` library file that will store your Pipelex script.
-If you are using Pipelex elsewhere than in the Getting Started repository, make sure you add this file to the `pipelex_libraries` folder.
+If you are using Pipelex elsewhere than in the Getting Started repository, the file should be placed in the `pipelex_libraries` folder.
+Run `pipelex init-libraries` to create this directory if it doesn't exist. For now, keep all your pipeline definitions inside that folder only.
 
 ```toml
 # character.toml
@@ -49,7 +50,7 @@ async def create_character() -> str:
     # Print the output
     print(pipe_output.main_stuff_as_text)
 
-# Setup required to initialize the Pipelex framework and load the pipeline libraries
+# Initialize the framework to load your pipeline libraries
 Pipelex.make()
 
 # Run using asyncio because our APIs are all async 
@@ -183,7 +184,7 @@ class CharacterMetadata(StructuredContent):
 
 ### **Let's use a template to fill prompts with data:**
 
-💡Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/) so you can include a variable using the classic {{ double.curly.braces }} and to make it simpler, we've added the possibility to just prefix your variable with the "@" symbol: 
+💡Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/). You can include a variable using the classic {{ double.curly.braces }} and, to make it simpler, we've added the possibility to just prefix your variable with the "@" symbol. Pipes now declare their required inputs explicitly with the `inputs` table:
 
 ```toml
 [concept]
@@ -193,7 +194,7 @@ CharacterMetadata = "Metadata regarding a character."
 [pipe]
 [pipe.extract_character_1]
 PipeLLM = "Get character information from a description."
-input = "Character"
+inputs = { character = "Character" }
 output = "CharacterMetadata"
 prompt_template = """
 You are given a text description of a character.
