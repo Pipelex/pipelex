@@ -7,12 +7,14 @@ Pipelex provides a flexible way to configure and manage your LLM (Large Language
 - LLM Presets
 - LLM Deck
 
+Those configuration are present in the `pipelex_libraries/llm_deck` directory. Those configuration are usable only if in the directory `pipelex_libraries/llm_deck/overrides.toml` you have the following configuration.
+
 ## LLM Handles
 
 An LLM handle is a unique identifier that maps to a specific LLM configuration. It defines:
-- The LLM provider (e.g., OpenAI, Anthropic, etc.)
+- The LLM name (e.g., `gpt-4o-mini`, `claude-3-sonnet`)
 - The model version
-- The platform-specific settings
+- The platform-specific settings (OpenAI, Anthropic, etc...)
 
 ### Example Handle Configuration
 

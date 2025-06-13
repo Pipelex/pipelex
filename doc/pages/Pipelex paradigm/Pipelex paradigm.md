@@ -60,7 +60,9 @@ Pipes embed **validation** of their outputs, so **we make sure of the knowledge 
 
 ## Stuff
 
-On the code side, **when a concept is instantiated** (to be processed or added to the working memory), **we call it a Stuff**.
+**When a concept is instantiated** (to be processed or added to the working memory), **we call it a Stuff**.
+
+##
 
 :arrow_left: [**Back to Quick-start**](../Quick-start/Quick-start.md)
 

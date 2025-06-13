@@ -1,55 +1,99 @@
 # Libraries
 
-Pipelex proposes a Python framework along with a syntax for defining and running knowledge processing workflows.
+Pipelex organizes code into libraries, which are collections of related functionality stored in the `pipelex_libraries` directory.
 
-## Scripts
+## Library Structure
 
-What we call _scripts_ are the `TOML` files containing the concept and pipe definitions written using the Pipelex syntax.
+A Pipelex library consists of:
 
-## `pipelex_libraries` folder
+1. **Pipeline Definitions** (`pipelines/`)
+   - TOML files defining domains, concepts, and pipes
+   - Python files containing structured output models
+   - Base library with common functionality
 
-Concepts, Pipelines and code are meant to be stored in a `pipelex_libraries` folder at the root of your project.
+2. **Templates** (`templates/`)
+   - Reusable prompt templates
+   - Common patterns and configurations
 
-## Pipelex Libraries
+3. **LLM Configuration** (`llm_deck/`)
+   - LLM model configurations
+   - Preset definitions
+   - See more in our [LLM Configuration Guide](../LLM-Configuration/llm-configuration.md)
 
-Within a consistent **domain** (domain is the Pipelex name for topic), scripts constitute a library.
+4. **LLM Integrations** (`llm_integrations/`)
+   - Provider-specific configurations
+   - Platform settings
 
-A library is a set of scripts along with their corresponding Python code (used for structuring LLM outputs through structured Concepts).
+## Creating a Library
 
-## Library structure
+Every library file must belong to a domain. The domain helps organize your code and provides context for your concepts and pipes.
 
-A library is defined by a `toml` file in a `pipelex_libraries` folder.
+### Library File Structure
 
-The `toml` file contains the concepts and pipes definitions.
-
-It looks like this:
-
-![Schema showing Pipelex library structure](library_structure.png)
-
-## Fields
-
-### Domain definition
-
-As a library `toml` file header, you need to define the domain of the library.
+A typical library file looks like this:
 
 ```toml
-domain = "domain_name"
-definition = "Definition of the domain"
+domain = "tutorial"                             # Domain name (required)
+description = "A tutorial library"              # Library description
+system_prompt = "You are a book writer."        # Default system prompt for this domain
+
+[concept]
+Character = "A character is a fiction story"    # Concept definition
+
+[pipe]
+[pipe.create_character]
+PipeLLM = "Create a character."                 # Pipe operator type
+output = "Character"                            # Output concept
+prompt_template = """You are a book writer. Your task is to create a character.
+Think of it and then output the character description."""
 ```
 
-:bulb: Optional global settings (such as `system_prompt`) can be defined at the library level, in the header.
+Learn more about domains in our [Domains Guide](../Domains/domains.md).
 
-### Concepts
+## Library Components
 
-See [Concepts](../Concepts/Concepts.md)
+### 1. Domain Definition
+Every library must specify its domain. This helps organize your code and provides context for your concepts and pipes.
 
-### Pipes
+### 2. Concepts
+Concepts define the structured data types your library works with. They link to Python classes that implement the structure.
 
-See [Pipes](../Pipes/Pipes.md)
+See more in our [Concepts Documentation](../Concepts/Concepts.md)
 
-:arrow_left: [**Back to Quick-start**](../Quick-start/Quick-start.md)
+### 3. Pipes
+Pipes define the operations your library can perform, such as generating text or processing data.
 
-:arrow_right: [**Next section: Concepts**](../Concepts/Concepts.md)
+See more in our [Pipes Documentation](../Pipes/Pipes.md)
+
+### 4. Operators
+Pipelex provides various operators (PipeLLM, PipeOcr, etc.) that define how pipes process data.
+
+See more in our [Pipelex Pipe Operators](../Pipelex%20Pipe%20Operators/Pipelex%20Pipe%20Operators.md)
+
+## Best Practices
+
+1. **Organization**
+   - Group related functionality into domains
+   - Keep library files focused and well-documented
+   - Use clear, descriptive names
+
+2. **Documentation**
+   - Add descriptions to domains and concepts
+   - Document pipe behavior and requirements
+   - Include examples where helpful
+
+3. **Structure**
+   - Follow the standard library layout
+   - Keep related files together
+   - Use consistent naming conventions
+
+## Related Topics
+
+- [Domains Guide](../Domains/domains.md) - Understanding how domains organize your code
+- [Concepts Documentation](../Concepts/Concepts.md)
+- [Pipes Documentation](../Pipes/Pipes.md)
+- [Pipelex Pipe Operators](../Pipelex%20Pipe%20Operators/Pipelex%20Pipe%20Operators.md)
+- [LLM Configuration Guide](../LLM-Configuration/llm-configuration.md)
 
 ---
 
