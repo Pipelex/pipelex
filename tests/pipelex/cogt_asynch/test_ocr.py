@@ -46,7 +46,7 @@ class TestOcr:
         pretty_print(ocr_output, title="OCR Output")
         assert ocr_output.pages
 
-    @pytest.mark.parametrize("url", [ImageTestCases.IMAGE_URL])
+    @pytest.mark.parametrize("url", ImageTestCases.IMAGE_URLS)
     async def test_ocr_image_url(self, url: str):
         ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job = OcrJobFactory.make_ocr_job(
