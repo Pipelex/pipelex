@@ -1,0 +1,26 @@
+name: Build & Deploy MkDocs
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'doc/**'
+      - 'mkdocs.yml'
+      - '.github/workflows/docs.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install MkDocs & theme
+        run: pip install mkdocs==1.6.1 mkdocs-material==9.6.14
+        
+      - name: gh-pages deploy
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          force_orphan: true

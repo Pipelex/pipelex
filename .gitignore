@@ -10,6 +10,9 @@ dist/
 build/
 *.egg-info/
 
+# mkdocs
+site/
+
 # Unit test / coverage reports
 htmlcov/
 .pytest_cache/
