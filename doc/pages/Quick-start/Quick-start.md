@@ -13,7 +13,8 @@ For illustration purposes, let's build **a character generator**. Each example r
 ### **🖊️ Write your first Pipelex script:**
 
 You have to create a `TOML` library file that will store your Pipelex script.
-If you are using Pipelex elsewhere than in the Getting Started repository, make sure you add this file to the `pipelex_libraries` folder.
+If you are using Pipelex elsewhere than in the Getting Started repository, the file should be placed in the `pipelex_libraries` folder.
+Run `pipelex init-libraries` to create this directory if it doesn't exist. For now, keep all your pipeline definitions inside that folder only.
 
 ```toml
 # character.toml
