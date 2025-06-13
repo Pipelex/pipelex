@@ -145,7 +145,7 @@ class TestContentGenerator:
                 top_job_id=cast(str, request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
             ),
             ocr_handle=OcrHandle.MISTRAL_OCR,
-            ocr_input=OcrInput(image_uri=ImageTestCases.IMAGE_FILE_PATH),
+            ocr_input=OcrInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
             ocr_job_params=OcrJobParams.make_default_ocr_job_params(),
             ocr_job_config=OcrJobConfig(),
         )

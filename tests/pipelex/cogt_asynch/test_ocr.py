@@ -36,7 +36,7 @@ class TestOcr:
         pretty_print(ocr_output, title="OCR Output")
         assert ocr_output.pages
 
-    @pytest.mark.parametrize("file_path", [ImageTestCases.IMAGE_FILE_PATH])
+    @pytest.mark.parametrize("file_path", ImageTestCases.IMAGE_FILE_PATHS)
     async def test_ocr_image_file(self, file_path: str):
         ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job = OcrJobFactory.make_ocr_job(
