@@ -133,9 +133,6 @@ class LibraryManager:
                     "Just write 'domain = \"my_domain\"' at the top of the file."
                 )
             domain_definition = library_dict.get("definition")
-            if domain_definition is None:
-                # we skip the domain without definition, it must be defined one and only one time in the domain library
-                continue
             system_prompt = library_dict.get("system_prompt")
             system_prompt_to_structure = library_dict.get("system_prompt_to_structure")
             prompt_template_to_structure = library_dict.get("prompt_template_to_structure")
@@ -146,7 +143,7 @@ class LibraryManager:
                 system_prompt_to_structure=system_prompt_to_structure,
                 prompt_template_to_structure=prompt_template_to_structure,
             )
-            self.domain_library.add_new_domain(domain=domain)
+            self.domain_library.add_domain_details(domain=domain)
 
         # Second pass: load all concepts
         for toml_path in toml_file_paths:
