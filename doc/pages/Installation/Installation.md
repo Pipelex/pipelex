@@ -9,10 +9,18 @@ Pipelex requires `python ≥3.10`, and access to LLM api keys, if you want to ru
 Everything you need to discover and test Pipelex is available in our **Getting Started repository**.
 Along with [our Documentation](../Quick-start/Quick-start.md), we recommend you review it before any further usage: [Cookbook](https://github.com/Pipelex/pipelex-cookbook).
 
-- **Install Pipelex using**
+- **Create a virtual environment** (recommended)
 
 ```bash
-pip install pipelex
+python3 -m venv .venv && source .venv/bin/activate
+```
+
+ - **Install Pipelex**
+
+ Pipelex can be installed from PyPI. We encourage the use of [uv](https://github.com/astral-sh/uv) for faster installs and dependency management:
+
+```bash
+uv pip install pipelex
 ```
 
 - **Make sure you have a .env** file at the root of your project that contains the following fields
