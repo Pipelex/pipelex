@@ -64,8 +64,6 @@ dev = [
     "mypy>=1.11.2",
     "pyright==1.1.398",
     "pandas-stubs>=2.2.3.241126",
-    "pygments>=2.17.2",
-    "pymdown-extensions>=10.8",
     "pytest>=8.3.3",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.1.1",

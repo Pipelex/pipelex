@@ -72,7 +72,5 @@ nav:
   - Jinja Templates: pages/Jinja/Jinja.md
   
 markdown_extensions:
-  - pymdownx.highlight:     # syntax colouring via Pygments
-      use_pygments: true
-      pygments_style: coffee
-  - pymdownx.superfences   # required for fenced blocks
+  - pymdownx.highlight
+  - pymdownx.superfences
