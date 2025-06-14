@@ -63,6 +63,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
         class ObjectFactory(ModelFactory[object_class]):  # type: ignore
             __model__ = object_class
+            __use_examples__ = True
 
         obj = ObjectFactory.build()
         return obj
