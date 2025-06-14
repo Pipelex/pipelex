@@ -3,26 +3,23 @@
 This guide shows the basics of Pipelex for the simplest use-cases: LLM calling and structured outputs.
 
 You can **run the following examples** directly from the [Cookbook repository](https://github.com/Pipelex/pipelex-cookbook).
-No need to create files in the cookbook repo, they are already there.
 
 ## Your first LLM call with Pipelex
 
 Let's start by running your very first LLM call using Pipelex.
 For illustration purposes, let's build **a character generator**. Each example relies on asynchronous execution and typed models for reliable prompts.
 
-### **🖊️ Write your first Pipelex script:**
+### **🖊️ Write your first pipeline**
 
-You have to create a `.toml` library file in the `pipelex_libraries/pipelines` directory that will store your Pipelex script.
+You have to create a `.toml` library file in the `pipelex_libraries/pipelines` directory that will store your pipe definition.
 Run `pipelex init-libraries` to create this directory if it doesn't exist. For now, keep all your pipeline definitions inside that folder only.
 
 `character.toml`
 ```toml
-# Library definition
 domain = "characters"
 
-# Pipe definition
 [pipe]
-[pipe.create_character]     # <- This is your pipe code
+[pipe.create_character]
 PipeLLM = "Creates a character."
 output = "Text"
 prompt_template = """You are a book writer. Your task is to create a character.
@@ -33,7 +30,7 @@ Think of it and then output the character description."""
 
 You have to create a `.py` python file to run your script. You can save it anywhere in your repository.
 
-`pipelex_libraries/pipelines/character.py`
+`character.py`
 ```python
 import asyncio
 from pipelex.pipeline.execute import execute_pipeline
@@ -42,10 +39,10 @@ from pipelex.pipelex import Pipelex
 async def create_character():
     # Run the script with execute_pipe
     pipe_output, _ = await execute_pipeline(
-        pipe_code="create_character", # <- your pipe code
+        pipe_code="create_character",
     )
     # Print the output
-    print(pipe_output.main_stuff_as_text)
+    print(pipe_output.main_stuff_as_str)
 
 # Initialize pipelex to load your pipeline libraries
 Pipelex.make()
@@ -57,51 +54,51 @@ asyncio.run(create_character())
 ### **🎉 Get your first Pipelex result!**
 
 ```bash
-python path/to/your/character.py
+python character.py
 ```
 
 ![Example of a generated character sheet](character_sheet.png)
 
 ## How to use a specific LLM or LLM provider
 
-### **🖊️ Indicate your LLM selection explicitly using the `llm` attribute:**
+### **🖊️ Indicate your LLM selection explicitly using the `llm` attribute**
 
 ```toml
 [pipe.create_character]
 PipeLLM = "Create a character."
-output = "native.Text"
+output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
 
-### **🖊️ Or use an LLM deck:**
+### **🖊️ Or use an LLM preset from the LLM deck**
 
 ```toml
 [pipe.create_character]
 PipeLLM = "Create a character."
-output = "native.Text"
+output = "Text"
 llm = "llm_for_creative_writing"
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 
 # The llm deck above is defined in `pipelex_libraries/llm_deck/base_llm_deck.toml` as:
 # llm_for_creative_writing = { llm_handle = "best-claude", temperature = 0.9 }
-# it's a base preset but you can add your own
+# it's a base preset that we provide. you can add your own presets, too.
 ```
 
-💡We have a lot of [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/pipelex/libraries/llm_deck/base_llm_deck.toml).
+💡 We have a lot of [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/pipelex/libraries/llm_deck/base_llm_deck.toml).
 Make sure you have credentials for the underlying LLM provider (and added your API key to the `.env`) and select the one you want!
 
-Learn more about LLM presets, LLM handle and LLM deck in our [LLM Configuration Guide](../LLM-Configuration/llm-configuration.md)
+Learn more about LLM presets, LLM handles and LLM deck in our [LLM Configuration Guide](../LLM-Configuration/llm-configuration.md)
 
 ### **Generate a structured output**
 
-Let's say that we no longer want plain text as output but a rigorous, structured Character object.
+Let's say that we no longer want plain text as output but a rigorously structured Character object.
 
 ### **🖊️ Define the model**
 
-Using the [Pydantic Basemodel](https://docs.pydantic.dev/latest/) syntax, define your object structure as a Python class, in the `pipelex_libraries`:
+Using the [Pydantic Basemodel](https://docs.pydantic.dev/latest/) syntax, define your object structure as a Python class, in the `pipelex_libraries/pipelines` directory:
 
 `pipelex_libraries/pipelines/characters.py`
 ```python
@@ -116,9 +113,11 @@ class Character(StructuredContent):
     description: str
 ```
 
-### **🖊️ Write the script**
+ℹ️ We'll soon make it possible to define your structure directly in the `.toml` file, without having to write any python code
 
-It's time to specify that your output should be a `Character` instance. Use the `output` field for that purpose.
+### **🖊️ Improve the pipeline**
+
+It's time to specify that your output be a `Character` instance. Use the `output` field for that purpose.
 
 💡 Here, the concept name matches the class name (ie. `Character`), the `Character` class will automatically be considered as the structure to output.
 
@@ -127,7 +126,7 @@ It's time to specify that your output should be a `Character` instance. Use the 
 domain = "characters"
 
 [concept]
-Character = "A character is a fiction story" # <- Define here the concept of your output so that it is linked to the class name
+Character = "A character is a fiction story" # <- Define here your output concept so that it is linked to the class name
 
 [pipe]
 [pipe.create_character]
@@ -139,7 +138,7 @@ Think of it and then output the character description."""
 
 💡 Defining the `Character` concept as "A character is a fiction story" might seem obvious but… think of it: "character" can also mean a letter or symbol in a text. Defining concepts is the best way to avoid any ambiguity and make sure the LLMs understand what you mean.
 
-### **🏃 Run your script**
+### **🏃 Run your pipeline**
 
 As you can see, the output is a `Character` instance.
 
@@ -148,7 +147,7 @@ As you can see, the output is a `Character` instance.
 
 ## Generate using information in a prompt template
 
-What if you want to pass some data into prompts?
+What if you want to pass some data into a prompt?
 You can do that using a prompt template.
 
 In this example, we no longer want to generate characters. We want to process existing ones, especially their description attributes.
@@ -158,7 +157,7 @@ We want to extract structured information from the description field. Thus we ha
 ### **Define the output structure**
 
 ```python
-# pipelex_libraries/character_model.py
+# pipelex_libraries/pipelines/character_model.py
 from pipelex.core.stuff_content import StructuredContent
 
 # input class
@@ -178,7 +177,7 @@ class CharacterMetadata(StructuredContent):
 
 ### **Let's use a template to fill prompts with data**
 
-💡Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/). You can include a variable using the **classic** `{{ double.curly.braces }}` and, to make it simpler, we've added the possibility to just prefix your variable with the `@` symbol (recommended). Pipes now declare their required inputs explicitly with the `inputs` table:
+💡 Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/). You can include a variable using the **classic** `{{ double.curly.braces }}` and, to make it simpler, we've added the possibility to just prefix your variable with the `@` symbol (recommended). Pipes now declare their required inputs explicitly with the `inputs` table:
 
 ```toml
 [concept]
@@ -188,15 +187,17 @@ CharacterMetadata = "Metadata regarding a character."
 [pipe]
 [pipe.extract_character_1]
 PipeLLM = "Get character information from a description."
-inputs = { character = "Character" }  # <- This is the inputs of your pipe, present in the prompt_template
+inputs = { character = "Character" }  # <- These are the inputs of your pipe, usable in the prompt_template
 output = "CharacterMetadata"
 prompt_template = """
 You are given a text description of a character.
 Your task is to extract specific data from the following description.
 
-@character.description                # <- This is the variable you will pass to the prompt_template. Jinja will format it
+@character.description
 """
 ```
+
+💡 `@character.description` is substituted by grabbing the stuff named `character`in the working memory and using its `description`attribute
 
 Learn more about how we use Jinja in our [Jinja documentation](../Jinja/Jinja.md)
 
@@ -256,4 +257,3 @@ asyncio.run(process_existing_character())
 ### **Get result**
 
 ![Example of extracted character metadata](extracted_character_metadata.png)
-
