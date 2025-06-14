@@ -224,6 +224,6 @@ sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
 
 ← [**Back to Configuration**](configuration.md)
 
-→ [**Next section: Cogt Configuration**](cogt-conafig.md)
+→ [**Next section: Cogt Configuration**](cogt-config.md)
 
 --- 
