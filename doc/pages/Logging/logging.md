@@ -110,12 +110,6 @@ log.verbose("Detailed debug information")
    - Include relevant data in error logs
    - Use appropriate log levels for exceptions
 
-## Related Topics
-
-- [Logging Configuration](../Configuration/logging-config.md)
-- [Error Handling](../Error-Handling/error-handling.md)
-- [Debugging Guide](../Debugging/debugging.md)
-
 ---
 
 "Pipelex" is a trademark of Evotis S.A.S.

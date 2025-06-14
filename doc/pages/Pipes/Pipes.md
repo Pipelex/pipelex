@@ -9,7 +9,7 @@ It can integrate **both LLM-based** or software-based knowledge processing.
 
 Like concepts, Pipes are defined using a **`toml` syntax.**
 
-- This part is meant to be **written in a library `toml` file, in the same one as concepts** (see [Libraries](../Libraries/library.md)).
+- This part is meant to be **written in a library `toml` file, in the same one as concepts** (see [Libraries](../Libraries/libraries.md)).
   💡*In the quick-start example (text summary generator) this is the role of `summarize.toml`.*
 
 ### General Structure

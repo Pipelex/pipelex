@@ -126,8 +126,8 @@ Pipelex supports injection of the following components:
     - Default: `PipeRouter`
     - [Details](pipe-router-injection.md)
 
-## Related Topics
+## Best Practices
 
-- [Configuration System](../Configuration/configuration.md)
-- [Testing Guide](../Testing/testing.md)
-- [Error Handling](../Development/error-handling.md)
+"Pipelex" is a trademark of Evotis S.A.S.
+
+© 2025 Evotis S.A.S.

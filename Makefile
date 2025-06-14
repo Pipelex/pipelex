@@ -101,7 +101,7 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs doc
+	li check-unused-imports fix-unused-imports check-uv check-TODOs doc doc-check
 
 all help:
 	@echo "$$HELP"
@@ -394,3 +394,7 @@ fix-unused-imports: env
 doc: env
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
 	$(VENV_MKDOCS) serve
+
+doc-check: env
+	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
+	$(VENV_MKDOCS) build --strict

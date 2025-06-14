@@ -8,4 +8,53 @@ theme:
 
 nav:
   - Home: index.md
+  - Installation: pages/Installation/Installation.md
+  - Quick-start: pages/Quick-start/Quick-start.md
+  - Pipelex paradigm: pages/Pipelex paradigm/Pipelex paradigm.md
+  - Libraries: pages/Libraries/libraries.md
+  - Domains: pages/Domains/domains.md
+  - Concepts: pages/Concepts/Concepts.md
+  - Pipes:
+    - Overview: pages/Pipes/Pipes.md
+    - Pipe Operators:
+      - Overview: pages/Pipes/Pipe Operators.md
+      - PipeLLM: pages/Pipes/Operators/PipeLLM.md
+      - PipeCondition: pages/Pipes/Operators/PipeCondition.md
+      - PipeSequence: pages/Pipes/Operators/PipeSequence.md
+      - PipeOcr: pages/Pipes/Operators/PipeOcr.md
+      - PipeFunc: pages/Pipes/Operators/PipeFunc.md
+      - PipeImgGen: pages/Pipes/Operators/PipeImgGen.md
+    - Pipe Sequence: pages/Pipes/PipeSequence.md
+  - LLM Configuration: pages/LLM-Configuration/llm-configuration.md
+  - Configuration:
+    - Overview: pages/Configuration/configuration.md
+    - AWS Configuration: pages/Configuration/aws-config.md
+    - Cogt Configuration: pages/Configuration/cogt-config.md
+    - Dry Run Configuration: pages/Configuration/dry-run-config.md
+    - Feature Configuration: pages/Configuration/feature-config.md
+    - Generic Template Names: pages/Configuration/generic-template-names.md
+    - Library Configuration: pages/Configuration/library-config.md
+    - Logging Configuration: pages/Configuration/logging-config.md
+    - Pipe Run Configuration: pages/Configuration/pipe-run-config.md
+    - Plugins Configuration: pages/Configuration/plugins-config.md
+    - Prompting Configuration: pages/Configuration/prompting-config.md
+    - Reporting Configuration: pages/Configuration/reporting-config.md
+    - Static Validation Configuration: pages/Configuration/static-validation-config.md
+    - Structure Configuration: pages/Configuration/structure-config.md
+    - Tracker Configuration: pages/Configuration/tracker-config.md
+  - Dependency Injection:
+    - Overview: pages/Dependency Injection/dependency-injection.md
+    - Activity Manager: pages/Dependency Injection/activity-manager-injection.md
+    - Content Generator: pages/Dependency Injection/content-generator-injection.md
+    - Inference Manager: pages/Dependency Injection/inference-manager-injection.md
+    - LLM Model Provider: pages/Dependency Injection/llm-model-provider-injection.md
+    - Pipe Router: pages/Dependency Injection/pipe-router-injection.md
+    - Pipeline Tracker: pages/Dependency Injection/pipeline-tracker-injection.md
+    - Plugin Manager: pages/Dependency Injection/plugin-manager-injection.md
+    - Reporting Delegate: pages/Dependency Injection/reporting-delegate-injection.md
+    - Secrets Provider: pages/Dependency Injection/secrets-provider-injection.md
+    - Template Provider: pages/Dependency Injection/template-provider-injection.md
+  - CLI: pages/CLI/CLI.md
+  - Logging: pages/Logging/logging.md
+  - Jinja Templates: pages/Jinja/Jinja.md
   

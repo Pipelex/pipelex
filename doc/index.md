@@ -12,7 +12,7 @@ Pipelex is a Python framework for defining and running LLM-based knowledge pipel
 
 4. [Libraries](pages/Libraries/libraries.md)
 
-5. [Domains](pages/Domains/Domains.md)
+5. [Domains](pages/Domains/domains.md)
 
 6. [Concepts](pages/Concepts/Concepts.md)
 
@@ -47,7 +47,7 @@ Pipelex is a Python framework for defining and running LLM-based knowledge pipel
 
 11. [CLI](pages/CLI/CLI.md)
 
-12. [Logging](pages/Logging/Logging.md)
+12. [Logging](pages/Logging/logging.md)
 
 13. [Jinja Templates](pages/Jinja/Jinja.md)
 

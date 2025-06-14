@@ -55,8 +55,8 @@ This allows for:
 - Test prompting styles with each LLM target
 - Document any special formatting requirements
 
-## Related Topics
+---
 
-- [LLM Configuration](llm-config.md)
-- [Prompting Guide](../LLM/prompting.md)
-- [LLM Integration](../LLM/llm-integration.md) 
+"Pipelex" is a trademark of Evotis S.A.S.
+
+© 2025 Evotis S.A.S. 

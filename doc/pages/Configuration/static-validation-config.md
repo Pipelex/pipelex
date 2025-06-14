@@ -57,8 +57,8 @@ CIRCULAR_DEPENDENCY = "raise"
 - Configure specific reactions for known error types
 - Use a reasonable `default_reaction` for unexpected error types
 
-## Related Topics
+---
 
-- [Error Handling](../Development/error-handling.md)
-- [Validation System](../Development/validation.md)
-- [Configuration System](configuration.md) 
+"Pipelex" is a trademark of Evotis S.A.S.
+
+© 2025 Evotis S.A.S. 

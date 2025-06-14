@@ -14,8 +14,6 @@ Concepts are defined using a **`toml` syntax** and (optional) **Python code ([Ba
 
 - The `toml` part is meant to be **written in a library `toml` file.**
 
-  - 💡*In the quick-start example (character generator) this is the role of `character.toml`[.](https://www.notion.so/Pipelex-Documentation-1b34fbe82c898062af44d70f6aa0f461?pvs=21)*
-
 - The python code related to the Concept definition **must be saved in a `pipelex_libraries` folder at the root of your project.**
 
 As seen in the quick-start, we use Python to instantiate concepts into Stuff objects.

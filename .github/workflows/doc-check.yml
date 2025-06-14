@@ -1,0 +1,39 @@
+name: Documentation Check
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - "release/v[0-9]+.[0-9]+.[0-9]+"
+    paths:
+      - 'doc/**'
+      - 'mkdocs.yml'
+  pull_request:
+    branches:
+      - main
+      - dev
+      - "release/v[0-9]+.[0-9]+.[0-9]+"
+    paths:
+      - 'doc/**'
+      - 'mkdocs.yml'
+
+jobs:
+  doc-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install mkdocs
+        run: |
+          python -m pip install --upgrade pip
+          pip install mkdocs-material
+
+      - name: Check documentation build
+        run: mkdocs build --strict 

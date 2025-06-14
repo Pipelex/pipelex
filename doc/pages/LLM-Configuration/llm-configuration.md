@@ -100,12 +100,6 @@ Generate a creative response...
 3. **Version Control**: Keep track of which model versions work best for your use cases
 4. **Cost Management**: Consider using different models based on task complexity and cost requirements
 
-## Related Topics
-
-- [Configuration Guide](../Configuration/configuration.md)
-- [Libraries Documentation](../Libraries/libraries.md)
-- [Quick Start Guide](../Quick-start/Quick-start.md)
-
 ---
 
 "Pipelex" is a trademark of Evotis S.A.S.

@@ -27,20 +27,12 @@ The feature flags directly affect which implementation is used for certain compo
 | `is_activity_tracking_enabled` | `ActivityManager` | `ActivityManagerNoOp` |
 | `is_reporting_enabled` | `ReportingManager` | `ReportingNoOp` |
 
-## Example Configuration
+## Feature Details
 
+### Pipeline Tracking
 ```toml
-[pipelex.feature_config]
-is_pipeline_tracking_enabled = true
-is_activity_tracking_enabled = true
-is_reporting_enabled = true
+is_pipeline_tracking_enabled = false
 ```
-
-## Related Topics
-
-- [Pipeline Tracking](../Pipeline/pipeline-tracking.md)
-- [Activity Tracking](../Pipeline/activity-tracking.md)
-- [Reporting System](../Reporting/reporting.md)
 - Controls whether pipeline execution tracking is enabled
 - When enabled, tracks the flow and execution of pipelines using by default mermaid chart:
   - View and edit charts at [Mermaid Live Editor](https://mermaid.live)
@@ -76,14 +68,6 @@ is_activity_tracking_enabled = false
 # Enable reporting for cost monitoring
 is_reporting_enabled = true
 ```
-
-## Best Practices
-
-## Related Topics
-
-- [Pipeline Documentation](../Pipelines/pipelines.md)
-- [Reporting Configuration](./reporting-config.md)
-- [Monitoring Guide](../Monitoring/monitoring.md)
 
 ---
 

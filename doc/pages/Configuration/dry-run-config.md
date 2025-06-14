@@ -62,8 +62,6 @@ The `text_gen_truncate_length` controls:
 - Enable template validation when testing templates
 - Review dry run logs for potential issues
 
-## Related Topics
+"Pipelex" is a trademark of Evotis S.A.S.
 
-- [Pipeline Testing](../Pipeline/pipeline-testing.md)
-- [Template System](../Templates/template-system.md)
-- [Resource Management](../Development/resource-management.md) 
+© 2025 Evotis S.A.S. 

@@ -74,11 +74,7 @@ cost_report_extension = "xlsx"
 cost_report_unit_scale = 1000.0
 ```
 
-## Related Topics
-
-- [Feature Configuration](./feature-config.md)
-- [Pipeline Documentation](../Pipelines/pipelines.md)
-- [Cost Management Guide](../Costs/costs.md)
+## Best Practices
 
 ---
 

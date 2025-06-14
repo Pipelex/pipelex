@@ -70,7 +70,7 @@ The configuration is divided into several logical groups:
 1. [Feature Configuration](./feature-config.md) - Feature flags and toggles
 2. [Logging Configuration](./logging-config.md) - Logging settings and levels
 3. [AWS Configuration](./aws-config.md) - AWS-related settings
-4. [Library Configuration](./library-config.md) - Library management settings
+4. [Library Configuration](./library-config.md) - Library organization and management
 5. [Static Validation Configuration](./static-validation-config.md) - Validation rules and behaviors
 6. [Tracker Configuration](./tracker-config.md) - Pipeline tracking settings
 7. [Structure Configuration](./structure-config.md) - Structure-related settings
@@ -90,11 +90,6 @@ Each configuration group has its own dedicated documentation page with detailed 
 3. **Documentation**: Comment any custom settings for team reference
 4. **Validation**: Run `pipelex validate` after making configuration changes
 5. **Gitignore**: Add local and sensitive override files to `.gitignore`
-
-## Related Topics
-
-- [CLI Documentation](../CLI/CLI.md)
-- [Quick Start Guide](../Quick-start/Quick-start.md)
 
 ---
 

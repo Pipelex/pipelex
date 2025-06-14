@@ -42,9 +42,3 @@ structure_from_preliminary_text_system = "structure_from_text_system.jinja2"
 - Follow consistent naming conventions
 - Document template purposes and usage
 - Version control templates alongside code
-
-## Related Topics
-
-- [Template System](../Templates/template-system.md)
-- [Text Processing](../Processing/text-processing.md)
-- [Structure Processing](../Processing/structure-processing.md) 

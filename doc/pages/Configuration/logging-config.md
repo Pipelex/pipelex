@@ -164,12 +164,6 @@ keywords_to_hilight = ["error", "warning", "failed"]
    - Keep pipelex at INFO for important updates
    - Use VERBOSE only when debugging specific issues
 
-## Related Topics
-
-- [Logging System](../Logging/logging.md)
-- [Error Handling](../Error-Handling/error-handling.md)
-- [Debugging Guide](../Debugging/debugging.md)
-
 ---
 
 "Pipelex" is a trademark of Evotis S.A.S.

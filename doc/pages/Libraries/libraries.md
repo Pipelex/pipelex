@@ -68,7 +68,7 @@ See more in our [Pipes Documentation](../Pipes/Pipes.md)
 ### 4. Operators
 Pipelex provides various operators (PipeLLM, PipeOcr, etc.) that define how pipes process data.
 
-See more in our [Pipelex Pipe Operators](../Pipelex%20Pipe%20Operators/Pipelex%20Pipe%20Operators.md)
+See more in our [Pipelex Pipe Operators](../Pipes/Pipe%20Operators.md)
 
 ## Best Practices
 
@@ -86,14 +86,6 @@ See more in our [Pipelex Pipe Operators](../Pipelex%20Pipe%20Operators/Pipelex%2
    - Follow the standard library layout
    - Keep related files together
    - Use consistent naming conventions
-
-## Related Topics
-
-- [Domains Guide](../Domains/domains.md) - Understanding how domains organize your code
-- [Concepts Documentation](../Concepts/Concepts.md)
-- [Pipes Documentation](../Pipes/Pipes.md)
-- [Pipelex Pipe Operators](../Pipelex%20Pipe%20Operators/Pipelex%20Pipe%20Operators.md)
-- [LLM Configuration Guide](../LLM-Configuration/llm-configuration.md)
 
 ---
 
