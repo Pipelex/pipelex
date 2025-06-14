@@ -1,26 +1,31 @@
-name: Build & Deploy MkDocs
+# .github/workflows/docs-preview.yml
+name: Preview MkDocs on GitHub Pages
+
 on:
   push:
-    branches: [main]
-    paths:
-      - 'doc/**'
-      - 'mkdocs.yml'
-      - '.github/workflows/docs.yml'
+    branches: [codex/update-documentation-for-installation-module]
 
 jobs:
-  deploy:
+  preview:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Install MkDocs & theme
-        run: pip install mkdocs==1.6.1 mkdocs-material==9.6.14
-        
-      - name: gh-pages deploy
+
+      - name: Build docs
+        run: |
+          pip install mkdocs==1.6.1 mkdocs-material==9.6.14
+          mkdocs build --strict         # generates ./site
+
+      - name: Publish to *gh-pages-preview*
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./site
+          publish_branch: gh-pages-preview   # <─ test branch
+          # put each branch in its own folder so multiple previews can coexist
+          destination_dir: ${{ github.ref_name }}
           force_orphan: true

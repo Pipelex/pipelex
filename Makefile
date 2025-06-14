@@ -13,6 +13,7 @@ VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
 VENV_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
 VENV_MYPY := $(VIRTUAL_ENV)/bin/mypy
 VENV_PIPELEX := $(VIRTUAL_ENV)/bin/pipelex
+VENV_MKDOCS := $(VIRTUAL_ENV)/bin/mkdocs
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -44,6 +45,7 @@ make install                  - Create local virtualenv & install all dependenci
 make update                   - Upgrade dependencies via uv
 make validate                 - Run the setup sequence to validate the config and libraries
 make build                    - Build the wheels
+make doc                      - Serve documentation locally with mkdocs
 
 make format                   - format with ruff format
 make lint                     - lint with ruff check
@@ -99,7 +101,7 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs
+	li check-unused-imports fix-unused-imports check-uv check-TODOs doc
 
 all help:
 	@echo "$$HELP"
@@ -388,3 +390,7 @@ check-TODOs: env
 fix-unused-imports: env
 	$(call PRINT_TITLE,"Fixing unused imports")
 	$(VENV_RUFF) check --select=F401 --fix -v .
+
+doc: env
+	$(call PRINT_TITLE,"Serving documentation with mkdocs")
+	$(VENV_MKDOCS) serve
