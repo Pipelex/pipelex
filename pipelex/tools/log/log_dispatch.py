@@ -209,7 +209,11 @@ class LogDispatch:
             self._log_to_console(message=message, severity=severity)
         elif isinstance(data, list):
             list_data: List[Any] = data
-            _, list_string = purify_json_list(data=list_data, indent=self._log_config.json_logs_indent)
+            _, list_string = purify_json_list(
+                data=list_data,
+                indent=self._log_config.json_logs_indent,
+                is_truncate_bytes_enabled=True,
+            )
             message = f"\n{list_string}"
             if title is not None:
                 message = f"{title}:{message}"
@@ -222,6 +226,7 @@ class LogDispatch:
             _, dict_string = purify_json(
                 data=data,
                 indent=self._log_config.json_logs_indent,
+                is_truncate_bytes_enabled=True,
                 is_warning_enabled=False,
             )
             message = f"\n{dict_string}"

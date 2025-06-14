@@ -205,3 +205,57 @@ class CustomBaseModel(BaseModel):
             else:
                 processed_args.append((name, value))
         return processed_args
+
+    def model_dump_truncated(self, **kwargs: Any) -> Any:
+        """
+        Dump the model to a dictionary with serialize_as_any=True and apply
+        AttributePolisher truncation to fields that should be truncated.
+        Handles nested attributes recursively.
+
+        Args:
+            **kwargs: Additional keyword arguments to pass to model_dump
+
+        Returns:
+            Dictionary with truncated values where appropriate
+        """
+        # Get the model dump with serialize_as_any=True
+        dumped_data = self.model_dump(**kwargs)
+
+        # Apply truncation logic recursively
+        return self._apply_truncation_recursive(dumped_data)
+
+    def _apply_truncation_recursive(self, obj: Any, name: Optional[str] = None) -> Any:
+        """
+        Recursively apply AttributePolisher truncation logic to a data structure.
+
+        Args:
+            obj: The object to process
+            name: The field name (for truncation logic)
+
+        Returns:
+            The processed object with truncation applied where appropriate
+        """
+        # First check if this specific object should be truncated
+        if name and AttributePolisher.should_truncate(name=name, value=obj):
+            return AttributePolisher.get_truncated_value(name, obj)
+
+        # If it's a dictionary, recurse into its values
+        if isinstance(obj, dict):
+            obj_dict: Dict[str, Any] = obj
+            truncated_dict: Dict[str, Any] = {}
+            for key, value in obj_dict.items():
+                truncated_dict[key] = self._apply_truncation_recursive(value, name=key)
+            return truncated_dict
+
+        # If it's a list, recurse into its items
+        elif isinstance(obj, list):
+            obj_list: List[Any] = obj
+            return [self._apply_truncation_recursive(item, name=name) for item in obj_list]
+
+        # If it's a tuple, recurse into its items and return as tuple
+        elif isinstance(obj, tuple):
+            return tuple(self._apply_truncation_recursive(item, name=name) for item in obj)  # type: ignore
+
+        # For all other types, return as-is
+        else:
+            return obj
