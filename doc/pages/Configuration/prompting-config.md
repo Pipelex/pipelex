@@ -54,9 +54,3 @@ This allows for:
 - Configure specific styles for LLMs with unique requirements
 - Test prompting styles with each LLM target
 - Document any special formatting requirements
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S. 

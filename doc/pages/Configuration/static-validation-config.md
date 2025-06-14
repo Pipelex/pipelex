@@ -56,9 +56,3 @@ CIRCULAR_DEPENDENCY = "raise"
 - Use `IGNORE` sparingly and only for known, harmless cases
 - Configure specific reactions for known error types
 - Use a reasonable `default_reaction` for unexpected error types
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S. 

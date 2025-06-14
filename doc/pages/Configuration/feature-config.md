@@ -68,9 +68,3 @@ is_activity_tracking_enabled = false
 # Enable reporting for cost monitoring
 is_reporting_enabled = true
 ```
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S. 

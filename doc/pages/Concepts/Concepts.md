@@ -170,13 +170,3 @@ character_stuff = StuffFactory.make_stuff(
     content=character,
 )
 ```
-
-← [**Back to Libraries**](../Libraries/libraries.md)
-
-→ [**Next section: Pipes**](../Pipes/Pipes.md)
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S.

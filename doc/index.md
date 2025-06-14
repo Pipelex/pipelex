@@ -52,9 +52,3 @@ Pipelex is a Python framework for defining and running repeatable AI workflows.
 - [Logging](pages/Logging/logging.md)
 
 - [Jinja Templates](pages/Jinja/Jinja.md)
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S.

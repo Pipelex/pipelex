@@ -86,9 +86,3 @@ See more in our [Pipelex Pipe Operators](../Pipes/Pipe%20Operators.md)
     - Follow the standard library layout
     - Keep related files together
     - Use consistent naming conventions
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S.

@@ -76,8 +76,4 @@ cost_report_unit_scale = 1000.0
 
 ## Best Practices
 
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S. 
+⚠️ Under construction

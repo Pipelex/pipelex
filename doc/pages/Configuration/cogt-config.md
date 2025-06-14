@@ -186,9 +186,3 @@ seed = "auto"
 ocr_handles = ["tesseract", "azure_ocr"]
 page_output_text_file_name = "page_text.txt"
 ```
-
-← [**Back to Configuration**](configuration.md)
-
-→ [**Next section: Plugins Configuration**](plugins-config.md)
-
---- 

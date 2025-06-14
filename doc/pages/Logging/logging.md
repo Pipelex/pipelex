@@ -109,9 +109,3 @@ log.verbose("Detailed debug information")
    - Use `include_exception=True` for error context
    - Include relevant data in error logs
    - Use appropriate log levels for exceptions
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S. 

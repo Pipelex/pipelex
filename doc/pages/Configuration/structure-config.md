@@ -87,9 +87,3 @@ graph TD
     B -->|false| G[Direct Structure Generation]
     G --> H
 ```
-
-← [**Back to Configuration**](configuration.md)
-
-→ [**Next section: Prompting Configuration**](prompting-config.md)
-
----

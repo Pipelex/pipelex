@@ -128,6 +128,4 @@ Pipelex supports injection of the following components:
 
 ## Best Practices
 
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S.
+⚠️ Under construction

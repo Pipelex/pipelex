@@ -90,9 +90,3 @@ Each configuration group has its own dedicated documentation page with detailed 
 3. **Documentation**: Comment any custom settings for team reference
 4. **Validation**: Run `pipelex validate` after making configuration changes
 5. **Gitignore**: Add local and sensitive override files to `.gitignore`
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S. 

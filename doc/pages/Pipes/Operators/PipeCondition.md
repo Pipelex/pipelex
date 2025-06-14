@@ -62,9 +62,3 @@ add_alias_from_expression_to = "category_type"
 ```
 - Creates an alias from the expression result
 - Makes the result available in working memory
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S. 

@@ -153,9 +153,3 @@ The library system includes specific error types:
    - Use `overrides.toml` for local LLM settings
    - Keep custom pipelines separate from base library
    - Document domain-specific configurations
-
-← [**Back to Configuration**](configuration.md)
-
-→ [**Next section: Tracker Configuration**](tracker-config.md)
-
---- 

@@ -63,11 +63,3 @@ Learn more about pipelex_libraries in our [Libraries documentation](../Libraries
 
 
 💡 _Any troubles? Have a look at our [Cookbook](https://github.com/Pipelex/pipelex-cookbook)!_
-
-→ [**Next section: Quick-start**](../Quick-start/Quick-start.md)
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S.

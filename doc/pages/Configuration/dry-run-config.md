@@ -61,7 +61,3 @@ The `text_gen_truncate_length` controls:
 - Set appropriate truncation lengths
 - Enable template validation when testing templates
 - Review dry run logs for potential issues
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S. 

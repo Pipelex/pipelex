@@ -81,9 +81,3 @@ Related topics:
 - [Concepts](../Concepts/Concepts.md)
 - [Libraries](../Libraries/libraries.md)
 - [Domains](../Domains/domains.md)
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S.

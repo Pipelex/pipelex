@@ -75,9 +75,3 @@ Generates and manipulates images.
 - Multiple output formats
 - Batch processing
 - Parameter customization
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S.

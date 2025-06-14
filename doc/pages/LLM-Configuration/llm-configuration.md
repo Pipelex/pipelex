@@ -99,9 +99,3 @@ Generate a creative response...
 2. **Task-Specific Presets**: Create presets optimized for specific types of tasks
 3. **Version Control**: Keep track of which model versions work best for your use cases
 4. **Cost Management**: Consider using different models based on task complexity and cost requirements
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S.

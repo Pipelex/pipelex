@@ -117,9 +117,3 @@ The tracker generates Mermaid flowcharts with the following features:
    - Sub-graphs for different pipeline layers
    - Color coding for visual distinction
    - Different edge styles for different types of connections
-
-← [**Back to Configuration**](configuration.md)
-
-→ [**Next section: AWS Configuration**](aws-config.md)
-
---- 

@@ -86,4 +86,3 @@ Please return your answer in english.
 - [Pipe Operators Guide](Pipe%20Operators.md) - Detailed information about each pipe type
 - [Concepts Documentation](../Concepts/Concepts.md)
 - [Libraries Documentation](../Libraries/libraries.md)
-
