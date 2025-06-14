@@ -9,7 +9,7 @@ You can **run the following examples** directly from the [Cookbook repository](h
 Let's start by running your very first LLM call using Pipelex.
 For illustration purposes, let's build **a character generator**. Each example relies on asynchronous execution and typed models for reliable prompts.
 
-### **🖊️ Write your first pipeline**
+### Write your first pipeline
 
 You have to create a `.toml` library file in the `pipelex_libraries/pipelines` directory that will store your pipe definition.
 Run `pipelex init-libraries` to create this directory if it doesn't exist. For now, keep all your pipeline definitions inside that folder only.
@@ -26,7 +26,7 @@ prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
 
-### **🏃 Run your first Pipelex script:**
+### Run your first Pipelex script
 
 You have to create a `.py` python file to run your script. You can save it anywhere in your repository.
 
@@ -51,7 +51,7 @@ Pipelex.make()
 asyncio.run(create_character())
 ```
 
-### **🎉 Get your first Pipelex result!**
+### Get your first Pipelex result
 
 ```bash
 python character.py
@@ -61,7 +61,7 @@ python character.py
 
 ## How to use a specific LLM or LLM provider
 
-### **🖊️ Indicate your LLM selection explicitly using the `llm` attribute**
+### Indicate your LLM selection explicitly using the `llm` attribute
 
 ```toml
 [pipe.create_character]
@@ -72,7 +72,7 @@ prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
 
-### **🖊️ Or use an LLM preset from the LLM deck**
+### Or use an LLM preset from the LLM deck
 
 ```toml
 [pipe.create_character]
@@ -92,11 +92,11 @@ Make sure you have credentials for the underlying LLM provider (and added your A
 
 Learn more about LLM presets, LLM handles and LLM deck in our [LLM Configuration Guide](../LLM-Configuration/llm-configuration.md)
 
-### **Generate a structured output**
+### Generate a structured output
 
 Let's say that we no longer want plain text as output but a rigorously structured Character object.
 
-### **🖊️ Define the model**
+### Define the model
 
 Using the [Pydantic Basemodel](https://docs.pydantic.dev/latest/) syntax, define your object structure as a Python class, in the `pipelex_libraries/pipelines` directory:
 
@@ -115,7 +115,7 @@ class Character(StructuredContent):
 
 ℹ️ We'll soon make it possible to define your structure directly in the `.toml` file, without having to write any python code
 
-### **🖊️ Improve the pipeline**
+### Improve the pipeline
 
 It's time to specify that your output be a `Character` instance. Use the `output` field for that purpose.
 
@@ -131,14 +131,14 @@ Character = "A character is a fiction story" # <- Define here your output concep
 [pipe]
 [pipe.create_character]
 PipeLLM = "Create a character. Get a structured result."
-output = "Character"                    # <- This is the output of your pipe
+output = "Character"    # <- This is the output concept for your pipe
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
 
 💡 Defining the `Character` concept as "A character is a fiction story" might seem obvious but… think of it: "character" can also mean a letter or symbol in a text. Defining concepts is the best way to avoid any ambiguity and make sure the LLMs understand what you mean.
 
-### **🏃 Run your pipeline**
+### Run your pipeline
 
 As you can see, the output is a `Character` instance.
 
@@ -154,7 +154,7 @@ In this example, we no longer want to generate characters. We want to process ex
 
 We want to extract structured information from the description field. Thus we have a `Character` input and a `CharacterMetadata` output.
 
-### **Define the output structure**
+### Define the output structure
 
 ```python
 # pipelex_libraries/pipelines/character_model.py
