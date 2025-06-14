@@ -398,3 +398,8 @@ doc: env
 doc-check: env
 	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
 	$(VENV_MKDOCS) build --strict
+
+doc-deploy: env
+	$(call PRINT_TITLE,"Deploying documentation with mkdocs")
+	$(VENV_MKDOCS) gh-deploy
+	
