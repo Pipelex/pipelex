@@ -36,6 +36,19 @@ extra:
       name: Pipelex on Discord
   generator: false
 
+plugins:
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: 100%
+      height: auto
+      zoomable: true
+      draggable: true
+      auto_caption: false
+      caption_position: bottom
+
 nav:
   - Home: index.md
   - Installation: pages/Installation/Installation.md
@@ -91,5 +104,8 @@ nav:
   - Jinja Templates: pages/Jinja/Jinja.md
   
 markdown_extensions:
+  - attr_list
+  - md_in_html
+  - pymdownx.blocks.caption
   - pymdownx.highlight
   - pymdownx.superfences
