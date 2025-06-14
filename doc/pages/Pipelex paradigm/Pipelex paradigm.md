@@ -64,9 +64,9 @@ Pipes embed **validation** of their outputs, so **we make sure of the knowledge 
 
 ##
 
-:arrow_left: [**Back to Quick-start**](../Quick-start/Quick-start.md)
+← [**Back to Quick-start**](../Quick-start/Quick-start.md)
 
-:arrow_right: [**Next section: Libraries**](../Libraries/libraries.md)
+→ [**Next section: Libraries**](../Libraries/libraries.md)
 
 ---
 

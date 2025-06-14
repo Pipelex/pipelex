@@ -64,7 +64,7 @@ Learn more about pipelex_libraries in our [Libraries documentation](../Libraries
 
 💡 _Any troubles? Have a look at our [Cookbook](https://github.com/Pipelex/pipelex-cookbook)!_
 
-:arrow_right: [**Next section: Quick-start**](../Quick-start/Quick-start.md)
+→ [**Next section: Quick-start**](../Quick-start/Quick-start.md)
 
 ---
 

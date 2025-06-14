@@ -173,9 +173,9 @@ character_stuff = StuffFactory.make_stuff(
 )
 ```
 
-:arrow_left: [**Back to Libraries**](../Libraries/libraries.md)
+← [**Back to Libraries**](../Libraries/libraries.md)
 
-:arrow_right: [**Next section: Pipes**](../Pipes/Pipes.md)
+→ [**Next section: Pipes**](../Pipes/Pipes.md)
 
 ---
 

@@ -257,9 +257,9 @@ asyncio.run(process_existing_character())
 
 ![Example of extracted character metadata](extracted_character_metadata.png)
 
-:arrow_left: [**Back to Installation**](../Installation/Installation.md)
+← [**Back to Installation**](../Installation/Installation.md)
 
-:arrow_right: [**Next section: Pipelex paradigm**](../Pipelex%20paradigm/Pipelex%20paradigm.md)
+→ [**Next section: Pipelex paradigm**](../Pipelex%20paradigm/Pipelex%20paradigm.md)
 
 ---
 
