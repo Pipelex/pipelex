@@ -143,7 +143,7 @@ Think of it and then output the character description."""
 
 As you can see, the output is a `Character` instance.
 
-![Example of a generated character sheet with structure in JSON](structured_character_sheet_json.png) (using `pretty_print` from `pipelex.tools.misc.pretty`)
+![Example of a generated character sheet with structure in JSON](structured_character_sheet_json.png)
 
 
 ## Generate using information in a prompt template
@@ -176,7 +176,7 @@ class CharacterMetadata(StructuredContent):
     height: float
 ```
 
-### **Let's use a template to fill prompts with data:**
+### **Let's use a template to fill prompts with data**
 
 💡Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/). You can include a variable using the **classic** `{{ double.curly.braces }}` and, to make it simpler, we've added the possibility to just prefix your variable with the `@` symbol (recommended). Pipes now declare their required inputs explicitly with the `inputs` table:
 

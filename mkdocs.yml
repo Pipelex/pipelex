@@ -4,7 +4,20 @@ docs_dir: doc
 
 theme:
   name: material
-  language: en
+  logo: https://pipelex-web.s3.amazonaws.com/logo/Pipelex-logo-wot-mono-560x176.png
+  palette:
+  - scheme: default          # light
+    primary: teal
+    accent: deep purple
+    toggle:
+      icon: material/weather-night
+      name: Switch to dark mode
+  - scheme: slate            # dark
+    primary: teal
+    accent: purple
+    toggle:
+      icon: material/weather-sunny
+      name: Switch to light mode
 
 nav:
   - Home: index.md
@@ -58,3 +71,8 @@ nav:
   - Logging: pages/Logging/logging.md
   - Jinja Templates: pages/Jinja/Jinja.md
   
+markdown_extensions:
+  - pymdownx.highlight:     # syntax colouring via Pygments
+      use_pygments: true
+      pygments_style: coffee
+  - pymdownx.superfences   # required for fenced blocks
