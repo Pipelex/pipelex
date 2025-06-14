@@ -87,8 +87,3 @@ Please return your answer in english.
 - [Concepts Documentation](../Concepts/Concepts.md)
 - [Libraries Documentation](../Libraries/libraries.md)
 
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S.

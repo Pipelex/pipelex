@@ -257,12 +257,3 @@ asyncio.run(process_existing_character())
 
 ![Example of extracted character metadata](extracted_character_metadata.png)
 
-← [**Back to Installation**](../Installation/Installation.md)
-
-→ [**Next section: Pipelex paradigm**](../Pipelex%20paradigm/Pipelex%20paradigm.md)
-
----
-
-"Pipelex" is a trademark of Evotis S.A.S.
-
-© 2025 Evotis S.A.S.

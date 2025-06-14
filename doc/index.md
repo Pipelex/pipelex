@@ -1,40 +1,42 @@
 # Documentation
 
-Pipelex is a Python framework for defining and running LLM-based knowledge pipelines with high reliability and replicability.
+Pipelex is a Python framework for defining and running repeatable AI workflows.
 
 ## Table of Contents
 
-1. [Installation](pages/Installation/Installation.md)
+- [Installation](pages/Installation/Installation.md)
 
-2. [Quick-start](pages/Quick-start/Quick-start.md)
+- [Quick-start](pages/Quick-start/Quick-start.md)
 
-3. [Pipelex paradigm](pages/Pipelex%20paradigm/Pipelex%20paradigm.md)
+- [Pipelex paradigm](pages/Overview/Pipelex%20paradigm.md)
 
-4. [Libraries](pages/Libraries/libraries.md)
+- [Building knowledge pipelines](pages/Overview/Building%20knowledge%20pipelines.md)
 
-5. [Domains](pages/Domains/domains.md)
+- [Libraries](pages/Libraries/libraries.md)
 
-6. [Concepts](pages/Concepts/Concepts.md)
+- [Domains](pages/Domains/domains.md)
 
-7. [Pipes](pages/Pipes/Pipes.md)
-   - [Pipe Operators](pages/Pipes/Pipe%20Operators.md)
-   - [Pipe Sequence](pages/Pipes/PipeSequence.md)
+- [Concepts](pages/Concepts/Concepts.md)
 
-8. [LLM Configuration](pages/LLM-Configuration/llm-configuration.md)
+- [Pipes](pages/Pipes/Pipes.md)
+    - [Pipe Operators](pages/Pipes/Pipe%20Operators.md)
+    - [Pipe Sequence](pages/Pipes/PipeSequence.md)
 
-9. [Configuration](pages/Configuration/configuration.md)
-   - [AWS Configuration](pages/Configuration/aws-config.md)
-   - [Dry Run Configuration](pages/Configuration/dry-run-config.md)
-   - [Feature Configuration](pages/Configuration/feature-config.md)
-   - [Generic Template Names](pages/Configuration/generic-template-names.md)
-   - [Logging Configuration](pages/Configuration/logging-config.md)
-   - [Pipe Run Configuration](pages/Configuration/pipe-run-config.md)
-   - [Prompting Configuration](pages/Configuration/prompting-config.md)
-   - [Reporting Configuration](pages/Configuration/reporting-config.md)
-   - [Static Validation Configuration](pages/Configuration/static-validation-config.md)
-   - [Structure Configuration](pages/Configuration/structure-config.md)
+- [LLM Configuration](pages/LLM-Configuration/llm-configuration.md)
 
-10. [Dependency Injection](pages/Dependency%20Injection/dependency-injection.md)
+- [Configuration](pages/Configuration/configuration.md)
+    - [AWS Configuration](pages/Configuration/aws-config.md)
+    - [Dry Run Configuration](pages/Configuration/dry-run-config.md)
+    - [Feature Configuration](pages/Configuration/feature-config.md)
+    - [Generic Template Names](pages/Configuration/generic-template-names.md)
+    - [Logging Configuration](pages/Configuration/logging-config.md)
+    - [Pipe Run Configuration](pages/Configuration/pipe-run-config.md)
+    - [Prompting Configuration](pages/Configuration/prompting-config.md)
+    - [Reporting Configuration](pages/Configuration/reporting-config.md)
+    - [Static Validation Configuration](pages/Configuration/static-validation-config.md)
+    - [Structure Configuration](pages/Configuration/structure-config.md)
+
+- [Dependency Injection](pages/Dependency%20Injection/dependency-injection.md)
     - [Activity Manager](pages/Dependency%20Injection/activity-manager-injection.md)
     - [Content Generator](pages/Dependency%20Injection/content-generator-injection.md)
     - [Inference Manager](pages/Dependency%20Injection/inference-manager-injection.md)
@@ -45,11 +47,11 @@ Pipelex is a Python framework for defining and running LLM-based knowledge pipel
     - [Secrets Provider](pages/Dependency%20Injection/secrets-provider-injection.md)
     - [Template Provider](pages/Dependency%20Injection/template-provider-injection.md)
 
-11. [CLI](pages/CLI/CLI.md)
+- [CLI](pages/CLI/CLI.md)
 
-12. [Logging](pages/Logging/logging.md)
+- [Logging](pages/Logging/logging.md)
 
-13. [Jinja Templates](pages/Jinja/Jinja.md)
+- [Jinja Templates](pages/Jinja/Jinja.md)
 
 ---
 

@@ -5,6 +5,8 @@ docs_dir: doc
 theme:
   name: material
   logo: https://pipelex-web.s3.amazonaws.com/logo/Pipelex-logo-wot-mono-560x176.png
+  features:
+    - navigation.footer
   palette:
   - scheme: default          # light
     primary: teal
@@ -19,11 +21,28 @@ theme:
       icon: material/weather-sunny
       name: Switch to light mode
 
+copyright: "© 2025 Evotis S.A.S. <br/>Pipelex is a trademark of Evotis S.A.S."
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Pipelex/pipelex
+      name: Pipelex on GitHub
+    - icon: fontawesome/brands/twitter
+      link: https://x.com/PipelexAI
+      name: Pipelex on X
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/SReshKQjWt
+      name: Pipelex on Discord
+  generator: false
+
 nav:
   - Home: index.md
   - Installation: pages/Installation/Installation.md
   - Quick-start: pages/Quick-start/Quick-start.md
-  - Pipelex paradigm: pages/Pipelex paradigm/Pipelex paradigm.md
+  - Overview:
+    - Pipelex paradigm: pages/Overview/Pipelex paradigm.md
+    - Building knowledge pipelines: pages/Overview/Building knowledge pipelines.md
   - Libraries: pages/Libraries/libraries.md
   - Domains: pages/Domains/domains.md
   - Concepts: pages/Concepts/Concepts.md

@@ -7,22 +7,22 @@ Pipelex organizes code into libraries, which are collections of related function
 A Pipelex library consists of:
 
 1. **Pipeline Definitions** (`pipelines/`)
-   - TOML files defining domains, concepts, and pipes
-   - Python files containing structured output models
-   - Base library with common functionality
+    - TOML files defining domains, concepts, and pipes
+    - Python files containing structured output models
+    - Base library with common functionality
 
 2. **Templates** (`templates/`)
-   - Reusable prompt templates
-   - Common patterns and configurations
+    - Reusable prompt templates
+    - Common patterns and configurations
 
 3. **LLM Configuration** (`llm_deck/`)
-   - LLM model configurations
-   - Preset definitions
-   - See more in our [LLM Configuration Guide](../LLM-Configuration/llm-configuration.md)
+    - LLM model configurations
+    - Preset definitions
+    - See more in our [LLM Configuration Guide](../LLM-Configuration/llm-configuration.md)
 
 4. **LLM Integrations** (`llm_integrations/`)
-   - Provider-specific configurations
-   - Platform settings
+    - Provider-specific configurations
+    - Platform settings
 
 ## Creating a Library
 
@@ -73,19 +73,19 @@ See more in our [Pipelex Pipe Operators](../Pipes/Pipe%20Operators.md)
 ## Best Practices
 
 1. **Organization**
-   - Group related functionality into domains
-   - Keep library files focused and well-documented
-   - Use clear, descriptive names
+    - Group related functionality into domains
+    - Keep library files focused and well-documented
+    - Use clear, descriptive names
 
 2. **Documentation**
-   - Add descriptions to domains and concepts
-   - Document pipe behavior and requirements
-   - Include examples where helpful
+    - Add descriptions to domains and concepts
+    - Document pipe behavior and requirements
+    - Include examples where helpful
 
 3. **Structure**
-   - Follow the standard library layout
-   - Keep related files together
-   - Use consistent naming conventions
+    - Follow the standard library layout
+    - Keep related files together
+    - Use consistent naming conventions
 
 ---
 
