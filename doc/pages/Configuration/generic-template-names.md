@@ -26,11 +26,13 @@ structure_from_preliminary_text_system = "structure_from_text_system.jinja2"
 ## Template Usage
 
 ### User Templates
+
 - Used for transforming user input into structured format
 - Typically more verbose and user-friendly
 - May include additional guidance or formatting
 
 ### System Templates
+
 - Used for internal text structuring
 - More concise and performance-oriented
 - Focus on efficient processing

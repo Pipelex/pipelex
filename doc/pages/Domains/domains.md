@@ -18,7 +18,7 @@ system_prompt = "You are a book writer."          # Optional system prompt for a
 
 A domain consists of:
 
-1. **Library File** (`.toml`):
+1. **Library File** (`.toml`)
    ```toml
    domain = "characters"
    
@@ -31,7 +31,7 @@ A domain consists of:
    output = "Character"
    ```
 
-2. **Python Models** (`.py`):
+2. **Python Models** (`.py`)
    ```python
    from pipelex.core.stuff_content import StructuredContent
    
@@ -45,19 +45,19 @@ A domain consists of:
 ## Best Practices
 
 1. **Naming**
-   - Use clear, descriptive domain names
-   - Keep names lowercase and simple
-   - Use names that reflect the purpose (e.g., "characters", "locations")
+    - Use clear, descriptive domain names
+    - Keep names lowercase and simple
+    - Use names that reflect the purpose (e.g., "characters", "locations")
 
 2. **Organization**
-   - One domain per topic/functionality
-   - Match Python file names with domain names
-   - Keep related concepts within the same domain
+    - One domain per topic/functionality
+    - Match Python file names with domain names
+    - Keep related concepts within the same domain
 
 3. **Documentation**
-   - Always add a description to your domain
-   - Document concepts clearly
-   - Include examples where helpful
+    - Always add a description to your domain
+    - Document concepts clearly
+    - Include examples where helpful
 
 ## Using Domains
 

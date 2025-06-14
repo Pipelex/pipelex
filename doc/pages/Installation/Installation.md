@@ -2,11 +2,10 @@
 
 ## 📋 Prerequisites
 
-Pipelex requires `python ≥ 3.10`, API keys in your environment file, or the API key to Pipelex API (coming soon).
+Pipelex requires `python` version `3.10` or above, and access to an LLM, via an API key or a custom endpoint.
 
 ## 🧭 Getting Started
 
-Everything you need to discover and test Pipelex is available in our **Getting Started repository**.
 Along with [our Documentation](../Quick-start/Quick-start.md), we recommend you review it before any further usage: [Cookbook](https://github.com/Pipelex/pipelex-cookbook).
 
 - **Create a virtual environment** (recommended)
@@ -34,14 +33,14 @@ pip install pipelex
 OPENAI_API_KEY=sk_...
 ```
 
-All the secret keys used by `pipelex` are specified in the `.env.example` file. However by default, only the `OPENAI_API_KEY` is required.
+All the secret keys used by `pipelex` are specified in the `.env.example` file. However, by default, only the `OPENAI_API_KEY` is required.
 
 
 - **Make sure you run the init commands:**
 
-In order to set the pipelex configuration files, you need to run 2 commands using the CLI (we recommand to run it at the root of you r project):
+In order to set the pipelex configuration files, you need to run 2 commands using the CLI (we recommend to run it at the root of your project):
 
-- `pipelex init-libraries`: This will create in the dir where the cli was run a folder `pipelex_libraries`, with the base llm configation and the bse pipelines. 
+- `pipelex init-libraries`: This will create a `pipelex_libraries` folder, with the base llm configuration and the base pipelines. 
 This is the directory where you should add your pipelines. 
 
 The structure is like this:
@@ -62,4 +61,4 @@ Learn more about pipelex_libraries in our [Libraries documentation](../Libraries
 - `pipelex init-config`: This cli command will create a `pipelex.toml` file at the root of the project, with basic configuration. This configuration file gathers all configuration for feature flags, logging, cost reporting, and so on... Learn more in our [Configuration documentation](../Configuration/configuration.md)
 
 
-💡 _Any troubles? Have a look at our [Cookbook](https://github.com/Pipelex/pipelex-cookbook)!_
+💡 _Any troubles? Have a look at our [Cookbook](https://github.com/Pipelex/pipelex-cookbook)! and come ask for help on our [Discord](https://discord.gg/SReshKQjWt)_

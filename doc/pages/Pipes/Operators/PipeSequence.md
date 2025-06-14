@@ -1,3 +1,3 @@
 # PipeSequence
 
-Chains multiple pipes together in sequence.
+Runs multiple pipes in sequence.

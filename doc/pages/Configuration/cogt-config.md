@@ -1,6 +1,6 @@
 # Cognitive Tools (Cogt) Configuration
 
-The Cogt configuration manages all cognitive tools in Pipelex, including LLM (Language Models), IMGG (Image Generation), and OCR capabilities.
+The Cogt configuration manages all cognitive tools in Pipelex, including LLM (Language Models), IMGG (Image Generation), and OCR (Optical Character Recognition) capabilities.
 
 ## Overview
 
@@ -50,6 +50,7 @@ is_openai_structured_output_enabled = true
 ### LLM Job Parameters
 
 When configuring LLM jobs, you can set:
+
 - `temperature` (float, 0-1): Controls randomness in outputs
 - `max_tokens` (optional int): Maximum tokens in response
 - `seed` (optional int): For reproducible outputs
@@ -84,23 +85,28 @@ seed = "auto"          # "auto" or specific integer
 ### IMGG Job Parameters
 
 Image generation jobs support these parameters:
+
 - **Dimensions**:
-  - `aspect_ratio`: Predefined ratios for image dimensions
-  - `background`: Background handling mode
+
+    - `aspect_ratio`: Predefined ratios for image dimensions
+    - `background`: Background handling mode
 
 - **Quality Control**:
-  - `quality`: Output quality level
-  - `nb_steps`: Number of generation steps
-  - `guidance_scale`: How closely to follow the prompt
+
+    - `quality`: Output quality level
+    - `nb_steps`: Number of generation steps
+    - `guidance_scale`: How closely to follow the prompt
 
 - **Safety**:
-  - `is_moderated`: Enable content moderation
-  - `safety_tolerance`: Safety check strictness (1-6)
+
+    - `is_moderated`: Enable content moderation
+    - `safety_tolerance`: Safety check strictness (1-6)
 
 - **Output**:
-  - `is_raw`: Raw output mode
-  - `output_format`: Image format (PNG/JPG/WEBP)
-  - `seed`: For reproducible generation
+
+    - `is_raw`: Raw output mode
+    - `output_format`: Image format (PNG/JPG/WEBP)
+    - `seed`: For reproducible generation
 
 ## OCR Configuration
 
@@ -129,19 +135,22 @@ page_output_text_file_name = "page_text.txt"
 ## Best Practices
 
 1. **LLM Settings**:
-   - Start with lower temperatures (0.1-0.3) for consistent outputs
-   - Use streaming for better user experience
-   - Set appropriate retry limits based on your use case
+
+    - Start with lower temperatures (0.1-0.3) for consistent outputs
+    - Use streaming for better user experience
+    - Set appropriate retry limits based on your use case
 
 2. **IMGG Settings**:
-   - Enable moderation for production use
-   - Use appropriate aspect ratios for your use case
-   - Balance quality and performance with step count
+
+    - Enable moderation for production use
+    - Use appropriate aspect ratios for your use case
+    - Balance quality and performance with step count
 
 3. **General**:
-   - Enable auto-setup for easier initialization
-   - Use platform preferences to ensure consistent model selection
-   - Configure OCR handles based on your accuracy needs
+
+     - Enable auto-setup for easier initialization
+     - Use platform preferences to ensure consistent model selection
+     - Configure OCR handles based on your accuracy needs
 
 ## Example Complete Configuration
 

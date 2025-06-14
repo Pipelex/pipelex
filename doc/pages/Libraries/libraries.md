@@ -11,18 +11,18 @@ A Pipelex library consists of:
     - Python files containing structured output models
     - Base library with common functionality
 
-2. **Templates** (`templates/`)
+1. **Templates** (`templates/`)
     - Reusable prompt templates
     - Common patterns and configurations
 
-3. **LLM Configuration** (`llm_deck/`)
+1. **LLM Integrations** (`llm_integrations/`)
+    - Provider-specific configurations
+    - Platform settings
+
+1. **LLM Configuration** (`llm_deck/`)
     - LLM model configurations
     - Preset definitions
     - See more in our [LLM Configuration Guide](../LLM-Configuration/llm-configuration.md)
-
-4. **LLM Integrations** (`llm_integrations/`)
-    - Provider-specific configurations
-    - Platform settings
 
 ## Creating a Library
 

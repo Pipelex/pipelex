@@ -1,16 +1,13 @@
 # Pipes
 
 A pipe is a **Pipeline step**.
-It can integrate **both LLM-based** or software-based knowledge processing.
-
-:bulb: **Remember the Quick-start chapter?** We defined a pipe (in toml, using the [pipe.create_character] section) to generate a character. It constituted a one-pipe-long pipeline.
+It can integrate both **AI-based** or software-based knowledge processing.
 
 ## Define pipes
 
 Like concepts, Pipes are defined using a **`toml` syntax.**
 
 - This part is meant to be **written in a library `toml` file, in the same one as concepts** (see [Libraries](../Libraries/libraries.md)).
-  💡*In the quick-start example (text summary generator) this is the role of `summarize.toml`.*
 
 ### General Structure
 
@@ -19,13 +16,13 @@ This is how to define a Pipe using the Pipelex `toml` syntax:
 ```toml
 [pipe]
 [pipe.<pipe_name>]
-Pipe<Type> = "Pipe definition"          # required, str
-input = "InputConcept"                  # required, str
-output = "OutputConcept"                # required, str
+Pipe<Type> = "<Pipe definition>"
+inputs = { <input_name> = "<InputConcept>" }
+output = "<OutputConcept>"
 ... then come the Pipe specific fields
 ```
 
-The `Pipe<Type>` determines what kind of operation the pipe performs. For a complete list of available pipe types and their specific configurations, see our [Pipe Operators Guide](Pipe%20Operators.md).
+The `Pipe<Type>` determines the kind of pipe. For a complete list of available pipe types and their specific configurations, see our [Pipe Operators Guide](Pipe%20Operators.md).
 
 ## Working Memory
 
@@ -69,15 +66,21 @@ You can access working memory stuffs directly in prompts using the jinja2 syntax
 You just need to call them by their name.
 
 ```toml
-[pipe.get_answer_with_extract]
-PipeLLM = "Answer the question with extract"
-input = "QuestionWithExtract"
-output = "AnswerToAQuestionWithExtract"
+[pipe.retrieve_excerpts]
+PipeLLM = "Find the most relevant excerpt in a text that answers a specific question"
+inputs = { text = "native.Text", question = "questions.Question" }
+output = "RetrievedExcerpt"
+llm = "llm_to_retrieve"
+multiple_output = true
 prompt_template = """
-I am asking you to read an extract and answer a question about it.
-{{ question_with_extract|tag("extract") }}
-{{ question_with_extract|tag("question") }}
-Please return your answer in english.
+Your task is to find all relevant excerpts from a text that contribute to answering a question.
+It might not contain the exact answer, but it should be relevant to the question.
+
+@text
+
+@question
+
+Justify why you chose those excerpts. Do not modify the original text.
 """
 ```
 

@@ -6,8 +6,8 @@ The `StaticValidationConfig` class controls how Pipelex handles validation error
 
 ```python
 class StaticValidationReaction(StrEnum):
-    RAISE = "raise"  # Raise an exception
-    LOG = "log"      # Log the error but continue
+    RAISE = "raise"    # Raise an exception
+    LOG = "log"        # Log the error but continue
     IGNORE = "ignore"  # Silently ignore the error
 
 class StaticValidationConfig(ConfigModel):
@@ -32,14 +32,12 @@ Each validation error type can be configured to have one of three reactions:
 
 ```toml
 [pipelex.static_validation_config]
-default_reaction = "log"
+default_reaction = "raise"
 
 [pipelex.static_validation_config.reactions]
-MISSING_TEMPLATE = "raise"
-INVALID_SYNTAX = "raise"
-TYPE_MISMATCH = "log"
-UNDEFINED_VARIABLE = "log"
-CIRCULAR_DEPENDENCY = "raise"
+missing_input_variable = "log"
+extraneous_input_variable = "log"
+inadequate_input_concept = "log"
 ```
 
 ## Validation Process

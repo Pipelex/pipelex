@@ -9,44 +9,54 @@ The reporting configuration controls how Pipelex generates and manages cost repo
 ## Configuration Options
 
 ### Console Logging
+
 ```toml
 is_log_costs_to_console = false
 ```
+
 - Controls whether costs are logged to the console in **real-time**
 - When enabled, displays token cost reports after each LLM operation (and other operations with costs)
 - Default: `false`
 
 ### Cost Report File Generation
+
 ```toml
 is_generate_cost_report_file_enabled = true
 ```
+
 - Controls whether cost report files are generated after the execution of the pipeline
 - When enabled, creates detailed reports in the xlsx format in the directory `reports/` by default.
 - Default: `true`
 
 ### Report File Location
+
 ```toml
 cost_report_dir_path = "reports"
 ```
+
 - Directory where cost report files will be saved
 - Path is relative to your project root
 - Directory will be created if it doesn't exist.
 - Default: `"reports"`
 
 ### Report File Naming
+
 ```toml
 cost_report_base_name = "cost_report"
 cost_report_extension = "xlsx"
 ```
+
 - Base name for report files
 - File extension for report files (e.g., "xlsx" for Excel files)
 - Final filename will include an incremental number (e.g., `cost_report_1.xlsx`, `cost_report_2.xlsx`)
 - Default: Base name = `"cost_report"`, Extension = `"xlsx"`
 
 ### Cost Unit Scaling
+
 ```toml
 cost_report_unit_scale = 1.0
 ```
+
 - Scaling factor applied to cost values in reports
 - Use 1.0 for actual costs
 - Use different values to scale costs (e.g., 1000.0 for thousands)

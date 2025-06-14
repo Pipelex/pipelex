@@ -5,6 +5,7 @@
 ### Pipe
 
 A pipe is an elementary step of knowledge processing. Each pipe:
+
 - Takes knowledge as input
 - Transforms it using LLMs or software
 - Produces structured output
@@ -33,6 +34,7 @@ This creates a network of understanding where any pipe can access relevant knowl
 ### Concepts
 
 Concepts define the structure and meaning of knowledge flowing through pipes. Each concept is defined:
+
 - **In natural language** - so humans and LLMs understand the intent
 - Optionaly **in code** - as Pydantic models for structuring and deterministic validation
 
@@ -43,6 +45,7 @@ Pipes validate their outputs against concepts, ensuring reliable, predictable re
 ## Composition Patterns
 
 Pipes compose like building blocks:
+
 - **Sequential**: Chain sub-pipes for step-by-step transformations
 - **Parallel**: Run multiple sub-pipes simultaneously
 - **Conditional**: Route based on a value or a test expression

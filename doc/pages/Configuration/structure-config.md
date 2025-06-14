@@ -27,12 +27,12 @@ The `is_default_text_then_structure` flag determines how LLM pipes generate stru
 ### Two-Step Process (When `true`)
 
 1. **First LLM Call**: Generates preliminary text
-   - Uses the pipe's main prompt template
-   - Produces natural language text about the subject
+    - Uses the pipe's main prompt template
+    - Produces natural language text about the subject
 
 2. **Second LLM Call**: Converts text to structure
-   - Uses a specialized system prompt: "You are a data modeling expert specialized in extracting structure from text"
-   - Uses a template that instructs the LLM to extract structured data:
+    - Uses a specialized system prompt: "You are a data modeling expert specialized in extracting structure from text"
+    - Uses a template that instructs the LLM to extract structured data:
    ```
    Your job is to extract and structure information from a text.
    Here is the text:
@@ -41,7 +41,7 @@ The `is_default_text_then_structure` flag determines how LLM pipes generate stru
    Now generate the JSON in the required format.
    Do not create information that is not in the text.
    ```
-   - Produces a JSON object matching the required concept structure
+    - Produces a JSON object matching the required concept structure
 
 ### Single-Step Process (When `false`)
 
@@ -52,6 +52,7 @@ The `is_default_text_then_structure` flag determines how LLM pipes generate stru
 ## Use Cases
 
 ### When to Use Two-Step Process (`true`)
+
 - When you want more natural and fluid content generation
 - When the structure is complex and needs careful extraction
 - When you want to ensure all generated content is properly structured
@@ -59,6 +60,7 @@ The `is_default_text_then_structure` flag determines how LLM pipes generate stru
 - When you want to debug or inspect the intermediate text
 
 ### When to Use Single-Step Process (`false`)
+
 - When the structure is simple and straightforward
 - When you need faster processing (avoids second LLM call)
 - When the output format is well-defined and easy to generate
@@ -68,6 +70,7 @@ The `is_default_text_then_structure` flag determines how LLM pipes generate stru
 ## Technical Details
 
 The two-step process uses:
+
 1. The pipe's configured prompts for initial text generation
 2. A specialized structure extraction prompt that can be customized:
    - Through domain configuration (`domain.prompt_template_to_structure`)

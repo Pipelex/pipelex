@@ -44,6 +44,7 @@ def get_prompting_style(self, prompting_target: Optional[LLMPromptingTarget] = N
 ```
 
 This allows for:
+
 - Target-specific prompting styles
 - Fallback to default style when no specific style is defined
 - Optional prompting when no target is specified

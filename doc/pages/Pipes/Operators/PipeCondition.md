@@ -5,11 +5,13 @@ The `PipeCondition` operator enables routing in your pipeline based on condition
 ## How It Works
 
 1. **Expression Evaluation**:
+
    - Takes an input expression (either simple or Jinja2 template)
    - Evaluates it using the current working memory context
    - Returns a string value that determines which pipe to execute
 
 2. **Pipe Selection**:
+
    - Uses a pipe map to match the evaluated expression to a target pipe
    - If no match is found, can use an optional default pipe
 
@@ -31,6 +33,7 @@ other = "extract_other"
 ```
 
 In this example:
+
 1. The condition reads the `category` field from `product_or_services_category` in working memory
 2. Based on the category value, it routes to a specific extraction pipe:
    - "product" → `extract_product`
@@ -43,6 +46,7 @@ In this example:
 ```python
 expression = "product_or_services_category.category"
 ```
+
 - Direct access to working memory variables
 - No template syntax needed
 - Good for simple field access
@@ -54,11 +58,13 @@ expression = "product_or_services_category.category"
 ```python
 default_pipe_code = "process_unknown"
 ```
+
 - Fallback pipe when no match is found
 
 ### Expression Aliasing
 ```python
 add_alias_from_expression_to = "category_type"
 ```
+
 - Creates an alias from the expression result
 - Makes the result available in working memory

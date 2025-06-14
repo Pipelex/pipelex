@@ -22,6 +22,7 @@ The Plugins Configuration manages all external service integrations in Pipelex, 
 ## Common Authentication Methods
 
 Most plugins support two authentication methods:
+
 - `ENV`: Read credentials from environment variables
 - `SECRET_PROVIDER`: Read credentials from a secrets provider
 
@@ -37,6 +38,7 @@ api_key_method = "env"  # or "secret_provider"
 ```
 
 Environment Variables:
+
 - `ANTHROPIC_API_KEY`: API key for Anthropic services
 
 ### 2. Azure OpenAI Configuration
@@ -47,6 +49,7 @@ api_key_method = "env"  # or "secret_provider"
 ```
 
 Environment Variables:
+
 - `AZURE_OPENAI_API_KEY`: API key
 - `AZURE_OPENAI_API_ENDPOINT`: API endpoint URL
 - `AZURE_OPENAI_API_VERSION`: API version
@@ -59,6 +62,7 @@ client_method = "aioboto3"  # or "boto3"
 ```
 
 Environment Variables:
+
 - `AWS_REGION`: AWS region for Bedrock services
 
 ### 4. Google Vertex AI Configuration
@@ -69,11 +73,13 @@ api_key_method = "env"  # or "secret_provider"
 ```
 
 Environment Variables:
+
 - `GCP_PROJECT_ID`: Google Cloud project ID
 - `GCP_REGION`: Google Cloud region
 - `GCP_CREDENTIALS_FILE_PATH`: Path to service account credentials file
 
 Dependencies:
+
 - Requires `google-auth-oauthlib` package (`pip install pipelex[google]`)
 
 ### 5. Mistral Configuration
@@ -84,6 +90,7 @@ api_key_method = "env"  # or "secret_provider"
 ```
 
 Environment Variables:
+
 - `MISTRAL_API_KEY`: API key for Mistral services
 
 ### 6. OpenAI Configuration
@@ -95,6 +102,7 @@ api_key_method = "env"  # or "secret_provider"
 ```
 
 Environment Variables:
+
 - `OPENAI_API_KEY`: API key for OpenAI services
 
 ### 7. Perplexity Configuration
@@ -105,6 +113,7 @@ api_key_method = "env"  # or "secret_provider"
 ```
 
 Environment Variables:
+
 - `PERPLEXITY_API_KEY`: API key
 - `PERPLEXITY_API_ENDPOINT`: API endpoint URL
 
@@ -116,6 +125,7 @@ api_key_method = "env"  # or "secret_provider"
 ```
 
 Environment Variables:
+
 - `XAI_API_KEY`: API key
 - `XAI_API_ENDPOINT`: API endpoint URL
 
@@ -129,6 +139,7 @@ api_key_method = "env"  # or "secret_provider"
 ```
 
 Environment Variables:
+
 - `CUSTOM_ENDPOINT_API_KEY`: Optional API key
 - `CUSTOM_ENDPOINT_BASE_URL`: Base URL for the custom endpoint
 
@@ -156,6 +167,7 @@ sdxl_lightning_map_quality_to_steps = {
 ## Error Handling
 
 Each plugin has its own error types:
+
 - `AnthropicCredentialsError`
 - `AzureOpenAICredentialsError`
 - `BedrockCredentialsError`
@@ -169,19 +181,22 @@ Each plugin has its own error types:
 ## Best Practices
 
 1. **Credentials Management**:
-   - Use environment variables for local development
-   - Use secrets provider for production environments
-   - Never commit credentials to version control
+
+    - Use environment variables for local development
+    - Use secrets provider for production environments
+    - Never commit credentials to version control
 
 2. **Error Handling**:
-   - Always handle credential errors appropriately
-   - Implement proper fallbacks when using multiple providers
-   - Check for required dependencies (especially for Google services)
+
+    - Always handle credential errors appropriately
+    - Implement proper fallbacks when using multiple providers
+    - Check for required dependencies (especially for Google services)
 
 3. **Configuration**:
-   - Set appropriate quality levels for image generation
-   - Configure retry limits and timeouts
-   - Use appropriate client methods for async/sync operations
+
+    - Set appropriate quality levels for image generation
+    - Configure retry limits and timeouts
+    - Use appropriate client methods for async/sync operations
 
 ## Example Complete Configuration
 

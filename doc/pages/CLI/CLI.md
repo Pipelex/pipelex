@@ -35,6 +35,7 @@ pipelex validate
 ```
 
 This command:
+
 1. Exports libraries
 2. Validates the configuration
 3. Ensures all pipelines are properly set up
@@ -59,6 +60,7 @@ pipelex list-pipes
 ```
 
 Displays a table of pipes organized by domain, showing:
+
 - Code: The unique identifier for each pipe
 - Definition: Description of the pipe's purpose
 - Input: Required input parameters and their concept codes
@@ -71,11 +73,13 @@ The output is formatted as tables grouped by domain, with concept codes simplifi
 1. Always run `pipelex validate` after making changes to your configuration or pipelines
 2. Use `pipelex show-config` to debug configuration issues
 3. When initializing a new project:
+
    - Start with `pipelex init-config`
    - Then run `pipelex init-libraries`
    - Finally, validate your setup with `pipelex validate`
 
 Related topics:
+
 - [Configuration](../Configuration/configuration.md)
 - [Pipes](../Pipes/Pipes.md)
 - [Concepts](../Concepts/Concepts.md)

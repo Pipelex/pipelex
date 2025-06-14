@@ -23,6 +23,7 @@ pipe_stack_limit = 100
 ## Stack Limit
 
 The `pipe_stack_limit` prevents infinite recursion in pipe execution by:
+
 - Limiting the depth of nested pipe calls
 - Throwing an exception when the limit is exceeded
 - Protecting against accidental circular dependencies
@@ -31,5 +32,3 @@ The `pipe_stack_limit` prevents infinite recursion in pipe execution by:
 
 - Set a reasonable stack limit based on your pipeline complexity
 - Monitor stack usage in complex pipelines
-- Use pipeline analysis tools to detect potential stack issues
-- Consider breaking up deeply nested pipelines

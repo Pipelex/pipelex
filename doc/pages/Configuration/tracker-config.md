@@ -5,6 +5,7 @@ The Tracker Configuration allows you to customize how your pipeline execution is
 ## Overview
 
 The pipeline tracker visualizes:
+
 - Stuff nodes (data objects) and their transformations
 - Pipe execution steps
 - Batch processing branches
@@ -16,45 +17,51 @@ The pipeline tracker visualizes:
 ### Basic Settings
 
 - `is_debug_mode` (bool): Enable or disable debug mode for tracking
-  - When enabled, shows additional information like:
-    - Node codes and internal identifiers
-    - Extended comments for repeated nodes
-    - Pipe codes in edge captions with comments
+    - When enabled, shows additional information like:
+        - Node codes and internal identifiers
+        - Extended comments for repeated nodes
+        - Pipe codes in edge captions with comments
 
 - `is_include_text_preview` (bool): Whether to include text previews in the tracking interface
-  - When enabled, shows first 100 characters of text content in stuff nodes
-  - Only applies to text-based stuff objects
+    - When enabled, shows first 100 characters of text content in stuff nodes
+    - Only applies to text-based stuff objects
 
 - `is_include_interactivity` (bool): Enable or disable interactive features in the tracking interface
 
 ### Visual Settings
 
 - `theme` (str | "auto"): The visual theme to use for the Mermaid flowchart
-  - Use "auto" for automatic theme selection based on context
-  - Or specify a custom theme name
+
+    - Use "auto" for automatic theme selection based on context
+    - Or specify a custom theme name
 
 - `layout` (str | "auto"): The layout algorithm to use for graph visualization
-  - Use "auto" for automatic layout selection
-  - Or specify a custom layout algorithm
-  - Affects how nodes and edges are arranged in the flowchart
+
+    - Use "auto" for automatic layout selection
+    - Or specify a custom layout algorithm
+    - Affects how nodes and edges are arranged in the flowchart
 
 - `wrapping_width` (int | "auto"): Text wrapping width for node labels
-  - Use "auto" for automatic width adjustment
-  - Or specify a fixed width in characters
-  - Helps control the visual width of node content
+
+    - Use "auto" for automatic width adjustment
+    - Or specify a fixed width in characters
+    - Helps control the visual width of node content
 
 - `nb_items_limit` (int | "unlimited"): Maximum number of items to display
-  - Use "unlimited" for no limit
-  - Or specify a maximum number of items
-  - Helps manage visualization of large pipelines
+
+    - Use "unlimited" for no limit
+    - Or specify a maximum number of items
+    - Helps manage visualization of large pipelines
 
 ### Graph Styling
 
 - `sub_graph_colors` (List[str]): List of colors to use for sub-graphs
+
   - Colors are used to visually distinguish different pipeline layers
   - Example: `["#1f77b4", "#ff7f0e", "#2ca02c"]`
 
 - Edge Styles (all str type):
+
   - `pipe_edge_style`: Style for regular pipe transformation edges
   - `branch_edge_style`: Style for batch processing branch edges
   - `aggregate_edge_style`: Style for aggregation step edges
@@ -96,24 +103,28 @@ These properties make it easy to work with the configuration values in your code
 The tracker generates Mermaid flowcharts with the following features:
 
 1. Node Types:
-   - Start node (special)
-   - Stuff nodes (data objects)
-   - Condition nodes (for pipeline branching)
+
+    - Start node (special)
+    - Stuff nodes (data objects)
+    - Condition nodes (for pipeline branching)
 
 2. Edge Types:
-   - Pipe edges (regular transformations)
-   - Branch edges (batch processing)
-   - Aggregate edges (combining results)
-   - Condition edges (with expressions)
-   - Choice edges (condition results)
+
+    - Pipe edges (regular transformations)
+    - Branch edges (batch processing)
+    - Aggregate edges (combining results)
+    - Condition edges (with expressions)
+    - Choice edges (condition results)
 
 3. Node Content:
-   - Concept type and name
-   - Content preview (for text)
-   - Debug information (when debug mode is enabled)
-   - Comments and descriptions
+
+    - Concept type and name
+    - Content preview (for text)
+    - Debug information (when debug mode is enabled)
+    - Comments and descriptions
 
 4. Visual Organization:
-   - Sub-graphs for different pipeline layers
-   - Color coding for visual distinction
-   - Different edge styles for different types of connections
+
+    - Sub-graphs for different pipeline layers
+    - Color coding for visual distinction
+    - Different edge styles for different types of connections

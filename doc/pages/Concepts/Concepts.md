@@ -70,7 +70,7 @@ class Summary(StructuredContent):
     created_at: datetime = Field(default_factory=datetime.now)
 ```
 
-:bulb: We take benefit of the `Field` pydantic class to automatically set the `created_at` attribute to the current date and time.
+💡 We take benefit of the `Field` pydantic class to automatically set the `created_at` attribute to the current date and time.
 
 **Super important: How do you bind Models and Concepts?**
 
@@ -83,11 +83,11 @@ class Summary(StructuredContent):
 Defining a list of concepts is done in the `toml` file. Just define a list of concepts with their definition.
 
 ```toml
-[concept]                                               # Required
-Concept1 = "Concept1 definition with Natural Language"  # Required, str
-Concept2 = "Concept2 definition with Natural Language"  # Required, str
+[concept]
+Concept1 = "Concept1 definition with Natural Language"
+Concept2 = "Concept2 definition with Natural Language"
 ...
-ConceptN = "ConceptN definition with Natural Language"  # Required, str
+ConceptN = "ConceptN definition with Natural Language"
 ```
 
 - `Concept` _(required, str)_: The Concept definition.
@@ -120,7 +120,7 @@ Stuff content objects are instances of a subclass of the StuffContent class. The
 
 ```python
 # Base Classes
-class StuffContent(ABC, BaseModel):
+class StuffContent(ABC, CustomBaseModel):
     """Base class for all content types. Provides methods to render content in different formats
     (plain text, HTML, Markdown, JSON, spreadsheet)."""
 ```

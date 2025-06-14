@@ -77,51 +77,61 @@ When a feature is disabled, the corresponding NoOp implementation is used automa
 Pipelex supports injection of the following components:
 
 1. **Template Provider** (`TemplateLibrary`)
-   - Protocol: `TemplateLibraryProtocol`
-   - Default: `TemplateLibrary`
-   - [Details](template-provider-injection.md)
+
+    - Protocol: `TemplateLibraryProtocol`
+    - Default: `TemplateLibrary`
+    - [Details](template-provider-injection.md)
 
 2. **LLM Model Provider** (`LLMModelLibrary`)
-   - Protocol: `LLMModelLibraryProtocol`
-   - Default: `LLMModelLibrary`
-   - [Details](llm-model-provider-injection.md)
+
+    - Protocol: `LLMModelLibraryProtocol`
+    - Default: `LLMModelLibrary`
+    - [Details](llm-model-provider-injection.md)
 
 3. **Plugin Manager** (`PluginManager`)
-   - Protocol: `PluginManagerProtocol`
-   - Default: `PluginManager`
-   - [Details](plugin-manager-injection.md)
+
+    - Protocol: `PluginManagerProtocol`
+    - Default: `PluginManager`
+    - [Details](plugin-manager-injection.md)
 
 4. **Inference Manager** (`InferenceManager`)
-   - Protocol: `InferenceManagerProtocol`
-   - Default: `InferenceManager`
-   - [Details](inference-manager-injection.md)
+
+    - Protocol: `InferenceManagerProtocol`
+    - Default: `InferenceManager`
+    - [Details](inference-manager-injection.md)
 
 5. **Reporting Delegate** (`ReportingManager`)
-   - Protocol: `ReportingProtocol`
-   - Default: `ReportingManager` or `ReportingNoOp` if disabled
-   - [Details](reporting-delegate-injection.md)
+
+    - Protocol: `ReportingProtocol`
+    - Default: `ReportingManager` or `ReportingNoOp` if disabled
+    - [Details](reporting-delegate-injection.md)
 
 6. **Pipeline Tracker** (`PipelineTracker`)
-   - Protocol: `PipelineTrackerProtocol`
-   - Default: `PipelineTracker` or `PipelineTrackerNoOp` if disabled
-   - [Details](pipeline-tracker-injection.md)
+
+    - Protocol: `PipelineTrackerProtocol`
+    - Default: `PipelineTracker` or `PipelineTrackerNoOp` if disabled
+    - [Details](pipeline-tracker-injection.md)
 
 7. **Activity Manager** (`ActivityManager`)
-   - Protocol: `ActivityManagerProtocol`
-   - Default: `ActivityManager` or `ActivityManagerNoOp` if disabled
-   - [Details](activity-manager-injection.md)
+
+    - Protocol: `ActivityManagerProtocol`
+    - Default: `ActivityManager` or `ActivityManagerNoOp` if disabled
+    - [Details](activity-manager-injection.md)
 
 8. **Secrets Provider** (`EnvSecretsProvider`)
-   - Protocol: `SecretsProviderProtocol`
-   - Default: `EnvSecretsProvider`
-   - [Details](secrets-provider-injection.md)
+
+    - Protocol: `SecretsProviderProtocol`
+    - Default: `EnvSecretsProvider`
+    - [Details](secrets-provider-injection.md)
 
 9. **Content Generator** (`ContentGenerator`)
-   - Protocol: `ContentGeneratorProtocol`
-   - Default: `ContentGenerator`
-   - [Details](content-generator-injection.md)
+
+    - Protocol: `ContentGeneratorProtocol`
+    - Default: `ContentGenerator`
+    - [Details](content-generator-injection.md)
 
 10. **Pipe Router** (`PipeRouter`)
+
     - Protocol: `PipeRouterProtocol`
     - Default: `PipeRouter`
     - [Details](pipe-router-injection.md)

@@ -26,14 +26,18 @@ text_gen_truncate_length = 100
 ## Dry Run Behavior
 
 ### Template Rendering
+
 When `apply_to_jinja2_rendering` is true:
+
 - Templates are processed but not actually rendered
 - Variables are validated
 - Template syntax is checked
 - No actual content is generated
 
 ### Text Generation
+
 The `text_gen_truncate_length` controls:
+
 - Maximum length of simulated text output
 - Helps prevent excessive resource usage during testing
 - Makes dry run output more manageable
@@ -41,19 +45,22 @@ The `text_gen_truncate_length` controls:
 ## Use Cases
 
 1. **Testing Pipeline Logic**
-   - Validate pipeline structure
-   - Check template syntax
-   - Verify variable references
+
+     - Validate pipeline structure
+     - Check template syntax
+     - Verify variable references
 
 2. **Resource Estimation**
-   - Estimate processing time
-   - Calculate potential costs
-   - Plan resource allocation
+
+     - Estimate processing time
+     - Calculate potential costs
+     - Plan resource allocation
 
 3. **Debugging**
-   - Trace execution paths
-   - Identify potential issues
-   - Test error handling
+
+     - Trace execution paths
+     - Identify potential issues
+     - Test error handling
 
 ## Best Practices
 
