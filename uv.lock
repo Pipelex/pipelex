@@ -1092,6 +1092,19 @@ wheels = [
 ]
 
 [[package]]
+name = "mkdocs-meta-manager"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "mkdocs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/18/9b/8884e1b8d9eb31bb012bb4309393ddb75162247905cc11826597a705f654/mkdocs_meta_manager-1.1.0.tar.gz", hash = "sha256:545d5976e291b684538421b6ec69b77e1027d6ff6d43c5ade71bcc0a226c9faa", size = 2708, upload-time = "2025-01-20T21:58:03.888Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fc/5b/0a90ae6576cd7fa2593e7bdde4fa52fe4e79f5812b8f1ada001414aaaa54/mkdocs_meta_manager-1.1.0-py3-none-any.whl", hash = "sha256:bdd1b5e9403bcfe222720dcd93102e0f1df5befef9b40a6ff91ad67926528658", size = 3186, upload-time = "2025-01-20T21:58:02.314Z" },
+]
+
+[[package]]
 name = "multidict"
 version = "6.4.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1652,6 +1665,7 @@ dev = [
     { name = "mkdocs" },
     { name = "mkdocs-glightbox" },
     { name = "mkdocs-material" },
+    { name = "mkdocs-meta-manager" },
     { name = "mypy" },
     { name = "pandas-stubs" },
     { name = "pyright" },
@@ -1702,6 +1716,7 @@ requires-dist = [
     { name = "mkdocs", marker = "extra == 'dev'", specifier = "==1.6.1" },
     { name = "mkdocs-glightbox", marker = "extra == 'dev'", specifier = ">=0.3.6" },
     { name = "mkdocs-material", marker = "extra == 'dev'", specifier = "==9.6.14" },
+    { name = "mkdocs-meta-manager", marker = "extra == 'dev'", specifier = ">=1.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=1.60.1" },

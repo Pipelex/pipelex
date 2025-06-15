@@ -1,12 +1,18 @@
 site_name: Pipelex Documentation
 site_url: https://docs.pipelex.com/
+site_description: "Official documentation for Pipelex, a framework and language for building deterministic, repeatable AI workflows and knowledge pipelines."
 docs_dir: doc
 
 theme:
   name: material
+  custom_dir: doc/overrides
   logo: https://pipelex-web.s3.amazonaws.com/logo/Pipelex-logo-wot-mono-560x176.png
   features:
     - navigation.footer
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.top
   palette:
   - scheme: default          # light
     primary: teal
@@ -37,6 +43,7 @@ extra:
   generator: false
 
 plugins:
+  - meta-manager
   - glightbox:
       touchNavigation: true
       loop: false
@@ -49,12 +56,29 @@ plugins:
       auto_caption: false
       caption_position: bottom
 
+markdown_extensions:
+  - meta
+  - attr_list
+  - md_in_html
+  - pymdownx.blocks.caption
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: .
+      check_paths: true
+
 nav:
-  - Home: index.md
-  - Installation: pages/installation/index.md
-  - Quick-start: pages/quick-start/index.md
-  - Pipelex paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
-  - Building knowledge pipelines:
+  - Home:
+    - Welcome: index.md
+    - Installation: pages/installation/index.md
+    - Quick-start: pages/quick-start/index.md
+    - Understand Pipelex:
+      - The Knowledge Pipeline Manifesto: manifesto.md
+      - The   Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
+    - Open-source:
+      - Changelog: changelog.md
+      - License: license.md
+  - Build with Pipelex:
     - Overview: pages/how-to-build-pipelex-pipelines/index.md
     - Libraries: pages/how-to-build-pipelex-pipelines/libraries.md
     - Domains: pages/how-to-build-pipelex-pipelines/domains.md
@@ -104,9 +128,3 @@ nav:
     - Logging: pages/tools/logging.md
     - Jinja2 & Templates: pages/tools/jinja2-templating.md
   
-markdown_extensions:
-  - attr_list
-  - md_in_html
-  - pymdownx.blocks.caption
-  - pymdownx.highlight
-  - pymdownx.superfences
