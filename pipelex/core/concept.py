@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from typing_extensions import Self
 
 from pipelex import log
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff_content import StuffContent
 from pipelex.exceptions import ConceptCodeError, ConceptDomainError, ConceptError, StructureClassError
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
@@ -56,14 +57,30 @@ class Concept(BaseModel):
     @field_validator("refines")
     @classmethod
     def validate_refines(cls, value: List[str]) -> List[str]:
-        for code in value:
-            if not cls.concept_str_contains_domain(code):
-                raise ConceptCodeError(f"Each refine code must contain a single dot (.), got: {code}")
+        validated_refines: List[str] = []
 
-            domain, code = Concept.extract_domain_and_concept_from_str(concept_str=code)
-            cls.validate_concept_code_syntax(code=code, concept_code=code, domain_field=code)
-            cls.validate_domain_syntax(domain=domain, code=code, domain_field=code)
-        return value
+        for refine_code in value:
+            # Handle NativeConcept values directly without importing ConceptCodeFactory to avoid circular import
+            if not cls.concept_str_contains_domain(refine_code):
+                # Check if it's a valid NativeConcept name
+                if refine_code in NativeConcept.names():
+                    native_concept = NativeConcept(refine_code)
+                    full_code = native_concept.code
+                    validated_refines.append(full_code)
+                    continue
+                else:
+                    raise ConceptCodeError(f"Each refine code must contain a single dot (.), got: {refine_code}")
+            else:
+                # Already has domain, validate it directly
+                full_code = refine_code
+                validated_refines.append(full_code)
+
+            # Validate the domain and concept syntax for the full code
+            domain, code = cls.extract_domain_and_concept_from_str(concept_str=full_code)
+            cls.validate_concept_code_syntax(code=code, concept_code=full_code, domain_field=domain)
+            cls.validate_domain_syntax(domain=domain, code=full_code, domain_field=domain)
+
+        return validated_refines
 
     @field_validator("structure_class_name")
     @classmethod

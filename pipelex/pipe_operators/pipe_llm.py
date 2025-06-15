@@ -122,13 +122,19 @@ class PipeLLM(PipeOperator):
                         input_concept_class = class_registry.get_required_subclass(name=input_concept_class_name, base_class=StuffContent)
                         if issubclass(input_concept_class, StructuredContent):
                             continue
+                    explanation = "The input provided for LLM Vision must be an image or a concept that refines image"
+                    if inadequate_concept := get_concept_provider().get_concept(concept_code=concept_code_of_declared_input):
+                        explanation += f",\nconcept = {inadequate_concept}"
+                    else:
+                        explanation += ",\nconcept not found"
+
                     inadequate_input_concept_error = StaticValidationError(
                         error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
                         domain_code=self.domain,
                         pipe_code=self.code,
                         variable_names=[required_variable_name],
                         provided_concept_code=concept_code_of_declared_input,
-                        explanation="The input provided for LLM Vision must be an image or a concept that refines image",
+                        explanation=explanation,
                     )
                     match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
                         case StaticValidationReaction.IGNORE:

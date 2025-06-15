@@ -13,7 +13,7 @@ refines = ["native.Text"]
 [concept.Photo]
 Concept = "Photo"
 structure = "ImageContent"
-refines = ["native.Image"]
+refines = ["Image"]
 
 [pipe]
 

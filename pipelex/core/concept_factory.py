@@ -25,10 +25,9 @@ class ConceptFactory:
     @classmethod
     def make_refines(cls, domain: str, refines: List[str]) -> List[str]:
         new_refines: List[str] = []
-        for ref in refines:
-            if not Concept.concept_str_contains_domain(ref):
-                ref = ConceptCodeFactory.make_concept_code(domain=domain, code=ref)
-            new_refines.append(ref)
+        for concept_str in refines:
+            concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str, fallback_domain=domain)
+            new_refines.append(concept_code)
         return new_refines
 
     @classmethod

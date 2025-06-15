@@ -33,6 +33,67 @@ class TestConceptPydanticFieldValidation:
         concept = Concept(code="test_domain.TestConcept", domain="test_domain", structure_class_name="TextContent", definition="A test concept")
         assert concept.refines == []
 
+    def test_concept_creation_with_native_concept_refines(self):
+        """Test successful concept creation with NativeConcept string values in refines."""
+        concept = Concept(
+            code="test_domain.TestConcept",
+            domain="test_domain",
+            structure_class_name="TextContent",
+            definition="A test concept",
+            refines=[
+                NativeConcept.TEXT.value,
+                NativeConcept.IMAGE.value,
+                NativeConcept.PDF.value,
+            ],
+        )
+        # NativeConcept strings should be converted to full codes
+        assert concept.refines == [
+            NativeConcept.TEXT.code,
+            NativeConcept.IMAGE.code,
+            NativeConcept.PDF.code,
+        ]
+
+    def test_concept_creation_with_mixed_refines(self):
+        """Test successful concept creation with mix of NativeConcept and domain.concept refines."""
+        concept = Concept(
+            code="test_domain.TestConcept",
+            domain="test_domain",
+            structure_class_name="TextContent",
+            definition="A test concept",
+            refines=[
+                "valid_domain.ValidConcept",
+                NativeConcept.TEXT.value,
+                "another_domain.AnotherConcept",
+                NativeConcept.IMAGE.value,
+            ],
+        )
+        expected_refines = [
+            "valid_domain.ValidConcept",
+            NativeConcept.TEXT.code,
+            "another_domain.AnotherConcept",
+            NativeConcept.IMAGE.code,
+        ]
+        assert concept.refines == expected_refines
+
+    def test_concept_creation_with_only_native_concept_refines(self):
+        """Test successful concept creation with only NativeConcept values in refines."""
+        concept = Concept(
+            code="test_domain.TestConcept",
+            domain="test_domain",
+            structure_class_name="TextContent",
+            definition="A test concept",
+            refines=[
+                NativeConcept.DYNAMIC.value,
+                NativeConcept.TEXT.value,
+                NativeConcept.NUMBER.value,
+            ],
+        )
+        assert concept.refines == [
+            NativeConcept.DYNAMIC.code,
+            NativeConcept.TEXT.code,
+            NativeConcept.NUMBER.code,
+        ]
+
     def test_concept_creation_with_refines_missing_dot(self):
         """Test concept creation fails when refines contain invalid codes missing dot."""
         with pytest.raises(ConceptCodeError) as exc_info:
@@ -80,7 +141,11 @@ class TestConceptPydanticFieldValidation:
                 domain="test_domain",
                 structure_class_name="TextContent",
                 definition="A test concept",
-                refines=["invalidConcept", "InvalidDomain.Concept", "valid_domain.invalid_concept"],
+                refines=[
+                    "invalidConcept",
+                    "InvalidDomain.Concept",
+                    "valid_domain.invalid_concept",
+                ],
             )
 
         # The first error should be about the missing dot (validation stops at first error)
@@ -94,7 +159,10 @@ class TestConceptPydanticFieldValidation:
                 domain="test_domain",
                 structure_class_name="TextContent",
                 definition="A test concept",
-                refines=["valid_domain.ValidConcept", "invalidConcept"],
+                refines=[
+                    "valid_domain.ValidConcept",
+                    "invalidConcept",
+                ],
             )
 
         assert "Each refine code must contain a single dot" in str(exc_info.value)
