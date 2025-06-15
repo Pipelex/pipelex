@@ -49,7 +49,7 @@ Keep it short and concise, just one sentence.
 
 [pipe.imagine_nature_product_list]
 PipeSequence = "Imagine nature products of different colors"
-output = "native.Image"
+output = "Image"
 steps = [
     { pipe = "choose_colors", result = "color", nb_output = 3 },
     { pipe = "imagine_nature_product", result = "product_of_nature" },
@@ -59,7 +59,7 @@ steps = [
 
 [pipe.imagine_nature_scene_of_original_power_rangers_colors]
 PipeSequence = "Imagine nature scenes of Power Rangers colors"
-output = "native.Image"
+output = "Image"
 steps = [
     { pipe = "original_power_ranger_colors", result = "color" },
     { pipe = "imagine_nature_product", result = "product_of_nature" },
@@ -70,7 +70,7 @@ steps = [
 
 [pipe.imagine_nature_scene_of_alltime_power_rangers_colors]
 PipeSequence = "Imagine nature scenes of Power Rangers colors"
-output = "native.Image"
+output = "Image"
 steps = [
     { pipe = "alltime_power_ranger_colors", result = "color", multiple_output = true },
     { pipe = "imagine_nature_product", result = "product_of_nature" },

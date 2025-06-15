@@ -10,16 +10,16 @@ Complex = "A complex object"
 
 [pipe.simple_llm_test_from_text]
 PipeLLM = "Simple LLM test from text"
-inputs = { text = "native.Text" }
-output = "native.Text"
+inputs = { text = "Text" }
+output = "Text"
 prompt_template = """
 This is a simple test prompt:
 @text
 """
 [pipe.simple_llm_test_from_image]
 PipeLLM = "Simple LLM test from image"
-inputs = { image = "native.Image" }
-output = "native.Text"
+inputs = { image = "Image" }
+output = "Text"
 prompt_template = """
 Describe the using rap lyrics, including puns and references to the image.
 """
@@ -37,8 +37,8 @@ multiple_output = true
 
 [pipe.create_synopsis]
 PipeLLM = "Create Synopsis"
-inputs = { text = "native.Text" }
-output = "native.Text"
+inputs = { text = "Text" }
+output = "Text"
 llm = "llm_for_creative_writing"
 prompt_template = """
 Create a short synopsis for a story about:
@@ -50,7 +50,7 @@ Be concise: 3 sentences max.
 
 [pipe.test_no_input]
 PipeLLM = "No Input"
-output = "native.Text"
+output = "Text"
 llm = "llm_for_testing_gen_text"
 prompt_template = """
 Explain that this is a test prompt which took no input from the user.
@@ -58,7 +58,7 @@ Explain that this is a test prompt which took no input from the user.
 
 [pipe.test_no_input_that_could_be_long]
 PipeLLM = "No Input but generates a text that could be long"
-output = "native.Text"
+output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 0.5, max_tokens = 100 }
 prompt_template = """
 Tell me a short story about a red baloon.
@@ -67,5 +67,5 @@ Tell me a short story about a red baloon.
 [pipe.generate_3_images]
 PipeImgGen = "Generate 3 images"
 inputs = { prompt = "images.ImgGenPrompt" }
-output = "native.Image"
+output = "Image"
 nb_output = 3

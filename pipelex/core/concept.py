@@ -58,7 +58,7 @@ class Concept(BaseModel):
     def validate_refines(cls, value: List[str]) -> List[str]:
         for code in value:
             if not cls.concept_str_contains_domain(code):
-                raise ConceptCodeError(f"Each inherited code must contain a dot (.), got: {code}")
+                raise ConceptCodeError(f"Each refine code must contain a single dot (.), got: {code}")
 
             domain, code = Concept.extract_domain_and_concept_from_str(concept_str=code)
             cls.validate_concept_code_syntax(code=code, concept_code=code, domain_field=code)

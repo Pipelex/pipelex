@@ -6,7 +6,7 @@ domain = "failure_modes"
 
 [pipe.dummy]
 PipeLLM = "This pipe is a dummy pipe"
-output = "native.Text"
+output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 1, max_tokens = 50 }
 prompt_template = """
 This is a dummy prompt, do whatever you want. Something funny but not a joke, ok?
@@ -14,7 +14,7 @@ This is a dummy prompt, do whatever you want. Something funny but not a joke, ok
 
 [pipe.infinite_loop_1]
 PipeSequence = "This pipe will cause an infinite loop"
-output = "native.Text"
+output = "Text"
 steps = [
     { pipe = "dummy", result = "dummy_result" },
     { pipe = "infinite_loop_1", result = "disaster" },
