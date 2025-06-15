@@ -1,4 +1,4 @@
-# LLM Configuration Guide
+# LLM Settings Guide
 
 ## Overview
 

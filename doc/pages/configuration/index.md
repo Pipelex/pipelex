@@ -64,26 +64,6 @@ NB: The run_mode unit_test is used for testing purposes.
 4. Use run mode files for normal or unit_test configurations
 5. Use `pipelex_super.toml` sparingly, only for temporary overrides (add to .gitignore)
 
-## Configuration Groups
-
-The configuration is divided into several logical groups:
-
-1. [Feature Configuration](./feature-config.md) - Feature flags and toggles
-2. [Logging Configuration](./logging-config.md) - Logging settings and levels
-3. [AWS Configuration](./aws-config.md) - AWS-related settings
-4. [Library Configuration](./library-config.md) - Library organization and management
-5. [Static Validation Configuration](./static-validation-config.md) - Validation rules and behaviors
-6. [Tracker Configuration](./tracker-config.md) - Pipeline tracking settings
-7. [Structure Configuration](./structure-config.md) - Structure-related settings
-8. [Prompting Configuration](./prompting-config.md) - Prompting styles and defaults
-9. [Dry Run Configuration](./dry-run-config.md) - Dry run mode settings
-10. [Pipe Run Configuration](./pipe-run-config.md) - Pipe execution settings
-11. [Reporting Configuration](./reporting-config.md) - Cost and performance reporting
-12. [Cogt Configuration](./cogt-config.md) - Cognitive tools settings
-13. [Plugins Configuration](./plugins-config.md) - Third-party plugin settings
-
-Each configuration group has its own dedicated documentation page with detailed explanations of available options.
-
 ## Best Practices
 
 1. **Version Control**: Include your base `pipelex.toml` in version control

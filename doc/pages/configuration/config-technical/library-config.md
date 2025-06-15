@@ -21,47 +21,6 @@ pipelex_libraries/         # Exported library root
 └── templates/             # Template files
 ```
 
-## Library Components
-
-### 1. Pipelines
-
-Pipelines are defined in TOML files with the following structure:
-
-```toml
-domain = "your_domain"
-definition = "Domain definition"
-
-[concept]
-concept_name = "concept definition"
-another_concept = { definition = "detailed concept", attributes = {} }
-
-[pipe]
-pipe_name = { PipeClassName = "pipe definition", config = {} }
-```
-
-Key features:
-
-- Each TOML file must specify a `domain`
-- Concepts can be defined as strings or detailed dictionaries
-- Pipes require a class name and definition
-- Supports nested structure for organization
-
-### 2. LLM Deck
-
-The LLM deck configuration defines available language models and their settings:
-
-- Located in `pipelex_libraries/llm_deck/`
-- Supports multiple TOML files for organization
-- Can be overridden with `overrides.toml`
-
-### 3. Templates
-
-Template files for various components:
-
-- Located in `pipelex_libraries/templates/`
-- Used for standardizing configurations
-- Supports TOML format
-
 ## Library Loading Process
 
 1. **Domain Loading**:

@@ -78,7 +78,7 @@ nav:
     - Quick-start: pages/quick-start/index.md
     - Understand Pipelex:
       - The Knowledge Pipeline Manifesto: manifesto.md
-      - The   Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
+      - The Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
     - Open-source:
       - Changelog: changelog.md
       - License: license.md
@@ -105,7 +105,6 @@ nav:
     - Cogt Configuration: pages/configuration/cogt-config.md
     - Dry Run Configuration: pages/configuration/dry-run-config.md
     - Feature Configuration: pages/configuration/feature-config.md
-    - Generic Template Names: pages/configuration/generic-template-names.md
     - Library Configuration: pages/configuration/library-config.md
     - Logging Configuration: pages/configuration/logging-config.md
     - Pipe Run Configuration: pages/configuration/pipe-run-config.md
