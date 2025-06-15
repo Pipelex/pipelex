@@ -18,8 +18,6 @@ class PipeBlueprint(StructuredContent):
 
     @model_validator(mode="after")
     def add_domain_prefix(self) -> Self:
-        # if self.input and "." not in self.input:
-        #     self.input = f"{self.domain}.{self.input}"
         if self.inputs:
             for input_name, input_concept_code in self.inputs.items():
                 if "." not in input_concept_code:

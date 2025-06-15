@@ -57,11 +57,12 @@ ImagePrompt = "A text prompt for generating an image"
 
 [pipe.generate_logo_variations]
 PipeImgGen = "Generate three logo variations from a prompt"
-input = "ImagePrompt"
-output = "native.Image"
-output_multiplicity = 3
+inputs = { prompt = "images.ImgGenPrompt" }
+output = "Image"
+nb_output = 3
 imgg_handle = "stable-diffusion"
 aspect_ratio = "1:1"
 ```
 
-To use this pipe, you would first load a text prompt (e.g., "A minimalist logo for a coffee shop, featuring a stylized mountain and a coffee bean") into the `ImagePrompt` concept. After running, the output will be a list containing three generated `ImageContent` objects.
+To use this pipe, you would first load a text prompt (e.g., "A minimalist logo for a coffee shop, featuring a stylized mountain and a coffee bean") into the "prompt" stuff (`ImgGenPrompt` concept). After running, the output will be a list containing three generated `ImageContent` objects.
+

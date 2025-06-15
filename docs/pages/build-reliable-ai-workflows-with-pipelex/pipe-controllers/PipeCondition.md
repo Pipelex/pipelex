@@ -35,8 +35,13 @@ Imagine a pipeline that needs to process invoices and receipts differently.
 ```toml
 [pipe.classify_document_type]
 PipeLLM = "Classify the document as 'invoice' or 'receipt'"
-input = "DocumentText"
+inputs = { document = "DocumentText" }
 output = "DocumentClassification" # A structure with a 'type' field
+prompt_template = """
+Classify the document as 'invoice' or 'receipt'
+
+@document
+"""
 
 [pipe.process_invoice]
 # ... pipe definition ...
@@ -53,7 +58,7 @@ output = "ProcessedDocument"
 # The PipeCondition definition
 [pipe.route_by_doc_type]
 PipeCondition = "Route document based on its classified type"
-input = "DocumentClassification"
+inputs = { classification = "DocumentClassification" }
 output = "ProcessedDocument"
 expression = "doc_classification.type" # Assumes input from a previous step was named 'doc_classification'
 

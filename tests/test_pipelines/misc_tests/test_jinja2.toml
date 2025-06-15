@@ -17,6 +17,6 @@ template_category = "llm_prompt"
 
 # [pipe.jinja2_test_2]
 # PipeJinja2 = "Jinja2 test 2"
-# input = "native.Text"
+# inputs = { text = "native.Text" }
 # output = "native.Text"
 # jinja2_name = "non-existing-name"
