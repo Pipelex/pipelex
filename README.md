@@ -6,7 +6,7 @@
 
   <div>
     <a href="https://www.pipelex.com/demo"><strong>Demo</strong></a> -
-    <a href="https://github.com/Pipelex/pipelex/blob/main/doc/Documentation.md"><strong>Documentation</strong></a> -
+    <a href="https://github.com/Pipelex/pipelex/blob/main/docs/Documentation.md"><strong>Documentation</strong></a> -
     <a href="https://github.com/Pipelex/pipelex/issues"><strong>Report Bug</strong></a> -
     <a href="https://github.com/Pipelex/pipelex/discussions"><strong>Feature Request</strong></a>
   </div>
@@ -81,7 +81,7 @@ Pipelex is an **open-source Python library** with a hosted API launching soon. I
 
 # 🚀 Quick start
 
-> :books: Note that you can check out the [Pipelex Documentation](doc/Documentation.md) for more information and clone the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) repository for ready-to-run samples.
+> :books: Note that you can check out the [Pipelex Documentation](docs/Documentation.md) for more information and clone the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) repository for ready-to-run samples.
 
 Follow these steps to get started:
 
@@ -150,7 +150,7 @@ Join our vibrant Discord community to connect with other developers, share your 
 
 - **GitHub Issues**: For bug reports and feature requests
 - **Discussions**: For questions and community discussions
-- [**Documentation**](doc/Documentation.md)
+- [**Documentation**](docs/Documentation.md)
 
 ## ⭐ Star Us!
 

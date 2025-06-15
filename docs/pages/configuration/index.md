@@ -8,7 +8,7 @@ Pipelex uses a TOML-based configuration system. The main configuration file `pip
 pipelex init-config
 ```
 
-⚠️ **Important Notes**:
+💡 **Important Notes**:
 
 1. `pipelex init-config` creates a **template** configuration file with sample settings. It does not include all possible configuration options - it's meant as a starting point.
 2. Using `pipelex init-config --reset` will **overwrite** your existing `pipelex.toml` file without warning. Make sure to backup your configuration before using this flag.

@@ -1,6 +1,6 @@
 ---
 description: 
-globs: doc/**/*.md
+globs: docs/**/*.md
 alwaysApply: false
 ---
 Write docs and answer questions about writing docs.

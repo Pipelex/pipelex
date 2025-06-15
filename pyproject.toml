@@ -47,7 +47,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"
-Documentation = "https://github.com/Pipelex/pipelex/blob/main/doc/Documentation.md"
+Documentation = "https://github.com/Pipelex/pipelex/blob/main/docs/Documentation.md"
 Changelog = "https://github.com/Pipelex/pipelex/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
