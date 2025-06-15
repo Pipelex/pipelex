@@ -5,6 +5,9 @@ from kajson.class_registry import class_registry
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex.core.concept import Concept
+from pipelex.core.concept_code_factory import ConceptCodeFactory
+from pipelex.core.concept_native import NativeConcept
+from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff_content import TextContent
 from pipelex.exceptions import ConceptFactoryError, StructureClassError
 
@@ -24,15 +27,9 @@ class ConceptFactory:
         new_refines: List[str] = []
         for ref in refines:
             if not Concept.concept_str_contains_domain(ref):
-                ref = ConceptFactory.make_concept_code(domain=domain, code=ref)
+                ref = ConceptCodeFactory.make_concept_code(domain=domain, code=ref)
             new_refines.append(ref)
         return new_refines
-
-    @classmethod
-    def make_concept_code(cls, domain: str, code: str) -> str:
-        if "." in code:
-            return code
-        return f"{domain}.{code}"
 
     @classmethod
     def make_from_details_dict_if_possible(
@@ -51,7 +48,7 @@ class ConceptFactory:
             # legacy format
             details_dict["domain"] = domain
             details_dict["refines"] = ConceptFactory.make_refines(domain=domain, refines=details_dict.pop("refines", []))
-            details_dict["code"] = ConceptFactory.make_concept_code(domain, code)
+            details_dict["code"] = ConceptCodeFactory.make_concept_code(domain, code)
             try:
                 the_concept = Concept.model_validate(details_dict)
             except ValidationError as e:
@@ -94,7 +91,7 @@ class ConceptFactory:
         # TODO: don't wall make_concept_code from the factory, the code received here must already be a valid concept code
         concept_dict = {
             "domain": domain_code,
-            "code": ConceptFactory.make_concept_code(domain_code, code),
+            "code": ConceptCodeFactory.make_concept_code(domain_code, code),
             "definition": definition,
             "structure_class_name": structure_class_name,
         }
@@ -126,12 +123,51 @@ class ConceptFactory:
             structure_class_name = TextContent.__name__
 
         return Concept(
-            code=ConceptFactory.make_concept_code(domain, code),
+            code=ConceptCodeFactory.make_concept_code(domain, code),
             domain=domain,
             definition=concept_blueprint.definition,
             structure_class_name=structure_class_name,
             refines=concept_blueprint.refines,
         )
+
+    @classmethod
+    def make_native_concept(cls, native_concept: NativeConcept) -> Concept:
+        definition: str
+        match native_concept:
+            case NativeConcept.TEXT:
+                definition = "A text"
+            case NativeConcept.IMAGE:
+                definition = "An image"
+            case NativeConcept.PDF:
+                definition = "A PDF"
+            case NativeConcept.TEXT_AND_IMAGES:
+                definition = "A text and an image"
+            case NativeConcept.NUMBER:
+                definition = "A number"
+            case NativeConcept.LLM_PROMPT:
+                definition = "A prompt for an LLM"
+            case NativeConcept.DYNAMIC:
+                definition = "A dynamic concept"
+            case NativeConcept.PAGE:
+                definition = "The content of a page of a document, comprising text and linked images as well as an optional page view image"
+            case NativeConcept.ANYTHING:
+                raise RuntimeError("NativeConcept.ANYTHING cannot be used as a concept")
+
+        return Concept(
+            code=native_concept.code,
+            domain=SpecialDomain.NATIVE,
+            definition=definition,
+            structure_class_name=native_concept.content_class_name,
+        )
+
+    @classmethod
+    def list_native_concepts(cls) -> List[Concept]:
+        concepts: List[Concept] = []
+        for native_concept in NativeConcept:
+            if native_concept == NativeConcept.ANYTHING:
+                continue
+            concepts.append(cls.make_native_concept(native_concept=native_concept))
+        return concepts
 
     @classmethod
     def get_concept_class_source_code(cls, concept_name: str, base_class: Type[Any]) -> str:

@@ -1,13 +1,14 @@
 import pytest
 
 from pipelex.core.concept import Concept
+from pipelex.core.concept_native import NativeConcept
 from pipelex.exceptions import ConceptCodeError, ConceptDomainError, ConceptError
 
 
-class TestConceptRefinesValidation:
+class TestConceptRefinesValidationFunction:
     def test_validate_refines_success(self):
         # Test valid refines list
-        valid_refines = ["domain1.Concept1", "domain2.Concept2"]
+        valid_refines = ["domain1.Concept1", "domain2.Concept2", NativeConcept.TEXT.value]
         result = Concept.validate_refines(valid_refines)
         assert result == valid_refines
 

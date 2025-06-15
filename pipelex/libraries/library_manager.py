@@ -86,7 +86,7 @@ class LibraryManager:
             )
             library_paths += [LibraryConfig.test_pipelines_path]
 
-        native_concepts = NativeConcept.all_concepts()
+        native_concepts = ConceptFactory.list_native_concepts()
         self.concept_library.add_concepts(concepts=native_concepts)
 
         self._load_combo_libraries(library_paths=library_paths)

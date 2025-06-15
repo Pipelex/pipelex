@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 
 from pipelex.config import get_config
 from pipelex.core.concept import Concept, ConceptError
+from pipelex.core.concept_code_factory import ConceptCodeFactory
+from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff, StuffCreationRecord
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
@@ -29,15 +31,6 @@ class StuffFactory:
         return Stuff.make_stuff_name(concept_str=concept_str)
 
     @classmethod
-    def make_concept_code_from_str(cls, concept_str: str) -> str:
-        if not Concept.concept_str_contains_domain(concept_str=concept_str):
-            if concept_str in NativeConcept.names():
-                native_concept = NativeConcept(concept_str)
-                return native_concept.code
-            raise ConceptError(f"Concept '{concept_str}' does not contain a domain")
-        return concept_str
-
-    @classmethod
     def make_stuff(
         cls,
         concept_str: str,
@@ -48,7 +41,7 @@ class StuffFactory:
         pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         try:
-            concept_code = cls.make_concept_code_from_str(concept_str=concept_str)
+            concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
         except ConceptError:
             stuff_ref = name or code or "unnamed"
             raise StuffFactoryError(f"Concept '{concept_str}' does not contain a domain, could not make stuff '{stuff_ref}'")
@@ -113,7 +106,7 @@ class StuffFactory:
         pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         try:
-            concept_code = cls.make_concept_code_from_str(concept_str=concept_str)
+            concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
         except ConceptError:
             stuff_ref = name or "unnamed"
             raise StuffFactoryError(f"Concept '{concept_str}' does not contain a domain, could not make stuff '{stuff_ref}'")

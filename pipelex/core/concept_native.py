@@ -1,8 +1,6 @@
 from enum import Enum
 from typing import List
 
-from pipelex.core.concept import Concept
-from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.domain import SpecialDomain
 from pipelex.types import StrEnum
 
@@ -37,7 +35,9 @@ class NativeConcept(Enum):
 
     @property
     def code(self) -> str:
-        return ConceptFactory.make_concept_code(SpecialDomain.NATIVE, self.value)
+        if "." in self.value:
+            return self.value
+        return f"{SpecialDomain.NATIVE}.{self.value}"
 
     @property
     def content_class_name(self) -> NativeConceptClass:
@@ -60,41 +60,3 @@ class NativeConcept(Enum):
                 return NativeConceptClass.PAGE
             case NativeConcept.ANYTHING:
                 raise RuntimeError("NativeConcept.ANYTHING cannot be used as a content class name")
-
-    def make_concept(self) -> Concept:
-        definition: str
-        match self:
-            case NativeConcept.TEXT:
-                definition = "A text"
-            case NativeConcept.IMAGE:
-                definition = "An image"
-            case NativeConcept.PDF:
-                definition = "A PDF"
-            case NativeConcept.TEXT_AND_IMAGES:
-                definition = "A text and an image"
-            case NativeConcept.NUMBER:
-                definition = "A number"
-            case NativeConcept.LLM_PROMPT:
-                definition = "A prompt for an LLM"
-            case NativeConcept.DYNAMIC:
-                definition = "A dynamic concept"
-            case NativeConcept.PAGE:
-                definition = "The content of a page of a document, comprising text and linked images as well as an optional page view image"
-            case NativeConcept.ANYTHING:
-                raise RuntimeError("NativeConcept.ANYTHING cannot be used as a concept")
-
-        return Concept(
-            code=self.code,
-            domain=SpecialDomain.NATIVE,
-            definition=definition,
-            structure_class_name=self.content_class_name,
-        )
-
-    @classmethod
-    def all_concepts(cls) -> List[Concept]:
-        concepts: List[Concept] = []
-        for code in cls:
-            if code == cls.ANYTHING:
-                continue
-            concepts.append(code.make_concept())
-        return concepts
