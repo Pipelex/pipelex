@@ -56,7 +56,7 @@ The structure is like this:
 │   └── llm_integrations/                   # This directory regroups the configuration of the different models
 ```
 
-Learn more about pipelex_libraries in our [Libraries documentation](../how-to-build-pipelex-pipelines/libraries.md)
+Learn more about pipelex_libraries in our [Libraries documentation](../build-reliable-ai-workflows-with-pipelex/setup-ai-pipeline-project.md)
 
 - `pipelex init-config`: This cli command will create a `pipelex.toml` file at the root of the project, with basic configuration. This configuration file gathers all configuration for feature flags, logging, cost reporting, and so on... Learn more in our [Configuration documentation](../configuration/index.md)
 

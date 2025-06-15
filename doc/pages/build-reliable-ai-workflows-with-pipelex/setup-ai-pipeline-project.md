@@ -54,52 +54,13 @@ This creates a simple Q&A pipeline with:
 - Two concepts: Question and Answer
 - One pipe that transforms a Question into an Answer
 
-## Organizing Libraries and Domains
+The `domain` property is the most important part of your library file. It groups all your concepts and pipes into a single, addressable unit. Learn more about how to use them in [What Are Domains?](what-are-domains.md).
 
-Think of domains as namespaces for your pipeline functionality. Each domain represents a distinct area of knowledge processing:
+## Organizing Your Libraries
 
-```
-pipelex_libraries/pipelines/
-├── legal.toml          # Domain: legal document processing
-├── legal.py            # Models for legal concepts
-├── finance.toml        # Domain: financial analysis
-├── finance.py          # Models for financial concepts
-├── content.toml        # Domain: content generation
-└── content.py          # Models for content concepts
-```
+As your project grows, you'll create multiple library files. Each file should contain a single domain with its related concepts and pipes. This helps keep your knowledge organized and easy to manage.
 
-**Domain Guidelines:**
-
-1. **One domain per file**: Each TOML file defines exactly one domain
-2. **Focused scope**: Keep domains focused on a specific area (legal, finance, content)
-3. **Shared models**: The corresponding Python file contains all structured models for that domain
-4. **Clear boundaries**: If concepts don't naturally fit together, they belong in different domains
-
-Example of multiple related concepts in one domain:
-
-```toml
-# pipelex_libraries/pipelines/legal.toml
-
-domain = "legal"
-description = "Legal document analysis and processing"
-
-[concept]
-Contract = "A legally binding agreement between parties"
-NonCompeteClause = "A clause restricting competitive activities"
-Jurisdiction = "The legal authority under which the contract operates"
-ContractSummary = "A concise overview of key contract terms"
-
-[pipe]
-[pipe.extract_non_compete]
-PipeLLM = "Extract non-compete clauses from a contract"
-inputs = { contract = "legal.Contract" }
-output = "legal.NonCompeteClause"
-
-[pipe.summarize_contract]
-PipeLLM = "Create a summary of contract key points"
-inputs = { contract = "legal.Contract" }
-output = "legal.ContractSummary"
-```
+For more details on how to structure your domains, see [What Are Domains?](what-are-domains.md).
 
 ## File Naming Conventions
 

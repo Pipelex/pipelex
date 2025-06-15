@@ -1,6 +1,6 @@
 # Pipe Controllers
 
-Pipe controllers are the orchestrators of a Pipelex pipeline. While [Pipe Operators](./../pipe-operators) perform the work, pipe controllers define the workflow and manage the execution logic. They allow you to run other pipes in sequence, in parallel, or conditionally.
+Pipe controllers are the orchestrators of a Pipelex pipeline. While [Pipe Operators](../pipe-operators/index.md) perform the work, pipe controllers define the workflow and manage the execution logic. They allow you to run other pipes in sequence, in parallel, or conditionally.
 
 ## Core Controllers
 
