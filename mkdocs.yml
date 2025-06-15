@@ -1,5 +1,5 @@
 site_name: Pipelex Documentation
-site_url: https://pipelex.com
+site_url: https://docs.pipelex.com/
 docs_dir: doc
 
 theme:
@@ -53,9 +53,8 @@ nav:
   - Home: index.md
   - Installation: pages/Installation/Installation.md
   - Quick-start: pages/Quick-start/Quick-start.md
-  - Overview:
-    - Pipelex paradigm: pages/Overview/Pipelex paradigm.md
-    - Building knowledge pipelines: pages/Overview/Building knowledge pipelines.md
+  - Pipelex paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
+  - Building knowledge pipelines: pages/how-to-build-pipelex-pipelines/index.md
   - Libraries: pages/Libraries/libraries.md
   - Domains: pages/Domains/domains.md
   - Concepts: pages/Concepts/Concepts.md

@@ -1,4 +1,4 @@
-# Building Knowledge Pipelines
+# Building Knowledge Pipelines with Pipelex
 
 ## Core Components
 

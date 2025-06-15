@@ -8,9 +8,9 @@ Pipelex is a Python framework for defining and running repeatable AI workflows.
 
 - [Quick-start](pages/Quick-start/Quick-start.md)
 
-- [Pipelex paradigm](pages/Overview/Pipelex%20paradigm.md)
+<!-- - [Pipelex paradigm](pages/Overview/Pipelex%20paradigm.md) -->
 
-- [Building knowledge pipelines](pages/Overview/Building%20knowledge%20pipelines.md)
+<!-- - [Building knowledge pipelines](pages/Overview/Building%20knowledge%20pipelines.md) -->
 
 - [Libraries](pages/Libraries/libraries.md)
 
