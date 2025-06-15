@@ -1,3 +1,53 @@
 # PipeOcr
 
-Processes images and PDFs using Optical Character Recognition.
+The `PipeOcr` operator performs Optical Character Recognition (OCR) on images and PDF documents. It extracts text, embedded images, and provides full-page renderings.
+
+## How it works
+
+`PipeOcr` takes a single input, which must be either an `Image` or a `Pdf`. It processes the document page by page and produces a list of `PageContent` objects. Each `PageContent` object encapsulates all the information extracted from a single page.
+
+The output is always a list, even if the input is a single image (in which case the list will contain just one item).
+
+### The `PageContent` Structure
+
+The `PageContent` object has the following structure:
+
+-   `text_and_images`: Contains the main extracted content.
+    -   `text`: The recognized text from the page as a `TextContent`.
+    -   `images`: A list of any images found embedded within the page.
+-   `page_view`: An `ImageContent` object representing a full visual rendering of the page.
+
+## Configuration
+
+`PipeOcr` is configured in your pipeline's `.toml` file.
+
+### TOML Parameters
+
+| Parameter                   | Type    | Description                                                                                                                              | Required |
+| --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `PipeOcr`                   | string  | A descriptive name for the pipe's function.                                                                                              | Yes      |
+| `input`                     | string  | The input concept, which must be compatible with `native.Image` or `native.Pdf`.                                                         | Yes      |
+| `output`                    | string  | The output concept. It should be defined to hold a list of pages, typically using a structure that wraps a `ListContent[PageContent]`.    | Yes      |
+| `should_include_images`     | boolean | If `true`, any images found within the document pages will be extracted and included in the output. Defaults to `false`.                 | No       |
+| `should_include_page_views` | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
+| `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `150`.                                 | No       |
+| `should_caption_images`     | boolean | If `true`, the OCR service may attempt to generate captions for the images found. *Note: This feature depends on the OCR provider.*        | No       |
+
+### Example: Processing a PDF
+
+This example defines a pipe that takes a PDF, extracts text and full-page images, and outputs them as a list of pages.
+
+```toml
+[concept]
+ScannedDocument = "A document that has been scanned as a PDF"
+ExtractedPages = "A list of pages extracted from a document by OCR"
+
+[pipe.ocr_scanned_document]
+PipeOcr = "Extract text and page images from a scanned document"
+input = "ScannedDocument"
+output = "ExtractedPages"
+should_include_page_views = true
+page_views_dpi = 200
+```
+
+To use this pipe, you would first need to load a PDF into the `ScannedDocument` concept. After the pipe runs, the `ExtractedPages` concept will contain a list of `PageContent` objects, where each object has the extracted text and a 200 DPI image of the corresponding page.

@@ -90,7 +90,7 @@ Think of it and then output the character description."""
 💡 We have a lot of [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/pipelex/libraries/llm_deck/base_llm_deck.toml).
 Make sure you have credentials for the underlying LLM provider (and added your API key to the `.env`) and select the one you want!
 
-Learn more about LLM presets, LLM handles and LLM deck in our [LLM Configuration Guide](../configuration/llm-configuration.md)
+Learn more about LLM presets, LLM handles and LLM deck in our [LLM Configuration Guide](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md)
 
 ### Generate a structured output
 
@@ -220,6 +220,7 @@ async def process_existing_character():
         name="Elias",
         age=38,
         gender="man",
+        occupation="explorer",
         description="""Elias Varrin is a 38-year-old man, standing at approximately 1.85 meters tall, with a lean,
         weathered frame shaped by decades of travel through remote and often unforgiving landscapes.
         His name, though not widely known, carries weight among historians, explorers, and those who trade in whispered legends.

@@ -1,6 +1,18 @@
 # Pipe Operators
 
-Pipe operators are the core processing units in Pipelex. Each operator type specializes in a specific kind of task, from LLM interactions to data transformations.
+Pipe operators are the fundamental building blocks in Pipelex, representing a single, focused task. They are the "verbs" of your pipeline that perform the actual work.
+
+Each operator specializes in a specific kind of action, from interacting with Large Language Models to executing custom Python code. You combine these operators using [Pipe Controllers](./../pipe-controllers) to create complex workflows.
+
+## Core Operators
+
+Here are the primary pipe operators available in Pipelex:
+
+-   [**`PipeLLM`**](./PipeLLM.md): The core operator for all interactions with Large Language Models (LLMs), including text generation, structured data extraction, and vision tasks.
+-   [**`PipeOcr`**](./PipeOcr.md): Performs Optical Character Recognition (OCR) on images and PDF documents to extract text and embedded images.
+-   [**`PipeImgGen`**](./PipeImgGen.md): Generates images from a text prompt using models like DALL-E 3 or Stable Diffusion.
+-   [**`PipeFunc`**](./PipeFunc.md): An escape hatch that allows you to execute any custom Python function, giving you maximum flexibility.
+-   [**`PipeJinja2`**](./PipeJinja2.md): Renders a Jinja2 template using data from the working memory, perfect for creating formatted reports or complex prompts.
 
 ## Overview
 

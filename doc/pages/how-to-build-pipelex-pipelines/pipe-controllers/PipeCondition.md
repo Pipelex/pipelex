@@ -1,44 +1,76 @@
 # PipeCondition
 
-The `PipeCondition` operator enables routing in your pipeline based on conditional expressions. It evaluates an expression and routes the execution to different pipes based on the result.
+The `PipeCondition` controller adds branching logic to your pipelines. It evaluates an expression and, based on the string result, chooses which subsequent pipe to execute from a map of possibilities.
 
-## How It Works
+## How it works
 
-1. **Expression Evaluation**:
+`PipeCondition` is a routing mechanism. Its execution flow is as follows:
 
-   - Takes an input expression (either simple or Jinja2 template)
-   - Evaluates it using the current working memory context
-   - Returns a string value that determines which pipe to execute
+1.  **Evaluate an Expression**: It takes an expression and renders it using Jinja2, with the full `WorkingMemory` available as context. This evaluation results in a simple string.
+2.  **Look Up in Pipe Map**: The resulting string is used as a key to find a corresponding pipe name in the `pipe_map`.
+3.  **Use Default (Optional)**: If the key is not found in the `pipe_map`, it will use the `default_pipe_code` if one is provided. If there's no match and no default, an error is raised.
+4.  **Execute Chosen Pipe**: The chosen pipe is then executed. It receives the exact same `WorkingMemory` and inputs that were passed to the `PipeCondition` operator. The output of the chosen pipe becomes the output of the `PipeCondition` itself.
 
-2. **Pipe Selection**:
+## Configuration
 
-   - Uses a pipe map to match the evaluated expression to a target pipe
-   - If no match is found, can use an optional default pipe
+`PipeCondition` is configured in your pipeline's `.toml` file.
 
-## Example: Product Type Router
+### TOML Parameters
+
+| Parameter                      | Type           | Description                                                                                                                                              | Required                       |
+| ------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `PipeCondition`                | string         | A descriptive name for the conditional pipe.                                                                                                             | Yes                            |
+| `input`                        | string or list | The input(s) required by the conditional logic itself and potentially by the downstream pipes.                                                             | No                             |
+| `output`                       | string         | The output concept. Since any of the downstream pipes could be chosen, this concept must be compatible with the output of all possible branches.          | Yes                            |
+| `expression`                   | string         | A simple Jinja2 expression. `{{ ... }}` are automatically added. Good for simple variable access like `"my_var.category"`.                                | Yes (or `expression_jinja2`)   |
+| `expression_jinja2`            | string         | A full Jinja2 template string. Use this for more complex logic, like `{% if my_var.value > 10 %}high{% else %}low{% endif %}`.                           | Yes (or `expression`)          |
+| `pipe_map`                     | table (dict)   | A mapping where keys are the possible string results of the expression, and values are the names of the pipes to execute.                                  | Yes                            |
+| `default_pipe_code`            | string         | The name of a pipe to execute if the expression result does not match any key in `pipe_map`.                                                             | No                             |
+| `add_alias_from_expression_to` | string         | An advanced feature. If provided, the string result of the expression evaluation is added to the working memory as an alias with this name.               | No                             |
+
+### Example: Routing based on document type
+
+Imagine a pipeline that needs to process invoices and receipts differently.
 
 ```toml
-[pipe.conditional_product_or_services]
-PipeCondition = "Choose the correct pipe based on the product or services category"
-inputs = { product_or_services_category = "ProductOrServicesCategory" }
-output = "ProductOrService"
-expression = "product_or_services_category.category"
+[pipe.classify_document_type]
+PipeLLM = "Classify the document as 'invoice' or 'receipt'"
+input = "DocumentText"
+output = "DocumentClassification" # A structure with a 'type' field
 
-[pipe.conditional_product_or_services.pipe_map]
-product = "extract_product"
-trips = "extract_trip"
-public_transportation_subscription = "extract_public_transportation_subscription"
-public_transportation_ticket = "extract_public_transportation_ticket"
-other = "extract_other"
+[pipe.process_invoice]
+# ... pipe definition ...
+output = "ProcessedDocument"
+
+[pipe.process_receipt]
+# ... pipe definition ...
+output = "ProcessedDocument"
+
+[pipe.process_other]
+# ... pipe definition ...
+output = "ProcessedDocument"
+
+# The PipeCondition definition
+[pipe.route_by_doc_type]
+PipeCondition = "Route document based on its classified type"
+input = "DocumentClassification"
+output = "ProcessedDocument"
+expression = "doc_classification.type" # Assumes input from a previous step was named 'doc_classification'
+
+[pipe.route_by_doc_type.pipe_map]
+invoice = "process_invoice"
+receipt = "process_receipt"
+
+[pipe.route_by_doc_type]
+default_pipe_code = "process_other"
 ```
 
-In this example:
-
-1. The condition reads the `category` field from `product_or_services_category` in working memory
-2. Based on the category value, it routes to a specific extraction pipe:
-   - "product" → `extract_product`
-   - "trips" → `extract_trip`
-   - etc.
+How this works:
+1.  A previous step, `classify_document_type`, runs and its output is named `doc_classification`. This output is an object with a `type` attribute (e.g., `"invoice"`).
+2.  `PipeCondition` evaluates the `expression`: `"doc_classification.type"`. Let's say it results in the string `"invoice"`.
+3.  It looks up `"invoice"` in the `pipe_map` and finds the corresponding pipe: `"process_invoice"`.
+4.  The `process_invoice` pipe is executed.
+5.  If the classification had been `"letter"`, it would not match any key in the `pipe_map`, so the `default_pipe_code` `"process_other"` would be executed instead.
 
 ## Expression Types
 

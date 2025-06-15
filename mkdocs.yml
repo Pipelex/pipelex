@@ -98,22 +98,29 @@ nav:
       - Overview: pages/how-to-build-pipelex-pipelines/pipe-controllers/index.md
       - PipeSequence: pages/how-to-build-pipelex-pipelines/pipe-controllers/PipeSequence.md
       - PipeCondition: pages/how-to-build-pipelex-pipelines/pipe-controllers/PipeCondition.md
+  - Build Reliable AI Workflows:
+    - Setup AI Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/setup-ai-pipeline-project.md
+    - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
+    - Configure AI LLM to optimize workflows: pages/build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md
+    - LLM Structured Generation: pages/build-reliable-ai-workflows-with-pipelex/llm-structured-generation-config.md
+    - LLM Prompting Style: pages/build-reliable-ai-workflows-with-pipelex/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+    - AI Plugins for multi-LLM workflows: pages/build-reliable-ai-workflows-with-pipelex/ai-plugins-for-multi-llm-workflows.md
   - Configuration:
     - Overview: pages/configuration/index.md
-    - LLM Configuration: pages/configuration/llm-configuration.md
-    - AWS Configuration: pages/configuration/aws-config.md
-    - Cogt Configuration: pages/configuration/cogt-config.md
-    - Dry Run Configuration: pages/configuration/dry-run-config.md
-    - Feature Configuration: pages/configuration/feature-config.md
-    - Library Configuration: pages/configuration/library-config.md
-    - Logging Configuration: pages/configuration/logging-config.md
-    - Pipe Run Configuration: pages/configuration/pipe-run-config.md
-    - Plugins Configuration: pages/configuration/plugins-config.md
-    - Prompting Configuration: pages/configuration/prompting-config.md
-    - Reporting Configuration: pages/configuration/reporting-config.md
-    - Static Validation Configuration: pages/configuration/static-validation-config.md
-    - Structure Configuration: pages/configuration/structure-config.md
-    - Tracker Configuration: pages/configuration/tracker-config.md
+    - Technical Configuration:
+      - AWS Configuration: pages/configuration/config-technical/aws-config.md
+      - Cogt Configuration: pages/configuration/config-technical/cogt-config.md
+      - Library Configuration: pages/configuration/config-technical/library-config.md
+    - Pipeline Validation:
+      - Dry Run Configuration: pages/configuration/config-pipeline-validation/dry-run-config.md
+      - Static Validation Configuration: pages/configuration/config-pipeline-validation/static-validation-config.md
+    - Advanced Configuration:
+      - Feature Configuration: pages/configuration/config-advanced/feature-config.md
+    - Practical Configuration:
+      - Logging Configuration: pages/configuration/config-practical/logging-config.md
+      - Pipe Run Configuration: pages/configuration/config-practical/pipe-run-config.md
+      - Reporting Configuration: pages/configuration/config-practical/reporting-config.md
+      - Tracker Configuration: pages/configuration/config-practical/tracker-config.md
   - Dependency Injection:
     - Overview: pages/dependency-injection/index.md
     - Activity Manager: pages/dependency-injection/activity-manager-injection.md

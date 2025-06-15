@@ -26,7 +26,7 @@ A Pipelex library consists of:
 
     - LLM model configurations
     - Preset definitions
-    - See more in our [LLM Configuration Guide](../configuration/llm-configuration.md)
+    - See more in our [LLM Configuration Guide](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md)
 
 ## Creating a Library
 
