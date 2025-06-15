@@ -39,17 +39,17 @@ Let's imagine a pipeline that first extracts text from an image, then summarizes
 ```toml
 [pipe.extract_text_from_image]
 PipeOcr = "..." # (definition of the OCR pipe)
-output = "native.Text"
+output = "Text"
 
 [pipe.summarize_text]
 PipeLLM = "..." # (definition of the summarization pipe)
-inputs = { text = "native.Text" }
-output = "native.Text"
+inputs = { text = "Text" }
+output = "Text"
 
 [pipe.translate_to_french]
 PipeLLM = "..." # (definition of the translation pipe)
-inputs = { text = "native.Text" }
-output = "native.Text"
+inputs = { text = "Text" }
+output = "Text"
 
 
 [pipe.image_to_french_summary]

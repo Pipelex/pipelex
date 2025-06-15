@@ -30,7 +30,7 @@ class TestPipeOCR:
                 domain="generic",
                 inputs=PipeInputSpec(
                     root={
-                        "page_scan": "native.Image",
+                        "page_scan": "Image",
                     }
                 ),
                 should_include_images=True,
@@ -64,7 +64,7 @@ class TestPipeOCR:
                 domain="generic",
                 inputs=PipeInputSpec(
                     root={
-                        "pdf": "native.PDF",
+                        "pdf": "PDF",
                     }
                 ),
                 should_include_images=True,

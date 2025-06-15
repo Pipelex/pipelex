@@ -52,13 +52,13 @@ class PipeTestCases:
     )
     SIMPLE_STUFF_IMAGE = StuffFactory.make_stuff(
         name="image",
-        concept_str="native.Image",
+        concept_str="Image",
         content=ImageContent(url=URL_IMG_FASHION_PHOTO_1),
         pipelex_session_id="unit_test",
     )
     SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
         name="pdf",
-        concept_str="native.PDF",
+        concept_str="PDF",
         content=PDFContent(url=PDFTestCases.DOCUMENT_URLS[0]),
         pipelex_session_id="unit_test",
     )
@@ -76,7 +76,7 @@ class PipeTestCases:
 
     STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1 = SomeContentWithImageAttribute(image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_1))
     STUFF_WITH_IMAGE_ATTRIBUTE = StuffFactory.make_stuff(
-        concept_str="native.Image",
+        concept_str="Image",
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
         name="stuff_with_image",
         pipelex_session_id="unit_test",
@@ -86,7 +86,7 @@ class PipeTestCases:
         sub_object=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
     )
     STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = StuffFactory.make_stuff(
-        concept_str="native.Image",
+        concept_str="Image",
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
         name="stuff_with_image_in_sub_object",
         pipelex_session_id="unit_test",

@@ -4,6 +4,7 @@ from pydantic import Field, RootModel, field_validator
 
 from pipelex import log
 from pipelex.core.concept import Concept
+from pipelex.core.concept_code_factory import ConceptCodeFactory
 from pipelex.exceptions import ConceptError, PipeInputSpecError
 
 PipeInputDetailsRoot = Dict[str, str]
@@ -27,16 +28,13 @@ class PipeInputDetails(RootModel[PipeInputDetailsRoot]):
                 log.warning(f"Sub-attribute {required_input} detected, using {transformed_key} as variable name")
 
             # Validate concept_code
-            try:
-                Concept.check_possible_concept_from_str(concept_str=concept_str)
-            except ConceptError as exc:
-                raise PipeInputSpecError(f"Invalid concept code: {concept_str}") from exc
+            concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
 
-            if transformed_key in transformed_dict and transformed_dict[transformed_key] != concept_str:
+            if transformed_key in transformed_dict and transformed_dict[transformed_key] != concept_code:
                 log.warning(
                     f"Variable {transformed_key} already exists with a different concept code: {transformed_dict[transformed_key]} -> {concept_str}"
                 )
-            transformed_dict[transformed_key] = concept_str
+            transformed_dict[transformed_key] = concept_code
 
         return transformed_dict
 

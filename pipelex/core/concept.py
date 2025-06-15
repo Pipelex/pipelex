@@ -99,12 +99,6 @@ class Concept(BaseModel):
             return False
 
     @classmethod
-    def check_possible_concept_from_str(cls, concept_str: str):
-        parts = concept_str.split(".")
-        if len(parts) > 2:
-            raise ConceptError(f"Concept code '{concept_str}' contains more than one dot")
-
-    @classmethod
     def extract_domain_and_concept_from_str(cls, concept_str: str) -> Tuple[str, str]:
         if "." in concept_str:
             domain_code, concept_code = concept_str.split(".")

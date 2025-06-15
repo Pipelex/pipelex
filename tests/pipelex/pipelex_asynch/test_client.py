@@ -30,7 +30,7 @@ class TestPipelexApiClient:
                 pipe_code="retrieve_excerpts",
                 memory=[
                     StuffFactory.make_stuff(
-                        concept_str="native.Text",
+                        concept_str="Text",
                         name="text",
                         content=TextContent(
                             text="""

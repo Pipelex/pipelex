@@ -28,10 +28,10 @@ We can achieve this with a `PipeLLM` operator.
 
 # 1. Define the concepts used in our pipes
 [concept.ProductDescription]
-refines = "native.Text"
+refines = "Text"
 
 [concept.Tagline]
-refines = "native.Text"
+refines = "Text"
 
 # 2. Define the pipe that does the work
 [pipe.generate_tagline]
@@ -56,17 +56,17 @@ To create a multi-step workflow, you use a controller. The `PipeSequence` contro
 # 1. Define concepts
 [concept.Keyword]
 Concept = "A keyword extracted from a text"
-refines = "native.Text"
+refines = "Text"
 
 [concept.Tagline]
 Concept = "A catchy marketing tagline"
-refines = "native.Text"
+refines = "Text"
 
 
 # 2. Define operator pipes
 [pipe.extract_keywords]
 PipeLLM = "Extract keywords from a text."
-inputs = { text = "native.Text" }
+inputs = { text = "Text" }
 output = "Keyword"
 multiple_output = true
 prompt_template = """
@@ -89,7 +89,7 @@ Please generate a catchy marketing tagline based on these keywords.
 # 3. This controller pipe defines the two-step pipeline
 [pipe.text_to_tagline]
 PipeSequence = "From text to tagline"
-inputs = { text = "native.Text" }
+inputs = { text = "Text" }
 output = "Tagline"
 steps = [
     { pipe = "extract_keywords", result = "extracted_keywords" },
@@ -130,7 +130,7 @@ async def main():
     working_memory = WorkingMemory()
     working_memory.add_stuff(
         "my product is a self-cleaning water bottle",
-        concept_code="native.Text"
+        concept_code="Text"
     )
 
     # Execute the pipeline and wait for the result

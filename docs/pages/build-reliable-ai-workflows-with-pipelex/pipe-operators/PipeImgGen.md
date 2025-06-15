@@ -40,7 +40,7 @@ This pipe generates one image of a futuristic car without requiring any input.
 ```toml
 [pipe.generate_car_image]
 PipeImgGen = "Generate a futuristic car image"
-output = "native.Image"
+output = "Image"
 imgg_prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
 imgg_handle = "dall-e-3"
 aspect_ratio = "16:9"

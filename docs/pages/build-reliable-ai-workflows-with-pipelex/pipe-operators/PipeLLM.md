@@ -41,7 +41,7 @@ This pipe takes no input and writes a poem.
 ```toml
 [pipe.write_poem]
 PipeLLM = "Write a short poem"
-output = "native.Text"
+output = "Text"
 llm = "llm_for_creative_writing"
 prompt = """
 Write a four-line poem about pipes.
