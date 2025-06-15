@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional, Protocol, TypeVar
 from pydantic import ConfigDict, field_validator, model_validator
 from typing_extensions import Self, runtime_checkable
 
+from pipelex.core.concept_code_factory import ConceptCodeFactory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.stuff_content import StructuredContent
@@ -20,29 +21,15 @@ class PipeBlueprint(StructuredContent):
     def add_domain_prefix(self) -> Self:
         if self.inputs:
             for input_name, input_concept_code in self.inputs.items():
-                if "." not in input_concept_code:
-                    self.inputs[input_name] = f"{self.domain}.{input_concept_code}"
-        if self.output and "." not in self.output:
-            self.output = f"{self.domain}.{self.output}"
+                self.inputs[input_name] = ConceptCodeFactory.make_concept_code_from_str(
+                    concept_str=input_concept_code,
+                    fallback_domain=self.domain,
+                )
+        self.output = ConceptCodeFactory.make_concept_code_from_str(
+            concept_str=self.output,
+            fallback_domain=self.domain,
+        )
         return self
-
-    @classmethod
-    def _add_native_prefix_if_needed(cls, value: str) -> str:
-        if value in NativeConcept.names():
-            return f"native.{value}"
-        return value
-
-    @field_validator("inputs")
-    @classmethod
-    def validate_inputs(cls, value: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
-        if value:
-            return {name: cls._add_native_prefix_if_needed(concept_code) for name, concept_code in value.items()}
-        return value
-
-    @field_validator("output")
-    @classmethod
-    def validate_output(cls, value: str) -> str:
-        return cls._add_native_prefix_if_needed(value)
 
 
 PipeBlueprintType = TypeVar("PipeBlueprintType", bound="PipeBlueprint", contravariant=True)

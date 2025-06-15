@@ -17,7 +17,7 @@ class NativeConceptClass(StrEnum):
 
 
 # Exceptionally, we use an Enum here (and not our usual StrEnum) to avoid confusion with
-# the concept_code with must have the form "native.ConceptName"
+# the concept_code which must have the form "native.ConceptName"
 class NativeConcept(Enum):
     ANYTHING = "Anything"
     DYNAMIC = "Dynamic"

@@ -8,12 +8,12 @@ VisualDescription = "Visual description of something"
 
 [concept.ImgGenPrompt]
 Concept = "Prompt to generate an image"
-refines = ["Text"]
+refines = "Text"
 
 [concept.Photo]
 Concept = "Photo"
 structure = "ImageContent"
-refines = ["Image"]
+refines = "Image"
 
 [pipe]
 

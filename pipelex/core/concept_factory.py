@@ -1,5 +1,5 @@
 from inspect import getsource
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Union
 
 from kajson.class_registry import class_registry
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -23,9 +23,13 @@ class ConceptBlueprint(BaseModel):
 
 class ConceptFactory:
     @classmethod
-    def make_refines(cls, domain: str, refines: List[str]) -> List[str]:
+    def make_refines(cls, domain: str, refines: Union[str, List[str]]) -> List[str]:
+        if isinstance(refines, str):
+            concept_str_list = [refines]
+        else:
+            concept_str_list = refines
         new_refines: List[str] = []
-        for concept_str in refines:
+        for concept_str in concept_str_list:
             concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str, fallback_domain=domain)
             new_refines.append(concept_code)
         return new_refines
