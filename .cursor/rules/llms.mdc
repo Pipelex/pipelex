@@ -59,7 +59,7 @@ The interest is that these presets can be used to set the LLM choice in a PipeLL
 ```toml
 [pipe.extract_invoice]
 PipeLLM = "Extract invoice information from an invoice text transcript"
-input = "InvoiceText"
+inputs = { invoice_text = "InvoiceText" }
 output = "Invoice"
 llm = "llm_to_extract_invoice"
 prompt_template = """
