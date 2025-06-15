@@ -7,7 +7,7 @@ It can integrate both **AI-based** or software-based knowledge processing.
 
 Like concepts, Pipes are defined using a **`toml` syntax.**
 
-- This part is meant to be **written in a library `toml` file, in the same one as concepts** (see [Libraries](../Libraries/libraries.md)).
+- This part is meant to be **written in a library `toml` file, in the same one as concepts** (see [Libraries](../how-to-build-pipelex-pipelines/libraries.md)).
 
 ### General Structure
 
@@ -22,7 +22,7 @@ output = "<OutputConcept>"
 ... then come the Pipe specific fields
 ```
 
-The `Pipe<Type>` determines the kind of pipe. For a complete list of available pipe types and their specific configurations, see our [Pipe Operators Guide](Pipe%20Operators.md).
+The `Pipe<Type>` determines the kind of pipe. For a complete list of available pipe types and their specific configurations, see our [Pipe Operators Guide](./pipe-operators/index.md).
 
 ## Working Memory
 
@@ -84,8 +84,3 @@ Justify why you chose those excerpts. Do not modify the original text.
 """
 ```
 
-## Related Topics
-
-- [Pipe Operators Guide](Pipe%20Operators.md) - Detailed information about each pipe type
-- [Concepts Documentation](../Concepts/Concepts.md)
-- [Libraries Documentation](../Libraries/libraries.md)

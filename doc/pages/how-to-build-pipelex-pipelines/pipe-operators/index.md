@@ -7,8 +7,6 @@ Pipe operators are the core processing units in Pipelex. Each operator type spec
 Pipelex provides the following pipe operators:
 
 - `PipeLLM`: For LLM-based text generation and processing
-- `PipeCondition`: For conditional execution based on input validation
-- `PipeSequence`: For chaining multiple pipes in sequence
 - `PipeOcr`: For optical character recognition and document processing
 - `PipeFunc`: For executing custom functions
 - `PipeImgGen`: For image generation and manipulation
@@ -24,22 +22,6 @@ Core operator for LLM-based text generation and processing.
 - Multiple output modes
 - System prompt customization
 - LLM configuration
-
-## PipeCondition
-
-Enables conditional execution based on input validation.
-
-### Key Features
-
-- Expression-based routing
-- Default fallback paths
-- Jinja2 template support
-- Input validation
-- Error handling
-
-## PipeSequence
-
-Chains multiple pipes together in sequence.
 
 ### Key Features
 

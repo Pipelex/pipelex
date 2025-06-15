@@ -6,7 +6,7 @@ Pipelex requires `python` version `3.10` or above, and access to an LLM, via an 
 
 ## 🧭 Getting Started
 
-Along with [our Documentation](../Quick-start/Quick-start.md), we recommend you review it before any further usage: [Cookbook](https://github.com/Pipelex/pipelex-cookbook).
+Along with [our Documentation](../quick-start/index.md), we recommend you review it before any further usage: [Cookbook](https://github.com/Pipelex/pipelex-cookbook).
 
 - **Create a virtual environment** (recommended)
 
@@ -56,9 +56,9 @@ The structure is like this:
 │   └── llm_integrations/                   # This directory regroups the configuration of the different models
 ```
 
-Learn more about pipelex_libraries in our [Libraries documentation](../Libraries/libraries.md)
+Learn more about pipelex_libraries in our [Libraries documentation](../how-to-build-pipelex-pipelines/libraries.md)
 
-- `pipelex init-config`: This cli command will create a `pipelex.toml` file at the root of the project, with basic configuration. This configuration file gathers all configuration for feature flags, logging, cost reporting, and so on... Learn more in our [Configuration documentation](../Configuration/configuration.md)
+- `pipelex init-config`: This cli command will create a `pipelex.toml` file at the root of the project, with basic configuration. This configuration file gathers all configuration for feature flags, logging, cost reporting, and so on... Learn more in our [Configuration documentation](../configuration/index.md)
 
 
 💡 _Any troubles? Have a look at our [Cookbook](https://github.com/Pipelex/pipelex-cookbook)! and come ask for help on our [Discord](https://discord.gg/SReshKQjWt)_

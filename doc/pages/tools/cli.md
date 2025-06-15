@@ -49,7 +49,7 @@ pipelex show-config
 ```
 
 Shows the complete configuration for your project, including all settings and parameters.
-See more in our [Configuration documentation](../Configuration/configuration.md)
+See more in our [Configuration documentation](../configuration/index.md)
 
 ### `pipelex list-pipes`
 
@@ -77,11 +77,3 @@ The output is formatted as tables grouped by domain, with concept codes simplifi
    - Start with `pipelex init-config`
    - Then run `pipelex init-libraries`
    - Finally, validate your setup with `pipelex validate`
-
-Related topics:
-
-- [Configuration](../Configuration/configuration.md)
-- [Pipes](../Pipes/Pipes.md)
-- [Concepts](../Concepts/Concepts.md)
-- [Libraries](../Libraries/libraries.md)
-- [Domains](../Domains/domains.md)

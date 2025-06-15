@@ -90,7 +90,7 @@ Think of it and then output the character description."""
 💡 We have a lot of [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/pipelex/libraries/llm_deck/base_llm_deck.toml).
 Make sure you have credentials for the underlying LLM provider (and added your API key to the `.env`) and select the one you want!
 
-Learn more about LLM presets, LLM handles and LLM deck in our [LLM Configuration Guide](../LLM-Configuration/llm-configuration.md)
+Learn more about LLM presets, LLM handles and LLM deck in our [LLM Configuration Guide](../configuration/llm-configuration.md)
 
 ### Generate a structured output
 
@@ -199,7 +199,7 @@ Your task is to extract specific data from the following description.
 
 💡 `@character.description` is substituted by grabbing the stuff named `character`in the working memory and using its `description`attribute
 
-Learn more about how we use Jinja in our [Jinja documentation](../Jinja/Jinja.md)
+Learn more about how we use Jinja in our [Jinja documentation](../tools/jinja2-templating.md)
 
 ### **This is how you do it from the code side**
 
