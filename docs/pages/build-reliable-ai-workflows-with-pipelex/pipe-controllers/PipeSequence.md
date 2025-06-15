@@ -19,7 +19,7 @@ A `PipeSequence` defines a list of `steps`. Each step calls another pipe and giv
 | Parameter  | Type            | Description                                                                                                    | Required |
 | ---------- | --------------- | -------------------------------------------------------------------------------------------------------------- | -------- |
 | `PipeSequence` | string          | A descriptive name for the sequence.                                                                           | Yes      |
-| `input`    | string or list  | The input concept(s) for the *first* pipe in the sequence.                                                     | No       |
+| `inputs`    | dictionary  | The input concept(s) for the *first* pipe in the sequence, as a dictionary mapping input names to concept codes.                                                     | No       |
 | `output`   | string          | The output concept produced by the *last* pipe in the sequence.                                                | Yes      |
 | `steps`    | array of tables | An ordered list of the pipes to execute. Each table in the array defines a single step.                          | Yes      |
 
@@ -43,28 +43,22 @@ output = "native.Text"
 
 [pipe.summarize_text]
 PipeLLM = "..." # (definition of the summarization pipe)
-input = "native.Text"
+inputs = { text = "native.Text" }
 output = "native.Text"
 
 [pipe.translate_to_french]
 PipeLLM = "..." # (definition of the translation pipe)
-input = "native.Text"
+inputs = { text = "native.Text" }
 output = "native.Text"
 
 
 [pipe.image_to_french_summary]
 PipeSequence = "Extract, summarize, and translate text from an image"
-input = "source.Image"
+inputs = { image = "source.Image" }
 output = "target.FrenchText"
 steps = [
     { pipe = "extract_text_from_image", result = "extracted_text" },
-    { pipe = "summarize_text", input = "extracted_text", result = "english_summary" },
-    { pipe = "translate_to_french", input = "english_summary", result = "french_summary" },
+    { pipe = "summarize_text", result = "english_summary" },
+    { pipe = "translate_to_french", result = "french_summary" },
 ]
 ```
-*Note: In a real toml, you would also need to define the concepts `source.Image` and `target.FrenchText`*
-
-How this sequence works:
-1.  **Step 1**: The `extract_text_from_image` pipe runs, taking the `source.Image` as input. Its text output is saved to the working memory as `extracted_text`.
-2.  **Step 2**: The `summarize_text` pipe runs. It takes `extracted_text` from the working memory as its input. Its output is saved as `english_summary`.
-3.  **Step 3**: The `translate_to_french` pipe runs, taking `english_summary` as its input. Its output is saved as `french_summary`. This is the last step, so its result becomes the final output of the entire `image_to_french_summary` sequence pipe.

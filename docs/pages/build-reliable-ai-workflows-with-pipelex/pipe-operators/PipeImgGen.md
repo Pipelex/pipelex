@@ -20,9 +20,9 @@ The pipe can be configured to generate a single image or a list of images.
 
 | Parameter               | Type            | Description                                                                                                                   | Required |
 | ----------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `PipeImgGen`            | string          | A descriptive name for the pipe's function.                                                                                   | Yes      |
-| `input`                 | string          | The input concept (must be a `Text`) that provides the prompt. Use this *or* `imgg_prompt`.                                    | No       |
-| `output`                | string          | The output concept. Should be compatible with `native.Image`.                                                                 | No       |
+| `PipeImgGen`            | string          | A descriptive name for the image generation operation.                                                                           | Yes      |
+| `inputs`                | dictionary      | The input concept(s) for the image generation operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
+| `output`                | string          | The output concept produced by the image generation operation.                                                | Yes      |
 | `imgg_prompt`           | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |
 | `output_multiplicity`   | integer         | The number of images to generate. If omitted, a single image is generated.                                                    | No       |
 | `imgg_handle`           | string          | The handle for the image generation model to use (e.g., `"dall-e-3"`). Defaults to the model specified in the global config.    | No       |

@@ -25,9 +25,9 @@ The `PageContent` object has the following structure:
 
 | Parameter                   | Type    | Description                                                                                                                              | Required |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `PipeOcr`                   | string  | A descriptive name for the pipe's function.                                                                                              | Yes      |
-| `input`                     | string  | The input concept, which must be compatible with `native.Image` or `native.Pdf`.                                                         | Yes      |
-| `output`                    | string  | The output concept. It should be defined to hold a list of pages, typically using a structure that wraps a `ListContent[PageContent]`.    | Yes      |
+| `PipeOcr`                   | string  | A descriptive name for the OCR operation.                                                                           | Yes      |
+| `inputs`                    | dictionary  | The input concept(s) for the OCR operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
+| `output`                    | string  | The output concept produced by the OCR operation.                                                | Yes      |
 | `should_include_images`     | boolean | If `true`, any images found within the document pages will be extracted and included in the output. Defaults to `false`.                 | No       |
 | `should_include_page_views` | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
 | `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `150`.                                 | No       |
@@ -42,10 +42,10 @@ This example defines a pipe that takes a PDF, extracts text and full-page images
 ScannedDocument = "A document that has been scanned as a PDF"
 ExtractedPages = "A list of pages extracted from a document by OCR"
 
-[pipe.ocr_scanned_document]
-PipeOcr = "Extract text and page images from a scanned document"
-input = "ScannedDocument"
-output = "ExtractedPages"
+[pipe.extract_text_from_document]
+PipeOcr = "Extract text from a scanned document"
+inputs = { document = "ScannedDocument" }
+output = "ExtractedText"
 should_include_page_views = true
 page_views_dpi = 200
 ```

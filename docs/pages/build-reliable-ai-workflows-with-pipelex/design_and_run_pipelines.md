@@ -36,10 +36,10 @@ refines = "native.Text"
 # 2. Define the pipe that does the work
 [pipe.generate_tagline]
 PipeLLM = "Generate a catchy tagline for a product."
-input = "ProductDescription"
+inputs = { description = "ProductDescription" }
 prompt_template = """
 Product Description:
-{{ ProductDescription }}
+@description
 ---
 Generate a catchy tagline based on the above description.
 """
@@ -54,39 +54,42 @@ To create a multi-step workflow, you use a controller. The `PipeSequence` contro
 # Filename: my_pipes.toml
 
 # 1. Define concepts
-[concept.Keywords]
+[concept.Keyword]
+Concept = "A keyword extracted from a text"
 refines = "native.Text"
 
 [concept.Tagline]
+Concept = "A catchy marketing tagline"
 refines = "native.Text"
 
 
 # 2. Define operator pipes
 [pipe.extract_keywords]
 PipeLLM = "Extract keywords from a text."
-input = "native.Text"
+inputs = { text = "native.Text" }
+output = "Keyword"
+multiple_output = true
 prompt_template = """
 Please extract the most relevant keywords from the following text:
 ---
-{{ native.Text }}
+@text
 """
-output = "Keywords"
 
 [pipe.generate_tagline_from_keywords]
 PipeLLM = "Generate a tagline from a list of keywords."
-input = "Keywords"
+inputs = { keywords = "Keyword" }
+output = "Tagline"
 prompt_template = """
 Here are some keywords:
-{{ Keywords }}
+@keywords
 ---
 Please generate a catchy marketing tagline based on these keywords.
 """
-output = "Tagline"
 
 # 3. This controller pipe defines the two-step pipeline
 [pipe.text_to_tagline]
 PipeSequence = "From text to tagline"
-input = "native.Text"
+inputs = { text = "native.Text" }
 output = "Tagline"
 steps = [
     { pipe = "extract_keywords", result = "extracted_keywords" },
@@ -102,7 +105,7 @@ The Working Memory is a temporary storage space that exists for the duration of 
 
 1.  When a pipe in a sequence executes, its output is given a name using the `result` key (e.g., `result = "extracted_keywords"`).
 2.  This named result is placed into the Working Memory.
-3.  Subsequent pipes can then reference this data by its name in their `input` field (e.g., `input = "extracted_keywords"`).
+3.  Subsequent pipes can then reference this data by its name in their `inputs` field (e.g., `inputs = { keywords = "Keyword" }`).
 
 This mechanism allows you to chain pipes together, creating a flow of information through your pipeline.
 

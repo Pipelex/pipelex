@@ -21,9 +21,9 @@ For structured data output, `PipeLLM` employs two main strategies:
 
 | Parameter                   | Type                | Description                                                                                                                                                                  | Required |
 | --------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `PipeLLM`                   | string              | A descriptive name for the pipe's function.                                                                                                                                  | Yes      |
-| `input`                     | string or list      | The concept(s) that this pipe takes as input.                                                                                                                                | No       |
-| `output`                    | string              | The concept that this pipe produces as output.                                                                                                                               | Yes      |
+| `PipeLLM`                   | string              | A descriptive name for the LLM operation.                                                                           | Yes      |
+| `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
+| `output`                    | string              | The output concept produced by the LLM operation.                                                | Yes      |
 | `llm`                       | string or table     | Specifies the LLM preset(s) to use. Can be a single preset or a table mapping different presets for different generation modes (e.g., `main`, `object_direct`).              | No       |
 | `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Can be inline text or a reference to a template file (`"file:path/to/prompt.md"`).  | No       |
 | `prompt`                    | string              | A simple, static user prompt. Use this when you don't need to inject any variables.                                                                                          | No       |
@@ -54,15 +54,15 @@ This pipe summarizes an input text, using a `prompt_template` to inject the inpu
 
 ```toml
 [pipe.summarize_text]
-PipeLLM = "Summarize the input text"
-input = "TextToSummarize"
-output = "native.Text"
-llm = "llm_to_summarize"
-system_prompt = "You are an expert in text summarization."
+PipeLLM = "Summarize a text"
+inputs = { text = "TextToSummarize" }
+output = "TextSummary"
 prompt_template = """
-Summarize the following text:
+Please provide a concise summary of the following text:
 
-@text_to_summarize
+@text
+
+The summary should be no longer than 3 sentences.
 """
 ```
 
@@ -71,13 +71,14 @@ Summarize the following text:
 This pipe takes an image of a table and uses a VLM to extract the content as an HTML table.
 
 ```toml
-[pipe.get_html_table_from_image]
-PipeLLM = "Convert table screenshot to HTML"
-input = "TableScreenshot"
-output = "HtmlTable"
-images = ["table_screenshot"]
-llm = "llm_vision_model"
-prompt = "Extract the table from the attached image in HTML format."
+[pipe.extract_table_from_image]
+PipeLLM = "Extract table data from an image"
+inputs = { image = "TableScreenshot" }
+output = "TableData"
+images = ["image"]
+prompt_template = """
+Extract the table data from this image and format it as a structured table.
+"""
 ```
 
 ### Structured Data Extraction Example
@@ -88,16 +89,19 @@ This pipe extracts a list of `Expense` items from a block of text.
 [concept.Expense]
 structure = "Expense" # Assumes a Pydantic model 'Expense' is defined
 
-[pipe.extract_expenses]
-PipeLLM = "Extract all expenses from the report"
-input = "ExpenseReport"
-output = "Expense"
-output_multiplicity = "list"
-llm = "llm_for_extraction"
+[pipe.process_expense_report]
+PipeLLM = "Process an expense report"
+inputs = { report = "ExpenseReport" }
+output = "ProcessedExpenseReport"
 prompt_template = """
-Extract all line items from the following expense report.
+Analyze this expense report and extract the following information:
+- Total amount
+- Date
+- Vendor
+- Category
+- Line items
 
-@expense_report
+@report
 """
 ```
 

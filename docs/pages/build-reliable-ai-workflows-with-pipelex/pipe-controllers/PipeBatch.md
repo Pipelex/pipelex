@@ -22,9 +22,9 @@ This is the ideal controller for processing collections of documents, images, or
 
 | Parameter          | Type         | Description                                                                                                                                      | Required |
 | ------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| `PipeBatch`        | string       | A descriptive name for the batch processing job.                                                                                                 | Yes      |
-| `input`            | string       | The input concept, which must be a list (e.g., `ListContent[MyType]`). The name given to this input is used as the `input_list_stuff_name`.        | Yes      |
-| `output`           | string       | The output concept, which will also be a list containing the results from the branch pipe (e.g., `ListContent[MyResultType]`).                     | Yes      |
+| `PipeBatch`        | string       | A descriptive name for the batch operation.                                                                           | Yes      |
+| `inputs`           | dictionary   | The input concept(s) for the batch operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
+| `output`           | string       | The output concept produced by the batch operation.                                                | Yes      |
 | `branch_pipe_code` | string       | The name of the single pipe to execute for each item in the input list.                                                                          | Yes      |
 | `batch_params`     | table (dict) | An optional table to provide more specific names for the batch operation.                                                                        | No       |
 
@@ -43,14 +43,14 @@ Suppose you have a list of articles and you want to generate a summary for each 
 # The pipe that knows how to summarize one article
 [pipe.summarize_one_article]
 PipeLLM = "Summarize a single article"
-input = "ArticleText"
+inputs = { article = "ArticleText" }
 output = "ArticleSummary"
 prompt_template = "Please provide a one-sentence summary of the following article:\n\n@article_text"
 
 # The PipeBatch definition
 [pipe.summarize_all_articles]
 PipeBatch = "Summarize a batch of articles in parallel"
-input = "ArticleList"  # This is the list to iterate over
+inputs = { articles = "ArticleList" }  # This is the list to iterate over
 output = "SummaryList" # This will be the list of summaries
 branch_pipe_code = "summarize_one_article"
 
