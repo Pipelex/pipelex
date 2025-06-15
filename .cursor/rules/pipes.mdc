@@ -83,7 +83,7 @@ Pipelex provides the following structures natively:
 - MermaidContent
 - LLMPromptContent
 
-The native structures are implied when using the native concepts: "native.Text", "native.Number", "native.Image"... do you don't have the state it.
+The native structures are implied when using the native concepts: "Text", "Number", "Image", "PDF",... do you don't have the state it.
 
 Some subclasses of StuffContent exist which you should never use directly:
 - ListContent: this is used internally to manipulate a list of stuff, but you should NEVER define a plural concept

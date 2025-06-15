@@ -8,7 +8,7 @@ VisualDescription = "Visual description of something"
 
 [concept.ImgGenPrompt]
 Concept = "Prompt to generate an image"
-refines = ["native.Text"]
+refines = ["Text"]
 
 [concept.Photo]
 Concept = "Photo"
