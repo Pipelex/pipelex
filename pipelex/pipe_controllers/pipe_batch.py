@@ -83,7 +83,7 @@ class PipeBatch(PipeController):
             branch_input_item_code = f"{input_stuff_code}-branch-{branch_index}"
             item_input_stuff = StuffFactory.make_stuff(
                 code=branch_input_item_code,
-                concept_code=input_item_concept_code,
+                concept_str=input_item_concept_code,
                 content=item,
                 name=input_item_stuff_name,
             )
@@ -119,7 +119,7 @@ class PipeBatch(PipeController):
         list_content: ListContent[StuffContent] = ListContent(items=output_items)
         output_stuff = StuffFactory.make_stuff(
             code=output_stuff_code,
-            concept_code=self.output_concept_code,
+            concept_str=self.output_concept_code,
             content=list_content,
             name=output_name,
         )

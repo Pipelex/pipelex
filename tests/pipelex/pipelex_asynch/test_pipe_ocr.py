@@ -42,7 +42,7 @@ class TestPipeOCR:
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_image(
                 image_url=image_url,
-                concept_code="ocr.PageScan",
+                concept_str="ocr.PageScan",
                 name="page_scan",
             ),
         )
@@ -76,7 +76,7 @@ class TestPipeOCR:
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_pdf(
                 pdf_url=pdf_url,
-                concept_code=NativeConcept.PDF.code,
+                concept_str=NativeConcept.PDF.code,
                 name="pdf",
             ),
         )

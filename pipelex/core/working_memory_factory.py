@@ -16,11 +16,11 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_text(
         cls,
         text: str,
-        concept_code: str = NativeConcept.TEXT.code,
+        concept_str: str = NativeConcept.TEXT.code,
         name: Optional[str] = "text",
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
-            concept_code=concept_code,
+            concept_str=concept_str,
             content=TextContent(text=text),
             name=name,
         )
@@ -30,11 +30,11 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_image(
         cls,
         image_url: str,
-        concept_code: str = NativeConcept.IMAGE.code,
+        concept_str: str = NativeConcept.IMAGE.code,
         name: Optional[str] = "image",
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
-            concept_code=concept_code,
+            concept_str=concept_str,
             content=ImageContent(url=image_url),
             name=name,
         )
@@ -44,11 +44,11 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_pdf(
         cls,
         pdf_url: str,
-        concept_code: str = NativeConcept.PDF.code,
+        concept_str: str = NativeConcept.PDF.code,
         name: Optional[str] = "pdf",
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
-            concept_code=concept_code,
+            concept_str=concept_str,
             content=PDFContent(url=pdf_url),
             name=name,
         )

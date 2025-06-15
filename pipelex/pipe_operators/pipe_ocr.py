@@ -206,7 +206,7 @@ class PipeOcr(PipeOperator):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept_code=self.output_concept_code,
+            concept_str=self.output_concept_code,
             content=content,
         )
 

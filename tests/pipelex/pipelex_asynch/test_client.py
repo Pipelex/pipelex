@@ -30,7 +30,7 @@ class TestPipelexApiClient:
                 pipe_code="retrieve_excerpts",
                 memory=[
                     StuffFactory.make_stuff(
-                        concept_code="native.Text",
+                        concept_str="native.Text",
                         name="text",
                         content=TextContent(
                             text="""
@@ -75,7 +75,7 @@ class TestPipelexApiClient:
                         ),
                     ),
                     StuffFactory.make_stuff(
-                        concept_code="answer.Question",
+                        concept_str="answer.Question",
                         name="question",
                         content=TextContent(text="Aerodynamic features?"),
                     ),

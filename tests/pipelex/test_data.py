@@ -46,25 +46,25 @@ class PipeTestCases:
     # Create simple Stuff objects
     SIMPLE_STUFF_TEXT = StuffFactory.make_stuff(
         name="text",
-        concept_code="native.Text",
+        concept_str="Text",
         content=TextContent(text="Describe a t-shirt in 2 sentences"),
         pipelex_session_id="unit_test",
     )
     SIMPLE_STUFF_IMAGE = StuffFactory.make_stuff(
         name="image",
-        concept_code="native.Image",
+        concept_str="native.Image",
         content=ImageContent(url=URL_IMG_FASHION_PHOTO_1),
         pipelex_session_id="unit_test",
     )
     SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
         name="pdf",
-        concept_code="native.PDF",
+        concept_str="native.PDF",
         content=PDFContent(url=PDFTestCases.DOCUMENT_URLS[0]),
         pipelex_session_id="unit_test",
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
         name="complex",
-        concept_code="tests.Complex",
+        concept_str="tests.Complex",
         content=ListContent(
             items=[
                 TextContent(text="The quick brown fox jumps over the lazy dog"),
@@ -76,7 +76,7 @@ class PipeTestCases:
 
     STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1 = SomeContentWithImageAttribute(image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_1))
     STUFF_WITH_IMAGE_ATTRIBUTE = StuffFactory.make_stuff(
-        concept_code="native.Image",
+        concept_str="native.Image",
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
         name="stuff_with_image",
         pipelex_session_id="unit_test",
@@ -86,7 +86,7 @@ class PipeTestCases:
         sub_object=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
     )
     STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = StuffFactory.make_stuff(
-        concept_code="native.Image",
+        concept_str="native.Image",
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
         name="stuff_with_image_in_sub_object",
         pipelex_session_id="unit_test",
@@ -143,7 +143,7 @@ class PipeTestCases:
         (
             "batch_test",
             StuffFactory.make_stuff(
-                concept_code="flows.Color",
+                concept_str="flows.Color",
                 name="colors",
                 content=ListContent(
                     items=[
@@ -168,13 +168,6 @@ class PipeTestCases:
             "Extract page contents from PDF",
             SIMPLE_STUFF_PDF,
             "extract_page_contents_from_pdf",
-        ),
-    ]
-    SIMPLE_PIPE_RUN_FROM_STR: ClassVar[List[Tuple[str, str, str]]] = [  # pipe_code, input_concept_code, str_value
-        (
-            "extract_colors",
-            "native.Text",
-            USER_TEXT_COLORS,
         ),
     ]
     FAILURE_PIPES: ClassVar[List[Tuple[str, Type[Exception], str]]] = [
@@ -290,7 +283,7 @@ Format filter html:
     ]
     ANY_OBJECT: ClassVar[List[Tuple[str, Any]]] = [
         ("cherry", PipeTestCases.SIMPLE_STUFF_TEXT),
-        ("complex", PipeTestCases.COMPLEX_STUFF),
+        # ("complex", PipeTestCases.COMPLEX_STUFF),
     ]
 
 

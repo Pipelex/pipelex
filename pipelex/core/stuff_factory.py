@@ -5,7 +5,7 @@ from kajson.class_registry import class_registry
 from pydantic import BaseModel, Field
 
 from pipelex.config import get_config
-from pipelex.core.concept import Concept
+from pipelex.core.concept import Concept, ConceptError
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff, StuffCreationRecord
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
@@ -29,17 +29,29 @@ class StuffFactory:
         return Stuff.make_stuff_name(concept_str=concept_str)
 
     @classmethod
+    def make_concept_code_from_str(cls, concept_str: str) -> str:
+        if not Concept.concept_str_contains_domain(concept_str=concept_str):
+            if concept_str in NativeConcept.names():
+                native_concept = NativeConcept(concept_str)
+                return native_concept.code
+            raise ConceptError(f"Concept '{concept_str}' does not contain a domain")
+        return concept_str
+
+    @classmethod
     def make_stuff(
         cls,
-        concept_code: str,
+        concept_str: str,
         content: StuffContent,
         name: Optional[str] = None,
         code: Optional[str] = None,
         creation_record: Optional[StuffCreationRecord] = None,
         pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
-        if not Concept.concept_str_contains_domain(concept_str=concept_code):
-            raise StuffFactoryError(f"Concept '{concept_code}' does not contain a domain")
+        try:
+            concept_code = cls.make_concept_code_from_str(concept_str=concept_str)
+        except ConceptError:
+            stuff_ref = name or code or "unnamed"
+            raise StuffFactoryError(f"Concept '{concept_str}' does not contain a domain, could not make stuff '{stuff_ref}'")
         if not name:
             name = cls.make_stuff_name(concept_code)
         return Stuff(
@@ -85,7 +97,7 @@ class StuffFactory:
     @classmethod
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
         the_stuff = cls.make_from_str(
-            concept_code=blueprint.concept_code,
+            concept_str=blueprint.concept_code,
             str_value=blueprint.value,
             name=blueprint.name,
             pipelex_session_id="blueprint",
@@ -97,11 +109,14 @@ class StuffFactory:
         cls,
         str_value: str,
         name: Optional[str] = None,
-        concept_code: str = NativeConcept.TEXT.code,
+        concept_str: str = NativeConcept.TEXT.code,
         pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
-        if not Concept.concept_str_contains_domain(concept_code):
-            raise StuffFactoryError(f"Concept '{concept_code}' does not contain a domain")
+        try:
+            concept_code = cls.make_concept_code_from_str(concept_str=concept_str)
+        except ConceptError:
+            stuff_ref = name or "unnamed"
+            raise StuffFactoryError(f"Concept '{concept_str}' does not contain a domain, could not make stuff '{stuff_ref}'")
         the_concept = get_required_concept(concept_code=concept_code)
         the_subclass_name = the_concept.structure_class_name
         the_subclass = class_registry.get_class(name=the_subclass_name) or eval(the_subclass_name)
@@ -110,10 +125,10 @@ class StuffFactory:
         stuff_content: StuffContent = the_subclass.make_from_str(str_value)
 
         if not name:
-            name = cls.make_stuff_name(concept_code)
+            name = cls.make_stuff_name(concept_str)
 
         return Stuff(
-            concept_code=concept_code,
+            concept_code=concept_str,
             content=stuff_content,
             stuff_name=name,
             stuff_code=shortuuid.uuid()[:5],
@@ -127,7 +142,7 @@ class StuffFactory:
         Make multiple stuffs from a dictionary of strings.
         It is implied that each string value should be associated with a native.Text concept.
         """
-        return [cls.make_from_str(concept_code=NativeConcept.TEXT.code, str_value=str_value, name=name) for name, str_value in str_text_dict.items()]
+        return [cls.make_from_str(concept_str=NativeConcept.TEXT.code, str_value=str_value, name=name) for name, str_value in str_text_dict.items()]
 
     @classmethod
     def make_multiple_stuff_from_str(cls, str_stuff_and_concepts_dict: Dict[str, Tuple[str, str]]) -> List[Stuff]:
@@ -137,7 +152,7 @@ class StuffFactory:
         """
         result: List[Stuff] = []
         for name, (concept_code, str_value) in str_stuff_and_concepts_dict.items():
-            stuff = cls.make_from_str(concept_code=concept_code, str_value=str_value, name=name)
+            stuff = cls.make_from_str(concept_str=concept_code, str_value=str_value, name=name)
             result.append(stuff)
         return result
 
@@ -151,7 +166,7 @@ class StuffFactory:
         the_subclass = class_registry.get_required_subclass(name=the_subclass_name, base_class=StuffContent)
         the_stuff_content = the_subclass.model_validate(obj=stuff_contents)
         return cls.make_stuff(
-            concept_code=concept_code,
+            concept_str=concept_code,
             content=the_stuff_content,
             name=name,
         )

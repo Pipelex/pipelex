@@ -21,7 +21,7 @@ class TestPipeBatch:
     ):
         # Create Stuff objects
         invoice_list_stuff = StuffFactory.make_stuff(
-            concept_code="test_pipe_batch.TestPipeBatchItem",
+            concept_str="test_pipe_batch.TestPipeBatchItem",
             content=ListContent(
                 items=[
                     TextContent(text="data_1"),
