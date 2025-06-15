@@ -14,6 +14,7 @@ from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.plugins.mistral.mistral_utils import upload_file_for_ocr
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 
 
@@ -124,10 +125,12 @@ class MistralOcrWorker(OcrWorkerAbstract):
     ) -> OcrOutput:
         b64 = await load_binary_as_base64_async(path=image_path)
 
-        # TODO: set proper image format
+        file_type = detect_file_type_from_base64(b64=b64)
+        mime_type = file_type.mime
+
         ocr_response = await self.mistral_client.ocr.process_async(
             model=self.ocr_engine.ocr_model_name,
-            document={"type": "image_url", "image_url": f"data:image/jpeg;base64,{b64.decode('utf-8')}"},
+            document={"type": "image_url", "image_url": f"data:{mime_type};base64,{b64.decode('utf-8')}"},
         )
         ocr_output = await MistralFactory.make_ocr_output_from_mistral_response(
             mistral_ocr_response=ocr_response,
