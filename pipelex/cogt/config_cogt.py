@@ -12,6 +12,7 @@ from pipelex.tools.config.models import ConfigModel
 class OcrConfig(ConfigModel):
     ocr_handles: List[str]
     page_output_text_file_name: str
+    default_page_views_dpi: int
 
 
 class ImggConfig(ConfigModel):

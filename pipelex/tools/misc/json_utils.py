@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from pipelex.tools.exceptions import ToolException
 from pipelex.tools.misc.file_utils import save_text_to_path
+from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 JsonContent = Union[Dict[Any, Any], List[Any]]
 
@@ -194,7 +195,12 @@ def remove_none_values(json_content: JsonContent) -> JsonContent:
         return [remove_none_values(item) for item in json_content]
 
 
-def purify_json(data: Any, indent: Optional[int] = None, is_warning_enabled: bool = True) -> Tuple[Union[Dict[Any, Any], List[Any]], str]:
+def purify_json(
+    data: Any,
+    indent: Optional[int] = None,
+    is_truncate_bytes_enabled: bool = False,
+    is_warning_enabled: bool = True,
+) -> Tuple[Union[Dict[Any, Any], List[Any]], str]:
     """
     Converts any Python object into a JSON-serializable format and its string representation.
 
@@ -222,10 +228,18 @@ def purify_json(data: Any, indent: Optional[int] = None, is_warning_enabled: boo
         '{"name": "test"}'
     """
     dict_string: str
-    if isinstance(data, BaseModel):
+    if isinstance(data, CustomBaseModel) and is_truncate_bytes_enabled:
+        return purify_json(
+            data.model_dump_truncated(serialize_as_any=True),
+            indent=indent,
+            is_truncate_bytes_enabled=is_truncate_bytes_enabled,
+            is_warning_enabled=is_warning_enabled,
+        )
+    elif isinstance(data, BaseModel):
         return purify_json(
             data.model_dump(serialize_as_any=True),
             indent=indent,
+            is_truncate_bytes_enabled=is_truncate_bytes_enabled,
             is_warning_enabled=is_warning_enabled,
         )
 
@@ -233,7 +247,12 @@ def purify_json(data: Any, indent: Optional[int] = None, is_warning_enabled: boo
         the_list = data  # type: ignore
         if not the_list:
             return [], "[]"
-        if isinstance(the_list[0], BaseModel):
+        if isinstance(the_list[0], CustomBaseModel) and is_truncate_bytes_enabled:
+            the_list_of_custom_base_models: List[CustomBaseModel] = the_list
+            pure_list = [item.model_dump_truncated(serialize_as_any=True) for item in the_list_of_custom_base_models]
+            dict_string = json.dumps(pure_list, indent=indent, default=str)
+            return pure_list, dict_string
+        elif isinstance(the_list[0], BaseModel):
             the_list_of_base_models: List[BaseModel] = the_list
             pure_list = [item.model_dump(serialize_as_any=True) for item in the_list_of_base_models]
             dict_string = json.dumps(pure_list, indent=indent, default=str)
@@ -255,7 +274,11 @@ def purify_json(data: Any, indent: Optional[int] = None, is_warning_enabled: boo
     return pure_dict, dict_string
 
 
-def purify_json_list(data: List[Any], indent: Optional[int] = None) -> Tuple[List[Any], str]:
+def purify_json_list(
+    data: List[Any],
+    indent: Optional[int] = None,
+    is_truncate_bytes_enabled: bool = False,
+) -> Tuple[List[Any], str]:
     """
     Converts a list of Python objects into a JSON-serializable list and its string representation.
 
@@ -284,7 +307,12 @@ def purify_json_list(data: List[Any], indent: Optional[int] = None) -> Tuple[Lis
 
     if not data:
         return [], "[]"
-    if isinstance(data[0], BaseModel):
+    if isinstance(data[0], CustomBaseModel) and is_truncate_bytes_enabled:
+        the_list_of_custom_base_models: List[CustomBaseModel] = data
+        pure_list = [item.model_dump_truncated(serialize_as_any=True) for item in the_list_of_custom_base_models]
+        list_string = json.dumps(pure_list, indent=indent, default=str)
+        return pure_list, list_string
+    elif isinstance(data[0], BaseModel):
         the_list_of_base_models: List[BaseModel] = data
         pure_list = [item.model_dump(serialize_as_any=True) for item in the_list_of_base_models]
         list_string = json.dumps(pure_list, indent=indent, default=str)

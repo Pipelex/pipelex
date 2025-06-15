@@ -18,6 +18,8 @@ class PipeRunMode(StrEnum):
     DRY = "dry"
 
 
+FORCE_DRY_RUN_MODE_ENV_KEY = "PIPELEX_FORCE_DRY_RUN_MODE"
+
 PipeOutputMultiplicity = Union[bool, int]
 
 

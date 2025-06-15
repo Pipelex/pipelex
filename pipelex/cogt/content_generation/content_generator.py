@@ -136,6 +136,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         object_class: Type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
+        nb_items: Optional[int] = None,
         wfid: Optional[str] = None,
     ) -> List[BaseModelTypeVar]:
         llm_assignment_for_object = LLMAssignment(
@@ -161,6 +162,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object_list: Optional[LLMPromptFactoryAbstract] = None,
+        nb_items: Optional[int] = None,
         wfid: Optional[str] = None,
     ) -> List[BaseModelTypeVar]:
         llm_assignment_for_text = LLMAssignment(

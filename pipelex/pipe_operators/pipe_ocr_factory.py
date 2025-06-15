@@ -4,6 +4,7 @@ from typing_extensions import override
 
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory, OcrPlatform
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
+from pipelex.config import get_config
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_operators.pipe_ocr import PipeOcr
@@ -15,7 +16,7 @@ class PipeOcrBlueprint(PipeBlueprint):
     page_images: bool = False
     page_image_captions: bool = False
     page_views: bool = False
-    page_views_dpi: int = 300
+    page_views_dpi: Optional[int] = None
 
 
 class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
@@ -42,7 +43,7 @@ class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
             should_include_images=pipe_blueprint.page_images,
             should_caption_images=pipe_blueprint.page_image_captions,
             should_include_page_views=pipe_blueprint.page_views,
-            page_views_dpi=pipe_blueprint.page_views_dpi,
+            page_views_dpi=pipe_blueprint.page_views_dpi or get_config().cogt.ocr_config.default_page_views_dpi,
         )
 
     @classmethod

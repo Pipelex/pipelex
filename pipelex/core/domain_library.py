@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 from pydantic import Field, RootModel
 from typing_extensions import override
 
-from pipelex import log
+from pipelex import log, pretty_print
 from pipelex.core.domain import Domain
 from pipelex.core.domain_provider_abstract import DomainProviderAbstract
 from pipelex.exceptions import DomainLibraryError
@@ -21,11 +21,13 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
     def reset(self):
         self.root = {}
 
-    def add_new_domain(self, domain: Domain):
+    def add_domain_details(self, domain: Domain):
         domain_code = domain.code
-        if domain_code in self.root:
-            raise DomainLibraryError(f"Domain '{domain_code}' already exists in the library")
-        self.root[domain_code] = domain
+        if existing_domain := self.root.get(domain_code):
+            # merge the new domain with the existing one
+            self.root[domain_code] = existing_domain.model_copy(update=domain.model_dump())
+        else:
+            self.root[domain_code] = domain
 
     def print_all(self):
         log.dev("-" * 80)
@@ -58,6 +60,7 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
     def get_required_domain(self, domain_code: str) -> Domain:
         the_domain = self.get_domain(domain_code=domain_code)
         if not the_domain:
+            pretty_print(self.root, title="DomainLibrary")
             raise DomainLibraryError(f"Domain '{domain_code}' not found. Check for typos and make sure it is declared in a pipeline library.")
         return the_domain
 

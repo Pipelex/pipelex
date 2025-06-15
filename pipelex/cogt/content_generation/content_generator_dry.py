@@ -63,6 +63,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
         class ObjectFactory(ModelFactory[object_class]):  # type: ignore
             __model__ = object_class
+            __use_examples__ = True
 
         obj = ObjectFactory.build()
         return obj
@@ -96,24 +97,22 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         object_class: Type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
+        nb_items: Optional[int] = None,
         wfid: Optional[str] = None,
     ) -> List[BaseModelTypeVar]:
         func_name = "make_object_list_direct"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        object_1 = await self.make_object_direct(
-            job_metadata=job_metadata,
-            object_class=object_class,
-            llm_setting_for_object=llm_setting_for_object_list,
-            llm_prompt_for_object=llm_prompt_for_object_list,
-        )
-        object_2 = await self.make_object_direct(
-            job_metadata=job_metadata,
-            object_class=object_class,
-            llm_setting_for_object=llm_setting_for_object_list,
-            llm_prompt_for_object=llm_prompt_for_object_list,
-        )
-        two_objects = [object_1, object_2]
-        return two_objects
+        nb_list_items = nb_items or get_config().pipelex.dry_run_config.nb_list_items
+        objects = [
+            await self.make_object_direct(
+                job_metadata=job_metadata,
+                object_class=object_class,
+                llm_setting_for_object=llm_setting_for_object_list,
+                llm_prompt_for_object=llm_prompt_for_object_list,
+            )
+            for _ in range(nb_list_items)
+        ]
+        return objects
 
     @override
     @update_job_metadata
@@ -125,6 +124,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object_list: Optional[LLMPromptFactoryAbstract] = None,
+        nb_items: Optional[int] = None,
         wfid: Optional[str] = None,
     ) -> List[BaseModelTypeVar]:
         func_name = "make_text_then_object_list"
@@ -134,6 +134,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             object_class=object_class,
             llm_setting_for_object_list=llm_setting_for_object_list,
             llm_prompt_for_object_list=llm_prompt_for_text,
+            nb_items=nb_items,
         )
 
     @override
@@ -149,8 +150,10 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> GeneratedImage:
         func_name = "make_single_image"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        image_urls = get_config().pipelex.dry_run_config.image_urls
+        image_url = image_urls[0]
         generated_image = GeneratedImage(
-            url="https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
+            url=image_url,
             width=1536,
             height=2752,
         )
@@ -170,17 +173,14 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> List[GeneratedImage]:
         func_name = "make_image_list"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        image_urls = get_config().pipelex.dry_run_config.image_urls
         generated_image_list = [
             GeneratedImage(
-                url="https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
+                url=image_urls[image_index % len(image_urls)],
                 width=1536,
                 height=2752,
-            ),
-            GeneratedImage(
-                url="https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
-                width=1024,
-                height=1536,
-            ),
+            )
+            for image_index in range(nb_images)
         ]
         return generated_image_list
 
@@ -225,25 +225,18 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                 pages={1: ocr_image_as_page},
             )
         else:
-            ocr_page_1 = Page(
-                text="DRY RUN: OCR text",
-                extracted_images=[],
-                page_view=ExtractedImageFromPage(
-                    image_id="page_view_1",
-                    base_64="",
-                    caption="DRY RUN: OCR text",
-                ),
-            )
-            ocr_page_2 = Page(
-                text="DRY RUN: OCR text",
-                extracted_images=[],
-                page_view=ExtractedImageFromPage(
-                    image_id="page_view_2",
-                    base_64="",
-                    caption="DRY RUN: OCR text",
-                ),
-            )
-            ocr_output = OcrOutput(
-                pages={1: ocr_page_1, 2: ocr_page_2},
-            )
+            nb_pages = get_config().pipelex.dry_run_config.nb_ocr_pages
+            pages = {
+                page_index: Page(
+                    text="DRY RUN: OCR text",
+                    extracted_images=[],
+                    page_view=ExtractedImageFromPage(
+                        image_id=f"page_view_{page_index}",
+                        base_64="",
+                        caption="DRY RUN: OCR text",
+                    ),
+                )
+                for page_index in range(1, nb_pages + 1)
+            }
+            ocr_output = OcrOutput(pages=pages)
         return ocr_output

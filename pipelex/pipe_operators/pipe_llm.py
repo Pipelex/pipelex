@@ -418,6 +418,7 @@ class PipeLLM(PipeOperator):
                     llm_setting_main=self.llm_setting_main,
                     llm_prompt_factory_for_object_list=llm_prompt_2_factory,
                     llm_setting_for_object_list=self.llm_setting_for_object_list,
+                    nb_items=fixed_nb_output,
                     wfid=task_desc,
                 )
             else:
@@ -429,6 +430,7 @@ class PipeLLM(PipeOperator):
                     object_class=content_class,
                     llm_prompt_for_object_list=llm_prompt_1,
                     llm_setting_for_object_list=self.llm_setting_for_object_list_direct,
+                    nb_items=fixed_nb_output,
                     wfid=task_desc,
                 )
 

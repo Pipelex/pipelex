@@ -1,7 +1,7 @@
 <div align="center">
   <a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
 
-  <h2 align="center">Lean-code language for repeatable workflows</h2>
+  <h2 align="center">Open-source language for repeatable AI workflows</h2>
   <p align="center">Pipelex is based on a simple declarative language that lets you define repeatable, structured, composable AI workflows.</p>
 
   <div>
