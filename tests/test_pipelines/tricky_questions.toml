@@ -9,7 +9,7 @@ ThoughtfulAnswerConclusion = "Conclusion of a thoughtful answer"
 [concept.ThoughtfulAnswer]
 Concept = "A thoughtful answer to a question"
 structure = "ThoughtfulAnswer"
-refines = ["AnswerToAQuestion"]
+refines = "AnswerToAQuestion"
 
 [pipe]
 

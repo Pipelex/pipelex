@@ -199,15 +199,15 @@ Document = "A written or printed record"
 
 [concept.Contract]
 Concept = "A legally binding agreement between parties"
-refines = ["Document"]
+refines = "Document"
 
 [concept.EmploymentContract]
 Concept = "A contract between an employer and employee"
-refines = ["Contract"]
+refines = "Contract"
 
 [concept.NonCompeteClause]
 Concept = "A contract clause restricting competitive activities"
-refines = ["ContractClause"]
+refines = "ContractClause"
 ```
 
 ### Why Refinement Matters
@@ -239,15 +239,15 @@ Text = "Written content in natural language"
 
 [concept.Article]
 Concept = "A written composition on a specific topic"
-refines = ["Text"]
+refines = "Text"
 
 [concept.NewsArticle]
 Concept = "An article reporting current events"
-refines = ["Article"]
+refines = "Article"
 
 [concept.OpinionPiece]
 Concept = "An article expressing personal views"
-refines = ["Article"]
+refines = "Article"
 
 [pipe.summarize_text]
 PipeLLM = "Create a summary of any text"

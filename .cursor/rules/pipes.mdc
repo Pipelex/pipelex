@@ -56,7 +56,7 @@ ConceptName = "Description of the concept"
 [concept.ConceptName]
 Concept = "Description of the concept"
 structure = "StructureName"
-refines = ["ParentConcept"]  # Optional, for concept inheritance
+refines = "ParentConcept"  # Optional, for concept inheritance
 ```
 
 About the `structure` field:
