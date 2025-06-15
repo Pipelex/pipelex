@@ -2,10 +2,14 @@ site_name: Pipelex Documentation
 site_url: https://docs.pipelex.com/
 site_description: "Official documentation for Pipelex, a framework and language for building deterministic, repeatable AI workflows and knowledge pipelines."
 docs_dir: doc
+repo_url: "https://github.com/Pipelex/pipelex"
+repo_name: "Pipelex on GitHub"
+watch: [README.md, CONTRIBUTING.md, CHANGELOG.md, MANIFESTO.md, LICENSE]
 
 theme:
   name: material
   custom_dir: doc/overrides
+  favicon: images/pipelex-favicon-32.png
   logo: https://pipelex-web.s3.amazonaws.com/logo/Pipelex-logo-wot-mono-560x176.png
   features:
     - navigation.footer
