@@ -17,7 +17,7 @@ An llm_handle matches the handle (an id of sorts) with the full specification of
 - llm_version
 - llm_platform_choice
 
-The declaration of llm_handleslooks like this in toml syntax:
+The declaration of llm_handles looks like this in toml syntax:
 ```toml
 [llm_handles]
 gpt-4o-2024-08-06 = { llm_name = "gpt-4o", llm_version = "2024-08-06" }
