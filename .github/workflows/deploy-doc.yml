@@ -1,11 +1,9 @@
-# .github/workflows/docs-preview.yml
 name: Preview MkDocs on GitHub Pages
 
 on:
   push:
     branches: fix/doc-gha
 
-# Add permissions for the GITHUB_TOKEN
 permissions:
   contents: write
   pages: write
