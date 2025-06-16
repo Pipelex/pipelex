@@ -82,15 +82,11 @@ nav:
     - Understand Pipelex:
       - The Knowledge Pipeline Manifesto: manifesto.md
       - The Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
-    - Open-source:
-      - Changelog: changelog.md
-      - License: license.md
-  - Build Reliable AI Workflows:
-    - What are Domains?: pages/build-reliable-ai-workflows-with-pipelex/what-are-domains.md
-    - Setup AI Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/setup-ai-pipeline-project.md
-    - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
-    - Design and Run Pipelines: 
-      - pages/build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md
+    - Build Reliable AI Workflows:
+      - What are Domains?: pages/build-reliable-ai-workflows-with-pipelex/what-are-domains.md
+      - Setup AI Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/setup-ai-pipeline-project.md
+      - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
+      - Design and Run Pipelines: pages/build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md
       - Pipe Operators:
         - Overview: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md
         - PipeLLM: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md
@@ -104,16 +100,12 @@ nav:
         - PipeCondition: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeCondition.md
         - PipeBatch: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeBatch.md
         - PipeParallel: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeParallel.md
-    - Configure AI LLM to optimize workflows: pages/build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md
-    - LLM Structured Generation: pages/build-reliable-ai-workflows-with-pipelex/llm-structured-generation-config.md
-    - LLM Prompting Style: pages/build-reliable-ai-workflows-with-pipelex/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
-    - AI Plugins for multi-LLM workflows: pages/build-reliable-ai-workflows-with-pipelex/ai-plugins-for-multi-llm-workflows.md
+      - Configure AI LLM to optimize workflows: pages/build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md
+      - LLM Structured Generation: pages/build-reliable-ai-workflows-with-pipelex/llm-structured-generation-config.md
+      - LLM Prompting Style: pages/build-reliable-ai-workflows-with-pipelex/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+      - AI Plugins for multi-LLM workflows: pages/build-reliable-ai-workflows-with-pipelex/ai-plugins-for-multi-llm-workflows.md
   - Configuration:
     - Overview: pages/configuration/index.md
-    - Technical Configuration:
-      - AWS Configuration: pages/configuration/config-technical/aws-config.md
-      - Cogt Configuration: pages/configuration/config-technical/cogt-config.md
-      - Library Configuration: pages/configuration/config-technical/library-config.md
     - Pipeline Validation:
       - Dry Run Configuration: pages/configuration/config-pipeline-validation/dry-run-config.md
       - Static Validation Configuration: pages/configuration/config-pipeline-validation/static-validation-config.md
@@ -124,20 +116,26 @@ nav:
       - Pipe Run Configuration: pages/configuration/config-practical/pipe-run-config.md
       - Reporting Configuration: pages/configuration/config-practical/reporting-config.md
       - Tracker Configuration: pages/configuration/config-practical/tracker-config.md
-  - Advanced Customization:
-    - Overview: pages/dependency-injection/index.md
-    - Secrets Provider: pages/dependency-injection/secrets-provider-injection.md
-    - Reporting Delegate: pages/dependency-injection/reporting-delegate-injection.md
-    - Pipeline Tracker: pages/dependency-injection/pipeline-tracker-injection.md
-    - Activity Manager: pages/dependency-injection/activity-manager-injection.md
-    - Template Provider: pages/dependency-injection/template-provider-injection.md
-    - Content Generator: pages/dependency-injection/content-generator-injection.md
-    - LLM Model Provider: pages/dependency-injection/llm-model-provider-injection.md
-    - Pipe Router: pages/dependency-injection/pipe-router-injection.md
-    - Plugin Manager: pages/dependency-injection/plugin-manager-injection.md
-    - Inference Manager: pages/dependency-injection/inference-manager-injection.md
-  - Tools:
-    - CLI: pages/tools/cli.md
-    - Logging: pages/tools/logging.md
-    - Jinja2 & Templates: pages/tools/jinja2-templating.md
+    - Technical Configuration:
+      - AWS Configuration: pages/configuration/config-technical/aws-config.md
+      - Cogt Configuration: pages/configuration/config-technical/cogt-config.md
+      - Library Configuration: pages/configuration/config-technical/library-config.md
+  - Development:
+    - Changelog: changelog.md
+    - Advanced Customization:
+      - Overview: pages/advanced-customization/index.md
+      - Secrets Provider: pages/advanced-customization/secrets-provider-injection.md
+      - Reporting Delegate: pages/advanced-customization/reporting-delegate-injection.md
+      - Pipeline Tracker: pages/advanced-customization/pipeline-tracker-injection.md
+      - Activity Manager: pages/advanced-customization/activity-manager-injection.md
+      - Template Provider: pages/advanced-customization/template-provider-injection.md
+      - Content Generator: pages/advanced-customization/content-generator-injection.md
+      - LLM Model Provider: pages/advanced-customization/llm-model-provider-injection.md
+      - Pipe Router: pages/advanced-customization/pipe-router-injection.md
+      - Plugin Manager: pages/advanced-customization/plugin-manager-injection.md
+      - Inference Manager: pages/advanced-customization/inference-manager-injection.md
+    - Tools:
+      - CLI: pages/tools/cli.md
+      - Logging: pages/tools/logging.md
+    - License: license.md
   
