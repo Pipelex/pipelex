@@ -14,13 +14,13 @@ TextAndImagesContent = "A content that comprises text and images where the text 
 [pipe.extract_page_contents_from_pdf]
 PipeOcr = "Extract page contents from a PDF document"
 inputs = { pdf = "PDF" }
-output = "PageContent"
+output = "Page"
 page_images = true
 page_views = false
 
 [pipe.extract_page_contents_and_views_from_pdf]
 PipeOcr = "Extract page contents from a PDF document as well aspage views"
 inputs = { pdf = "PDF" }
-output = "PageContent"
+output = "Page"
 page_images = true
 page_views = true
