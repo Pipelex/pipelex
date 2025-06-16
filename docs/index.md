@@ -1,8 +1,8 @@
 ---
-title: "Pipelex: open-source language for repeatable AI workflows"
+title: "Open-source AI workflows"
 ---
 
-![Pipelex Banner](images/pipelex_banner_docs_1200x630.png)
+![Pipelex Banner](https://d2cinlfp2qnig1.cloudfront.net/docs/pipelex_banner_docs_1200x630.png)
 
 # Easily build repeatable AI workflows
 

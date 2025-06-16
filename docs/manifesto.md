@@ -1,5 +1,5 @@
 ---
-title: Pipelex • The Knowledge Pipeline Manifesto
+title: The Knowledge Pipeline Manifesto
 ---
 
 --8<-- "MANIFESTO.md"

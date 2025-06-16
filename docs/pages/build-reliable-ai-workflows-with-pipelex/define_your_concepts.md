@@ -48,7 +48,7 @@ ProductReview = "A customer's evaluation of a product or service"
 
 ### Organizing Related Concepts
 
-Group concepts that naturally belong together in the same domain. A domain acts as a namespace for a set of related concepts and pipes, helping you organize and reuse your pipeline components. You can learn more about them in [What Are Domains?](what-are-domains.md).
+Group concepts that naturally belong together in the same domain. A domain acts as a namespace for a set of related concepts and pipes, helping you organize and reuse your pipeline components. You can learn more about them in [Kick off a Knowledge Pipeline Project](kick-off-a-knowledge-pipeline-project.md#what-are-domains).
 
 ```toml
 # pipelex_libraries/pipelines/finance.toml

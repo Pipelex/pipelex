@@ -1,4 +1,4 @@
-site_name: Pipelex Documentation
+site_name: Pipelex Docs
 site_url: https://docs.pipelex.com/
 site_description: "Official documentation for Pipelex, a framework and language for building deterministic, repeatable AI workflows and knowledge pipelines."
 docs_dir: docs
@@ -83,46 +83,47 @@ nav:
       - The Knowledge Pipeline Manifesto: manifesto.md
       - The Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
     - Build Reliable AI Workflows:
-      - What are Domains?: pages/build-reliable-ai-workflows-with-pipelex/what-are-domains.md
-      - Setup AI Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/setup-ai-pipeline-project.md
+      - Kick off a Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md
       - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
       - Design and Run Pipelines: pages/build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md
       - Pipe Operators:
         - Overview: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md
         - PipeLLM: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md
         - PipeOcr: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeOcr.md
-        - PipeFunc: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc.md
         - PipeImgGen: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeImgGen.md
         - PipeJinja2: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeJinja2.md
+        - PipeFunc: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc.md
       - Pipe Controllers:
         - Overview: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/index.md
         - PipeSequence: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeSequence.md
-        - PipeCondition: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeCondition.md
-        - PipeBatch: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeBatch.md
         - PipeParallel: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeParallel.md
+        - PipeBatch: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeBatch.md
+        - PipeCondition: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeCondition.md
       - Optimize Cost & Quality: pages/build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md
       - LLM Structured Generation: pages/build-reliable-ai-workflows-with-pipelex/llm-structured-generation-config.md
       - LLM Prompting Style: pages/build-reliable-ai-workflows-with-pipelex/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
       - LLM Providers & Models: pages/build-reliable-ai-workflows-with-pipelex/ai-plugins-for-multi-llm-workflows.md
   - Configuration:
     - Overview: pages/configuration/index.md
-    - Pipeline Validation:
-      - Dry Run Configuration: pages/configuration/config-pipeline-validation/dry-run-config.md
-      - Static Validation Configuration: pages/configuration/config-pipeline-validation/static-validation-config.md
-    - Advanced Configuration:
-      - Feature Configuration: pages/configuration/config-advanced/feature-config.md
+    - Pipeline Validation Configuration:
+      - Dry Run: pages/configuration/config-pipeline-validation/dry-run-config.md
+      - Static Validation: pages/configuration/config-pipeline-validation/static-validation-config.md
     - Practical Configuration:
-      - Logging Configuration: pages/configuration/config-practical/logging-config.md
-      - Pipe Run Configuration: pages/configuration/config-practical/pipe-run-config.md
-      - Reporting Configuration: pages/configuration/config-practical/reporting-config.md
-      - Tracker Configuration: pages/configuration/config-practical/tracker-config.md
+      - Logging: pages/configuration/config-practical/logging-config.md
+      - Pipe Run: pages/configuration/config-practical/pipe-run-config.md
+      - Reporting: pages/configuration/config-practical/reporting-config.md
+      - Tracker: pages/configuration/config-practical/tracker-config.md
     - Technical Configuration:
-      - AWS Configuration: pages/configuration/config-technical/aws-config.md
-      - Cogt Configuration: pages/configuration/config-technical/cogt-config.md
-      - Library Configuration: pages/configuration/config-technical/library-config.md
+      - AWS: pages/configuration/config-technical/aws-config.md
+      - Cogt: pages/configuration/config-technical/cogt-config.md
+      - Library: pages/configuration/config-technical/library-config.md
+      - Feature: pages/configuration/config-advanced/feature-config.md
   - Development:
     - Changelog: changelog.md
-    - Advanced Customization:
+    - Tools:
+      - CLI: pages/tools/cli.md
+      - Logging: pages/tools/logging.md
+    - Advanced Customizations:
       - Overview: pages/advanced-customization/index.md
       - Secrets Provider: pages/advanced-customization/secrets-provider-injection.md
       - Reporting Delegate: pages/advanced-customization/reporting-delegate-injection.md
@@ -134,8 +135,6 @@ nav:
       - Pipe Router: pages/advanced-customization/pipe-router-injection.md
       - Plugin Manager: pages/advanced-customization/plugin-manager-injection.md
       - Inference Manager: pages/advanced-customization/inference-manager-injection.md
-    - Tools:
-      - CLI: pages/tools/cli.md
-      - Logging: pages/tools/logging.md
     - License: license.md
+    - Contributing: contributing.md
   
