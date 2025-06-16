@@ -47,8 +47,8 @@ dependencies = [
 [project.urls]
 Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"
-Documentation = "https://github.com/Pipelex/pipelex/blob/main/docs/Documentation.md"
-Changelog = "https://github.com/Pipelex/pipelex/blob/main/CHANGELOG.md"
+Documentation = "https://docs.pipelex.com/"
+Changelog = "https://docs.pipelex.com/changelog/"
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.49.0"]
