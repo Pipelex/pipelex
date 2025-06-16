@@ -34,7 +34,10 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         cost_report_file_path: Optional[str] = None,
     ):
         if not llm_tokens_usages:
-            log.warning(f"No report to generate for pipeline '{pipeline_run_id}'")
+            if pipeline_run_id != "untitled":
+                log.warning(f"No report to generate for pipeline '{pipeline_run_id}'")
+            else:
+                log.verbose(f"No report to generate for pipeline '{pipeline_run_id}'")
             return
         cost_registry = CostRegistry()
         for llm_tokens_usage in llm_tokens_usages:

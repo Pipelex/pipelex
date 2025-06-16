@@ -36,4 +36,58 @@ get_report_delegate().generate_report()
 # Print the flowchart url of the pipeline.
 get_pipeline_tracker().output_flowchart()
 ```
-This is invaluable for understanding the cost and the execution flow of your pipelines. 
+This is invaluable for understanding the cost and the execution flow of your pipelines.
+
+## The Data Structure: `Invoice` Model
+
+The pipeline's output is a structured `Invoice` object. This is defined using Pydantic's `BaseModel`, which allows for clear, typed, and validated data.
+
+```python
+class Invoice(StructuredContent):
+    """Invoice information extracted from text, supporting both formal bills and receipts"""
+
+    invoice_id: Optional[str] = Field(None, description="Unique identifier for the invoice")
+    invoice_number: Optional[str] = Field(None, description="Invoice number as shown on the document")
+    date: Optional[datetime] = Field(None, description="Date when the invoice was issued")
+    
+    amount_incl_tax: Optional[float] = Field(None, description="Total amount including taxes")
+    
+    vendor: Optional[str] = Field(None, description="Name of the vendor/seller")
+    
+    # ... other fields
+```
+
+## The Pipeline Definition: `invoice.toml`
+
+The entire workflow is defined in a TOML file. This declarative approach makes the pipeline easy to understand and modify. Here's a snippet from `invoice.toml`:
+
+```toml
+# The main pipeline, a sequence of steps
+[pipe.process_invoice]
+PipeSequence = "Process relevant information from an invoice"
+inputs = { invoice_pdf = "PDF" }
+output = "Invoice"
+steps = [
+    # First, run OCR on the PDF
+    { pipe = "extract_text_from_image", result = "invoice_pages" },
+    # Then, run the invoice extraction on each page
+    { pipe = "extract_invoice", batch_over = "invoice_pages", batch_as = "invoice_page", result = "invoice" },
+]
+
+# A sub-pipeline that uses an LLM to extract the data
+[pipe.extract_invoice_data]
+PipeLLM = "Extract invoice information from an invoice text transcript"
+inputs = { invoice_page = "Page", invoice_details = "InvoiceDetails" }
+output = "Invoice"
+# The output is constrained to the "Invoice" model
+llm = "llm_to_extract_invoice" 
+images = ["invoice_page.page_view"]
+prompt_template = """
+Extract invoice information from this invoice:
+
+The category of this invoice is: $invoice_details.category.
+
+@invoice_page.text_and_images.text.text
+"""
+```
+This shows how a complex workflow, including OCR and LLM calls, can be defined in a simple, readable format. The `llm = "llm_to_extract_invoice"` line is particularly powerful, as it tells the LLM to structure its output according to the `Invoice` model. 

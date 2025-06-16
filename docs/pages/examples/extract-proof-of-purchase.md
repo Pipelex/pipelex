@@ -26,4 +26,56 @@ async def extract_proof_of_purchase(pdf_url: str) -> ProofOfPurchase:
     return proof_of_purchase
 ```
 
-This is a great starting point for building more complex expense processing or accounting automation pipelines. 
+This is a great starting point for building more complex expense processing or accounting automation pipelines.
+
+## The Data Structure: `ProofOfPurchase` Model
+
+The pipeline is designed to extract a `ProofOfPurchase` object, which is a structured model that includes a list of `Products`.
+
+```python
+class Products(StructuredContent):
+    name: Optional[str] = None
+    quantity: Optional[int] = None
+    unit_price: Optional[float] = None
+    total_price: Optional[float] = None
+
+
+class ProofOfPurchase(StructuredContent):
+    date_of_purchase: Optional[datetime] = None
+    amount_paid: Optional[float] = None
+    currency: Optional[str] = None
+    payment_method: Optional[str] = None
+    purchase_number: Optional[str] = None
+    products: Optional[List[Products]] = None
+```
+This demonstrates how you can create nested data structures to accurately model your data.
+
+## The Pipeline Definition: `extract_proof_of_purchase.toml`
+
+The pipeline uses a powerful `PipeLLM` to extract the structured data from the document. The prompt is carefully engineered to guide the LLM.
+
+```toml
+[pipe.write_markdown_from_page_content_proof_of_purchase]
+PipeLLM = "Write markdown from page content"
+inputs = { page_content = "Page" }
+output = "ProofOfPurchase" # The LLM is forced to output a ProofOfPurchase object
+images = ["page_content.page_view"] # The LLM receives the image of the page
+llm = "llm_for_img_to_text"
+structuring_method = "preliminary_text"
+system_prompt = """You are a multimodal LLM, expert at converting images into perfect markdown."""
+prompt_template = """
+You are given an image of a proof of purchase.
+Your role is to convert the image into perfect markdown.
+
+To help you do so, you are given the text extracted from the page by an OCR model.
+@page_content.text_and_images.text.text
+
+- Ensure you collect every title, number, and currency from the proof of purchase.
+- Pay attention to the text alignment, it might have been misaligned by the OCR.
+- The OCR extraction may be highly incomplete. It is your job to complete the text and add the missing information using the image.
+- Output only the markdown, nothing else. No need for "```markdown" or "```".
+- You can use HTML if it helps you.
+- You can use tables if it is relevant.
+"""
+```
+The combination of a detailed prompt, the OCR text, and the document image allows the LLM to accurately extract the required information and structure it as a `ProofOfPurchase` object. 

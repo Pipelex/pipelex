@@ -29,4 +29,69 @@ async def extract_gantt(image_url: str) -> GanttChart:
     return pipe_output.main_stuff_as(content_type=GanttChart)
 ```
 
-This is a powerful demonstration of multi-modal capabilities, combining vision and language understanding. 
+This is a powerful demonstration of multi-modal capabilities, combining vision and language understanding.
+
+## The Data Structure: `GanttChart` Model
+
+The final output is a `GanttChart` object, which contains lists of tasks and milestones. These are themselves structured objects, ensuring the data is clean and easy to work with.
+
+```python
+class GanttTaskDetails(StructuredContent):
+    """Do not include timezone in the dates."""
+    name: str
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    # ...
+
+class Milestone(StructuredContent):
+    name: str
+    date: Optional[datetime]
+    # ...
+
+class GanttChart(StructuredContent):
+    tasks: Optional[List[GanttTaskDetails]]
+    milestones: Optional[List[Milestone]]
+```
+
+## The Pipeline Definition: `gantt.toml`
+
+The `extract_gantt_by_steps` pipeline is a sequence of smaller, focused pipes. This is a great example of building a complex workflow from simple, reusable components.
+
+```toml
+[pipe.extract_gantt_by_steps]
+PipeSequence = "Extract all details from a gantt chart"
+inputs = { gantt_chart_image = "GanttChartImage" }
+output = "GanttChart"
+steps = [
+    # First, figure out the timescale of the chart
+    { pipe = "extract_gantt_timescale", result = "gantt_timescale" },
+    # Then, get the names of all the tasks
+    { pipe = "extract_gantt_task_names", result = "gantt_task_names" },
+    # Then, for each task, extract the details
+    { pipe = "extract_details_of_task", batch_as = "gantt_task_name", result = "details_of_all_tasks" },
+    # Finally, assemble everything into a single GanttChart object
+    { pipe = "gather_in_a_gantt_chart", result = "gantt_chart" },
+]
+
+# This is the pipe that extracts the details for a single task
+[pipe.extract_details_of_task]
+PipeLLM = "Extract the precise dates of the task, start_date and end_date"
+inputs = { gantt_chart_image = "GanttChartImage", gantt_timescale = "GanttTimescaleDescription", gantt_task_name = "GanttTaskName" }
+output = "GanttTaskDetails" # The output is structured as a GanttTaskDetails object
+structuring_method = "preliminary_text"
+images = ["gantt_chart_image"]
+llm = "llm_to_extract_diagram"
+prompt_template = """
+I am sharing an image of a Gantt chart.
+Please analyse the image and for a given task name (and only this task), extract the information of the task, if relevant.
+
+Be careful, the time unit is this:
+@gantt_timescale
+
+If the task is a milestone, then only output the start_date.
+
+Here is the name of the task you have to extract the dates for:
+@gantt_task_name
+"""
+```
+This demonstrates the "divide and conquer" approach that Pipelex encourages. By breaking down a complex problem into smaller steps, each step can be handled by a specialized pipe, making the overall workflow more robust and easier to debug. 
