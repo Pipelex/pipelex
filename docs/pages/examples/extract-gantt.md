@@ -95,3 +95,120 @@ Here is the name of the task you have to extract the dates for:
 """
 ```
 This demonstrates the "divide and conquer" approach that Pipelex encourages. By breaking down a complex problem into smaller steps, each step can be handled by a specialized pipe, making the overall workflow more robust and easier to debug. 
+
+## Flowchart
+
+```mermaid
+---
+config:
+  layout: dagre
+  theme: base
+---
+flowchart LR
+    subgraph "extract_gantt_by_steps"
+    direction LR
+        ZJNLe["gantt_chart_image:<br>**Gantt image**"]
+        Bh9Ab["gantt_timescale:<br>**Gantt timescale description**"]
+        R2oLH["gantt_task_names:<br>**List of [Gantt task name]**"]
+    end
+    subgraph "extract_details_of_task"
+    direction LR
+        R2oLH-branch-0["**Gantt task name** #1"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-0["**Gantt task details** #1"]
+        R2oLH-branch-1["**Gantt task name** #2"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-1["**Gantt task details** #2"]
+        R2oLH-branch-2["**Gantt task name** #3"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-2["**Gantt task details** #3"]
+        R2oLH-branch-3["**Gantt task name** #4"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-3["**Gantt task details** #4"]
+        R2oLH-branch-4["**Gantt task name** #5"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-4["**Gantt task details** #5"]
+        R2oLH-branch-5["**Gantt task name** #6"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-5["**Gantt task details** #6"]
+        R2oLH-branch-6["**Gantt task name** #7"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-6["**Gantt task details** #7"]
+        R2oLH-branch-7["**Gantt task name** #8"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-7["**Gantt task details** #8"]
+        R2oLH-branch-8["**Gantt task name** #9"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-8["**Gantt task details** #9"]
+        R2oLH-branch-9["**Gantt task name** #10"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-9["**Gantt task details** #10"]
+        R2oLH-branch-10["**Gantt task name** #11"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-10["**Gantt task details** #11"]
+        R2oLH-branch-11["**Gantt task name** #12"]
+        QFEdmVvYVHdL6DsCRtwqHq-branch-11["**Gantt task details** #12"]
+        nCmpx["details_of_all_tasks:<br>**List of [Gantt task details]**"]
+        NuMVc["gantt_chart:<br>**Gantt chart**"]
+    end
+class extract_gantt_by_steps sub_a;
+class extract_details_of_task sub_b;
+
+    classDef sub_a fill:#e6f5ff,color:#333,stroke:#333;
+
+    classDef sub_b fill:#fff5f7,color:#333,stroke:#333;
+
+    classDef sub_c fill:#f0fff0,color:#333,stroke:#333;
+    ZJNLe -- "Extract gantt timescale" ----> Bh9Ab
+    ZJNLe -- "Extract gantt task names" ----> R2oLH
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-0
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-1
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-2
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-3
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-4
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-5
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-6
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-7
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-8
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-9
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-10
+    ZJNLe -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-11
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-0
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-1
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-2
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-3
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-4
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-5
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-6
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-7
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-8
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-9
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-10
+    Bh9Ab -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-11
+    R2oLH -...- R2oLH-branch-0
+    R2oLH -...- R2oLH-branch-1
+    R2oLH -...- R2oLH-branch-2
+    R2oLH -...- R2oLH-branch-3
+    R2oLH -...- R2oLH-branch-4
+    R2oLH -...- R2oLH-branch-5
+    R2oLH -...- R2oLH-branch-6
+    R2oLH -...- R2oLH-branch-7
+    R2oLH -...- R2oLH-branch-8
+    R2oLH -...- R2oLH-branch-9
+    R2oLH -...- R2oLH-branch-10
+    R2oLH -...- R2oLH-branch-11
+    R2oLH-branch-0 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-0
+    QFEdmVvYVHdL6DsCRtwqHq-branch-0 -...- nCmpx
+    R2oLH-branch-1 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-1
+    QFEdmVvYVHdL6DsCRtwqHq-branch-1 -...- nCmpx
+    R2oLH-branch-2 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-2
+    QFEdmVvYVHdL6DsCRtwqHq-branch-2 -...- nCmpx
+    R2oLH-branch-3 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-3
+    QFEdmVvYVHdL6DsCRtwqHq-branch-3 -...- nCmpx
+    R2oLH-branch-4 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-4
+    QFEdmVvYVHdL6DsCRtwqHq-branch-4 -...- nCmpx
+    R2oLH-branch-5 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-5
+    QFEdmVvYVHdL6DsCRtwqHq-branch-5 -...- nCmpx
+    R2oLH-branch-6 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-6
+    QFEdmVvYVHdL6DsCRtwqHq-branch-6 -...- nCmpx
+    R2oLH-branch-7 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-7
+    QFEdmVvYVHdL6DsCRtwqHq-branch-7 -...- nCmpx
+    R2oLH-branch-8 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-8
+    QFEdmVvYVHdL6DsCRtwqHq-branch-8 -...- nCmpx
+    R2oLH-branch-9 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-9
+    QFEdmVvYVHdL6DsCRtwqHq-branch-9 -...- nCmpx
+    R2oLH-branch-10 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-10
+    QFEdmVvYVHdL6DsCRtwqHq-branch-10 -...- nCmpx
+    R2oLH-branch-11 -- "Extract details of task" ----> QFEdmVvYVHdL6DsCRtwqHq-branch-11
+    QFEdmVvYVHdL6DsCRtwqHq-branch-11 -...- nCmpx
+    nCmpx -- "Gather in a gantt chart" ----> NuMVc
+```

@@ -91,3 +91,34 @@ The category of this invoice is: $invoice_details.category.
 """
 ```
 This shows how a complex workflow, including OCR and LLM calls, can be defined in a simple, readable format. The `llm = "llm_to_extract_invoice"` line is particularly powerful, as it tells the LLM to structure its output according to the `Invoice` model. 
+
+## The Pipeline Flowchart
+
+```mermaid
+---
+config:
+  layout: dagre
+  theme: base
+---
+flowchart LR
+    subgraph "extract_invoice"
+    direction LR
+        ZynbH-branch-0["invoice_page:<br>**Page**"]
+        RRYZF["invoice_details:<br>**Invoice details**"]
+        RzjEzwGpkk5dXnrK3HXQJx-branch-0["invoice:<br>**Invoice**"]
+        ZynbH["invoice_pages:<br>**List of [Page]**"]
+        5SXqJ["invoice:<br>**List of [Invoice]**"]
+    end
+class extract_invoice sub_a;
+
+    classDef sub_a fill:#e6f5ff,color:#333,stroke:#333;
+
+    classDef sub_b fill:#fff5f7,color:#333,stroke:#333;
+
+    classDef sub_c fill:#f0fff0,color:#333,stroke:#333;
+    ZynbH-branch-0 -- "Analyze invoice" ----> RRYZF
+    ZynbH-branch-0 -- "Extract invoice data" ----> RzjEzwGpkk5dXnrK3HXQJx-branch-0
+    RRYZF -- "Extract invoice data" ----> RzjEzwGpkk5dXnrK3HXQJx-branch-0
+    RzjEzwGpkk5dXnrK3HXQJx-branch-0 -...- 5SXqJ
+    ZynbH -...- ZynbH-branch-0
+```
