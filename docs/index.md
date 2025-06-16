@@ -12,11 +12,11 @@ Pipelex is an open-source language specifically designed to build reliable, repe
 
 **Just want to see it in action?** Get up and running in minutes with our quick-start guide.
 
-[:material-rocket-launch: Install & Quick Start](pages/quick-start){ .md-button .md-button--primary }
+[:material-rocket-launch: Install & Quick Start](pages/quick-start/index.md){ .md-button .md-button--primary }
 
 **Want to understand the bigger picture?** Discover why Pipelex changes everything about AI development.
 
 [:material-book-open: Read the Manifesto](manifesto.md){ .md-button }
-[:material-lightbulb: Explore the Paradigm](pages/pipelex-paradigm-for-repeatable-ai-workflows/){ .md-button }
+[:material-lightbulb: Explore the Paradigm](pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md){ .md-button }
 
 

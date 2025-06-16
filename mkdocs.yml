@@ -88,20 +88,19 @@ nav:
       - The Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
     - Examples:
       - Overview: pages/examples/index.md
-      - Getting Started:
-        - Hello World: pages/examples/hello-world.md
+      - Hello World: pages/examples/hello-world.md
       - Document Processing:
         - Simple OCR: pages/examples/simple-ocr.md
         - Generic Document Extraction: pages/examples/extract-generic.md
         - Invoice Extractor: pages/examples/invoice-extractor.md
         - Proof of Purchase Extraction: pages/examples/extract-proof-of-purchase.md
-        - DPE Extraction: pages/examples/extract-dpe.md
-      - Image Processing:
-        - Table Extraction from Image: pages/examples/extract-table.md
+      - Graphical Extraction:
         - Gantt Chart Extraction: pages/examples/extract-gantt.md
+        - Table Extraction from Image: pages/examples/extract-table.md
+        - DPE Extraction: pages/examples/extract-dpe.md
       - Text Generation:
-        - Screenplay Generator: pages/examples/write-screenplay.md
-        - Tweet Optimizer: pages/examples/write-tweet.md
+        - Screenplay Generator (wip): pages/examples/write-screenplay.md
+        - Tweet Optimizer (wip): pages/examples/write-tweet.md
     - Build Reliable AI Workflows:
       - Kick off a Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md
       - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
@@ -157,6 +156,7 @@ nav:
       - Inference Manager: pages/advanced-customization/inference-manager-injection.md
     - License: license.md
     - Contributing: contributing.md
+    - Code of Conduct: CODE_OF_CONDUCT.md
 
 extra_css:
   - stylesheets/mermaid.css
