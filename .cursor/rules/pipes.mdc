@@ -1,6 +1,6 @@
 ---
 description: 
-globs: **/pipelex_libraries/pipelines/toml/**/*.toml
+globs: **/pipelex/libraries/pipelines/**/*.toml
 alwaysApply: false
 ---
 This rule explains how to build pipes.
@@ -9,7 +9,7 @@ This rule explains how to build pipes.
 
 ## The pipelines/ directory
 
-- Pipelines and structures are defined in the `pipelex/libraries/` directory
+- Pipelines and structures are defined in the `pipelex/libraries/pipelines` directory
 
 pipelex/libraries
 └── pipelines
@@ -40,6 +40,11 @@ pipelex/libraries
     - Never include the usage context in the concept. The concept indicates what the stuff is in itself, it's not "for something", it just is something. e.g. don't define "TextToSummarize": it's just "Text". If you want to refine the concept for instance you can define "Essay".
     - In particular, never define a concept as a plural form: if the context of the pipeline execution makes it multiple, it will just be handled using a ListContent (see below). e.g. don't define a concept for "Stories", just define "Story".
     - Also, avoid including adjectives in concepts, e.g. don't define "LargeText", it's just "Text".
+- Don't redefine the native concepts from [concept_native.py](mdc:pipelex/core/concept_native.py)
+
+⚠️ Important ⚠️
+
+A Concept MUST NEVER be a plural noun and you should never create a SomeConceptList: lists and arrays are implicitly handled by Pipelex according to the context. Just define SomeConcept.
 
 - Define concepts in one of two ways:
 
@@ -63,7 +68,7 @@ About the `structure` field:
 - It's Optional
 - It's the name of the Python BaseModel class used for the concept
 - The class must be a subclass of StuffContent
-- The class must be defined in a python module placed inside the `pipelex/pipelex_libraries/pipelines/structures/` directory
+- The class must be defined in a python module placed inside the `pipelex/libraries/pipelines/` directory
 - If the `structure` field is omitted but a class with the same name as the concept is defined in the structures directory, then it's implicitly applied to the concept
 
 About the `refines` field:
@@ -143,7 +148,7 @@ Summarize the following text:
 
 """
 
-# Example of a PipeLLM that uses @ prefix to insert a block of text but also a $ prefix to insert text inline in a sentence (that is teh case for the $topic)
+# Example of a PipeLLM that uses '@' prefix to insert a block of text but also a '$' prefix to insert text inline in a sentence (that is teh case for the $topic)
 [pipe.summarize_topic]
 PipeLLM = "Summarize a dense text with of focus on a specific topic."
 inputs = { topic = "Topic", text = "Text" }

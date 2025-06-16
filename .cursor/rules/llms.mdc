@@ -5,8 +5,10 @@ alwaysApply: false
 ---
 # Rules to choose LLM models used in PipeLLMs.
 
+## LLM Handles
+
 In order to use it in a pipe, an LLM is referenced by its llm_handle and possibly by an llm_preset.
-Both llm_handles and llm_presets are defined in this toml config file: [config_pipelex_llm_deck.toml](mdc:pipelex/config_pipelex_llm_deck.toml)
+Both llm_handles and llm_presets are defined in this toml config file: [base_llm_deck.toml](mdc:pipelex/libraries/llm_deck/base_llm_deck.toml)
 
 ## LLM Handles
 
@@ -15,18 +17,20 @@ An llm_handle matches the handle (an id of sorts) with the full specification of
 - llm_version
 - llm_platform_choice
 
-The declaration looks like this in toml syntax:
+The declaration of llm_handleslooks like this in toml syntax:
 ```toml
-[cogt.llm_config.llm_deck.llm_handle_to_llm_engine_blueprint.gpt-4o-2024-05-13]
-llm_name = "gpt-4o"
-llm_version = "2024-05-13"
-llm_platform_choice = "openai"
+[llm_handles]
+gpt-4o-2024-08-06 = { llm_name = "gpt-4o", llm_version = "2024-08-06" }
 ```
 
 In mosty cases, we only want to use version "latest" and llm_platform_choice "default" in which case the declaration is simply a match of the llm_handle to the llm_name, like this:
 ```toml
-gemini-2-5-pro = "gemini-2.5-pro"
+best-claude = "claude-4-opus"
+best-gemini = "gemini-2.5-pro"
+best-mistral = "mistral-large"
 ```
+
+And of course, llm_handles are automatically assigned for all models by their name, with version "latest" and llm_platform_choice "default".
 
 ## Using an LLM Handle in a PipeLLM
 
@@ -73,3 +77,6 @@ The category of this invoice is: $invoice_details.category.
 
 The setting here `llm = "llm_to_extract_invoice"` works because "llm_to_extract_invoice" has been declared as an llm_preset in the deck.
 You must not use an LLM preset in a PipeLLM that does not exist in the deck. If needed, you can add llm presets.
+
+
+You can override the predefined llm presets in [overrides.toml](mdc:pipelex/libraries/llm_deck/overrides.toml).
