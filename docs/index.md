@@ -2,7 +2,7 @@
 title: "Open-source AI workflows"
 ---
 
-![Pipelex Banner](https://d2cinlfp2qnig1.cloudfront.net/docs/pipelex_banner_docs_1200x630.png)
+![Pipelex Banner](https://d2cinlfp2qnig1.cloudfront.net/docs/pipelex_banner_docs_1200x420.png)
 
 # Easily build repeatable AI workflows
 
