@@ -1,10 +1,10 @@
 # Installation
 
-## 📋 Prerequisites
+## Prerequisites
 
 Pipelex requires `python` version `3.10` or above, and access to an LLM, via an API key or a custom endpoint.
 
-## 🧭 Getting Started
+## Getting Started
 
 Along with [our Documentation](../quick-start/index.md), we recommend you review it before any further usage: [Cookbook](https://github.com/Pipelex/pipelex-cookbook).
 
