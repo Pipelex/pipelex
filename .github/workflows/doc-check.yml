@@ -1,14 +1,6 @@
 name: Documentation Check
 
 on:
-  push:
-    branches:
-      - main
-      - dev
-      - "release/v[0-9]+.[0-9]+.[0-9]+"
-    paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
   pull_request:
     branches:
       - main

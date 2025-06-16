@@ -3,7 +3,7 @@ name: Preview MkDocs on GitHub Pages
 
 on:
   push:
-    branches: [codex/update-documentation-for-installation-module]
+    branches: [main]
 
 jobs:
   preview:
