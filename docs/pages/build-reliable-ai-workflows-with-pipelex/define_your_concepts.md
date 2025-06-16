@@ -153,7 +153,7 @@ domain = "hr"
 Employee = "A person employed by an organization"
 Meeting = "A scheduled gathering of people for discussion"
 PerformanceReview = "An evaluation of an employee's work performance"
-Department = "An organizational unit within a company"  # No Python model = text-based
+Department = "An organizational unit within a company"  # No Python model => text-based
 ```
 
 ```python

@@ -1,34 +1,14 @@
 # Kicking off a Knowledge Pipeline Project
 
-## Project Structure
+## Creating Your First Pipeline
 
-Every Pipelex project follows a simple directory structure that keeps your knowledge pipelines organized and maintainable:
-
-```
-your-project/
-├── pipelex_libraries/          # All your pipeline code lives here
-│   ├── pipelines/             # Pipeline definitions and models
-│   │   ├── __init__.py
-│   │   ├── characters.toml    # Domain definitions
-│   │   └── characters.py      # Python models for concepts
-│   ├── templates/             # Reusable prompt templates
-│   ├── llm_integrations/      # LLM provider configurations
-│   └── llm_deck/              # LLM model presets
-├── main.py                    # Your application code
-└── requirements.txt           # Python dependencies
-```
-
-The `pipelex_libraries` directory is where Pipelex looks for your pipeline definitions. This standardized structure means you can share libraries between projects, version control them separately, and maintain clean separation between your pipeline logic and application code.
-
-## Creating Your First Library
-
-A library in Pipelex is a collection of related concepts and pipes. Start by creating a TOML file in the `pipelines` directory:
+A pipeline in Pipelex is a collection of related concepts and pipes. Start by creating a TOML file in the `pipelines` directory:
 
 ```toml
 # pipelex_libraries/pipelines/tutorial.toml
 
 domain = "tutorial"
-description = "My first Pipelex library"
+definition = "My first Pipelex library"
 system_prompt = "You are a helpful assistant."
 
 [concept]
@@ -54,7 +34,7 @@ This creates a simple Q&A pipeline with:
 - Two concepts: Question and Answer
 - One pipe that transforms a Question into an Answer
 
-The `domain` property is the most important part of your library file. It groups all your concepts and pipes into a single, addressable unit.
+The `domain` property is the most important part of your pipeline file. It groups all your concepts and pipes into a single, easy to read bundle.
 
 ## What Are Domains?
 
@@ -65,9 +45,9 @@ A domain in Pipelex represents a topic or area of functionality within your pipe
 When you create a pipeline file (`.toml`), you always start by declaring its domain:
 
 ```toml
-domain = "finance"                                # The domain name for this file
-description = "Financial document processing"     # Optional description
-system_prompt = "You are an expert financial analyst." # Optional system prompt for all PipeLLM in this domain
+domain = "finance"                                      # The domain name for this file
+definition = "Financial document processing"            # Optional description
+system_prompt = "You are an expert financial analyst."  # Optional system prompt for all PipeLLM in this domain
 ```
 
 A domain consists of:
@@ -134,7 +114,7 @@ from pipelex.core.stuff_factory import StuffFactory
 
 # The concept_code combines domain and concept names
 invoice_stuff = StuffFactory.make_stuff(
-    concept_code="finance.Invoice",  # domain.ConceptName
+    concept_str="finance.Invoice",  # domain.ConceptName
     name="invoice_123",
     content=invoice_data # dictionary or Invoice object
 )
@@ -152,3 +132,23 @@ Consistent naming makes your pipeline code discoverable and maintainable:
 ### Python Model Files
 - It is recommended to match the TOML filename exactly: `legal.toml` → `legal.py`
 - But in any case, Pipelex will load models from all python modules in the `pipelines` directory or its subdirectories.
+
+## Project Structure
+
+Every Pipelex project follows a simple directory structure that keeps your knowledge pipelines organized and maintainable:
+
+```
+your-project/
+├── pipelex_libraries/         # All your pipeline code lives here
+│   ├── pipelines/             # Pipeline definitions and models
+│   │   ├── __init__.py
+│   │   ├── characters.toml    # Domain definitions
+│   │   └── characters.py      # Python models for concepts
+│   ├── templates/             # Reusable prompt templates
+│   ├── llm_integrations/      # LLM provider configurations
+│   └── llm_deck/              # LLM model presets
+├── main.py                    # Your application code
+└── requirements.txt           # Python dependencies
+```
+
+The `pipelex_libraries` directory is where Pipelex looks for your pipeline definitions. This standardized structure means you can share libraries between projects, version control them separately, and maintain clean separation between your pipeline logic and application code.
