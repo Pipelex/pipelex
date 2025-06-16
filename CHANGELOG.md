@@ -113,7 +113,7 @@ is_reporting_enabled = true
 
 ## [v0.2.13] - 2025-06-06
 
-- Added Discord badge on the Readme. Join the community! -> https://go.pipelex.com/IccCIv
+- Added Discord badge on the Readme. Join the community! -> https://go.pipelex.com/discord
 - Added a client for the Pipelex API. Join the waitlist -> https://www.pipelex.com/signup
 - Removed the `run_pipe_code` function. Replaced by `execute_pipeline` in `pipelex.pipeline.execute`.
 - Added llm deck `llm_for_img_to_text`.
