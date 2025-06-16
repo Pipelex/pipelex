@@ -2,7 +2,7 @@
 
 This guide shows the basics of Pipelex for the simplest use-cases: LLM calling and structured outputs.
 
-You can **find more powerful examples** in the [Examples](../examples/index.md) section of the docs or dive directly into the [Cookbook repository](https://github.com/Pipelex/pipelex-cookbook). [![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
+You can **find more powerful examples** in the [Cookbook Examples](../cookbook-examples/index.md) section of the docs or dive directly into the [Cookbook repository](https://github.com/Pipelex/pipelex-cookbook). [![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
 
 ---
 

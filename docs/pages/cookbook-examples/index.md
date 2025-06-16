@@ -1,6 +1,6 @@
-# Pipelex Cookbook: Examples and Recipes
+# Pipelex Cookbook Examples
 
-Welcome to the Pipelex Cookbook! 🍳📖
+Welcome to the Pipelex Cookbook!
 
 [![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
 
