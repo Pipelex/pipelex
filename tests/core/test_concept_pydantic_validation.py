@@ -1,8 +1,6 @@
 import pytest
-from pydantic import ValidationError
 
 from pipelex.core.concept import Concept
-from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.exceptions import ConceptCodeError, ConceptDomainError
 

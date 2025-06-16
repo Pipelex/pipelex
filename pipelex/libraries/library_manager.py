@@ -10,7 +10,6 @@ from pipelex import log, pretty_print
 from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_library import ConceptLibrary
-from pipelex.core.concept_native import NativeConcept
 from pipelex.core.domain import Domain
 from pipelex.core.domain_library import DomainLibrary
 from pipelex.core.pipe_abstract import PipeAbstract

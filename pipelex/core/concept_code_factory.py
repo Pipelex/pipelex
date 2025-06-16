@@ -1,14 +1,9 @@
-from inspect import getsource
-from typing import Any, Dict, List, Optional, Type
+from typing import Optional
 
-from kajson.class_registry import class_registry
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.domain import SpecialDomain
-from pipelex.core.stuff_content import TextContent
-from pipelex.exceptions import ConceptFactoryError, StructureClassError
+from pipelex.exceptions import ConceptFactoryError
 
 
 class ConceptCodeFactory:

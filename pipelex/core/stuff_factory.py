@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 from pipelex.config import get_config
 from pipelex.core.concept import Concept, ConceptError
 from pipelex.core.concept_code_factory import ConceptCodeFactory
-from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff, StuffCreationRecord
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
