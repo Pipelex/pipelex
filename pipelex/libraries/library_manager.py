@@ -6,7 +6,7 @@ from kajson.class_registry import class_registry
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
 from pydantic import ValidationError
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_library import ConceptLibrary
