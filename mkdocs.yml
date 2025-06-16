@@ -86,7 +86,7 @@ nav:
     - Understand Pipelex:
       - The Knowledge Pipeline Manifesto: manifesto.md
       - The Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
-    - Examples:
+    - Check out Examples:
       - Overview: pages/examples/index.md
       - Hello World: pages/examples/hello-world.md
       - Document Processing:
@@ -160,4 +160,5 @@ nav:
 
 extra_css:
   - stylesheets/mermaid.css
+  - stylesheets/general.css
   

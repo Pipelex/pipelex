@@ -1,0 +1,8 @@
+/* Custom styles for Pipelex documentation */
+
+/* Equal width buttons */
+.equal-width {
+    width: 100%;
+    max-width: 300px;
+    display: inline-block;
+}
