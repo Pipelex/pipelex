@@ -17,7 +17,7 @@ class ConceptBlueprint(BaseModel):
 
     definition: str
     structure: Optional[str] = None
-    refines: List[str] = Field(default_factory=list)
+    refines: Union[str, List[str]] = Field(default_factory=list)
     domain: Optional[str] = None
 
 
@@ -125,12 +125,18 @@ class ConceptFactory:
         else:
             structure_class_name = TextContent.__name__
 
+        refines_list: List[str]
+        if isinstance(concept_blueprint.refines, str):
+            refines_list = [concept_blueprint.refines]
+        else:
+            refines_list = concept_blueprint.refines
+
         return Concept(
             code=ConceptCodeFactory.make_concept_code(domain, code),
             domain=domain,
             definition=concept_blueprint.definition,
             structure_class_name=structure_class_name,
-            refines=concept_blueprint.refines,
+            refines=refines_list,
         )
 
     @classmethod
