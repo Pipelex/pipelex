@@ -87,11 +87,8 @@ class LibraryManager:
 
         native_concepts = ConceptFactory.list_native_concepts()
         self.concept_library.add_concepts(concepts=native_concepts)
-        pretty_print(native_concepts, title="Native concepts")
-        pretty_print(self.concept_library.list_concepts(), title="All loaded concepts before loading combo libraries")
 
         self._load_combo_libraries(library_paths=library_paths)
-        pretty_print(self.concept_library.list_concepts(), title="All loaded concepts after loading combo libraries")
 
     def load_deck(self) -> LLMDeck:
         llm_deck_paths = LibraryConfig.get_llm_deck_paths()
