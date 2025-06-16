@@ -60,6 +60,7 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
     def get_required_domain(self, domain_code: str) -> Domain:
         the_domain = self.get_domain(domain_code=domain_code)
         if not the_domain:
+            pretty_print(self.root, title="DomainLibrary")
             raise DomainLibraryError(f"Domain '{domain_code}' not found. Check for typos and make sure it is declared in a pipeline library.")
         return the_domain
 
