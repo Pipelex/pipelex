@@ -2,7 +2,7 @@ name: Preview MkDocs on GitHub Pages
 
 on:
   push:
-    branches: fix/doc-gha
+    branches: main
 
 permissions:
   contents: write
