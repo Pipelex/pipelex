@@ -24,26 +24,28 @@ Let's look at a simple example. Imagine we want a workflow that:
 We can achieve this with a `PipeLLM` operator.
 
 ```toml
-# Filename: my_pipes.toml
+# Filename: marketing_pipeline.toml
+
+domain = "marketing"
+definition = "Marketing content generation domain"
 
 # 1. Define the concepts used in our pipes
-[concept.ProductDescription]
-refines = "Text"
-
-[concept.Tagline]
-refines = "Text"
+[concept]
+ProductDescription = "A description of a product's features and benefits"
+Tagline = "A catchy marketing tagline"
 
 # 2. Define the pipe that does the work
 [pipe.generate_tagline]
-PipeLLM = "Generate a catchy tagline for a product."
+PipeLLM = "Generate a catchy tagline for a product"
 inputs = { description = "ProductDescription" }
+output = "Tagline"
 prompt_template = """
 Product Description:
 @description
----
+
 Generate a catchy tagline based on the above description.
+The tagline should be memorable, concise, and highlight the key benefit.
 """
-output = "Tagline"
 ```
 
 This defines a single-step pipeline. The pipe `generate_tagline` takes a `ProductDescription` as input and outputs a `Tagline`.
@@ -51,45 +53,47 @@ This defines a single-step pipeline. The pipe `generate_tagline` takes a `Produc
 To create a multi-step workflow, you use a controller. The `PipeSequence` controller is the most common one. It executes a series of pipes in a specific order.
 
 ```toml
-# Filename: my_pipes.toml
+# Filename: marketing_pipeline.toml
+
+domain = "marketing"
+definition = "Marketing content generation domain"
 
 # 1. Define concepts
-[concept.Keyword]
-Concept = "A keyword extracted from a text"
-refines = "Text"
-
-[concept.Tagline]
-Concept = "A catchy marketing tagline"
-refines = "Text"
-
+[concept]
+ProductDescription = "A description of a product's features and benefits"
+Keyword = "A keyword extracted from a text"
+Tagline = "A catchy marketing tagline"
 
 # 2. Define operator pipes
 [pipe.extract_keywords]
-PipeLLM = "Extract keywords from a text."
-inputs = { text = "Text" }
+PipeLLM = "Extract keywords from a product description"
+inputs = { description = "ProductDescription" }
 output = "Keyword"
 multiple_output = true
 prompt_template = """
-Please extract the most relevant keywords from the following text:
----
-@text
+Please extract the most relevant keywords from the following product description:
+
+@description
+
+Focus on features, benefits, and unique selling points.
 """
 
 [pipe.generate_tagline_from_keywords]
-PipeLLM = "Generate a tagline from a list of keywords."
+PipeLLM = "Generate a tagline from keywords"
 inputs = { keywords = "Keyword" }
 output = "Tagline"
 prompt_template = """
-Here are some keywords:
+Here are the key product keywords:
 @keywords
----
-Please generate a catchy marketing tagline based on these keywords.
+
+Generate a catchy marketing tagline based on these keywords.
+The tagline should be memorable, concise (under 10 words), and highlight the main benefit.
 """
 
 # 3. This controller pipe defines the two-step pipeline
-[pipe.text_to_tagline]
-PipeSequence = "From text to tagline"
-inputs = { text = "Text" }
+[pipe.description_to_tagline]
+PipeSequence = "From product description to tagline"
+inputs = { description = "ProductDescription" }
 output = "Tagline"
 steps = [
     { pipe = "extract_keywords", result = "extracted_keywords" },
@@ -113,33 +117,35 @@ This mechanism allows you to chain pipes together, creating a flow of informatio
 
 Once your pipes are defined, you can execute them from your Python code. Pipelex provides two main functions for this: `start_pipeline` and `execute_pipeline`.
 
-To run the `text_to_tagline` pipeline we defined above, you would call it by its unique name:
+To run the `description_to_tagline` pipeline we defined above, you would call it by its unique name:
 
 ```python
 import asyncio
-from pipelex.session import PipelexSession
-from pipelex.pipeline.execute import execute_pipeline
 from pipelex.core.working_memory import WorkingMemory
-
-# First, initialize a Pipelex session and load your definitions
-session = PipelexSession()
-session.load_tome_file("my_pipes.toml")
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.pipelex import Pipelex
+from pipelex.pipeline.execute import execute_pipeline
 
 async def main():
-    # Prepare the initial working memory with the pipeline's input
-    working_memory = WorkingMemory()
-    working_memory.add_stuff(
-        "my product is a self-cleaning water bottle",
-        concept_code="Text"
+    # First, initialize Pipelex (this loads all pipeline definitions)
+    Pipelex.make()
+    
+    # Create working memory with the pipeline's input
+    working_memory = WorkingMemoryFactory.make_from_text(
+        text="EcoClean Pro is a revolutionary biodegradable cleaning solution that removes 99.9% of germs while being completely safe for children and pets. Made from plant-based ingredients.",
+        concept_code="ProductDescription",
+        name="description"
     )
 
     # Execute the pipeline and wait for the result
-    output_stuff = await execute_pipeline(
-        pipe_code="text_to_tagline",
+    pipe_output, _ = await execute_pipeline(
+        pipe_code="description_to_tagline",
         working_memory=working_memory,
     )
 
-    print(f"Generated tagline: {output_stuff.content}")
+    # Get the final output
+    tagline = pipe_output.main_stuff_as(content_type=str)
+    print(f"Generated tagline: {tagline}")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -100,10 +100,10 @@ nav:
         - PipeCondition: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeCondition.md
         - PipeBatch: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeBatch.md
         - PipeParallel: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeParallel.md
-      - Configure AI LLM to optimize workflows: pages/build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md
+      - Optimize Cost & Quality: pages/build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md
       - LLM Structured Generation: pages/build-reliable-ai-workflows-with-pipelex/llm-structured-generation-config.md
       - LLM Prompting Style: pages/build-reliable-ai-workflows-with-pipelex/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
-      - AI Plugins for multi-LLM workflows: pages/build-reliable-ai-workflows-with-pipelex/ai-plugins-for-multi-llm-workflows.md
+      - LLM Providers & Models: pages/build-reliable-ai-workflows-with-pipelex/ai-plugins-for-multi-llm-workflows.md
   - Configuration:
     - Overview: pages/configuration/index.md
     - Pipeline Validation:

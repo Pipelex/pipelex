@@ -199,7 +199,7 @@ Your task is to extract specific data from the following description.
 
 💡 `@character.description` is substituted by grabbing the stuff named `character`in the working memory and using its `description`attribute
 
-Learn more about how we use Jinja in our [Jinja documentation](../tools/jinja2-templating.md)
+Learn more about how we use Jinja in the [PipeLLM documentation](../build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md).
 
 ### **This is how you do it from the code side**
 

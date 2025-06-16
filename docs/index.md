@@ -2,11 +2,11 @@
 title: "Pipelex: open-source language for repeatable AI workflows"
 ---
 
-![Pipelex Banner](../images/pipelex_banner_docs_1200x630.png)
+![Pipelex Banner](images/pipelex_banner_docs_1200x630.png)
 
-# Build AI workflows that actually work in production
+# Easily build repeatable AI workflows
 
-Pipelex is a Python framework that transforms chaotic AI experiments into reliable, repeatable workflows. Stop wrestling with fragile pipelines and start building AI systems you can trust.
+Pipelex is an open-source language specifically designed to build reliable, repeatable workflows. Stop wrestling with fragile workflows and start building AI systems you can trust.
 
 ## Ready to build something amazing?
 
