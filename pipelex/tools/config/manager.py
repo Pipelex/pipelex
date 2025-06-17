@@ -1,5 +1,5 @@
-import os
 import importlib
+import os
 from configparser import ConfigParser
 from typing import Any, Dict, Optional
 
@@ -70,17 +70,17 @@ class ConfigManager:
         pyproject_path = os.path.join(self.local_root_dir, "pyproject.toml")
         if not os.path.exists(pyproject_path):
             print(f"pyproject.toml not found in {self.local_root_dir}")
-            return  
+            return
 
         def _find_package_path(package_name: str) -> Optional[str]:
             """Find package path by importing it"""
             try:
                 module = importlib.import_module(package_name)
-                if hasattr(module, '__file__') and module.__file__:
+                if hasattr(module, "__file__") and module.__file__:
                     return os.path.dirname(module.__file__)
             except ImportError:
                 pass
-            
+
             return None
 
         pyproject = toml.load(pyproject_path)
