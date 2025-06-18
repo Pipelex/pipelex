@@ -7,8 +7,8 @@ from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtoc
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
-from pipelex.tools.templating.jinja2_environment import Jinja2TemplateCategory
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.templating_models import PromptingStyle
 
