@@ -6,7 +6,7 @@ Pipelex requires `python` version `3.10` or above, and access to an LLM, via an 
 
 ## Getting Started
 
-Along with [our Documentation](../quick-start/index.md), we recommend you review it before any further usage: [Cookbook](https://github.com/Pipelex/pipelex-cookbook).
+Along with our [Quick Start Guide](../quick-start/index.md), we recommend you check out our [Cookbook](https://github.com/Pipelex/pipelex-cookbook) for practical examples.
 
 - **Create a virtual environment** (recommended)
 

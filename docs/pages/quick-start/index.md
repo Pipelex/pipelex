@@ -13,7 +13,7 @@ For illustration purposes, let's build **a character generator**. Each example r
 
 ### Write your first pipeline
 
-You have to create a `.toml` library file in the `pipelex_libraries/pipelines` directory that will store your pipe definition.
+First, create a `.toml` library file in the `pipelex_libraries/pipelines` directory to store your pipe definition.
 Run `pipelex init-libraries` to create this directory if it doesn't exist. For now, keep all your pipeline definitions inside that folder only.
 
 `character.toml`
@@ -30,7 +30,7 @@ Think of it and then output the character description."""
 
 ### Run your first Pipelex script
 
-You have to create a `.py` python file to run your script. You can save it anywhere in your repository.
+Now, create a `.py` python file to run your script. You can save it anywhere in your repository.
 
 `character.py`
 ```python
@@ -100,7 +100,7 @@ Let's say that we no longer want plain text as output but a rigorously structure
 
 ### Define the model
 
-Using the [Pydantic Basemodel](https://docs.pydantic.dev/latest/) syntax, define your object structure as a Python class, in the `pipelex_libraries/pipelines` directory:
+Using the [Pydantic BaseModel](https://docs.pydantic.dev/latest/) syntax, define your object structure as a Python class, in the `pipelex_libraries/pipelines` directory:
 
 `pipelex_libraries/pipelines/characters.py`
 ```python
@@ -179,7 +179,7 @@ class CharacterMetadata(StructuredContent):
 
 ### **Let's use a template to fill prompts with data**
 
-💡 Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/). You can include a variable using the **classic** `{{ double.curly.braces }}` and, to make it simpler, we've added the possibility to just prefix your variable with the `@` symbol (recommended). Pipes now declare their required inputs explicitly with the `inputs` table:
+💡 Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/). You can include a variable using the **classic** `{{ double.curly.braces }}`, and to make it simpler, we've added the possibility to just prefix your variable with the `@` symbol (recommended). Pipes declare their required inputs explicitly with the `inputs` table:
 
 ```toml
 [concept]

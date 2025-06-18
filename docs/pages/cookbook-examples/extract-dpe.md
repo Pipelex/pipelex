@@ -66,7 +66,7 @@ output = "Dpe" # The output is structured as a Dpe object
 images = ["page_content.page_view"]
 llm = "llm_for_img_to_text"
 structuring_method = "preliminary_text"
-system_prompt = """You are a multimodal LLM, expert at converting images into perfect markdown."""
+system_prompt = """You are a multimodal LLM, expert in converting images into perfect markdown."""
 prompt_template = """
 You are given an image of a French 'Diagnostic de Performance Energetique'.
 Your role is to convert the image into perfect markdown.

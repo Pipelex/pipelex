@@ -12,7 +12,9 @@ Pipelex introduces **knowledge pipelines**: a way to capture these workflow step
 
 Knowledge refers to information you input from various data sources such as documents, PDFs, images, or information output by our pipes. There are different kinds of knowledge.
 
-In traditional programming, we work with data types: strings, integers, booleans (true/false), etc. But **knowledge work operates at a higher level.** Take for instance a *"non-compete clause from a contract"* and a *"description of a flower"*: they're both text, both are stored as strings, but they represent fundamentally different concepts. You can ask AI to extract the duration in months from a non-compete clause. You can ask AI to render a flower description as a Monet-style painting. But if you try the reverse, it doesn't make sense.
+### From Data Types to Concepts
+
+In traditional programming, we work with data types: strings, integers, booleans (true/false), etc. But **knowledge work operates at a higher level.** Take for instance a *"non-compete clause from a contract"* and a *"description of a flower"*: they're both text, both are stored as strings, but they represent fundamentally different concepts. You can ask an AI to extract the duration in months from a non-compete clause. You can ask an AI to render a flower description as a Monet-style painting. But if you try the reverse, it doesn't make sense.
 
 This is why Pipelex introduces **Concepts: typing with meaning attached.**
 
@@ -22,20 +24,20 @@ This is why Pipelex introduces **Concepts: typing with meaning attached.**
 
 Concretely, in Pipelex, a piece of knowledge is an object in the working memory. It could be anything, so we call that "stuff", and our Python class for it is `Stuff`.
 
-Stuff can be pretty basic, like plain text or an image, but it can also be structured with attributes, comprise lists, include other nested stuff, you get it... it's content is actually a `Pydantic BaseModel`. Also, each Stuff knows what concept it belongs to, e.g., `Text` or `NonCompeteClause` or `FlowerDescription`.
+Stuff can be pretty basic, like plain text or an image, but it can also be structured with attributes, comprise lists, include other nested stuff, you get it... the stuff's content is actually a `Pydantic BaseModel`. Also, each Stuff knows what concept it belongs to, e.g., `Text` or `NonCompeteClause` or `FlowerDescription`.
 
 And with that we are fully equipped for Lego-style plug-n-play:
 
 - Each pipe declares what inputs it uses, indicating the expected concept(s)
 - Each pipe also declares what it outputs
 
-So when you connect two pipes, Pipelex systematically checks that they are compatible. Actually it's even more powerful than that: imagine you have a sequence of 5 pipes, maybe pipe #4 takes two inputs, one given from the output of previous pipe #3 and the other one from the output of pipe #1. Pipelex checks that running the previous steps will have generated the required stuff and with the required concepts.
+So when you connect two pipes, Pipelex systematically checks that they are compatible. Actually, it's even more powerful than that: imagine you have a sequence of 5 pipes, maybe pipe #4 takes two inputs, one given from the output of previous pipe #3 and the other one from the output of pipe #1. Pipelex checks that running the previous steps will have generated the required stuff and with the required concepts.
 
 What if you have a pipe that requires a `Text` input, to translate it to Spanish for instance, then it should also accept a `FlowerDescription`, right? Yes, the greater includes the lesser. This is expressed in Pipelex by indicating that concept `FlowerDescription` **refines** concept `Text`.
 
 One problem that developers face when working with LLMs is that LLMs always try to answer your queries, and it pushes them to hallucinate. For instance, if you're trying to extract structured purchase details from an invoice, and there's a bug in your system so instead of receiving an invoice as input, the LLM received a picture of a flower, or nothing at all, there's a good chance it will generate a 100% hallucinated mock invoice. Pipelex prevents this kind of bugs, first by making sure the pipeline makes sense a priori, but it can also check any input for compatibility with the expected concept.
 
-**By letting you clearly assign concepts to the input and output stuff of your pipes, Pipelex makes sure that your pipeline makes sense, that it works in theory and detects any failure of meaning at the earliest stage possible in practice.**
+**By letting you clearly assign concepts to the input and output stuff of your pipes, Pipelex makes sure that your pipeline makes sense, that it works in theory, and detects any failure of meaning at the earliest stage possible in practice.**
 
 ## Who Defines the Concepts?
 

@@ -36,7 +36,6 @@ Built-in emoji indicators for different components:
 - ⚪️ OpenAI-related logs
 - 🌀 Google-related logs
 - ⚡️ Network connections
-- 📡 Web server (Werkzeug)
 - *️⃣ JSON processing
 - 🧿 Sandbox operations
 

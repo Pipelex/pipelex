@@ -1,6 +1,6 @@
 # Example: Hello World
 
-This is the "Hello World" of Pipelex. A simple pipeline that demonstrates the basic concepts of Pipelex.
+This is the "Hello World" of Pipelex, a simple pipeline that demonstrates the basic concepts of Pipelex.
 
 It's the perfect starting point to verify your installation and get a first taste of how Pipelex works.
 
