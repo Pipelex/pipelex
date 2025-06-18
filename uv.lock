@@ -1619,7 +1619,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.3.2"
+version = "0.4.2"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1662,10 +1662,6 @@ compat = [
 ]
 dev = [
     { name = "boto3-stubs" },
-    { name = "mkdocs" },
-    { name = "mkdocs-glightbox" },
-    { name = "mkdocs-material" },
-    { name = "mkdocs-meta-manager" },
     { name = "mypy" },
     { name = "pandas-stubs" },
     { name = "pyright" },
@@ -1684,6 +1680,12 @@ dev = [
     { name = "types-pyyaml" },
     { name = "types-requests" },
     { name = "types-toml" },
+]
+docs = [
+    { name = "mkdocs" },
+    { name = "mkdocs-glightbox" },
+    { name = "mkdocs-material" },
+    { name = "mkdocs-meta-manager" },
 ]
 fal = [
     { name = "fal-client" },
@@ -1713,10 +1715,10 @@ requires-dist = [
     { name = "kajson", specifier = ">=0.1.5" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "mistralai", marker = "extra == 'mistralai'", specifier = "==1.5.2" },
-    { name = "mkdocs", marker = "extra == 'dev'", specifier = "==1.6.1" },
-    { name = "mkdocs-glightbox", marker = "extra == 'dev'", specifier = "==0.4.0" },
-    { name = "mkdocs-material", marker = "extra == 'dev'", specifier = "==9.6.14" },
-    { name = "mkdocs-meta-manager", marker = "extra == 'dev'", specifier = "==1.1.0" },
+    { name = "mkdocs", marker = "extra == 'docs'", specifier = "==1.6.1" },
+    { name = "mkdocs-glightbox", marker = "extra == 'docs'", specifier = "==0.4.0" },
+    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = "==9.6.14" },
+    { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = "==1.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=1.60.1" },
@@ -1752,7 +1754,7 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.13.2" },
     { name = "yattag", specifier = ">=1.15.2" },
 ]
-provides-extras = ["anthropic", "bedrock", "fal", "google", "mistralai", "compat", "dev"]
+provides-extras = ["anthropic", "bedrock", "fal", "google", "mistralai", "compat", "docs", "dev"]
 
 [[package]]
 name = "platformdirs"

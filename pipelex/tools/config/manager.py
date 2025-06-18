@@ -1,3 +1,4 @@
+import importlib
 import os
 from configparser import ConfigParser
 from typing import Any, Dict, Optional
@@ -71,32 +72,24 @@ class ConfigManager:
             print(f"pyproject.toml not found in {self.local_root_dir}")
             return
 
+        def _find_package_path(package_name: str) -> Optional[str]:
+            """Find package path by importing it"""
+            try:
+                module = importlib.import_module(package_name)
+                if hasattr(module, "__file__") and module.__file__:
+                    return os.path.dirname(module.__file__)
+            except ImportError:
+                pass
+
+            return None
+
         pyproject = toml.load(pyproject_path)
         if "tool" in pyproject and "pipelex" in pyproject["tool"] and "config_inheritance" in pyproject["tool"]["pipelex"]:
             for config_name in pyproject["tool"]["pipelex"]["config_inheritance"]:
-                print(f"Loading config inheritance for {config_name}")
-                # First check if it's a local dependency in poetry
-                package_path: Optional[str] = None
-                if "tool" in pyproject and "poetry" in pyproject["tool"] and "dependencies" in pyproject["tool"]["poetry"]:
-                    dep_config: Dict[str, Any] = pyproject["tool"]["poetry"]["dependencies"].get(config_name, {})
-                    if "path" in dep_config:
-                        # It's a local path
-                        local_path: str = str(dep_config["path"])
-                        package_path = os.path.abspath(os.path.join(self.local_root_dir, local_path))
-
-                if not package_path:
-                    # Try to find in .venv
-                    venv_path = os.path.join(self.local_root_dir, ".venv")
-                    if os.path.exists(venv_path):
-                        site_packages = os.path.join(venv_path, "lib", "python3.11", "site-packages", config_name)
-                        if os.path.exists(site_packages):
-                            package_path = site_packages
-
+                package_path = _find_package_path(config_name)
                 if package_path:
                     config_path = os.path.join(package_path, "pipelex.toml")
-                    print(f"Loading config inheritance for {config_name} from {config_path}")
                     if os.path.exists(config_path):
-                        print(f"Found config inheritance for {config_name} from {config_path}")
                         config = failable_load_toml_from_path(config_path)
                         if config:
                             deep_update(the_pipelex_config, config)

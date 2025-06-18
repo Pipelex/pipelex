@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.4.2] - 2025-06-17
+
+- Fixed the inheritance config manager method (Undocumented feature, soon to be removed)
+- Fixed the `deploy-doc.yml` GitHub Action
+- Grouped the mkdocs dependencies in a single group `docs` in the `pyproject.toml` file
+
 ## [v0.4.1] - 2025-06-16
 
 - Changed discord link to the new one: https://go.pipelex.com/discord

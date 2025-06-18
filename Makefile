@@ -401,5 +401,5 @@ doc-check: env
 
 doc-deploy: env
 	$(call PRINT_TITLE,"Deploying documentation with mkdocs")
-	$(VENV_MKDOCS) gh-deploy
+	$(VENV_MKDOCS) gh-deploy --force --clean
 	

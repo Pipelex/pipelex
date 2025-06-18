@@ -1,13 +1,18 @@
-# .github/workflows/docs-preview.yml
 name: Preview MkDocs on GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: main
+
+permissions:
+  contents: write
+  pages: write
 
 jobs:
   preview:
     runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
     steps:
       - uses: actions/checkout@v4
 
@@ -15,17 +20,17 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Build docs
-        run: |
-          pip install mkdocs==1.6.1 mkdocs-material==9.6.14 mkdocs-glightbox==0.4.0 mkdocs-meta-manager==1.1.0
-          mkdocs build --strict         # generates ./site
+      - name: Check UV installation
+        run: make check-uv
 
-      - name: Publish to *gh-pages-preview*
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          publish_branch: gh-pages-preview   # <─ test branch
-          # put each branch in its own folder so multiple previews can coexist
-          destination_dir: ${{ github.ref_name }}
-          force_orphan: true
+      - name: Verify UV installation
+        run: uv --version
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Install docs dependencies
+        run: uv pip install -e ".[docs]"
+
+      - name: Deploy documentation
+        run: make doc-deploy
