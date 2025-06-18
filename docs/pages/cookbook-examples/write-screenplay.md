@@ -4,7 +4,7 @@ This example demonstrates how to use Pipelex for creative text generation. It ta
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/wip/write_screen_play.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/wip/write_screen_play.py)
+[**➡️ View on GitHub: examples/wip/write_screenplay.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/wip/write_screenplay.py)
 
 ## The Pipeline Explained
 
@@ -109,4 +109,5 @@ steps = [
     { pipe = "create_scene_sequence", batch_over = "initial_scenes", batch_as = "scene", result = "developed_scenes" }
 ]
 ```
-This modular, step-by-step process, guided by the structured data models, allows Pipelex to generate a complete, well-structured screenplay from a single, simple pitch. It's a powerful demonstration of building complex, creative AI agents. 
+
+This modular, step-by-step process, guided by the structured data models, allows Pipelex to generate a complete, well-structured screenplay from a single, simple pitch. It's a powerful demonstration of building complex, creative AI agents.

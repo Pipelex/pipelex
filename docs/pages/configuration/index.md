@@ -38,7 +38,7 @@ The exact loading sequence is:
    - Example environments: dev, staging, prod -> based on the environment variable `ENV` in your .env file
 5. Run mode overrides (`pipelex_{run_mode}.toml`)
    - Example run modes: normal, unit_test
-6. Super user overrides (`pipelex_super.toml`) (recommanded to put in .gitignore)
+6. Super user overrides (`pipelex_super.toml`) (recommended to put in .gitignore)
 
 Each subsequent configuration file in this sequence can override settings from the previous ones. This means:
 - Settings in `pipelex_local.toml` override the base configuration
