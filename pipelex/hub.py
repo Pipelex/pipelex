@@ -1,6 +1,8 @@
 from collections import defaultdict
 from typing import ClassVar, Dict, List, Optional, Type
 
+from kajson.class_registry_abstract import ClassRegistryAbstract
+
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
@@ -43,6 +45,7 @@ class PipelexHub:
         self._config: Optional[ConfigRoot] = None
         self._secrets_provider: Optional[SecretsProviderAbstract] = None
         self._template_provider: Optional[TemplateProviderAbstract] = None
+        self._class_registry: Optional[ClassRegistryAbstract] = None
         # cogt
         self._llm_models_provider: Optional[LLMModelProviderAbstract] = None
         self._llm_deck_provider: Optional[LLMDeckAbstract] = None
@@ -111,6 +114,9 @@ class PipelexHub:
 
     def set_template_provider(self, template_provider: TemplateProviderAbstract):
         self._template_provider = template_provider
+
+    def set_class_registry(self, class_registry: ClassRegistryAbstract):
+        self._class_registry = class_registry
 
     # cogt
 
@@ -186,6 +192,11 @@ class PipelexHub:
         if self._template_provider is None:
             raise RuntimeError("Template provider is not set. You must initialize Pipelex first.")
         return self._template_provider
+
+    def get_required_class_registry(self) -> ClassRegistryAbstract:
+        if self._class_registry is None:
+            raise RuntimeError("ClassRegistry is not initialized")
+        return self._class_registry
 
     # cogt
 
@@ -292,6 +303,10 @@ def get_template_provider() -> TemplateProviderAbstract:
 
 def get_template(template_name: str) -> str:
     return get_template_provider().get_template(template_name=template_name)
+
+
+def get_class_registry() -> ClassRegistryAbstract:
+    return get_pipelex_hub().get_required_class_registry()
 
 
 # cogt

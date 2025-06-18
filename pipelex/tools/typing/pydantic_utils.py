@@ -109,7 +109,7 @@ def serialize_model(
     # Identify which fields should be excluded
     fields_to_exclude: Set[str] = set()
 
-    for field_name, field_info in obj.model_fields.items():
+    for field_name, field_info in obj.__class__.model_fields.items():
         json_schema_extra = field_info.json_schema_extra
         is_hidden = json_schema_extra and isinstance(json_schema_extra, dict) and json_schema_extra.get(ExtraFieldAttribute.IS_HIDDEN) is True
         match field_visibility:
@@ -124,7 +124,7 @@ def serialize_model(
 
     # Build a dict, omitting hidden fields. Recursively handle nested models.
     data: Dict[str, Any] = {}
-    for field_name, _ in obj.model_fields.items():
+    for field_name, _ in obj.__class__.model_fields.items():
         if field_name in fields_to_exclude:
             continue  # Skip hidden fields
 

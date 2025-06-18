@@ -1,6 +1,5 @@
 from typing import List, Optional, Set, Type, cast
 
-from kajson.class_registry import class_registry
 from pydantic import model_validator
 from typing_extensions import Self, override
 
@@ -34,6 +33,7 @@ from pipelex.exceptions import (
     StaticValidationErrorType,
 )
 from pipelex.hub import (
+    get_class_registry,
     get_concept_provider,
     get_content_generator,
     get_llm_deck,
@@ -118,7 +118,7 @@ class PipeLLM(PipeOperator):
                         # let's check at least that the input is a structured concept
                         input_concept = concept_provider.get_required_concept(concept_code=concept_code_of_declared_input)
                         input_concept_class_name = input_concept.structure_class_name
-                        input_concept_class = class_registry.get_required_subclass(name=input_concept_class_name, base_class=StuffContent)
+                        input_concept_class = get_class_registry().get_required_subclass(name=input_concept_class_name, base_class=StuffContent)
                         if issubclass(input_concept_class, StructuredContent):
                             continue
                     explanation = "The input provided for LLM Vision must be an image or a concept that refines image"
@@ -393,7 +393,7 @@ class PipeLLM(PipeOperator):
         llm_prompt_2_factory: Optional[LLMPromptFactoryAbstract],
         content_generator: ContentGeneratorProtocol,
     ) -> StuffContent:
-        content_class: Type[StuffContent] = class_registry.get_required_subclass(name=output_class_name, base_class=StuffContent)
+        content_class: Type[StuffContent] = get_class_registry().get_required_subclass(name=output_class_name, base_class=StuffContent)
         task_desc: str
         the_content: StuffContent
 
