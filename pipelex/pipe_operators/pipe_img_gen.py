@@ -9,7 +9,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, ImggJobParams, Quality
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
-from pipelex.config import StaticValidationErrorType, StaticValidationReaction, get_config
+from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunParams, output_multiplicity_to_apply
@@ -21,6 +21,7 @@ from pipelex.exceptions import (
     PipeInputError,
     PipeRunParamsError,
     StaticValidationError,
+    StaticValidationErrorType,
     UnexpectedPipeDefinitionError,
     WorkingMemoryStuffNotFoundError,
 )

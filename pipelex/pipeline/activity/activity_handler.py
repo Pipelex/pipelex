@@ -3,7 +3,7 @@ from typing import Set, cast
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.stuff import Stuff, StuffContent
+from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import (
     HtmlContent,
     ImageContent,
@@ -11,6 +11,7 @@ from pipelex.core.stuff_content import (
     MermaidContent,
     NumberContent,
     StructuredContent,
+    StuffContent,
     TextContent,
 )
 from pipelex.pipeline.activity.activity_models import ActivityReport

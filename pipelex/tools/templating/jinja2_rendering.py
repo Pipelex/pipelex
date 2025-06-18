@@ -8,6 +8,7 @@ from jinja2.exceptions import (
 )
 
 from pipelex import log
+from pipelex.tools.templating.jinja2_environment import make_jinja2_env_from_template_provider
 from pipelex.tools.templating.jinja2_errors import (
     Jinja2ContextError,
     Jinja2RenderError,
@@ -15,7 +16,6 @@ from pipelex.tools.templating.jinja2_errors import (
     make_jinja2_error_explanation,
 )
 from pipelex.tools.templating.jinja2_models import Jinja2ContextKey
-from pipelex.tools.templating.jinja2_required_variables import make_jinja2_env_from_template_provider
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.template_provider_abstract import TemplateProviderAbstract
 from pipelex.tools.templating.templating_models import PromptingStyle

@@ -3,8 +3,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex.cogt.llm.llm_models.llm_deck import LLMSettingChoices
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingOrPresetId
+from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_run_params import make_output_multiplicity

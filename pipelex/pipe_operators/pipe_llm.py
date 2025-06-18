@@ -7,9 +7,8 @@ from typing_extensions import Self, override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.llm.llm_models.llm_deck import LLMSettingChoices
 from pipelex.cogt.llm.llm_models.llm_deck_check import check_llm_setting_with_deck
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
+from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.config import StaticValidationReaction, get_config
