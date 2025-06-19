@@ -79,7 +79,7 @@ silenced_problem_ids = ["azure_openai_no_stream_options"]
 ### Poor Loggers
 
 ```toml
-generic_poor_logger = "#sandbox"
+generic_poor_logger = "#poor-log"
 poor_loggers = [
     "kajson.decoder.sandbox",
     "kajson.encoder.sandbox",
@@ -150,7 +150,7 @@ is_caller_info_enabled = true
 caller_info_template = "file_line_func"
 
 silenced_problem_ids = []
-generic_poor_logger = "#sandbox"
+generic_poor_logger = "#poor-log"
 poor_loggers = []
 
 [pipelex.log_config.package_log_levels]

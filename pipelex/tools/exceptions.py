@@ -27,7 +27,7 @@ class TracebackMessageError(RootException):
         logger_name = __name__
         match self.__class__.error_mode:
             case TracebackMessageErrorMode.ERROR:
-                generic_poor_logger = "#sandbox"
+                generic_poor_logger = "#poor-log"
                 logger = logging.getLogger(generic_poor_logger)
                 logger.error(message)
             case TracebackMessageErrorMode.EXCEPTION:
