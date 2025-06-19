@@ -167,7 +167,6 @@ Your summary should not be longer than 2 sentences.
 PipeLLM = "Convert table screenshot to HTML"
 inputs = { table_screenshot = "TableScreenshot" }
 output = "HtmlTable"
-images = ["table_screenshot"]
 system_prompt = """
 You are a vision-based table extractor.
 """

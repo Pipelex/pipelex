@@ -63,7 +63,6 @@ The pipeline uses a `PipeLLM` with a very specific prompt to extract the informa
 PipeLLM = "Write markdown from page content of a 'Diagnostic de Performance Energetique'"
 inputs = { page_content = "Page" }
 output = "Dpe" # The output is structured as a Dpe object
-images = ["page_content.page_view"]
 llm = "llm_for_img_to_text"
 structuring_method = "preliminary_text"
 system_prompt = """You are a multimodal LLM, expert in converting images into perfect markdown."""

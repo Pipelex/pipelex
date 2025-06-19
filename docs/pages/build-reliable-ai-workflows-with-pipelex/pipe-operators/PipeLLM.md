@@ -75,7 +75,6 @@ This pipe takes an image of a table and uses a VLM to extract the content as an 
 PipeLLM = "Extract table data from an image"
 inputs = { image = "TableScreenshot" }
 output = "TableData"
-images = ["image"]
 prompt_template = """
 Extract the table data from this image and format it as a structured table.
 """
