@@ -1,6 +1,6 @@
 ---
 description: 
-globs: tests/**
+globs: tests/**/*.py
 alwaysApply: false
 ---
 These rules apply when writing unit tests.

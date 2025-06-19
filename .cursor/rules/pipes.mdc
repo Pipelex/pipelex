@@ -5,6 +5,10 @@ alwaysApply: false
 ---
 This rule explains how to build pipes.
 
+## Pipeline file naming
+
+- The file name should be descriptive, in snake_case and end with `.toml`
+
 ## Pipeline file structure
 
 1- Domain statement (name, definition, other attributes)
