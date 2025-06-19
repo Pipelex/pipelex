@@ -1,0 +1,25 @@
+domain = "test_image_inputs"
+definition = "Test domain for verifying image input functionality"
+
+[pipe]
+[pipe.describe_page_content_test]
+PipeLLM = "Describe a page content"
+inputs = { "page.page_view" = "Image", page = "Page" }
+output = "Text"
+system_prompt = """
+You are an expert at describing page contents.
+"""
+prompt_template = """
+Please describe this page:
+
+Text content:
+@page.text_and_images.text.text
+
+Images:
+@page.text_and_images.images
+
+Page view:
+@page.page_view
+
+Provide a clear and comprehensive description.
+"""

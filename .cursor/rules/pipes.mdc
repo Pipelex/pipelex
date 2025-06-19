@@ -1,7 +1,7 @@
 ---
 description: 
-globs: **/pipelex/libraries/pipelines/**/*.toml
-alwaysApply: false
+globs: 
+alwaysApply: true
 ---
 This rule explains how to build pipes.
 
