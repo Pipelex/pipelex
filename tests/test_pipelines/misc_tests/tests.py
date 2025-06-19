@@ -7,4 +7,5 @@ class RandomListContent(ListContent[TextContent]):
 
 class Article(StructuredContent):
     title: str
+    description: str
     date: str

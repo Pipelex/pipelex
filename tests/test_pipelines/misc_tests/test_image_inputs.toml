@@ -5,7 +5,7 @@ definition = "Test domain for verifying image input functionality"
 Article = "Article"
 
 [pipe]
-[pipe.describe_page_content_test]
+[pipe.extract_article_from_image]
 PipeLLM = "Describe a page content"
 inputs = { image = "Image" }
 output = "Article"
@@ -14,4 +14,19 @@ You are an expert at describing page contents.
 """
 prompt_template = """
 Extract the text and the date of the article in the image.
+"""
+
+[pipe.describe_page]
+PipeLLM = "Describe a page"
+inputs = { "page.page_view" = "Image", page = "Page" }
+output = "Article"
+system_prompt = """
+You are an expert at describing page contents.
+"""
+prompt_template = """
+Extract the date and title of the article.
+
+Also, add this as the description of the article:
+
+@page.text_and_images.text.text
 """
