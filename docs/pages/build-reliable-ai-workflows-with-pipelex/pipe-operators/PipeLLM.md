@@ -86,14 +86,14 @@ Compare these two images and describe their similarities and differences.
 
 ### Combining Text and Image Inputs
 
-You can mix text and image inputs in the same pipe:
+You can mix any stuff and images inputs in the same pipe:
 
 ```toml
 [pipe.analyze_document_with_context]
 PipeLLM = "Analyze a document page with additional context"
 inputs = { 
     context = "Text",
-    page_image = "document.page_view"
+    document.page_view = "Image"
 }
 output = "DocumentAnalysis"
 prompt_template = """

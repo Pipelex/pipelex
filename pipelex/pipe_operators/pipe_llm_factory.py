@@ -113,9 +113,8 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         if pipe_blueprint.inputs:
             for stuff_name, concept_code in (pipe_blueprint.inputs).items():
                 concept = get_concept_provider().get_required_concept(concept_code=concept_code)
-                if concept:
-                    if get_concept_provider().is_image_concept(concept_code=concept.code):
-                        user_images.append(stuff_name)
+                if get_concept_provider().is_image_concept(concept_code=concept.code):
+                    user_images.append(stuff_name)
                 else:
                     # Implicit text concept
                     pass

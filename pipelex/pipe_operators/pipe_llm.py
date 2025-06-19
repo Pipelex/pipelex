@@ -69,7 +69,13 @@ class PipeLLM(PipeOperator):
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
 
     def needed_inputs(self) -> PipeInputSpec:
-        return self.pipe_llm_prompt.needed_inputs()
+        pipe_llm_prompt_needed_inputs = self.pipe_llm_prompt.needed_inputs()
+        # The images are not tagged in the prompt_template. Therefore if an image is provided in the
+        # inputs, it becomes a needed input.
+        for input_name, concept_code in self.inputs.root.items():
+            if get_concept_provider().is_image_concept(concept_code=concept_code):
+                pipe_llm_prompt_needed_inputs.add_requirement(variable_name=input_name, concept_code=NativeConcept.IMAGE.code)
+        return pipe_llm_prompt_needed_inputs
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
@@ -143,12 +149,12 @@ class PipeLLM(PipeOperator):
                         case StaticValidationReaction.RAISE:
                             raise inadequate_input_concept_error
         # check that all inputs are in the required variables
+        from pipelex import pretty_print
+
+        pretty_print(self.inputs.variables, title="inputs.variables")
+        pretty_print(the_needed_inputs.required_names, title="the_needed_inputs.required_names")
         for input_name in self.inputs.variables:
             if input_name not in the_needed_inputs.required_names:
-                # Exception for image inputs: They are automatically passed to vision-enabled LLMs
-                input_concept = concept_provider.get_required_concept(self.inputs.get_required_concept_code(variable_name=input_name))
-                if concept_provider.is_image_concept(concept_code=input_concept.code):
-                    continue
                 extraneous_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
                     domain_code=self.domain,
@@ -164,10 +170,9 @@ class PipeLLM(PipeOperator):
                         raise extraneous_input_var_error
             else:
                 # Check if this input is an image concept but is being used as a variable in the prompt
-                input_concept = concept_provider.get_required_concept(self.inputs.get_required_concept_code(variable_name=input_name))
-                if concept_provider.is_image_concept(concept_code=input_concept.code):
+                if concept_provider.is_image_concept(concept_code=input_name):
                     raise PipeDefinitionError(
-                        f"Image-based input '{input_name}' of concept '{input_concept.code}' "
+                        f"Image-based input '{input_name}' of concept '{input_name}' "
                         f"cannot be used as a variable in a prompt for Pipe '{self.code}'. "
                         f"Image variables are automatically passed to vision-enabled LLMs."
                     )
