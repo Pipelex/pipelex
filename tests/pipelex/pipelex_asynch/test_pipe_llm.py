@@ -62,7 +62,6 @@ class TestPipeLLM:
         if not stuff_name:
             pytest.fail(f"Cannot use nameless stuff in this test: {stuff}")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
-
         pipe_job = PipeJobFactory.make_pipe_job(
             working_memory=working_memory,
             pipe=PipeLLM(
@@ -75,11 +74,11 @@ class TestPipeLLM:
                     domain="generic",
                     system_prompt=PipeTestCases.SYSTEM_PROMPT,
                     user_text=PipeTestCases.MULTI_IMG_DESC_PROMPT,
-                    user_images=attribute_paths,
                 ),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
+
         pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,
         )

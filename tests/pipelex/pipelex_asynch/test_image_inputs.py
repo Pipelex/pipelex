@@ -3,14 +3,12 @@ from typing import cast
 import pytest
 from pytest import FixtureRequest
 
-from pipelex import log, pretty_print
+from pipelex import pretty_print
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, PageContent, TextAndImagesContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate, get_required_pipe
 from pipelex.pipeline.job_metadata import JobMetadata

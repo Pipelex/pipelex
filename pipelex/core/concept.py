@@ -7,7 +7,7 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.stuff_content import ImageContent, StuffContent
+from pipelex.core.stuff_content import StuffContent
 from pipelex.exceptions import ConceptCodeError, ConceptDomainError, ConceptError, StructureClassError
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 
@@ -129,14 +129,3 @@ class Concept(BaseModel):
     @property
     def node_name(self) -> str:
         return self.code
-
-    def is_image_concept(self) -> bool:
-        """
-        Check if the concept is an image concept.
-        It is an image concept if its structure class is a subclass of ImageContent
-        or if it refines the native Image concept.
-        """
-        pydantic_model = class_registry.get_class(self.structure_class_name)
-        is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
-        refines_image = NativeConcept.IMAGE.code in self.refines
-        return is_image_class or refines_image

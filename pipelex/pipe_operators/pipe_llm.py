@@ -147,7 +147,7 @@ class PipeLLM(PipeOperator):
             if input_name not in the_needed_inputs.required_names:
                 # Exception for image inputs: They are automatically passed to vision-enabled LLMs
                 input_concept = concept_provider.get_required_concept(self.inputs.get_required_concept_code(variable_name=input_name))
-                if input_concept.is_image_concept():
+                if concept_provider.is_image_concept(concept_code=input_concept.code):
                     continue
                 extraneous_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
@@ -165,7 +165,7 @@ class PipeLLM(PipeOperator):
             else:
                 # Check if this input is an image concept but is being used as a variable in the prompt
                 input_concept = concept_provider.get_required_concept(self.inputs.get_required_concept_code(variable_name=input_name))
-                if input_concept.is_image_concept():
+                if concept_provider.is_image_concept(concept_code=input_concept.code):
                     raise PipeDefinitionError(
                         f"Image-based input '{input_name}' of concept '{input_concept.code}' "
                         f"cannot be used as a variable in a prompt for Pipe '{self.code}'. "

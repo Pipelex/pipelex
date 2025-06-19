@@ -46,3 +46,7 @@ class ConceptProviderAbstract(ABC):
     @abstractmethod
     def get_class(self, concept_code: str) -> Optional[Type[Any]]:
         pass
+
+    @abstractmethod
+    def is_image_concept(self, concept_code: str) -> bool:
+        pass

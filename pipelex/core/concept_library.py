@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional, Type
 
-from kajson.class_registry import class_registry
 from pydantic import Field, RootModel
 from typing_extensions import override
 
@@ -9,7 +8,9 @@ from pipelex.core.concept import Concept
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.stuff_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
+from pipelex.hub import get_class_registry
 
 ConceptLibraryRoot = Dict[str, Concept]
 
@@ -130,4 +131,19 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def get_class(self, concept_code: str) -> Optional[Type[Any]]:
-        return class_registry.get_class(concept_code)
+        return get_class_registry().get_class(concept_code)
+
+    @override
+    def is_image_concept(self, concept_code: str) -> bool:
+        """
+        Check if the concept is an image concept.
+        It is an image concept if its structure class is a subclass of ImageContent
+        or if it refines the native Image concept.
+        """
+        concept = self.get_concept(concept_code=concept_code)
+        if not concept:
+            return False
+        pydantic_model = self.get_class(concept_code=concept.structure_class_name)
+        is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
+        refines_image = NativeConcept.IMAGE.code in concept.refines
+        return is_image_class or refines_image
