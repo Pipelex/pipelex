@@ -91,9 +91,11 @@ class Concept(BaseModel):
 
     @classmethod
     def is_valid_structure_class(cls, structure_class_name: str) -> bool:
+        # we get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
         if KajsonManager.get_class_registry().has_subclass(name=structure_class_name, base_class=StuffContent):
             return True
         else:
+            # we get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
             if KajsonManager.get_class_registry().has_class(name=structure_class_name):
                 log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
             return False
