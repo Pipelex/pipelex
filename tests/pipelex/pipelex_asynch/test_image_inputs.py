@@ -23,11 +23,7 @@ class TestImageInputs:
     """Test class for verifying image input functionality in pipes."""
 
     async def test_extract_article_from_image(self, request: FixtureRequest) -> None:
-        """Test that a pipe can accept a PageContent input.
-
-        Args:
-            request: Pytest fixture request object for accessing test metadata.
-        """
+        """Test that an image is indeed given to the LLM, and that it can extract extact whats on the image."""
         # Create the page content
         image_content = ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG)
 
@@ -59,10 +55,9 @@ class TestImageInputs:
         assert article.title == "The Solar System: An Overview"
 
     async def test_describe_page(self, request: FixtureRequest) -> None:
-        """Test that a pipe can accept a PageContent input.
-
-        Args:
-            request: Pytest fixture request object for accessing test metadata.
+        """
+        Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes,
+        But also accepts basic objects
         """
         # Create the page content
         image_content = ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG)
