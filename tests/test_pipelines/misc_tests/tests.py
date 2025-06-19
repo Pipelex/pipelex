@@ -1,5 +1,10 @@
-from pipelex.core.stuff_content import ListContent, TextContent
+from pipelex.core.stuff_content import ListContent, StructuredContent, TextContent
 
 
 class RandomListContent(ListContent[TextContent]):
     pass
+
+
+class Article(StructuredContent):
+    title: str
+    date: str

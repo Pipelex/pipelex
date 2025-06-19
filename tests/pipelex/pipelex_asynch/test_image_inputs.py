@@ -7,12 +7,13 @@ from pipelex import pretty_print
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import ImageContent, PageContent, TextAndImagesContent, TextContent
+from pipelex.core.stuff_content import ImageContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate, get_required_pipe
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.test_data import ImageTestCases
+from tests.test_pipelines.misc_tests.tests import Article
 
 
 @pytest.mark.llm
@@ -29,25 +30,15 @@ class TestImageInputs:
         """
         # Create the page content
         image_content = ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG)
-        text_and_images = TextAndImagesContent(text=TextContent(text="This is a test page"), images=[image_content])
-        page_content = PageContent(text_and_images=text_and_images, page_view=image_content)
 
         # Create stuff from page content
-        stuff = StuffFactory.make_stuff(concept_str="Page", content=page_content, name="page")
+        stuff = StuffFactory.make_stuff(concept_str="Image", content=image_content, name="image")
 
         # Create working memory
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Get the pipe
         pipe: PipeAbstract = get_required_pipe(pipe_code="describe_page_content_test")
-
-        # Verify pipe loaded successfully
-        assert pipe.code == "describe_page_content_test"
-        assert pipe.domain == "test_image_inputs"
-
-        # Verify input configuration
-        assert "page" in pipe.inputs.variables
-        assert pipe.inputs.get_required_concept_code("page") == "native.Page"
 
         # Run the pipe
         pipe_output: PipeOutput = await pipe.run_pipe(
@@ -62,8 +53,11 @@ class TestImageInputs:
         pretty_print(pipe_output, title="Pipe output")
         get_report_delegate().generate_report()
 
+        article = pipe_output.main_stuff_as(content_type=Article)
+        pretty_print(article, title="Article")
         # Verify output
+        assert article.title == "The Solar System: An Overview"
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
-        assert pipe_output.main_stuff.concept_code == "native.Text"
+        assert pipe_output.main_stuff.concept_code == "test_image_inputs.Article"

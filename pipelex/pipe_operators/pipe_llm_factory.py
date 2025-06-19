@@ -7,7 +7,6 @@ from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettin
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_run_params import make_output_multiplicity
-from pipelex.core.stuff_content import ImageContent
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider, get_optional_domain
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
@@ -113,16 +112,13 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         user_images: List[str] = []
         if pipe_blueprint.inputs:
             for stuff_name, concept_code in (pipe_blueprint.inputs or {}).items():
-                concept = get_concept_provider().get_concept(concept_code=concept_code)
+                concept = get_concept_provider().get_required_concept(concept_code=concept_code)
                 if concept:
-                    pydantic_model = get_concept_provider().get_class(concept_code=concept_code)
-                    is_image = pydantic_model and issubclass(pydantic_model, ImageContent)
-                    if "Image" in concept.refines or is_image:
+                    if get_concept_provider().is_image_concept(concept_code=concept.code):
                         user_images.append(stuff_name)
                 else:
                     # Implicit text concept
                     pass
-
         pipe_llm_prompt = PipeLLMPrompt(
             code="adhoc_for_pipe_llm_prompt",
             domain=domain_code,
