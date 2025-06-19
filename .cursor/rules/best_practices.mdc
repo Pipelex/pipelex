@@ -29,21 +29,6 @@ This document outlines the core best practices and patterns used in our codebase
 1. **Use Factory Pattern for Object Creation**
    - Create factories when dealing with multiple implementations
 
-## Abstract Classes and Protocols
-
-1. **Use Abstract Base Classes**
-   - Define interfaces using abstract base classes
-   - Use `@abstractmethod` decorator for required methods
-   ```python
-   from abc import ABC, abstractmethod
-   
-   class BaseProcessor(ABC):
-       @abstractmethod
-       def process(self, data: InputData) -> OutputData:
-           """Process the input data."""
-           pass
-   ```
-
 ## Documentation
 
 1. **Docstring Format**
