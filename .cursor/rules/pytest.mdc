@@ -1,7 +1,7 @@
 ---
 description: 
-globs: 
-alwaysApply: true
+globs: tests/**
+alwaysApply: false
 ---
 These rules apply when writing unit tests.
 - Always use pytest
@@ -18,7 +18,7 @@ These rules apply when writing unit tests.
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `tests.pipelex.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
 - Always put test inside Test classes.
-- The pipelex pipelines should be stored in `tests/test_pipelines`.
+- The pipelex pipelines should be stored in `tests/test_pipelines` as well as the related structured Output classes that inherit from `StructuredContent`
 
 ## Markers
 
@@ -163,13 +163,3 @@ Also note that we provide a topic for the test case, which is purely for conveni
 - Include docstrings explaining test purpose
 - Log outputs for debugging
 - Generate reports for cost tracking
-
-## Running tests:
-
-In order to run the tests, we have make commands.
-the most essential ones are make t and make ti. 
-
-- make t runs all tests with those markers: `(dry_runnable or not (inference or llm or imgg or ocr)) and not (needs_output or pipelex_api)`
-- make ti runs all tests with those markers: `inference and not imgg`
-
-You can run a specific test using the arguments TEST=<TestClass> or TEST=<test_function_name>. 
