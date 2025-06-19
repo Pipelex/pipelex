@@ -5,7 +5,6 @@ from pipelex.tools.log.log_config import LogConfig, LogMode
 from pipelex.tools.log.log_dispatch import LogDispatch
 from pipelex.tools.log.log_formatter import EmojiLogFormatter, LevelAndEmojiLogFormatter
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, LOGGING_LEVEL_VERBOSE, LogLevel
-from pipelex.types import StrEnum
 
 
 class Log:
