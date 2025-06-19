@@ -6,7 +6,7 @@ import pytest
 from pydantic import BaseModel, Field
 from pytest import CaptureFixture
 
-from pipelex.tools.misc.pretty import pretty_print, pretty_print_in_sandbox
+from pipelex.tools.misc.pretty import PrettyPrinter, pretty_print
 
 
 class Address(BaseModel):
@@ -199,7 +199,7 @@ class TestPrettyPrint:
 
 class TestPrettyPrintInSandbox:
     def test_empty_content(self, capsys: CaptureFixture[str]):
-        pretty_print_in_sandbox(content="")
+        PrettyPrinter.pretty_print_without_rich(content="")
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -213,7 +213,7 @@ class TestPrettyPrintInSandbox:
         assert output == expected_output, f"Output did not match expected:\n{output}"
 
     def test_none_content(self, capsys: CaptureFixture[str]):
-        pretty_print_in_sandbox(content=None, title="title", subtitle="subtitle")
+        PrettyPrinter.pretty_print_without_rich(content=None, title="title", subtitle="subtitle")
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)

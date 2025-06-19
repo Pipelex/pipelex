@@ -32,6 +32,8 @@ silenced_problem_ids = ["azure_openai_no_stream_options"]
 caller_info_template = "file_line"
 is_caller_info_enabled = false
 
+log_mode = "rich"
+
 poor_loggers = [
     "kajson.decoder.sandbox",
     "kajson.encoder.sandbox",
