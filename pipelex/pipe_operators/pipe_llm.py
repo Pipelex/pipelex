@@ -149,10 +149,6 @@ class PipeLLM(PipeOperator):
                         case StaticValidationReaction.RAISE:
                             raise inadequate_input_concept_error
         # check that all inputs are in the required variables
-        from pipelex import pretty_print
-
-        pretty_print(self.inputs.variables, title="inputs.variables")
-        pretty_print(the_needed_inputs.required_names, title="the_needed_inputs.required_names")
         for input_name in self.inputs.variables:
             if input_name not in the_needed_inputs.required_names:
                 extraneous_input_var_error = StaticValidationError(
