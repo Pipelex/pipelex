@@ -1,12 +1,11 @@
 from typing import List
 
-from kajson.class_registry import class_registry
 from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.hub import get_llm_worker
+from pipelex.hub import get_class_registry, get_llm_worker
 
 
 async def llm_gen_text(llm_assignment: LLMAssignment) -> str:
@@ -31,7 +30,7 @@ async def llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
         llm_job_params=llm_assignment.llm_job_params,
     )
     content_class_name = object_assignment.object_class_name
-    content_class = class_registry.get_required_base_model(name=content_class_name)
+    content_class = get_class_registry().get_required_base_model(name=content_class_name)
     generated_object: BaseModel = await llm_worker.gen_object(
         llm_job=llm_job,
         schema=content_class,
@@ -49,7 +48,7 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment) -> List[BaseM
         llm_job_params=llm_assignment.llm_job_params,
     )
     item_class_name = object_assignment.object_class_name
-    item_class = class_registry.get_required_class(name=item_class_name)
+    item_class = get_class_registry().get_required_class(name=item_class_name)
 
     class ListSchema(BaseModel):
         items: List[item_class]  # type: ignore

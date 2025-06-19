@@ -1,8 +1,11 @@
+from typing import List, Tuple, Type
+
 import pytest
 
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuff_content import StructuredContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
@@ -76,7 +79,7 @@ class TestPipeLLMPrompt:
 
     async def test_prompt_with_output_structure(self, pipe_run_mode: PipeRunMode):
         """Test prompt with output structure for different content types."""
-        test_cases = [
+        test_cases: List[Tuple[Type[StructuredContent], str, str]] = [
             (SimpleTextContent, "Empty class inheritance", "test.SimpleTextContent"),
             (SimpleStructuredContent, "Primitive types", "test.SimpleStructuredContent"),
             (DocumentTypeContent, "Enum fields", "test.DocumentTypeContent"),

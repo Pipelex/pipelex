@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 import shortuuid
-from kajson.class_registry import class_registry
 from pydantic import BaseModel, Field
 
 from pipelex.config import get_config
@@ -11,7 +10,7 @@ from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff, StuffCreationRecord
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
 from pipelex.exceptions import ConceptError, PipelexError
-from pipelex.hub import get_required_concept
+from pipelex.hub import get_class_registry, get_required_concept
 
 
 class StuffFactoryError(PipelexError):
@@ -111,7 +110,7 @@ class StuffFactory:
             raise StuffFactoryError(f"Concept '{concept_str}' does not contain a domain, could not make stuff '{stuff_ref}'")
         the_concept = get_required_concept(concept_code=concept_code)
         the_subclass_name = the_concept.structure_class_name
-        the_subclass = class_registry.get_class(name=the_subclass_name) or eval(the_subclass_name)
+        the_subclass = get_class_registry().get_class(name=the_subclass_name) or eval(the_subclass_name)
         if not issubclass(the_subclass, StuffContentInitableFromStr):
             raise StuffFactoryError(f"Concept '{concept_code}', subclass '{the_subclass}' is not InitableFromStr")
         stuff_content: StuffContent = the_subclass.make_from_str(str_value)
@@ -155,7 +154,7 @@ class StuffFactory:
         """
         the_concept = get_required_concept(concept_code=concept_code)
         the_subclass_name = the_concept.structure_class_name
-        the_subclass = class_registry.get_required_subclass(name=the_subclass_name, base_class=StuffContent)
+        the_subclass = get_class_registry().get_required_subclass(name=the_subclass_name, base_class=StuffContent)
         the_stuff_content = the_subclass.model_validate(obj=stuff_contents)
         return cls.make_stuff(
             concept_str=concept_code,

@@ -28,7 +28,7 @@ def emoji_for_channel(channel_name: str) -> Optional[str]:
     elif channel_name.startswith("kajson"):
         # space added to make it look better
         return "*️⃣ "
-    elif channel_name.startswith("#sandbox"):
+    elif channel_name.startswith("#poor-log"):
         # space added to make it look better
         return "🧿 "
     elif channel_name.startswith("pipelex"):

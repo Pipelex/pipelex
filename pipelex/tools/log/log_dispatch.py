@@ -4,12 +4,7 @@ import os
 import traceback
 from typing import Any, List, Optional, Union
 
-from kajson.sandbox_manager import sandbox_manager
-
-from pipelex.tools.log.log_config import (
-    CallerInfoTemplate,
-    LogConfig,
-)
+from pipelex.tools.log.log_config import CallerInfoTemplate, LogConfig, LogMode
 from pipelex.tools.misc.json_utils import purify_json, purify_json_dict, purify_json_list
 
 
@@ -25,6 +20,10 @@ class LogDispatch:
     def __init__(self):
         self.project_name: Optional[str] = None
         self._log_config_instance: Optional[LogConfig] = None
+        self.log_mode: LogMode = LogMode.RICH
+
+    def set_log_mode(self, mode: LogMode):
+        self.log_mode = mode
 
     def reset(self):
         """
@@ -67,6 +66,7 @@ class LogDispatch:
             raise RuntimeError("LogConfig is already set. You can only call log.configure() once.")
         self._log_config_instance = log_config
         self.project_name = project_name
+        self.log_mode = log_config.log_mode
 
     ########################################################
     # Private methods
@@ -249,10 +249,12 @@ class LogDispatch:
         if not self._log_config.is_console_logging_enabled:
             return
 
-        if sandbox_manager.is_in_sandbox():
-            logger = logging.getLogger(self._log_config.generic_poor_logger)
-            logger.log(level=severity, msg=message, stacklevel=6)
-            return
+        match self.log_mode:
+            case LogMode.RICH:
+                pass
+            case LogMode.POOR:
+                logger = logging.getLogger(self._log_config.generic_poor_logger)
+                logger.log(level=severity, msg=message, stacklevel=6)
 
         stack = inspect.stack()
         try:

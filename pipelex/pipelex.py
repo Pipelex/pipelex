@@ -2,7 +2,9 @@ from importlib.metadata import metadata
 from typing import Any, ClassVar, List, Optional, Type
 
 from dotenv import load_dotenv
-from kajson.class_registry import class_registry
+from kajson.class_registry import ClassRegistry
+from kajson.class_registry_abstract import ClassRegistryAbstract
+from kajson.kajson_manager import KajsonManager
 from pydantic import ValidationError
 from rich import print
 from typing_extensions import Self
@@ -50,6 +52,7 @@ class Pipelex:
         pipelex_hub: Optional[PipelexHub] = None,
         config_cls: Optional[Type[ConfigRoot]] = None,
         ready_made_config: Optional[ConfigRoot] = None,
+        class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
         llm_model_provider: Optional[LLMModelLibrary] = None,
         plugin_manager: Optional[PluginManager] = None,
@@ -77,6 +80,7 @@ class Pipelex:
         pipelex_hub: Optional[PipelexHub] = None,
         config_cls: Optional[Type[ConfigRoot]] = None,
         ready_made_config: Optional[ConfigRoot] = None,
+        class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
         llm_model_provider: Optional[LLMModelLibrary] = None,
         plugin_manager: Optional[PluginManager] = None,
@@ -113,6 +117,9 @@ class Pipelex:
         # tools
         self.template_provider = template_provider or TemplateLibrary()
         self.pipelex_hub.set_template_provider(self.template_provider)
+        self.class_registry = class_registry or ClassRegistry()
+        self.pipelex_hub.set_class_registry(self.class_registry)
+        self.kajson_manager = KajsonManager(class_registry=self.class_registry)
 
         # cogt
         self.llm_model_provider = llm_model_provider or LLMModelLibrary()
@@ -172,14 +179,14 @@ class Pipelex:
         # cogt
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
-        class_registry.register_classes(PipelexRegistryModels.get_all_models())
+        self.class_registry.register_classes(PipelexRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
             log.debug("Registering test models for unit testing")
-            class_registry.register_classes(PipelexTestModels.get_all_models())
+            self.class_registry.register_classes(PipelexTestModels.get_all_models())
         self.activity_manager.setup()
 
         if structure_classes:
-            class_registry.register_classes(structure_classes)
+            self.class_registry.register_classes(structure_classes)
 
         self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter())
 
@@ -226,7 +233,8 @@ class Pipelex:
         self.llm_model_provider.teardown()
 
         # tools
-        class_registry.reset()
+        self.kajson_manager.teardown()
+        self.class_registry.teardown()
         func_registry.teardown()
 
         Pipelex._pipelex_instance = None

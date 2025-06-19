@@ -1,14 +1,12 @@
 import logging
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-from kajson.sandbox_manager import sandbox_manager
 from pydantic import Field, PrivateAttr, RootModel
 
 from pipelex.tools.exceptions import ToolException
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 
 FUNC_REGISTRY_LOGGER_CHANNEL_NAME = "func_registry"
-FUNC_REGISTRY_LOGGER_CHANNEL_NAME_IN_SANDBOX = "func_registry.sandbox"
 
 # Type variable for generic function types
 T = TypeVar("T")
@@ -24,11 +22,10 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     _logger: logging.Logger = PrivateAttr(logging.getLogger(FUNC_REGISTRY_LOGGER_CHANNEL_NAME))
 
     def log(self, message: str) -> None:
-        if sandbox_manager.is_in_sandbox():
-            logger = logging.getLogger(FUNC_REGISTRY_LOGGER_CHANNEL_NAME_IN_SANDBOX)
-            logger.debug(message)
-        else:
-            self._logger.debug(message)
+        self._logger.debug(message)
+
+    def set_logger(self, logger: logging.Logger) -> None:
+        self._logger = logger
 
     def teardown(self) -> None:
         """Resets the registry to an empty state."""

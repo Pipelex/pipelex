@@ -32,12 +32,10 @@ silenced_problem_ids = ["azure_openai_no_stream_options"]
 caller_info_template = "file_line"
 is_caller_info_enabled = false
 
-poor_loggers = [
-    "kajson.decoder.sandbox",
-    "kajson.encoder.sandbox",
-    "class_registry.sandbox",
-]
-generic_poor_logger = "#sandbox"
+log_mode = "rich"
+
+poor_loggers = []
+generic_poor_logger = "#poor-log"
 
 [pipelex.log_config.package_log_levels]
 # for logger names, the dots "." have been replaced by "-" to avoid toml parsing issues

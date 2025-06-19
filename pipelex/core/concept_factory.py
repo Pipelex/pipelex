@@ -1,7 +1,6 @@
 from inspect import getsource
 from typing import Any, Dict, List, Optional, Type, Union
 
-from kajson.class_registry import class_registry
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex.core.concept import Concept
@@ -10,6 +9,7 @@ from pipelex.core.concept_native import NativeConcept
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff_content import TextContent
 from pipelex.exceptions import ConceptFactoryError, StructureClassError
+from pipelex.hub import get_class_registry
 
 
 class ConceptBlueprint(BaseModel):
@@ -180,8 +180,8 @@ class ConceptFactory:
 
     @classmethod
     def get_concept_class_source_code(cls, concept_name: str, base_class: Type[Any]) -> str:
-        if not class_registry.has_class(concept_name):
+        if not get_class_registry().has_class(concept_name):
             raise RuntimeError(f"Class '{concept_name}' not found in registry")
 
-        cls = class_registry.get_required_subclass(name=concept_name, base_class=base_class)
+        cls = get_class_registry().get_required_subclass(name=concept_name, base_class=base_class)
         return getsource(cls)

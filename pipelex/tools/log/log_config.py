@@ -10,6 +10,11 @@ from pipelex.tools.log.log_levels import LogLevel
 from pipelex.types import StrEnum
 
 
+class LogMode(StrEnum):
+    RICH = "rich"
+    POOR = "poor"
+
+
 class HighlighterName(StrEnum):
     JSON = "json"
     REPR = "repr"
@@ -79,6 +84,7 @@ class RichLogConfig(ConfigModel):
 class LogConfig(ConfigModel):
     default_log_level: LogLevel = Field(strict=False)
     package_log_levels: Dict[str, LogLevel]
+    log_mode: LogMode = Field(strict=False)
 
     is_console_logging_enabled: bool
 

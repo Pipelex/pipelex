@@ -2,8 +2,8 @@ import os
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Type
 
-from kajson.class_registry import class_registry
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
+from kajson.kajson_manager import KajsonManager
 from pydantic import ValidationError
 
 from pipelex import log
@@ -74,13 +74,13 @@ class LibraryManager:
     def load_libraries(self):
         log.debug("LibraryManager loading separate libraries")
 
-        class_registry.register_classes_in_folder(
+        KajsonManager.get_class_registry().register_classes_in_folder(
             folder_path=LibraryConfig.loaded_pipelines_path,
         )
         library_paths = [LibraryConfig.loaded_pipelines_path]
         if runtime_manager.is_unit_testing:
             log.debug("Registering test pipeline structures for unit testing")
-            class_registry.register_classes_in_folder(
+            KajsonManager.get_class_registry().register_classes_in_folder(
                 folder_path=LibraryConfig.test_pipelines_path,
             )
             library_paths += [LibraryConfig.test_pipelines_path]
@@ -283,7 +283,7 @@ class LibraryManager:
         # the factory class name for that specific type of Pipe is the pipe class name with "Factory" suffix
         factory_class_name = f"{pipe_class_name}Factory"
         try:
-            pipe_factory: Type[PipeSpecificFactoryProtocol[Any, Any]] = class_registry.get_required_subclass(
+            pipe_factory: Type[PipeSpecificFactoryProtocol[Any, Any]] = KajsonManager.get_class_registry().get_required_subclass(
                 name=factory_class_name,
                 base_class=PipeSpecificFactoryProtocol,
             )

@@ -1,6 +1,5 @@
 from typing import Any, Dict, Optional, Type
 
-from kajson.class_registry import class_registry
 from pydantic import BaseModel
 from typing_extensions import override
 
@@ -16,6 +15,7 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
+from pipelex.hub import get_class_registry
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
@@ -80,7 +80,7 @@ class ObjectAssignment(BaseModel):
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
-        if not class_registry.has_class(name=self.object_class_name):
+        if not get_class_registry().has_class(name=self.object_class_name):
             error_msg = f"Could not create ObjectAssignment for class '{self.object_class_name}' because it is not in the class registry."
             raise LLMAssignmentError(error_msg)
 
@@ -90,7 +90,7 @@ class ObjectAssignment(BaseModel):
         llm_assignment: LLMAssignment,
     ) -> "ObjectAssignment":
         object_class_name = object_class.__name__
-        class_registry.register_class(
+        get_class_registry().register_class(
             class_type=object_class,
             name=object_class_name,
             should_warn_if_already_registered=False,

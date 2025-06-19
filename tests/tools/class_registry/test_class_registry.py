@@ -1,9 +1,9 @@
 from typing import List
 
 import pytest
-from kajson.class_registry import class_registry
 
 from pipelex.core.stuff_content import StuffContent
+from pipelex.hub import get_class_registry
 from tests.tools.test_data import ClassRegistryTestCases
 
 
@@ -25,6 +25,7 @@ class TestClassRegistry:
         classes_to_register: List[str],
         classes_not_to_register: List[str],
     ) -> None:
+        class_registry = get_class_registry()
         class_registry.register_classes_in_folder(folder_path=folder, base_class=StuffContent)
 
         for class_name in classes_to_register:

@@ -1,6 +1,7 @@
 import logging
+from typing import ClassVar
 
-from kajson.sandbox_manager import sandbox_manager
+from pipelex.types import StrEnum
 
 
 class RootException(Exception):
@@ -13,17 +14,25 @@ class ToolException(RootException):
     pass
 
 
+class TracebackMessageErrorMode(StrEnum):
+    ERROR = "error"
+    EXCEPTION = "exception"
+
+
 class TracebackMessageError(RootException):
+    error_mode: ClassVar[TracebackMessageErrorMode] = TracebackMessageErrorMode.EXCEPTION
+
     def __init__(self, message: str):
         super().__init__(message)
         logger_name = __name__
-        if sandbox_manager.is_in_sandbox():
-            generic_poor_logger = "#sandbox"
-            logger = logging.getLogger(generic_poor_logger)
-            logger.error(message)
-        else:
-            self.logger = logging.getLogger(logger_name)
-            self.logger.exception(message)
+        match self.__class__.error_mode:
+            case TracebackMessageErrorMode.ERROR:
+                generic_poor_logger = "#poor-log"
+                logger = logging.getLogger(generic_poor_logger)
+                logger.error(message)
+            case TracebackMessageErrorMode.EXCEPTION:
+                self.logger = logging.getLogger(logger_name)
+                self.logger.exception(message)
 
 
 class FatalError(TracebackMessageError):
