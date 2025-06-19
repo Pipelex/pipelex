@@ -1,7 +1,6 @@
 import shutil
 from typing import Any, List, Optional, Union
 
-from kajson.sandbox_manager import sandbox_manager
 from rich import print as rich_print
 from rich.panel import Panel
 from rich.pretty import Pretty
@@ -10,6 +9,7 @@ from rich.table import Table
 from rich.text import Text, TextType
 
 from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor
+from pipelex.tools.sandbox_manager import sandbox_manager
 
 TEXT_COLOR = TerminalColor.WHITE
 TITLE_COLOR = TerminalColor.CYAN

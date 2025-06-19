@@ -4,13 +4,12 @@ import os
 import traceback
 from typing import Any, List, Optional, Union
 
-from kajson.sandbox_manager import sandbox_manager
-
 from pipelex.tools.log.log_config import (
     CallerInfoTemplate,
     LogConfig,
 )
 from pipelex.tools.misc.json_utils import purify_json, purify_json_dict, purify_json_list
+from pipelex.tools.sandbox_manager import sandbox_manager
 
 
 class LogDispatch:

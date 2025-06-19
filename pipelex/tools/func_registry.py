@@ -1,11 +1,11 @@
 import logging
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-from kajson.sandbox_manager import sandbox_manager
 from pydantic import Field, PrivateAttr, RootModel
 
 from pipelex.tools.exceptions import ToolException
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
+from pipelex.tools.sandbox_manager import sandbox_manager
 
 FUNC_REGISTRY_LOGGER_CHANNEL_NAME = "func_registry"
 FUNC_REGISTRY_LOGGER_CHANNEL_NAME_IN_SANDBOX = "func_registry.sandbox"

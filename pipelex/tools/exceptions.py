@@ -1,6 +1,6 @@
 import logging
 
-from kajson.sandbox_manager import sandbox_manager
+from pipelex.tools.sandbox_manager import sandbox_manager
 
 
 class RootException(Exception):
