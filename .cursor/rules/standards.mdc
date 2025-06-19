@@ -24,16 +24,6 @@ This command runs multiple code quality tools:
 
 Always fix any issues reported by these tools before proceeding.
 
-### Import Cleanup
-
-After completing your code change, running the linting and typechecking, and before committing, clean up unused imports by running:
-
-```bash
-make fix-unused-imports
-```
-
-This ensures your code doesn't contain any unnecessary imports that could bloat the codebase. (It can also prevent useless cyclic imports)
-
 ### Running Tests
 
 We have several make commands for running tests:
