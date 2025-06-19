@@ -59,3 +59,4 @@ Structure classes defined within `pipelex_libraries/pipelines/` are automaticall
 - Use Pydantic validators for data cleaning/validation
 - Remove timezone info from datetime fields
 - Respect rules of @base_models.
+

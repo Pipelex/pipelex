@@ -11,7 +11,7 @@ This document outlines the coding standards and quality control procedures that 
 
 ### Linting and Type Checking
 
-Before submitting any code changes, you must run the following command to check for linting issues, type errors, and code quality problems:
+Before finalizing a task, you must run the following command to check for linting issues, type errors, and code quality problems:
 
 ```bash
 make cc
@@ -32,35 +32,13 @@ After completing your code changes and before committing, clean up unused import
 make fix-unused-imports
 ```
 
-This ensures your code doesn't contain any unnecessary imports that could bloat the codebase.
-
-## Testing
-
-### Test-Driven Development (TDD)
-
-This project follows a strict Test-Driven Development approach. This means:
-
-1. **ALWAYS write tests first** - Before implementing any new feature or fixing a bug:
-   - Write a failing test that describes the expected behavior
-   - Verify that the test fails (since the feature doesn't exist yet)
-   - Only then proceed to implement the feature
-
-2. **Red-Green-Refactor** cycle:
-   - Red: Write a failing test
-   - Green: Write the minimum code to make the test pass
-   - Refactor: Clean up the code while keeping tests green
-
-This approach ensures:
-- Better design through thinking about usage before implementation
-- Comprehensive test coverage
-- Clear understanding of requirements before coding
-- Built-in regression testing
+This ensures your code doesn't contain any unnecessary imports that could bloat the codebase. (It can also prevent useless cyclic imports)
 
 ### Running Tests
 
 We have several make commands for running tests:
 
-1. `make t`: Runs all tests with these markers:
+1. `make tp`: Runs all tests with these markers:
    ```
    (dry_runnable or not (inference or llm or imgg or ocr)) and not (needs_output or pipelex_api)
    ```
@@ -74,54 +52,22 @@ We have several make commands for running tests:
 
 3. To run specific tests:
    ```bash
-   make t TEST=TestClassName
+   make tp TEST=TestClassName
    # or
-   make t TEST=test_function_name
+   make tp TEST=test_function_name
    ```
    It matches names, so `TEST=test_function_name` is going to run all test with the function name that STARTS with `test_function_name`.
 
-### Test Development Workflow
+   ## The pipelines/ directory
 
-1. **Write the test first** for the new feature/bugfix
-2. Run the test to verify it fails appropriately
-3. Implement the minimum code needed to make the test pass
-4. Run `make cc` to check code quality
-5. Fix any linting/type issues
-6. Run appropriate test command (`make t` or `make ti`) to verify all tests pass
-7. Run `make fix-unused-imports` to clean up imports
-8. **Update documentation** in `docs/`:
-   - Add or update relevant documentation for new features
-   - Update examples if behavior has changed
-   - Update configuration documentation if needed
-   - Ensure all new features are properly documented
-9. Commit your changes
+- Pipelines and structures are defined in the `pipelex/libraries/pipelines` directory
 
-## Best Practices
+pipelex/libraries
+└── pipelines
 
-- Always write tests before implementing features (TDD)
-- Always run `make cc` before committing changes
-- Fix all linting and type checking issues
-- Clean up unused imports with `make fix-unused-imports`
-- Run appropriate test suite before submitting changes
-- **Keep documentation in sync with code changes**
+## Pipeline file naming
 
-## Documentation
+- Pipeline TOML files should be placed in the `pipelex/libraries/pipelines/` directory or a subdirectory of it
+- The file name should be descriptive, in snake_case and end with `.toml`
+- The file should contain both concepts and pipes definitions
 
-### Documentation Updates
-
-Documentation must be kept in sync with code changes. After implementing and testing a feature:
-
-1. **Location**: All documentation should be updated in the `docs/` directory
-2. **What to Document**:
-   - New features and their usage
-   - Changes to existing functionality
-   - Configuration options
-   - Examples and tutorials
-   - API changes
-3. **Documentation Quality**:
-   - Keep documentation clear and concise
-   - Include practical examples
-   - Update any affected diagrams or flowcharts
-   - Ensure code snippets in docs match the current implementation
-
-Remember: A feature is not complete until both its tests and documentation are complete.

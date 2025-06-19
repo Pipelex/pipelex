@@ -111,7 +111,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
 
         user_images: List[str] = []
         if pipe_blueprint.inputs:
-            for stuff_name, concept_code in (pipe_blueprint.inputs or {}).items():
+            for stuff_name, concept_code in (pipe_blueprint.inputs).items():
                 concept = get_concept_provider().get_required_concept(concept_code=concept_code)
                 if concept:
                     if get_concept_provider().is_image_concept(concept_code=concept.code):

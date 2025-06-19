@@ -33,6 +33,20 @@ Describe the provided image in great detail.
 
 **Important**: Do NOT reference image variables in your prompt template using `@image` or `$image`. Images are automatically passed to vision-enabled LLMs and should not be treated as text variables.
 
+**Flexible Image Inputs**
+
+You can use any concept that refines `Image` as an input, and choose descriptive variable names that fit your use case:
+
+```toml
+[pipe.analyze_wedding]
+PipeLLM = "Analyze wedding photo"
+inputs = { wedding_photo = "images.Photo" }
+output = "PhotoAnalysis"
+prompt_template = """
+Analyze this wedding photo and describe the key moments captured.
+"""
+```
+
 ### Images as Sub-attributes of Structured Content
 
 When working with structured content that contains image fields (like `PageContent` which has a `page_view` field), you need to specify the full path to the image attribute in the `inputs` section:
@@ -40,7 +54,7 @@ When working with structured content that contains image fields (like `PageConte
 ```toml
 [pipe.analyze_page_view]
 PipeLLM = "Analyze the visual layout of a page"
-inputs = { page_image = "page_content.page_view" }
+inputs = { "page_content.page_view" = "Image" }
 output = "LayoutAnalysis"
 prompt_template = """
 Analyze the visual layout and design elements of this page.

@@ -4,13 +4,13 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_output import PipeOutput
+from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import ImageContent, PageContent, TextAndImagesContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_report_delegate, get_required_pipe
+from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.test_data import ImageTestCases
 from tests.test_pipelines.misc_tests.tests import Article
@@ -22,23 +22,18 @@ from tests.test_pipelines.misc_tests.tests import Article
 class TestImageInputs:
     """Test class for verifying image input functionality in pipes."""
 
-    async def test_extract_article_from_image(self, request: FixtureRequest) -> None:
+    async def test_extract_article_from_image(
+        self,
+        request: FixtureRequest,
+        pipe_run_mode: PipeRunMode,
+    ) -> None:
         """Test that an image is indeed given to the LLM, and that it can extract extact whats on the image."""
-        # Create the page content
-        image_content = ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG)
-
-        # Create stuff from page content
-        stuff = StuffFactory.make_stuff(concept_str="Image", content=image_content, name="image")
-
-        # Create working memory
-        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
-
-        # Get the pipe
-        pipe: PipeAbstract = get_required_pipe(pipe_code="extract_article_from_image")
+        working_memory = WorkingMemoryFactory.make_from_image(image_url=ImageTestCases.IMAGE_FILE_PATH_PNG)
 
         # Run the pipe
-        pipe_output: PipeOutput = await pipe.run_pipe(
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
+        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
+            pipe_code="extract_article_from_image",
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
@@ -54,7 +49,7 @@ class TestImageInputs:
         # Verify output
         assert article.title == "The Solar System: An Overview"
 
-    async def test_describe_page(self, request: FixtureRequest) -> None:
+    async def test_describe_page(self, request: FixtureRequest, pipe_run_mode: PipeRunMode) -> None:
         """
         Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes,
         But also accepts basic objects
@@ -70,12 +65,10 @@ class TestImageInputs:
         # Create working memory
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
-        # Get the pipe
-        pipe: PipeAbstract = get_required_pipe(pipe_code="describe_page")
-
         # Run the pipe
-        pipe_output: PipeOutput = await pipe.run_pipe(
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
+        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
+            pipe_code="describe_page",
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
             job_metadata=JobMetadata(
                 top_job_id=cast(str, request.node.originalname),  # type: ignore
