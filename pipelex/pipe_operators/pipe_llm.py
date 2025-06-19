@@ -172,19 +172,6 @@ class PipeLLM(PipeOperator):
                         f"Image variables are automatically passed to vision-enabled LLMs."
                     )
 
-        # Check for invalid base variable usage when only sub-attributes are declared as inputs
-        for input_name in self.inputs.variables:
-            if "." in input_name:
-                # This is a dotted input like "invoice_page.page_view"
-                base_variable = input_name.split(".", 1)[0]  # Extract "invoice_page"
-                if base_variable in the_needed_inputs.required_names:
-                    raise PipeDefinitionError(
-                        f"Variable '{base_variable}' is used in the prompt template, but only '{input_name}' "
-                        f"is declared in inputs for Pipe '{self.code}'. "
-                        f"You cannot reference the base object '{base_variable}' when only a sub-attribute is available. "
-                        f"Either declare '{base_variable}' as a full input, or reference the specific sub-attribute in your prompt."
-                    )
-
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
         if self.structuring_method is not None:
