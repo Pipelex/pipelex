@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.4.3] - 2025-06-19
+
+### Fixed
+- **Removed deprecated Gemini 1.5 models**: Removed `gemini-1.5-flash` and `gemini-1.5-pro` from the VertexAI integration as they are no longer supported
+- Fixed multiple import statements across the codebase
+
+### Documentation
+- **Enhanced MkDocs search**: Added search functionality to the documentation site
+- **Proofreading improvements**: Fixed various typos and improved clarity across documentation
+
+### Refactor
+- Mini refactor: changed kajson dependency to `kajson==0.1.5` (instead of `>=`) to tolerate temporary breaking changes from kajson
+
 ## [v0.4.2] - 2025-06-17
 
 - Fixed the inheritance config manager method (Undocumented feature, soon to be removed)
