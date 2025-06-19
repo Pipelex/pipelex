@@ -1,5 +1,6 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
+from kajson.class_registry import class_registry
 from pydantic import Field, RootModel
 from typing_extensions import override
 
@@ -126,3 +127,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     @override
     def teardown(self) -> None:
         self.root = {}
+
+    @override
+    def get_class(self, concept_code: str) -> Optional[Type[Any]]:
+        return class_registry.get_class(concept_code)
