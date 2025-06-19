@@ -14,7 +14,7 @@ This document outlines the coding standards and quality control procedures that 
 Before finalizing a task, you must run the following command to check for linting issues, type errors, and code quality problems:
 
 ```bash
-make cc
+make check
 ```
 
 This command runs multiple code quality tools:
@@ -26,7 +26,7 @@ Always fix any issues reported by these tools before proceeding.
 
 ### Import Cleanup
 
-After completing your code changes and before committing, clean up unused imports by running:
+After completing your code change, running the linting and typechecking, and before committing, clean up unused imports by running:
 
 ```bash
 make fix-unused-imports
@@ -58,16 +58,13 @@ We have several make commands for running tests:
    ```
    It matches names, so `TEST=test_function_name` is going to run all test with the function name that STARTS with `test_function_name`.
 
-   ## The pipelines/ directory
+## Important Project Directories
 
-- Pipelines and structures are defined in the `pipelex/libraries/pipelines` directory
+### Pipelines Directory
+- All pipeline definitions go in `pipelex/libraries/pipelines/`
 
-pipelex/libraries
-└── pipelines
+### Tests Directory
+- All tests are located in the `tests/` directory
 
-## Pipeline file naming
-
-- Pipeline TOML files should be placed in the `pipelex/libraries/pipelines/` directory or a subdirectory of it
-- The file name should be descriptive, in snake_case and end with `.toml`
-- The file should contain both concepts and pipes definitions
-
+### Documentation Directory
+- All documentation is located in the `docs/` directory
