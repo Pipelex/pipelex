@@ -12,7 +12,7 @@ We are open to contributions in all areas of our core Pipelex library:
 - **Feature**: New API, CLI flag, module, test coverage
 - **Refactor**: Rethink architecture
 - **Chore**: Dependency updates, config tweaks, file renames
-- **Doc**: Main docs, SWE Agent rules, tutorials, examples, READMEs
+- **Docs**: Main docs, SWE Agent rules, tutorials, examples, READMEs
 - **CI/CD**: GitHub Actions, packaging, release tooling
 
 ## Contribution process
@@ -22,7 +22,7 @@ We are open to contributions in all areas of our core Pipelex library:
 - Install dependencies: `make install` (creates .venv and installs dependencies)
 - Copy `.env.example` to `.env` and fill in required API keys (at least OpenAI)
 - Run checks to make sure all is good: `make check` & `make test`
-- Create a branch with the format user_name/category/short_slug where category is one of: `feature`, `fix`, `refactor`, `doc`, `cicd` or `chore`
+- Create a branch with the format user_name/category/short_slug where category is one of: `feature`, `fix`, `refactor`, `docs`, `cicd` or `chore`
 - Make and commit changes
 - Push your local branch to your fork
 - Open a PR that [links to an existing Issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue) which does not include the `needs triage` label

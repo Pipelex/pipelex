@@ -36,7 +36,7 @@ jobs:
           if [[ "$HEAD" == "dev" ]]; then
             exit 0
           fi
-          if [[ ! "$HEAD" =~ ^(fix|feature|refactor|chore|doc|ci-cd|changelog|codex)\/[A-Za-z0-9._\/\<\>\=\-]+$ ]]; then
+          if [[ ! "$HEAD" =~ ^(fix|feature|refactor|chore|docs|ci-cd|changelog|codex)\/[A-Za-z0-9._\/\<\>\=\-]+$ ]]; then
             echo "::error::Branch must start with fix/, feature/, refactor/, chore/, docs/, or ci-cd/."
             exit 1
           fi
