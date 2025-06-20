@@ -86,7 +86,7 @@ Compare these two images and describe their similarities and differences.
 
 ### Combining Text and Image Inputs
 
-You can mix any stuff and images inputs in the same pipe:
+You can mix any stuff and image inputs in the same pipe:
 
 ```toml
 [pipe.analyze_document_with_context]

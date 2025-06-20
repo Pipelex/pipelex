@@ -16,6 +16,7 @@ from tests.test_data import ImageTestCases
 from tests.test_pipelines.misc_tests.tests import Article
 
 
+@pytest.mark.dry_runnable
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
@@ -47,7 +48,12 @@ class TestImageInputs:
         article = pipe_output.main_stuff_as(content_type=Article)
         pretty_print(article, title="Article")
         # Verify output
-        assert article.title == "The Solar System: An Overview"
+        if pipe_run_mode != PipeRunMode.DRY:
+            assert article.title == "The Solar System: An Overview"
+        assert pipe_output is not None
+        assert pipe_output.working_memory is not None
+        assert pipe_output.main_stuff is not None
+
 
     async def test_describe_page(self, request: FixtureRequest, pipe_run_mode: PipeRunMode) -> None:
         """
@@ -82,5 +88,9 @@ class TestImageInputs:
         article = pipe_output.main_stuff_as(content_type=Article)
         pretty_print(article, title="Article")
         # Verify output
-        assert article.title == "The Solar System: An Overview"
-        assert article.description == "This is a test page"
+        if pipe_run_mode != PipeRunMode.DRY:
+            assert article.title == "The Solar System: An Overview"
+            assert article.description == "This is a test page"
+        assert pipe_output is not None
+        assert pipe_output.working_memory is not None
+        assert pipe_output.main_stuff is not None

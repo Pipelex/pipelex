@@ -72,8 +72,9 @@ class PipeLLM(PipeOperator):
         pipe_llm_prompt_needed_inputs = self.pipe_llm_prompt.needed_inputs()
         # The images are not tagged in the prompt_template. Therefore if an image is provided in the
         # inputs, it becomes a needed input.
+        concept_provider = get_concept_provider()
         for input_name, concept_code in self.inputs.root.items():
-            if get_concept_provider().is_image_concept(concept_code=concept_code):
+            if concept_provider.is_image_concept(concept_code=concept_code):
                 pipe_llm_prompt_needed_inputs.add_requirement(variable_name=input_name, concept_code=NativeConcept.IMAGE.code)
         return pipe_llm_prompt_needed_inputs
 
