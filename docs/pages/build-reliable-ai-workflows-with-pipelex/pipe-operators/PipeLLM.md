@@ -31,8 +31,18 @@ For structured data output, `PipeLLM` employs two main strategies:
 | `images`                    | list of strings     | For Vision Language Models (VLMs), specifies which input variables are images.                                                                                               | No       |
 | `structuring_method`        | string              | The method for generating structured output. Can be `direct` or `preliminary_text`. Defaults to the global configuration.                                                      | No       |
 | `prompt_template_to_structure` | string           | The prompt template for the second step in `preliminary_text` mode.                                                                                                            | No       |
-| `output_multiplicity`       | string or integer   | Defines the number of outputs. Use `"list"` for a variable-length list, or an integer (e.g., `3`) for a fixed-size list.                                                       | No       |
+| `nb_output`                 | integer             | Specifies exactly how many outputs to generate (e.g., `nb_output = 3` for exactly 3 outputs). Use when you need a fixed number of results. Mutually exclusive with `multiple_output`.  | No       |
+| `multiple_output`           | boolean             | Controls output generation mode. Default is `false` (single output). Set to `true` for variable-length list generation when you need an indeterminate number of outputs. Mutually exclusive with `nb_output`. | No       |
 
+### Output Generation Modes
+
+`PipeLLM` supports three different output generation modes:
+
+1. **Single Output** (default): Don't specify `nb_output` or `multiple_output`, or set `multiple_output = false`. The LLM generates exactly one result.
+
+2. **Fixed Multiple Outputs**: Use `nb_output = N` (where N is a positive integer) when you need exactly N outputs. For example, `nb_output = 3` will try to generate 3 results. The parameter `_nb_output` will be available in the prompt template, e.g. "Give me the names of $_nb_output flowers".
+
+3. **Variable Multiple Outputs**: Use `multiple_output = true` when you need a variable-length list where the LLM determines how many outputs to generate based on the content and context.
 
 ### Simple Text Generation Example
 
