@@ -1,4 +1,4 @@
-V# PipeLLM
+# PipeLLM
 
 `PipeLLM` is the core operator in Pipelex for leveraging Large Language Models (LLMs). It can be used for a wide range of tasks, including text generation, summarization, classification, and structured data extraction.
 
