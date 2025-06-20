@@ -54,7 +54,6 @@ class TestImageInputs:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
 
-
     async def test_describe_page(self, request: FixtureRequest, pipe_run_mode: PipeRunMode) -> None:
         """
         Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes,
