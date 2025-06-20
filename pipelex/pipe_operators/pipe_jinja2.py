@@ -141,10 +141,10 @@ class PipeJinja2(PipeOperator):
     ) -> PipeOutput:
         content_generator_used: ContentGeneratorProtocol
         if get_config().pipelex.dry_run_config.apply_to_jinja2_rendering:
-            log.warning(f"PipeJinja2: using dry run operator pipe for jinja2 rendering: {self.code}")
+            log.info(f"PipeJinja2: using dry run operator pipe for jinja2 rendering: {self.code}")
             content_generator_used = ContentGeneratorDry()
         else:
-            log.warning(f"PipeJinja2: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
+            log.info(f"PipeJinja2: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
             content_generator_used = get_content_generator()
         pipe_output = await self._run_operator_pipe(
             job_metadata=job_metadata,

@@ -73,7 +73,7 @@ class PipeOperator(PipeAbstract):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        log.warning(
+        log.info(
             f"PipeOperator: dry run method called for operator pipe: {self.code}, but no dry run method is implemented for {self.__class__.__name__}"
         )
         return await self._run_operator_pipe(

@@ -283,7 +283,7 @@ class PipeImgGen(PipeOperator):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        log.warning(f"PipeImgGen: dry run operator pipe: {self.code}")
+        log.info(f"PipeImgGen: dry run operator pipe: {self.code}")
         content_generator_dry = ContentGeneratorDry()
         pipe_output = await self._run_operator_pipe(
             job_metadata=job_metadata,
