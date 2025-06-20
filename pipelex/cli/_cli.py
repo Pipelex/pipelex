@@ -97,8 +97,7 @@ def list_pipes() -> None:
     Pipelex.make()
 
     try:
-        pipe_provider = get_pipe_provider()
-        pipe_provider.pretty_list_pipes()
+        get_pipe_provider().pretty_list_pipes()
 
     except Exception as e:
         raise PipelexCLIError(f"Failed to list pipes: {e}")
