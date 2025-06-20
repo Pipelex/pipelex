@@ -45,10 +45,10 @@ class TestImageInputs:
         pretty_print(pipe_output, title="Pipe output")
         get_report_delegate().generate_report()
 
-        article = pipe_output.main_stuff_as(content_type=Article)
-        pretty_print(article, title="Article")
         # Verify output
         if pipe_run_mode != PipeRunMode.DRY:
+            article = pipe_output.main_stuff_as(content_type=Article)
+            pretty_print(article, title="Article")
             assert article.title == "The Solar System: An Overview"
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
@@ -84,10 +84,10 @@ class TestImageInputs:
         pretty_print(pipe_output, title="Pipe output")
         get_report_delegate().generate_report()
 
-        article = pipe_output.main_stuff_as(content_type=Article)
-        pretty_print(article, title="Article")
         # Verify output
         if pipe_run_mode != PipeRunMode.DRY:
+            article = pipe_output.main_stuff_as(content_type=Article)
+            pretty_print(article, title="Article")
             assert article.title == "The Solar System: An Overview"
             assert article.description == "This is a test page"
         assert pipe_output is not None
