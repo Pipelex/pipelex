@@ -1,4 +1,4 @@
-### This is our manifesto, this is why we build [Pipelex](https://pipelex.com).
+### This is our manifesto, this is why we built [Pipelex](https://pipelex.com).
 
 First published on our [blog](https://www.pipelex.com/post/repeatable-ai-workflows-knowledge-pipelines) on June 3, 2025.
 
