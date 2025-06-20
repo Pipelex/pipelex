@@ -26,3 +26,7 @@ class PipeProviderAbstract(ABC):
     @abstractmethod
     def teardown(self) -> None:
         pass
+
+    @abstractmethod
+    def pretty_list_pipes(self) -> None:
+        pass

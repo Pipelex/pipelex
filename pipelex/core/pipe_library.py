@@ -1,8 +1,12 @@
+from itertools import groupby
 from typing import Dict, List, Optional
 
 from pydantic import Field, RootModel
+from rich import box
+from rich.table import Table
 from typing_extensions import override
 
+from pipelex import pretty_print
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_provider_abstract import PipeProviderAbstract
 from pipelex.exceptions import ConceptError, ConceptLibraryConceptNotFoundError, PipeLibraryError, PipeLibraryPipeNotFoundError
@@ -64,3 +68,61 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     @override
     def teardown(self) -> None:
         self.root = {}
+
+    @override
+    def pretty_list_pipes(self) -> None:
+        def _format_concept_code(concept_code: Optional[str], current_domain: str) -> str:
+            """Format concept code by removing domain prefix if it matches current domain."""
+            if not concept_code:
+                return ""
+            parts = concept_code.split(".")
+            if len(parts) == 2 and parts[0] == current_domain:
+                return parts[1]
+            return concept_code
+
+        pipes = self.get_pipes()
+
+        # Sort pipes by domain and code
+        ordered_items = sorted(pipes, key=lambda x: (x.domain or "", x.code or ""))
+
+        # Create dictionary for return value
+        pipes_dict: Dict[str, Dict[str, Dict[str, str]]] = {}
+
+        # Group by domain and create separate tables
+        for domain, domain_pipes in groupby(ordered_items, key=lambda x: x.domain):
+            table = Table(
+                title=f"[bold magenta]domain = {domain}[/]",
+                show_header=True,
+                show_lines=True,
+                header_style="bold cyan",
+                box=box.SQUARE_DOUBLE_HEAD,
+                border_style="blue",
+            )
+
+            table.add_column("Code", style="green")
+            table.add_column("Definition", style="white")
+            table.add_column("Input", style="yellow")
+            table.add_column("Output", style="yellow")
+
+            pipes_dict[domain] = {}
+
+            for pipe in domain_pipes:
+                inputs = pipe.inputs
+                formatted_inputs = [f"{name}: {_format_concept_code(concept_code, domain)}" for name, concept_code in inputs.items]
+                formatted_inputs_str = ", ".join(formatted_inputs)
+                output_code = _format_concept_code(pipe.output_concept_code, domain)
+
+                table.add_row(
+                    pipe.code,
+                    pipe.definition or "",
+                    formatted_inputs_str,
+                    output_code,
+                )
+
+                pipes_dict[domain][pipe.code] = {
+                    "definition": pipe.definition or "",
+                    "inputs": formatted_inputs_str,
+                    "output": pipe.output_concept_code,
+                }
+
+            pretty_print(table)
