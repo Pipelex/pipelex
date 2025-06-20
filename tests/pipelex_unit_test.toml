@@ -1,5 +1,3 @@
-
-
 [cogt.llm_config.preferred_platforms]
 # These override the defaults set for any llm integration
 # Use at your convenience:

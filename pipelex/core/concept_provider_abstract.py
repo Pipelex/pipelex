@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional, Type
 
 from pipelex.core.concept import Concept
 
@@ -41,4 +41,12 @@ class ConceptProviderAbstract(ABC):
 
     @abstractmethod
     def teardown(self) -> None:
+        pass
+
+    @abstractmethod
+    def get_class(self, concept_code: str) -> Optional[Type[Any]]:
+        pass
+
+    @abstractmethod
+    def is_image_concept(self, concept_code: str) -> bool:
         pass

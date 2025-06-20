@@ -57,9 +57,8 @@ The pipeline uses a powerful `PipeLLM` to extract the structured data from the d
 ```toml
 [pipe.write_markdown_from_page_content_proof_of_purchase]
 PipeLLM = "Write markdown from page content"
-inputs = { page_content = "Page" }
+inputs = { "page_content.page_view" = "Page" } # The LLM receives the image of the page
 output = "ProofOfPurchase" # The LLM is forced to output a ProofOfPurchase object
-images = ["page_content.page_view"] # The LLM receives the image of the page
 llm = "llm_for_img_to_text"
 structuring_method = "preliminary_text"
 system_prompt = """You are a multimodal LLM, expert at converting images into perfect markdown."""

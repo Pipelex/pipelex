@@ -77,11 +77,10 @@ steps = [
 # A sub-pipeline that uses an LLM to extract the data
 [pipe.extract_invoice_data]
 PipeLLM = "Extract invoice information from an invoice text transcript"
-inputs = { invoice_page = "Page", invoice_details = "InvoiceDetails" }
+inputs = { "invoice_page.page_view" = "Page", invoice_details = "InvoiceDetails" }
 output = "Invoice"
 # The output is constrained to the "Invoice" model
 llm = "llm_to_extract_invoice" 
-images = ["invoice_page.page_view"]
 prompt_template = """
 Extract invoice information from this invoice:
 

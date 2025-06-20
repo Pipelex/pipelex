@@ -23,7 +23,6 @@ output = "Text"
 prompt_template = """
 Describe the using rap lyrics, including puns and references to the image.
 """
-images = ["image"]
 
 [pipe.create_characters]
 PipeLLM = "Create Characters"

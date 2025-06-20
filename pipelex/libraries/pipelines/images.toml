@@ -1,5 +1,3 @@
-
-
 domain = "images"
 definition = "Generic image-related domain"
 
@@ -26,7 +24,6 @@ PipeLLM = "Describe an image"
 inputs = { image = "Image" }
 output = "VisualDescription"
 system_prompt = "You are a very good observer."
-images = ["image"]
 llm = "llm_to_describe_img"
 prompt_template = """
 Describe the provided image in great detail.
@@ -37,7 +34,6 @@ PipeLLM = "Describe a photo"
 inputs = { photo = "Photo" }
 output = "VisualDescription"
 system_prompt = "You are a very good observer."
-images = ["photo"]
 llm = "llm_to_describe_img"
 prompt_template = """
 Describe the provided photo and how it was shot: scene, lighting, camera, etc.

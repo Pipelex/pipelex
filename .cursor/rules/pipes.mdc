@@ -5,20 +5,9 @@ alwaysApply: false
 ---
 This rule explains how to build pipes.
 
-# File Naming & Structure
-
-## The pipelines/ directory
-
-- Pipelines and structures are defined in the `pipelex/libraries/pipelines` directory
-
-pipelex/libraries
-└── pipelines
-
 ## Pipeline file naming
 
-- Pipeline TOML files should be placed in the `pipelex/libraries/pipelines/` directory or a subdirectory of it
 - The file name should be descriptive, in snake_case and end with `.toml`
-- The file should contain both concepts and pipes definitions
 
 ## Pipeline file structure
 
@@ -167,7 +156,6 @@ Your summary should not be longer than 2 sentences.
 PipeLLM = "Convert table screenshot to HTML"
 inputs = { table_screenshot = "TableScreenshot" }
 output = "HtmlTable"
-images = ["table_screenshot"]
 system_prompt = """
 You are a vision-based table extractor.
 """

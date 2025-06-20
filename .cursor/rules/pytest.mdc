@@ -17,6 +17,8 @@ These rules apply when writing unit tests.
 - More precisely, for `pipelex` and `pipelex.cogt` the async tests are placed inside subdirectories named `cogt_asynch` and `pipelex_asynch`
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `tests.pipelex.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
+- Always put test inside Test classes.
+- The pipelex pipelines should be stored in `tests/test_pipelines` as well as the related structured Output classes that inherit from `StructuredContent`
 
 ## Markers
 

@@ -8,7 +8,7 @@ from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtoc
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.hub import get_optional_domain
+from pipelex.hub import get_concept_provider, get_optional_domain
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm import PipeLLM, StructuringMethod
@@ -28,8 +28,6 @@ class PipeLLMBlueprint(PipeBlueprint):
     prompt_name: Optional[str] = None
     prompt: Optional[str] = None
 
-    images: Optional[List[str]] = None
-
     llm: Optional[LLMSettingOrPresetId] = None
     llm_to_structure: Optional[LLMSettingOrPresetId] = None
     llm_to_structure_direct: Optional[LLMSettingOrPresetId] = None
@@ -43,7 +41,6 @@ class PipeLLMBlueprint(PipeBlueprint):
     nb_output: Optional[int] = None
     multiple_output: Optional[bool] = None
 
-    # TODO: chack that the listed images are listed in the inputs
     @model_validator(mode="after")
     def validate_multiple_output(self) -> Self:
         if excess_attributes_list := has_more_than_one_among_attributes_from_lists(
@@ -112,6 +109,15 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 jinja2_name=pipe_code,
             )
 
+        user_images: List[str] = []
+        if pipe_blueprint.inputs:
+            for stuff_name, concept_code in (pipe_blueprint.inputs).items():
+                concept = get_concept_provider().get_required_concept(concept_code=concept_code)
+                if get_concept_provider().is_image_concept(concept_code=concept.code):
+                    user_images.append(stuff_name)
+                else:
+                    # Implicit text concept
+                    pass
         pipe_llm_prompt = PipeLLMPrompt(
             code="adhoc_for_pipe_llm_prompt",
             domain=domain_code,
@@ -122,7 +128,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             user_pipe_jinja2=user_pipe_jinja2,
             user_prompt_verbatim_name=pipe_blueprint.prompt_name,
             user_text=pipe_blueprint.prompt,
-            user_images=pipe_blueprint.images,
+            user_images=user_images or None,
         )
 
         llm_settings = LLMSettingChoices(

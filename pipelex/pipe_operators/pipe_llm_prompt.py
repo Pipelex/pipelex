@@ -106,10 +106,6 @@ class PipeLLMPrompt(PipeOperator):
                 continue
             pipe_input_spec.add_requirement(variable_name=conceptless_required_variable, concept_code=NativeConcept.ANYTHING.code)
 
-        if self.user_images:
-            for user_image in self.user_images:
-                pipe_input_spec.add_requirement(variable_name=user_image, concept_code=NativeConcept.IMAGE.code)
-
         return pipe_input_spec
 
     @override

@@ -75,7 +75,6 @@ steps = [
 PipeLLM = "Review an HTML table"
 inputs = { table_screenshot = "TableScreenshot", html_table = "HtmlTable" }
 output = "HtmlTable"
-images = ["table_screenshot"]
 prompt_template = """
 Your role is to correct an html_table to make sure that it matches the one in the provided image.
 
