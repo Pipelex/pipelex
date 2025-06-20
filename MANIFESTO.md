@@ -1,6 +1,6 @@
-### This is our manifesto, this is why we build [Pipelex](https://pipelex.com){:target="_blank"}.
+### This is our manifesto, this is why we build [Pipelex](https://pipelex.com).
 
-First published on our [blog](https://www.pipelex.com/post/repeatable-ai-workflows-knowledge-pipelines){:target="_blank"} on June 3, 2025.
+First published on our [blog](https://www.pipelex.com/post/repeatable-ai-workflows-knowledge-pipelines) on June 3, 2025.
 
 ---
 # The Knowledge Pipeline Manifesto
@@ -54,7 +54,7 @@ We've seen this movie before. Docker transformed deployment by giving us a simpl
 
 Today's AI workflows are ready for the same breakthrough.
 
-This is why we built [**Pipelex**](https://github.com/Pipelex/pipelex){:target="_blank"} as an open-source standard for repeatable AI workflows. Not just another tool, but a foundation for the community to build on.
+This is why we built [**Pipelex**](https://github.com/Pipelex/pipelex) as an open-source standard for repeatable AI workflows. Not just another tool, but a foundation for the community to build on.
 
 The manifesto is simple: **When you discover a method that works, capture it as a knowledge pipeline. When you build a pipeline that roars, share it with the world!**
 
