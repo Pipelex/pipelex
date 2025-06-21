@@ -117,6 +117,7 @@ class LibraryManager:
                 pattern="*.toml",
                 is_recursive=True,
             )
+            log.debug(f"Searching for TOML files in {libraries_path}, found '{found_file_paths}'")
             if not found_file_paths:
                 log.warning(f"No TOML files found in library path: {libraries_path}")
             toml_file_paths.extend(found_file_paths)

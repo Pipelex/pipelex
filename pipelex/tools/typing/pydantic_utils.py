@@ -27,6 +27,15 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
     type_errors = [f"{'.'.join(map(str, err['loc']))}: expected {err['type']}" for err in exc.errors() if err["type"] == "type_error"]
     value_errors = [f"{'.'.join(map(str, err['loc']))}: {err['msg']}" for err in exc.errors() if err["type"] == "value_error"]
     enum_errors = [f"{'.'.join(map(str, err['loc']))}: invalid enum value" for err in exc.errors() if err["type"] == "enum"]
+    model_type_errors: List[str] = []
+    for err in exc.errors():
+        if err["type"] == "model_type":
+            field_path = ".".join(map(str, err["loc"]))
+            # Extract expected type from context if available
+            expected_type = err.get("ctx", {}).get("class_name", "unknown model type")
+            actual_input = err.get("input", "unknown")
+            actual_type = type(actual_input).__name__ if actual_input != "unknown" else "unknown"
+            model_type_errors.append(f"{field_path}: expected {expected_type}, got {actual_type}")
 
     # Add each type of error to the message if present
     if missing_fields:
@@ -39,9 +48,11 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
         error_msg += f"\nValue errors: {value_errors}"
     if enum_errors:
         error_msg += f"\nEnum errors: {enum_errors}"
+    if model_type_errors:
+        error_msg += f"\nModel type errors: {model_type_errors}"
 
     # If none of the specific error types were found, add the raw error messages
-    if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors]):
+    if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors, model_type_errors]):
         error_msg += "\nOther validation errors:"
         for err in exc.errors():
             error_msg += f"\n{'.'.join(map(str, err['loc']))}: {err['type']}: {err['msg']}"

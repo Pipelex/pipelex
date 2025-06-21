@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 import shortuuid
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from pipelex.config import get_config
 from pipelex.core.concept import Concept
@@ -11,6 +11,7 @@ from pipelex.core.stuff import Stuff, StuffCreationRecord
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
 from pipelex.exceptions import ConceptError, PipelexError
 from pipelex.hub import get_class_registry, get_required_concept
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
 class StuffFactoryError(PipelexError):
@@ -148,14 +149,22 @@ class StuffFactory:
         return result
 
     @classmethod
-    def combine_stuffs(cls, concept_code: str, stuff_contents: Dict[str, StuffContent], name: Optional[str] = None) -> Stuff:
+    def combine_stuffs(
+        cls,
+        concept_code: str,
+        stuff_contents: Dict[str, StuffContent],
+        name: Optional[str] = None,
+    ) -> Stuff:
         """
         Combine a dictionary of stuffs into a single stuff.
         """
         the_concept = get_required_concept(concept_code=concept_code)
         the_subclass_name = the_concept.structure_class_name
         the_subclass = get_class_registry().get_required_subclass(name=the_subclass_name, base_class=StuffContent)
-        the_stuff_content = the_subclass.model_validate(obj=stuff_contents)
+        try:
+            the_stuff_content = the_subclass.model_validate(obj=stuff_contents)
+        except ValidationError as exc:
+            raise StuffFactoryError(f"Error combining stuffs: {format_pydantic_validation_error(exc=exc)}") from exc
         return cls.make_stuff(
             concept_str=concept_code,
             content=the_stuff_content,

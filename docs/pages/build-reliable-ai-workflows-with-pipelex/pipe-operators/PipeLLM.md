@@ -133,7 +133,6 @@ Analyze the document page shown in the image and explain how it relates to the p
 2. **Fixed Multiple Outputs**: Use `nb_output = N` (where N is a positive integer) when you need exactly N outputs. For example, `nb_output = 3` will try to generate 3 results. The parameter `_nb_output` will be available in the prompt template, e.g. "Give me the names of $_nb_output flowers".
 
 3. **Variable Multiple Outputs**: Use `multiple_output = true` when you need a variable-length list where the LLM determines how many outputs to generate based on the content and context.
-| `output_multiplicity`       | string or integer   | Defines the number of outputs. Use `"list"` for a variable-length list, or an integer (e.g., `3`) for a fixed-size list.                                                       | No       |
 
 ## Examples
 

@@ -95,6 +95,22 @@ def test_format_pydantic_validation_error() -> None:
     assert "Extra forbidden fields: ['c: 1']" in formatted
 
 
+def test_format_pydantic_validation_error_model_type() -> None:
+    class InnerModel(BaseModel):
+        value: int
+
+    class OuterModel(BaseModel):
+        inner: InnerModel
+
+    # Try to pass a dict where a specific model type is expected
+    with pytest.raises(ValidationError) as exc:
+        OuterModel.model_validate({"inner": "not_a_model"})
+
+    formatted = format_pydantic_validation_error(exc.value)
+    assert "Model type errors:" in formatted
+    assert "expected InnerModel, got str" in formatted
+
+
 def test_custom_base_model_truncates_repr() -> None:
     class TestModel(CustomBaseModel):
         base_64: str
