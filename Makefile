@@ -204,15 +204,10 @@ cleanall: cleanderived cleanenv cleanlibraries
 ### TESTING
 ##########################################################################################
 
-# codex-tests: env
-# 	$(call PRINT_TITLE,"Unit testing for Codex")
-# 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
-# 	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (needs_output or pipelex_api or codex_disabled)" || [ $$? = 5 ]
-
 codex-tests: env
 	$(call PRINT_TITLE,"Unit testing for Codex")
 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
-	$(VENV_PYTEST) -n auto --exitfirst -s -v -m "(dry_runnable or not inference) and not (needs_output or pipelex_api or codex_disabled)" || [ $$? = 5 ]
+	$(VENV_PYTEST) --exitfirst -s -v -m "(dry_runnable or not inference) and not (needs_output or pipelex_api or codex_disabled)" || [ $$? = 5 ]
 
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
