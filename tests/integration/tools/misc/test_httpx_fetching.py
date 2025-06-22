@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx, fetch_file_from_url_httpx_async
-from tests.data.test_data import TestURLs
+from tests.cases import TestURLs
 
 
 @pytest.mark.codex_disabled

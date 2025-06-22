@@ -16,8 +16,8 @@ from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.hub import get_content_generator, get_llm_deck
 from pipelex.pipeline.job_metadata import JobMetadata
+from tests.cases import ImageTestCases
 from tests.integration.pipelex.cogt.test_data import Employee
-from tests.test_data_models import ImageTestCases
 
 USER_TEXT_FOR_BASE = """
 Write a detailed description of a woman's clothing in the style of a 19th-century novel.

@@ -10,7 +10,7 @@ from pipelex.tools.misc.base_64_utils import (
     load_binary_as_base64_async,
     save_base64_to_binary_file,
 )
-from tests.data.test_data import FileHelperTestCases
+from tests.cases import FileHelperTestCases
 
 
 class TestBase64Utils:

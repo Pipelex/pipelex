@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
-from tests.test_data_models import PDFTestCases
+from tests.cases import PDFTestCases
 
 
 @pytest.mark.asyncio(loop_scope="class")

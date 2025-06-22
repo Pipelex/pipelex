@@ -12,7 +12,7 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.test_data_models import Article, ImageTestCases
+from tests.cases import Article, ImageTestCases
 
 
 @pytest.mark.dry_runnable

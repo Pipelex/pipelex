@@ -8,7 +8,7 @@ from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
-from tests.data.test_data import JINJA2TestCases
+from tests.cases import JINJA2TestCases
 
 
 @pytest.mark.dry_runnable

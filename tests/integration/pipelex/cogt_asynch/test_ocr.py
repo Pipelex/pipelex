@@ -8,7 +8,7 @@ from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
 from pipelex.config import get_config
 from pipelex.hub import get_ocr_worker
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
-from tests.test_data_models import ImageTestCases, PDFTestCases
+from tests.cases import ImageTestCases, PDFTestCases
 
 
 @pytest.mark.ocr

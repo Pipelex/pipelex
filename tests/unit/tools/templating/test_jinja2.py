@@ -5,7 +5,7 @@ from pipelex.hub import get_template_provider
 from pipelex.tools.templating.jinja2_rendering import render_jinja2
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
-from tests.data.test_data import Fruit, JINJA2TestCases
+from tests.cases import Fruit, JINJA2TestCases
 
 PLACE_HOLDER = "place_holder"
 

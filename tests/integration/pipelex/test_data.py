@@ -5,7 +5,7 @@ from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, ListContent, PDFContent, StructuredContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.exceptions import PipeStackOverflowError
-from tests.test_data_models import ImageTestCases, PDFTestCases
+from tests.cases import ImageTestCases, PDFTestCases
 
 
 class SomeContentWithImageAttribute(StructuredContent):
