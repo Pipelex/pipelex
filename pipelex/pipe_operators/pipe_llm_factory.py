@@ -131,7 +131,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             user_images=user_images or None,
         )
 
-        llm_settings = LLMSettingChoices(
+        llm_choices = LLMSettingChoices(
             for_text=pipe_blueprint.llm,
             for_object=pipe_blueprint.llm_to_structure,
             for_object_direct=pipe_blueprint.llm_to_structure_direct,
@@ -152,7 +152,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             pipe_llm_prompt=pipe_llm_prompt,
-            llm_choices=llm_settings,
+            llm_choices=llm_choices,
             structuring_method=pipe_blueprint.structuring_method,
             prompt_template_to_structure=pipe_blueprint.prompt_template_to_structure,
             system_prompt_to_structure=pipe_blueprint.system_prompt_to_structure,

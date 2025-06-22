@@ -217,6 +217,7 @@ markers = [
     "pipelex_api: tests that require access to the Pipelex API",
 ]
 minversion = "8.0"
+xfail_strict = true
 
 [tool.coverage.run]
 source = ["pipelex"]
