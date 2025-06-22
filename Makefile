@@ -318,6 +318,24 @@ test-pipelex-api: env
 ta: test-pipelex-api
 	@echo "> done: ta = test-pipelex-api"
 
+cov: env
+	$(call PRINT_TITLE,"Unit testing with coverage")
+	@echo "• Running unit tests with coverage"
+	@if [ -n "$(TEST)" ]; then \
+		$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) -k "$(TEST)" $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+	else \
+		$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+	fi
+
+cov-missing: env
+	$(call PRINT_TITLE,"Unit testing with coverage and missing lines")
+	@echo "• Running unit tests with coverage and missing lines"
+	@if [ -n "$(TEST)" ]; then \
+		$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) --cov-report=term-missing -k "$(TEST)" $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+	else \
+		$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) --cov-report=term-missing $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+	fi
+
 ############################################################################################
 ############################               Linting              ############################
 ############################################################################################

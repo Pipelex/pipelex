@@ -5,7 +5,7 @@ import pytest
 from pipelex.core.stuff_content import StuffContent
 from pipelex.hub import get_class_registry
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
-from tests.tools.test_data import ClassRegistryTestCases
+from tests.data.test_data import ClassRegistryTestCases
 
 
 class TestClassRegistryUtilsIntegration:
