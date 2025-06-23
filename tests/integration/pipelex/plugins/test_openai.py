@@ -14,8 +14,8 @@ from pipelex.plugins.openai.openai_llms import openai_list_available_models
 @pytest.mark.asyncio(loop_scope="class")
 class TestOpenAI:
     async def test_openai_api_key(self):
-        openai_openai_config = get_config().plugins.openai_config
-        assert openai_openai_config.get_api_key(secrets_provider=get_secrets_provider())
+        openai_config = get_config().plugins.openai_config
+        assert openai_config.get_api_key(secrets_provider=get_secrets_provider())
 
     # pytest -k test_openai_list_available_models -s -vv
     async def test_openai_list_available_models(
