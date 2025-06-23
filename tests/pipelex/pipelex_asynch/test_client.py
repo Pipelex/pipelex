@@ -3,7 +3,6 @@ from typing import List
 import pytest
 from pydantic import BaseModel
 
-from pipelex import pretty_print
 from pipelex.client.client import PipelexClient
 from pipelex.client.protocol import PipelineState
 from pipelex.core.stuff import Stuff
@@ -18,6 +17,7 @@ class Example(BaseModel):
 
 
 @pytest.mark.pipelex_api
+@pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipelexApiClient:
     @pytest.fixture
@@ -101,13 +101,16 @@ class TestPipelexApiClient:
 
             # Execute pipe
             client = PipelexClient()
-            result = await client.execute_pipeline(
+            pipeline_reponse = await client.execute_pipeline(
                 pipe_code=example.pipe_code,
                 working_memory=memory,
             )
-            pretty_print(result)
 
             # Verify result
-            assert result.pipeline_run_id is not None
-            assert result.pipeline_state == PipelineState.COMPLETED
-            assert result.pipe_output is not None
+            assert pipeline_reponse.pipeline_run_id is not None
+            assert pipeline_reponse.pipeline_state == PipelineState.COMPLETED
+            assert pipeline_reponse.pipe_output is not None
+
+            working_memory = pipeline_reponse.pipe_output["working_memory"]
+            question_artefact = working_memory["question"]
+            assert question_artefact["concept_code"] == "answer.Question"

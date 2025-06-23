@@ -48,19 +48,16 @@ class PipeTestCases:
         name="text",
         concept_str="Text",
         content=TextContent(text="Describe a t-shirt in 2 sentences"),
-        pipelex_session_id="unit_test",
     )
     SIMPLE_STUFF_IMAGE = StuffFactory.make_stuff(
         name="image",
         concept_str="Image",
         content=ImageContent(url=URL_IMG_FASHION_PHOTO_1),
-        pipelex_session_id="unit_test",
     )
     SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
         name="pdf",
         concept_str="PDF",
         content=PDFContent(url=PDFTestCases.DOCUMENT_URLS[0]),
-        pipelex_session_id="unit_test",
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
         name="complex",
@@ -71,7 +68,6 @@ class PipeTestCases:
                 ImageContent(url=URL_IMG_GANTT_1),
             ]
         ),
-        pipelex_session_id="unit_test",
     )
 
     STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1 = SomeContentWithImageAttribute(image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_1))
@@ -79,7 +75,6 @@ class PipeTestCases:
         concept_str="Image",
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
         name="stuff_with_image",
-        pipelex_session_id="unit_test",
     )
     STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = SomeContentWithImageSubObjectAttribute(
         image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_2),
@@ -89,7 +84,6 @@ class PipeTestCases:
         concept_str="Image",
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
         name="stuff_with_image_in_sub_object",
-        pipelex_session_id="unit_test",
     )
     STUFFS_IMAGE_ATTRIBUTES: ClassVar[List[Tuple[Stuff, List[str]]]] = [  # stuff, attribute_paths
         (STUFF_WITH_IMAGE_ATTRIBUTE, ["stuff_with_image.image_attribute"]),
@@ -152,7 +146,6 @@ class PipeTestCases:
                         TextContent(text="green"),
                     ]
                 ),
-                pipelex_session_id="unit_test",
             ),
             "colors",
             "color",

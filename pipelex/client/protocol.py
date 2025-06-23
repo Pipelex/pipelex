@@ -1,10 +1,9 @@
 from abc import abstractmethod
-from typing import Optional, Protocol
+from typing import Any, Dict, Optional, Protocol
 
 from pydantic import BaseModel
 from typing_extensions import runtime_checkable
 
-from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.types import StrEnum
@@ -64,14 +63,61 @@ class PipelineResponse(ApiResponse):
         created_at (str): Timestamp when the pipeline was created
         pipeline_state (PipelineState): Current state of the pipeline
         finished_at (Optional[str]): Timestamp when the pipeline finished, if completed
-        pipe_output (Optional[PipeOutput]): Output data from the pipeline execution, if available
+        pipe_output (Optional[Dict[str, Any]]): Output data from the pipeline execution as raw dict, if available
     """
 
     pipeline_run_id: str
     created_at: str
     pipeline_state: PipelineState
     finished_at: Optional[str] = None
-    pipe_output: Optional[PipeOutput] = None
+    pipe_output: Optional[Dict[str, Any]] = None
+
+    @classmethod
+    def from_api_response(cls, response_data: Dict[str, Any]) -> "PipelineResponse":
+        """
+        Create PipelineResponse from API response data, handling working_memory conversion.
+        """
+        import json
+
+        # Parse JSON if it's a string
+        if isinstance(response_data, str):
+            data = json.loads(response_data)
+        else:
+            data = response_data
+
+        # Simple conversion: if working_memory exists, convert root to artefact dict
+        if data.get("pipe_output") and data["pipe_output"].get("working_memory") and data["pipe_output"]["working_memory"].get("root"):
+            root = data["pipe_output"]["working_memory"]["root"]
+            artefacts = {}
+
+            for name, stuff in root.items():
+                artefact = {}
+                # Copy content fields
+                if stuff.get("content"):
+                    content = stuff["content"]
+                    # Remove __class__ and __module__ from content
+                    artefact.update({k: v for k, v in content.items() if k not in ("__class__", "__module__")})  # type: ignore
+
+                # Add metadata
+                artefact.update(  # type: ignore
+                    {
+                        "stuff_name": stuff.get("stuff_name"),
+                        "concept_code": stuff.get("concept_code"),
+                        "stuff_code": stuff.get("stuff_code"),
+                        "content": {k: v for k, v in stuff.get("content", {}).items() if k not in ("__class__", "__module__")},
+                    }
+                )
+                artefacts[name] = artefact
+
+            data["pipe_output"]["working_memory"] = artefacts
+
+        return cls(
+            pipeline_run_id=data["pipeline_run_id"],
+            created_at=data["created_at"],
+            pipeline_state=data["pipeline_state"],
+            finished_at=data.get("finished_at"),
+            pipe_output=data.get("pipe_output"),
+        )
 
 
 @runtime_checkable

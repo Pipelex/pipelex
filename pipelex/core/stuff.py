@@ -31,8 +31,6 @@ class Stuff(CustomBaseModel):
     model_config = ConfigDict(extra="ignore", strict=True)
 
     stuff_code: str
-    pipelex_session_id: Optional[str] = Field(default=None)
-    creation_record: Optional[StuffCreationRecord] = None
     stuff_name: Optional[str] = None
     concept_code: str
     content: StuffContent
@@ -81,7 +79,7 @@ class Stuff(CustomBaseModel):
 
     @property
     def short_desc(self) -> str:
-        return f"""{self.pipelex_session_id}/{self.stuff_code}:
+        return f"""{self.stuff_code}:
 {self.concept_code} — {type(self.content).__name__}:
 {self.content.short_desc}"""
 

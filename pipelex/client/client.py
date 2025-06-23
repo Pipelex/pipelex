@@ -1,4 +1,4 @@
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 import httpx
 from kajson import kajson
@@ -84,8 +84,8 @@ class PipelexClient(PipelexProtocol):
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
         )
-        response = await self._make_api_call(f"pipelex/v1/pipeline/{pipe_code}/execute", request=kajson.dumps(pipeline_request))
-        return cast(PipelineResponse, kajson.loads(response))
+        response = await self._make_api_call(f"v1/pipeline/{pipe_code}/execute", request=kajson.dumps(pipeline_request))
+        return PipelineResponse.from_api_response(response)
 
     @override
     async def start_pipeline(
@@ -102,5 +102,5 @@ class PipelexClient(PipelexProtocol):
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
         )
-        response = await self._make_api_call(f"pipelex/v1/pipeline/{pipe_code}/start", request=kajson.dumps(pipeline_request))
-        return cast(PipelineResponse, kajson.loads(response))
+        response = await self._make_api_call(f"v1/pipeline/{pipe_code}/start", request=kajson.dumps(pipeline_request))
+        return PipelineResponse.from_api_response(response)

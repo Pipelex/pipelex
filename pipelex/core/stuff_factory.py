@@ -35,8 +35,6 @@ class StuffFactory:
         content: StuffContent,
         name: Optional[str] = None,
         code: Optional[str] = None,
-        creation_record: Optional[StuffCreationRecord] = None,
-        pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         try:
             concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
@@ -50,8 +48,6 @@ class StuffFactory:
             content=content,
             stuff_name=name,
             stuff_code=code or shortuuid.uuid()[:5],
-            creation_record=creation_record,
-            pipelex_session_id=pipelex_session_id or get_config().session_id,
         )
 
     @classmethod
@@ -61,8 +57,6 @@ class StuffFactory:
         content: StuffContent,
         name: Optional[str] = None,
         code: Optional[str] = None,
-        creation_record: Optional[StuffCreationRecord] = None,
-        pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         if not name:
             name = cls.make_stuff_name(concept_str=concept.code)
@@ -71,8 +65,6 @@ class StuffFactory:
             content=content,
             stuff_name=name,
             stuff_code=code or shortuuid.uuid()[:5],
-            creation_record=creation_record,
-            pipelex_session_id=pipelex_session_id or get_config().session_id,
         )
 
     @classmethod
@@ -91,7 +83,6 @@ class StuffFactory:
             concept_str=blueprint.concept_code,
             str_value=blueprint.value,
             name=blueprint.name,
-            pipelex_session_id="blueprint",
         )
         return the_stuff
 
@@ -101,7 +92,6 @@ class StuffFactory:
         str_value: str,
         name: Optional[str] = None,
         concept_str: str = NativeConcept.TEXT.code,
-        pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         try:
             concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
@@ -123,8 +113,6 @@ class StuffFactory:
             content=stuff_content,
             stuff_name=name,
             stuff_code=shortuuid.uuid()[:5],
-            creation_record=None,
-            pipelex_session_id=pipelex_session_id or get_config().session_id,
         )
 
     @classmethod
