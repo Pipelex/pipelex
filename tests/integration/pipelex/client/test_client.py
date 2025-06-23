@@ -17,7 +17,6 @@ class Example(BaseModel):
 
 
 @pytest.mark.pipelex_api
-@pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipelexApiClient:
     @pytest.fixture
