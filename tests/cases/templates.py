@@ -1,6 +1,6 @@
 """Template constants for testing."""
 
-from typing import ClassVar, List
+from typing import Any, ClassVar, List, Tuple
 
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
 
@@ -120,4 +120,15 @@ Format filter html:
         Fruit(color="red", name="cherry"),
         Fruit(color="blue", name="blueberry"),
         Fruit(color="green", name="grape"),
+    ]
+
+    # Mixed object types for comprehensive testing
+    ANY_OBJECT: ClassVar[List[Tuple[str, Any]]] = [  # topic, any_object
+        ("string", "test_string"),
+        ("integer", 42),
+        ("float", 3.14),
+        ("boolean", True),
+        ("list", ["item1", "item2", "item3"]),
+        ("dict", {"key1": "value1", "key2": "value2"}),
+        ("fruit_object", Fruit(color="red", name="apple")),
     ]
