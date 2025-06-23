@@ -889,14 +889,14 @@ wheels = [
 
 [[package]]
 name = "kajson"
-version = "0.1.6"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/40/cf/eb2cc86fc0f56b982692d2a2401d3464e8143dfc7e6549afa0eaf3613053/kajson-0.1.6.tar.gz", hash = "sha256:163abcfe8c376adb351d4e7acdc82744e2ddcb7ae4082803284318cc4d240f06", size = 15236, upload-time = "2025-06-19T10:18:00.314Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/b5/404dda6ea283cba04e408d4447466a14863586f6872f87d70883e32ac48a/kajson-0.2.0.tar.gz", hash = "sha256:1dbe9595ef70a6cb1e3fdfc28fa6f1f3e361bbdfb03b0a4ca525f3f6f6100b92", size = 18178, upload-time = "2025-06-23T09:05:15.665Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/22/75/53cc71d915c4269c624f8e76f10e0aff9f1112d6b568ac1b987d1b5df4b1/kajson-0.1.6-py3-none-any.whl", hash = "sha256:93ddca59dd225a79d8ffb9b54170e98b4b6c8a1f999bcf2d5981d919e132538d", size = 21594, upload-time = "2025-06-19T10:17:58.919Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/da/8942c19fb6806d29d8769059a2f5f0a19bd9cbaadaaad725dd1aae8efa78/kajson-0.2.0-py3-none-any.whl", hash = "sha256:1221d4d3be54033f97642c4df9a7144d086a49d95f1f2adeb975308e671c5ac9", size = 24219, upload-time = "2025-06-23T09:05:14.193Z" },
 ]
 
 [[package]]
@@ -1668,6 +1668,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
+    { name = "pytest-mock" },
     { name = "pytest-sugar" },
     { name = "pytest-xdist" },
     { name = "ruff" },
@@ -1712,7 +1713,7 @@ requires-dist = [
     { name = "instructor", specifier = ">=1.8.3" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
-    { name = "kajson", specifier = "==0.1.6" },
+    { name = "kajson", specifier = "==0.2.0" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "mistralai", marker = "extra == 'mistralai'", specifier = "==1.5.2" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = "==1.6.1" },
@@ -1733,6 +1734,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.3" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.1.1" },
+    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.14.0" },
     { name = "pytest-sugar", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.6.1" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
@@ -2083,6 +2085,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/18/99/668cade231f434aaa59bbfbf49469068d2ddd945000621d3d165d2e7dd7b/pytest_cov-6.2.1.tar.gz", hash = "sha256:25cc6cc0a5358204b8108ecedc51a9b57b34cc6b8c967cc2c01a4e00d8a67da2", size = 69432, upload-time = "2025-06-12T10:47:47.684Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/16/4ea354101abb1287856baa4af2732be351c7bee728065aed451b678153fd/pytest_cov-6.2.1-py3-none-any.whl", hash = "sha256:f5bc4c23f42f1cdd23c70b1dab1bbaef4fc505ba950d53e0081d0730dd7e86d5", size = 24644, upload-time = "2025-06-12T10:47:45.932Z" },
+]
+
+[[package]]
+name = "pytest-mock"
+version = "3.14.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/71/28/67172c96ba684058a4d24ffe144d64783d2a270d0af0d9e792737bddc75c/pytest_mock-3.14.1.tar.gz", hash = "sha256:159e9edac4c451ce77a5cdb9fc5d1100708d2dd4ba3c3df572f14097351af80e", size = 33241, upload-time = "2025-05-26T13:58:45.167Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b2/05/77b60e520511c53d1c1ca75f1930c7dd8e971d0c4379b7f4b3f9644685ba/pytest_mock-3.14.1-py3-none-any.whl", hash = "sha256:178aefcd11307d874b4cd3100344e7e2d888d9791a6a1d9bfe90fbc1b74fd1d0", size = 9923, upload-time = "2025-05-26T13:58:43.487Z" },
 ]
 
 [[package]]

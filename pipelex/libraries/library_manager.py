@@ -24,6 +24,7 @@ from pipelex.exceptions import (
     StaticValidationError,
 )
 from pipelex.libraries.library_config import LibraryConfig
+from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -74,13 +75,13 @@ class LibraryManager:
     def load_libraries(self):
         log.debug("LibraryManager loading separate libraries")
 
-        KajsonManager.get_class_registry().register_classes_in_folder(
+        ClassRegistryUtils.register_classes_in_folder(
             folder_path=LibraryConfig.loaded_pipelines_path,
         )
         library_paths = [LibraryConfig.loaded_pipelines_path]
         if runtime_manager.is_unit_testing:
             log.debug("Registering test pipeline structures for unit testing")
-            KajsonManager.get_class_registry().register_classes_in_folder(
+            ClassRegistryUtils.register_classes_in_folder(
                 folder_path=LibraryConfig.test_pipelines_path,
             )
             library_paths += [LibraryConfig.test_pipelines_path]
@@ -117,6 +118,7 @@ class LibraryManager:
                 pattern="*.toml",
                 is_recursive=True,
             )
+            log.debug(f"Searching for TOML files in {libraries_path}, found '{found_file_paths}'")
             if not found_file_paths:
                 log.warning(f"No TOML files found in library path: {libraries_path}")
             toml_file_paths.extend(found_file_paths)

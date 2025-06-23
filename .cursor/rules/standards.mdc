@@ -14,6 +14,7 @@ This document outlines the coding standards and quality control procedures that 
 Before finalizing a task, you must run the following command to check for linting issues, type errors, and code quality problems:
 
 ```bash
+make fix-unused-imports
 make check
 ```
 
@@ -34,19 +35,15 @@ We have several make commands for running tests:
    ```
    Use this for quick test runs that don't require LLM or image generation.
 
-2. `make ti`: Runs all tests with these markers:
-   ```
-   inference and not imgg
-   ```
-   Use this for testing LLM functionality without image generation.
-
-3. To run specific tests:
+2. To run specific tests:
    ```bash
    make tp TEST=TestClassName
    # or
    make tp TEST=test_function_name
    ```
    It matches names, so `TEST=test_function_name` is going to run all test with the function name that STARTS with `test_function_name`.
+
+Note: never run `make ti`, `make test-inference`, `make to`, `make test-ocr`, `make tg`, or `make test-imgg`: these all use inference which is costly.
 
 ## Important Project Directories
 

@@ -9,6 +9,7 @@ import pipelex.config
 import pipelex.pipelex
 from pipelex import log
 from pipelex.config import get_config
+from tests.cases.registry import Fruit
 
 pytest_plugins = [
     "pipelex.test_extras.shared_pytest_plugins",
@@ -48,3 +49,22 @@ def pretty():
 @pytest.fixture(scope="session", autouse=True)  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
 def apply_manage_pipelex_libraries(manage_pipelex_libraries_with_overwrite: Any):  # pyright: ignore[reportUnknownParameterType]
     return
+
+
+# Test data fixtures
+@pytest.fixture(scope="session")
+def apple() -> Fruit:
+    """Apple fruit fixture."""
+    return Fruit(name="apple", color="red")
+
+
+@pytest.fixture(scope="session")
+def cherry() -> Fruit:
+    """Cherry fruit fixture."""
+    return Fruit(name="cherry", color="red")
+
+
+@pytest.fixture(scope="session")
+def blueberry() -> Fruit:
+    """Blueberry fruit fixture."""
+    return Fruit(name="blueberry", color="blue")

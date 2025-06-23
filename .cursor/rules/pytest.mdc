@@ -10,11 +10,11 @@ These rules apply when writing unit tests.
 
 - Name test files with `test_` prefix
 - Use descriptive names that match the functionality being tested
-- Place test files in the appropriate subdirectory of `tests/`:
-    - `tests/tools/` for tests related to sub-package `pipelex.tools`
-    - `tests/pipelex/` for tests related to `pipelex`and its sub-packages
-    - `tests/pipelex/cogt/` for tests related to sub-package `pipelex.cogt`
-- More precisely, for `pipelex` and `pipelex.cogt` the async tests are placed inside subdirectories named `cogt_asynch` and `pipelex_asynch`
+- Place test files in the appropriate test category directory:
+    - `tests/unit/` - for unit tests that test individual functions/classes in isolation
+    - `tests/integration/` - for integration tests that test component interactions
+    - `tests/e2e/` - for end-to-end tests that test complete workflows
+    - `tests/test_pipelines/` - for test pipeline definitions (TOML files)
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `tests.pipelex.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
 - Always put test inside Test classes.
@@ -55,7 +55,7 @@ class TestFooBar:
         # Test implementation
 ```
 
-Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get th test name using `cast(str, request.node.originalname),  # type: ignore`. 
+Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get the test name using `cast(str, request.node.originalname),  # type: ignore`. 
 
 # Pipe tests
 
