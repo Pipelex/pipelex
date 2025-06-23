@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Callable, Dict, List
 
 import pytest
@@ -112,3 +113,54 @@ class TestFuncRegistry:
         registry.root["not_a_function"] = "a string"  # type: ignore
         with pytest.raises(FuncRegistryError, match="is not a callable function"):
             registry.get_required_function_with_signature("not_a_function", sample_function)
+
+    def test_register_function_without_warning_when_already_exists(self, registry: FuncRegistry, caplog: LogCaptureFixture):
+        """Test that no 'already exists' log is generated when should_warn_if_already_registered=False and function doesn't exist yet"""
+        with caplog.at_level("DEBUG"):
+            registry.register_function(sample_function, should_warn_if_already_registered=False)
+        # This covers line 28 - the else branch when function doesn't exist yet
+        assert "Registered new single function" in caplog.text
+
+    def test_register_functions_dict_single_function(self, registry: FuncRegistry, caplog: LogCaptureFixture):
+        """Test registering a single function via dict - covers line 72"""
+        functions: Dict[str, Callable[..., Any]] = {"single_func": sample_function}
+        with caplog.at_level("DEBUG"):
+            registry.register_functions_dict(functions)
+        assert "Registered single function 'sample_function' in registry" in caplog.text
+        assert registry.get_function("single_func") is sample_function
+
+    def test_register_functions_skip_existing(self, registry: FuncRegistry, caplog: LogCaptureFixture):
+        """Test that existing functions are skipped when registering multiple functions - covers lines 83-84"""
+        # First register a function
+        registry.register_function(sample_function)
+
+        # Now try to register a list that includes the existing function
+        functions: List[Callable[..., Any]] = [sample_function, another_function]
+        with caplog.at_level("DEBUG"):
+            registry.register_functions(functions)
+
+        # Should log that existing function was skipped
+        assert "already exists in registry, skipping" in caplog.text
+        # But should still register the new function
+        assert registry.get_function("another_function") is another_function
+
+    def test_register_functions_single_function_in_list(self, registry: FuncRegistry, caplog: LogCaptureFixture):
+        """Test registering a single function via list - covers line 93"""
+        functions: List[Callable[..., Any]] = [sample_function]
+        with caplog.at_level("DEBUG"):
+            registry.register_functions(functions)
+        assert "Registered single function 'sample_function' in registry" in caplog.text
+        assert registry.get_function("sample_function") is sample_function
+
+    def test_set_logger(self, registry: FuncRegistry, caplog: LogCaptureFixture):
+        """Test setting a custom logger - covers line 28"""
+        custom_logger = logging.getLogger("custom_test_logger")
+        registry.set_logger(custom_logger)
+
+        # Test that the custom logger is being used by triggering a log message
+        with caplog.at_level("DEBUG", logger="custom_test_logger"):
+            registry.register_function(sample_function)
+
+        # Verify the log message was captured by our custom logger
+        assert len(caplog.records) > 0
+        assert any("Registered new single function" in record.message for record in caplog.records)
