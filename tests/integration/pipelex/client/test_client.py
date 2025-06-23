@@ -96,8 +96,10 @@ class TestPipelexApiClient:
         for example in examples:
             # Create working memory from example data
             memory = WorkingMemory()
-            for stuff in example.memory:
-                memory.add_new_stuff(name=stuff.stuff_name or stuff.concept_code, stuff=stuff)
+            question = example.memory[1]
+            text = example.memory[0]
+            memory.add_new_stuff(name=question.stuff_name or question.concept_code, stuff=question)
+            memory.add_new_stuff(name=text.stuff_name or text.concept_code, stuff=text)
 
             # Execute pipe
             client = PipelexClient()
@@ -112,5 +114,59 @@ class TestPipelexApiClient:
             assert pipeline_reponse.pipe_output is not None
 
             working_memory = pipeline_reponse.pipe_output["working_memory"]
-            question_artefact = working_memory["question"]
-            assert question_artefact["concept_code"] == "answer.Question"
+            assert working_memory["question"] == {
+                "concept_code": "answer.Question",
+                "stuff_code": question.stuff_code,
+                "stuff_name": "question",
+                "content": {"text": "Aerodynamic features?"},
+            }
+            assert working_memory["main_stuff"] is not None
+            assert working_memory["main_stuff"]["concept_code"] == "retrieve.RetrievedExcerpt"
+            assert working_memory["main_stuff"]["stuff_name"] == "retrieved_excerpt"
+
+            assert working_memory["text"] == {
+                "concept_code": "native.Text",
+                "stuff_code": text.stuff_code,
+                "stuff_name": "text",
+                "content": {
+                    "text": """
+                                The Dawn of Ultra-Rapid Transit: NextGen High-Speed Trains Redefine Travel
+                                By Eliza Montgomery, Transportation Technology Reporter
+
+                                In an era where time is increasingly precious, a revolution in rail transportation is quietly 
+                                transforming how we connect cities and regions. The emergence of ultra-high-speed train 
+                                networks, capable of speeds exceeding 350 mph, promises to render certain short-haul 
+                                flights obsolete while dramatically reducing carbon emissions.
+
+                                QuantumRail's Breakthrough Technology
+                                Leading this transportation revolution is QuantumRail Technologies, whose new MagLev-X 
+                                platform has shattered previous speed records during recent tests in Nevada's 
+                                Velocity Valley testinggrounds. The train achieved a remarkable 368 mph, 
+                                maintaining this speed for over fifteen minutes.
+
+                                'What we're seeing isn't just an incremental improvement—it's a fundamental shift 
+                                in transportationphysics,' explains Dr. Hiroshi Takahashi, Chief Engineer at 
+                                QuantumRail. 'The MagLev-X's superconducting magnets and aerodynamic profile 
+                                allow us to overcome limitations that have constrained train speeds for decades.'
+
+                                Economic Implications
+                                The introduction of these next-generation trains isn't merely a technical 
+                                achievement—it represents a potential economic windfall for connected regions.
+                                The TransContinental Alliance, a consortium of cities supporting high-speed rail 
+                                development, estimates that new high-speed corridors could generate $87 
+                                billion in economic activity over the next decade.
+
+                                'When you can travel between Chicago and Detroit in under an hour, 
+                                you're essentially creating a single economic zone, notes Dr. Amara Washington, 
+                                economist at the Urban Mobility Institute. This transforms labor markets, housing 
+                                patterns, and business relationships.
+
+                                WindStream's Competitive Response
+                                Not to be outdone, European manufacturer WindStream Mobility has unveiled 
+                                its own ultra-high-speed platform, the AeroGlide TGV-7. Featuring a 
+                                distinctive bionic design inspired by peregrine falcons, the train uses an innovative 
+                                hybrid propulsion system that combines traditional electric motors with 
+                                compressed air boosters for acceleration phases.
+                            """
+                },
+            }

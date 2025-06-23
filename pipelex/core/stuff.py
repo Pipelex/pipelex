@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, Type, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
 from pipelex import log

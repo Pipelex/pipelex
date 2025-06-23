@@ -73,7 +73,7 @@ class PipelineResponse(ApiResponse):
     pipe_output: Optional[Dict[str, Any]] = None
 
     @classmethod
-    def from_api_response(cls, response_data: Dict[str, Any]) -> "PipelineResponse":
+    def from_api_response(cls, response_data: Any) -> "PipelineResponse":
         """
         Create PipelineResponse from API response data, handling working_memory conversion.
         """
@@ -85,31 +85,20 @@ class PipelineResponse(ApiResponse):
         else:
             data = response_data
 
-        # Simple conversion: if working_memory exists, convert root to artefact dict
-        if data.get("pipe_output") and data["pipe_output"].get("working_memory") and data["pipe_output"]["working_memory"].get("root"):
-            root = data["pipe_output"]["working_memory"]["root"]
-            artefacts = {}
+        # Convert working_memory root to artefact dict
+        root = data["pipe_output"]["working_memory"]["root"]
+        artefacts = {}
 
-            for name, stuff in root.items():
-                artefact = {}
-                # Copy content fields
-                if stuff.get("content"):
-                    content = stuff["content"]
-                    # Remove __class__ and __module__ from content
-                    artefact.update({k: v for k, v in content.items() if k not in ("__class__", "__module__")})  # type: ignore
+        for name, stuff in root.items():
+            artefact = {
+                "stuff_name": stuff.get("stuff_name"),
+                "concept_code": stuff.get("concept_code"),
+                "stuff_code": stuff.get("stuff_code"),
+                "content": {k: v for k, v in stuff.get("content", {}).items() if k not in ("__class__", "__module__")},
+            }
+            artefacts[name] = artefact
 
-                # Add metadata
-                artefact.update(  # type: ignore
-                    {
-                        "stuff_name": stuff.get("stuff_name"),
-                        "concept_code": stuff.get("concept_code"),
-                        "stuff_code": stuff.get("stuff_code"),
-                        "content": {k: v for k, v in stuff.get("content", {}).items() if k not in ("__class__", "__module__")},
-                    }
-                )
-                artefacts[name] = artefact
-
-            data["pipe_output"]["working_memory"] = artefacts
+        data["pipe_output"]["working_memory"] = artefacts
 
         return cls(
             pipeline_run_id=data["pipeline_run_id"],

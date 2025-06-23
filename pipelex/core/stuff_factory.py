@@ -3,11 +3,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import shortuuid
 from pydantic import BaseModel, Field, ValidationError
 
-from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_code_factory import ConceptCodeFactory
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.stuff import Stuff, StuffCreationRecord
+from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
 from pipelex.exceptions import ConceptError, PipelexError
 from pipelex.hub import get_class_registry, get_required_concept
