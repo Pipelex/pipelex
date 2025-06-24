@@ -3,10 +3,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import shortuuid
 from pydantic import BaseModel, Field, ValidationError
 
+from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_code_factory import ConceptCodeFactory
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.stuff import Stuff
+from pipelex.core.stuff import Stuff, StuffCreationRecord
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
 from pipelex.exceptions import ConceptError, PipelexError
 from pipelex.hub import get_class_registry, get_required_concept
@@ -19,8 +20,8 @@ class StuffFactoryError(PipelexError):
 
 class StuffBlueprint(BaseModel):
     name: str
-    concept_code: str = Field(alias="concept")
-    value: str
+    concept_code: str
+    value: Dict[str, Any] | str
 
 
 class StuffFactory:
@@ -35,6 +36,8 @@ class StuffFactory:
         content: StuffContent,
         name: Optional[str] = None,
         code: Optional[str] = None,
+        creation_record: Optional[StuffCreationRecord] = None,
+        pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         try:
             concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
@@ -48,6 +51,8 @@ class StuffFactory:
             content=content,
             stuff_name=name,
             stuff_code=code or shortuuid.uuid()[:5],
+            creation_record=creation_record,
+            pipelex_session_id=pipelex_session_id or get_config().session_id,
         )
 
     @classmethod
@@ -57,6 +62,8 @@ class StuffFactory:
         content: StuffContent,
         name: Optional[str] = None,
         code: Optional[str] = None,
+        creation_record: Optional[StuffCreationRecord] = None,
+        pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         if not name:
             name = cls.make_stuff_name(concept_str=concept.code)
@@ -65,25 +72,35 @@ class StuffFactory:
             content=content,
             stuff_name=name,
             stuff_code=code or shortuuid.uuid()[:5],
+            creation_record=creation_record,
+            pipelex_session_id=pipelex_session_id or get_config().session_id,
         )
 
     @classmethod
-    def make_from_blueprint_dict(cls, blueprint_dict: Dict[str, Any]) -> "Stuff":
-        blueprint = StuffBlueprint.model_validate(obj=blueprint_dict)
+    def make_from_blueprint_dict(cls, blueprint: StuffBlueprint) -> "Stuff":
         return cls.make_from_blueprint(blueprint=blueprint)
 
     @classmethod
-    def make_from_blueprint_str(cls, blueprint_str: str) -> "Stuff":
-        blueprint = StuffBlueprint.model_validate_json(json_data=blueprint_str)
+    def make_from_blueprint_str(cls, blueprint: str | StuffBlueprint) -> "Stuff":
+        if isinstance(blueprint, str):
+            blueprint = StuffBlueprint.model_validate_json(json_data=blueprint)
         return cls.make_from_blueprint(blueprint=blueprint)
 
     @classmethod
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
-        the_stuff = cls.make_from_str(
-            concept_str=blueprint.concept_code,
-            str_value=blueprint.value,
-            name=blueprint.name,
-        )
+        if isinstance(blueprint.value, str):
+            the_stuff = cls.make_from_str(
+                concept_str=blueprint.concept_code,
+                str_value=blueprint.value,
+                name=blueprint.name,
+                pipelex_session_id="blueprint",
+            )
+        else:
+            the_stuff = cls.make_stuff(
+                concept_str=blueprint.concept_code,
+                content=blueprint.value,
+                name=blueprint.name,
+            )
         return the_stuff
 
     @classmethod
@@ -92,6 +109,7 @@ class StuffFactory:
         str_value: str,
         name: Optional[str] = None,
         concept_str: str = NativeConcept.TEXT.code,
+        pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         try:
             concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
@@ -113,6 +131,8 @@ class StuffFactory:
             content=stuff_content,
             stuff_name=name,
             stuff_code=shortuuid.uuid()[:5],
+            creation_record=None,
+            pipelex_session_id=pipelex_session_id or get_config().session_id,
         )
 
     @classmethod
