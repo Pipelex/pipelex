@@ -1,5 +1,5 @@
 from operator import attrgetter
-from typing import Any, Dict, List, Optional, Set, Type, TypeVar
+from typing import Any, Dict, List, Optional, Set, Type, TypeVar, cast
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
@@ -382,11 +382,13 @@ class WorkingMemory(BaseModel):
         final_dict: Dict[str, StuffBlueprintReduced] = {}
         for stuff_name, stuff in self.root.items():
             if stuff.concept_code == NativeConcept.TEXT.code:
-                content = stuff.content.get("text")
+                final_dict[stuff_name] = StuffBlueprintReduced(
+                    concept_code=stuff.concept_code,
+                    content= cast(TextContent, stuff.content).text,
+                )
             else:
-                content = stuff.content.model_dump(serialize_as_any=True)
-            final_dict[stuff_name] = StuffBlueprintReduced(
-                concept_code=stuff.concept_code,
-                content=stuff.content.smart_dump(),
+                final_dict[stuff_name] = StuffBlueprintReduced(
+                    concept_code=stuff.concept_code,
+                    content=stuff.content.model_dump(serialize_as_any=True),
             )
         return final_dict
