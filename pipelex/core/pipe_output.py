@@ -1,4 +1,4 @@
-from typing import Dict, List, Type, TypeVar
+from typing import Any, Dict, List, Type, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -13,7 +13,7 @@ from pipelex.core.stuff_content import (
     TextAndImagesContent,
     TextContent,
 )
-from pipelex.core.working_memory import ReducedStuff, WorkingMemory
+from pipelex.core.working_memory import WorkingMemory
 
 
 class PipeOutput(BaseModel):
@@ -79,7 +79,7 @@ class PipeOutput(BaseModel):
         """Get main stuff content as MermaidContent if applicable."""
         return self.working_memory.main_stuff_as_mermaid
 
-    def to_stuff_blueprint(self) -> Dict[str, ReducedStuff]:
+    def to_stuff_blueprint(self) -> Dict[str, Dict[str, Any]]:
         """Get main stuff content as StuffBlueprint if applicable."""
         return self.working_memory.to_reduced_memory()
 

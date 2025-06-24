@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing_extensions import runtime_checkable
 
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
-from pipelex.core.working_memory import ReducedStuff, WorkingMemory
+from pipelex.core.working_memory import WorkingMemory
 from pipelex.types import StrEnum
 
 
@@ -42,13 +42,13 @@ class PipelineRequest(BaseModel):
     Request for executing a pipeline.
 
     Attributes:
-        working_memory (Optional[Dict[str, StuffBlueprintReduced]]): Blueprint-style working memory for the pipeline
+        working_memory (Optional[Dict[str, Dict[str, Any]]]): In the format of WorkingMemory.to_reduced_memory()
         output_name (Optional[str]): Name of the output slot to write to
         output_multiplicity (Optional[PipeOutputMultiplicity]): Output multiplicity setting
         dynamic_output_concept_code (Optional[str]): Override for the dynamic output concept code
     """
 
-    working_memory: Optional[Dict[str, ReducedStuff]] = None
+    working_memory: Optional[Dict[str, Dict[str, Any]]] = None
     output_name: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
     dynamic_output_concept_code: Optional[str] = None
