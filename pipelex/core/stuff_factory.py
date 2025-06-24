@@ -17,11 +17,6 @@ class StuffFactoryError(PipelexError):
     pass
 
 
-class StuffBlueprintReduced(BaseModel):
-    concept_code: str
-    content: Dict[str, Any] | str
-
-
 class StuffBlueprint(BaseModel):
     stuff_name: str
     concept_code: str
@@ -172,7 +167,6 @@ class StuffFactory:
             content=the_stuff_content,
             name=name,
         )
-
 
 
 class StuffContentFactoryError(PipelexError):

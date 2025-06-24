@@ -1,5 +1,5 @@
 from operator import attrgetter
-from typing import Any, Dict, List, Optional, Set, Type, TypeVar, cast
+from typing import Any, Dict, List, Optional, Set, Type, cast
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
@@ -8,7 +8,6 @@ from pipelex import log, pretty_print
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_artefact import StuffArtefact
-from pipelex.core.stuff_factory import StuffBlueprintReduced
 from pipelex.core.stuff_content import (
     HtmlContent,
     ImageContent,
@@ -35,8 +34,14 @@ BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
 StuffDict = Dict[str, Stuff]
 StuffArtefactDict = Dict[str, StuffArtefact]
 
-# Create a generic type variable
-T = TypeVar("T")
+
+class ReducedStuff(BaseModel):
+    concept_code: str
+    content: Dict[str, Any] | str
+
+
+class WorkingMemoryReduced(BaseModel):
+    working_memory: Dict[str, ReducedStuff]
 
 
 class WorkingMemory(BaseModel):
@@ -377,18 +382,18 @@ class WorkingMemory(BaseModel):
         """Get main stuff content as MermaidContent if applicable."""
         return self.get_stuff_as_mermaid(name=MAIN_STUFF_NAME)
 
-    def to_reduced_memory(self) -> Dict[str, StuffBlueprintReduced]:
+    def to_reduced_memory(self) -> Dict[str, ReducedStuff]:
         """Convert working memory to API input format."""
-        final_dict: Dict[str, StuffBlueprintReduced] = {}
+        reduced_memory: WorkingMemoryReduced = WorkingMemoryReduced(working_memory={})
         for stuff_name, stuff in self.root.items():
             if stuff.concept_code == NativeConcept.TEXT.code:
-                final_dict[stuff_name] = StuffBlueprintReduced(
+                reduced_memory.working_memory[stuff_name] = ReducedStuff(
                     concept_code=stuff.concept_code,
-                    content= cast(TextContent, stuff.content).text,
+                    content=cast(TextContent, stuff.content).text,
                 )
             else:
-                final_dict[stuff_name] = StuffBlueprintReduced(
+                reduced_memory.working_memory[stuff_name] = ReducedStuff(
                     concept_code=stuff.concept_code,
                     content=stuff.content.model_dump(serialize_as_any=True),
-            )
-        return final_dict
+                )
+        return reduced_memory.working_memory

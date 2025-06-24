@@ -14,16 +14,10 @@ class TestCases:
     }
 
     # Test cases for TextContent with dict content
-    TEXT_DICT_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_code": "native.Text",
-        "content": {"text": "Sample text content"}
-    }
+    TEXT_DICT_BLUEPRINT: ClassVar[Dict[str, Any]] = {"concept_code": "native.Text", "content": {"text": "Sample text content"}}
 
     # Test cases for native concept without prefix (should work)
-    TEXT_NO_PREFIX_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_code": "Text",
-        "content": {"text": "Text content without native prefix"}
-    }
+    TEXT_NO_PREFIX_BLUEPRINT: ClassVar[Dict[str, Any]] = {"concept_code": "Text", "content": {"text": "Text content without native prefix"}}
 
     # Test cases for registered class (using actual registered class)
     REGISTERED_CLASS_BLUEPRINT: ClassVar[Dict[str, Any]] = {
@@ -40,7 +34,7 @@ class TestCases:
     # Test cases for unregistered class with dict content
     UNREGISTERED_DICT_BLUEPRINT: ClassVar[Dict[str, Any]] = {
         "concept_code": "unknown.NonExistentConcept",
-        "content": {"text": "Dict content for implicit concept"}
+        "content": {"text": "Dict content for implicit concept"},
     }
 
     TEST_BLUEPRINTS: ClassVar[List[Tuple[str, Dict[str, Any]]]] = [
