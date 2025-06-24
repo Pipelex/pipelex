@@ -406,11 +406,11 @@ li: lock install
 
 check-TODOs: env
 	$(call PRINT_TITLE,"Checking for TODOs")
-	$(VENV_RUFF) check --select=TD -v .
+	$(VENV_RUFF) check --select=TD .
 
 fix-unused-imports: env
 	$(call PRINT_TITLE,"Fixing unused imports")
-	$(VENV_RUFF) check --select=F401 --fix -v .
+	$(VENV_RUFF) check --select=F401 --fix .
 
 doc: env
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")

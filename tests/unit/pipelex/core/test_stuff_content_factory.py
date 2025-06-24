@@ -3,7 +3,7 @@ from typing import Any, ClassVar, Dict, List, Tuple
 import pytest
 
 from pipelex.core.stuff_content import StructuredContent, TextContent
-from pipelex.core.stuff_content_factory import StuffContentFactory
+from pipelex.core.stuff_factory import StuffContentFactory
 
 
 class TestCases:
