@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing_extensions import runtime_checkable
 
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
+from pipelex.core.stuff_factory import StuffBlueprintReduced
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.types import StrEnum
 
@@ -37,18 +38,19 @@ class ApiResponse(BaseModel):
     error: Optional[str] = None
 
 
+
 class PipelineRequest(BaseModel):
     """
     Request for executing a pipeline.
 
     Attributes:
-        working_memory (Optional[WorkingMemory]): WorkingMemory instance passed to the pipeline
+        working_memory (Optional[Dict[str, StuffBlueprintReduced]]): Blueprint-style working memory for the pipeline
         output_name (Optional[str]): Name of the output slot to write to
         output_multiplicity (Optional[PipeOutputMultiplicity]): Output multiplicity setting
         dynamic_output_concept_code (Optional[str]): Override for the dynamic output concept code
     """
 
-    working_memory: Optional[WorkingMemory] = None
+    working_memory: Optional[Dict[str, StuffBlueprintReduced]] = None
     output_name: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
     dynamic_output_concept_code: Optional[str] = None

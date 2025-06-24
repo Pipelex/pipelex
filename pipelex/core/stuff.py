@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, Type, Union
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 from typing_extensions import override
 
 from pipelex import log
@@ -21,10 +21,6 @@ from pipelex.core.stuff_content import (
 from pipelex.exceptions import StuffError
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
-
-
-class StuffCreationRecord(BaseModel):
-    pass
 
 
 class Stuff(CustomBaseModel):

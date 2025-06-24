@@ -8,6 +8,7 @@ from pipelex import log, pretty_print
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_artefact import StuffArtefact
+from pipelex.core.stuff_factory import StuffBlueprintReduced
 from pipelex.core.stuff_content import (
     HtmlContent,
     ImageContent,
@@ -375,3 +376,17 @@ class WorkingMemory(BaseModel):
     def main_stuff_as_mermaid(self) -> MermaidContent:
         """Get main stuff content as MermaidContent if applicable."""
         return self.get_stuff_as_mermaid(name=MAIN_STUFF_NAME)
+
+    def to_reduced_memory(self) -> Dict[str, StuffBlueprintReduced]:
+        """Convert working memory to API input format."""
+        final_dict: Dict[str, StuffBlueprintReduced] = {}
+        for stuff_name, stuff in self.root.items():
+            if stuff.concept_code == NativeConcept.TEXT.code:
+                content = stuff.content.get("text")
+            else:
+                content = stuff.content.model_dump(serialize_as_any=True)
+            final_dict[stuff_name] = StuffBlueprintReduced(
+                concept_code=stuff.concept_code,
+                content=stuff.content.smart_dump(),
+            )
+        return final_dict

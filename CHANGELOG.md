@@ -1,5 +1,40 @@
 # Changelog
 
+## [v0.4.6] - 2025-06-24
+
+- Changed the link to the doc in the `README.md`: https://docs.pipelex.com
+
+## [v0.4.5] - 2025-06-23
+
+### Changed
+- **Test structure overhaul**: Reorganized test directory structure for better organization:
+  - Tests now separated into `unit/`, `integration/`, and `e2e/` directories
+  - Created `tests/cases/` package for pure test data and constants
+  - Created `tests/helpers/` package for test utilities
+  - Cleaned up test imports and removed empty `__init__.py` files
+- **Class registry refactoring**: Updated kajson from 0.1.6 to 0.2.0, adapted to changes in [Kajson](https://github.com/Pipelex/kajson)'s class registry with new `ClassRegistryUtils` (better separation of concerns)
+- **Dependency updates**:
+  - Added pytest-mock to dev dependencies for improved unit testing
+
+### Added
+- **Coverage commands**: New Makefile targets for test coverage analysis:
+  - `make cov`: Run tests with coverage report
+  - `make cov-missing` (or `make cm`): Show coverage with missing lines
+- **Test configuration**: Set `xfail_strict = true` in pytest config for stricter test failure handling
+- **Pydantic validation errors**: Enhanced error formatting to properly handle model_type errors
+
+### Fixed
+- **External links**: Removed broken Markdown target="_blank" syntax from MANIFESTO.md links
+- **Variable naming consistency**: Fixed redundant naming in OpenAI config (openai_openai_config → openai_config)
+- **Makefile optimization**: Removed parallel test execution (`-n auto`) from codex-tests, works better now
+
+### Tests
+- **Unit tests added**: New comprehensive unit tests for:
+  - `ClassRegistryUtils`
+  - `FuncRegistry` 
+  - `ModuleInspector`
+  - File finding utilities
+
 ## [v0.4.4] - 2025-06-20
 
 ### Fixed

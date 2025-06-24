@@ -93,7 +93,7 @@ class PipeTestCases:
             ],
         ),
     ]
-    TRICKY_QUESTION_BLUEPRINT = StuffBlueprint(name="question", concept="answer.Question", value=USER_TEXT_TRICKY_2)
+    TRICKY_QUESTION_BLUEPRINT = StuffBlueprint(stuff_name="question", concept_code="answer.Question", content=USER_TEXT_TRICKY_2)
     BLUEPRINT_AND_PIPE: ClassVar[List[Tuple[str, StuffBlueprint, str]]] = [  # topic, blueprint, pipe
         (
             "Tricky question conclude",

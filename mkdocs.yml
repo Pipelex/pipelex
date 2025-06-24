@@ -38,6 +38,9 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/Pipelex/pipelex
       name: Pipelex on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/kajson/
+      name: kajson on PyPI
     - icon: fontawesome/brands/twitter
       link: https://x.com/PipelexAI
       name: Pipelex on X

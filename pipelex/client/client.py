@@ -79,7 +79,7 @@ class PipelexClient(PipelexProtocol):
         dynamic_output_concept_code: Optional[str] = None,
     ) -> PipelineResponse:
         pipeline_request = PipelineRequest(
-            working_memory=working_memory,
+            working_memory=working_memory.to_reduced_memory() if working_memory else None,
             output_name=output_name,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
@@ -97,7 +97,7 @@ class PipelexClient(PipelexProtocol):
         dynamic_output_concept_code: Optional[str] = None,
     ) -> PipelineResponse:
         pipeline_request = PipelineRequest(
-            working_memory=working_memory,
+            working_memory=working_memory.to_reduced_memory() if working_memory else None,
             output_name=output_name,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
