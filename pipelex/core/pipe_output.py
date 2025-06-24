@@ -81,7 +81,7 @@ class PipeOutput(BaseModel):
 
     def to_stuff_blueprint(self) -> Dict[str, Dict[str, Any]]:
         """Get main stuff content as StuffBlueprint if applicable."""
-        return self.working_memory.to_reduced_memory()
+        return {"working_memory": self.working_memory.to_reduced_memory()}
 
 
 PipeOutputType = TypeVar("PipeOutputType", bound=PipeOutput)

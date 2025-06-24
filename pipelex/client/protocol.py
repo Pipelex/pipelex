@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, Protocol
 from pydantic import BaseModel
 from typing_extensions import runtime_checkable
 
+from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.types import StrEnum
@@ -63,50 +64,45 @@ class PipelineResponse(ApiResponse):
         created_at (str): Timestamp when the pipeline was created
         pipeline_state (PipelineState): Current state of the pipeline
         finished_at (Optional[str]): Timestamp when the pipeline finished, if completed
-        pipe_output (Optional[Dict[str, Any]]): Output data from the pipeline execution as raw dict, if available
+        pipe_output (Optional[Dict[str, Dict[str, Any]]]): Output data from the pipeline execution as raw dict, if available
     """
 
     pipeline_run_id: str
     created_at: str
     pipeline_state: PipelineState
     finished_at: Optional[str] = None
-    pipe_output: Optional[Dict[str, Any]] = None
+    pipe_output: Optional[Dict[str, Dict[str, Any]]] = None
 
-    @classmethod
-    def from_api_response(cls, response_data: Any) -> "PipelineResponse":
+    def get_pipe_output(self) -> Optional["PipeOutput"]:
         """
-        Create PipelineResponse from API response data, handling working_memory conversion.
+        Convert the dictionary pipe_output to a PipeOutput object.
+
+        Returns:
+            PipeOutput object if pipe_output exists, None otherwise
         """
-        import json
+        if self.pipe_output is None:
+            return None
 
-        # Parse JSON if it's a string
-        if isinstance(response_data, str):
-            data = json.loads(response_data)
-        else:
-            data = response_data
+        # Import here to avoid circular imports
+        from pipelex.core.pipe_output import PipeOutput
+        from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
+        from pipelex.core.working_memory_factory import WorkingMemoryFactory
 
-        # Convert working_memory root to artefact dict
-        root = data["pipe_output"]["working_memory"]["root"]
-        artefacts = {}
+        working_memory = WorkingMemoryFactory.make_empty()
+        for stuff_key, stuff_data in self.pipe_output.items():
+            blueprint = StuffBlueprint(stuff_name=stuff_key, concept_code=stuff_data.get("concept_code", ""), content=stuff_data.get("content", {}))
+            working_memory.add_new_stuff(name=stuff_key, stuff=StuffFactory.make_from_blueprint(blueprint=blueprint))
+        return PipeOutput(working_memory=working_memory)
 
-        for name, stuff in root.items():
-            artefact = {
-                "stuff_name": stuff.get("stuff_name"),
-                "concept_code": stuff.get("concept_code"),
-                "stuff_code": stuff.get("stuff_code"),
-                "content": {k: v for k, v in stuff.get("content", {}).items() if k not in ("__class__", "__module__")},
-            }
-            artefacts[name] = artefact
+    def get_working_memory(self) -> Optional["WorkingMemory"]:
+        """
+        Get the working memory from the pipe output.
 
-        data["pipe_output"]["working_memory"] = artefacts
-
-        return cls(
-            pipeline_run_id=data["pipeline_run_id"],
-            created_at=data["created_at"],
-            pipeline_state=data["pipeline_state"],
-            finished_at=data.get("finished_at"),
-            pipe_output=data.get("pipe_output"),
-        )
+        Returns:
+            WorkingMemory object if pipe_output exists, None otherwise
+        """
+        pipe_output = self.get_pipe_output()
+        return pipe_output.working_memory if pipe_output else None
 
 
 @runtime_checkable
