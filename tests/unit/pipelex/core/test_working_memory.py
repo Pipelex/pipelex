@@ -4,8 +4,8 @@ import pytest
 
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff_content import ImageContent, TextContent
-from pipelex.core.stuff_factory import  StuffFactory
-from pipelex.core.working_memory import WorkingMemory, ReducedStuff
+from pipelex.core.stuff_factory import StuffFactory
+from pipelex.core.working_memory import ReducedStuff, WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 
 
@@ -99,6 +99,7 @@ class TestWorkingMemory:
         """Test to_reduced_memory with single text content."""
         reduced_memory = single_text_memory.to_reduced_memory()
         from pipelex import pretty_print
+
         pretty_print(reduced_memory)
 
         # Should have one entry for the text content
