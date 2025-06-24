@@ -6,7 +6,7 @@
 
   <div>
     <a href="https://www.pipelex.com/demo"><strong>Demo</strong></a> -
-    <a href="https://github.com/Pipelex/pipelex/blob/main/docs/Documentation.md"><strong>Documentation</strong></a> -
+    <a href="https://docs.pipelex.com/"><strong>Documentation</strong></a> -
     <a href="https://github.com/Pipelex/pipelex/issues"><strong>Report Bug</strong></a> -
     <a href="https://github.com/Pipelex/pipelex/discussions"><strong>Feature Request</strong></a>
   </div>
@@ -263,7 +263,7 @@ class optimize_tweet_sequence sub_a;
 ```
 
 
-### 3. wait… no, there is not 3, you're done!
+### 3. wait… no, there is no step 3, you're done!
 
 ---
 
@@ -281,7 +281,7 @@ Join our vibrant Discord community to connect with other developers, share your 
 
 - **GitHub Issues**: For bug reports and feature requests
 - **Discussions**: For questions and community discussions
-- [**Documentation**](docs/Documentation.md)
+- [**Documentation**](https://docs.pipelex.com/)
 
 ## ⭐ Star Us!
 
