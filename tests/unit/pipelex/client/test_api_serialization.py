@@ -4,7 +4,7 @@ from typing import cast
 
 import pytest
 
-from pipelex.client.factory import ApiSerializationError, ApiSerializer
+from pipelex.client.api_serializer import ApiSerializationError, ApiSerializer
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.stuff_content import NumberContent, TextContent

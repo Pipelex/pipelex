@@ -3,7 +3,8 @@ from typing import Any, Optional
 import httpx
 from typing_extensions import override
 
-from pipelex.client.factory import PipelineRequestFactory, PipelineResponseFactory
+from pipelex.client.pipeline_request_factory import PipelineRequestFactory
+from pipelex.client.pipeline_response_factory import PipelineResponseFactory
 from pipelex.client.protocol import PipelexProtocol, PipelineResponse
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
