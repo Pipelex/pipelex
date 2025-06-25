@@ -1,6 +1,6 @@
 ---
 description: 
-globs: **/pipelex_libraries/pipelines/toml/**/*.toml
+globs: pipelex/libraries/pipelines/**/*.toml
 alwaysApply: false
 ---
 This rule explains how to write prompt templates in PipeLLM definitions. These prompts will be rendered and become the user_text or the system_prompt part of LLM chat completion queries.
