@@ -8,8 +8,7 @@ from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuff_content import StuffContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.stuff_factory import StuffContentFactory
+from pipelex.core.stuff_factory import StuffContentFactory, StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 
@@ -127,8 +126,6 @@ class ApiSerializer:
             ApiSerializationError: If concept cannot be resolved or content creation fails
         """
         try:
-            
-
             return StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(concept_code=concept_code, value=value)
 
         except Exception as e:
