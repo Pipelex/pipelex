@@ -179,6 +179,3 @@ class TestWorkingMemory:
         empty_memory = WorkingMemoryFactory.make_empty()
         assert len(empty_memory.root) == 0
         assert len(empty_memory.aliases) == 0
-
-    # NOTE: API serialization tests have been moved to tests/unit/pipelex/client/test_api_serialization.py
-    # The to_reduced_memory() method has been moved to the API client layer
