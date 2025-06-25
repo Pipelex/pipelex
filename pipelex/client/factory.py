@@ -7,11 +7,11 @@ from pipelex.client.protocol import PipelineRequest, PipelineResponse, PipelineS
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
-from pipelex.core.stuff_content import StuffContent, TextContent
+from pipelex.core.stuff_content import StuffContent
 from pipelex.core.stuff_factory import StuffFactory
+from pipelex.core.stuff_factory import StuffContentFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_class_registry, get_required_concept
 
 
 class ApiSerializationError(Exception):
@@ -127,26 +127,9 @@ class ApiSerializer:
             ApiSerializationError: If concept cannot be resolved or content creation fails
         """
         try:
-            # Handle native text concept
-            if isinstance(value, str) and concept_code == NativeConcept.TEXT.code:
-                return TextContent(text=value)
+            
 
-            # Get concept and associated class
-            concept = get_required_concept(concept_code=concept_code)
-            class_name = concept.structure_class_name
-            content_class = get_class_registry().get_class(name=class_name)
-
-            if content_class is None:
-                raise ApiSerializationError(f"Concept '{concept_code}' requires class '{class_name}' to be registered in the class registry")
-
-            if not issubclass(content_class, StuffContent):
-                raise ApiSerializationError(f"Concept '{concept_code}', class '{content_class}' is not a subclass of StuffContent")
-
-            # Handle concepts with no structure that resolve to TextContent
-            if isinstance(value, str) and content_class == TextContent:
-                return TextContent(text=value)
-
-            return content_class.model_validate(obj=value)
+            return StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(concept_code=concept_code, value=value)
 
         except Exception as e:
             raise ApiSerializationError(f"Failed to create StuffContent for concept '{concept_code}': {e}") from e
