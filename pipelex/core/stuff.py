@@ -147,6 +147,11 @@ class Stuff(CustomBaseModel):
         return self.content_as(TextContent)
 
     @property
+    def as_str(self) -> str:
+        """Get content as string if applicable."""
+        return self.as_text.text
+
+    @property
     def as_image(self) -> ImageContent:
         """Get content as ImageContent if applicable."""
         return self.content_as(ImageContent)

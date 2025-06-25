@@ -72,7 +72,11 @@ class ConceptFactory:
             raise ConceptFactoryError(f"Concept '{code}' in domain '{domain_code}' has no definition")
         details_dict["definition"] = concept_definition
         details_dict["domain"] = domain_code
-        details_dict["refines"] = ConceptFactory.make_refines(domain=domain_code, refines=details_dict.pop("refines", []))
+        refines = ConceptFactory.make_refines(domain=domain_code, refines=details_dict.pop("refines", []))
+        if not refines and not details_dict.get("structure"):
+            # No structure? this refines Text
+            refines = [NativeConcept.TEXT.code]
+        details_dict["refines"] = refines
         concept_blueprint = ConceptBlueprint.model_validate(details_dict)
         the_concept = ConceptFactory.make_concept_from_blueprint(domain=domain_code, code=code, concept_blueprint=concept_blueprint)
         return the_concept
@@ -90,19 +94,18 @@ class ConceptFactory:
             structure_class_name = code
         else:
             structure_class_name = TextContent.__name__
-        # TODO: why use a dict to create a concept? it makes no sense
-        # TODO: don't wall make_concept_code from the factory, the code received here must already be a valid concept code
-        concept_dict = {
-            "domain": domain_code,
-            "code": ConceptCodeFactory.make_concept_code(domain_code, code),
-            "definition": definition,
-            "structure_class_name": structure_class_name,
-        }
+
         try:
-            the_concept = Concept.model_validate(concept_dict)
+            the_concept = Concept(
+                code=ConceptCodeFactory.make_concept_code(domain_code, code),
+                domain=domain_code,
+                definition=definition,
+                structure_class_name=structure_class_name,
+                refines=[NativeConcept.TEXT.code],
+            )
+            return Concept.model_validate(the_concept)
         except ValidationError as e:
             raise ConceptFactoryError(f"Error validating concept: {e}") from e
-        return the_concept
 
     @classmethod
     def make_concept_from_blueprint(
