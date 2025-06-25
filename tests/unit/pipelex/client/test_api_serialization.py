@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from typing import cast
 
 import pytest
 
@@ -151,14 +152,44 @@ class TestApiSerialization:
         }
 
         content = ApiSerializer.make_stuff_content_from_api_data(concept_code="event.DateTimeEvent", value=api_data)
-
-        assert isinstance(content, DateTimeEvent)
+        content = cast(DateTimeEvent, content)
         assert content.event_name == "Test Event"
+        assert content.start_time == datetime(2024, 1, 15, 10, 0, 0)
+        assert content.end_time == datetime(2024, 1, 15, 11, 30, 0)
+        assert content.created_at == datetime(2024, 1, 1, 9, 0, 0)
 
     def test_make_stuff_content_from_api_data_error(self):
         """Test error handling for invalid concept codes."""
         with pytest.raises(ApiSerializationError, match="Failed to create StuffContent"):
             ApiSerializer.make_stuff_content_from_api_data(concept_code="invalid.ConceptCode", value={"some": "data"})
+
+    def test_make_stuff_content_from_api_data_text_concept_no_structure(self):
+        """Test creating StuffContent from API data for concept with no structure (should be TextContent)."""
+        # Test case for concept that has no structure - should be treated as TextContent
+        content = ApiSerializer.make_stuff_content_from_api_data(concept_code="answer.Question", value="What is the capital of France?")
+
+        assert isinstance(content, TextContent)
+        assert content.text == "What is the capital of France?"
+
+    def test_make_stuff_content_from_api_data_various_cases(self):
+        """Test make_stuff_content_from_api_data with various input cases."""
+
+        # Test 1: Native text concept
+        text_content = ApiSerializer.make_stuff_content_from_api_data(concept_code=NativeConcept.TEXT.code, value="Simple text")
+        assert isinstance(text_content, TextContent)
+        assert text_content.text == "Simple text"
+
+        # Test 2: Concept with no structure should become TextContent
+        question_content = ApiSerializer.make_stuff_content_from_api_data(concept_code="answer.Question", value="What is 2+2?")
+        assert isinstance(question_content, TextContent)
+        assert question_content.text == "What is 2+2?"
+
+        # Test 3: Number content (structured)
+        number_data = {"number": 42.0}
+        number_content = ApiSerializer.make_stuff_content_from_api_data(concept_code="native.Number", value=number_data)
+        assert number_content.__class__.__name__ == "NumberContent"
+        assert hasattr(number_content, "number")
+        assert number_content.number == 42.0  # type: ignore
 
     def test_datetime_format_consistency(self):
         """Test that the datetime format is consistent."""

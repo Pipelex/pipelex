@@ -127,6 +127,7 @@ class ApiSerializer:
             ApiSerializationError: If concept cannot be resolved or content creation fails
         """
         try:
+            # Handle native text concept
             if isinstance(value, str) and concept_code == NativeConcept.TEXT.code:
                 return TextContent(text=value)
 
@@ -140,6 +141,10 @@ class ApiSerializer:
 
             if not issubclass(content_class, StuffContent):
                 raise ApiSerializationError(f"Concept '{concept_code}', class '{content_class}' is not a subclass of StuffContent")
+
+            # Handle concepts with no structure that resolve to TextContent
+            if isinstance(value, str) and content_class == TextContent:
+                return TextContent(text=value)
 
             return content_class.model_validate(obj=value)
 
