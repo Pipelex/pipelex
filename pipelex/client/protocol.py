@@ -65,6 +65,34 @@ class PipelineResponse(ApiResponse):
         pipeline_state (PipelineState): Current state of the pipeline
         finished_at (Optional[str]): Timestamp when the pipeline finished, if completed
         pipe_output (Optional[Dict[str, Dict[str, Any]]]): Output data from the pipeline execution as raw dict, if available
+
+        Example of pipe_output:
+        "pipe_output": {
+            "working_memory": {
+                "text": {
+                    "concept_code": "native.Text",
+                    "content": "Some text........"
+                },
+                "question": {
+                    "concept_code": "answer.Question",
+                    "content": {
+                        "text": "What are aerodynamic features?"
+                    }
+                },
+                "main_stuff": {
+                    "concept_code": "retrieve.RetrievedExcerpt",
+                    "content": {
+                        "items": [
+                            {
+                                "text": "What we're seeing isn't just an incremental...",
+                                "justification": "This excerpt directly mentions the 'aerodynamic profile' of ...."
+                            },
+                            ...
+                        ]
+                    }
+                }
+            }
+        }
     """
 
     pipeline_run_id: str

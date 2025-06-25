@@ -8,6 +8,7 @@ from pipelex.core.concept import Concept
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
@@ -147,3 +148,10 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
         refines_image = self.is_compatible_by_concept_code(tested_concept_code=concept.code, wanted_concept_code=NativeConcept.IMAGE.code)
         return is_image_class or refines_image
+
+    def is_native_concept(self, concept_str: str) -> bool:
+        if Concept.concept_str_contains_domain(concept_str=concept_str):
+            domain, _ = Concept.extract_domain_and_concept_from_str(concept_str=concept_str)
+            return domain == SpecialDomain.NATIVE.value
+        else:
+            return concept_str in NativeConcept.names()
