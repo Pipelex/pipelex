@@ -1,22 +1,12 @@
-from typing import Any, ClassVar, Dict, List, Tuple, cast
-from datetime import datetime
+from typing import ClassVar, List, Tuple
 
 import pytest
 
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.stuff_content import HtmlContent, ImageContent, ListContent, NumberContent, TextAndImagesContent, TextContent, StructuredContent
+from pipelex.core.stuff_content import HtmlContent, ImageContent, ListContent, NumberContent, TextAndImagesContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-
-
-class DateTimeEvent(StructuredContent):
-    """Test model for datetime content."""
-    
-    event_name: str
-    start_time: datetime
-    end_time: datetime
-    created_at: datetime
 
 
 class TestWorkingMemoryData:
@@ -47,7 +37,6 @@ class TestWorkingMemoryData:
     TEXT_AND_IMAGES_CASE = "text_and_images"
     HTML_CONTENT_CASE = "html_content"
     NUMBER_CONTENT_CASE = "number_content"
-    DATETIME_CONTENT_CASE = "datetime_content"
 
     TEST_CASES: ClassVar[List[Tuple[str, str]]] = [
         ("Single text content", SINGLE_TEXT_CASE),
@@ -59,12 +48,11 @@ class TestWorkingMemoryData:
         ("Text and images content", TEXT_AND_IMAGES_CASE),
         ("HTML content", HTML_CONTENT_CASE),
         ("Number content", NUMBER_CONTENT_CASE),
-        ("DateTime content", DATETIME_CONTENT_CASE),
     ]
 
 
 class TestWorkingMemory:
-    """Unit tests for WorkingMemory class."""
+    """Unit tests for WorkingMemory class - focus on core functionality."""
 
     @pytest.fixture
     def single_text_memory(self) -> WorkingMemory:
@@ -163,278 +151,34 @@ class TestWorkingMemory:
 
         return WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
-    def test_to_reduced_memory_single_text(self, single_text_memory: WorkingMemory):
-        """Test to_reduced_memory with single text content."""
-        reduced_memory = single_text_memory.to_reduced_memory()
-        from pipelex import pretty_print
-
-        pretty_print(reduced_memory)
-
+    def test_working_memory_basic_functionality(self, single_text_memory: WorkingMemory):
+        """Test basic WorkingMemory functionality."""
         # Should have one entry for the text content
-        assert len(reduced_memory) == 1
-        assert "sample_text" in reduced_memory
+        assert len(single_text_memory.root) == 1
+        assert "sample_text" in single_text_memory.root
 
-        # Check the dict structure
-        text_blueprint = reduced_memory["sample_text"]
-        assert isinstance(text_blueprint, dict)
-        assert text_blueprint["concept_code"] == NativeConcept.TEXT.code
+        # Check stuff retrieval
+        stuff = single_text_memory.get_stuff("sample_text")
+        assert stuff.concept_code == NativeConcept.TEXT.code
+        assert isinstance(stuff.content, TextContent)
+        assert stuff.content.text == TestWorkingMemoryData.SAMPLE_TEXT
 
-        # Check content is properly serialized - smart_dump() returns just the text string
-        assert isinstance(text_blueprint["content"], str)
-        assert text_blueprint["content"] == TestWorkingMemoryData.SAMPLE_TEXT
+    def test_working_memory_aliases(self, memory_with_aliases: WorkingMemory):
+        """Test WorkingMemory alias functionality."""
+        # Should have two root items and two aliases
+        assert len(memory_with_aliases.root) == 2
+        assert len(memory_with_aliases.aliases) == 2
 
-    def test_to_reduced_memory_single_image(self, single_image_memory: WorkingMemory):
-        """Test to_reduced_memory with single image content."""
-        reduced_memory = single_image_memory.to_reduced_memory()
+        # Check aliases work
+        primary_stuff = memory_with_aliases.get_stuff("primary_text")
+        alias_stuff = memory_with_aliases.get_stuff("main_text")
+        assert primary_stuff == alias_stuff
 
-        # Should have one entry for the image content
-        assert len(reduced_memory) == 1
-        assert "gantt_chart_image" in reduced_memory
-
-        # Check the dict structure
-        image_blueprint = reduced_memory["gantt_chart_image"]
-        assert isinstance(image_blueprint, dict)
-        assert image_blueprint["concept_code"] == "gantt.GanttImage"
-
-        # Check content is properly serialized
-        assert isinstance(image_blueprint["content"], dict)
-        assert "url" in image_blueprint["content"]
-        assert image_blueprint["content"]["url"] == TestWorkingMemoryData.SAMPLE_IMAGE_URL
-
-    def test_to_reduced_memory_single_pdf(self, single_pdf_memory: WorkingMemory):
-        """Test to_reduced_memory with single PDF content."""
-        reduced_memory = single_pdf_memory.to_reduced_memory()
-
-        # Should have one entry for the PDF content
-        assert len(reduced_memory) == 1
-        assert "pdf_document" in reduced_memory
-
-        # Check the dict structure
-        pdf_blueprint = reduced_memory["pdf_document"]
-        assert isinstance(pdf_blueprint, dict)
-        assert pdf_blueprint["concept_code"] == "native.PDF"
-
-        # Check content is properly serialized
-        assert isinstance(pdf_blueprint["content"], dict)
-        assert "url" in pdf_blueprint["content"]
-        assert pdf_blueprint["content"]["url"] == TestWorkingMemoryData.SAMPLE_PDF_URL
-
-    def test_to_reduced_memory_multiple_stuff(self, multiple_stuff_memory: WorkingMemory):
-        """Test to_reduced_memory with multiple stuff items."""
-        reduced_memory = multiple_stuff_memory.to_reduced_memory()
-
-        # Should have three entries for the three stuff items
-        assert len(reduced_memory) == 3
-        assert "question" in reduced_memory
-        assert "document" in reduced_memory
-        assert "diagram" in reduced_memory
-
-        # Check each item is properly converted
-        question_blueprint = reduced_memory["question"]
-        assert question_blueprint["concept_code"] == "native.Text"
-        assert isinstance(question_blueprint["content"], str)
-        assert question_blueprint["content"] == "What are the aerodynamic features?"
-
-        document_blueprint = reduced_memory["document"]
-        assert document_blueprint["concept_code"] == "native.Text"
-        assert isinstance(document_blueprint["content"], str)
-        assert document_blueprint["content"] == TestWorkingMemoryData.SAMPLE_TEXT
-
-        diagram_blueprint = reduced_memory["diagram"]
-        assert diagram_blueprint["concept_code"] == "native.Image"
-        assert isinstance(diagram_blueprint["content"], dict)
-        assert diagram_blueprint["content"]["url"] == TestWorkingMemoryData.SAMPLE_IMAGE_URL
-
-    def test_to_reduced_memory_excludes_aliases(self, memory_with_aliases: WorkingMemory):
-        """Test to_reduced_memory excludes aliases (only includes root items)."""
-        reduced_memory = memory_with_aliases.to_reduced_memory()
-
-        # Should only have the root items, not the aliases
-        assert len(reduced_memory) == 2
-        assert "primary_text" in reduced_memory
-        assert "secondary_text" in reduced_memory
-
-        # Aliases should not be included
-        assert "main_text" not in reduced_memory
-        assert "backup_text" not in reduced_memory
-
-        # Check content is correct
-        primary_blueprint = reduced_memory["primary_text"]
-        assert primary_blueprint["concept_code"] == "native.Text"
-        assert isinstance(primary_blueprint["content"], str)
-        assert primary_blueprint["content"] == "Primary content"
-
-        secondary_blueprint = reduced_memory["secondary_text"]
-        assert secondary_blueprint["concept_code"] == "native.Text"
-        assert isinstance(secondary_blueprint["content"], str)
-        assert secondary_blueprint["content"] == "Secondary content"
-
-    def test_to_reduced_memory_empty_working_memory(self):
-        """Test to_reduced_memory with empty WorkingMemory."""
+    def test_working_memory_empty(self):
+        """Test empty WorkingMemory."""
         empty_memory = WorkingMemoryFactory.make_empty()
-        reduced_memory = empty_memory.to_reduced_memory()
+        assert len(empty_memory.root) == 0
+        assert len(empty_memory.aliases) == 0
 
-        # Should return empty dictionary
-        assert len(reduced_memory) == 0
-        assert isinstance(reduced_memory, dict)
-
-    def test_to_reduced_memory_return_type(self, single_text_memory: WorkingMemory):
-        """Test that to_reduced_memory returns correct type."""
-        reduced_memory = single_text_memory.to_reduced_memory()
-
-        # Check return type
-        assert isinstance(reduced_memory, dict)
-
-        # Check each value is a dict with the expected structure
-        for key, value in reduced_memory.items():
-            assert isinstance(key, str)
-            assert isinstance(value, dict)
-            assert "concept_code" in value
-            assert "content" in value
-
-    def test_to_reduced_memory_complex_list(self, complex_list_memory: WorkingMemory):
-        """Test to_reduced_memory with complex list containing mixed content types."""
-        reduced_memory = complex_list_memory.to_reduced_memory()
-
-        # Should have one entry for the list content
-        assert len(reduced_memory) == 1
-        assert "mixed_list" in reduced_memory
-
-        # Check the dict structure
-        list_blueprint = reduced_memory["mixed_list"]
-        assert isinstance(list_blueprint, dict)
-        assert list_blueprint["concept_code"] == "native.List"
-
-        # Check content is properly serialized
-        assert isinstance(list_blueprint["content"], dict)
-        assert "items" in list_blueprint["content"]
-        items = cast(List[Dict[str, Any]], list_blueprint["content"]["items"])
-        assert len(items) == 3
-
-        # Verify each item is properly serialized
-        text_item = items[0]
-        assert text_item["text"] == "The quick brown fox jumps over the lazy dog"
-
-        image_item = items[1]
-        assert image_item["url"] == TestWorkingMemoryData.SAMPLE_IMAGE_URL
-
-        number_item = items[2]
-        assert number_item["number"] == 42.5
-
-        # Ensure no __module__ or __class__ fields are present
-        assert "__module__" not in list_blueprint["content"]
-        assert "__class__" not in list_blueprint["content"]
-
-    def test_to_reduced_memory_text_and_images(self, text_and_images_memory: WorkingMemory):
-        """Test to_reduced_memory with text and images content."""
-        reduced_memory = text_and_images_memory.to_reduced_memory()
-
-        # Should have one entry for the text and images content
-        assert len(reduced_memory) == 1
-        assert "project_overview" in reduced_memory
-
-        # Check the dict structure
-        content_blueprint = reduced_memory["project_overview"]
-        assert isinstance(content_blueprint, dict)
-        assert content_blueprint["concept_code"] == "native.TextAndImages"
-
-        # Check content is properly serialized
-        content = content_blueprint["content"]
-        assert isinstance(content, dict)
-        assert "text" in content
-        assert content["text"]["text"] == "Project overview with diagrams"
-        assert "images" in content
-        images = cast(List[Dict[str, Any]], content["images"])
-        assert len(images) == 2
-
-        # Verify image URLs
-        assert images[0]["url"] == TestWorkingMemoryData.SAMPLE_IMAGE_URL
-        assert images[1]["url"] == "assets/diagrams/architecture.png"
-
-    def test_to_reduced_memory_html_content(self, html_content_memory: WorkingMemory):
-        """Test to_reduced_memory with HTML content."""
-        reduced_memory = html_content_memory.to_reduced_memory()
-
-        # Should have one entry for the HTML content
-        assert len(reduced_memory) == 1
-        assert "test_report" in reduced_memory
-
-        # Check the dict structure
-        html_blueprint = reduced_memory["test_report"]
-        assert isinstance(html_blueprint, dict)
-        assert html_blueprint["concept_code"] == "native.Html"
-
-        # Check content is properly serialized
-        content = html_blueprint["content"]
-        assert isinstance(content, dict)
-        assert "inner_html" in content
-        assert "css_class" in content
-        assert "<h1>Test Report</h1>" in content["inner_html"]
-        assert "<strong>test</strong>" in content["inner_html"]
-        assert content["css_class"] == "report-content"
-
-    def test_to_reduced_memory_number_content(self, number_content_memory: WorkingMemory):
-        """Test to_reduced_memory with number content."""
-        reduced_memory = number_content_memory.to_reduced_memory()
-
-        # Should have one entry for the number content
-        assert len(reduced_memory) == 1
-        assert "pi_value" in reduced_memory
-
-        # Check the dict structure
-        number_blueprint = reduced_memory["pi_value"]
-        assert isinstance(number_blueprint, dict)
-        assert number_blueprint["concept_code"] == "native.Number"
-
-        # Check content is properly serialized
-        content = number_blueprint["content"]
-        assert isinstance(content, dict)
-        assert "number" in content
-        assert content["number"] == 3.14159
-
-    @pytest.mark.parametrize("description,test_case", TestWorkingMemoryData.TEST_CASES)
-    def test_to_reduced_memory_parametrized(
-        self,
-        description: str,
-        test_case: str,
-        single_text_memory: WorkingMemory,
-        single_image_memory: WorkingMemory,
-        single_pdf_memory: WorkingMemory,
-        multiple_stuff_memory: WorkingMemory,
-        memory_with_aliases: WorkingMemory,
-        complex_list_memory: WorkingMemory,
-        text_and_images_memory: WorkingMemory,
-        html_content_memory: WorkingMemory,
-        number_content_memory: WorkingMemory,
-    ):
-        """Parametrized test for different memory types."""
-        memory_map = {
-            TestWorkingMemoryData.SINGLE_TEXT_CASE: single_text_memory,
-            TestWorkingMemoryData.SINGLE_IMAGE_CASE: single_image_memory,
-            TestWorkingMemoryData.SINGLE_PDF_CASE: single_pdf_memory,
-            TestWorkingMemoryData.MULTIPLE_STUFF_CASE: multiple_stuff_memory,
-            TestWorkingMemoryData.WITH_ALIASES_CASE: memory_with_aliases,
-            TestWorkingMemoryData.COMPLEX_LIST_CASE: complex_list_memory,
-            TestWorkingMemoryData.TEXT_AND_IMAGES_CASE: text_and_images_memory,
-            TestWorkingMemoryData.HTML_CONTENT_CASE: html_content_memory,
-            TestWorkingMemoryData.NUMBER_CONTENT_CASE: number_content_memory,
-        }
-
-        memory = memory_map[test_case]
-        reduced_memory = memory.to_reduced_memory()
-
-        # Basic assertions that should work for all cases
-        assert isinstance(reduced_memory, dict)
-        assert len(reduced_memory) >= 0
-
-        # All values should be dicts with the expected structure
-        for key, value in reduced_memory.items():
-            assert isinstance(key, str)
-            assert isinstance(value, dict)
-            assert isinstance(value["concept_code"], str)
-            assert value["content"] is not None
-
-            # Ensure no __module__ or __class__ fields are present in any content
-            if isinstance(value["content"], dict):
-                assert "__module__" not in value["content"]
-                assert "__class__" not in value["content"]
+    # NOTE: API serialization tests have been moved to tests/unit/pipelex/client/test_api_serialization.py
+    # The to_reduced_memory() method has been moved to the API client layer

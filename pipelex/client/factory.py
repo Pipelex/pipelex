@@ -1,11 +1,145 @@
+from datetime import datetime
 from typing import Any, Dict, Optional
 
+from kajson import kajson
+
 from pipelex.client.protocol import PipelineRequest, PipelineResponse, PipelineState
+from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
-from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
+from pipelex.core.stuff_content import StuffContent, TextContent
+from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.hub import get_class_registry, get_required_concept
+
+
+class ApiSerializationError(Exception):
+    """Exception raised when API serialization fails."""
+
+    pass
+
+
+class ApiSerializer:
+    """Handles API-specific serialization with kajson, datetime formatting, and cleanup."""
+
+    # Fixed datetime format for API consistency
+    API_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
+    @classmethod
+    def serialize_working_memory_for_api(cls, working_memory: WorkingMemory) -> Dict[str, Dict[str, Any]]:
+        """
+        Convert WorkingMemory to API-ready format using kajson with proper datetime handling.
+
+        Args:
+            working_memory: The WorkingMemory to serialize
+
+        Returns:
+            Dict ready for API transmission with datetime strings and no __class__/__module__
+        """
+        reduced_memory: Dict[str, Dict[str, Any]] = {}
+
+        for stuff_name, stuff in working_memory.root.items():
+            if stuff.concept_code == NativeConcept.TEXT.code:
+                # Handle text content directly
+                item_dict: Dict[str, Any] = {
+                    "concept_code": stuff.concept_code,
+                    "content": stuff.content.text,  # type: ignore
+                }
+            else:
+                # Use kajson for complex objects
+                content_dict = stuff.content.model_dump(serialize_as_any=True)
+
+                # Serialize with kajson and clean up
+                content_json = kajson.dumps(content_dict)
+                clean_content = kajson.loads(content_json)
+
+                # Clean up API-unfriendly fields and fix datetime format
+                clean_content = cls._clean_and_format_content(clean_content)
+
+                item_dict = {
+                    "concept_code": stuff.concept_code,
+                    "content": clean_content,
+                }
+
+            reduced_memory[stuff_name] = item_dict
+
+        return reduced_memory
+
+    @classmethod
+    def serialize_pipe_output_for_api(cls, pipe_output: PipeOutput) -> Dict[str, Dict[str, Any]]:
+        """
+        Convert PipeOutput to API-ready format.
+
+        Args:
+            pipe_output: The PipeOutput to serialize
+
+        Returns:
+            Dict ready for API transmission
+        """
+        return {"working_memory": cls.serialize_working_memory_for_api(pipe_output.working_memory)}
+
+    @classmethod
+    def _clean_and_format_content(cls, content: Any) -> Any:
+        """
+        Recursively clean content by removing __class__/__module__ and formatting datetimes.
+
+        Args:
+            content: Content to clean
+
+        Returns:
+            Cleaned content with formatted datetimes
+        """
+        if isinstance(content, dict):
+            cleaned: Dict[str, Any] = {}
+            for key, value in content.items():
+                # Skip API-unfriendly fields
+                if key in ("__class__", "__module__"):
+                    continue
+                cleaned[key] = cls._clean_and_format_content(value)
+            return cleaned
+        elif isinstance(content, list):
+            return [cls._clean_and_format_content(item) for item in content]
+        elif isinstance(content, datetime):
+            # Format datetime to fixed API format
+            return content.strftime(cls.API_DATETIME_FORMAT)
+        else:
+            return content
+
+    @classmethod
+    def make_stuff_content_from_api_data(cls, concept_code: str, value: Dict[str, Any] | str) -> StuffContent:
+        """
+        Create StuffContent from API data using concept code.
+
+        Args:
+            concept_code: The concept code to determine the content type
+            value: The content value from API
+
+        Returns:
+            StuffContent instance
+
+        Raises:
+            ApiSerializationError: If concept cannot be resolved or content creation fails
+        """
+        try:
+            if isinstance(value, str) and concept_code == NativeConcept.TEXT.code:
+                return TextContent(text=value)
+
+            # Get concept and associated class
+            concept = get_required_concept(concept_code=concept_code)
+            class_name = concept.structure_class_name
+            content_class = get_class_registry().get_class(name=class_name)
+
+            if content_class is None:
+                raise ApiSerializationError(f"Concept '{concept_code}' requires class '{class_name}' to be registered in the class registry")
+
+            if not issubclass(content_class, StuffContent):
+                raise ApiSerializationError(f"Concept '{concept_code}', class '{content_class}' is not a subclass of StuffContent")
+
+            return content_class.model_validate(obj=value)
+
+        except Exception as e:
+            raise ApiSerializationError(f"Failed to create StuffContent for concept '{concept_code}': {e}") from e
 
 
 class PipelineRequestFactory:
@@ -32,7 +166,7 @@ class PipelineRequestFactory:
         """
         reduced_memory = None
         if working_memory is not None:
-            reduced_memory = working_memory.to_reduced_memory()
+            reduced_memory = ApiSerializer.serialize_working_memory_for_api(working_memory)
 
         return PipelineRequest(
             working_memory=reduced_memory,
@@ -47,7 +181,7 @@ class PipelineRequestFactory:
         Create a WorkingMemory from a reduced memory dictionary.
 
         Args:
-            reduced_memory: Dictionary in the format of WorkingMemory.to_reduced_memory()
+            reduced_memory: Dictionary in the format from API
 
         Returns:
             WorkingMemory object reconstructed from the reduced format
@@ -57,8 +191,17 @@ class PipelineRequestFactory:
             return working_memory
 
         for stuff_key, stuff_data in reduced_memory.items():
-            blueprint = StuffBlueprint(stuff_name=stuff_key, concept_code=stuff_data.get("concept_code", ""), content=stuff_data.get("content", {}))
-            working_memory.add_new_stuff(name=stuff_key, stuff=StuffFactory.make_from_blueprint(blueprint=blueprint))
+            concept_code = stuff_data.get("concept_code", "")
+            content_value = stuff_data.get("content", {})
+
+            # Use API serializer to create content
+            content = ApiSerializer.make_stuff_content_from_api_data(concept_code=concept_code, value=content_value)
+
+            # Create stuff directly
+            stuff = StuffFactory.make_stuff(concept_str=concept_code, name=stuff_key, content=content)
+
+            working_memory.add_new_stuff(name=stuff_key, stuff=stuff)
+
         return working_memory
 
     @staticmethod
@@ -112,7 +255,7 @@ class PipelineResponseFactory:
         """
         reduced_output = None
         if pipe_output is not None:
-            reduced_output = pipe_output.to_reduced_memory()
+            reduced_output = ApiSerializer.serialize_pipe_output_for_api(pipe_output)
 
         return PipelineResponse(
             pipeline_run_id=pipeline_run_id,

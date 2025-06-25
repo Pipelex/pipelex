@@ -4,7 +4,6 @@ from typing import Any, Dict, Optional, Protocol
 from pydantic import BaseModel
 from typing_extensions import runtime_checkable
 
-from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.types import StrEnum
@@ -100,37 +99,6 @@ class PipelineResponse(ApiResponse):
     pipeline_state: PipelineState
     finished_at: Optional[str] = None
     pipe_output: Optional[Dict[str, Dict[str, Any]]] = None
-
-    def get_pipe_output(self) -> Optional["PipeOutput"]:
-        """
-        Convert the dictionary pipe_output to a PipeOutput object.
-
-        Returns:
-            PipeOutput object if pipe_output exists, None otherwise
-        """
-        if self.pipe_output is None:
-            return None
-
-        # Import here to avoid circular imports
-        from pipelex.core.pipe_output import PipeOutput
-        from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
-        from pipelex.core.working_memory_factory import WorkingMemoryFactory
-
-        working_memory = WorkingMemoryFactory.make_empty()
-        for stuff_key, stuff_data in self.pipe_output.items():
-            blueprint = StuffBlueprint(stuff_name=stuff_key, concept_code=stuff_data.get("concept_code", ""), content=stuff_data.get("content", {}))
-            working_memory.add_new_stuff(name=stuff_key, stuff=StuffFactory.make_from_blueprint(blueprint=blueprint))
-        return PipeOutput(working_memory=working_memory)
-
-    def get_working_memory(self) -> Optional["WorkingMemory"]:
-        """
-        Get the working memory from the pipe output.
-
-        Returns:
-            WorkingMemory object if pipe_output exists, None otherwise
-        """
-        pipe_output = self.get_pipe_output()
-        return pipe_output.working_memory if pipe_output else None
 
 
 @runtime_checkable

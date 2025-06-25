@@ -1,7 +1,6 @@
 from operator import attrgetter
-from typing import Any, Dict, List, Optional, Set, Type, cast
+from typing import Any, Dict, List, Optional, Set, Type
 
-from kajson import kajson
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
@@ -382,30 +381,3 @@ class WorkingMemory(BaseModel):
     def main_stuff_as_mermaid(self) -> MermaidContent:
         """Get main stuff content as MermaidContent if applicable."""
         return self.get_stuff_as_mermaid(name=MAIN_STUFF_NAME)
-
-    def to_reduced_memory(self) -> Dict[str, Dict[str, Any]]:
-        """Convert working memory to API input format."""
-        reduced_memory: Dict[str, Dict[str, Any]] = {}
-        for stuff_name, stuff in self.root.items():
-            item_dict: Dict[str, Any] = {}
-            if stuff.concept_code == NativeConcept.TEXT.code:
-                item_dict = {
-                    "concept_code": stuff.concept_code,
-                    "content": cast(TextContent, stuff.content).text,
-                }
-            else:
-                content_dict = stuff.content.model_dump(serialize_as_any=True)
-                # Use kajson to serialize and clean up __module__ and __class__
-                content_json = kajson.dumps(content_dict)
-                clean_content = kajson.loads(content_json)
-                # Remove __module__ and __class__ fields if they exist
-                if isinstance(clean_content, dict):
-                    clean_content.pop("__module__", None)  # type: ignore
-                    clean_content.pop("__class__", None)  # type: ignore
-
-                item_dict = {
-                    "concept_code": stuff.concept_code,
-                    "content": clean_content,
-                }
-            reduced_memory[stuff_name] = item_dict
-        return reduced_memory
