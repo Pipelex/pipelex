@@ -35,15 +35,6 @@ StuffDict = Dict[str, Stuff]
 StuffArtefactDict = Dict[str, StuffArtefact]
 
 
-class ReducedStuff(BaseModel):
-    concept_code: str
-    content: Dict[str, Any] | str
-
-
-class WorkingMemoryReduced(BaseModel):
-    working_memory: Dict[str, ReducedStuff]
-
-
 class WorkingMemory(BaseModel):
     root: StuffDict = Field(default_factory=dict)
     aliases: Dict[str, str] = Field(default_factory=dict)

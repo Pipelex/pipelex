@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from kajson import kajson
 
@@ -92,14 +92,19 @@ class ApiSerializer:
         """
         if isinstance(content, dict):
             cleaned: Dict[str, Any] = {}
-            for key, value in content.items():
+            content_dict = cast(Dict[str, Any], content)
+            for key in content_dict:
                 # Skip API-unfriendly fields
                 if key in ("__class__", "__module__"):
                     continue
-                cleaned[key] = cls._clean_and_format_content(value)
+                cleaned[key] = cls._clean_and_format_content(content_dict[key])
             return cleaned
         elif isinstance(content, list):
-            return [cls._clean_and_format_content(item) for item in content]
+            cleaned_list: List[Any] = []
+            content_list = cast(List[Any], content)
+            for idx in range(len(content_list)):
+                cleaned_list.append(cls._clean_and_format_content(content_list[idx]))
+            return cleaned_list
         elif isinstance(content, datetime):
             # Format datetime to fixed API format
             return content.strftime(cls.API_DATETIME_FORMAT)
