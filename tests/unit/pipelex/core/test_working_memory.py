@@ -1,12 +1,22 @@
 from typing import Any, ClassVar, Dict, List, Tuple, cast
+from datetime import datetime
 
 import pytest
 
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.stuff_content import HtmlContent, ImageContent, ListContent, NumberContent, TextAndImagesContent, TextContent
+from pipelex.core.stuff_content import HtmlContent, ImageContent, ListContent, NumberContent, TextAndImagesContent, TextContent, StructuredContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
+
+
+class DateTimeEvent(StructuredContent):
+    """Test model for datetime content."""
+    
+    event_name: str
+    start_time: datetime
+    end_time: datetime
+    created_at: datetime
 
 
 class TestWorkingMemoryData:
@@ -37,6 +47,7 @@ class TestWorkingMemoryData:
     TEXT_AND_IMAGES_CASE = "text_and_images"
     HTML_CONTENT_CASE = "html_content"
     NUMBER_CONTENT_CASE = "number_content"
+    DATETIME_CONTENT_CASE = "datetime_content"
 
     TEST_CASES: ClassVar[List[Tuple[str, str]]] = [
         ("Single text content", SINGLE_TEXT_CASE),
@@ -48,6 +59,7 @@ class TestWorkingMemoryData:
         ("Text and images content", TEXT_AND_IMAGES_CASE),
         ("HTML content", HTML_CONTENT_CASE),
         ("Number content", NUMBER_CONTENT_CASE),
+        ("DateTime content", DATETIME_CONTENT_CASE),
     ]
 
 

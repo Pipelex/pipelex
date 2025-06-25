@@ -112,7 +112,7 @@ class PipelineResponseFactory:
         """
         reduced_output = None
         if pipe_output is not None:
-            reduced_output = pipe_output.to_stuff_blueprint()
+            reduced_output = pipe_output.to_reduced_memory()
 
         return PipelineResponse(
             pipeline_run_id=pipeline_run_id,

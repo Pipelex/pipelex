@@ -79,7 +79,7 @@ class PipeOutput(BaseModel):
         """Get main stuff content as MermaidContent if applicable."""
         return self.working_memory.main_stuff_as_mermaid
 
-    def to_stuff_blueprint(self) -> Dict[str, Dict[str, Any]]:
+    def to_reduced_memory(self) -> Dict[str, Dict[str, Any]]:
         """Get main stuff content as StuffBlueprint if applicable."""
         return {"working_memory": self.working_memory.to_reduced_memory()}
 
