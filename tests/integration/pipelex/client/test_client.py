@@ -3,6 +3,7 @@ from typing import List
 import pytest
 from pydantic import BaseModel
 
+from pipelex import pretty_print
 from pipelex.client.client import PipelexClient
 from pipelex.client.protocol import PipelineState
 from pipelex.core.stuff import Stuff
@@ -106,7 +107,6 @@ class TestPipelexApiClient:
                 pipe_code=example.pipe_code,
                 working_memory=memory,
             )
-            from pipelex import pretty_print
 
             pretty_print(pipeline_reponse, title="PIPELINE RESPONSE")
             # Verify result
