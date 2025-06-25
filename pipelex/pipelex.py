@@ -11,7 +11,9 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
-from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.cogt.content_generation.content_generator_protocol import (
+    ContentGeneratorProtocol,
+)
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
@@ -24,10 +26,16 @@ from pipelex.libraries.library_manager import LibraryManager
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager import ActivityManager
-from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerNoOp, ActivityManagerProtocol
+from pipelex.pipeline.activity.activity_manager_protocol import (
+    ActivityManagerNoOp,
+    ActivityManagerProtocol,
+)
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.track.pipeline_tracker import PipelineTracker
-from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerNoOp, PipelineTrackerProtocol
+from pipelex.pipeline.track.pipeline_tracker_protocol import (
+    PipelineTrackerNoOp,
+    PipelineTrackerProtocol,
+)
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
@@ -36,6 +44,7 @@ from pipelex.tools.func_registry import func_registry
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
+from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.templating.template_library import TemplateLibrary
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -96,7 +105,9 @@ class Pipelex:
         # tools
         if ready_made_config is not None:
             if config_cls is not None:
-                raise PipelexConfigError("config_cls must be None when ready_made_config is provided")
+                raise PipelexConfigError(
+                    "config_cls must be None when ready_made_config is provided"
+                )
             self.pipelex_hub.set_config(ready_made_config)
         else:
             if config_cls is None:
@@ -131,23 +142,33 @@ class Pipelex:
 
         self.reporting_delegate: ReportingProtocol
         if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager(reporting_config=get_config().pipelex.reporting_config)
+            self.reporting_delegate = reporting_delegate or ReportingManager(
+                reporting_config=get_config().pipelex.reporting_config
+            )
         else:
             self.reporting_delegate = ReportingNoOp()
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
 
         # pipelex libraries
         self.library_manager = LibraryManager()
-        self.pipelex_hub.set_domain_provider(domain_provider=self.library_manager.domain_library)
-        self.pipelex_hub.set_concept_provider(concept_provider=self.library_manager.concept_library)
-        self.pipelex_hub.set_pipe_provider(pipe_provider=self.library_manager.pipe_library)
+        self.pipelex_hub.set_domain_provider(
+            domain_provider=self.library_manager.domain_library
+        )
+        self.pipelex_hub.set_concept_provider(
+            concept_provider=self.library_manager.concept_library
+        )
+        self.pipelex_hub.set_pipe_provider(
+            pipe_provider=self.library_manager.pipe_library
+        )
 
         # pipelex pipeline
         self.pipeline_tracker: PipelineTrackerProtocol
         if pipeline_tracker:
             self.pipeline_tracker = pipeline_tracker
         elif get_config().pipelex.feature_config.is_pipeline_tracking_enabled:
-            self.pipeline_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
+            self.pipeline_tracker = PipelineTracker(
+                tracker_config=get_config().pipelex.tracker_config
+            )
         else:
             self.pipeline_tracker = PipelineTrackerNoOp()
         self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
@@ -172,10 +193,11 @@ class Pipelex:
         content_generator: Optional[ContentGeneratorProtocol] = None,
         pipe_router: Optional[PipeRouterProtocol] = None,
         structure_classes: Optional[List[Type[Any]]] = None,
+        storage_provider: Optional[StorageProviderAbstract] = None,
     ):
         # tools
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
-
+        self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
@@ -194,7 +216,9 @@ class Pipelex:
         self.pipeline_tracker.setup()
         self.pipeline_manager.setup()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}")
+        log.debug(
+            f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}"
+        )
 
     def finish_setup(self):
         try:
@@ -212,12 +236,16 @@ class Pipelex:
             if self.library_manager.llm_deck is None:
                 raise PipelexSetupError("LLM deck is not loaded")
 
-            self.pipelex_hub.set_llm_deck_provider(llm_deck_provider=self.library_manager.llm_deck)
+            self.pipelex_hub.set_llm_deck_provider(
+                llm_deck_provider=self.library_manager.llm_deck
+            )
             self.library_manager.validate_libraries()
         except ValidationError as exc:
             error_msg = format_pydantic_validation_error(exc)
             raise PipelexSetupError(f"Error because of: {error_msg}") from exc
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} finish setup done for {get_config().project_name}")
+        log.debug(
+            f"{PACKAGE_NAME} version {PACKAGE_VERSION} finish setup done for {get_config().project_name}"
+        )
 
     def teardown(self):
         # pipelex
@@ -239,9 +267,13 @@ class Pipelex:
 
         Pipelex._pipelex_instance = None
         project_name = get_config().project_name
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_config().project_name} (except config & logs)")
+        log.debug(
+            f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_config().project_name} (except config & logs)"
+        )
         self.pipelex_hub.reset_config()
-        print(f"{PACKAGE_NAME} version {PACKAGE_VERSION} config reset done for {project_name}")
+        print(
+            f"{PACKAGE_NAME} version {PACKAGE_VERSION} config reset done for {project_name}"
+        )
 
     # TODO: add kwargs to make() so that subclasses can employ specific parameters
     @classmethod
