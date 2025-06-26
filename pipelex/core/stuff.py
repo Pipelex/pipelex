@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, Type, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict
 from typing_extensions import override
 
 from pipelex import log
@@ -23,16 +23,10 @@ from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 
-class StuffCreationRecord(BaseModel):
-    pass
-
-
 class Stuff(CustomBaseModel):
     model_config = ConfigDict(extra="ignore", strict=True)
 
     stuff_code: str
-    pipelex_session_id: Optional[str] = Field(default=None)
-    creation_record: Optional[StuffCreationRecord] = None
     stuff_name: Optional[str] = None
     concept_code: str
     content: StuffContent
@@ -81,7 +75,7 @@ class Stuff(CustomBaseModel):
 
     @property
     def short_desc(self) -> str:
-        return f"""{self.pipelex_session_id}/{self.stuff_code}:
+        return f"""{self.stuff_code}:
 {self.concept_code} — {type(self.content).__name__}:
 {self.content.short_desc}"""
 

@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from pipelex import pretty_print
 from pipelex.client.client import PipelexClient
-from pipelex.client.protocol import PipelineState
+from pipelex.client.protocol import COMPACT_MEMORY_KEY, PipelineState
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import TextContent
 from pipelex.core.stuff_factory import StuffFactory
@@ -96,18 +96,49 @@ class TestPipelexApiClient:
         for example in examples:
             # Create working memory from example data
             memory = WorkingMemory()
-            for stuff in example.memory:
-                memory.add_new_stuff(name=stuff.stuff_name or stuff.concept_code, stuff=stuff)
+            question = example.memory[1]
+            text = example.memory[0]
+            memory.add_new_stuff(name=question.stuff_name or question.concept_code, stuff=question)
+            memory.add_new_stuff(name=text.stuff_name or text.concept_code, stuff=text)
 
             # Execute pipe
             client = PipelexClient()
-            result = await client.execute_pipeline(
+            pipeline_reponse = await client.execute_pipeline(
                 pipe_code=example.pipe_code,
                 working_memory=memory,
             )
-            pretty_print(result)
 
+            pretty_print(pipeline_reponse, title="PIPELINE RESPONSE")
             # Verify result
-            assert result.pipeline_run_id is not None
-            assert result.pipeline_state == PipelineState.COMPLETED
-            assert result.pipe_output is not None
+            assert pipeline_reponse.pipeline_run_id is not None
+            assert pipeline_reponse.pipeline_state == PipelineState.COMPLETED
+            assert pipeline_reponse.pipe_output is not None
+
+            working_memory = pipeline_reponse.pipe_output[COMPACT_MEMORY_KEY]
+
+            # Verify question structure
+            assert working_memory["question"] == {
+                "concept_code": "answer.Question",
+                "content": {"text": "Aerodynamic features?"},
+            }
+
+            # Verify main_stuff structure
+            assert working_memory["main_stuff"] is not None
+            assert working_memory["main_stuff"]["concept_code"] == "retrieve.RetrievedExcerpt"
+            assert "content" in working_memory["main_stuff"]
+            assert "items" in working_memory["main_stuff"]["content"]
+            assert isinstance(working_memory["main_stuff"]["content"]["items"], list)
+            assert len(working_memory["main_stuff"]["content"]["items"]) > 0
+
+            # Verify each item has required fields
+            for item in working_memory["main_stuff"]["content"]["items"]:
+                assert "text" in item
+                assert "justification" in item
+                assert isinstance(item["text"], str)
+                assert isinstance(item["justification"], str)
+
+            # Verify text structure
+            assert working_memory["text"]["concept_code"] == "native.Text"
+            assert "content" in working_memory["text"]
+            assert isinstance(working_memory["text"]["content"], str)
+            assert "The Dawn of Ultra-Rapid Transit" in working_memory["text"]["content"]

@@ -1,10 +1,11 @@
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 import httpx
-from kajson import kajson
 from typing_extensions import override
 
-from pipelex.client.protocol import PipelexProtocol, PipelineRequest, PipelineResponse
+from pipelex.client.pipeline_request_factory import PipelineRequestFactory
+from pipelex.client.pipeline_response_factory import PipelineResponseFactory
+from pipelex.client.protocol import PipelexProtocol, PipelineResponse
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import ClientAuthenticationError
@@ -78,14 +79,14 @@ class PipelexClient(PipelexProtocol):
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
     ) -> PipelineResponse:
-        pipeline_request = PipelineRequest(
+        pipeline_request = PipelineRequestFactory.make_from_working_memory(
             working_memory=working_memory,
             output_name=output_name,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
         )
-        response = await self._make_api_call(f"pipelex/v1/pipeline/{pipe_code}/execute", request=kajson.dumps(pipeline_request))
-        return cast(PipelineResponse, kajson.loads(response))
+        response = await self._make_api_call(f"v1/pipeline/{pipe_code}/execute", request=pipeline_request.model_dump_json())
+        return PipelineResponseFactory.make_from_api_response(response)
 
     @override
     async def start_pipeline(
@@ -96,11 +97,11 @@ class PipelexClient(PipelexProtocol):
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
     ) -> PipelineResponse:
-        pipeline_request = PipelineRequest(
+        pipeline_request = PipelineRequestFactory.make_from_working_memory(
             working_memory=working_memory,
             output_name=output_name,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
         )
-        response = await self._make_api_call(f"pipelex/v1/pipeline/{pipe_code}/start", request=kajson.dumps(pipeline_request))
-        return cast(PipelineResponse, kajson.loads(response))
+        response = await self._make_api_call(f"v1/pipeline/{pipe_code}/start", request=pipeline_request.model_dump_json())
+        return PipelineResponseFactory.make_from_api_response(response)

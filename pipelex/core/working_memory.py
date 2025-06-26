@@ -1,5 +1,5 @@
 from operator import attrgetter
-from typing import Any, Dict, List, Optional, Set, Type, TypeVar
+from typing import Any, Dict, List, Optional, Set, Type
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
@@ -33,9 +33,6 @@ BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
 
 StuffDict = Dict[str, Stuff]
 StuffArtefactDict = Dict[str, StuffArtefact]
-
-# Create a generic type variable
-T = TypeVar("T")
 
 
 class WorkingMemory(BaseModel):

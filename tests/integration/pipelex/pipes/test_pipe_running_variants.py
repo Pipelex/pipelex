@@ -34,7 +34,7 @@ class TestPipeRunningVariants:
         blueprint: StuffBlueprint,
         pipe_code: str,
     ):
-        log.verbose(blueprint, title=f"{topic}: start from '{blueprint.name}', run pipe '{pipe_code}'")
+        log.verbose(blueprint, title=f"{topic}: start from '{blueprint.stuff_name}', run pipe '{pipe_code}'")
         working_memory = WorkingMemoryFactory.make_from_single_blueprint(blueprint=blueprint)
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,

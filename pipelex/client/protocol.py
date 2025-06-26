@@ -1,13 +1,15 @@
 from abc import abstractmethod
-from typing import Optional, Protocol
+from typing import Any, Dict, Optional, Protocol
 
 from pydantic import BaseModel
 from typing_extensions import runtime_checkable
 
-from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.types import StrEnum
+
+CompactMemory = Dict[str, Dict[str, Any]]
+COMPACT_MEMORY_KEY = "compact_memory"
 
 
 class PipelineState(StrEnum):
@@ -43,13 +45,13 @@ class PipelineRequest(BaseModel):
     Request for executing a pipeline.
 
     Attributes:
-        working_memory (Optional[WorkingMemory]): WorkingMemory instance passed to the pipeline
+        compact_memory (Optional[CompactMemory]): In the format of WorkingMemory.to_compact_memory()
         output_name (Optional[str]): Name of the output slot to write to
         output_multiplicity (Optional[PipeOutputMultiplicity]): Output multiplicity setting
         dynamic_output_concept_code (Optional[str]): Override for the dynamic output concept code
     """
 
-    working_memory: Optional[WorkingMemory] = None
+    compact_memory: Optional[CompactMemory] = None
     output_name: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
     dynamic_output_concept_code: Optional[str] = None
@@ -64,14 +66,42 @@ class PipelineResponse(ApiResponse):
         created_at (str): Timestamp when the pipeline was created
         pipeline_state (PipelineState): Current state of the pipeline
         finished_at (Optional[str]): Timestamp when the pipeline finished, if completed
-        pipe_output (Optional[PipeOutput]): Output data from the pipeline execution, if available
+        pipe_output (Optional[CompactMemory]): Output data from the pipeline execution as raw dict, if available
+
+        Example of pipe_output:
+        "pipe_output": {
+            "compact_memory": {
+                "text": {
+                    "concept_code": "native.Text",
+                    "content": "Some text........"
+                },
+                "question": {
+                    "concept_code": "answer.Question",
+                    "content": {
+                        "text": "What are aerodynamic features?"
+                    }
+                },
+                "main_stuff": {
+                    "concept_code": "retrieve.RetrievedExcerpt",
+                    "content": {
+                        "items": [
+                            {
+                                "text": "What we're seeing isn't just an incremental...",
+                                "justification": "This excerpt directly mentions the 'aerodynamic profile' of ...."
+                            },
+                            ...
+                        ]
+                    }
+                }
+            }
+        }
     """
 
     pipeline_run_id: str
     created_at: str
     pipeline_state: PipelineState
     finished_at: Optional[str] = None
-    pipe_output: Optional[PipeOutput] = None
+    pipe_output: Optional[CompactMemory] = None
 
 
 @runtime_checkable

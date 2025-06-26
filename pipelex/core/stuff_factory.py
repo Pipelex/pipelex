@@ -1,16 +1,15 @@
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import shortuuid
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ValidationError
 
-from pipelex.config import get_config
 from pipelex.core.concept import Concept
 from pipelex.core.concept_code_factory import ConceptCodeFactory
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.stuff import Stuff, StuffCreationRecord
-from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr
+from pipelex.core.stuff import Stuff
+from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr, TextContent
 from pipelex.exceptions import ConceptError, PipelexError
-from pipelex.hub import get_class_registry, get_required_concept
+from pipelex.hub import get_class_registry, get_concept_provider, get_required_concept
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -19,9 +18,9 @@ class StuffFactoryError(PipelexError):
 
 
 class StuffBlueprint(BaseModel):
-    name: str
-    concept_code: str = Field(alias="concept")
-    value: str
+    stuff_name: str
+    concept_code: str
+    content: Dict[str, Any] | str
 
 
 class StuffFactory:
@@ -36,8 +35,6 @@ class StuffFactory:
         content: StuffContent,
         name: Optional[str] = None,
         code: Optional[str] = None,
-        creation_record: Optional[StuffCreationRecord] = None,
-        pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         try:
             concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
@@ -51,8 +48,6 @@ class StuffFactory:
             content=content,
             stuff_name=name,
             stuff_code=code or shortuuid.uuid()[:5],
-            creation_record=creation_record,
-            pipelex_session_id=pipelex_session_id or get_config().session_id,
         )
 
     @classmethod
@@ -62,8 +57,6 @@ class StuffFactory:
         content: StuffContent,
         name: Optional[str] = None,
         code: Optional[str] = None,
-        creation_record: Optional[StuffCreationRecord] = None,
-        pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         if not name:
             name = cls.make_stuff_name(concept_str=concept.code)
@@ -72,29 +65,32 @@ class StuffFactory:
             content=content,
             stuff_name=name,
             stuff_code=code or shortuuid.uuid()[:5],
-            creation_record=creation_record,
-            pipelex_session_id=pipelex_session_id or get_config().session_id,
         )
-
-    @classmethod
-    def make_from_blueprint_dict(cls, blueprint_dict: Dict[str, Any]) -> "Stuff":
-        blueprint = StuffBlueprint.model_validate(obj=blueprint_dict)
-        return cls.make_from_blueprint(blueprint=blueprint)
-
-    @classmethod
-    def make_from_blueprint_str(cls, blueprint_str: str) -> "Stuff":
-        blueprint = StuffBlueprint.model_validate_json(json_data=blueprint_str)
-        return cls.make_from_blueprint(blueprint=blueprint)
 
     @classmethod
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
-        the_stuff = cls.make_from_str(
-            concept_str=blueprint.concept_code,
-            str_value=blueprint.value,
-            name=blueprint.name,
-            pipelex_session_id="blueprint",
-        )
+        if isinstance(blueprint.content, str) and get_concept_provider().is_compatible_by_concept_code(
+            tested_concept_code=blueprint.concept_code, wanted_concept_code=NativeConcept.TEXT.code
+        ):
+            the_stuff = cls.make_from_str(
+                concept_str=NativeConcept.TEXT.code,
+                str_value=blueprint.content,
+                name=blueprint.stuff_name,
+            )
+        else:
+            the_stuff_content = StuffContentFactory.make_stuffcontent_from_concept_code_required(
+                concept_code=blueprint.concept_code, value=blueprint.content
+            )
+            the_stuff = cls.make_stuff(
+                concept_str=blueprint.concept_code,
+                content=the_stuff_content,
+                name=blueprint.stuff_name,
+            )
         return the_stuff
+
+    @classmethod
+    def make_from_blueprint_dict(cls, blueprint: StuffBlueprint) -> "Stuff":
+        return cls.make_from_blueprint(blueprint=blueprint)
 
     @classmethod
     def make_from_str(
@@ -102,7 +98,6 @@ class StuffFactory:
         str_value: str,
         name: Optional[str] = None,
         concept_str: str = NativeConcept.TEXT.code,
-        pipelex_session_id: Optional[str] = None,
     ) -> Stuff:
         try:
             concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
@@ -124,8 +119,6 @@ class StuffFactory:
             content=stuff_content,
             stuff_name=name,
             stuff_code=shortuuid.uuid()[:5],
-            creation_record=None,
-            pipelex_session_id=pipelex_session_id or get_config().session_id,
         )
 
     @classmethod
@@ -170,3 +163,43 @@ class StuffFactory:
             content=the_stuff_content,
             name=name,
         )
+
+
+class StuffContentFactoryError(PipelexError):
+    pass
+
+
+class StuffContentFactory:
+    @classmethod
+    def make_content_from_value(cls, stuff_content_subclass: Type[StuffContent], value: Dict[str, Any] | str) -> StuffContent:
+        if isinstance(value, str) and stuff_content_subclass == TextContent:
+            return TextContent(text=value)
+        return stuff_content_subclass.model_validate(obj=value)
+
+    @classmethod
+    def make_stuffcontent_from_concept_code_required(cls, concept_code: str, value: Dict[str, Any] | str) -> StuffContent:
+        """
+        Create StuffContent from concept code, requiring the concept to be linked to a class in the registry.
+        Raises StuffContentFactoryError if no registry class is found.
+        """
+        concept = get_required_concept(concept_code=concept_code)
+        the_subclass_name = concept.structure_class_name
+        the_subclass = get_class_registry().get_required_subclass(name=the_subclass_name, base_class=StuffContent)
+        return cls.make_content_from_value(stuff_content_subclass=the_subclass, value=value)
+
+    @classmethod
+    def make_stuffcontent_from_concept_code_with_fallback(cls, concept_code: str, value: Dict[str, Any] | str) -> StuffContent:
+        """
+        Create StuffContent from concept code, falling back to TextContent if no registry class is found.
+        """
+        concept = get_required_concept(concept_code=concept_code)
+        the_subclass_name = concept.structure_class_name
+        the_subclass = get_class_registry().get_class(name=the_subclass_name)
+
+        if the_subclass is None:
+            return cls.make_content_from_value(stuff_content_subclass=TextContent, value=value)
+
+        if not issubclass(the_subclass, StuffContent):
+            raise StuffContentFactoryError(f"Concept '{concept_code}', subclass '{the_subclass}' is not a subclass of StuffContent")
+
+        return cls.make_content_from_value(stuff_content_subclass=the_subclass, value=value)

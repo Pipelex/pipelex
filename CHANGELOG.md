@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.4.7] - 2025-06-26
+
+- Added an API serializer: introducing the `compact_memory`, a new way to store the working memeory for the API.
+- Added `StorageProviderAbstract`
+
 ## [v0.4.6] - 2025-06-24
 
 - Changed the link to the doc in the `README.md`: https://docs.pipelex.com
