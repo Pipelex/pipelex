@@ -91,9 +91,7 @@ class PipelexHub:
 
     # tools
 
-    def setup_config(
-        self, config_cls: Type[ConfigRoot], specific_config_path: Optional[str] = None
-    ):
+    def setup_config(self, config_cls: Type[ConfigRoot], specific_config_path: Optional[str] = None):
         """
         Set the global configuration instance.
 
@@ -106,9 +104,7 @@ class PipelexHub:
 
     def set_config(self, config: ConfigRoot):
         if self._config is not None:
-            log.warning(
-                f"set_config() got called but {self._config.project_name} config has already been set"
-            )
+            log.warning(f"set_config() got called but {self._config.project_name} config has already been set")
             return
         self._config = config
 
@@ -193,23 +189,17 @@ class PipelexHub:
             RuntimeError: If the configuration has not been set.
         """
         if self._config is None:
-            raise RuntimeError(
-                "Config instance is not set. You must initialize Pipelex first."
-            )
+            raise RuntimeError("Config instance is not set. You must initialize Pipelex first.")
         return self._config
 
     def get_required_secrets_provider(self) -> SecretsProviderAbstract:
         if self._secrets_provider is None:
-            raise RuntimeError(
-                "Secrets provider is not set. You must initialize Pipelex first."
-            )
+            raise RuntimeError("Secrets provider is not set. You must initialize Pipelex first.")
         return self._secrets_provider
 
     def get_required_template_provider(self) -> TemplateProviderAbstract:
         if self._template_provider is None:
-            raise RuntimeError(
-                "Template provider is not set. You must initialize Pipelex first."
-            )
+            raise RuntimeError("Template provider is not set. You must initialize Pipelex first.")
         return self._template_provider
 
     def get_required_class_registry(self) -> ClassRegistryAbstract:
@@ -405,11 +395,7 @@ def get_domains(excluded_domains: Optional[List[str]] = None) -> List[Domain]:
 
 
 def get_required_domain(domain_code: str) -> Domain:
-    return (
-        get_pipelex_hub()
-        .get_required_domain_provider()
-        .get_required_domain(domain_code=domain_code)
-    )
+    return get_pipelex_hub().get_required_domain_provider().get_required_domain(domain_code=domain_code)
 
 
 def get_optional_domain(domain_code: str) -> Optional[Domain]:
@@ -436,19 +422,11 @@ def get_pipes_by_domain(
 
 
 def get_required_pipe(pipe_code: str) -> PipeAbstract:
-    return (
-        get_pipelex_hub()
-        .get_required_pipe_provider()
-        .get_required_pipe(pipe_code=pipe_code)
-    )
+    return get_pipelex_hub().get_required_pipe_provider().get_required_pipe(pipe_code=pipe_code)
 
 
 def get_optional_pipe(pipe_code: str) -> Optional[PipeAbstract]:
-    return (
-        get_pipelex_hub()
-        .get_required_pipe_provider()
-        .get_optional_pipe(pipe_code=pipe_code)
-    )
+    return get_pipelex_hub().get_required_pipe_provider().get_optional_pipe(pipe_code=pipe_code)
 
 
 def get_concept_provider() -> ConceptProviderAbstract:
@@ -460,11 +438,7 @@ def get_optional_concept_provider() -> Optional[ConceptProviderAbstract]:
 
 
 def get_required_concept(concept_code: str) -> Concept:
-    return (
-        get_pipelex_hub()
-        .get_required_concept_provider()
-        .get_required_concept(concept_code=concept_code)
-    )
+    return get_pipelex_hub().get_required_concept_provider().get_required_concept(concept_code=concept_code)
 
 
 def get_pipe_router() -> PipeRouterProtocol:
