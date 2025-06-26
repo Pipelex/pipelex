@@ -11,7 +11,6 @@ class PipeRouterProtocol(Protocol):
     async def run_pipe_job(
         self,
         pipe_job: PipeJob,
-        wfid: Optional[str] = None,
     ) -> PipeOutputType: ...  # pyright: ignore[reportInvalidTypeVarUse]
 
     async def run_pipe_code(
@@ -21,5 +20,4 @@ class PipeRouterProtocol(Protocol):
         job_metadata: Optional[JobMetadata] = None,
         working_memory: Optional[WorkingMemory] = None,
         output_name: Optional[str] = None,
-        wfid: Optional[str] = None,
     ) -> PipeOutputType: ...  # pyright: ignore[reportInvalidTypeVarUse]

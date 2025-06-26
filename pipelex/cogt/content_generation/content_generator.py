@@ -44,7 +44,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        wfid: Optional[str] = None,
     ) -> str:
         log.verbose(f"{self.__class__.__name__} make_llm_text: {llm_prompt_for_text}")
         log.verbose(f"llm_setting_main: {llm_setting_main}")
@@ -66,7 +65,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         object_class: Type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
-        wfid: Optional[str] = None,
     ) -> BaseModelTypeVar:
         log.verbose(f"{self.__class__.__name__} make_object_direct: {llm_prompt_for_object}")
         llm_assignment_for_object = LLMAssignment(
@@ -92,7 +90,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object: Optional[LLMPromptFactoryAbstract] = None,
-        wfid: Optional[str] = None,
     ) -> BaseModelTypeVar:
         llm_assignment_for_text = LLMAssignment(
             job_metadata=job_metadata,
@@ -137,7 +134,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: Optional[int] = None,
-        wfid: Optional[str] = None,
     ) -> List[BaseModelTypeVar]:
         llm_assignment_for_object = LLMAssignment(
             job_metadata=job_metadata,
@@ -163,7 +159,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object_list: Optional[LLMPromptFactoryAbstract] = None,
         nb_items: Optional[int] = None,
-        wfid: Optional[str] = None,
     ) -> List[BaseModelTypeVar]:
         llm_assignment_for_text = LLMAssignment(
             job_metadata=job_metadata,
@@ -208,7 +203,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         imgg_prompt: ImggPrompt,
         imgg_job_params: Optional[ImggJobParams] = None,
         imgg_job_config: Optional[ImggJobConfig] = None,
-        wfid: Optional[str] = None,
     ) -> GeneratedImage:
         imgg_config = get_config().cogt.imgg_config
         imgg_assignment = ImggAssignment(
@@ -233,7 +227,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         nb_images: int,
         imgg_job_params: Optional[ImggJobParams] = None,
         imgg_job_config: Optional[ImggJobConfig] = None,
-        wfid: Optional[str] = None,
     ) -> List[GeneratedImage]:
         imgg_config = get_config().cogt.imgg_config
         imgg_assignment = ImggAssignment(
@@ -256,7 +249,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         jinja2: Optional[str] = None,
         prompting_style: Optional[PromptingStyle] = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
-        wfid: Optional[str] = None,
     ) -> str:
         jinja2_assignment = Jinja2Assignment(
             context=context,
@@ -277,7 +269,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         ocr_handle: OcrHandle,
         ocr_job_params: Optional[OcrJobParams] = None,
         ocr_job_config: Optional[OcrJobConfig] = None,
-        wfid: Optional[str] = None,
     ) -> OcrOutput:
         ocr_assignment = OcrAssignment(
             job_metadata=job_metadata,

@@ -18,7 +18,6 @@ class PipeRouter(PipeRouterProtocol):
     async def run_pipe_job(
         self,
         pipe_job: PipeJob,
-        wfid: Optional[str] = None,
     ) -> PipeOutputType:  # pyright: ignore[reportInvalidTypeVarUse]
         log.debug(f"Start run_pipe_job: pipe_code={pipe_job.pipe.code}")
         working_memory = pipe_job.working_memory
@@ -43,7 +42,6 @@ class PipeRouter(PipeRouterProtocol):
         job_metadata: Optional[JobMetadata] = None,
         working_memory: Optional[WorkingMemory] = None,
         output_name: Optional[str] = None,
-        wfid: Optional[str] = None,
     ) -> PipeOutputType:  # pyright: ignore[reportInvalidTypeVarUse]
         log.debug(f"Start run_pipe_code: pipe_code={pipe_code}")
         pipe = get_required_pipe(pipe_code)
@@ -56,7 +54,6 @@ class PipeRouter(PipeRouterProtocol):
         )
         pipe_output: PipeOutputType = await self.run_pipe_job(
             pipe_job=pipe_job,
-            wfid=wfid,
         )
         log.debug(f"Completed run_pipe_code: pipe_code={pipe_code}")
         return pipe_output

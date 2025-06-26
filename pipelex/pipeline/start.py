@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional, Tuple
+from typing import Optional
 
 from pipelex import pretty_print
 from pipelex.core.pipe_output import PipeOutput
@@ -18,7 +18,7 @@ async def start_pipeline(
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
     dynamic_output_concept_code: Optional[str] = None,
     pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
-) -> Tuple[str, asyncio.Task[PipeOutput]]:
+) -> asyncio.Task[PipeOutput]:
     """Start a pipeline in the background.
 
     This function mirrors *execute_pipeline* but returns immediately with the
@@ -77,4 +77,4 @@ async def start_pipeline(
     # Launch execution without awaiting the result.
     task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run_pipe_job(pipe_job))
 
-    return pipeline_run_id, task
+    return task

@@ -223,7 +223,6 @@ class PipeImgGen(PipeOperator):
                 nb_images=nb_images,
                 imgg_job_params=imgg_job_params,
                 imgg_job_config=imgg_config.imgg_job_config,
-                wfid="imgg",
             )
             image_content_items: List[StuffContent] = []
             for generated_image in generated_image_list:
@@ -247,7 +246,6 @@ class PipeImgGen(PipeOperator):
                 ),
                 imgg_job_params=imgg_job_params,
                 imgg_job_config=imgg_config.imgg_job_config,
-                wfid="imgg",
             )
 
             generated_image_url = generated_image.url
@@ -272,6 +270,7 @@ class PipeImgGen(PipeOperator):
 
         pipe_output = PipeImgGenOutput(
             working_memory=working_memory,
+            pipeline_run_id=job_metadata.pipeline_run_id,
         )
         return pipe_output
 

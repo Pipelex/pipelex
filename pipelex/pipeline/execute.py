@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional
 
 from pipelex import pretty_print
 from pipelex.core.pipe_output import PipeOutput
@@ -18,7 +18,7 @@ async def execute_pipeline(
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
     dynamic_output_concept_code: Optional[str] = None,
     pipe_run_mode: Optional[PipeRunMode] = None,
-) -> Tuple[PipeOutput, str]:
+) -> PipeOutput:
     """Execute a pipeline and wait for its completion.
 
     This function executes a pipe and returns its output along with the pipeline run ID.
@@ -81,4 +81,4 @@ async def execute_pipeline(
         output_name=output_name,
     )
 
-    return await get_pipe_router().run_pipe_job(pipe_job), pipeline_run_id
+    return await get_pipe_router().run_pipe_job(pipe_job)

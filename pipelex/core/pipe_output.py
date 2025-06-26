@@ -14,10 +14,12 @@ from pipelex.core.stuff_content import (
     TextContent,
 )
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.pipeline.pipeline_models import SpecialPipelineId
 
 
 class PipeOutput(BaseModel):
     working_memory: WorkingMemory = Field(default_factory=WorkingMemory)
+    pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
 
     @property
     def main_stuff(self) -> Stuff:

@@ -49,7 +49,6 @@ class ContentGeneratorProtocol(Protocol):
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        wfid: Optional[str] = None,
     ) -> str: ...
 
     async def make_object_direct(
@@ -58,7 +57,6 @@ class ContentGeneratorProtocol(Protocol):
         object_class: Type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
-        wfid: Optional[str] = None,
     ) -> BaseModelTypeVar: ...
 
     async def make_text_then_object(
@@ -69,7 +67,6 @@ class ContentGeneratorProtocol(Protocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object: Optional[LLMPromptFactoryAbstract] = None,
-        wfid: Optional[str] = None,
     ) -> BaseModelTypeVar: ...
 
     async def make_object_list_direct(
@@ -79,7 +76,6 @@ class ContentGeneratorProtocol(Protocol):
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: Optional[int] = None,
-        wfid: Optional[str] = None,
     ) -> List[BaseModelTypeVar]: ...
 
     async def make_text_then_object_list(
@@ -91,7 +87,6 @@ class ContentGeneratorProtocol(Protocol):
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object_list: Optional[LLMPromptFactoryAbstract] = None,
         nb_items: Optional[int] = None,
-        wfid: Optional[str] = None,
     ) -> List[BaseModelTypeVar]: ...
 
     async def make_single_image(
@@ -101,7 +96,6 @@ class ContentGeneratorProtocol(Protocol):
         imgg_prompt: ImggPrompt,
         imgg_job_params: Optional[ImggJobParams] = None,
         imgg_job_config: Optional[ImggJobConfig] = None,
-        wfid: Optional[str] = None,
     ) -> GeneratedImage: ...
 
     async def make_image_list(
@@ -112,7 +106,6 @@ class ContentGeneratorProtocol(Protocol):
         nb_images: int,
         imgg_job_params: Optional[ImggJobParams] = None,
         imgg_job_config: Optional[ImggJobConfig] = None,
-        wfid: Optional[str] = None,
     ) -> List[GeneratedImage]: ...
 
     async def make_jinja2_text(
@@ -122,7 +115,6 @@ class ContentGeneratorProtocol(Protocol):
         jinja2: Optional[str] = None,
         prompting_style: Optional[PromptingStyle] = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
-        wfid: Optional[str] = None,
     ) -> str: ...
 
     async def make_ocr_extract_pages(
@@ -132,5 +124,4 @@ class ContentGeneratorProtocol(Protocol):
         ocr_handle: OcrHandle,
         ocr_job_params: OcrJobParams,
         ocr_job_config: OcrJobConfig,
-        wfid: Optional[str] = None,
     ) -> OcrOutput: ...

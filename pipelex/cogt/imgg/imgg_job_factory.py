@@ -18,10 +18,8 @@ class ImggJobFactory:
         imgg_job_config: Optional[ImggJobConfig] = None,
         job_metadata: Optional[JobMetadata] = None,
     ) -> ImggJob:
-        config = get_config()
         imgg_config = get_config().cogt.imgg_config
         job_metadata = job_metadata or JobMetadata(
-            top_job_id=f"IMGGJob for {config.project_name}",
             job_category=JobCategory.IMGG_JOB,
         )
         job_params = imgg_job_params or imgg_config.make_default_imgg_job_params()
@@ -44,10 +42,8 @@ class ImggJobFactory:
         imgg_job_config: Optional[ImggJobConfig] = None,
         job_metadata: Optional[JobMetadata] = None,
     ) -> ImggJob:
-        config = get_config()
         imgg_config = get_config().cogt.imgg_config
         job_metadata = job_metadata or JobMetadata(
-            top_job_id=f"IMGGJob for {config.project_name}",
             job_category=JobCategory.IMGG_JOB,
         )
         imgg_prompt = ImggPrompt(positive_text=positive_text)

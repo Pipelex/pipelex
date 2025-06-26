@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple, Type, cast
+from typing import Any, Optional, Tuple, Type
 
 import pytest
 from pytest import FixtureRequest
@@ -40,9 +40,7 @@ class TestPipeRunningVariants:
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
-            job_metadata=JobMetadata(
-                top_job_id=cast(str, request.node.originalname),  # type: ignore
-            ),
+            job_metadata=JobMetadata(),
         )
         log.verbose(pipe_output, title="pipe_output")
         pretty_print(pipe_output, title="pipe_output")
@@ -70,9 +68,7 @@ class TestPipeRunningVariants:
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
-            job_metadata=JobMetadata(
-                top_job_id=cast(str, request.node.originalname),  # type: ignore
-            ),
+            job_metadata=JobMetadata(),
         )
         get_report_delegate().generate_report()
 
@@ -95,9 +91,7 @@ class TestPipeRunningVariants:
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemory(),
-            job_metadata=JobMetadata(
-                top_job_id=cast(str, request.node.originalname),  # type: ignore
-            ),
+            job_metadata=JobMetadata(),
         )
         get_report_delegate().generate_report()
 
@@ -129,9 +123,7 @@ class TestPipeRunningVariants:
                 output_multiplicity=output_multiplicity,
             ),
             working_memory=WorkingMemory(),
-            job_metadata=JobMetadata(
-                top_job_id=cast(str, request.node.originalname),  # type: ignore
-            ),
+            job_metadata=JobMetadata(),
         )
         get_report_delegate().generate_report()
 
@@ -167,9 +159,7 @@ class TestPipeRunningVariants:
                 pipe_run_mode=pipe_run_mode,
             ),
             working_memory=working_memory,
-            job_metadata=JobMetadata(
-                top_job_id=cast(str, request.node.originalname),  # type: ignore
-            ),
+            job_metadata=JobMetadata(),
         )
         pretty_print(pipe_output, title=f"run pipe '{pipe_code}'")
         get_report_delegate().generate_report()
@@ -194,9 +184,7 @@ class TestPipeRunningVariants:
                     pipe_stack_limit=6,
                     pipe_run_mode=pipe_run_mode,
                 ),
-                job_metadata=JobMetadata(
-                    top_job_id=cast(str, request.node.originalname),  # type: ignore
-                ),
+                job_metadata=JobMetadata(),
             )
         pretty_print(exc.value, title="exception")
         assert expected_error_message in str(exc.value)

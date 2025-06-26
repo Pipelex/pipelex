@@ -127,6 +127,7 @@ class PipeJinja2(PipeOperator):
 
         pipe_output = PipeJinja2Output(
             working_memory=working_memory,
+            pipeline_run_id=job_metadata.pipeline_run_id,
         )
 
         return pipe_output

@@ -311,7 +311,6 @@ class PipeLLM(PipeOperator):
                 job_metadata=job_metadata,
                 llm_prompt_for_text=llm_prompt_1,
                 llm_setting_main=self.llm_setting_main,
-                wfid=f"{self.class_name}_gen_text",
             )
 
             the_content = TextContent(
@@ -395,6 +394,7 @@ class PipeLLM(PipeOperator):
 
         pipe_output = PipeLLMOutput(
             working_memory=working_memory,
+            pipeline_run_id=job_metadata.pipeline_run_id,
         )
         return pipe_output
 
@@ -433,7 +433,6 @@ class PipeLLM(PipeOperator):
                     llm_prompt_factory_for_object_list=llm_prompt_2_factory,
                     llm_setting_for_object_list=self.llm_setting_for_object_list,
                     nb_items=fixed_nb_output,
-                    wfid=task_desc,
                 )
             else:
                 # We're generating a list of objects directly
@@ -445,7 +444,6 @@ class PipeLLM(PipeOperator):
                     llm_prompt_for_object_list=llm_prompt_1,
                     llm_setting_for_object_list=self.llm_setting_for_object_list_direct,
                     nb_items=fixed_nb_output,
-                    wfid=task_desc,
                 )
 
             the_content = ListContent(items=generated_objects)
@@ -464,7 +462,6 @@ class PipeLLM(PipeOperator):
                     llm_setting_main=self.llm_setting_main,
                     llm_prompt_factory_for_object=llm_prompt_2_factory,
                     llm_setting_for_object=self.llm_setting_for_object,
-                    wfid=task_desc,
                 )
             else:
                 # We're generating a single object directly
@@ -475,7 +472,6 @@ class PipeLLM(PipeOperator):
                     object_class=content_class,
                     llm_prompt_for_object=llm_prompt_1,
                     llm_setting_for_object=self.llm_setting_for_object_direct,
-                    wfid=task_desc,
                 )
             the_content = generated_object
 

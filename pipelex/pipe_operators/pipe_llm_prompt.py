@@ -208,6 +208,7 @@ class PipeLLMPrompt(PipeOperator):
 
         pipe_output = PipeLLMPromptOutput(
             working_memory=working_memory,
+            pipeline_run_id=job_metadata.pipeline_run_id,
         )
         return pipe_output
 

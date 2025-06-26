@@ -104,10 +104,7 @@ pipe_output: PipeOutput = await pipe_router.run_pipe(
     pipe_code="pipe_name",
     pipe_run_params=PipeRunParamsFactory.make_run_params(),
     working_memory=working_memory,
-    job_metadata=JobMetadata(
-        
-        top_job_id=cast(str, request.node.originalname),  # type: ignore
-    ),
+    job_metadata=JobMetadata(),
 )
 ```
 

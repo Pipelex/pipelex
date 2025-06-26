@@ -40,7 +40,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        wfid: Optional[str] = None,
     ) -> str:
         func_name = "make_llm_text"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -56,7 +55,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         object_class: Type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
-        wfid: Optional[str] = None,
     ) -> BaseModelTypeVar:
         func_name = "make_object_direct"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -78,7 +76,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object: Optional[LLMPromptFactoryAbstract] = None,
-        wfid: Optional[str] = None,
     ) -> BaseModelTypeVar:
         func_name = "make_text_then_object"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -98,7 +95,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: Optional[int] = None,
-        wfid: Optional[str] = None,
     ) -> List[BaseModelTypeVar]:
         func_name = "make_object_list_direct"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -125,7 +121,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object_list: Optional[LLMPromptFactoryAbstract] = None,
         nb_items: Optional[int] = None,
-        wfid: Optional[str] = None,
     ) -> List[BaseModelTypeVar]:
         func_name = "make_text_then_object_list"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -146,7 +141,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         imgg_prompt: ImggPrompt,
         imgg_job_params: Optional[ImggJobParams] = None,
         imgg_job_config: Optional[ImggJobConfig] = None,
-        wfid: Optional[str] = None,
     ) -> GeneratedImage:
         func_name = "make_single_image"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -169,7 +163,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         nb_images: int,
         imgg_job_params: Optional[ImggJobParams] = None,
         imgg_job_config: Optional[ImggJobConfig] = None,
-        wfid: Optional[str] = None,
     ) -> List[GeneratedImage]:
         func_name = "make_image_list"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -192,7 +185,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         jinja2: Optional[str] = None,
         prompting_style: Optional[PromptingStyle] = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
-        wfid: Optional[str] = None,
     ) -> str:
         func_name = "make_jinja2_text"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -211,7 +203,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         ocr_handle: OcrHandle,
         ocr_job_params: Optional[OcrJobParams] = None,
         ocr_job_config: Optional[OcrJobConfig] = None,
-        wfid: Optional[str] = None,
     ) -> OcrOutput:
         func_name = "make_ocr_extract_pages"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")

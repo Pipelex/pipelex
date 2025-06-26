@@ -51,4 +51,5 @@ class PipeSequence(PipeController):
 
         return PipeOutput(
             working_memory=current_memory,
+            pipeline_run_id=job_metadata.pipeline_run_id,
         )

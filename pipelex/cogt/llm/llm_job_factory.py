@@ -31,7 +31,6 @@ class LLMJobFactory:
             )
         else:
             job_metadata = JobMetadata(
-                top_job_id=f"LLMJob for {config.project_name}",
                 job_category=JobCategory.LLM_JOB,
             )
         job_params = llm_job_params
@@ -106,7 +105,6 @@ class LLMJobFactory:
             )
         else:
             job_metadata = JobMetadata(
-                top_job_id=f"LLMJob for {config.project_name}",
                 job_category=JobCategory.LLM_JOB,
             )
         llm_prompt = LLMPrompt(
