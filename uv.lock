@@ -889,14 +889,14 @@ wheels = [
 
 [[package]]
 name = "kajson"
-version = "0.2.0"
+version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8a/b5/404dda6ea283cba04e408d4447466a14863586f6872f87d70883e32ac48a/kajson-0.2.0.tar.gz", hash = "sha256:1dbe9595ef70a6cb1e3fdfc28fa6f1f3e361bbdfb03b0a4ca525f3f6f6100b92", size = 18178, upload-time = "2025-06-23T09:05:15.665Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/90/997c2bf6c47714e1655ac7cbb718317b815c9155634148625f93faad8520/kajson-0.2.2.tar.gz", hash = "sha256:2a7d71a772d12303b398e1d6ec35fd6213fc0d23861ed860beb201105721a498", size = 19792, upload-time = "2025-06-26T10:56:01.675Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/da/8942c19fb6806d29d8769059a2f5f0a19bd9cbaadaaad725dd1aae8efa78/kajson-0.2.0-py3-none-any.whl", hash = "sha256:1221d4d3be54033f97642c4df9a7144d086a49d95f1f2adeb975308e671c5ac9", size = 24219, upload-time = "2025-06-23T09:05:14.193Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/ef/9b4a1bf8b7e9fcff9450be3ed7ce69738cf7c3ef58b057385fac73eb60a1/kajson-0.2.2-py3-none-any.whl", hash = "sha256:5b1b77dab1be2af2904f9872e24e66289adeafdf1017705e1f7e0e87a1fbe6b6", size = 25863, upload-time = "2025-06-26T10:56:00.257Z" },
 ]
 
 [[package]]
@@ -1619,7 +1619,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.4.4"
+version = "0.4.6"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1713,7 +1713,7 @@ requires-dist = [
     { name = "instructor", specifier = ">=1.8.3" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
-    { name = "kajson", specifier = "==0.2.0" },
+    { name = "kajson", specifier = "==0.2.2" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "mistralai", marker = "extra == 'mistralai'", specifier = "==1.5.2" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = "==1.6.1" },
