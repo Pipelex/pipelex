@@ -44,7 +44,6 @@ class ApiSerializer:
                 # model_dump() - Converts Pydantic model to plain dictionary (strips the model wrapper)
                 # kajson.dumps() - Handles any remaining complex objects (datetime, enums, etc.) in the dict
                 # kajson.loads() - Returns clean dictionary with primitives (no class reconstruction because it started as a dict)
-
                 content_dict = stuff.content.model_dump(serialize_as_any=True)
 
                 content_json = kajson.dumps(content_dict)
