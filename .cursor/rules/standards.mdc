@@ -7,6 +7,10 @@ alwaysApply: true
 
 This document outlines the coding standards and quality control procedures that must be followed when contributing to this project.
 
+## Style
+
+Always use type hints. Use the types with Uppercase first letter for types like Dict[], List[] etc.
+
 ## Code Quality Checks
 
 ### Linting and Type Checking

@@ -21,7 +21,7 @@ best-grok = "grok-3"
 ####################################################################################################
 # LLM Presets — General purpose
 
-cheap_llm_for_text = { llm_handle = "gpt-4o-mini", temperature = 0.5, max_tokens = 50 }
+cheap_llm_for_text = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
 cheap_llm_for_short_text = { llm_handle = "gpt-4o-mini", temperature = 0.5, max_tokens = 50 }
 cheap_llm_for_object = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
 cheap_llm_to_structure = { llm_handle = "gpt-4o-mini", temperature = 0.1 }
