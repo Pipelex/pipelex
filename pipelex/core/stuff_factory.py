@@ -91,12 +91,6 @@ class StuffFactory:
         return cls.make_from_blueprint(blueprint=blueprint)
 
     @classmethod
-    def make_from_blueprint_str(cls, blueprint: str | StuffBlueprint) -> "Stuff":
-        if isinstance(blueprint, str):
-            blueprint = StuffBlueprint.model_validate_json(json_data=blueprint)
-        return cls.make_from_blueprint(blueprint=blueprint)
-
-    @classmethod
     def make_from_str(
         cls,
         str_value: str,

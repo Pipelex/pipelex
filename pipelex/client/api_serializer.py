@@ -5,7 +5,7 @@ from kajson import kajson
 
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.stuff_content import StuffContent
+from pipelex.core.stuff_content import StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffContentFactory
 from pipelex.core.working_memory import WorkingMemory
 
@@ -21,6 +21,7 @@ class ApiSerializer:
 
     # Fixed datetime format for API consistency
     API_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
+    FIELDS_TO_SKIP = ("__class__", "__module__")
 
     @classmethod
     def serialize_working_memory_for_api(cls, working_memory: WorkingMemory) -> Dict[str, Dict[str, Any]]:
@@ -37,20 +38,17 @@ class ApiSerializer:
 
         for stuff_name, stuff in working_memory.root.items():
             if stuff.concept_code == NativeConcept.TEXT.code:
-                # Handle text content directly
+                stuff_content = cast(TextContent, stuff.content)
                 item_dict: Dict[str, Any] = {
                     "concept_code": stuff.concept_code,
-                    "content": stuff.content.text,  # type: ignore
+                    "content": stuff_content.text,
                 }
             else:
-                # Use kajson for complex objects
                 content_dict = stuff.content.model_dump(serialize_as_any=True)
 
-                # Serialize with kajson and clean up
                 content_json = kajson.dumps(content_dict)
                 clean_content = kajson.loads(content_json)
 
-                # Clean up API-unfriendly fields and fix datetime format
                 clean_content = cls._clean_and_format_content(clean_content)
 
                 item_dict = {
@@ -78,7 +76,7 @@ class ApiSerializer:
     @classmethod
     def _clean_and_format_content(cls, content: Any) -> Any:
         """
-        Recursively clean content by removing __class__/__module__ and formatting datetimes.
+        Recursively clean content by removing the fields in FIELDS_TO_SKIP and formatting datetimes.
 
         Args:
             content: Content to clean
@@ -90,8 +88,7 @@ class ApiSerializer:
             cleaned: Dict[str, Any] = {}
             content_dict = cast(Dict[str, Any], content)
             for key in content_dict:
-                # Skip API-unfriendly fields
-                if key in ("__class__", "__module__"):
+                if key in cls.FIELDS_TO_SKIP:
                     continue
                 cleaned[key] = cls._clean_and_format_content(content_dict[key])
             return cleaned
@@ -102,7 +99,6 @@ class ApiSerializer:
                 cleaned_list.append(cls._clean_and_format_content(content_list[idx]))
             return cleaned_list
         elif isinstance(content, datetime):
-            # Format datetime to fixed API format
             return content.strftime(cls.API_DATETIME_FORMAT)
         else:
             return content

@@ -158,7 +158,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     def is_native_concept(self, concept_str: str) -> bool:
         if Concept.concept_str_contains_domain(concept_str=concept_str):
-            domain, _ = Concept.extract_domain_and_concept_from_str(concept_str=concept_str)
+            domain = Concept.extract_domain_from_str(concept_str=concept_str)
             return domain == SpecialDomain.NATIVE.value
         else:
             return concept_str in NativeConcept.names()
