@@ -61,6 +61,29 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_llm_text_only(self, request: FixtureRequest):
+        from pipelex import pretty_print
+        import pprint
+
+        # Method 1: See all attributes and methods
+        print("=== All attributes and methods ===")
+        print(dir(request))
+
+        # Method 2: See instance variables
+        print("\n=== Instance variables ===")
+        pprint.pprint(vars(request))
+
+        # Method 3: Inspect specific useful attributes
+        print("\n=== Useful attributes ===")
+        print(f"request.node: {request.node.__dict__}")
+        print(f"request.node.name: {request.node.name}")
+        if hasattr(request.node, "originalname"):
+            print(f"request.node.originalname: {request.node.originalname}")
+        print(f"request.node.nodeid: {request.node.nodeid}")
+        print(f"request.cls: {request.cls}")
+        print(f"request.function: {request.function}")
+        print(f"request.module: {request.module}")
+
+        pretty_print(request, title="test_make_llm_text_only")
         llm_setting_main = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_text")
 
         text: str = await get_content_generator().make_llm_text(

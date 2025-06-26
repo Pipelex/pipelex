@@ -25,12 +25,11 @@ class UnitJobId(StrEnum):
 
 class JobMetadata(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    job_category: Optional[JobCategory] = None
 
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
-    top_job_id: Optional[str] = None
     pipe_job_ids: Optional[List[str]] = None
     content_generation_job_id: Optional[str] = None
-    job_category: Optional[JobCategory] = None
     unit_job_id: Optional[str] = None
 
     started_at: Optional[datetime] = Field(default_factory=lambda: datetime.now())
@@ -45,8 +44,6 @@ class JobMetadata(BaseModel):
     def update(self, updated_metadata: "JobMetadata"):
         if updated_metadata.job_category:
             self.job_category = updated_metadata.job_category
-        if updated_metadata.top_job_id:
-            self.top_job_id = updated_metadata.top_job_id
         if updated_metadata.pipe_job_ids:
             self.pipe_job_ids = self.pipe_job_ids or []
             self.pipe_job_ids.extend(updated_metadata.pipe_job_ids)
