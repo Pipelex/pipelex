@@ -1,7 +1,8 @@
 from datetime import datetime
+from decimal import Decimal
+from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, cast
-
-from kajson import kajson
 
 from pipelex.client.protocol import CompactMemory
 from pipelex.core.concept_native import NativeConcept
@@ -40,16 +41,8 @@ class ApiSerializer:
                     "content": stuff_content.text,
                 }
             else:
-                # TODO: Clean this up
-                # model_dump() - Converts Pydantic model to plain dictionary (strips the model wrapper)
-                # kajson.dumps() - Handles any remaining complex objects (datetime, enums, etc.) in the dict
-                # kajson.loads() - Returns clean dictionary with primitives (no class reconstruction because it started as a dict)
                 content_dict = stuff.content.model_dump(serialize_as_any=True)
-
-                content_json = kajson.dumps(content_dict)
-                clean_content = kajson.loads(content_json)
-
-                clean_content = cls._clean_and_format_content(clean_content)
+                clean_content = cls._clean_and_format_content(content_dict)
 
                 item_dict = {
                     "concept_code": stuff.concept_code,
@@ -100,6 +93,12 @@ class ApiSerializer:
             return cleaned_list
         elif isinstance(content, datetime):
             return content.strftime(cls.API_DATETIME_FORMAT)
+        elif isinstance(content, Enum):
+            return content.value  # Convert enum to its value
+        elif isinstance(content, Decimal):
+            return float(content)  # Convert Decimal to float for JSON compatibility
+        elif isinstance(content, Path):
+            return str(content)  # Convert Path to string representation
         else:
             return content
 
