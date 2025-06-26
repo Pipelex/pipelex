@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.types import StrEnum
@@ -24,13 +24,13 @@ class UnitJobId(StrEnum):
 
 
 class JobMetadata(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    job_category: Optional[JobCategory] = None
-
+    job_name: Optional[str] = None
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
     pipe_job_ids: Optional[List[str]] = None
+
     content_generation_job_id: Optional[str] = None
     unit_job_id: Optional[str] = None
+    job_category: Optional[JobCategory] = None
 
     started_at: Optional[datetime] = Field(default_factory=lambda: datetime.now())
     completed_at: Optional[datetime] = None
