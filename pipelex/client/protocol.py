@@ -8,6 +8,9 @@ from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.types import StrEnum
 
+CompactMemory = Dict[str, Dict[str, Any]]
+COMPACT_MEMORY_KEY = "compact_memory"
+
 
 class PipelineState(StrEnum):
     """
@@ -42,13 +45,13 @@ class PipelineRequest(BaseModel):
     Request for executing a pipeline.
 
     Attributes:
-        working_memory (Optional[Dict[str, Dict[str, Any]]]): In the format of WorkingMemory.to_reduced_memory()
+        compact_memory (Optional[CompactMemory]): In the format of WorkingMemory.to_compact_memory()
         output_name (Optional[str]): Name of the output slot to write to
         output_multiplicity (Optional[PipeOutputMultiplicity]): Output multiplicity setting
         dynamic_output_concept_code (Optional[str]): Override for the dynamic output concept code
     """
 
-    working_memory: Optional[Dict[str, Dict[str, Any]]] = None
+    compact_memory: Optional[CompactMemory] = None
     output_name: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
     dynamic_output_concept_code: Optional[str] = None
@@ -63,11 +66,11 @@ class PipelineResponse(ApiResponse):
         created_at (str): Timestamp when the pipeline was created
         pipeline_state (PipelineState): Current state of the pipeline
         finished_at (Optional[str]): Timestamp when the pipeline finished, if completed
-        pipe_output (Optional[Dict[str, Dict[str, Any]]]): Output data from the pipeline execution as raw dict, if available
+        pipe_output (Optional[CompactMemory]): Output data from the pipeline execution as raw dict, if available
 
         Example of pipe_output:
         "pipe_output": {
-            "working_memory": {
+            "compact_memory": {
                 "text": {
                     "concept_code": "native.Text",
                     "content": "Some text........"
@@ -98,7 +101,7 @@ class PipelineResponse(ApiResponse):
     created_at: str
     pipeline_state: PipelineState
     finished_at: Optional[str] = None
-    pipe_output: Optional[Dict[str, Dict[str, Any]]] = None
+    pipe_output: Optional[CompactMemory] = None
 
 
 @runtime_checkable

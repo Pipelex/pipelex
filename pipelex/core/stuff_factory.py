@@ -9,7 +9,7 @@ from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr, TextContent
 from pipelex.exceptions import ConceptError, PipelexError
-from pipelex.hub import get_class_registry, get_required_concept
+from pipelex.hub import get_class_registry, get_concept_provider, get_required_concept
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -69,7 +69,9 @@ class StuffFactory:
 
     @classmethod
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
-        if isinstance(blueprint.content, str) and blueprint.concept_code == NativeConcept.TEXT.code:
+        if isinstance(blueprint.content, str) and get_concept_provider().is_compatible_by_concept_code(
+            tested_concept_code=blueprint.concept_code, wanted_concept_code=NativeConcept.TEXT.code
+        ):
             the_stuff = cls.make_from_str(
                 concept_str=NativeConcept.TEXT.code,
                 str_value=blueprint.content,
@@ -182,14 +184,7 @@ class StuffContentFactory:
         """
         concept = get_required_concept(concept_code=concept_code)
         the_subclass_name = concept.structure_class_name
-        the_subclass = get_class_registry().get_class(name=the_subclass_name)
-
-        if the_subclass is None:
-            raise StuffContentFactoryError(f"Concept '{concept_code}' requires class '{the_subclass_name}' to be registered in the class registry")
-
-        if not issubclass(the_subclass, StuffContent):
-            raise StuffContentFactoryError(f"Concept '{concept_code}', subclass '{the_subclass}' is not a subclass of StuffContent")
-
+        the_subclass = get_class_registry().get_required_subclass(name=the_subclass_name, base_class=StuffContent)
         return cls.make_content_from_value(stuff_content_subclass=the_subclass, value=value)
 
     @classmethod

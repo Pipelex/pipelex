@@ -3,17 +3,13 @@ from typing import Any, Dict, List, cast
 
 from kajson import kajson
 
+from pipelex.client.protocol import CompactMemory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.stuff_content import StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffContentFactory
 from pipelex.core.working_memory import WorkingMemory
-
-
-class ApiSerializationError(Exception):
-    """Exception raised when API serialization fails."""
-
-    pass
+from pipelex.exceptions import ApiSerializationError
 
 
 class ApiSerializer:
@@ -24,7 +20,7 @@ class ApiSerializer:
     FIELDS_TO_SKIP = ("__class__", "__module__")
 
     @classmethod
-    def serialize_working_memory_for_api(cls, working_memory: WorkingMemory) -> Dict[str, Dict[str, Any]]:
+    def serialize_working_memory_for_api(cls, working_memory: WorkingMemory) -> CompactMemory:
         """
         Convert WorkingMemory to API-ready format using kajson with proper datetime handling.
 
@@ -34,7 +30,7 @@ class ApiSerializer:
         Returns:
             Dict ready for API transmission with datetime strings and no __class__/__module__
         """
-        reduced_memory: Dict[str, Dict[str, Any]] = {}
+        compact_memory: CompactMemory = {}
 
         for stuff_name, stuff in working_memory.root.items():
             if stuff.concept_code == NativeConcept.TEXT.code:
@@ -44,6 +40,11 @@ class ApiSerializer:
                     "content": stuff_content.text,
                 }
             else:
+                # TODO: Clean this up
+                # model_dump() - Converts Pydantic model to plain dictionary (strips the model wrapper)
+                # kajson.dumps() - Handles any remaining complex objects (datetime, enums, etc.) in the dict
+                # kajson.loads() - Returns clean dictionary with primitives (no class reconstruction because it started as a dict)
+
                 content_dict = stuff.content.model_dump(serialize_as_any=True)
 
                 content_json = kajson.dumps(content_dict)
@@ -56,12 +57,12 @@ class ApiSerializer:
                     "content": clean_content,
                 }
 
-            reduced_memory[stuff_name] = item_dict
+            compact_memory[stuff_name] = item_dict
 
-        return reduced_memory
+        return compact_memory
 
     @classmethod
-    def serialize_pipe_output_for_api(cls, pipe_output: PipeOutput) -> Dict[str, Dict[str, Any]]:
+    def serialize_pipe_output_for_api(cls, pipe_output: PipeOutput) -> CompactMemory:
         """
         Convert PipeOutput to API-ready format.
 
@@ -71,7 +72,7 @@ class ApiSerializer:
         Returns:
             Dict ready for API transmission
         """
-        return {"working_memory": cls.serialize_working_memory_for_api(pipe_output.working_memory)}
+        return {"compact_memory": cls.serialize_working_memory_for_api(pipe_output.working_memory)}
 
     @classmethod
     def _clean_and_format_content(cls, content: Any) -> Any:
@@ -121,5 +122,5 @@ class ApiSerializer:
         try:
             return StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(concept_code=concept_code, value=value)
 
-        except Exception as e:
-            raise ApiSerializationError(f"Failed to create StuffContent for concept '{concept_code}': {e}") from e
+        except Exception as exc:
+            raise ApiSerializationError(f"Failed to create StuffContent for concept '{concept_code}': {exc}") from exc

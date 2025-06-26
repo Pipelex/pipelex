@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
 from pipelex.client.api_serializer import ApiSerializer
-from pipelex.client.protocol import PipelineRequest
+from pipelex.client.protocol import COMPACT_MEMORY_KEY, CompactMemory, PipelineRequest
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
@@ -30,33 +30,33 @@ class PipelineRequestFactory:
         Returns:
             PipelineRequest with the working memory serialized to reduced format
         """
-        reduced_memory = None
+        compact_memory = None
         if working_memory is not None:
-            reduced_memory = ApiSerializer.serialize_working_memory_for_api(working_memory)
+            compact_memory = ApiSerializer.serialize_working_memory_for_api(working_memory)
 
         return PipelineRequest(
-            working_memory=reduced_memory,
+            compact_memory=compact_memory,
             output_name=output_name,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
         )
 
     @staticmethod
-    def make_working_memory_from_reduced(reduced_memory: Optional[Dict[str, Dict[str, Any]]]) -> WorkingMemory:
+    def make_working_memory_from_reduced(compact_memory: Optional[CompactMemory]) -> WorkingMemory:
         """
         Create a WorkingMemory from a reduced memory dictionary.
 
         Args:
-            reduced_memory: Dictionary in the format from API
+            compact_memory: Dictionary in the format from API
 
         Returns:
             WorkingMemory object reconstructed from the reduced format
         """
         working_memory = WorkingMemoryFactory.make_empty()
-        if reduced_memory is None:
+        if compact_memory is None:
             return working_memory
 
-        for stuff_key, stuff_data in reduced_memory.items():
+        for stuff_key, stuff_data in compact_memory.items():
             concept_code = stuff_data.get("concept_code", "")
             content_value = stuff_data.get("content", {})
 
@@ -82,7 +82,7 @@ class PipelineRequestFactory:
             PipelineRequest object with dictionary working_memory
         """
         return PipelineRequest(
-            working_memory=request_body.get("working_memory"),
+            compact_memory=request_body.get(COMPACT_MEMORY_KEY),
             output_name=request_body.get("output_name"),
             output_multiplicity=request_body.get("output_multiplicity"),
             dynamic_output_concept_code=request_body.get("dynamic_output_concept_code"),

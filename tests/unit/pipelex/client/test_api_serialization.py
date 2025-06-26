@@ -5,6 +5,7 @@ from typing import cast
 import pytest
 
 from pipelex.client.api_serializer import ApiSerializationError, ApiSerializer
+from pipelex.client.protocol import COMPACT_MEMORY_KEY
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.stuff_content import NumberContent, TextContent
@@ -44,18 +45,18 @@ class TestApiSerialization:
 
     def test_serialize_working_memory_with_datetime(self, datetime_content_memory: WorkingMemory):
         """Test that datetime content is properly serialized to ISO format strings."""
-        reduced_memory = ApiSerializer.serialize_working_memory_for_api(datetime_content_memory)
+        compact_memory = ApiSerializer.serialize_working_memory_for_api(datetime_content_memory)
 
         from pipelex import pretty_print
 
-        pretty_print(reduced_memory, title="API Serialized Memory")
+        pretty_print(compact_memory, title="API Serialized Memory")
 
         # Should have one entry for the datetime content
-        assert len(reduced_memory) == 1
-        assert "project_meeting" in reduced_memory
+        assert len(compact_memory) == 1
+        assert "project_meeting" in compact_memory
 
         # Check the dict structure
-        datetime_blueprint = reduced_memory["project_meeting"]
+        datetime_blueprint = compact_memory["project_meeting"]
         assert isinstance(datetime_blueprint, dict)
         assert datetime_blueprint["concept_code"] == "event.DateTimeEvent"
 
@@ -81,14 +82,14 @@ class TestApiSerialization:
 
     def test_api_serialized_memory_is_json_serializable(self, datetime_content_memory: WorkingMemory):
         """Test that API serialized memory is JSON serializable."""
-        reduced_memory = ApiSerializer.serialize_working_memory_for_api(datetime_content_memory)
+        compact_memory = ApiSerializer.serialize_working_memory_for_api(datetime_content_memory)
 
         # This should NOT raise an exception now
-        json_string = json.dumps(reduced_memory)
+        json_string = json.dumps(compact_memory)
         roundtrip = json.loads(json_string)
 
         # Verify roundtrip works
-        assert roundtrip == reduced_memory
+        assert roundtrip == compact_memory
 
         # Verify datetime fields are strings
         content = roundtrip["project_meeting"]["content"]
@@ -98,24 +99,24 @@ class TestApiSerialization:
 
     def test_serialize_text_content(self, text_content_memory: WorkingMemory):
         """Test that text content is handled specially."""
-        reduced_memory = ApiSerializer.serialize_working_memory_for_api(text_content_memory)
+        compact_memory = ApiSerializer.serialize_working_memory_for_api(text_content_memory)
 
-        assert len(reduced_memory) == 1
-        assert "sample_text" in reduced_memory
+        assert len(compact_memory) == 1
+        assert "sample_text" in compact_memory
 
-        text_blueprint = reduced_memory["sample_text"]
+        text_blueprint = compact_memory["sample_text"]
         assert text_blueprint["concept_code"] == NativeConcept.TEXT.code
         assert isinstance(text_blueprint["content"], str)
         assert text_blueprint["content"] == "Sample text content"
 
     def test_serialize_number_content(self, number_content_memory: WorkingMemory):
         """Test that number content is properly serialized."""
-        reduced_memory = ApiSerializer.serialize_working_memory_for_api(number_content_memory)
+        compact_memory = ApiSerializer.serialize_working_memory_for_api(number_content_memory)
 
-        assert len(reduced_memory) == 1
-        assert "pi_value" in reduced_memory
+        assert len(compact_memory) == 1
+        assert "pi_value" in compact_memory
 
-        number_blueprint = reduced_memory["pi_value"]
+        number_blueprint = compact_memory["pi_value"]
         assert number_blueprint["concept_code"] == "native.Number"
         assert isinstance(number_blueprint["content"], dict)
         assert number_blueprint["content"]["number"] == 3.14159
@@ -125,10 +126,10 @@ class TestApiSerialization:
         pipe_output = PipeOutput(working_memory=datetime_content_memory)
         reduced_output = ApiSerializer.serialize_pipe_output_for_api(pipe_output)
 
-        assert "working_memory" in reduced_output
+        assert COMPACT_MEMORY_KEY in reduced_output
 
         # Should contain the same structure as working memory serialization
-        working_memory_data = reduced_output["working_memory"]
+        working_memory_data = reduced_output[COMPACT_MEMORY_KEY]
         assert "project_meeting" in working_memory_data
 
         # Verify datetime formatting

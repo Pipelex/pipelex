@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from pipelex import pretty_print
 from pipelex.client.client import PipelexClient
-from pipelex.client.protocol import PipelineState
+from pipelex.client.protocol import COMPACT_MEMORY_KEY, PipelineState
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import TextContent
 from pipelex.core.stuff_factory import StuffFactory
@@ -114,7 +114,7 @@ class TestPipelexApiClient:
             assert pipeline_reponse.pipeline_state == PipelineState.COMPLETED
             assert pipeline_reponse.pipe_output is not None
 
-            working_memory = pipeline_reponse.pipe_output["working_memory"]
+            working_memory = pipeline_reponse.pipe_output[COMPACT_MEMORY_KEY]
 
             # Verify question structure
             assert working_memory["question"] == {

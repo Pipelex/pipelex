@@ -249,3 +249,9 @@ class PipeInputNotFoundError(PipelexError):
 
 class PipeInputDetailsError(PipelexError):
     pass
+
+
+class ApiSerializationError(Exception):
+    """Exception raised when API serialization fails."""
+
+    pass

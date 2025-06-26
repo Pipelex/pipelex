@@ -37,7 +37,7 @@ class PipelineResponseFactory:
         """
         reduced_output = None
         if pipe_output is not None:
-            reduced_output = ApiSerializer.serialize_pipe_output_for_api(pipe_output)
+            reduced_output = ApiSerializer.serialize_pipe_output_for_api(pipe_output=pipe_output)
 
         return PipelineResponse(
             pipeline_run_id=pipeline_run_id,
