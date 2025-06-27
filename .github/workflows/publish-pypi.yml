@@ -4,61 +4,61 @@ on:
   push:
     branches:
       - main
-      - fix/github-release-notes  # Test branch
 
 jobs:
-  # build:
-  #   name: Build distribution 📦
-  #   runs-on: ubuntu-latest
+  build:
+    name: Build distribution 📦
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         persist-credentials: false
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.x"
-  #     - name: Install pypa/build
-  #       run: >-
-  #         python3 -m
-  #         pip install
-  #         build
-  #         --user
-  #     - name: Build a binary wheel and a source tarball
-  #       run: python3 -m build
-  #     - name: Store the distribution packages
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: python-package-distributions
-  #         path: dist/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install pypa/build
+        run: >-
+          python3 -m
+          pip install
+          build
+          --user
+      - name: Build a binary wheel and a source tarball
+        run: python3 -m build
+      - name: Store the distribution packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
 
-  # publish-to-pypi:
-  #   name: >-
-  #     Publish Python 🐍 distribution 📦 to PyPI
-  #   needs:
-  #     - build
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: pypi
-  #     url: https://pypi.org/p/pipelex
-  #   permissions:
-  #     id-token: write # IMPORTANT: mandatory for trusted publishing
+  publish-to-pypi:
+    name: >-
+      Publish Python 🐍 distribution 📦 to PyPI
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pipelex
+    permissions:
+      id-token: write # IMPORTANT: mandatory for trusted publishing
 
-  #   steps:
-  #     - name: Download all the dists
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: python-package-distributions
-  #         path: dist/
-  #     - name: Publish distribution 📦 to PyPI
-  #       uses: pypa/gh-action-pypi-publish@release/v1
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
 
   github-release:
     name: >-
-      Test Changelog Extraction
-    # needs:
-    #   - publish-to-pypi
+      Sign the Python 🐍 distribution 📦 with Sigstore
+      and upload them to GitHub Release
+    needs:
+      - publish-to-pypi
     runs-on: ubuntu-latest
 
     permissions:
@@ -113,47 +113,39 @@ jobs:
           echo "CHANGELOG_NOTES<<EOF" >> $GITHUB_ENV
           echo "$CHANGELOG_CONTENT" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-      - name: Print extracted changelog content for testing
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Sign the dists with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v3.0.0
+        with:
+          inputs: >-
+            ./dist/*.tar.gz
+            ./dist/*.whl
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          echo "=== EXTRACTED CHANGELOG CONTENT FOR v$VERSION ==="
-          echo "$CHANGELOG_NOTES"
-          echo "=== END OF CHANGELOG CONTENT ==="
-          echo ""
-          echo "Length of extracted content: $(echo "$CHANGELOG_NOTES" | wc -c)"
-          echo "Number of lines: $(echo "$CHANGELOG_NOTES" | wc -l)"
-      # - name: Download all the dists
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: python-package-distributions
-      #     path: dist/
-      # - name: Sign the dists with Sigstore
-      #   uses: sigstore/gh-action-sigstore-python@v3.0.0
-      #   with:
-      #     inputs: >-
-      #       ./dist/*.tar.gz
-      #       ./dist/*.whl
-      # - name: Create GitHub Release
-      #   env:
-      #     GITHUB_TOKEN: ${{ github.token }}
-      #   run: |
-      #     if [ -n "$CHANGELOG_NOTES" ]; then
-      #       gh release create "v$VERSION" \
-      #         --repo "$GITHUB_REPOSITORY" \
-      #         --title "v$VERSION" \
-      #         --notes "$CHANGELOG_NOTES"
-      #     else
-      #       gh release create "v$VERSION" \
-      #         --repo "$GITHUB_REPOSITORY" \
-      #         --title "v$VERSION" \
-      #         --notes "Release v$VERSION"
-      #     fi
-      # - name: Upload artifact signatures to GitHub Release
-      #   env:
-      #     GITHUB_TOKEN: ${{ github.token }}
-      #   # Upload to GitHub Release using the `gh` CLI.
-      #   # `dist/` contains the built packages, and the
-      #   # sigstore-produced signatures and certificates.
-      #   run: >-
-      #     gh release upload
-      #     "v$VERSION" dist/**
-      #     --repo "$GITHUB_REPOSITORY"
+          if [ -n "$CHANGELOG_NOTES" ]; then
+            gh release create "v$VERSION" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "v$VERSION" \
+              --notes "$CHANGELOG_NOTES"
+          else
+            gh release create "v$VERSION" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "v$VERSION" \
+              --notes "Release v$VERSION"
+          fi
+      - name: Upload artifact signatures to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        # Upload to GitHub Release using the `gh` CLI.
+        # `dist/` contains the built packages, and the
+        # sigstore-produced signatures and certificates.
+        run: >-
+          gh release upload
+          "v$VERSION" dist/**
+          --repo "$GITHUB_REPOSITORY"
