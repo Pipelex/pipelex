@@ -81,7 +81,7 @@ jobs:
           echo "Extracting changelog for version v$VERSION"
           
           # Find the start of the current version section
-          START_LINE=$(grep -n "## \[v$VERSION\]" CHANGELOG.md | cut -d: -f1)
+          START_LINE=$(grep -n "## \[v$VERSION\] - " CHANGELOG.md | cut -d: -f1)
           
           if [ -z "$START_LINE" ]; then
             echo "Warning: No changelog entry found for version v$VERSION"
@@ -90,7 +90,7 @@ jobs:
           fi
           
           # Find the start of the next version section (previous version)
-          NEXT_VERSION_LINE=$(tail -n +$((START_LINE + 1)) CHANGELOG.md | grep -n "^## \[v" | head -1 | cut -d: -f1)
+          NEXT_VERSION_LINE=$(tail -n +$((START_LINE + 1)) CHANGELOG.md | grep -n "^## \[v.*\] - " | head -1 | cut -d: -f1)
           
           if [ -z "$NEXT_VERSION_LINE" ]; then
             # No next version found, extract from current version till end of file
@@ -101,8 +101,13 @@ jobs:
             CHANGELOG_CONTENT=$(sed -n "$START_LINE,$((END_LINE - 1))p" CHANGELOG.md)
           fi
           
-          # Clean up the content (remove empty lines at start/end, trim whitespace)
-          CHANGELOG_CONTENT=$(echo "$CHANGELOG_CONTENT" | sed '/^$/d' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+          # Clean up the content but preserve the blank line after the header
+          # First, get the header line and add a blank line after it
+          HEADER_LINE=$(echo "$CHANGELOG_CONTENT" | head -1)
+          CONTENT_LINES=$(echo "$CHANGELOG_CONTENT" | tail -n +2 | sed '/^$/d' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+          
+          # Combine header + blank line + content
+          CHANGELOG_CONTENT=$(printf "%s\n\n%s" "$HEADER_LINE" "$CONTENT_LINES")
           
           # Escape for GitHub Actions
           echo "CHANGELOG_NOTES<<EOF" >> $GITHUB_ENV
