@@ -93,12 +93,12 @@ jobs:
           NEXT_VERSION_LINE=$(tail -n +$((START_LINE + 1)) CHANGELOG.md | grep -n "^## \[v" | head -1 | cut -d: -f1)
           
           if [ -z "$NEXT_VERSION_LINE" ]; then
-            # No next version found, extract till end of file
-            CHANGELOG_CONTENT=$(tail -n +$((START_LINE + 1)) CHANGELOG.md)
+            # No next version found, extract from current version till end of file
+            CHANGELOG_CONTENT=$(tail -n +$START_LINE CHANGELOG.md)
           else
-            # Extract content between current and next version
+            # Extract content from current version header to before next version
             END_LINE=$((START_LINE + NEXT_VERSION_LINE - 1))
-            CHANGELOG_CONTENT=$(sed -n "$((START_LINE + 1)),$((END_LINE - 1))p" CHANGELOG.md)
+            CHANGELOG_CONTENT=$(sed -n "$START_LINE,$((END_LINE - 1))p" CHANGELOG.md)
           fi
           
           # Clean up the content (remove empty lines at start/end, trim whitespace)
