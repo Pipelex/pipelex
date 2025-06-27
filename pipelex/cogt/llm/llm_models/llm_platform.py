@@ -20,6 +20,7 @@ class LLMPlatform(StrEnum):
     VERTEXAI = "vertexai"
     XAI = "xai"
     CUSTOM_LLM = "custom_llm"
+    SPECIFIC_LLM = "specific_llm"
 
     @staticmethod
     def list_openai_related() -> list["LLMPlatform"]:
@@ -57,6 +58,8 @@ class LLMPlatform(StrEnum):
                 return True
             case LLMPlatform.BEDROCK:
                 return False
+            case LLMPlatform.SPECIFIC_LLM:
+                return False
 
     @property
     def console_color(self) -> str:
@@ -80,6 +83,8 @@ class LLMPlatform(StrEnum):
             case LLMPlatform.XAI:
                 return "green"
             case LLMPlatform.CUSTOM_LLM:
+                return "white"
+            case _:
                 return "white"
 
 

@@ -5,9 +5,9 @@ from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_platform import ImggPlatform
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.plugin_manager import PluginHandle
 from pipelex.hub import get_plugin_manager, get_secret
 from pipelex.plugins.openai.openai_imgg_worker import OpenAIImggWorker
+from pipelex.plugins.plugin_manager import PluginHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 

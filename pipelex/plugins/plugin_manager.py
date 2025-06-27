@@ -20,6 +20,7 @@ class PluginHandle(StrEnum):
     XAI_OPENAI_SDK = "xai_openai_sdk"
     CUSTOM_LLM_OPENAI_SDK = "custom_llm_openai_sdk"
     FAL_SDK = "fal_sdk"
+    SPECIFIC_LLM_SDK = "specific_llm_sdk"
 
     @staticmethod
     def get_for_llm_platform(llm_platform: LLMPlatform) -> "PluginHandle":
@@ -44,6 +45,8 @@ class PluginHandle(StrEnum):
                 return PluginHandle.XAI_OPENAI_SDK
             case LLMPlatform.CUSTOM_LLM:
                 return PluginHandle.CUSTOM_LLM_OPENAI_SDK
+            case LLMPlatform.SPECIFIC_LLM:
+                return PluginHandle.SPECIFIC_LLM_SDK
 
     @staticmethod
     def get_for_ocr_engine(ocr_platform: OcrPlatform) -> "PluginHandle":

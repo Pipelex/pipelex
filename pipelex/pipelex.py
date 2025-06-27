@@ -17,7 +17,6 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
-from pipelex.cogt.plugin_manager import PluginManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
@@ -36,6 +35,8 @@ from pipelex.pipeline.track.pipeline_tracker_protocol import (
     PipelineTrackerNoOp,
     PipelineTrackerProtocol,
 )
+from pipelex.plugins.plugin_manager import PluginManager
+from pipelex.plugins.plugin_manager2 import PluginManager2
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
@@ -131,6 +132,7 @@ class Pipelex:
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
 
         # cogt
+        self.plugin_manager2 = PluginManager2()
         self.llm_model_provider = llm_model_provider or LLMModelLibrary()
         self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
         self.plugin_manager = plugin_manager or PluginManager()
@@ -187,6 +189,7 @@ class Pipelex:
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
         self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
+        self.plugin_manager2.load_plugin_config()
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())

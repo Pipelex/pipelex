@@ -4,8 +4,8 @@ from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
-from pipelex.cogt.plugin_manager import PluginHandle
 from pipelex.hub import get_plugin_manager
+from pipelex.plugins.plugin_manager import PluginHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 

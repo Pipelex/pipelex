@@ -11,7 +11,7 @@ from pipelex.plugins.openai.xai_config import XaiConfig
 from pipelex.tools.config.models import ConfigModel
 
 
-class PluginsConfig(ConfigModel):
+class PluginConfig(ConfigModel):
     anthropic_config: AnthropicConfig
     azure_openai_config: AzureOpenAIConfig
     bedrock_config: BedrockConfig

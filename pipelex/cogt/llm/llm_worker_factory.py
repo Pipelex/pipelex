@@ -5,9 +5,9 @@ from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.cogt.plugin_manager import PluginHandle
 from pipelex.config import get_config
 from pipelex.hub import get_plugin_manager
+from pipelex.plugins.plugin_manager import PluginHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -154,4 +154,6 @@ class LLMWorkerFactory:
                     llm_engine=llm_engine,
                     reporting_delegate=reporting_delegate,
                 )
+            case LLMPlatform.SPECIFIC_LLM:
+                raise NotImplementedError("Specific LLM platform not implemented")
         return llm_worker
