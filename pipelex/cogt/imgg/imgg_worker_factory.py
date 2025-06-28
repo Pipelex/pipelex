@@ -23,7 +23,7 @@ class ImggWorkerFactory:
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> ImggWorkerAbstract:
         imgg_sdk_handle = PluginSdkHandle.get_for_imgg_engine(imgg_platform=imgg_engine.imgg_platform)
-        plugin_manager = get_plugin_sdk_registry()
+        plugin_sdk_registry = get_plugin_sdk_registry()
         imgg_worker: ImggWorkerAbstract
         match imgg_engine.imgg_platform:
             case ImggPlatform.FAL_AI:
@@ -41,7 +41,9 @@ class ImggWorkerFactory:
 
                 from pipelex.plugins.fal.fal_imgg_worker import FalImggWorker
 
-                imgg_sdk_instance = plugin_manager.get_imgg_sdk_instance(imgg_sdk_handle=imgg_sdk_handle) or plugin_manager.set_imgg_sdk_instance(
+                imgg_sdk_instance = plugin_sdk_registry.get_imgg_sdk_instance(
+                    imgg_sdk_handle=imgg_sdk_handle
+                ) or plugin_sdk_registry.set_imgg_sdk_instance(
                     imgg_sdk_handle=imgg_sdk_handle,
                     imgg_sdk_instance=FalAsyncClient(key=fal_api_key),
                 )
@@ -54,7 +56,9 @@ class ImggWorkerFactory:
             case ImggPlatform.OPENAI:
                 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 
-                imgg_sdk_instance = plugin_manager.get_llm_sdk_instance(llm_sdk_handle=imgg_sdk_handle) or plugin_manager.set_llm_sdk_instance(
+                imgg_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
+                    llm_sdk_handle=imgg_sdk_handle
+                ) or plugin_sdk_registry.set_llm_sdk_instance(
                     llm_sdk_handle=imgg_sdk_handle,
                     llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=LLMPlatform.OPENAI),
                 )

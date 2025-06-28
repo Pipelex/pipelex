@@ -16,7 +16,7 @@ class OcrWorkerFactory:
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> OcrWorkerAbstract:
         ocr_sdk_handle = PluginSdkHandle.get_for_ocr_engine(ocr_platform=ocr_engine.ocr_platform)
-        plugin_manager = get_plugin_sdk_registry()
+        plugin_sdk_registry = get_plugin_sdk_registry()
         ocr_worker: OcrWorkerAbstract
         match ocr_engine.ocr_platform:
             case OcrPlatform.MISTRAL:
@@ -32,7 +32,9 @@ class OcrWorkerFactory:
                 from pipelex.plugins.mistral.mistral_factory import MistralFactory
                 from pipelex.plugins.mistral.mistral_ocr_worker import MistralOcrWorker
 
-                ocr_sdk_instance = plugin_manager.get_ocr_sdk_instance(ocr_sdk_handle=ocr_sdk_handle) or plugin_manager.set_ocr_sdk_instance(
+                ocr_sdk_instance = plugin_sdk_registry.get_ocr_sdk_instance(
+                    ocr_sdk_handle=ocr_sdk_handle
+                ) or plugin_sdk_registry.set_ocr_sdk_instance(
                     ocr_sdk_handle=ocr_sdk_handle,
                     ocr_sdk_instance=MistralFactory.make_mistral_client(),
                 )
