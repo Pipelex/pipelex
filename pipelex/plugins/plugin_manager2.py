@@ -11,8 +11,9 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.types import StrEnum
 
 
-class PluginManager2(BaseModel):
-    _plugin_configs: Optional[PluginConfig] = None
+class PluginManager2:
+    def __init__(self):
+        self._plugin_configs: Optional[PluginConfig] = None
 
     @property
     def plugin_configs(self) -> PluginConfig:

@@ -19,7 +19,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     def __init__(
         self,
         llm_engine: LLMEngine,
-        structure_method: Optional[StructureMethod],
+        structure_method: Optional[StructureMethod] = None,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
         """

@@ -1,0 +1,6 @@
+
+[specific.template.latest]
+is_gen_object_supported = false
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 0, output = 0 }
+platform_llm_id = { specific_llm = "template" }

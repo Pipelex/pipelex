@@ -26,7 +26,9 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
     extra_fields = [f"{'.'.join(map(str, err['loc']))}: {err['input']}" for err in exc.errors() if err["type"] == "extra_forbidden"]
     type_errors = [f"{'.'.join(map(str, err['loc']))}: expected {err['type']}" for err in exc.errors() if err["type"] == "type_error"]
     value_errors = [f"{'.'.join(map(str, err['loc']))}: {err['msg']}" for err in exc.errors() if err["type"] == "value_error"]
-    enum_errors = [f"{'.'.join(map(str, err['loc']))}: invalid enum value" for err in exc.errors() if err["type"] == "enum"]
+    enum_errors = [
+        f"{'.'.join(map(str, err['loc']))}: invalid enum value '{err.get('input', 'unknown')}'" for err in exc.errors() if err["type"] == "enum"
+    ]
     model_type_errors: List[str] = []
     for err in exc.errors():
         if err["type"] == "model_type":

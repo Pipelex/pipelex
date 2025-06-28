@@ -6,7 +6,7 @@ from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.config import get_config
-from pipelex.hub import get_plugin_manager
+from pipelex.hub import get_plugin_manager, get_plugin_manager2
 from pipelex.plugins.plugin_manager import PluginHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -155,5 +155,11 @@ class LLMWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case LLMPlatform.SPECIFIC_LLM:
-                raise NotImplementedError("Specific LLM platform not implemented")
+                plugin_manager2 = get_plugin_manager2()
+                specific_llm_config = plugin_manager2.plugin_configs.specific_llm_config
+                llm_worker_class_name = specific_llm_config.llm_worker_classes[llm_engine.llm_model.llm_name]
+                from pipelex.plugins.specific_llm.template_llm_worker import TemplateLLMWorker
+
+                llm_worker_class = eval(llm_worker_class_name)
+                llm_worker = llm_worker_class(llm_engine=llm_engine, reporting_delegate=reporting_delegate)
         return llm_worker
