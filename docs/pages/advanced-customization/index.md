@@ -16,7 +16,6 @@ from pipelex import Pipelex
 pipelex = Pipelex(
     template_provider=MyTemplateProvider(),
     llm_model_provider=MyLLMProvider(),
-    plugin_manager=MyPluginManager(),
     inference_manager=MyInferenceManager(),
     pipeline_tracker=MyPipelineTracker(),
     activity_manager=MyActivityManager(),
@@ -38,7 +37,6 @@ from pipelex.hub import PipelexHub
 hub = PipelexHub()
 hub.set_template_provider(MyTemplateProvider())
 hub.set_llm_models_provider(MyLLMProvider())
-hub.set_plugin_manager(MyPluginManager())
 # ... and so on for other components
 ```
 
@@ -88,54 +86,45 @@ Pipelex supports injection of the following components:
     - Default: `LLMModelLibrary`
     - [Details](llm-model-provider-injection.md)
 
-3. **Plugin Manager** (`PluginManager`)
-
-    - Protocol: `PluginManagerProtocol`
-    - Default: `PluginManager`
-    - [Details](plugin-manager-injection.md)
-
-4. **Inference Manager** (`InferenceManager`)
+3. **Inference Manager** (`InferenceManager`)
 
     - Protocol: `InferenceManagerProtocol`
     - Default: `InferenceManager`
     - [Details](inference-manager-injection.md)
 
-5. **Reporting Delegate** (`ReportingManager`)
+4. **Reporting Delegate** (`ReportingManager`)
 
     - Protocol: `ReportingProtocol`
     - Default: `ReportingManager` or `ReportingNoOp` if disabled
     - [Details](reporting-delegate-injection.md)
 
-6. **Pipeline Tracker** (`PipelineTracker`)
+5. **Pipeline Tracker** (`PipelineTracker`)
 
     - Protocol: `PipelineTrackerProtocol`
     - Default: `PipelineTracker` or `PipelineTrackerNoOp` if disabled
     - [Details](pipeline-tracker-injection.md)
 
-7. **Activity Manager** (`ActivityManager`)
+6. **Activity Manager** (`ActivityManager`)
 
     - Protocol: `ActivityManagerProtocol`
     - Default: `ActivityManager` or `ActivityManagerNoOp` if disabled
     - [Details](activity-manager-injection.md)
 
-8. **Secrets Provider** (`EnvSecretsProvider`)
+7. **Secrets Provider** (`EnvSecretsProvider`)
 
     - Protocol: `SecretsProviderProtocol`
     - Default: `EnvSecretsProvider`
     - [Details](secrets-provider-injection.md)
 
-9. **Content Generator** (`ContentGenerator`)
+8. **Content Generator** (`ContentGenerator`)
 
     - Protocol: `ContentGeneratorProtocol`
     - Default: `ContentGenerator`
     - [Details](content-generator-injection.md)
 
-10. **Pipe Router** (`PipeRouter`)
+9. **Pipe Router** (`PipeRouter`)
 
     - Protocol: `PipeRouterProtocol`
     - Default: `PipeRouter`
     - [Details](pipe-router-injection.md)
 
-## Best Practices
-
-⚠️ Under construction

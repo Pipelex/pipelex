@@ -23,6 +23,10 @@ class SdkTypeError(CogtError):
     pass
 
 
+class SdkRegistryError(CogtError):
+    pass
+
+
 class LLMWorkerError(CogtError):
     pass
 

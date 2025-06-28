@@ -27,8 +27,8 @@ from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerP
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
-from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.plugins.plugin_manager2 import PluginManager2
+from pipelex.plugins.plugin_sdk_registry import PluginSdkRegistry
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigRoot
@@ -56,7 +56,7 @@ class PipelexHub:
         # cogt
         self._llm_models_provider: Optional[LLMModelProviderAbstract] = None
         self._llm_deck_provider: Optional[LLMDeckAbstract] = None
-        self._plugin_manager: Optional[PluginManager] = None
+        self._plugin_sdk_registry: Optional[PluginSdkRegistry] = None
         self._plugin_manager2: Optional[PluginManager2] = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
@@ -137,8 +137,8 @@ class PipelexHub:
     def set_llm_deck_provider(self, llm_deck_provider: LLMDeckAbstract):
         self._llm_deck_provider = llm_deck_provider
 
-    def set_plugin_manager(self, plugin_manager: PluginManager):
-        self._plugin_manager = plugin_manager
+    def set_plugin_sdk_registry(self, plugin_sdk_registry: PluginSdkRegistry):
+        self._plugin_sdk_registry = plugin_sdk_registry
 
     def set_plugin_manager2(self, plugin_manager2: PluginManager2):
         self._plugin_manager2 = plugin_manager2
@@ -232,10 +232,10 @@ class PipelexHub:
             raise RuntimeError("LLMDeck is not initialized")
         return self._llm_deck_provider
 
-    def get_plugin_manager(self) -> PluginManager:
-        if self._plugin_manager is None:
-            raise RuntimeError("SdkManager is not initialized")
-        return self._plugin_manager
+    def get_plugin_sdk_registry(self) -> PluginSdkRegistry:
+        if self._plugin_sdk_registry is None:
+            raise RuntimeError("Plugin SDK Registry is not initialized")
+        return self._plugin_sdk_registry
 
     def get_plugin_manager2(self) -> PluginManager2:
         if self._plugin_manager2 is None:
@@ -348,8 +348,8 @@ def get_llm_deck() -> LLMDeckAbstract:
     return get_pipelex_hub().get_required_llm_deck()
 
 
-def get_plugin_manager() -> PluginManager:
-    return get_pipelex_hub().get_plugin_manager()
+def get_plugin_sdk_registry() -> PluginSdkRegistry:
+    return get_pipelex_hub().get_plugin_sdk_registry()
 
 
 def get_plugin_manager2() -> PluginManager2:

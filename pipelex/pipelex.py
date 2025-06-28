@@ -35,8 +35,8 @@ from pipelex.pipeline.track.pipeline_tracker_protocol import (
     PipelineTrackerNoOp,
     PipelineTrackerProtocol,
 )
-from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.plugins.plugin_manager2 import PluginManager2
+from pipelex.plugins.plugin_sdk_registry import PluginSdkRegistry
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
@@ -65,7 +65,6 @@ class Pipelex:
         class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
         llm_model_provider: Optional[LLMModelLibrary] = None,
-        plugin_manager: Optional[PluginManager] = None,
         inference_manager: Optional[InferenceManager] = None,
         pipeline_manager: Optional[PipelineManager] = None,
         pipeline_tracker: Optional[PipelineTracker] = None,
@@ -93,7 +92,6 @@ class Pipelex:
         class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
         llm_model_provider: Optional[LLMModelLibrary] = None,
-        plugin_manager: Optional[PluginManager] = None,
         inference_manager: Optional[InferenceManager] = None,
         pipeline_manager: Optional[PipelineManager] = None,
         pipeline_tracker: Optional[PipelineTracker] = None,
@@ -132,12 +130,12 @@ class Pipelex:
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
 
         # cogt
+        self.plugin_sdk_registry = PluginSdkRegistry()
+        self.pipelex_hub.set_plugin_sdk_registry(self.plugin_sdk_registry)
         self.plugin_manager2 = PluginManager2()
         self.pipelex_hub.set_plugin_manager2(self.plugin_manager2)
         self.llm_model_provider = llm_model_provider or LLMModelLibrary()
         self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
-        self.plugin_manager = plugin_manager or PluginManager()
-        self.pipelex_hub.set_plugin_manager(self.plugin_manager)
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
