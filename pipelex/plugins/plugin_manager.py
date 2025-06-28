@@ -9,7 +9,7 @@ from pipelex.plugins.specific_llm.template_llm_worker import TemplateLLMWorker
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
-class PluginManager2:
+class PluginManager:
     def __init__(self):
         self._plugin_configs: Optional[PluginConfig] = None
         self._plugin_registry = ClassRegistry()

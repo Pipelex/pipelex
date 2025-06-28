@@ -35,7 +35,7 @@ from pipelex.pipeline.track.pipeline_tracker_protocol import (
     PipelineTrackerNoOp,
     PipelineTrackerProtocol,
 )
-from pipelex.plugins.plugin_m2 import PluginManager2
+from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.plugins.plugin_sdk_registry import PluginSdkRegistry
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
@@ -132,8 +132,8 @@ class Pipelex:
         # cogt
         self.plugin_sdk_registry = PluginSdkRegistry()
         self.pipelex_hub.set_plugin_sdk_registry(self.plugin_sdk_registry)
-        self.plugin_m2 = PluginManager2()
-        self.pipelex_hub.set_plugin_m2(self.plugin_m2)
+        self.plugin_manager = PluginManager()
+        self.pipelex_hub.set_plugin_manager(self.plugin_manager)
         self.llm_model_provider = llm_model_provider or LLMModelLibrary()
         self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
         self.inference_manager = inference_manager or InferenceManager()
@@ -188,7 +188,7 @@ class Pipelex:
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
         self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
-        self.plugin_m2.load_plugin_config()
+        self.plugin_manager.load_plugin_config()
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())

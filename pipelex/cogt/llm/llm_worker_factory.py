@@ -8,7 +8,7 @@ from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.config import get_config
-from pipelex.hub import get_plugin_m2, get_plugin_sdk_registry
+from pipelex.hub import get_plugin_manager, get_plugin_sdk_registry
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -169,9 +169,9 @@ class LLMWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case LLMPlatform.SPECIFIC_LLM:
-                plugin_m2 = get_plugin_m2()
+                plugin_manager = get_plugin_manager()
                 try:
-                    llm_worker_class = plugin_m2.get_required_plugin(plugin_name=llm_engine.llm_model.llm_name)
+                    llm_worker_class = plugin_manager.get_required_plugin(plugin_name=llm_engine.llm_model.llm_name)
                 except ClassRegistryNotFoundError as exc:
                     raise MissingPluginError(f"Plugin LLM worker class for '{llm_engine.llm_model.llm_name}' not found") from exc
                 llm_worker = llm_worker_class(llm_engine=llm_engine, reporting_delegate=reporting_delegate)
