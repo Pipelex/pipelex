@@ -8,6 +8,7 @@ from pipelex.plugins.openai.openai_config import OpenAIConfig
 from pipelex.plugins.openai.perplexity_config import PerplexityConfig
 from pipelex.plugins.openai.vertexai_config import VertexAIConfig
 from pipelex.plugins.openai.xai_config import XaiConfig
+from pipelex.plugins.specific_llm.specific_llm_config import SpecificLLMConfig
 from pipelex.tools.config.models import ConfigModel
 
 
@@ -22,3 +23,4 @@ class PluginConfig(ConfigModel):
     xai_config: XaiConfig
     custom_endpoint_config: CustomEndpointConfig
     fal_config: FalConfig
+    specific_llm_config: SpecificLLMConfig
