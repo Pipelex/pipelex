@@ -1,5 +1,5 @@
 [pipelex.aws_config]
-api_key_method = "env" 
+api_key_method = "env"
 # The possible values are "env" and "secret_provider". 
 # "env" means means that the env var are stored in your .env file. 
 # "secret_provider" means that the env var are stored in your Secret Manager (See the doc for injecting a secret provider).
@@ -8,39 +8,6 @@ api_key_method = "env"
 [cogt.llm_config.preferred_platforms]
 # This overrrides the defaults set for any llm handle
 "gpt-4o-mini" = "openai"
-
-[plugins]
-
-[plugins.openai_config]
-image_output_compression = 100
-api_key_method = "env"
-
-[plugins.azure_openai_config]
-api_key_method = "env"
-
-# TODO: handle multiple azure openai accounts with different resource groups and account names for various llm model
-
-[plugins.perplexity_config]
-api_key_method = "env"
-
-[plugins.xai_config]
-api_key_method = "env"
-
-[plugins.vertexai_config]
-api_key_method = "env"
-
-[plugins.mistral_config]
-api_key_method = "env"
-
-[plugins.bedrock_config]
-client_method = "aioboto3"
-
-[plugins.anthropic_config]
-claude_4_reduced_tokens_limit = 8192  # use "unlimited" to enable the full 32/64K tokens Opus/Sonet but it raises streaming/timeout issues
-api_key_method = "env"
-
-[plugins.custom_endpoint_config]
-api_key_method = "env"
 
 ####################################################################################################
 # OCR config

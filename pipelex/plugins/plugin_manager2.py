@@ -12,9 +12,15 @@ from pipelex.types import StrEnum
 
 
 class PluginManager2(BaseModel):
-    plugin_config: Optional[PluginConfig] = None
+    _plugin_configs: Optional[PluginConfig] = None
+
+    @property
+    def plugin_configs(self) -> PluginConfig:
+        if self._plugin_configs is None:
+            raise RuntimeError("Plugin configs not loaded")
+        return self._plugin_configs
 
     def load_plugin_config(self):
         plugin_config_path = LibraryConfig.get_plugin_config_path()
         plugin_config_dict = load_toml_from_path(path=plugin_config_path)
-        self.plugin_config = PluginConfig.model_validate(plugin_config_dict)
+        self._plugin_configs = PluginConfig.model_validate(plugin_config_dict)

@@ -133,6 +133,7 @@ class Pipelex:
 
         # cogt
         self.plugin_manager2 = PluginManager2()
+        self.pipelex_hub.set_plugin_manager2(self.plugin_manager2)
         self.llm_model_provider = llm_model_provider or LLMModelLibrary()
         self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
         self.plugin_manager = plugin_manager or PluginManager()

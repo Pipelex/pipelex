@@ -28,6 +28,7 @@ from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
 from pipelex.plugins.plugin_manager import PluginManager
+from pipelex.plugins.plugin_manager2 import PluginManager2
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.config.models import ConfigRoot
@@ -56,6 +57,7 @@ class PipelexHub:
         self._llm_models_provider: Optional[LLMModelProviderAbstract] = None
         self._llm_deck_provider: Optional[LLMDeckAbstract] = None
         self._plugin_manager: Optional[PluginManager] = None
+        self._plugin_manager2: Optional[PluginManager2] = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: Optional[ContentGeneratorProtocol] = None
@@ -137,6 +139,9 @@ class PipelexHub:
 
     def set_plugin_manager(self, plugin_manager: PluginManager):
         self._plugin_manager = plugin_manager
+
+    def set_plugin_manager2(self, plugin_manager2: PluginManager2):
+        self._plugin_manager2 = plugin_manager2
 
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
@@ -231,6 +236,11 @@ class PipelexHub:
         if self._plugin_manager is None:
             raise RuntimeError("SdkManager is not initialized")
         return self._plugin_manager
+
+    def get_plugin_manager2(self) -> PluginManager2:
+        if self._plugin_manager2 is None:
+            raise RuntimeError("PluginManager2 is not initialized")
+        return self._plugin_manager2
 
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
@@ -340,6 +350,10 @@ def get_llm_deck() -> LLMDeckAbstract:
 
 def get_plugin_manager() -> PluginManager:
     return get_pipelex_hub().get_plugin_manager()
+
+
+def get_plugin_manager2() -> PluginManager2:
+    return get_pipelex_hub().get_plugin_manager2()
 
 
 def get_inference_manager() -> InferenceManagerProtocol:

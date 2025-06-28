@@ -114,7 +114,6 @@ class Pipelex(ConfigModel):
 class PipelexConfig(ConfigRoot):
     session_id: str = shortuuid.uuid()
     cogt: Cogt
-    plugins: PluginConfig
     pipelex: Pipelex
 
 
