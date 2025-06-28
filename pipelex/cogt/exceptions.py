@@ -128,5 +128,9 @@ class MissingDependencyError(CogtError):
         super().__init__(error_msg)
 
 
+class MissingPluginError(CogtError):
+    pass
+
+
 class OcrCapabilityError(CogtError):
     pass

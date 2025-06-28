@@ -1,6 +1,8 @@
 from typing import Optional
 
-from pipelex.cogt.exceptions import MissingDependencyError
+from kajson.exceptions import ClassRegistryNotFoundError
+
+from pipelex.cogt.exceptions import MissingDependencyError, MissingPluginError
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
@@ -156,10 +158,9 @@ class LLMWorkerFactory:
                 )
             case LLMPlatform.SPECIFIC_LLM:
                 plugin_manager2 = get_plugin_manager2()
-                specific_llm_config = plugin_manager2.plugin_configs.specific_llm_config
-                llm_worker_class_name = specific_llm_config.llm_worker_classes[llm_engine.llm_model.llm_name]
-                from pipelex.plugins.specific_llm.template_llm_worker import TemplateLLMWorker
-
-                llm_worker_class = eval(llm_worker_class_name)
+                try:
+                    llm_worker_class = plugin_manager2.get_required_plugin(plugin_name=llm_engine.llm_model.llm_name)
+                except ClassRegistryNotFoundError as exc:
+                    raise MissingPluginError(f"Plugin LLM worker class for '{llm_engine.llm_model.llm_name}' not found") from exc
                 llm_worker = llm_worker_class(llm_engine=llm_engine, reporting_delegate=reporting_delegate)
         return llm_worker

@@ -1,19 +1,19 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field, RootModel
+from kajson.class_registry import ClassRegistry
 
-from pipelex.cogt.imgg.imgg_platform import ImggPlatform
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.ocr.ocr_platform import OcrPlatform
+from pipelex import log
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.plugins.plugins_config import PluginConfig
+from pipelex.plugins.specific_llm.template_llm_worker import TemplateLLMWorker
 from pipelex.tools.misc.toml_utils import load_toml_from_path
-from pipelex.types import StrEnum
 
 
 class PluginManager2:
     def __init__(self):
         self._plugin_configs: Optional[PluginConfig] = None
+        self._plugin_registry = ClassRegistry()
+        self._plugin_registry.register_class(class_type=TemplateLLMWorker)
 
     @property
     def plugin_configs(self) -> PluginConfig:
@@ -25,3 +25,8 @@ class PluginManager2:
         plugin_config_path = LibraryConfig.get_plugin_config_path()
         plugin_config_dict = load_toml_from_path(path=plugin_config_path)
         self._plugin_configs = PluginConfig.model_validate(plugin_config_dict)
+
+    def get_required_plugin(self, plugin_name: str) -> Any:
+        plugin_class_name = self.plugin_configs.specific_llm_config.llm_worker_classes[plugin_name]
+        plugin_class = self._plugin_registry.get_required_class(plugin_class_name)
+        return plugin_class
