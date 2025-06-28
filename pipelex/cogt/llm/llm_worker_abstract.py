@@ -114,7 +114,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # Verify feasibility
         if not self.llm_engine.is_gen_object_supported:
-            raise LLMCapabilityError(f"LLM Engine '{self.llm_engine.tag}' does not support object generation.")
+            raise LLMCapabilityError(f"LLM Engine '{self.llm_engine.tag}' does not support object generation:\n{self.llm_engine}")
         self._check_can_perform_job(llm_job=llm_job)
 
         # TODO: Fix printing prompts that contain image bytes

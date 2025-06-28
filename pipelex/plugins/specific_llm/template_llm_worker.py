@@ -1,5 +1,6 @@
 from typing import Type
 
+from polyfactory.factories.pydantic_factory import ModelFactory
 from typing_extensions import override
 
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -9,15 +10,6 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
 class TemplateLLMWorker(LLMWorkerAbstract):
-    # def __init__(
-    #     self,
-    #     llm_engine: LLMEngine,
-    #     reporting_delegate: Optional[ReportingProtocol] = None,
-    # ):
-    #     super().__init__(llm_engine=llm_engine, structure_method=None, reporting_delegate=reporting_delegate)
-
-    #########################################################
-
     @override
     async def _gen_text(
         self,
@@ -39,4 +31,9 @@ class TemplateLLMWorker(LLMWorkerAbstract):
         llm_job: LLMJob,
         schema: Type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        raise NotImplementedError()
+        class ObjectFactory(ModelFactory[schema]):  # type: ignore
+            __model__ = schema
+            __use_examples__ = True
+
+        obj = ObjectFactory.build()
+        return obj

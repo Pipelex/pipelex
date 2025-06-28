@@ -59,7 +59,7 @@ class LLMPlatform(StrEnum):
             case LLMPlatform.BEDROCK:
                 return False
             case LLMPlatform.SPECIFIC_LLM:
-                return False
+                return True
 
     @property
     def console_color(self) -> str:
