@@ -4,6 +4,7 @@ from kajson.class_registry import ClassRegistry
 
 from pipelex import log
 from pipelex.libraries.library_config import LibraryConfig
+from pipelex.plugins.plugin_sdk_registry import PluginSdkRegistry
 from pipelex.plugins.plugins_config import PluginConfig
 from pipelex.plugins.specific_llm.template_llm_worker import TemplateLLMWorker
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -14,6 +15,7 @@ class PluginManager:
         self._plugin_configs: Optional[PluginConfig] = None
         self._plugin_registry = ClassRegistry()
         self._plugin_registry.register_class(class_type=TemplateLLMWorker)
+        self.plugin_sdk_registry = PluginSdkRegistry()
 
     @property
     def plugin_configs(self) -> PluginConfig:

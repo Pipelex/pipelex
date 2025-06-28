@@ -8,7 +8,7 @@ from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.config import get_config
-from pipelex.hub import get_plugin_manager, get_plugin_sdk_registry
+from pipelex.hub import get_plugin_manager
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -20,7 +20,7 @@ class LLMWorkerFactory:
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> LLMWorkerAbstract:
         llm_sdk_handle = PluginSdkHandle.get_for_llm_platform(llm_platform=llm_engine.llm_platform)
-        plugin_sdk_registry = get_plugin_sdk_registry()
+        plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         llm_worker: LLMWorkerAbstract
         match llm_engine.llm_platform:
             case LLMPlatform.OPENAI | LLMPlatform.AZURE_OPENAI | LLMPlatform.PERPLEXITY | LLMPlatform.XAI:

@@ -4,7 +4,7 @@ from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
-from pipelex.hub import get_plugin_sdk_registry
+from pipelex.hub import get_plugin_manager
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -16,7 +16,7 @@ class OcrWorkerFactory:
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> OcrWorkerAbstract:
         ocr_sdk_handle = PluginSdkHandle.get_for_ocr_engine(ocr_platform=ocr_engine.ocr_platform)
-        plugin_sdk_registry = get_plugin_sdk_registry()
+        plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         ocr_worker: OcrWorkerAbstract
         match ocr_engine.ocr_platform:
             case OcrPlatform.MISTRAL:

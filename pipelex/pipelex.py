@@ -130,8 +130,6 @@ class Pipelex:
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
 
         # cogt
-        self.plugin_sdk_registry = PluginSdkRegistry()
-        self.pipelex_hub.set_plugin_sdk_registry(self.plugin_sdk_registry)
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
         self.llm_model_provider = llm_model_provider or LLMModelLibrary()
