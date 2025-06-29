@@ -1,6 +1,5 @@
 from typing import Optional
 
-
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform

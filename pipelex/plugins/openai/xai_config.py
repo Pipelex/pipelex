@@ -3,15 +3,15 @@ from typing import Tuple
 from pydantic import Field
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError
 from pipelex.tools.config.models import ConfigModel
 from pipelex.tools.environment import EnvVarNotFoundError, get_required_env
+from pipelex.tools.exceptions import CredentialsError
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.types import StrEnum
 
 
-class XaiCredentialsError(CogtError):
+class XaiCredentialsError(CredentialsError):
     pass
 
 
