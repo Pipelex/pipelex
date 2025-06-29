@@ -20,7 +20,7 @@ class LLMPlatform(StrEnum):
     VERTEXAI = "vertexai"
     XAI = "xai"
     CUSTOM_LLM = "custom_llm"
-    SPECIFIC_LLM = "specific_llm"
+    EXTERNAL_LLM = "external_llm"
 
     @staticmethod
     def list_openai_related() -> list["LLMPlatform"]:
@@ -58,7 +58,7 @@ class LLMPlatform(StrEnum):
                 return True
             case LLMPlatform.BEDROCK:
                 return False
-            case LLMPlatform.SPECIFIC_LLM:
+            case LLMPlatform.EXTERNAL_LLM:
                 return True
 
     @property

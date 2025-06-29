@@ -45,7 +45,7 @@ class PluginSdkHandle(StrEnum):
                 return PluginSdkHandle.XAI_OPENAI_SDK
             case LLMPlatform.CUSTOM_LLM:
                 return PluginSdkHandle.CUSTOM_LLM_OPENAI_SDK
-            case LLMPlatform.SPECIFIC_LLM:
+            case LLMPlatform.EXTERNAL_LLM:
                 return PluginSdkHandle.SPECIFIC_SDK
 
     @staticmethod

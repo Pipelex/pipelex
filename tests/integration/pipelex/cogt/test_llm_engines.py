@@ -44,7 +44,6 @@ class TestLLMEngines:
         log.info(f"Testing {llm_id} on {llm_platform}")
         llm_models_provider = get_llm_models_provider()
         llm_models = llm_models_provider.get_all_llm_models()
-        llm_worker_factory = LLMWorkerFactory()
         count = 0
         for llm_model in llm_models:
             platform_llm_id = llm_model.platform_llm_id.get(llm_platform)
@@ -55,7 +54,7 @@ class TestLLMEngines:
                 llm_platform=llm_platform,
                 llm_model=llm_model,
             )
-            llm_worker = llm_worker_factory.make_llm_worker(
+            llm_worker = LLMWorkerFactory.make_llm_worker(
                 llm_engine=llm_engine,
                 reporting_delegate=get_report_delegate(),
             )
@@ -115,7 +114,6 @@ class TestLLMEngines:
     async def test_llm_engines_from_one_platform(self, llm_job_params: LLMJobParams, llm_platform: LLMPlatform):
         llm_models_provider = get_llm_models_provider()
         llm_models = llm_models_provider.get_all_llm_models()
-        llm_worker_factory = LLMWorkerFactory()
         for llm_model in llm_models:
             if llm_platform not in llm_model.enabled_platforms:
                 continue
@@ -123,7 +121,7 @@ class TestLLMEngines:
                 llm_platform=llm_platform,
                 llm_model=llm_model,
             )
-            llm_worker = llm_worker_factory.make_llm_worker(
+            llm_worker = LLMWorkerFactory.make_llm_worker(
                 llm_engine=llm_engine,
                 reporting_delegate=get_report_delegate(),
             )

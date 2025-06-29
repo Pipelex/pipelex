@@ -103,7 +103,7 @@ class LLMFamily(StrEnum):
     CUSTOM_MISTRAL_SMALL_3_1 = "custom-mistral-small3.1"
     CUSTOM_QWEN_3 = "custom-qwen3"
 
-    SPECIFIC = "specific"
+    EXTERNAL = "external"
 
     @property
     def creator(self) -> LLMCreator:
@@ -147,7 +147,7 @@ class LLMFamily(StrEnum):
                 return LLMCreator.META
             case LLMFamily.CUSTOM_QWEN_3:
                 return LLMCreator.ALIBABA
-            case LLMFamily.SPECIFIC:
+            case LLMFamily.EXTERNAL:
                 return LLMCreator.SPECIFIC
 
     @property

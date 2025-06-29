@@ -168,7 +168,7 @@ class LLMWorkerFactory:
                     llm_engine=llm_engine,
                     reporting_delegate=reporting_delegate,
                 )
-            case LLMPlatform.SPECIFIC_LLM:
+            case LLMPlatform.EXTERNAL_LLM:
                 plugin_manager = get_plugin_manager()
                 try:
                     llm_worker_class = plugin_manager.get_required_plugin(plugin_name=llm_engine.llm_model.llm_name)

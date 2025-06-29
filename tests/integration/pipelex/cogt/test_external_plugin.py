@@ -70,19 +70,18 @@ class TestExternalPlugin:
         get_plugin_manager().register_plugin(name=EXTERNAL_PLUGIN_NAME, plugin_class=MockExternalLLMWorker)
 
         llm_engine = LLMEngine(
-            llm_platform=LLMPlatform.SPECIFIC_LLM,
+            llm_platform=LLMPlatform.EXTERNAL_LLM,
             llm_model=LLMModel(
                 llm_name=EXTERNAL_PLUGIN_NAME,
                 version=LATEST_VERSION_NAME,
-                default_platform=LLMPlatform.SPECIFIC_LLM,
-                llm_family=LLMFamily.SPECIFIC,
+                default_platform=LLMPlatform.EXTERNAL_LLM,
+                llm_family=LLMFamily.EXTERNAL,
                 is_gen_object_supported=True,
-                platform_llm_id={LLMPlatform.SPECIFIC_LLM: EXTERNAL_PLUGIN_NAME},
+                platform_llm_id={LLMPlatform.EXTERNAL_LLM: EXTERNAL_PLUGIN_NAME},
                 max_prompt_images=0,
             ),
         )
-        llm_worker_factory = LLMWorkerFactory()
-        llm_worker = llm_worker_factory.make_llm_worker(
+        llm_worker = LLMWorkerFactory.make_llm_worker(
             llm_engine=llm_engine,
             reporting_delegate=get_report_delegate(),
         )

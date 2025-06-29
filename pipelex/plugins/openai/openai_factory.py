@@ -79,7 +79,7 @@ class OpenAIFactory:
                     api_key=api_key,
                     base_url=base_url,
                 )
-            case LLMPlatform.ANTHROPIC | LLMPlatform.BEDROCK | LLMPlatform.BEDROCK_ANTHROPIC | LLMPlatform.MISTRAL | LLMPlatform.SPECIFIC_LLM:
+            case LLMPlatform.ANTHROPIC | LLMPlatform.BEDROCK | LLMPlatform.BEDROCK_ANTHROPIC | LLMPlatform.MISTRAL | LLMPlatform.EXTERNAL_LLM:
                 raise LLMEngineParameterError(f"Platform '{llm_platform}' is not supported by this factory '{cls.__name__}'")
 
         return the_client

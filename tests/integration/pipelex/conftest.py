@@ -133,7 +133,7 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
         # LLMPlatform.VERTEXAI,
         # LLMPlatform.CUSTOM_LLM,
         # LLMPlatform.XAI,
-        LLMPlatform.SPECIFIC_LLM,
+        LLMPlatform.EXTERNAL_LLM,
     ]
 )
 def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
