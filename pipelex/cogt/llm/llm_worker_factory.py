@@ -179,7 +179,7 @@ class LLMWorkerFactory:
         llm_worker: LLMWorkerAbstract
         plugin_manager = get_plugin_manager()
         try:
-            llm_worker_class = plugin_manager.get_required_plugin(plugin_name=external_plugin_name)
+            llm_worker_class = plugin_manager.get_llm_plugin(plugin_name=external_plugin_name)
         except ClassRegistryNotFoundError as exc:
             raise MissingPluginError(f"Could not find external plugin '{external_plugin_name}' to make LLM worker") from exc
         llm_worker = llm_worker_class(reporting_delegate=reporting_delegate)

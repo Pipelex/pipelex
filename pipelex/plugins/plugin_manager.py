@@ -3,6 +3,8 @@ from typing import Any, Dict, Optional, Type
 from kajson.class_registry import ClassRegistry
 from pydantic import Field
 
+from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.plugins.plugin_sdk_registry import PluginSdkRegistry
 from pipelex.plugins.plugins_config import PluginConfig
@@ -13,7 +15,6 @@ class PluginManager:
     def __init__(self):
         self._plugin_configs: Optional[PluginConfig] = None
         self._plugin_registry = ClassRegistry()
-        self._llm_worker_classes: Dict[str, str] = dict()
         self.plugin_sdk_registry = PluginSdkRegistry()
 
     @property
@@ -27,11 +28,12 @@ class PluginManager:
         plugin_config_dict = load_toml_from_path(path=plugin_config_path)
         self._plugin_configs = PluginConfig.model_validate(plugin_config_dict)
 
-    def get_required_plugin(self, plugin_name: str) -> Any:
-        plugin_class_name = self._llm_worker_classes[plugin_name]
-        plugin_class = self._plugin_registry.get_required_class(plugin_class_name)
-        return plugin_class
+    def register_plugin(self, name: str, plugin_class: Type[InferenceWorkerAbstract]):
+        self._plugin_registry.register_class(name=name, class_type=plugin_class)
 
-    def register_plugin(self, name: str, plugin_class: Type[Any]):
-        self._llm_worker_classes[name] = plugin_class.__name__
-        self._plugin_registry.register_class(class_type=plugin_class)
+    def get_llm_plugin(self, plugin_name: str) -> Type[LLMWorkerAbstract]:
+        plugin_class: Type[LLMWorkerAbstract] = self._plugin_registry.get_required_subclass(
+            name=plugin_name,
+            base_class=LLMWorkerAbstract,
+        )
+        return plugin_class
