@@ -61,40 +61,8 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestExternalPlugin:
-    async def test_external_plugin(self):
-        plugin_name = EXTERNAL_PLUGIN_NAME
-        get_plugin_manager().register_plugin(name=plugin_name, plugin_class=MockExternalLLMWorker)
-        llm_worker = LLMWorkerFactory.make_llm_worker_from_external_plugin(
-            external_plugin_name=plugin_name,
-            reporting_delegate=get_report_delegate(),
-        )
-        llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
-            system_text=None,
-            user_text=LLMTestConstants.USER_TEXT_SHORT,
-            llm_job_params=LLMJobParams(
-                temperature=0.5,
-                max_tokens=None,
-                seed=None,
-            ),
-        )
-        generated_text = await llm_worker.gen_text(llm_job=llm_job)
-        assert generated_text
-        pretty_print(generated_text)
-        generated_object = await llm_worker.gen_object(llm_job=llm_job, schema=Person)
-        assert generated_object
-        pretty_print(generated_object)
-
-    async def test_external_llm_handle(self):
-        plugin_name = EXTERNAL_PLUGIN_NAME
-        get_plugin_manager().register_plugin(name=plugin_name, plugin_class=MockExternalLLMWorker)
-        llm_external_worker = LLMWorkerFactory.make_llm_worker_from_external_plugin(
-            external_plugin_name=plugin_name,
-            reporting_delegate=get_report_delegate(),
-        )
-        inference_manager = get_inference_manager()
-        llm_handle = plugin_name
-        inference_manager.set_llm_worker(llm_handle=llm_handle, llm_worker=llm_external_worker)
-        llm_worker = inference_manager.get_llm_worker(llm_handle=llm_handle)
+    async def test_external_llm_worker(self):
+        llm_worker = MockExternalLLMWorker(reporting_delegate=get_report_delegate())
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             system_text=None,
             user_text=LLMTestConstants.USER_TEXT_SHORT,
@@ -112,16 +80,11 @@ class TestExternalPlugin:
         pretty_print(generated_object)
 
     async def test_pipe_llm_with_external_llm_handle(self):
-        plugin_name = EXTERNAL_PLUGIN_NAME
-        get_plugin_manager().register_plugin(name=plugin_name, plugin_class=MockExternalLLMWorker)
-        llm_external_worker = LLMWorkerFactory.make_llm_worker_from_external_plugin(
-            external_plugin_name=plugin_name,
-            reporting_delegate=get_report_delegate(),
+        llm_handle = EXTERNAL_PLUGIN_NAME
+        get_inference_manager().set_llm_worker_from_external_plugin(
+            llm_handle=llm_handle,
+            llm_worker_class=MockExternalLLMWorker,
         )
-        inference_manager = get_inference_manager()
-        llm_handle = plugin_name
-        inference_manager.set_llm_worker(llm_handle=llm_handle, llm_worker=llm_external_worker)
-
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm_with_external_llm_handle",

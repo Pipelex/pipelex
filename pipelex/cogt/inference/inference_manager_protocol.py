@@ -1,4 +1,4 @@
-from typing import Optional, Protocol
+from typing import Optional, Protocol, Type
 
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
@@ -26,10 +26,17 @@ class InferenceManagerProtocol(Protocol):
         specific_llm_engine_blueprint: Optional[LLMEngineBlueprint] = None,
     ) -> LLMWorkerAbstract: ...
 
-    def set_llm_worker(
+    # def set_llm_worker(
+    #     self,
+    #     llm_handle: str,
+    #     llm_worker: LLMWorkerAbstract,
+    #     should_warn_if_already_registered: bool = True,
+    # ): ...
+
+    def set_llm_worker_from_external_plugin(
         self,
         llm_handle: str,
-        llm_worker: LLMWorkerAbstract,
+        llm_worker_class: Type[LLMWorkerAbstract],
         should_warn_if_already_registered: bool = True,
     ): ...
 

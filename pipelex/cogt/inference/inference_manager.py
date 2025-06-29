@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Type
 
 from typing_extensions import override
 
@@ -100,17 +100,29 @@ class InferenceManager(InferenceManagerProtocol):
 
         return llm_worker
 
+    # @override
+    # def set_llm_worker(
+    #     self,
+    #     llm_handle: str,
+    #     llm_worker: LLMWorkerAbstract,
+    #     should_warn_if_already_registered: bool = True,
+    # ):
+    #     if llm_handle in self.llm_workers:
+    #         if should_warn_if_already_registered:
+    #             log.warning(f"LLM worker for '{llm_handle}' already registered, skipping")
+    #     self.llm_workers[llm_handle] = llm_worker
+
     @override
-    def set_llm_worker(
+    def set_llm_worker_from_external_plugin(
         self,
         llm_handle: str,
-        llm_worker: LLMWorkerAbstract,
+        llm_worker_class: Type[LLMWorkerAbstract],
         should_warn_if_already_registered: bool = True,
     ):
         if llm_handle in self.llm_workers:
             if should_warn_if_already_registered:
                 log.warning(f"LLM worker for '{llm_handle}' already registered, skipping")
-        self.llm_workers[llm_handle] = llm_worker
+        self.llm_workers[llm_handle] = llm_worker_class(reporting_delegate=get_report_delegate())
 
     ####################################################################################################
     # Manage IMGG Workers
