@@ -48,6 +48,14 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         return self.llm_engine.is_gen_object_supported
 
     @override
+    async def _before_job(
+        self,
+        llm_job: LLMJob,
+    ):
+        await super()._before_job(llm_job=llm_job)
+        llm_job.llm_job_before_start(llm_engine=self.llm_engine)
+
+    @override
     def _check_can_perform_job(self, llm_job: LLMJob):
         # This can be overridden by subclasses for specific checks
         self._check_vision_support(llm_job=llm_job)
@@ -61,89 +69,3 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
             max_prompt_images = self.llm_engine.llm_model.max_prompt_images or 5000
             if nb_images > max_prompt_images:
                 raise LLMCapabilityError(f"LLM Engine '{self.llm_engine.tag}' does not accept that many images: {nb_images}.")
-
-    @override
-    async def gen_text(
-        self,
-        llm_job: LLMJob,
-    ) -> str:
-        log.debug("LLM Worker gen_text")
-        log.verbose(f"\n{self.llm_engine.desc}")
-        log.verbose(llm_job.params_desc)
-
-        # Verify that the job is valid
-        llm_job.validate_before_execution()
-
-        # Verify feasibility
-        self._check_can_perform_job(llm_job=llm_job)
-
-        # TODO: Fix printing prompts that contain image bytes
-        # log.verbose(llm_job.llm_prompt.desc, title="llm_prompt")
-
-        # metadata
-        llm_job.job_metadata.unit_job_id = UnitJobId.LLM_GEN_TEXT
-
-        # Prepare job
-        # TODO: prep job should exits for non-internal llm workers
-        llm_job.llm_job_before_start(llm_engine=self.llm_engine)
-
-        result = await self._gen_text(llm_job=llm_job)
-
-        # Cleanup result (Instructor adds the client's response as a _raw_response attribute, we don't want to pass it along)
-        if hasattr(result, "_raw_response"):
-            delattr(result, "_raw_response")
-
-        # Report job
-        llm_job.llm_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=llm_job)
-
-        return result
-
-    @override
-    async def gen_object(
-        self,
-        llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
-    ) -> BaseModelTypeVar:
-        log.debug("LLM Worker gen_object")
-        log.verbose(f"\n{self.llm_engine.desc}")
-        log.verbose(llm_job.params_desc)
-
-        # Verify that the job is valid
-        llm_job.validate_before_execution()
-
-        # Verify feasibility
-        if not self.llm_engine.is_gen_object_supported:
-            raise LLMCapabilityError(f"LLM Engine '{self.llm_engine.tag}' does not support object generation:\n{self.llm_engine}")
-        self._check_can_perform_job(llm_job=llm_job)
-
-        # TODO: Fix printing prompts that contain image bytes
-        # log.verbose(llm_job.llm_prompt.desc, title="llm_prompt")
-
-        # metadata
-        llm_job.job_metadata.unit_job_id = UnitJobId.LLM_GEN_OBJECT
-
-        # Prepare job
-        llm_job.llm_job_before_start(llm_engine=self.llm_engine)
-
-        # Execute job
-        try:
-            result = await self._gen_object(llm_job=llm_job, schema=schema)
-        except InstructorRetryException as exc:
-            raise LLMCompletionError(
-                f"""Instructor failed to generate object: {schema} after retry with llm '{self.llm_engine.tag}'
-                Reason: {exc}
-                LLMPrompt: {llm_job.llm_prompt.desc}"""
-            ) from exc
-
-        # Cleanup result
-        if hasattr(result, "_raw_response"):
-            delattr(result, "_raw_response")
-
-        # Report job
-        llm_job.llm_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=llm_job)
-
-        return result

@@ -38,6 +38,25 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     def is_gen_object_supported(self) -> bool:
         return False
 
+    async def _before_job(
+        self,
+        llm_job: LLMJob,
+    ):
+        # Verify that the job is valid
+        llm_job.validate_before_execution()
+
+        # Verify feasibility
+        self._check_can_perform_job(llm_job=llm_job)
+
+    async def _after_job(
+        self,
+        llm_job: LLMJob,
+    ):
+        # Report job
+        llm_job.llm_job_after_complete()
+        if self.reporting_delegate:
+            self.reporting_delegate.report_inference_job(inference_job=llm_job)
+
     def _check_can_perform_job(self, llm_job: LLMJob):
         # This can be overridden by subclasses for specific checks
         pass
@@ -48,33 +67,16 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     ) -> str:
         log.debug("LLM Worker gen_text")
         log.verbose(llm_job.params_desc)
-
-        # Verify that the job is valid
-        llm_job.validate_before_execution()
-
-        # Verify feasibility
-        self._check_can_perform_job(llm_job=llm_job)
-
-        # TODO: Fix printing prompts that contain image bytes
-        # log.verbose(llm_job.llm_prompt.desc, title="llm_prompt")
+        log.verbose(llm_job.llm_prompt.desc, title="llm_prompt")
 
         # metadata
         llm_job.job_metadata.unit_job_id = UnitJobId.LLM_GEN_TEXT
 
-        # Prepare job
-        # TODO: prep job should exits for non-internal llm workers
-        # llm_job.llm_job_before_start(llm_engine=self.llm_engine)
+        await self._before_job(llm_job=llm_job)
 
         result = await self._gen_text(llm_job=llm_job)
 
-        # Cleanup result (Instructor adds the client's response as a _raw_response attribute, we don't want to pass it along)
-        if hasattr(result, "_raw_response"):
-            delattr(result, "_raw_response")
-
-        # Report job
-        llm_job.llm_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=llm_job)
+        await self._after_job(llm_job=llm_job)
 
         return result
 
@@ -92,18 +94,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     ) -> BaseModelTypeVar:
         log.debug("LLM Worker gen_object")
         log.verbose(llm_job.params_desc)
-
-        # Verify that the job is valid
-        llm_job.validate_before_execution()
-
-        # Verify feasibility
-        self._check_can_perform_job(llm_job=llm_job)
-
-        # TODO: Fix printing prompts that contain image bytes
-        # log.verbose(llm_job.llm_prompt.desc, title="llm_prompt")
+        log.verbose(llm_job.llm_prompt.desc, title="llm_prompt")
 
         # metadata
         llm_job.job_metadata.unit_job_id = UnitJobId.LLM_GEN_OBJECT
+
+        await self._before_job(llm_job=llm_job)
 
         # Execute job
         result = await self._gen_object(llm_job=llm_job, schema=schema)
@@ -112,10 +108,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if hasattr(result, "_raw_response"):
             delattr(result, "_raw_response")
 
-        # Report job
-        llm_job.llm_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=llm_job)
+        await self._after_job(llm_job=llm_job)
 
         return result
 
