@@ -10,8 +10,8 @@ from pipelex.cogt.imgg.imgg_worker_factory import ImggWorkerFactory
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_engine_factory import LLMEngineFactory
-from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
+from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.cogt.ocr.ocr_worker_factory import OcrWorkerFactory
@@ -23,7 +23,7 @@ class InferenceManager(InferenceManagerProtocol):
     def __init__(self):
         self.imgg_worker_factory = ImggWorkerFactory()
         self.ocr_worker_factory = OcrWorkerFactory()
-        self.llm_workers: Dict[str, LLMWorkerAbstract] = {}
+        self.llm_workers: Dict[str, LLMWorkerInternalAbstract] = {}
         self.imgg_workers: Dict[str, ImggWorkerAbstract] = {}
         self.ocr_workers: Dict[str, OcrWorkerAbstract] = {}
 
@@ -68,7 +68,7 @@ class InferenceManager(InferenceManagerProtocol):
         self,
         llm_engine_blueprint: LLMEngineBlueprint,
         llm_handle: str,
-    ) -> LLMWorkerAbstract:
+    ) -> LLMWorkerInternalAbstract:
         llm_engine = LLMEngineFactory.make_llm_engine(llm_engine_blueprint=llm_engine_blueprint)
         llm_worker = LLMWorkerFactory.make_llm_worker(
             llm_engine=llm_engine,
@@ -82,7 +82,7 @@ class InferenceManager(InferenceManagerProtocol):
         self,
         llm_handle: str,
         specific_llm_engine_blueprint: Optional[LLMEngineBlueprint] = None,
-    ) -> LLMWorkerAbstract:
+    ) -> LLMWorkerInternalAbstract:
         if llm_worker := self.llm_workers.get(llm_handle):
             return llm_worker
         if not get_config().cogt.inference_manager_config.is_auto_setup_preset_llm:

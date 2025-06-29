@@ -8,8 +8,8 @@ from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_engine_factory import LLMEngineFactory
 from pipelex.cogt.llm.llm_models.llm_family import LLMCreator, LLMFamily
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
+from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.hub import get_inference_manager, get_llm_deck, get_llm_models_provider, get_report_delegate
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
 
@@ -18,7 +18,7 @@ from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestLLMEngines:
-    async def run_inference(self, llm_worker: LLMWorkerAbstract, llm_job: LLMJob):
+    async def run_inference(self, llm_worker: LLMWorkerInternalAbstract, llm_job: LLMJob):
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)

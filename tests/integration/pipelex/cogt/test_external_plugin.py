@@ -54,35 +54,11 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestExternalPlugin:
-    async def run_inference(self, llm_worker: LLMWorkerAbstract, llm_job: LLMJob):
-        generated_text = await llm_worker.gen_text(llm_job=llm_job)
-        assert generated_text
-        pretty_print(generated_text)
-        llm_model = llm_worker.llm_engine.llm_model
-        if llm_model.is_gen_object_supported:
-            generated_object = await llm_worker.gen_object(llm_job=llm_job, schema=Person)
-            assert generated_object
-            pretty_print(generated_object)
-        else:
-            log.info(f"No object generation supported for this model: '{llm_model.name_and_version_and_platform}'")
-
     async def test_external_plugin(self):
-        get_plugin_manager().register_plugin(name=EXTERNAL_PLUGIN_NAME, plugin_class=MockExternalLLMWorker)
-
-        llm_engine = LLMEngine(
-            llm_platform=LLMPlatform.EXTERNAL_LLM,
-            llm_model=LLMModel(
-                llm_name=EXTERNAL_PLUGIN_NAME,
-                version=LATEST_VERSION_NAME,
-                default_platform=LLMPlatform.EXTERNAL_LLM,
-                llm_family=LLMFamily.EXTERNAL,
-                is_gen_object_supported=True,
-                platform_llm_id={LLMPlatform.EXTERNAL_LLM: EXTERNAL_PLUGIN_NAME},
-                max_prompt_images=0,
-            ),
-        )
-        llm_worker = LLMWorkerFactory.make_llm_worker(
-            llm_engine=llm_engine,
+        plugin_name = EXTERNAL_PLUGIN_NAME
+        get_plugin_manager().register_plugin(name=plugin_name, plugin_class=MockExternalLLMWorker)
+        llm_worker = LLMWorkerFactory.make_llm_worker_from_external_plugin(
+            external_plugin_name=plugin_name,
             reporting_delegate=get_report_delegate(),
         )
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
@@ -94,4 +70,9 @@ class TestExternalPlugin:
                 seed=None,
             ),
         )
-        await self.run_inference(llm_worker=llm_worker, llm_job=llm_job)
+        generated_text = await llm_worker.gen_text(llm_job=llm_job)
+        assert generated_text
+        pretty_print(generated_text)
+        generated_object = await llm_worker.gen_object(llm_job=llm_job, schema=Person)
+        assert generated_object
+        pretty_print(generated_object)

@@ -6,6 +6,7 @@ from pipelex.cogt.exceptions import MissingDependencyError, MissingPluginError
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.config import get_config
 from pipelex.hub import get_plugin_manager
@@ -18,10 +19,10 @@ class LLMWorkerFactory:
     def make_llm_worker(
         llm_engine: LLMEngine,
         reporting_delegate: Optional[ReportingProtocol] = None,
-    ) -> LLMWorkerAbstract:
+    ) -> LLMWorkerInternalAbstract:
         llm_sdk_handle = PluginSdkHandle.get_for_llm_platform(llm_platform=llm_engine.llm_platform)
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
-        llm_worker: LLMWorkerAbstract
+        llm_worker: LLMWorkerInternalAbstract
         match llm_engine.llm_platform:
             case LLMPlatform.OPENAI | LLMPlatform.AZURE_OPENAI | LLMPlatform.PERPLEXITY | LLMPlatform.XAI:
                 from pipelex.plugins.openai.openai_factory import OpenAIFactory
@@ -175,4 +176,18 @@ class LLMWorkerFactory:
                 except ClassRegistryNotFoundError as exc:
                     raise MissingPluginError(f"Plugin LLM worker class for '{llm_engine.llm_model.llm_name}' not found") from exc
                 llm_worker = llm_worker_class(llm_engine=llm_engine, reporting_delegate=reporting_delegate)
+        return llm_worker
+
+    @staticmethod
+    def make_llm_worker_from_external_plugin(
+        external_plugin_name: str,
+        reporting_delegate: Optional[ReportingProtocol] = None,
+    ) -> LLMWorkerAbstract:
+        llm_worker: LLMWorkerAbstract
+        plugin_manager = get_plugin_manager()
+        try:
+            llm_worker_class = plugin_manager.get_required_plugin(plugin_name=external_plugin_name)
+        except ClassRegistryNotFoundError as exc:
+            raise MissingPluginError(f"Could not find external plugin '{external_plugin_name}' to make LLM worker") from exc
+        llm_worker = llm_worker_class(reporting_delegate=reporting_delegate)
         return llm_worker
