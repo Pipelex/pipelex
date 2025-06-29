@@ -32,10 +32,16 @@ class InferenceManager(InferenceManagerProtocol):
     def teardown(self):
         self.imgg_worker_factory = ImggWorkerFactory()
         self.ocr_worker_factory = OcrWorkerFactory()
-        self.llm_workers.clear()
-        self.imgg_workers.clear()
-        self.ocr_workers.clear()
-        log.verbose("InferenceManagerAsync reset")
+        for llm_worker in self.llm_workers.values():
+            llm_worker.teardown()
+        self.llm_workers = {}
+        for imgg_worker in self.imgg_workers.values():
+            imgg_worker.teardown()
+        self.imgg_workers = {}
+        for ocr_worker in self.ocr_workers.values():
+            ocr_worker.teardown()
+        self.ocr_workers = {}
+        log.verbose("InferenceManager teardown done")
 
     def print_workers(self):
         log.debug("LLM Workers:")

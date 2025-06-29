@@ -17,7 +17,11 @@ class PluginManager:
             raise RuntimeError("Plugin configs not loaded")
         return self._plugin_configs
 
-    def load_plugin_config(self):
+    def setup(self):
         plugin_config_path = LibraryConfig.get_plugin_config_path()
         plugin_config_dict = load_toml_from_path(path=plugin_config_path)
         self._plugin_configs = PluginConfig.model_validate(plugin_config_dict)
+
+    def teardown(self):
+        self._plugin_configs = None
+        self.plugin_sdk_registry.teardown()

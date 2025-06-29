@@ -66,8 +66,11 @@ PluginSdkRegistryRoot = Dict[str, Any]
 class PluginSdkRegistry(RootModel[PluginSdkRegistryRoot]):
     root: PluginSdkRegistryRoot = Field(default_factory=dict)
 
-    def reset(self):
-        self.root.clear()
+    def teardown(self):
+        for llm_sdk_instance in self.root.values():
+            if hasattr(llm_sdk_instance, "teardown"):
+                llm_sdk_instance.teardown()
+        self.root = {}
 
     def get_llm_sdk_instance(self, llm_sdk_handle: PluginSdkHandle) -> Optional[Any]:
         return self.root.get(llm_sdk_handle)

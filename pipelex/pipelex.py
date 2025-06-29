@@ -185,7 +185,7 @@ class Pipelex:
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
         self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
-        self.plugin_manager.load_plugin_config()
+        self.plugin_manager.setup()
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())
@@ -239,6 +239,7 @@ class Pipelex:
         self.inference_manager.teardown()
         self.reporting_delegate.teardown()
         self.llm_model_provider.teardown()
+        self.plugin_manager.teardown()
 
         # tools
         self.kajson_manager.teardown()
