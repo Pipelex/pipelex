@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Type
+from typing import Dict, Type
 
 from typing_extensions import override
 

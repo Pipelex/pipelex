@@ -1,11 +1,9 @@
 from typing import Optional
 
-from kajson.exceptions import ClassRegistryNotFoundError
 
-from pipelex.cogt.exceptions import MissingDependencyError, MissingPluginError
+from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.config import get_config
@@ -169,16 +167,4 @@ class LLMWorkerFactory:
                     llm_engine=llm_engine,
                     reporting_delegate=reporting_delegate,
                 )
-        return llm_worker
-
-    @staticmethod
-    def make_llm_worker_from_external_plugin(
-        external_plugin_name: str,
-        reporting_delegate: Optional[ReportingProtocol] = None,
-    ) -> LLMWorkerAbstract:
-        try:
-            llm_worker_class = get_plugin_manager().get_llm_plugin(plugin_name=external_plugin_name)
-        except ClassRegistryNotFoundError as exc:
-            raise MissingPluginError(f"Could not find external plugin '{external_plugin_name}' to make LLM worker") from exc
-        llm_worker = llm_worker_class(reporting_delegate=reporting_delegate)
         return llm_worker

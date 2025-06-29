@@ -10,7 +10,6 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
-from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_model_provider_abstract import (
     LLMModelProviderAbstract,
 )
