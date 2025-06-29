@@ -10,7 +10,7 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
-from pipelex.cogt.llm.llm_models.llm_model import LLMModel
+from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME, LLMModel
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
@@ -18,6 +18,8 @@ from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategor
 from pipelex.hub import get_plugin_manager, get_report_delegate
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
+
+EXTERNAL_PLUGIN_NAME = "mock_external_llm"
 
 
 class MockExternalLLMWorker(LLMWorkerAbstract):
@@ -65,17 +67,17 @@ class TestExternalPlugin:
             log.info(f"No object generation supported for this model: '{llm_model.name_and_version_and_platform}'")
 
     async def test_external_plugin(self):
-        get_plugin_manager().register_plugin(name="mock_external_llm", plugin_class=MockExternalLLMWorker)
+        get_plugin_manager().register_plugin(name=EXTERNAL_PLUGIN_NAME, plugin_class=MockExternalLLMWorker)
 
         llm_engine = LLMEngine(
             llm_platform=LLMPlatform.SPECIFIC_LLM,
             llm_model=LLMModel(
-                llm_name="mock_external_llm",
-                version="latest",
+                llm_name=EXTERNAL_PLUGIN_NAME,
+                version=LATEST_VERSION_NAME,
                 default_platform=LLMPlatform.SPECIFIC_LLM,
                 llm_family=LLMFamily.SPECIFIC,
                 is_gen_object_supported=True,
-                platform_llm_id={LLMPlatform.SPECIFIC_LLM: "mock_external_llm"},
+                platform_llm_id={LLMPlatform.SPECIFIC_LLM: EXTERNAL_PLUGIN_NAME},
                 max_prompt_images=0,
             ),
         )
