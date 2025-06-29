@@ -36,7 +36,6 @@ from pipelex.pipeline.track.pipeline_tracker_protocol import (
     PipelineTrackerProtocol,
 )
 from pipelex.plugins.plugin_manager import PluginManager
-from pipelex.plugins.plugin_sdk_registry import PluginSdkRegistry
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels

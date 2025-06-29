@@ -1,8 +1,7 @@
-from typing import Any, Optional
+from typing import Any, Optional, Type
 
 from kajson.class_registry import ClassRegistry
 
-from pipelex import log
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.plugins.plugin_sdk_registry import PluginSdkRegistry
 from pipelex.plugins.plugins_config import PluginConfig
@@ -14,8 +13,8 @@ class PluginManager:
     def __init__(self):
         self._plugin_configs: Optional[PluginConfig] = None
         self._plugin_registry = ClassRegistry()
-        self._plugin_registry.register_class(class_type=TemplateLLMWorker)
         self.plugin_sdk_registry = PluginSdkRegistry()
+        # self.register_plugin(name="template_llm_worker", plugin_class=TemplateLLMWorker)
 
     @property
     def plugin_configs(self) -> PluginConfig:
@@ -32,3 +31,7 @@ class PluginManager:
         plugin_class_name = self.plugin_configs.specific_llm_config.llm_worker_classes[plugin_name]
         plugin_class = self._plugin_registry.get_required_class(plugin_class_name)
         return plugin_class
+
+    def register_plugin(self, name: str, plugin_class: Type[Any]):
+        self.plugin_configs.specific_llm_config.llm_worker_classes[name] = plugin_class.__name__
+        self._plugin_registry.register_class(class_type=plugin_class)
