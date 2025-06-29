@@ -71,16 +71,15 @@ class TestLLMEngines:
             pytest.fail(f"No llm_engines found for llm_id '{llm_id}' on platform '{llm_platform}'")
 
     async def test_llm_engines_from_one_family(self, llm_job_params: LLMJobParams, llm_family: LLMFamily):
-        inference_manager = get_inference_manager()
         llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
         count = 0
-        for llm_handle, llm_engine_blueprint in llm_handle_to_llm_engine_blueprint.items():
+        for _, llm_engine_blueprint in llm_handle_to_llm_engine_blueprint.items():
             llm_engine = LLMEngineFactory.make_llm_engine(llm_engine_blueprint=llm_engine_blueprint)
             if llm_engine.llm_model.llm_family != llm_family:
                 continue
-            llm_worker = inference_manager.get_llm_worker(
-                llm_handle=llm_handle,
-                specific_llm_engine_blueprint=llm_engine_blueprint,
+            llm_worker = LLMWorkerFactory.make_llm_worker(
+                llm_engine=llm_engine,
+                reporting_delegate=get_report_delegate(),
             )
             llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
                 system_text=None,
@@ -93,15 +92,14 @@ class TestLLMEngines:
         log.info(f"Tested {count} llm_engines for family {llm_family}")
 
     async def test_llm_engines_from_one_creator(self, llm_job_params: LLMJobParams, llm_creator: LLMCreator):
-        inference_manager = get_inference_manager()
         llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
-        for llm_handle, llm_engine_blueprint in llm_handle_to_llm_engine_blueprint.items():
+        for _, llm_engine_blueprint in llm_handle_to_llm_engine_blueprint.items():
             llm_engine = LLMEngineFactory.make_llm_engine(llm_engine_blueprint=llm_engine_blueprint)
             if llm_engine.llm_model.llm_family.creator != llm_creator:
                 continue
-            llm_worker = inference_manager.get_llm_worker(
-                llm_handle=llm_handle,
-                specific_llm_engine_blueprint=llm_engine_blueprint,
+            llm_worker = LLMWorkerFactory.make_llm_worker(
+                llm_engine=llm_engine,
+                reporting_delegate=get_report_delegate(),
             )
             llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
                 system_text=None,
