@@ -140,6 +140,19 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
         return llm_model
 
     @override
+    def find_optional_llm_model(self, llm_handle: str) -> Optional[LLMModel]:
+        llm_models_provider = get_llm_models_provider()
+        llm_engine_blueprint = self.llm_handles.get(llm_handle)
+        if not llm_engine_blueprint:
+            return None
+        llm_model = llm_models_provider.get_optional_llm_model(
+            llm_name=llm_engine_blueprint.llm_name,
+            llm_version=llm_engine_blueprint.llm_version,
+            llm_platform_choice=llm_engine_blueprint.llm_platform_choice,
+        )
+        return llm_model
+
+    @override
     @classmethod
     def final_validate(cls, deck: Self):
         for llm_preset_id, llm_setting in deck.llm_presets.items():
@@ -217,7 +230,7 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
 
     def add_llm_handle_to_llm_engine_blueprint(self, llm_handle: str, llm_engine_default: str):
         if llm_handle in self.llm_handles:
-            raise ConfigValidationError(f"LLM engine blueprint for '{llm_handle}' is already defined in llm_handle_to_llm_engine_blueprint")
+            raise ConfigValidationError(f"LLM engine blueprint for '{llm_handle}' is already defined in llm deck's llm_handles")
         # TODO: sort the defaults by llm family
         self.llm_handles[llm_handle] = LLMEngineBlueprint(llm_name=llm_engine_default)
 

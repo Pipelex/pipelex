@@ -10,7 +10,6 @@ from pipelex.cogt.llm.llm_models.llm_family import LLMCreator, LLMFamily
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
-from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.hub import get_inference_manager, get_llm_deck, get_llm_models_provider, get_report_delegate
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
 

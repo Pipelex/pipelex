@@ -57,6 +57,10 @@ class LLMDeckAbstract(ABC):
     def find_llm_model(self, llm_handle: str) -> LLMModel:
         pass
 
+    @abstractmethod
+    def find_optional_llm_model(self, llm_handle: str) -> Optional[LLMModel]:
+        pass
+
     @classmethod
     @abstractmethod
     def final_validate(cls, deck: Self):
