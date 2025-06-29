@@ -14,7 +14,6 @@ class LLMCreator(StrEnum):
     PERPLEXITY = "Perplexity"
     XAI = "XAI"
     ALIBABA = "Alibaba"
-    SPECIFIC = "Specific"
 
     @property
     def prompting_target(self) -> LLMPromptingTarget:
@@ -28,8 +27,6 @@ class LLMCreator(StrEnum):
             case LLMCreator.GOOGLE:
                 return LLMPromptingTarget.GEMINI
             case LLMCreator.AMAZON | LLMCreator.PERPLEXITY | LLMCreator.META | LLMCreator.DEEPSEEK | LLMCreator.XAI | LLMCreator.ALIBABA:
-                return LLMPromptingTarget.OPENAI
-            case LLMCreator.SPECIFIC:
                 return LLMPromptingTarget.OPENAI
 
     @property
@@ -55,8 +52,6 @@ class LLMCreator(StrEnum):
                 return "green"
             case LLMCreator.ALIBABA:
                 return "yellow"
-            case LLMCreator.SPECIFIC:
-                return "gray"
 
 
 class LLMFamily(StrEnum):
@@ -103,8 +98,6 @@ class LLMFamily(StrEnum):
     CUSTOM_MISTRAL_SMALL_3_1 = "custom-mistral-small3.1"
     CUSTOM_QWEN_3 = "custom-qwen3"
 
-    EXTERNAL = "external"
-
     @property
     def creator(self) -> LLMCreator:
         match self:
@@ -147,8 +140,6 @@ class LLMFamily(StrEnum):
                 return LLMCreator.META
             case LLMFamily.CUSTOM_QWEN_3:
                 return LLMCreator.ALIBABA
-            case LLMFamily.EXTERNAL:
-                return LLMCreator.SPECIFIC
 
     @property
     def prompting_target(self) -> LLMPromptingTarget:
