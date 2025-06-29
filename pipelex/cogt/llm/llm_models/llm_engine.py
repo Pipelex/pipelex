@@ -31,7 +31,7 @@ platform llm id:  '{self.llm_id}'"""
 
     @property
     def tag(self) -> str:
-        return f"{self.llm_platform} - {self.llm_model.llm_name} - {self.llm_model.version}"
+        return f"{self.llm_platform}:{self.llm_model.llm_name}:{self.llm_model.version}:id-[{self.llm_id}]"
 
     @property
     def is_gen_object_supported(self) -> bool:

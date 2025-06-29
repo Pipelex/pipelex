@@ -40,7 +40,12 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     @property
     @override
     def desc(self) -> str:
-        return f"LLM Worker using:\n{self.llm_engine.desc}"
+        return f"LLM-Worker:{self.llm_engine.tag}"
+
+    @property
+    @override
+    def is_gen_object_supported(self) -> bool:
+        return self.llm_engine.is_gen_object_supported
 
     @override
     def _check_can_perform_job(self, llm_job: LLMJob):

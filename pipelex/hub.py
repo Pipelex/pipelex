@@ -14,7 +14,7 @@ from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_model_provider_abstract import (
     LLMModelProviderAbstract,
 )
-from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.core.concept import Concept
 from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
@@ -349,7 +349,7 @@ def get_inference_manager() -> InferenceManagerProtocol:
 def get_llm_worker(
     llm_handle: str,
     specific_llm_engine_blueprint: Optional[LLMEngineBlueprint] = None,
-) -> LLMWorkerInternalAbstract:
+) -> LLMWorkerAbstract:
     return get_inference_manager().get_llm_worker(
         llm_handle=llm_handle,
         specific_llm_engine_blueprint=specific_llm_engine_blueprint,

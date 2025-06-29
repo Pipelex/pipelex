@@ -24,14 +24,19 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """
         InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
 
+    #########################################################
+    # Instance methods
+    #########################################################
+
     @property
     @override
     def desc(self) -> str:
         return "LLM Worker • if you're using an external plugin, override this method to describe your llm worker"
 
-    #########################################################
-    # Instance methods
-    #########################################################
+    @property
+    @abstractmethod
+    def is_gen_object_supported(self) -> bool:
+        return False
 
     def _check_can_perform_job(self, llm_job: LLMJob):
         # This can be overridden by subclasses for specific checks

@@ -10,6 +10,7 @@ from pipelex.cogt.imgg.imgg_worker_factory import ImggWorkerFactory
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_engine_factory import LLMEngineFactory
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
@@ -23,7 +24,7 @@ class InferenceManager(InferenceManagerProtocol):
     def __init__(self):
         self.imgg_worker_factory = ImggWorkerFactory()
         self.ocr_worker_factory = OcrWorkerFactory()
-        self.llm_workers: Dict[str, LLMWorkerInternalAbstract] = {}
+        self.llm_workers: Dict[str, LLMWorkerAbstract] = {}
         self.imgg_workers: Dict[str, ImggWorkerAbstract] = {}
         self.ocr_workers: Dict[str, OcrWorkerAbstract] = {}
 
@@ -60,11 +61,11 @@ class InferenceManager(InferenceManagerProtocol):
         llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
         log.verbose(f"{len(llm_handle_to_llm_engine_blueprint)} LLM engine_cards found")
         for llm_handle, llm_engine_blueprint in llm_handle_to_llm_engine_blueprint.items():
-            self._setup_one_llm_worker(llm_engine_blueprint=llm_engine_blueprint, llm_handle=llm_handle)
+            self._setup_one_internal_llm_worker(llm_engine_blueprint=llm_engine_blueprint, llm_handle=llm_handle)
             log.verbose(f"Setup LLM worker for '{llm_handle}' on {llm_engine_blueprint.llm_platform_choice}")
         log.debug("Done setting up LLM Workers (async)")
 
-    def _setup_one_llm_worker(
+    def _setup_one_internal_llm_worker(
         self,
         llm_engine_blueprint: LLMEngineBlueprint,
         llm_handle: str,
@@ -82,7 +83,7 @@ class InferenceManager(InferenceManagerProtocol):
         self,
         llm_handle: str,
         specific_llm_engine_blueprint: Optional[LLMEngineBlueprint] = None,
-    ) -> LLMWorkerInternalAbstract:
+    ) -> LLMWorkerAbstract:
         if llm_worker := self.llm_workers.get(llm_handle):
             return llm_worker
         if not get_config().cogt.inference_manager_config.is_auto_setup_preset_llm:
@@ -92,12 +93,24 @@ class InferenceManager(InferenceManagerProtocol):
 
         if not specific_llm_engine_blueprint:
             specific_llm_engine_blueprint = get_llm_deck().get_llm_engine_blueprint(llm_handle=llm_handle)
-        llm_worker = self._setup_one_llm_worker(
+        llm_worker = self._setup_one_internal_llm_worker(
             llm_engine_blueprint=specific_llm_engine_blueprint,
             llm_handle=llm_handle,
         )
 
         return llm_worker
+
+    @override
+    def set_llm_worker(
+        self,
+        llm_handle: str,
+        llm_worker: LLMWorkerAbstract,
+        should_warn_if_already_registered: bool = True,
+    ):
+        if llm_handle in self.llm_workers:
+            if should_warn_if_already_registered:
+                log.warning(f"LLM worker for '{llm_handle}' already registered, skipping")
+        self.llm_workers[llm_handle] = llm_worker
 
     ####################################################################################################
     # Manage IMGG Workers

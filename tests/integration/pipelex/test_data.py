@@ -72,28 +72,22 @@ class PipeTestCases:
         ),
     )
 
-    STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1 = SomeContentWithImageAttribute(
-        image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_1)
-    )
+    STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1 = SomeContentWithImageAttribute(image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_1))
     STUFF_WITH_IMAGE_ATTRIBUTE = StuffFactory.make_stuff(
         concept_str="Image",
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
         name="stuff_with_image",
     )
-    STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = (
-        SomeContentWithImageSubObjectAttribute(
-            image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_2),
-            sub_object=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
-        )
+    STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = SomeContentWithImageSubObjectAttribute(
+        image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_2),
+        sub_object=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
     )
     STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = StuffFactory.make_stuff(
         concept_str="Image",
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
         name="stuff_with_image_in_sub_object",
     )
-    STUFFS_IMAGE_ATTRIBUTES: ClassVar[
-        List[Tuple[Stuff, List[str]]]
-    ] = [  # stuff, attribute_paths
+    STUFFS_IMAGE_ATTRIBUTES: ClassVar[List[Tuple[Stuff, List[str]]]] = [  # stuff, attribute_paths
         (STUFF_WITH_IMAGE_ATTRIBUTE, ["stuff_with_image.image_attribute"]),
         (
             STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
@@ -116,9 +110,7 @@ class PipeTestCases:
         concept_code="answer.Question",
         content=USER_TEXT_TRICKY_2,
     )
-    BLUEPRINT_AND_PIPE: ClassVar[
-        List[Tuple[str, StuffBlueprint, str]]
-    ] = [  # topic, blueprint, pipe
+    BLUEPRINT_AND_PIPE: ClassVar[List[Tuple[str, StuffBlueprint, str]]] = [  # topic, blueprint, pipe
         (
             "Tricky question conclude",
             TRICKY_QUESTION_BLUEPRINT,
@@ -135,9 +127,7 @@ class PipeTestCases:
             "test_no_input_that_could_be_long",
         ),
     ]
-    NO_INPUT_PARALLEL1: ClassVar[
-        List[Tuple[str, str, Optional[PipeOutputMultiplicity]]]
-    ] = [  # topic, pipe, multiplicity
+    NO_INPUT_PARALLEL1: ClassVar[List[Tuple[str, str, Optional[PipeOutputMultiplicity]]]] = [  # topic, pipe, multiplicity
         (
             "Nature colors painting",
             "choose_colors",
@@ -155,9 +145,7 @@ class PipeTestCases:
         ),
     ]
 
-    BATCH_TEST: ClassVar[
-        List[Tuple[str, Stuff, str, str]]
-    ] = [  # pipe_code, stuff, input_list_stuff_name, input_item_stuff_name
+    BATCH_TEST: ClassVar[List[Tuple[str, Stuff, str, str]]] = [  # pipe_code, stuff, input_list_stuff_name, input_item_stuff_name
         (
             "batch_test",
             StuffFactory.make_stuff(
@@ -175,9 +163,7 @@ class PipeTestCases:
             "color",
         ),
     ]
-    STUFF_AND_PIPE: ClassVar[
-        List[Tuple[str, Stuff, str]]
-    ] = [  # topic, stuff, pipe_code
+    STUFF_AND_PIPE: ClassVar[List[Tuple[str, Stuff, str]]] = [  # topic, stuff, pipe_code
         (
             "Process Simple Image",
             SIMPLE_STUFF_IMAGE,
@@ -211,9 +197,7 @@ class PipeOcrTestCases:
         ImageTestCases.IMAGE_FILE_PATH_PNG,
         ImageTestCases.IMAGE_URL_PNG,
     ]
-    PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = (
-        PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS
-    )
+    PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS
 
 
 class IMGGTestCases:
