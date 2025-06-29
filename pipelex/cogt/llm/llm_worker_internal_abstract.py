@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from typing import Optional, Type
 
 from instructor.exceptions import InstructorRetryException
@@ -6,7 +5,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError
-from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
