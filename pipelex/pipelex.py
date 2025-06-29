@@ -212,9 +212,8 @@ class Pipelex:
             llm_deck = self.library_manager.load_deck()
             for llm_model in self.llm_model_provider.get_all_llm_models():
                 if llm_model.version == LATEST_VERSION_NAME:
-                    llm_deck.add_llm_handle_to_llm_engine_blueprint(
-                        llm_handle=llm_model.llm_name,
-                        llm_engine_default=llm_model.llm_name,
+                    llm_deck.add_llm_name_as_handle_with_defaults(
+                        llm_name=llm_model.llm_name,
                     )
             llm_deck.validate_llm_presets()
             self.library_manager.load_libraries()
