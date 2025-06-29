@@ -348,12 +348,8 @@ def get_inference_manager() -> InferenceManagerProtocol:
 
 def get_llm_worker(
     llm_handle: str,
-    specific_llm_engine_blueprint: Optional[LLMEngineBlueprint] = None,
 ) -> LLMWorkerAbstract:
-    return get_inference_manager().get_llm_worker(
-        llm_handle=llm_handle,
-        specific_llm_engine_blueprint=specific_llm_engine_blueprint,
-    )
+    return get_inference_manager().get_llm_worker(llm_handle=llm_handle)
 
 
 def get_imgg_worker(

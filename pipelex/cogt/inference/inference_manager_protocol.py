@@ -20,18 +20,7 @@ class InferenceManagerProtocol(Protocol):
 
     def setup_llm_workers(self): ...
 
-    def get_llm_worker(
-        self,
-        llm_handle: str,
-        specific_llm_engine_blueprint: Optional[LLMEngineBlueprint] = None,
-    ) -> LLMWorkerAbstract: ...
-
-    # def set_llm_worker(
-    #     self,
-    #     llm_handle: str,
-    #     llm_worker: LLMWorkerAbstract,
-    #     should_warn_if_already_registered: bool = True,
-    # ): ...
+    def get_llm_worker(self, llm_handle: str) -> LLMWorkerAbstract: ...
 
     def set_llm_worker_from_external_plugin(
         self,
