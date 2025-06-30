@@ -57,7 +57,7 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key:
         # If it's a string with multiple lines, just output them as-is.
         str_value = str(data)
         if key and AttributePolisher.should_truncate(name=key, value=str_value):
-            return AttributePolisher.get_truncated_value(name=key, value=str_value)
+            return str(AttributePolisher.get_truncated_value(name=key, value=str_value))
         return str_value
 
     elif data is None:

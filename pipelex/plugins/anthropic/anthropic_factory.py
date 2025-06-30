@@ -84,7 +84,7 @@ class AnthropicFactory:
                         "source": {
                             "type": "base64",
                             "media_type": mime,  # type: ignore
-                            "data": prepped_image.image_bytes.decode("utf-8"),
+                            "data": prepped_image.base_64.decode("utf-8"),
                         },  # type: ignore
                     }
                 elif isinstance(prepped_image, str):  # pyright: ignore[reportUnnecessaryIsInstance]
@@ -127,7 +127,7 @@ class AnthropicFactory:
                         "source": {
                             "type": "base64",
                             "media_type": mime,  # type: ignore
-                            "data": prepped_image.image_bytes.decode("utf-8"),
+                            "data": prepped_image.base_64.decode("utf-8"),
                         },  # type: ignore
                     }
                 elif isinstance(prepped_image, str):  # pyright: ignore[reportUnnecessaryIsInstance]
@@ -141,7 +141,6 @@ class AnthropicFactory:
                     }
                 else:
                     raise AnthropicFactoryError(f"Unsupported PromptImageTypedBytesOrUrl type: '{type(prepped_image).__name__}'")
-                log.debug(image_block_param_in_loop)
                 images_block_params.append(image_block_param_in_loop)
 
             content: List[Union[TextBlockParam, ImageBlockParam]] = images_block_params + [text_block_param]
@@ -170,7 +169,7 @@ class AnthropicFactory:
             typed_bytes_or_url = prompt_image.url
         elif isinstance(prompt_image, PromptImagePath):
             b64 = await load_binary_as_base64_async(prompt_image.file_path)
-            typed_bytes_or_url = PromptImageTypedBytes(image_bytes=b64, file_type=prompt_image.get_file_type())
+            typed_bytes_or_url = PromptImageTypedBytes(base_64=b64, file_type=prompt_image.get_file_type())
         else:
             raise AnthropicFactoryError(f"Unsupported PromptImage type: '{type(prompt_image).__name__}'")
         return typed_bytes_or_url
