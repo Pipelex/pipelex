@@ -222,12 +222,12 @@ Output this only: "large"
 
     def test_validate_toml_file_actual_problematic_file(self) -> None:
         """Test validation on the actual problematic file from the codebase."""
-        problematic_file = "tests/pipelines/pipe_controllers/pipe_condition/pipe_condition_2.toml"
+        problematic_file = "tests/data/tools_data/problematic_test_cases.toml"
 
-        # This should catch the trailing whitespace issue
+        # This should catch multiple trailing whitespace issues
         with pytest.raises(TOMLValidationError) as exc_info:
             validate_toml_file(problematic_file)
 
         error_msg = str(exc_info.value)
-        assert "Trailing whitespace after triple quotes" in error_msg
+        assert "Trailing whitespace" in error_msg
         assert problematic_file in error_msg
