@@ -55,12 +55,14 @@ class LLMSetting(ConfigModel):
 LLMSettingOrPresetId = Union[LLMSetting, str]
 
 
+class LLMSettingChoicesDefaults(ConfigModel):
+    for_text: LLMSettingOrPresetId
+    for_object: LLMSettingOrPresetId
+
+
 class LLMSettingChoices(ConfigModel):
     for_text: Optional[LLMSettingOrPresetId]
     for_object: Optional[LLMSettingOrPresetId]
-    for_object_direct: Optional[LLMSettingOrPresetId]
-    for_object_list: Optional[LLMSettingOrPresetId]
-    for_object_list_direct: Optional[LLMSettingOrPresetId]
 
     def list_used_presets(self) -> Set[str]:
         return set(
@@ -69,9 +71,6 @@ class LLMSettingChoices(ConfigModel):
                 for setting in [
                     self.for_text,
                     self.for_object,
-                    self.for_object_direct,
-                    self.for_object_list,
-                    self.for_object_list_direct,
                 ]
                 if isinstance(setting, str)
             ]
@@ -82,14 +81,8 @@ class LLMSettingChoices(ConfigModel):
         cls,
         for_text: Optional[LLMSettingOrPresetId] = None,
         for_object: Optional[LLMSettingOrPresetId] = None,
-        for_object_direct: Optional[LLMSettingOrPresetId] = None,
-        for_object_list: Optional[LLMSettingOrPresetId] = None,
-        for_object_list_direct: Optional[LLMSettingOrPresetId] = None,
     ) -> Self:
         return cls(
             for_text=for_text,
             for_object=for_object,
-            for_object_direct=for_object_direct,
-            for_object_list=for_object_list,
-            for_object_list_direct=for_object_list_direct,
         )

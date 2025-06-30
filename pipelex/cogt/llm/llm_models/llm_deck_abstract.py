@@ -6,20 +6,17 @@ from typing_extensions import Self
 
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_model import LLMModel
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
+from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults, LLMSettingOrPresetId
 
 
 class LLMDeckAbstract(ABC):
     llm_handles: Dict[str, LLMEngineBlueprint] = Field(default_factory=dict)
     llm_external_handles: List[str] = Field(default_factory=list)
     llm_presets: Dict[str, LLMSetting] = Field(default_factory=dict)
-    llm_choice_defaults: LLMSettingChoices
+    llm_choice_defaults: LLMSettingChoicesDefaults
     llm_choice_overrides: LLMSettingChoices = LLMSettingChoices(
         for_text=None,
         for_object=None,
-        for_object_direct=None,
-        for_object_list=None,
-        for_object_list_direct=None,
     )
 
     @abstractmethod
@@ -32,26 +29,6 @@ class LLMDeckAbstract(ABC):
 
     @abstractmethod
     def get_llm_setting(self, llm_setting_or_preset_id: LLMSettingOrPresetId) -> LLMSetting:
-        pass
-
-    @abstractmethod
-    def get_llm_setting_for_text(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
-        pass
-
-    @abstractmethod
-    def get_llm_setting_for_object(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
-        pass
-
-    @abstractmethod
-    def get_llm_setting_for_object_direct(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
-        pass
-
-    @abstractmethod
-    def get_llm_setting_for_object_list(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
-        pass
-
-    @abstractmethod
-    def get_llm_setting_for_object_list_direct(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
         pass
 
     @abstractmethod

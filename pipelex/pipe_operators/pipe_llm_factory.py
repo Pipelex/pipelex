@@ -30,9 +30,6 @@ class PipeLLMBlueprint(PipeBlueprint):
 
     llm: Optional[LLMSettingOrPresetId] = None
     llm_to_structure: Optional[LLMSettingOrPresetId] = None
-    llm_to_structure_direct: Optional[LLMSettingOrPresetId] = None
-    llm_to_structure_list: Optional[LLMSettingOrPresetId] = None
-    llm_to_structure_list_direct: Optional[LLMSettingOrPresetId] = None
 
     structuring_method: Optional[StructuringMethod] = None
     prompt_template_to_structure: Optional[str] = None
@@ -134,9 +131,6 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         llm_choices = LLMSettingChoices(
             for_text=pipe_blueprint.llm,
             for_object=pipe_blueprint.llm_to_structure,
-            for_object_direct=pipe_blueprint.llm_to_structure_direct,
-            for_object_list=pipe_blueprint.llm_to_structure_list,
-            for_object_list_direct=pipe_blueprint.llm_to_structure_list_direct,
         )
 
         # output_multiplicity defaults to False for PipeLLM so unless it's run with explicit demand for multiple outputs,
