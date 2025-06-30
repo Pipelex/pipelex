@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
-
-from mistralai import Optional
+from typing import List, Optional
 
 from pipelex.cogt.llm.llm_models.llm_model import LLMModel
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatformChoice
