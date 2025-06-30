@@ -25,7 +25,7 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
-from pipelex.hub import get_secrets_provider
+from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.tools.misc.base_64_utils import (
     load_binary_as_base64_async,
 )
@@ -43,7 +43,7 @@ class AnthropicFactory:
         # TODO: also support Anthropic with VertexAI
         match llm_platform:
             case LLMPlatform.ANTHROPIC:
-                anthropic_config = get_config().plugins.anthropic_config
+                anthropic_config = get_plugin_manager().plugin_configs.anthropic_config
                 api_key = anthropic_config.get_api_key(secrets_provider=get_secrets_provider())
                 return AsyncAnthropic(api_key=api_key)
             case LLMPlatform.BEDROCK_ANTHROPIC:

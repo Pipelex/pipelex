@@ -17,7 +17,6 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
-from pipelex.cogt.plugin_manager import PluginManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
@@ -36,6 +35,7 @@ from pipelex.pipeline.track.pipeline_tracker_protocol import (
     PipelineTrackerNoOp,
     PipelineTrackerProtocol,
 )
+from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
@@ -64,7 +64,6 @@ class Pipelex:
         class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
         llm_model_provider: Optional[LLMModelLibrary] = None,
-        plugin_manager: Optional[PluginManager] = None,
         inference_manager: Optional[InferenceManager] = None,
         pipeline_manager: Optional[PipelineManager] = None,
         pipeline_tracker: Optional[PipelineTracker] = None,
@@ -92,7 +91,6 @@ class Pipelex:
         class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
         llm_model_provider: Optional[LLMModelLibrary] = None,
-        plugin_manager: Optional[PluginManager] = None,
         inference_manager: Optional[InferenceManager] = None,
         pipeline_manager: Optional[PipelineManager] = None,
         pipeline_tracker: Optional[PipelineTracker] = None,
@@ -131,10 +129,10 @@ class Pipelex:
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
 
         # cogt
+        self.plugin_manager = PluginManager()
+        self.pipelex_hub.set_plugin_manager(self.plugin_manager)
         self.llm_model_provider = llm_model_provider or LLMModelLibrary()
         self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
-        self.plugin_manager = plugin_manager or PluginManager()
-        self.pipelex_hub.set_plugin_manager(self.plugin_manager)
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
@@ -187,6 +185,7 @@ class Pipelex:
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
         self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
+        self.plugin_manager.setup()
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())
@@ -213,9 +212,8 @@ class Pipelex:
             llm_deck = self.library_manager.load_deck()
             for llm_model in self.llm_model_provider.get_all_llm_models():
                 if llm_model.version == LATEST_VERSION_NAME:
-                    llm_deck.add_llm_handle_to_llm_engine_blueprint(
-                        llm_handle=llm_model.llm_name,
-                        llm_engine_default=llm_model.llm_name,
+                    llm_deck.add_llm_name_as_handle_with_defaults(
+                        llm_name=llm_model.llm_name,
                     )
             llm_deck.validate_llm_presets()
             self.library_manager.load_libraries()
@@ -241,6 +239,7 @@ class Pipelex:
         self.inference_manager.teardown()
         self.reporting_delegate.teardown()
         self.llm_model_provider.teardown()
+        self.plugin_manager.teardown()
 
         # tools
         self.kajson_manager.teardown()
@@ -261,6 +260,10 @@ class Pipelex:
         pipelex_instance.finish_setup()
         log.info(f"Pipelex {PACKAGE_VERSION} initialized.")
         return pipelex_instance
+
+    @classmethod
+    def get_optional_instance(cls) -> Optional[Self]:
+        return cls._pipelex_instance
 
     @classmethod
     def get_instance(cls) -> Self:

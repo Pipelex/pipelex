@@ -2,8 +2,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError, PromptImageFormatError
 from pipelex.cogt.image.prompt_image import PromptImageBytes
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.config import get_config
-from pipelex.hub import get_secrets_provider
+from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
 from pipelex.plugins.bedrock.bedrock_config import BedrockClientMethod
 from pipelex.plugins.bedrock.bedrock_message import BedrockContentItem, BedrockImage, BedrockMessage, BedrockSource, ImageFormat
@@ -16,7 +15,7 @@ class BedrockFactory:
 
     @classmethod
     def make_bedrock_client(cls) -> BedrockClientProtocol:
-        bedrock_config = get_config().plugins.bedrock_config
+        bedrock_config = get_plugin_manager().plugin_configs.bedrock_config
         aws_region = bedrock_config.configure(secrets_provider=get_secrets_provider())
         client_method = bedrock_config.client_method
         bedrock_async_client: BedrockClientProtocol

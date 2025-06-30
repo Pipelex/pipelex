@@ -20,6 +20,8 @@ class LibraryConfig(ConfigModel):
     exported_llm_deck_path: ClassVar[str] = f"{exported_library_root}/llm_deck"
     internal_templates_path: ClassVar[str] = f"{internal_library_root}/templates"
     exported_templates_path: ClassVar[str] = f"{exported_library_root}/templates"
+    internal_plugins_path: ClassVar[str] = f"{internal_library_root}/plugins"
+    exported_plugins_path: ClassVar[str] = f"{exported_library_root}/plugins"
 
     @classmethod
     def get_llm_deck_paths(cls) -> List[str]:
@@ -30,6 +32,10 @@ class LibraryConfig(ConfigModel):
     @classmethod
     def get_templates_paths(cls) -> List[str]:
         return [str(path) for path in find_files_in_dir(dir_path=cls.exported_templates_path, pattern="*.toml", is_recursive=True)]
+
+    @classmethod
+    def get_plugin_config_path(cls) -> str:
+        return f"{cls.exported_plugins_path}/plugin_config.toml"
 
     @classmethod
     def export_libraries(cls, overwrite: bool = False) -> None:
@@ -82,5 +88,13 @@ class LibraryConfig(ConfigModel):
             package_name=cls.package_name,
             folder_path_in_package=cls.internal_templates_path,
             target_dir=cls.exported_templates_path,
+            overwrite=overwrite,
+        )
+
+        # plugins
+        copy_folder_from_package(
+            package_name=cls.package_name,
+            folder_path_in_package=cls.internal_plugins_path,
+            target_dir=cls.exported_plugins_path,
             overwrite=overwrite,
         )

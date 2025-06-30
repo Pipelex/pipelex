@@ -129,47 +129,6 @@ page_output_text_file_name = "page_text.md"
 default_page_views_dpi = 72
 
 ####################################################################################################
-# Plugins config
-####################################################################################################
-
-[plugins]
-
-[plugins.openai_config]
-image_output_compression = 100
-api_key_method = "env"
-
-[plugins.azure_openai_config]
-api_key_method = "env"
-
-# TODO: handle multiple azure openai accounts with different resource groups and account names for various llm model
-
-[plugins.perplexity_config]
-api_key_method = "env"
-
-[plugins.xai_config]
-api_key_method = "env"
-
-[plugins.vertexai_config]
-api_key_method = "env"
-
-[plugins.mistral_config]
-api_key_method = "env"
-
-[plugins.bedrock_config]
-client_method = "aioboto3"
-
-[plugins.anthropic_config]
-claude_4_reduced_tokens_limit = 8192  # use "unlimited" to enable the full 32/64K tokens Opus/Sonet but it raises streaming/timeout issues
-api_key_method = "env"
-
-[plugins.custom_endpoint_config]
-api_key_method = "env"
-
-[plugins.fal_config]
-flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
-sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
-
-####################################################################################################
 # Pipelex prompting config
 ####################################################################################################
 
@@ -250,4 +209,3 @@ image_urls = [
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg", 
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
     ]
-

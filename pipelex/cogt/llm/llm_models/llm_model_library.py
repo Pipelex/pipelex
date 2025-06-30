@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import Field, RootModel
 from typing_extensions import override
@@ -84,12 +84,25 @@ class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
         llm_version: str,
         llm_platform_choice: LLMPlatformChoice,
     ) -> LLMModel:
+        llm_model = self.get_optional_llm_model(llm_name=llm_name, llm_version=llm_version, llm_platform_choice=llm_platform_choice)
+        if not llm_model:
+            raise LLMModelProviderError(f"Model '{llm_name}' version '{llm_version}' not found")
+        else:
+            return llm_model
+
+    @override
+    def get_optional_llm_model(
+        self,
+        llm_name: str,
+        llm_version: str,
+        llm_platform_choice: LLMPlatformChoice,
+    ) -> Optional[LLMModel]:
         if llm_version == LATEST_VERSION_NAME:
-            return self._get_llm_model_latest_version(llm_name=llm_name, llm_platform_choice=llm_platform_choice)
+            return self._get_optional_llm_model_latest_version(llm_name=llm_name, llm_platform_choice=llm_platform_choice)
 
         found_llm_models = [llm_model for llm_model in self.root if llm_model.llm_name == llm_name and llm_model.version == llm_version]
         if not found_llm_models:
-            raise LLMModelProviderError(f"Model '{llm_name}' version '{llm_version}' not found")
+            return None
         if len(found_llm_models) > 1:
             raise LLMModelProviderError(f"Model '{llm_name}' version '{llm_version}' has multiple instances in the library")
         llm_model = found_llm_models[0]
@@ -100,14 +113,14 @@ class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
                 raise LLMModelPlatformError(f"Missing llm id for LLM model {llm_model.name_and_version}'s chosen platform='{llm_platform}'")
         return llm_model
 
-    def _get_llm_model_latest_version(
+    def _get_optional_llm_model_latest_version(
         self,
         llm_name: str,
         llm_platform_choice: LLMPlatformChoice,
-    ) -> LLMModel:
+    ) -> Optional[LLMModel]:
         found_llm_models = [llm_model for llm_model in self.root if llm_model.llm_name == llm_name]
         if not found_llm_models:
-            raise LLMModelProviderError(f"Could not find model named '{llm_name}'")
+            return None
         elif len(found_llm_models) == 1:
             # only one so it is the latest we've got
             llm_model = found_llm_models[0]
@@ -124,3 +137,16 @@ class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
             assert llm_platform_choice == DEFAULT_PLATFORM_INDICATOR
             llm_model = max(found_llm_models, key=lambda m: m.version)
         return llm_model
+
+    def _get_llm_model_latest_version(
+        self,
+        llm_name: str,
+        llm_platform_choice: LLMPlatformChoice,
+    ) -> LLMModel:
+        llm_model_latest_version = self.get_optional_llm_model(
+            llm_name=llm_name, llm_version=LATEST_VERSION_NAME, llm_platform_choice=llm_platform_choice
+        )
+        if llm_model_latest_version is not None:
+            return llm_model_latest_version
+        else:
+            raise LLMModelProviderError(f"Could not find model named '{llm_name}'")

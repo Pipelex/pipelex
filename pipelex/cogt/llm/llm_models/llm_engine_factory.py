@@ -15,7 +15,7 @@ class LLMEngineFactory:
         Create an instance of LLMEngine based on the parameters provided through the LLMEngineCard.
 
         Args:
-            llm_engine_blueprint: LLMEngineCard
+            llm_engine_blueprint: LLMEngineBlueprint
 
         """
         llm_platform_choice = llm_engine_blueprint.llm_platform_choice

@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Type
 
 from typing_extensions import override
 
@@ -12,6 +12,7 @@ from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_engine_factory import LLMEngineFactory
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
+from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.cogt.ocr.ocr_worker_factory import OcrWorkerFactory
@@ -31,10 +32,16 @@ class InferenceManager(InferenceManagerProtocol):
     def teardown(self):
         self.imgg_worker_factory = ImggWorkerFactory()
         self.ocr_worker_factory = OcrWorkerFactory()
-        self.llm_workers.clear()
-        self.imgg_workers.clear()
-        self.ocr_workers.clear()
-        log.verbose("InferenceManagerAsync reset")
+        for llm_worker in self.llm_workers.values():
+            llm_worker.teardown()
+        self.llm_workers = {}
+        for imgg_worker in self.imgg_workers.values():
+            imgg_worker.teardown()
+        self.imgg_workers = {}
+        for ocr_worker in self.ocr_workers.values():
+            ocr_worker.teardown()
+        self.ocr_workers = {}
+        log.verbose("InferenceManager teardown done")
 
     def print_workers(self):
         log.debug("LLM Workers:")
@@ -60,15 +67,15 @@ class InferenceManager(InferenceManagerProtocol):
         llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
         log.verbose(f"{len(llm_handle_to_llm_engine_blueprint)} LLM engine_cards found")
         for llm_handle, llm_engine_blueprint in llm_handle_to_llm_engine_blueprint.items():
-            self._setup_one_llm_worker(llm_engine_blueprint=llm_engine_blueprint, llm_handle=llm_handle)
+            self._setup_one_internal_llm_worker(llm_engine_blueprint=llm_engine_blueprint, llm_handle=llm_handle)
             log.verbose(f"Setup LLM worker for '{llm_handle}' on {llm_engine_blueprint.llm_platform_choice}")
         log.debug("Done setting up LLM Workers (async)")
 
-    def _setup_one_llm_worker(
+    def _setup_one_internal_llm_worker(
         self,
         llm_engine_blueprint: LLMEngineBlueprint,
         llm_handle: str,
-    ) -> LLMWorkerAbstract:
+    ) -> LLMWorkerInternalAbstract:
         llm_engine = LLMEngineFactory.make_llm_engine(llm_engine_blueprint=llm_engine_blueprint)
         llm_worker = LLMWorkerFactory.make_llm_worker(
             llm_engine=llm_engine,
@@ -78,11 +85,7 @@ class InferenceManager(InferenceManagerProtocol):
         return llm_worker
 
     @override
-    def get_llm_worker(
-        self,
-        llm_handle: str,
-        specific_llm_engine_blueprint: Optional[LLMEngineBlueprint] = None,
-    ) -> LLMWorkerAbstract:
+    def get_llm_worker(self, llm_handle: str) -> LLMWorkerAbstract:
         if llm_worker := self.llm_workers.get(llm_handle):
             return llm_worker
         if not get_config().cogt.inference_manager_config.is_auto_setup_preset_llm:
@@ -90,14 +93,25 @@ class InferenceManager(InferenceManagerProtocol):
                 f"No LLM worker for '{llm_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_llm"
             )
 
-        if not specific_llm_engine_blueprint:
-            specific_llm_engine_blueprint = get_llm_deck().get_llm_engine_blueprint(llm_handle=llm_handle)
-        llm_worker = self._setup_one_llm_worker(
-            llm_engine_blueprint=specific_llm_engine_blueprint,
+        llm_engine_blueprint = get_llm_deck().get_llm_engine_blueprint(llm_handle=llm_handle)
+        llm_worker = self._setup_one_internal_llm_worker(
+            llm_engine_blueprint=llm_engine_blueprint,
             llm_handle=llm_handle,
         )
 
         return llm_worker
+
+    @override
+    def set_llm_worker_from_external_plugin(
+        self,
+        llm_handle: str,
+        llm_worker_class: Type[LLMWorkerAbstract],
+        should_warn_if_already_registered: bool = True,
+    ):
+        if llm_handle in self.llm_workers:
+            if should_warn_if_already_registered:
+                log.warning(f"LLM worker for '{llm_handle}' already registered, skipping")
+        self.llm_workers[llm_handle] = llm_worker_class(reporting_delegate=get_report_delegate())
 
     ####################################################################################################
     # Manage IMGG Workers

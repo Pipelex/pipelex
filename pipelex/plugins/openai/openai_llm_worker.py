@@ -11,14 +11,14 @@ from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError,
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
-from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
-class OpenAILLMWorker(LLMWorkerAbstract):
+class OpenAILLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,
@@ -26,7 +26,12 @@ class OpenAILLMWorker(LLMWorkerAbstract):
         structure_method: Optional[StructureMethod],
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        super().__init__(llm_engine=llm_engine, structure_method=structure_method, reporting_delegate=reporting_delegate)
+        LLMWorkerInternalAbstract.__init__(
+            self,
+            llm_engine=llm_engine,
+            structure_method=structure_method,
+            reporting_delegate=reporting_delegate,
+        )
 
         if not isinstance(sdk_instance, openai.AsyncOpenAI):
             raise SdkTypeError(

@@ -23,6 +23,10 @@ class SdkTypeError(CogtError):
     pass
 
 
+class SdkRegistryError(CogtError):
+    pass
+
+
 class LLMWorkerError(CogtError):
     pass
 
@@ -126,6 +130,10 @@ class MissingDependencyError(CogtError):
             error_msg += f" {message}"
         error_msg += f" Please install it with 'pip install pipelex[{extra_name}]'."
         super().__init__(error_msg)
+
+
+class MissingPluginError(CogtError):
+    pass
 
 
 class OcrCapabilityError(CogtError):

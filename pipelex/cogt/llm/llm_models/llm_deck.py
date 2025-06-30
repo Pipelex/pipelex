@@ -42,17 +42,14 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
 
     @override
     def get_llm_setting(self, llm_setting_or_preset_id: LLMSettingOrPresetId) -> LLMSetting:
-        the_llm_setting: LLMSetting
-        if isinstance(llm_setting_or_preset_id, str):
+        if isinstance(llm_setting_or_preset_id, LLMSetting):
+            return llm_setting_or_preset_id
+        else:
             # it's a preset id
             the_llm_preset = self.llm_presets.get(llm_setting_or_preset_id)
             if not the_llm_preset:
                 raise LLMPresetNotFoundError(f"LLM preset '{llm_setting_or_preset_id}' not found in deck")
-            the_llm_setting = the_llm_preset
-        else:
-            # it's an explict setting
-            the_llm_setting = llm_setting_or_preset_id
-        return the_llm_setting
+            return the_llm_preset
 
     @override
     def get_llm_setting_for_text(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
@@ -140,6 +137,19 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
         return llm_model
 
     @override
+    def find_optional_llm_model(self, llm_handle: str) -> Optional[LLMModel]:
+        llm_models_provider = get_llm_models_provider()
+        llm_engine_blueprint = self.llm_handles.get(llm_handle)
+        if not llm_engine_blueprint:
+            return None
+        llm_model = llm_models_provider.get_optional_llm_model(
+            llm_name=llm_engine_blueprint.llm_name,
+            llm_version=llm_engine_blueprint.llm_version,
+            llm_platform_choice=llm_engine_blueprint.llm_platform_choice,
+        )
+        return llm_model
+
+    @override
     @classmethod
     def final_validate(cls, deck: Self):
         for llm_preset_id, llm_setting in deck.llm_presets.items():
@@ -215,11 +225,11 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
             value.for_object_list_direct = None
         return value
 
-    def add_llm_handle_to_llm_engine_blueprint(self, llm_handle: str, llm_engine_default: str):
-        if llm_handle in self.llm_handles:
-            raise ConfigValidationError(f"LLM engine blueprint for '{llm_handle}' is already defined in llm_handle_to_llm_engine_blueprint")
+    def add_llm_name_as_handle_with_defaults(self, llm_name: str):
+        if llm_name in self.llm_handles:
+            raise ConfigValidationError(f"LLM engine blueprint for '{llm_name}' is already defined in llm deck's llm_handles")
         # TODO: sort the defaults by llm family
-        self.llm_handles[llm_handle] = LLMEngineBlueprint(llm_name=llm_engine_default)
+        self.llm_handles[llm_name] = LLMEngineBlueprint(llm_name=llm_name)
 
     def validate_llm_presets(self) -> Self:
         for llm_preset_id, llm_setting in self.llm_presets.items():

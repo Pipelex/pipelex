@@ -14,6 +14,10 @@ class ToolException(RootException):
     pass
 
 
+class CredentialsError(RootException):
+    pass
+
+
 class TracebackMessageErrorMode(StrEnum):
     ERROR = "error"
     EXCEPTION = "exception"

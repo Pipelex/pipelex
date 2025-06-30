@@ -3,16 +3,17 @@ from typing import Any, Dict, Tuple
 from pydantic import Field
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, MissingDependencyError
+from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.tools.config.models import ConfigModel
 from pipelex.tools.environment import EnvVarNotFoundError, get_required_env
+from pipelex.tools.exceptions import CredentialsError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.types import StrEnum
 
 
-class VertexAICredentialsError(CogtError):
+class VertexAICredentialsError(CredentialsError):
     pass
 
 

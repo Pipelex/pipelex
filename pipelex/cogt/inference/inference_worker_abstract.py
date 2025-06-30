@@ -11,6 +11,12 @@ class InferenceWorkerAbstract(ABC):
     ):
         self.reporting_delegate = reporting_delegate
 
+    def setup(self):
+        pass
+
+    def teardown(self):
+        pass
+
     @property
     @abstractmethod
     def desc(self) -> str:

@@ -2,7 +2,13 @@ from typing import ClassVar, List, Optional, Tuple, Type
 
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ImageContent, ListContent, PDFContent, StructuredContent, TextContent
+from pipelex.core.stuff_content import (
+    ImageContent,
+    ListContent,
+    PDFContent,
+    StructuredContent,
+    TextContent,
+)
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.exceptions import PipeStackOverflowError
 from tests.cases import ImageTestCases, PDFTestCases
@@ -83,8 +89,14 @@ class PipeTestCases:
     )
     STUFFS_IMAGE_ATTRIBUTES: ClassVar[List[Tuple[Stuff, List[str]]]] = [  # stuff, attribute_paths
         (STUFF_WITH_IMAGE_ATTRIBUTE, ["stuff_with_image.image_attribute"]),
-        (STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT, ["stuff_with_image_in_sub_object.image_attribute"]),
-        (STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT, ["stuff_with_image_in_sub_object.sub_object.image_attribute"]),
+        (
+            STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
+            ["stuff_with_image_in_sub_object.image_attribute"],
+        ),
+        (
+            STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
+            ["stuff_with_image_in_sub_object.sub_object.image_attribute"],
+        ),
         (
             STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
             [
@@ -93,7 +105,11 @@ class PipeTestCases:
             ],
         ),
     ]
-    TRICKY_QUESTION_BLUEPRINT = StuffBlueprint(stuff_name="question", concept_code="answer.Question", content=USER_TEXT_TRICKY_2)
+    TRICKY_QUESTION_BLUEPRINT = StuffBlueprint(
+        stuff_name="question",
+        concept_code="answer.Question",
+        content=USER_TEXT_TRICKY_2,
+    )
     BLUEPRINT_AND_PIPE: ClassVar[List[Tuple[str, StuffBlueprint, str]]] = [  # topic, blueprint, pipe
         (
             "Tricky question conclude",

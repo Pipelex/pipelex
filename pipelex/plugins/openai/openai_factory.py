@@ -19,8 +19,7 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.config import get_config
-from pipelex.hub import get_secrets_provider
+from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 
 
@@ -31,7 +30,7 @@ class OpenAIFactory:
         api_key: Optional[str] = None
         match llm_platform:
             case LLMPlatform.AZURE_OPENAI:
-                azure_openai_config = get_config().plugins.azure_openai_config
+                azure_openai_config = get_plugin_manager().plugin_configs.azure_openai_config
                 endpoint, api_version, api_key = azure_openai_config.configure(secrets_provider=get_secrets_provider())
 
                 log.verbose(f"Making AsyncAzureOpenAI client with endpoint: {endpoint}, api_version: {api_version}")
@@ -41,7 +40,7 @@ class OpenAIFactory:
                     api_version=api_version,
                 )
             case LLMPlatform.PERPLEXITY:
-                perplexity_config = get_config().plugins.perplexity_config
+                perplexity_config = get_plugin_manager().plugin_configs.perplexity_config
                 endpoint, api_key = perplexity_config.configure(secrets_provider=get_secrets_provider())
 
                 log.verbose(f"Making perplexity AsyncOpenAI client with endpoint: {endpoint}")
@@ -50,11 +49,11 @@ class OpenAIFactory:
                     base_url=endpoint,
                 )
             case LLMPlatform.OPENAI:
-                openai_config = get_config().plugins.openai_config
+                openai_config = get_plugin_manager().plugin_configs.openai_config
                 api_key = openai_config.get_api_key(secrets_provider=get_secrets_provider())
                 the_client = openai.AsyncOpenAI(api_key=api_key)
             case LLMPlatform.VERTEXAI:
-                vertexai_config = get_config().plugins.vertexai_config
+                vertexai_config = get_plugin_manager().plugin_configs.vertexai_config
                 endpoint, api_key = vertexai_config.configure(secrets_provider=get_secrets_provider())
 
                 log.verbose(f"Making vertex AsyncOpenAI client with endpoint: {endpoint}")
@@ -63,7 +62,7 @@ class OpenAIFactory:
                     base_url=endpoint,
                 )
             case LLMPlatform.XAI:
-                xai_config = get_config().plugins.xai_config
+                xai_config = get_plugin_manager().plugin_configs.xai_config
                 endpoint, api_key = xai_config.configure(secrets_provider=get_secrets_provider())
 
                 log.verbose(f"Making Xai AsyncOpenAI client with endpoint: {endpoint}")
@@ -72,7 +71,7 @@ class OpenAIFactory:
                     base_url=endpoint,
                 )
             case LLMPlatform.CUSTOM_LLM:
-                custom_endpoint_config = get_config().plugins.custom_endpoint_config
+                custom_endpoint_config = get_plugin_manager().plugin_configs.custom_endpoint_config
                 base_url, api_key = custom_endpoint_config.configure(secrets_provider=get_secrets_provider())
 
                 log.verbose(f"Making custom AsyncOpenAI client with base_url: {base_url}")

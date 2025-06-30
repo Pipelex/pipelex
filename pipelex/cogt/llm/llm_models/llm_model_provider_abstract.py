@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List
 
+from mistralai import Optional
+
 from pipelex.cogt.llm.llm_models.llm_model import LLMModel
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatformChoice
 
@@ -22,6 +24,15 @@ class LLMModelProviderAbstract(ABC):
         llm_version: str,
         llm_platform_choice: LLMPlatformChoice,
     ) -> LLMModel:
+        pass
+
+    @abstractmethod
+    def get_optional_llm_model(
+        self,
+        llm_name: str,
+        llm_version: str,
+        llm_platform_choice: LLMPlatformChoice,
+    ) -> Optional[LLMModel]:
         pass
 
     @abstractmethod

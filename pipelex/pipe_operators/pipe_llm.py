@@ -265,9 +265,9 @@ class PipeLLM(PipeOperator):
         else:
             log.verbose(f"{self.class_name} generate a single '{output_concept_code}' (class '{output_concept.structure_class_name}')")
 
-        if not self.pipe_llm_prompt.prompting_style:
-            llm_deck = get_llm_deck()
-            llm_model = llm_deck.find_llm_model(llm_handle=self.llm_setting_main.llm_handle)
+        if not self.pipe_llm_prompt.prompting_style and (
+            llm_model := get_llm_deck().find_optional_llm_model(llm_handle=self.llm_setting_main.llm_handle)
+        ):
             llm_family = llm_model.llm_family
             if self.llm_setting_main.prompting_target:
                 log.dev(f"prompting_target for '{self.llm_setting_main.llm_handle}' from setting: {self.llm_setting_main}")

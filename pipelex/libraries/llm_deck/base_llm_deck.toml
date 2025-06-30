@@ -1,16 +1,21 @@
 
-
-####################################################################################################
 # LLM Deck base
+
+####################################################################################################
+# LLM Handles
 ####################################################################################################
 
-# Match a llm_handle with a complete blueprint (llm_name, llm_version and llm_platform_choice).
+llm_external_handles = []
+
+# Match a llm_handle with either just and llm_name
+# or a complete blueprint including llm_version (defaulting to "latest") and llm_platform_choice (defaulting to "default").
 [llm_handles]
 gpt-4o-2024-08-06 = { llm_name = "gpt-4o", llm_version = "2024-08-06" }
 best-claude = "claude-4-opus"
 best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-large"
 best-grok = "grok-3"
+
 
 ####################################################################################################
 # LLM Presets

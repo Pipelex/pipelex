@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from pydantic import Field
 from typing_extensions import Self
@@ -11,6 +11,7 @@ from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoice
 
 class LLMDeckAbstract(ABC):
     llm_handles: Dict[str, LLMEngineBlueprint] = Field(default_factory=dict)
+    llm_external_handles: List[str] = Field(default_factory=list)
     llm_presets: Dict[str, LLMSetting] = Field(default_factory=dict)
     llm_choice_defaults: LLMSettingChoices
     llm_choice_overrides: LLMSettingChoices = LLMSettingChoices(
@@ -55,6 +56,10 @@ class LLMDeckAbstract(ABC):
 
     @abstractmethod
     def find_llm_model(self, llm_handle: str) -> LLMModel:
+        pass
+
+    @abstractmethod
+    def find_optional_llm_model(self, llm_handle: str) -> Optional[LLMModel]:
         pass
 
     @classmethod

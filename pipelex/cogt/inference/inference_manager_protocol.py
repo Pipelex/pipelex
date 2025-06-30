@@ -1,7 +1,6 @@
-from typing import Optional, Protocol
+from typing import Protocol, Type
 
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
-from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 
@@ -20,11 +19,14 @@ class InferenceManagerProtocol(Protocol):
 
     def setup_llm_workers(self): ...
 
-    def get_llm_worker(
+    def get_llm_worker(self, llm_handle: str) -> LLMWorkerAbstract: ...
+
+    def set_llm_worker_from_external_plugin(
         self,
         llm_handle: str,
-        specific_llm_engine_blueprint: Optional[LLMEngineBlueprint] = None,
-    ) -> LLMWorkerAbstract: ...
+        llm_worker_class: Type[LLMWorkerAbstract],
+        should_warn_if_already_registered: bool = True,
+    ): ...
 
     ####################################################################################################
     # IMG Generation Workers

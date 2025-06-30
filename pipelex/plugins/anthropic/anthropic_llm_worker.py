@@ -9,15 +9,15 @@ from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError,
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.config import get_config
+from pipelex.hub import get_plugin_manager
 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
-class AnthropicLLMWorker(LLMWorkerAbstract):
+class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,
@@ -25,7 +25,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         structure_method: Optional[StructureMethod] = None,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        LLMWorkerAbstract.__init__(
+        LLMWorkerInternalAbstract.__init__(
             self,
             llm_engine=llm_engine,
             structure_method=structure_method,
@@ -63,7 +63,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
     # TODO: implement streaming behind the scenes to avoid timeout/streaming errors with Claude 4 and high tokens
     def _adapt_max_tokens(self, max_tokens: Optional[int]) -> int:
         max_tokens = max_tokens or self.default_max_tokens
-        if claude_4_tokens_limit := get_config().plugins.anthropic_config.claude_4_tokens_limit:
+        if claude_4_tokens_limit := get_plugin_manager().plugin_configs.anthropic_config.claude_4_tokens_limit:
             if max_tokens > claude_4_tokens_limit:
                 max_tokens = claude_4_tokens_limit
                 log.warning(f"Max tokens is greater than the claude 4 reduced tokens limit, reducing to {max_tokens}")

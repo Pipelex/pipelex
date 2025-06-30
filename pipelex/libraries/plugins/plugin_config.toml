@@ -1,0 +1,39 @@
+
+####################################################################################################
+# Plugins config
+####################################################################################################
+
+[openai_config]
+image_output_compression = 100
+api_key_method = "env"
+
+[azure_openai_config]
+api_key_method = "env"
+
+# TODO: handle multiple azure openai accounts with different resource groups and account names for various llm model
+
+[perplexity_config]
+api_key_method = "env"
+
+[xai_config]
+api_key_method = "env"
+
+[vertexai_config]
+api_key_method = "env"
+
+[mistral_config]
+api_key_method = "env"
+
+[bedrock_config]
+client_method = "aioboto3"
+
+[anthropic_config]
+claude_4_reduced_tokens_limit = 8192  # use "unlimited" to enable the full 32/64K tokens Opus/Sonet but it raises streaming/timeout issues
+api_key_method = "env"
+
+[custom_endpoint_config]
+api_key_method = "env"
+
+[fal_config]
+flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
+sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
