@@ -9,19 +9,19 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.test_pipelines.pipe_condition import CategoryInput
+from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition import CategoryInput
 
 
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipeCondition:
+class TestPipeConditionExpression:
     @pytest.mark.parametrize(
         "category",
         ["small", "medium", "large"],
     )
-    async def test_pipe_condition_routing(
+    async def test_pipe_condition_routing_expression(
         self,
         request: FixtureRequest,
         pipe_run_mode: PipeRunMode,

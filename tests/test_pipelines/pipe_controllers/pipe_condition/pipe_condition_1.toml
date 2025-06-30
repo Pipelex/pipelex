@@ -4,18 +4,17 @@ definition = "Simple test for PipeCondition functionality"
 [concept]
 CategoryInput = "Input with a category field"
 
+[pipe]
 [pipe.basic_condition_by_category]
 PipeCondition = "Route based on category field"
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
-# expression = "input_data.category"
-# or 
 expression_template = "{{ input_data.category }}"
 
 [pipe.basic_condition_by_category.pipe_map]
 small = "process_small"
 medium = "process_medium"
-large = "process_large" 
+large = "process_large"
 
 [pipe.process_small]
 PipeLLM = "Generate random text for small items"

@@ -27,7 +27,7 @@ from pipelex.libraries.library_config import LibraryConfig
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.json_utils import deep_update
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path, validate_toml_file
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import StrEnum
@@ -72,19 +72,21 @@ class LibraryManager:
         self.concept_library.teardown()
         self.domain_library.teardown()
 
-    def load_libraries(self):
-        log.debug("LibraryManager loading separate libraries")
-
-        ClassRegistryUtils.register_classes_in_folder(
-            folder_path=LibraryConfig.loaded_pipelines_path,
-        )
+    def libraries_paths(self) -> List[str]:
         library_paths = [LibraryConfig.loaded_pipelines_path]
         if runtime_manager.is_unit_testing:
             log.debug("Registering test pipeline structures for unit testing")
-            ClassRegistryUtils.register_classes_in_folder(
-                folder_path=LibraryConfig.test_pipelines_path,
-            )
             library_paths += [LibraryConfig.test_pipelines_path]
+        return library_paths
+
+    def load_libraries(self):
+        log.debug("LibraryManager loading separate libraries")
+        library_paths = self.libraries_paths()
+        self._validate_toml_files()
+        for library_path in library_paths:
+            ClassRegistryUtils.register_classes_in_folder(
+                folder_path=library_path,
+            )
 
         native_concepts = ConceptFactory.list_native_concepts()
         self.concept_library.add_concepts(concepts=native_concepts)
@@ -100,9 +102,13 @@ class LibraryManager:
         for llm_deck_path in llm_deck_paths:
             if not os.path.exists(llm_deck_path):
                 raise LLMDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
-            llm_deck_dict = load_toml_from_path(path=llm_deck_path)
-            log.debug(f"Loaded LLM deck from {llm_deck_path}")
-            deep_update(full_llm_deck_dict, llm_deck_dict)
+            try:
+                llm_deck_dict = load_toml_from_path(path=llm_deck_path)
+                log.debug(f"Loaded LLM deck from {llm_deck_path}")
+                deep_update(full_llm_deck_dict, llm_deck_dict)
+            except Exception as exc:
+                log.error(f"Failed to load LLM deck file '{llm_deck_path}': {exc}")
+                raise
 
         self.llm_deck = LLMDeck.model_validate(full_llm_deck_dict)
         return self.llm_deck
@@ -161,7 +167,11 @@ class LibraryManager:
         # Third pass: load all pipes
         for toml_path in toml_file_paths:
             nb_pipes_before = len(self.pipe_library.root)
-            library_dict = load_toml_from_path(path=str(toml_path))
+            try:
+                library_dict = load_toml_from_path(path=str(toml_path))
+            except Exception as exc:
+                log.error(f"Failed to load TOML file '{toml_path}': {exc}")
+                continue
             library_name = toml_path.stem
             try:
                 self._load_library_dict(library_name=library_name, library_dict=library_dict, component_type=LibraryComponent.PIPE)
@@ -260,10 +270,52 @@ class LibraryManager:
         log.debug("LibraryManager validating libraries")
         if self.llm_deck is None:
             raise LibraryError("LLM deck is not loaded")
+
         LLMDeck.final_validate(deck=self.llm_deck)
         self.concept_library.validate_with_libraries()
         self.pipe_library.validate_with_libraries()
         self.domain_library.validate_with_libraries()
+
+    def _validate_toml_files(self):
+        """Validate all TOML files used by the library manager for formatting issues."""
+        log.debug("LibraryManager validating TOML file formatting")
+
+        llm_deck_paths = LibraryConfig.get_llm_deck_paths()
+        for llm_deck_path in llm_deck_paths:
+            if os.path.exists(llm_deck_path):
+                try:
+                    validate_toml_file(llm_deck_path)
+                except TOMLValidationError as exc:
+                    log.error(f"TOML formatting issues in LLM deck file '{llm_deck_path}': {exc}")
+                    raise LibraryError(f"TOML validation failed for LLM deck file '{llm_deck_path}': {exc}") from exc
+
+        # Validate pipeline library TOML files (same pattern as _load_combo_libraries)
+        library_paths = self.libraries_paths()
+        toml_file_paths: List[Path] = []
+        for libraries_path in library_paths:
+            if os.path.exists(libraries_path):
+                found_file_paths = find_files_in_dir(
+                    dir_path=libraries_path,
+                    pattern="*.toml",
+                    is_recursive=True,
+                )
+                toml_file_paths.extend(found_file_paths)
+
+        for toml_path in toml_file_paths:
+            try:
+                validate_toml_file(str(toml_path))
+            except TOMLValidationError as exc:
+                log.error(f"TOML formatting issues in library file '{toml_path}': {exc}")
+                raise LibraryError(f"TOML validation failed for library file '{toml_path}': {exc}") from exc
+
+        template_paths = LibraryConfig.get_templates_paths()
+        for template_path in template_paths:
+            if os.path.exists(template_path):
+                try:
+                    validate_toml_file(template_path)
+                except TOMLValidationError as exc:
+                    log.error(f"TOML formatting issues in template file '{template_path}': {exc}")
+                    raise LibraryError(f"TOML validation failed for template file '{template_path}': {exc}") from exc
 
     @classmethod
     def make_pipe_from_details_dict(

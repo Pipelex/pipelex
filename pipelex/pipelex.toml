@@ -206,6 +206,6 @@ text_gen_truncate_length = 256
 nb_list_items = 3
 nb_ocr_pages = 4
 image_urls = [
-    "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg", 
+    "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
     ]

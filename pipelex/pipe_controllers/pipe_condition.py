@@ -5,11 +5,21 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
+from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeConditionError, PipeDefinitionError, PipeExecutionError, PipeInputError, WorkingMemoryStuffNotFoundError
-from pipelex.hub import get_pipe_router, get_pipeline_tracker
+from pipelex.exceptions import (
+    PipeConditionError,
+    PipeDefinitionError,
+    PipeExecutionError,
+    PipeInputError,
+    StaticValidationError,
+    StaticValidationErrorType,
+    WorkingMemoryStuffNotFoundError,
+)
+from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
@@ -18,8 +28,8 @@ from pipelex.tools.typing.validation_utils import has_exactly_one_among_attribut
 
 
 class PipeCondition(PipeController):
-    expression_template: Optional[str]
-    expression: Optional[str]
+    expression_template: Optional[str] = None
+    expression: Optional[str] = None
     pipe_map: Dict[str, str]
     default_pipe_code: Optional[str] = None
     add_alias_from_expression_to: Optional[str] = None
@@ -48,6 +58,112 @@ class PipeCondition(PipeController):
             evaluated_expression=evaluated_expression,
             chosen_pipe_code=chosen_pipe_code,
         )
+
+    def needed_inputs(self) -> PipeInputSpec:
+        """
+        Calculate the inputs needed by this PipeCondition.
+
+        The inputs are:
+        1. Inputs needed by the condition expression/expression_template
+        2. Inputs needed by ALL possible target pipes (since we don't know which will be chosen)
+        """
+        needed_inputs = PipeInputSpec()
+
+        # Get inputs needed by the condition expression
+        pipe_jinja2 = PipeJinja2(
+            code="adhoc_for_needed_inputs",
+            domain=self.domain,
+            jinja2=self.applied_expression_template,
+        )
+        expression_required_vars = pipe_jinja2.required_variables()
+
+        # Add expression variables as needed inputs (excluding internal variables starting with _)
+        for var_name in expression_required_vars:
+            if not var_name.startswith("_"):
+                # We don't know the concept code from just the variable name,
+                # so we'll use a generic placeholder that will be validated later
+                needed_inputs.add_requirement(variable_name=var_name, concept_code=f"{self.domain}.Unknown")
+
+        # Get inputs needed by all possible target pipes
+        target_pipe_codes = list(self.pipe_map.values())
+        if self.default_pipe_code:
+            target_pipe_codes.append(self.default_pipe_code)
+
+        for pipe_code in target_pipe_codes:
+            pipe = get_required_pipe(pipe_code=pipe_code)
+
+            # Get the inputs needed by this target pipe
+            target_pipe_needed_inputs: PipeInputSpec
+            if hasattr(pipe, "needed_inputs") and callable(getattr(pipe, "needed_inputs", None)):
+                # If the pipe has a needed_inputs method, use it
+                needed_inputs_method = getattr(pipe, "needed_inputs")
+                target_pipe_needed_inputs = needed_inputs_method()
+            else:
+                # Otherwise, use the pipe's declared inputs
+                target_pipe_needed_inputs = pipe.inputs
+
+            # Add all inputs from this target pipe
+            for input_name, concept_code in target_pipe_needed_inputs.root.items():
+                needed_inputs.add_requirement(variable_name=input_name, concept_code=concept_code)
+
+        return needed_inputs
+
+    @model_validator(mode="after")
+    def validate_inputs(self) -> Self:
+        # Skip validation during model creation - it will be done in validate_with_libraries()
+        return self
+
+    def _validate_inputs(self):
+        """
+        Validate that the inputs declared for this PipeCondition match what is actually needed.
+        """
+        static_validation_config = get_config().pipelex.static_validation_config
+        default_reaction = static_validation_config.default_reaction
+        reactions = static_validation_config.reactions
+
+        the_needed_inputs = self.needed_inputs()
+
+        # Check all required variables are in the inputs
+        for required_variable_name, _, _ in the_needed_inputs.detailed_requirements:
+            if required_variable_name not in self.inputs.variables:
+                missing_input_var_error = StaticValidationError(
+                    error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[required_variable_name],
+                )
+                match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
+                    case StaticValidationReaction.IGNORE:
+                        pass
+                    case StaticValidationReaction.LOG:
+                        log.error(missing_input_var_error.desc())
+                    case StaticValidationReaction.RAISE:
+                        raise missing_input_var_error
+
+        # Check that all declared inputs are actually needed
+        for input_name in self.inputs.variables:
+            if input_name not in the_needed_inputs.required_names:
+                extraneous_input_var_error = StaticValidationError(
+                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[input_name],
+                )
+                match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, default_reaction):
+                    case StaticValidationReaction.IGNORE:
+                        pass
+                    case StaticValidationReaction.LOG:
+                        log.error(extraneous_input_var_error.desc())
+                    case StaticValidationReaction.RAISE:
+                        raise extraneous_input_var_error
+
+    @override
+    def validate_with_libraries(self):
+        """
+        Perform full validation after all libraries are loaded.
+        This is called after all pipes and concepts are available.
+        """
+        self._validate_inputs()
 
     @override
     def pipe_dependencies(self) -> Set[str]:
