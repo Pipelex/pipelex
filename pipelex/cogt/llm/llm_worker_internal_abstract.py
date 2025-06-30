@@ -1,17 +1,13 @@
-from typing import Optional, Type
+from typing import Optional
 
-from instructor.exceptions import InstructorRetryException
 from typing_extensions import override
 
-from pipelex import log
-from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError
+from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
 class LLMWorkerInternalAbstract(LLMWorkerAbstract):
