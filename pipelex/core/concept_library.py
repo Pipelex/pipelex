@@ -66,6 +66,16 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return [Concept.extract_domain_and_concept_from_str(c.code)[1] for c in self.list_concepts()]
 
     @override
+    def is_concept_code_legal(self, concept_code: str) -> bool:
+        """Given a `domain.concept_code` concept_str verifies that this concept does belong to this domain or not."""
+        if Concept.concept_str_contains_domain(concept_str=concept_code):
+            domain = Concept.extract_domain_from_str(concept_str=concept_code)
+            concept_code = Concept.extract_concept_name_from_str(concept_str=concept_code)
+            return f"{domain}.{concept_code}" in self.root
+        else:
+            return False
+
+    @override
     def list_concepts_by_domain(self, domain: str) -> List[Concept]:
         return [concept for key, concept in self.root.items() if key.startswith(f"{domain}.")]
 

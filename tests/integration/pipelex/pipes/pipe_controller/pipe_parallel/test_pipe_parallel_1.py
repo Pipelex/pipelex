@@ -16,7 +16,6 @@ from tests.pipelines.pipe_controllers.pipe_parallel.pipe_parallel import Content
 
 @pytest.mark.llm
 @pytest.mark.inference
-@pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeParallelDocumentAnalysis:
     @pytest.mark.parametrize(

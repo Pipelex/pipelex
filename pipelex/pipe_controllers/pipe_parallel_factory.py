@@ -2,9 +2,11 @@ from typing import Any, Dict, List, Optional
 
 from typing_extensions import override
 
+from pipelex.core.concept import Concept
 from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
+from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
@@ -33,6 +35,10 @@ class PipeParallelFactory(PipeSpecificFactoryProtocol[PipeParallelBlueprint, Pip
             parallel_sub_pipes.append(sub_pipe)
         if not pipe_blueprint.add_each_output and not pipe_blueprint.combined_output:
             raise PipeDefinitionError("PipeParallel requires either add_each_output or combined_output to be set")
+        if pipe_blueprint.combined_output and not Concept.concept_str_contains_domain(concept_str=pipe_blueprint.combined_output):
+            pipe_blueprint.combined_output = domain_code + "." + pipe_blueprint.combined_output
+            get_concept_provider().is_concept_code_legal(concept_code=pipe_blueprint.combined_output)
+
         return PipeParallel(
             domain=domain_code,
             code=pipe_code,

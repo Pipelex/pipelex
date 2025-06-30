@@ -50,3 +50,7 @@ class ConceptProviderAbstract(ABC):
     @abstractmethod
     def is_image_concept(self, concept_code: str) -> bool:
         pass
+
+    @abstractmethod
+    def is_concept_code_legal(self, concept_code: str) -> bool:
+        pass
