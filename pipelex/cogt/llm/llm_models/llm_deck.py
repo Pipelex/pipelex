@@ -3,7 +3,6 @@ from typing import Dict, Optional, Union
 from pydantic import field_validator, model_validator
 from typing_extensions import Self, override
 
-from pipelex import log
 from pipelex.cogt.exceptions import LLMDeckValidatonError, LLMHandleNotFoundError, LLMPresetNotFoundError, LLMSettingsValidationError
 from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
