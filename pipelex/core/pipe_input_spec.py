@@ -29,13 +29,13 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
             # in case of sub-attribute, the variable name is the object name, before the 1st dot
             transformed_key: str = required_input.split(".", 1)[0]
             if transformed_key != required_input:
-                log.warning(f"Sub-attribute {required_input} detected, using {transformed_key} as variable name")
+                log.verbose(f"Sub-attribute {required_input} detected, using {transformed_key} as variable name")
 
             # Validate concept_code
             concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
 
             if transformed_key in transformed_dict and transformed_dict[transformed_key] != concept_code:
-                log.warning(
+                log.verbose(
                     f"Variable {transformed_key} already exists with a different concept code: {transformed_dict[transformed_key]} -> {concept_str}"
                 )
             transformed_dict[transformed_key] = concept_code
