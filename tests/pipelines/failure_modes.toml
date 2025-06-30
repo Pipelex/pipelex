@@ -2,8 +2,7 @@
 
 domain = "failure_modes"
 
-[concept]
-
+[pipe]
 [pipe.dummy]
 PipeLLM = "This pipe is a dummy pipe"
 output = "Text"

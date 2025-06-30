@@ -8,43 +8,12 @@ FictionCharacter = "A character in a fiction story"
 ArticleAndCritic = "An article and a critique of it"
 Complex = "A complex object"
 
-[pipe.simple_llm_test_from_text]
-PipeLLM = "Simple LLM test from text"
-inputs = { text = "Text" }
-output = "Text"
-prompt_template = """
-This is a simple test prompt:
-@text
-"""
 [pipe.simple_llm_test_from_image]
 PipeLLM = "Simple LLM test from image"
 inputs = { image = "Image" }
 output = "Text"
 prompt_template = """
 Describe the using rap lyrics, including puns and references to the image.
-"""
-
-[pipe.create_characters]
-PipeLLM = "Create Characters"
-output = "FictionCharacter"
-prompt_template = """
-Create a list of 3 characters for a story about a startup in Paris, France.
-Be concise.
-"""
-llm = { llm_handle = "gpt-4o", temperature = 1, max_tokens = "auto" }
-multiple_output = true
-
-[pipe.create_synopsis]
-PipeLLM = "Create Synopsis"
-inputs = { text = "Text" }
-output = "Text"
-llm = "llm_for_creative_writing"
-prompt_template = """
-Create a short synopsis for a story about:
-
-@text
-
-Be concise: 3 sentences max.
 """
 
 [pipe.test_no_input]
@@ -62,9 +31,3 @@ llm = { llm_handle = "gpt-4o-mini", temperature = 0.5, max_tokens = 100 }
 prompt_template = """
 Tell me a short story about a red baloon.
 """
-
-[pipe.generate_3_images]
-PipeImgGen = "Generate 3 images"
-inputs = { prompt = "images.ImgGenPrompt" }
-output = "Image"
-nb_output = 3

@@ -222,7 +222,7 @@ Output this only: "large"
 
     def test_validate_toml_file_actual_problematic_file(self) -> None:
         """Test validation on the actual problematic file from the codebase."""
-        problematic_file = "tests/test_pipelines/pipe_controllers/pipe_condition/pipe_condition_2.toml"
+        problematic_file = "tests/pipelines/pipe_controllers/pipe_condition/pipe_condition_2.toml"
 
         # This should catch the trailing whitespace issue
         with pytest.raises(TOMLValidationError) as exc_info:

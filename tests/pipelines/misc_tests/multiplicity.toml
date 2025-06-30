@@ -47,24 +47,6 @@ Imagine a fantasy scene including the following products of nature:
 Keep it short and concise, just one sentence.
 """
 
-[pipe.choose_colors_local]
-PipeLLM = "Choose Colors locally"
-output = "Color"
-prompt_template = """
-Choose {{ _nb_output }} colors.
-"""
-llm = "llm_for_creative_writing"
-
-[pipe.imagine_nature_product_list]
-PipeSequence = "Imagine nature products of different colors"
-output = "Image"
-steps = [
-    { pipe = "choose_colors_local", result = "color", nb_output = 3 },
-    { pipe = "imagine_nature_product", result = "product_of_nature" },
-    { pipe = "imagine_fantasy_scene_including_products_of_nature", result = "imgg_prompt" },
-    # { pipe = "generate_image", result = "image" },
-]
-
 [pipe.imagine_nature_scene_of_original_power_rangers_colors]
 PipeSequence = "Imagine nature scenes of Power Rangers colors"
 output = "Image"
@@ -72,7 +54,6 @@ steps = [
     { pipe = "original_power_ranger_colors", result = "color" },
     { pipe = "imagine_nature_product", result = "product_of_nature" },
     { pipe = "imagine_fantasy_scene_including_products_of_nature", result = "imgg_prompt" },
-    # { pipe = "generate_image", result = "image" },
 ]
 
 
@@ -83,5 +64,4 @@ steps = [
     { pipe = "alltime_power_ranger_colors", result = "color", multiple_output = true },
     { pipe = "imagine_nature_product", result = "product_of_nature" },
     { pipe = "imagine_fantasy_scene_including_products_of_nature", result = "imgg_prompt" },
-    # { pipe = "generate_image", result = "image" },
 ]

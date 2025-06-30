@@ -12,7 +12,7 @@ from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptO
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
 from tests.integration.pipelex.test_data import PipeTestCases
-from tests.test_pipelines.pipe_llm_prompt import (
+from tests.pipelines.pipe_llm_prompt import (
     ComplexListContent,
     DocumentTypeContent,
     MusicCategoryContent,
