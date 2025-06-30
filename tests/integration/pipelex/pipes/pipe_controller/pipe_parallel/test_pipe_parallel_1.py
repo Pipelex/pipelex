@@ -1,0 +1,83 @@
+from typing import cast
+
+import pytest
+from pytest import FixtureRequest
+
+from pipelex import pretty_print
+from pipelex.core.pipe_output import PipeOutput
+from pipelex.core.pipe_run_params import PipeRunMode
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuff_factory import StuffFactory
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.hub import get_pipe_router, get_report_delegate
+from pipelex.pipeline.job_metadata import JobMetadata
+from tests.pipelines.pipe_controllers.pipe_parallel.pipe_parallel import ContentAnalysis, DocumentInput, LengthAnalysis
+
+
+@pytest.mark.llm
+@pytest.mark.inference
+@pytest.mark.dry_runnable
+@pytest.mark.asyncio(loop_scope="class")
+class TestPipeParallelDocumentAnalysis:
+    @pytest.mark.parametrize(
+        "document_text",
+        [
+            "This is a short document about artificial intelligence and machine learning.",
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            "The quick brown fox jumps over the lazy dog. This pangram contains every letter of the alphabet.",
+        ],
+    )
+    async def test_pipe_parallel_document_analysis(
+        self,
+        request: FixtureRequest,
+        pipe_run_mode: PipeRunMode,
+        document_text: str,
+    ):
+        """Test that PipeParallel processes document analysis in parallel."""
+        # Create input data
+        document_input = DocumentInput(text=document_text)
+        stuff = StuffFactory.make_stuff(
+            concept_str="test_pipe_parallel.DocumentInput",
+            content=document_input,
+            name="document",
+        )
+
+        # Create Working Memory
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff)
+
+        # Run the pipe
+        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
+            pipe_code="parallel_document_analysis",
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            working_memory=working_memory,
+            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+        )
+
+        # Log output and generate report
+        pretty_print(pipe_output, title="PipeParallel document analysis test")
+        get_report_delegate().generate_report()
+
+        # Basic assertions
+        assert pipe_output is not None
+        assert pipe_output.working_memory is not None
+        assert pipe_output.main_stuff is not None
+
+        # Check that both parallel results are available in working memory
+        length_result_stuff = pipe_output.working_memory.get_optional_stuff("length_result")
+        content_result_stuff = pipe_output.working_memory.get_optional_stuff("content_result")
+        assert length_result_stuff is not None
+        assert content_result_stuff is not None
+
+        # Verify the combined output structure
+        combined_analysis = pipe_output.main_stuff.content
+        assert hasattr(combined_analysis, "length_result")
+        assert hasattr(combined_analysis, "content_result")
+
+        # Verify that both analyses contain meaningful content
+        length_analysis = cast(LengthAnalysis, length_result_stuff.content)
+        content_analysis = cast(ContentAnalysis, content_result_stuff.content)
+
+        assert isinstance(length_analysis.analysis, str)
+        assert isinstance(content_analysis.analysis, str)
+        assert len(length_analysis.analysis) > 0
+        assert len(content_analysis.analysis) > 0
