@@ -31,7 +31,7 @@ class PipeConditionFactory(PipeSpecificFactoryProtocol[PipeConditionBlueprint, P
             definition=pipe_blueprint.definition,
             inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
-            expression_jinja2=pipe_blueprint.expression_template,
+            expression_template=pipe_blueprint.expression_template,
             expression=pipe_blueprint.expression,
             pipe_map=pipe_blueprint.pipe_map,
             default_pipe_code=pipe_blueprint.default_pipe_code,

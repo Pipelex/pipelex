@@ -18,7 +18,7 @@ from pipelex.tools.typing.validation_utils import has_exactly_one_among_attribut
 
 
 class PipeCondition(PipeController):
-    expression_jinja2: Optional[str]
+    expression_template: Optional[str]
     expression: Optional[str]
     pipe_map: Dict[str, str]
     default_pipe_code: Optional[str] = None
@@ -26,23 +26,23 @@ class PipeCondition(PipeController):
 
     @model_validator(mode="after")
     def validate_expression(self) -> Self:
-        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_jinja2", "expression"]):
-            raise PipeDefinitionError("PipeCondition should have exactly one of expression_jinja2 or expression")
+        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
+            raise PipeDefinitionError("PipeCondition should have exactly one of expression_template or expression")
         return self
 
     @property
-    def applied_expression_jinja2(self) -> str:
-        if self.expression_jinja2:
-            return self.expression_jinja2
+    def applied_expression_template(self) -> str:
+        if self.expression_template:
+            return self.expression_template
         elif self.expression:
             return "{{ " + self.expression + " }}"
         else:
-            raise PipeExecutionError("No expression or expression_jinja2 provided")
+            raise PipeExecutionError("No expression or expression_template provided")
 
     def _make_pipe_condition_details(self, evaluated_expression: str, chosen_pipe_code: str) -> PipeConditionDetails:
         return PipeConditionDetails(
             code=shortuuid.uuid()[:5],
-            test_expression=self.expression or self.applied_expression_jinja2,
+            test_expression=self.expression or self.applied_expression_template,
             pipe_map=self.pipe_map,
             default_pipe_code=self.default_pipe_code,
             evaluated_expression=evaluated_expression,
@@ -72,14 +72,14 @@ class PipeCondition(PipeController):
         pipe_jinja2 = PipeJinja2(
             code="adhoc_for_pipe_condition",
             domain=self.domain,
-            jinja2=self.applied_expression_jinja2,
+            jinja2=self.applied_expression_template,
         )
         jinja2_job_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(
                 job_category=JobCategory.JINJA2_JOB,
             )
         )
-        log.debug(f"Jinja2 expression: {self.applied_expression_jinja2}")
+        log.debug(f"Jinja2 expression: {self.applied_expression_template}")
         # evaluated_expression = (
         #     await pipe_jinja2.run_pipe(
         #         job_metadata=jinja2_job_metadata,
@@ -98,7 +98,7 @@ class PipeCondition(PipeController):
 
         if not evaluated_expression or evaluated_expression == "None":
             error_msg = f"Conditional expression returned an empty string in pipe {self.code}:"
-            error_msg += f"\n\nExpression: {self.applied_expression_jinja2}"
+            error_msg += f"\n\nExpression: {self.applied_expression_template}"
             raise PipeConditionError(error_msg)
         log.debug(f"evaluated_expression: '{evaluated_expression}'")
 
@@ -112,7 +112,7 @@ class PipeCondition(PipeController):
         chosen_pipe_code = self.pipe_map.get(evaluated_expression, self.default_pipe_code)
         if not chosen_pipe_code:
             error_msg = f"No pipe code found for evaluated expression '{evaluated_expression}' in pipe {self.code}:"
-            error_msg += f"\n\nExpression: {self.applied_expression_jinja2}"
+            error_msg += f"\n\nExpression: {self.applied_expression_template}"
             error_msg += f"\n\nPipe map: {self.pipe_map}"
             raise PipeConditionError(error_msg)
 
@@ -135,7 +135,7 @@ class PipeCondition(PipeController):
             get_pipeline_tracker().add_condition_step(
                 from_stuff=required_stuff,
                 to_condition=condition_details,
-                condition_expression=self.expression or self.applied_expression_jinja2,
+                condition_expression=self.expression or self.applied_expression_template,
                 pipe_layer=pipe_run_params.pipe_layers,
                 comment="PipeCondition required for condition",
             )
