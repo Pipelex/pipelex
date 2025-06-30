@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.0] - 2025-06-30
+
+- Test releases 
+
 ## [v0.4.9] - 2025-06-30
 
 - Added a GitHub Action to create a release notes from the changelog
