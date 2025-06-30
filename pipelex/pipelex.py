@@ -262,6 +262,10 @@ class Pipelex:
         return pipelex_instance
 
     @classmethod
+    def get_optional_instance(cls) -> Optional[Self]:
+        return cls._pipelex_instance
+
+    @classmethod
     def get_instance(cls) -> Self:
         if cls._pipelex_instance is None:
             raise RuntimeError("Pipelex is not initialized")
