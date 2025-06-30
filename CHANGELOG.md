@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.4.9] - 2025-06-30
+
+- Added a GitHub Action to create a release notes from the changelog
+
 ## [v0.4.8] - 2025-06-26
 
 - Added `StorageProviderAbstract`

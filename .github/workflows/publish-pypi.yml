@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - fx/github-release-notes  # Test branch
 
 jobs:
   build:
@@ -32,33 +33,32 @@ jobs:
           name: python-package-distributions
           path: dist/
 
-  publish-to-pypi:
-    name: >-
-      Publish Python 🐍 distribution 📦 to PyPI
-    needs:
-      - build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/pipelex
-    permissions:
-      id-token: write # IMPORTANT: mandatory for trusted publishing
+  # publish-to-pypi:
+  #   name: >-
+  #     Publish Python 🐍 distribution 📦 to PyPI
+  #   needs:
+  #     - build
+  #   runs-on: ubuntu-latest
+  #   environment:
+  #     name: pypi
+  #     url: https://pypi.org/p/pipelex
+  #   permissions:
+  #     id-token: write # IMPORTANT: mandatory for trusted publishing
 
-    steps:
-      - name: Download all the dists
-        uses: actions/download-artifact@v4
-        with:
-          name: python-package-distributions
-          path: dist/
-      - name: Publish distribution 📦 to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+  #   steps:
+  #     - name: Download all the dists
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: python-package-distributions
+  #         path: dist/
+  #     - name: Publish distribution 📦 to PyPI
+  #       uses: pypa/gh-action-pypi-publish@release/v1
 
   github-release:
     name: >-
-      Sign the Python 🐍 distribution 📦 with Sigstore
-      and upload them to GitHub Release
+      Test GitHub Release Creation with Changelog
     needs:
-      - publish-to-pypi
+      - build
     runs-on: ubuntu-latest
 
     permissions:
