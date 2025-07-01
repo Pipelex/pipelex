@@ -30,6 +30,10 @@ Apply the appropriate markers:
 
 Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
 
+## Tips
+
+- Never use the unittest.mock. Use pytest-mock
+
 ## Test Class Structure
 
 Always group the tests of a module into a test class:
