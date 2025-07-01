@@ -285,6 +285,14 @@ test-inference: env
 ti: test-inference
 	@echo "> done: ti = test-inference"
 
+ti-dry: env
+	$(call PRINT_TITLE,"Unit testing")
+	@if [ -n "$(TEST)" ]; then \
+		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference and not imgg" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+	else \
+		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference and not imgg" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+	fi
+
 test-ocr: env
 	$(call PRINT_TITLE,"Unit testing ocr")
 	@if [ -n "$(TEST)" ]; then \

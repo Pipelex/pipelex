@@ -169,6 +169,15 @@ class PipeStackOverflowError(PipeExecutionError):
     pass
 
 
+class DryRunError(PipeExecutionError):
+    """Raised when a dry run fails due to missing inputs or other validation issues."""
+
+    def __init__(self, message: str, missing_inputs: Optional[List[str]] = None, pipe_code: Optional[str] = None):
+        self.missing_inputs = missing_inputs or []
+        self.pipe_code = pipe_code
+        super().__init__(message)
+
+
 class PipeConditionError(PipelexError):
     pass
 

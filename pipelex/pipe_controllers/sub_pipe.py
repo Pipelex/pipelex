@@ -99,3 +99,17 @@ class SubPipe(BaseModel):
                 )
         pretty_print(pipe_output.main_stuff, title=f"Pipe output for {self.pipe_code}")
         return pipe_output
+
+    async def dry_run(
+        self,
+        working_memory: WorkingMemory,
+        job_metadata: JobMetadata,
+        sub_pipe_run_params: PipeRunParams,
+    ) -> PipeOutput:
+        pipe = get_required_pipe(pipe_code=self.pipe_code)
+        return await pipe.dry_run_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=sub_pipe_run_params,
+            output_name=self.output_name,
+        )

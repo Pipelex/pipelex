@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Set, cast
+from typing import Dict, List, Optional, Set, cast
 
 import shortuuid
 from pydantic import model_validator
@@ -8,9 +8,11 @@ from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import (
+    DryRunError,
     PipeConditionError,
     PipeDefinitionError,
     PipeExecutionError,
@@ -110,6 +112,9 @@ class PipeCondition(PipeController):
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
+        if not self.pipe_map:
+            raise ValueError(f"Pipe {self.code} (PipeCondition) must have at least one mapping in pipe_map")
+
         # Skip validation during model creation - it will be done in validate_with_libraries()
         return self
 
@@ -271,3 +276,140 @@ class PipeCondition(PipeController):
             comment="PipeCondition chosen pipe",
         )
         return pipe_output
+
+    @override
+    async def dry_run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: Optional[PipeRunParams] = None,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        """
+        Dry run implementation for PipeCondition.
+        Validates that all required inputs are present, expression is valid, and target pipes exist.
+        """
+        log.info(f"PipeCondition: dry run controller pipe: {self.code}")
+
+        pipe_run_params_dry = (
+            pipe_run_params.model_copy(update=({"run_mode": PipeRunMode.DRY}))
+            if pipe_run_params
+            else PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY)
+        )
+
+        # 1. Validate that all required inputs are present
+        needed_inputs = self.needed_inputs()
+        missing_input_names: List[str] = []
+
+        for required_variable_name, _, _ in needed_inputs.detailed_requirements:
+            if not working_memory.get_optional_stuff(required_variable_name):
+                missing_input_names.append(required_variable_name)
+
+        if missing_input_names:
+            log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
+            raise DryRunError(
+                message=f"Dry run failed for pipe '{self.code}' (PipeCondition): missing required inputs: {', '.join(missing_input_names)}",
+                missing_inputs=missing_input_names,
+                pipe_code=self.code,
+            )
+
+        # 2. Validate that the expression template is valid
+        try:
+            pipe_jinja2 = PipeJinja2(
+                code="adhoc_for_pipe_condition_dry_run",
+                domain=self.domain,
+                jinja2=self.applied_expression_template,
+            )
+            # Get required variables to validate the template syntax
+            required_variables = pipe_jinja2.required_variables()
+            log.debug(f"Expression template is valid, requires variables: {required_variables}")
+        except Exception as e:
+            log.error(f"Dry run failed: invalid expression template: {e}")
+            error_msg = (
+                f"Dry run failed for pipe '{self.code}' (PipeCondition): invalid expression template '{self.applied_expression_template}': {e}"
+            )
+            raise DryRunError(
+                message=error_msg,
+                missing_inputs=[],
+                pipe_code=self.code,
+            )
+
+        # 3. Validate that the expression can be evaluated (using dry run mode)
+        try:
+            jinja2_job_metadata = job_metadata.copy_with_update(
+                updated_metadata=JobMetadata(
+                    job_category=JobCategory.JINJA2_JOB,
+                )
+            )
+
+            # Use dry run mode for jinja2 evaluation
+            pipe_output_jinja2: PipeOutput = await pipe_jinja2.dry_run_pipe(
+                job_metadata=jinja2_job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params_dry,
+            )
+            pipe_jinja2_output = cast(PipeJinja2Output, pipe_output_jinja2)
+            evaluated_expression = pipe_jinja2_output.rendered_text.strip()
+
+            if not evaluated_expression or evaluated_expression == "None":
+                log.error("Dry run failed: expression evaluated to empty result")
+                error_msg = (
+                    f"Dry run failed for pipe '{self.code}' (PipeCondition): "
+                    f"expression '{self.applied_expression_template}' evaluated to empty result"
+                )
+                raise DryRunError(
+                    message=error_msg,
+                    missing_inputs=[],
+                    pipe_code=self.code,
+                )
+
+            log.debug(f"Expression successfully evaluated to: '{evaluated_expression}'")
+
+        except DryRunError:
+            # Re-raise DryRunError as is
+            raise
+        except Exception as e:
+            log.error(f"Dry run failed: expression evaluation error: {e}")
+            raise DryRunError(
+                message=f"Dry run failed for pipe '{self.code}' (PipeCondition): expression evaluation failed: {e}",
+                missing_inputs=[],
+                pipe_code=self.code,
+            )
+
+        # 4. Validate that the evaluated expression maps to a valid pipe
+        chosen_pipe_code = self.pipe_map.get(evaluated_expression, self.default_pipe_code)
+        if not chosen_pipe_code:
+            log.error(f"Dry run failed: no pipe found for expression result '{evaluated_expression}'")
+            error_msg = (
+                f"Dry run failed for pipe '{self.code}' (PipeCondition): no pipe code found for evaluated expression '{evaluated_expression}'. "
+                f"Available mappings: {self.pipe_map}, default: {self.default_pipe_code}"
+            )
+            raise DryRunError(
+                message=error_msg,
+                missing_inputs=[],
+                pipe_code=self.code,
+            )
+
+        # 5. Validate that the chosen pipe exists and can be dry run
+        try:
+            chosen_pipe = get_required_pipe(pipe_code=chosen_pipe_code)
+            log.debug(f"Chosen pipe '{chosen_pipe_code}' exists and is accessible")
+
+            # Run the chosen pipe in dry mode to validate it can execute
+            pipe_output = await chosen_pipe.dry_run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params_dry,
+                output_name=output_name,
+            )
+
+            log.info(f"PipeCondition dry run successful: expression '{evaluated_expression}' -> pipe '{chosen_pipe_code}'")
+            return pipe_output
+
+        except Exception as e:
+            log.error(f"Dry run failed: chosen pipe '{chosen_pipe_code}' validation failed: {e}")
+            raise DryRunError(
+                message=f"Dry run failed for pipe '{self.code}' (PipeCondition): chosen pipe '{chosen_pipe_code}' failed validation: {e}",
+                missing_inputs=[],
+                pipe_code=self.code,
+            )

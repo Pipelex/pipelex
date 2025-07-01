@@ -214,3 +214,13 @@ class PipeParallel(PipeController):
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
+
+    @override
+    async def dry_run_pipe(
+        self,
+        job_metadata: Optional[JobMetadata] = None,
+        working_memory: Optional[WorkingMemory] = None,
+        pipe_run_params: Optional[PipeRunParams] = None,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        raise NotImplementedError("dry_run_pipe not yet implemented")

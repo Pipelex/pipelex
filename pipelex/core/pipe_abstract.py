@@ -9,6 +9,12 @@ from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.types import StrEnum
+
+
+class PipeType(StrEnum):
+    OPERATOR = "operator"
+    CONTROLLER = "controller"
 
 
 class PipeAbstract(ABC, BaseModel):
@@ -21,6 +27,7 @@ class PipeAbstract(ABC, BaseModel):
     # TODO: support auto (implicit) input, it makes sense for pipe controllers
     inputs: PipeInputSpec = Field(default_factory=PipeInputSpec)
     output_concept_code: str
+    pipe_type: PipeType
 
     @property
     def class_name(self) -> str:
@@ -28,8 +35,6 @@ class PipeAbstract(ABC, BaseModel):
 
     def validate_with_libraries(self):
         pass
-
-    # Dependencies
 
     def pipe_dependencies(self) -> Set[str]:
         return set()
@@ -39,11 +44,8 @@ class PipeAbstract(ABC, BaseModel):
         required_concepts.update(self.inputs.concepts)
         return required_concepts
 
-    # Required variables
     def required_variables(self) -> Set[str]:
         return set()
-
-    # Run pipe
 
     @abstractmethod
     async def run_pipe(
@@ -51,6 +53,16 @@ class PipeAbstract(ABC, BaseModel):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        pass
+
+    @abstractmethod
+    async def dry_run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: Optional[PipeRunParams] = None,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         pass

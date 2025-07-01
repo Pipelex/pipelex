@@ -7,9 +7,10 @@ from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeRunParamsError, StaticValidationError, StaticValidationErrorType
+from pipelex.exceptions import DryRunError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -77,8 +78,16 @@ class PipeSequence(PipeController):
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
-        # Skip validation during model creation - it will be done in validate_with_libraries()
+        if len(self.sequential_sub_pipes) == 0:
+            raise ValueError(f"Pipe {self.code} (PipeSequence) must have at least 1 step")
         return self
+
+    def _validate_output_multiplicity_support(self, pipe_run_params: PipeRunParams) -> None:
+        """Validate that the pipe supports the requested output multiplicity."""
+        if pipe_run_params.is_multiple_output_required:
+            raise PipeRunParamsError(
+                f"{self.__class__.__name__} does not support multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
+            )
 
     def _validate_inputs(self):
         """
@@ -145,10 +154,7 @@ class PipeSequence(PipeController):
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         pipe_run_params.push_pipe_layer(pipe_code=self.code)
-        if pipe_run_params.is_multiple_output_required:
-            raise PipeRunParamsError(
-                f"PipeSequence does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
-            )
+        self._validate_output_multiplicity_support(pipe_run_params)
 
         current_memory = working_memory
 
@@ -161,6 +167,62 @@ class PipeSequence(PipeController):
                 sub_pipe_run_params = pipe_run_params.model_copy(update=({"final_stuff_code": None}))
             pipe_output = await sub_pipe.run(
                 calling_pipe_code=self.code,
+                working_memory=current_memory,
+                job_metadata=job_metadata,
+                sub_pipe_run_params=sub_pipe_run_params,
+            )
+            current_memory = pipe_output.working_memory
+
+        return PipeOutput(
+            working_memory=current_memory,
+            pipeline_run_id=job_metadata.pipeline_run_id,
+        )
+
+    @override
+    async def dry_run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: Optional[PipeRunParams] = None,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        """
+        Dry run implementation for PipeSequence.
+        Validates that all required inputs are present and raises DryRunError if any are missing.
+        """
+        log.info(f"PipeSequence: dry run controller pipe: {self.code}")
+
+        pipe_run_params_dry = (
+            pipe_run_params.model_copy(update=({"run_mode": PipeRunMode.DRY}))
+            if pipe_run_params
+            else PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY)
+        )
+
+        needed_inputs = self.needed_inputs()
+
+        missing_input_names: List[str] = []
+        for required_variable_name, _, _ in needed_inputs.detailed_requirements:
+            if not working_memory.get_optional_stuff(required_variable_name):
+                missing_input_names.append(required_variable_name)
+
+        if missing_input_names:
+            log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
+            raise DryRunError(
+                message=f"Dry run failed for pipe '{self.code}' (PipeSequence): missing required inputs: {', '.join(missing_input_names)}",
+                missing_inputs=missing_input_names,
+                pipe_code=self.code,
+            )
+
+        current_memory = working_memory
+
+        for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
+            sub_pipe_run_params: PipeRunParams
+            if sub_pipe_index == len(self.sequential_sub_pipes) - 1:
+                sub_pipe_run_params = pipe_run_params_dry.model_copy()
+            else:
+                sub_pipe_run_params = pipe_run_params_dry.model_copy(update=({"final_stuff_code": None}))
+
+            pipe_output = await sub_pipe.dry_run(
                 working_memory=current_memory,
                 job_metadata=job_metadata,
                 sub_pipe_run_params=sub_pipe_run_params,

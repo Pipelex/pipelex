@@ -11,10 +11,12 @@ from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,
@@ -211,6 +213,21 @@ class PipeLLMPrompt(PipeOperator):
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
         return pipe_output
+
+    @override
+    async def dry_run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: Optional[WorkingMemory] = None,
+        pipe_run_params: Optional[PipeRunParams] = None,
+        output_name: Optional[str] = None,
+    ) -> PipeOutput:
+        return await self._run_operator_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory or WorkingMemoryFactory.make_empty(),
+            pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+            output_name=output_name,
+        )
 
     @staticmethod
     def get_output_structure_prompt(output_concept: str) -> str:

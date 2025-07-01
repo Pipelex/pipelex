@@ -1,10 +1,13 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Type
 
+import shortuuid
+from polyfactory.factories.pydantic_factory import ModelFactory
 from pydantic import BaseModel
 
+from pipelex import log
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ImageContent, PDFContent, TextContent
+from pipelex.core.stuff_content import ImageContent, PDFContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.exceptions import WorkingMemoryFactoryError
@@ -119,4 +122,57 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_memory_file(cls, memory_file_path: str) -> WorkingMemory:
         working_memory_dict = load_json_dict_from_path(memory_file_path)
         working_memory = WorkingMemory.model_validate(working_memory_dict)
+        return working_memory
+
+    @classmethod
+    def make_for_dry_run(cls, needed_inputs: List[Tuple[str, str, Type[StuffContent]]]) -> "WorkingMemory":
+        """
+        Create a WorkingMemory with mock objects for dry run mode.
+
+        Args:
+            needed_inputs: List of tuples (stuff_name, concept_code, structure_class)
+
+        Returns:
+            WorkingMemory with mock objects for each needed input
+        """
+
+        working_memory = WorkingMemory(root={})
+
+        for variable_name, concept_code, structure_class in needed_inputs:
+            log.debug(f"Creating dry run mock for '{variable_name}' with concept '{concept_code}' and class '{structure_class.__name__}'")
+
+            try:
+                if structure_class:
+                    # Create mock object using polyfactory
+                    class MockFactory(ModelFactory[structure_class]):  # type: ignore
+                        __model__ = structure_class
+                        __use_examples__ = True
+
+                    mock_content = MockFactory.build()
+                else:
+                    # Fallback to text content
+                    mock_content = TextContent(text=f"DRY RUN: Mock content for '{variable_name}' ({concept_code})")
+
+                # Create stuff with mock content
+                mock_stuff = Stuff(
+                    stuff_name=variable_name,
+                    stuff_code=shortuuid.uuid()[:5],
+                    concept_code=concept_code,
+                    content=mock_content,
+                )
+
+                working_memory.add_new_stuff(name=variable_name, stuff=mock_stuff)
+
+            except Exception as e:
+                log.warning(f"Failed to create mock for '{variable_name}' ({concept_code}): {e}. Using fallback text content.")
+                # Create fallback text content
+                fallback_content = TextContent(text=f"DRY RUN: Fallback mock for '{variable_name}' ({concept_code})")
+                fallback_stuff = Stuff(
+                    stuff_name=variable_name,
+                    stuff_code=shortuuid.uuid()[:5],
+                    concept_code=concept_code,
+                    content=fallback_content,
+                )
+                working_memory.add_new_stuff(name=variable_name, stuff=fallback_stuff)
+
         return working_memory

@@ -11,10 +11,12 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.config import get_config
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import TextContent
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
 from pipelex.hub import get_content_generator, get_template, get_template_provider
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -133,11 +135,11 @@ class PipeJinja2(PipeOperator):
         return pipe_output
 
     @override
-    async def _dry_run_operator_pipe(
+    async def dry_run_pipe(
         self,
         job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
+        working_memory: Optional[WorkingMemory] = None,
+        pipe_run_params: Optional[PipeRunParams] = None,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         content_generator_used: ContentGeneratorProtocol
@@ -149,8 +151,8 @@ class PipeJinja2(PipeOperator):
             content_generator_used = get_content_generator()
         pipe_output = await self._run_operator_pipe(
             job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
+            working_memory=working_memory or WorkingMemoryFactory.make_empty(),
+            pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             output_name=output_name,
             content_generator=content_generator_used,
         )
