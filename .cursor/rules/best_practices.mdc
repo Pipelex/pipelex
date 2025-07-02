@@ -15,13 +15,9 @@ This document outlines the core best practices and patterns used in our codebase
    - Use type hints for all variables where type is not obvious
 
 2. **StrEnum**
-   - Import StrEnum from pipelex.types
+    If you want to use StrEnum, import it from `pipelex.types`
    ```python
    from pipelex.types import StrEnum
-   
-   class ModelType(StrEnum):
-       GPT4 = "gpt-4"
-       GPT35 = "gpt-3.5-turbo"
    ```
 
 ## Factory Pattern
