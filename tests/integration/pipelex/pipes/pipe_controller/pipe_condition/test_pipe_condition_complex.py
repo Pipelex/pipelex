@@ -15,7 +15,7 @@ from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.exceptions import DryRunError
 from pipelex.hub import get_pipe_router
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.pipelines.pipe_controllers.pipe_condition.pipe_condition_complex import (
+from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition_complex import (
     DocumentRequest,
     UserProfile,
 )

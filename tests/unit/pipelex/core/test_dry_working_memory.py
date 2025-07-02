@@ -9,7 +9,7 @@ from pipelex import log
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff_content import PageContent, StuffContent, TextContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from tests.pipelines.tricky_questions import ThoughtfulAnswer
+from tests.test_pipelines.tricky_questions import ThoughtfulAnswer
 
 
 @pytest.mark.dry_runnable

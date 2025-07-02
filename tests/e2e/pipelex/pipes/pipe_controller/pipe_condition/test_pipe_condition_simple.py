@@ -10,7 +10,7 @@ from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.exceptions import DryRunError
 from pipelex.pipe_controllers.pipe_condition import PipeCondition
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.pipelines.pipe_controllers.pipe_condition.pipe_condition import CategoryInput
+from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition import CategoryInput
 
 
 @pytest.mark.dry_runnable

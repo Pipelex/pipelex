@@ -11,7 +11,7 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.pipelines.pipe_controllers.pipe_parallel.pipe_parallel import ContentAnalysis, DocumentInput, LengthAnalysis
+from tests.test_pipelines.pipe_controllers.pipe_parallel.pipe_parallel import ContentAnalysis, DocumentInput, LengthAnalysis
 
 
 @pytest.mark.llm

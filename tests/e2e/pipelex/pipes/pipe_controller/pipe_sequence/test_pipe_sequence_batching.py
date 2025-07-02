@@ -10,7 +10,7 @@ from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_required_pipe
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.pipelines.pipe_controllers.pipe_sequence.pipe_sequence import Document, ProductRating
+from tests.test_pipelines.pipe_controllers.pipe_sequence.pipe_sequence import Document, ProductRating
 
 
 @pytest.mark.dry_runnable
