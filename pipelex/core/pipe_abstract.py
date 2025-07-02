@@ -57,16 +57,6 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         pass
 
-    @abstractmethod
-    async def dry_run_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: Optional[PipeRunParams] = None,
-        output_name: Optional[str] = None,
-    ) -> PipeOutput:
-        pass
-
     def monitor_pipe_stack(self, pipe_run_params: PipeRunParams):
         pipe_stack = pipe_run_params.pipe_stack
         limit = pipe_run_params.pipe_stack_limit

@@ -28,7 +28,7 @@ llm = "llm_for_testing_gen_text"
 prompt_template = """
 Extract each individual customer review from this document as separate items:
 
-{{ document|tag }}
+@document
 """
 
 [pipe.analyze_review_sentiment]
@@ -39,7 +39,7 @@ llm = "llm_for_testing_gen_text"
 prompt_template = """
 Analyze the sentiment of this customer review:
 
-{{ single_review|tag }}
+@single_review
 
 Provide sentiment (positive/negative/neutral) and confidence score.
 """
@@ -52,7 +52,7 @@ llm = "llm_for_testing_gen_text"
 prompt_template = """
 Based on these sentiment analyses, provide an overall product rating:
 
-{{ sentiment_analyses|tag }}
+@sentiment_analyses
 
 Give a rating from 1-5 stars with explanation.
 """

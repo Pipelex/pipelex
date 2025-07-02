@@ -6,6 +6,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import TextContent
 from pipelex.core.stuff_factory import StuffFactory
@@ -21,7 +22,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestPipeParallelSimple:
     """Simple integration test for PipeParallel controller."""
 
-    async def test_parallel_text_analysis(self, request: FixtureRequest):
+    async def test_parallel_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeParallel running three text analysis pipes in parallel."""
         # Create PipeParallel instance - pipes are loaded from TOML files
         pipe_parallel = PipeParallel(
@@ -69,11 +70,11 @@ class TestPipeParallelSimple:
         assert input_text.content.text == "The weather is beautiful today. I love sunny days and outdoor activities."
 
         # Actually run the PipeParallel pipe
-        pipe_output = await pipe_parallel._run_controller_pipe(  # pyright: ignore[reportPrivateUsage]
+        pipe_output = await pipe_parallel.run_pipe(
             job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
             working_memory=working_memory,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
             output_name="parallel_results",
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
 
         # Verify the pipe executed successfully
@@ -127,7 +128,7 @@ class TestPipeParallelSimple:
         assert isinstance(final_result.content, TextContent)
         assert final_result.content.text == "The weather is beautiful today. I love sunny days and outdoor activities."
 
-    async def test_parallel_short_text_analysis(self, request: FixtureRequest):
+    async def test_parallel_short_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeParallel with shorter text to verify consistent behavior."""
         # Create PipeParallel instance
         pipe_parallel = PipeParallel(
@@ -154,11 +155,11 @@ class TestPipeParallelSimple:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(input_text_stuff)
 
         # Actually run the PipeParallel pipe
-        pipe_output = await pipe_parallel._run_controller_pipe(  # pyright: ignore[reportPrivateUsage]
+        pipe_output = await pipe_parallel.run_pipe(
             job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
             working_memory=working_memory,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
             output_name="parallel_results",
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
 
         # Verify the pipe executed successfully

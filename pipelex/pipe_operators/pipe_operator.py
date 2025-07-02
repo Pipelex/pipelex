@@ -3,7 +3,6 @@ from typing import Optional
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.core.pipe_abstract import PipeAbstract, PipeType
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
@@ -68,6 +67,7 @@ class PipeOperator(PipeAbstract):
     ) -> PipeOutput:
         pass
 
+    @abstractmethod
     async def _dry_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
@@ -75,12 +75,4 @@ class PipeOperator(PipeAbstract):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        log.info(
-            f"PipeOperator: dry run method called for operator pipe: {self.code}, but no dry run method is implemented for {self.__class__.__name__}"
-        )
-        return await self._run_operator_pipe(
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
-        )
+        pass

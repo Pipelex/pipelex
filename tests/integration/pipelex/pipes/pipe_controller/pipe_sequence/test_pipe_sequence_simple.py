@@ -7,6 +7,7 @@ from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import TextContent
 from pipelex.core.stuff_factory import StuffFactory
@@ -22,7 +23,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestPipeSequenceSimple:
     """Simple integration test for PipeSequence controller."""
 
-    async def test_simple_sequence_processing(self, request: FixtureRequest):
+    async def test_simple_sequence_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeSequence with a simple 2-step text transformation scenario."""
         # Create PipeSequence instance - pipes are loaded from TOML files
         pipe_sequence = PipeSequence(
@@ -67,11 +68,11 @@ class TestPipeSequenceSimple:
         pretty_print(working_memory, title="Initial working memory with input text")
 
         # Actually run the PipeSequence pipe
-        pipe_output = await pipe_sequence._run_controller_pipe(  # pyright: ignore[reportPrivateUsage]
+        pipe_output = await pipe_sequence.run_pipe(
             job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
             working_memory=working_memory,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
             output_name="sequence_result",
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
 
         # Log the output for debugging

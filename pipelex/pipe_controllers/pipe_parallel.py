@@ -159,7 +159,7 @@ class PipeParallel(PipeController):
 
         for sub_pipe in self.parallel_sub_pipes:
             tasks.append(
-                sub_pipe.run(
+                sub_pipe.run_pipe(
                     calling_pipe_code=self.code,
                     job_metadata=job_metadata,
                     working_memory=working_memory.make_deep_copy(),
@@ -216,11 +216,11 @@ class PipeParallel(PipeController):
         )
 
     @override
-    async def dry_run_pipe(
+    async def _dry_run_controller_pipe(
         self,
-        job_metadata: Optional[JobMetadata] = None,
-        working_memory: Optional[WorkingMemory] = None,
-        pipe_run_params: Optional[PipeRunParams] = None,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        raise NotImplementedError("dry_run_pipe not yet implemented")
+        raise NotImplementedError("Dry run not yet implemented for PipeParallel")

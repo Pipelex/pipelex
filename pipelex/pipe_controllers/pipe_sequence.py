@@ -7,8 +7,7 @@ from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import DryRunError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_required_pipe
@@ -165,7 +164,7 @@ class PipeSequence(PipeController):
                 sub_pipe_run_params = pipe_run_params.model_copy()
             else:
                 sub_pipe_run_params = pipe_run_params.model_copy(update=({"final_stuff_code": None}))
-            pipe_output = await sub_pipe.run(
+            pipe_output = await sub_pipe.run_pipe(
                 calling_pipe_code=self.code,
                 working_memory=current_memory,
                 job_metadata=job_metadata,
@@ -179,11 +178,11 @@ class PipeSequence(PipeController):
         )
 
     @override
-    async def dry_run_pipe(
+    async def _dry_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
-        pipe_run_params: Optional[PipeRunParams] = None,
+        pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         """
@@ -191,12 +190,6 @@ class PipeSequence(PipeController):
         Validates that all required inputs are present and raises DryRunError if any are missing.
         """
         log.info(f"PipeSequence: dry run controller pipe: {self.code}")
-
-        pipe_run_params_dry = (
-            pipe_run_params.model_copy(update=({"run_mode": PipeRunMode.DRY}))
-            if pipe_run_params
-            else PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY)
-        )
 
         needed_inputs = self.needed_inputs()
 
@@ -218,11 +211,12 @@ class PipeSequence(PipeController):
         for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
             sub_pipe_run_params: PipeRunParams
             if sub_pipe_index == len(self.sequential_sub_pipes) - 1:
-                sub_pipe_run_params = pipe_run_params_dry.model_copy()
+                sub_pipe_run_params = pipe_run_params.model_copy()
             else:
-                sub_pipe_run_params = pipe_run_params_dry.model_copy(update=({"final_stuff_code": None}))
+                sub_pipe_run_params = pipe_run_params.model_copy(update=({"final_stuff_code": None}))
 
-            pipe_output = await sub_pipe.dry_run(
+            pipe_output = await sub_pipe.run_pipe(
+                calling_pipe_code=self.code,
                 working_memory=current_memory,
                 job_metadata=job_metadata,
                 sub_pipe_run_params=sub_pipe_run_params,

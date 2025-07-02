@@ -481,14 +481,13 @@ class PipeLLM(PipeOperator):
         return the_content
 
     @override
-    async def dry_run_pipe(
+    async def _dry_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: Optional[WorkingMemory] = None,
         pipe_run_params: Optional[PipeRunParams] = None,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        log.info(f"PipeLLM: dry run operator pipe: {self.code}")
         content_generator_dry = ContentGeneratorDry()
         pipe_output = await self._run_operator_pipe(
             job_metadata=job_metadata,

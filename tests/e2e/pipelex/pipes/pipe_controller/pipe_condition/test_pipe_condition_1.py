@@ -42,8 +42,8 @@ class TestPipeConditionExpressionTemplate:
         # Run the pipe
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="basic_condition_by_category_2",
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
 

@@ -8,8 +8,7 @@ from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import (
     DryRunError,
@@ -278,11 +277,11 @@ class PipeCondition(PipeController):
         return pipe_output
 
     @override
-    async def dry_run_pipe(
+    async def _dry_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
-        pipe_run_params: Optional[PipeRunParams] = None,
+        pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         """
@@ -290,12 +289,6 @@ class PipeCondition(PipeController):
         Validates that all required inputs are present, expression is valid, and target pipes exist.
         """
         log.info(f"PipeCondition: dry run controller pipe: {self.code}")
-
-        pipe_run_params_dry = (
-            pipe_run_params.model_copy(update=({"run_mode": PipeRunMode.DRY}))
-            if pipe_run_params
-            else PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY)
-        )
 
         # 1. Validate that all required inputs are present
         needed_inputs = self.needed_inputs()
@@ -342,11 +335,10 @@ class PipeCondition(PipeController):
                 )
             )
 
-            # Use dry run mode for jinja2 evaluation
-            pipe_output_jinja2: PipeOutput = await pipe_jinja2.dry_run_pipe(
+            pipe_output_jinja2: PipeOutput = await pipe_jinja2.run_pipe(
                 job_metadata=jinja2_job_metadata,
                 working_memory=working_memory,
-                pipe_run_params=pipe_run_params_dry,
+                pipe_run_params=pipe_run_params,
             )
             pipe_jinja2_output = cast(PipeJinja2Output, pipe_output_jinja2)
             evaluated_expression = pipe_jinja2_output.rendered_text.strip()
@@ -396,10 +388,10 @@ class PipeCondition(PipeController):
             log.debug(f"Chosen pipe '{chosen_pipe_code}' exists and is accessible")
 
             # Run the chosen pipe in dry mode to validate it can execute
-            pipe_output = await chosen_pipe.dry_run_pipe(
+            pipe_output = await chosen_pipe.run_pipe(
                 job_metadata=job_metadata,
                 working_memory=working_memory,
-                pipe_run_params=pipe_run_params_dry,
+                pipe_run_params=pipe_run_params,
                 output_name=output_name,
             )
 

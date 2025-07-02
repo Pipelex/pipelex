@@ -34,7 +34,7 @@ class TestPipeConditionSimple:
         empty_working_memory = WorkingMemoryFactory.make_empty()
 
         with pytest.raises(DryRunError) as exc_info:
-            await pipe_condition.dry_run_pipe(
+            await pipe_condition.run_pipe(
                 job_metadata=JobMetadata(job_name="test_direct_condition_fail"),
                 working_memory=empty_working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
@@ -67,7 +67,7 @@ class TestPipeConditionSimple:
         working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=[("user_status", "test_pipe_condition.CategoryInput", CategoryInput)])
 
         try:
-            pipe_output = await pipe_condition.dry_run_pipe(
+            pipe_output = await pipe_condition.run_pipe(
                 job_metadata=JobMetadata(job_name="test_direct_condition_succeed"),
                 working_memory=working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),

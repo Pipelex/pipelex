@@ -64,11 +64,11 @@ class PipeFunc(PipeOperator):
         return pipe_output
 
     @override
-    async def dry_run_pipe(
+    async def _dry_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
-        working_memory: Optional[WorkingMemory] = None,
-        pipe_run_params: Optional[PipeRunParams] = None,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        raise NotImplementedError("dry_run_pipe not yet implemented")
+        raise NotImplementedError("Dry run not yet implemented for PipeFunc")
