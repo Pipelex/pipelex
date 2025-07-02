@@ -18,7 +18,7 @@ PipeLLM is used to:
 [pipe.write_story]
 PipeLLM = "Write a short story"
 output = "Text"
-prompt = """
+prompt_template = """
 Write a short story about a programmer.
 """
 ```
@@ -59,7 +59,7 @@ You can specify LLM settings in two ways:
 PipeLLM = "Analyze text"
 output = "Analysis"
 llm = { llm_handle = "gpt-4", temperature = 0.7 }
-prompt = "Analyze this text"
+prompt_template = "Analyze this text"
 ```
 
 2. **Using predefined settings** from `pipelex_libraries/llm_deck/base_llm_deck.toml`:
@@ -68,7 +68,7 @@ prompt = "Analyze this text"
 PipeLLM = "Analyze text"
 output = "Analysis"
 llm = "llm_for_analysis"  # References a preset from llm_deck
-prompt = "Analyze this text"
+prompt_template = "Analyze this text"
 ```
 
 ### System Prompts
@@ -78,7 +78,7 @@ Add system-level instructions:
 PipeLLM = "Expert analysis"
 output = "Analysis"
 system_prompt = "You are a data analysis expert"
-prompt = "Analyze this data"
+prompt_template = "Analyze this data"
 ```
 
 ### Multiple Outputs
@@ -99,7 +99,7 @@ Process images with VLMs:
 PipeLLM = "Analyze image"
 inputs = { image = "Image" } # `image` is the name of the stuff that contains the Image. If its in a stuff, you can add something like `{ "page.image": "Image" }
 output = "ImageAnalysis"
-prompt = "Describe what you see in this image"
+prompt_template = "Describe what you see in this image"
 ```
 
 # Important tip

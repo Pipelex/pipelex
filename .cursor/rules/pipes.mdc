@@ -51,8 +51,9 @@ inputs = { input_1 = "ConceptName1", input_2 = "ConceptName2" }
 output = "ConceptName"
 ```
 
-The pipes will all have at least this base structure. The ConceptName are related to a python structure, so that you can output structured objects.
-Look on how to do that here: [structures.mdc](mdc:.cursor/rules/structures.mdc)
+The pipes will all have at least this base structure. 
+- `inputs`: Dictionnary of key behing the variable used in the prompts, and the value behing the ConceptName
+- `output`: The name of the concept to output. The `ConceptName` should have the same name as the python class if you want structured output. Look on how to do that here: [structures.mdc](mdc:.cursor/rules/structures.mdc)
 
 ## Pipe Controllers and Pipe Operator
 
