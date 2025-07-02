@@ -45,3 +45,6 @@ large = "process_large"
 1 - The key on the left (`small`, `medium`) is the result of `expression` or `expression_template`.
 2 - The value on the right (`process_small`, `process_medium`, ..) is the name of the pipce to trigger
 
+# Important tip
+
+Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

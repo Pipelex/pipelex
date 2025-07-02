@@ -101,3 +101,7 @@ inputs = { image = "Image" } # `image` is the name of the stuff that contains th
 output = "ImageAnalysis"
 prompt = "Describe what you see in this image"
 ```
+
+# Important tip
+
+Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

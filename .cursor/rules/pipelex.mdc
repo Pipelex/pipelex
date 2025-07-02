@@ -5,8 +5,7 @@ alwaysApply: false
 ---
 Rules to write pipes:
 
-- To write the pipes toml, check out:
-[pipes.mdc](mdc:.cursor/rules/pipes.mdc)
+- To write pipelines: [pipes.mdc](mdc:.cursor/rules/pipes.mdc)
 
 - To write the structure classes for concepts used in pipes with structured generations, check out:
 [structures.mdc](mdc:.cursor/rules/structures.mdc)
@@ -16,3 +15,7 @@ Rules to write pipes:
 
 - To choose an llm preset or define a new one, check out:
 [llms.mdc](mdc:.cursor/rules/llms.mdc)
+
+# Important tip
+
+Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

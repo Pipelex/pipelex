@@ -53,4 +53,6 @@ steps = [
 
 The result of a batched step will be a `ListContent` containing the outputs from processing each item.
 
+# Important tip
 
+Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

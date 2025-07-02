@@ -33,3 +33,7 @@ class PageContent(StructuredContent):
 ```
 - `text_and_images` are the text, and the related images found in the input image or PDF.
 - `page_view` is the screenshot of the whole pdf page/image.
+
+# Important tip
+
+Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

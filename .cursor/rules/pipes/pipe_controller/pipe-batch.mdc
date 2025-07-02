@@ -25,3 +25,7 @@ steps = [
 - `batch_over`: The name of the list in the context to iterate over
 - `batch_as`: The name to use for the current element in the pipe's context
 - `result`: Where to store the results of the batch operation
+
+# Important tip
+
+Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

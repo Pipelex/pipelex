@@ -71,3 +71,7 @@ This document outlines the core best practices and patterns used in our codebase
            "The fal-client SDK is required to use FAL models."
        ) from exc
    ```
+
+## Pipelines
+
+Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

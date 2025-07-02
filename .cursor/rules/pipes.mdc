@@ -73,3 +73,7 @@ Look at the Pipes we have in order to adapt it. Pipes are organized in two categ
 When building a pipeline:
 1. Always define controllers first, then operators
 2. Each pipe must have a clear, single responsibility
+
+# Important tip
+
+Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.
