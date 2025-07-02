@@ -13,7 +13,7 @@ class LibraryConfig(ConfigModel):
     exported_pipelines_path: ClassVar[str] = f"{exported_library_root}/pipelines"
     exported_base_pipelines_path: ClassVar[str] = f"{exported_library_root}/pipelines/base_library"
     loaded_pipelines_path: ClassVar[str] = f"{exported_library_root}/pipelines"
-    test_pipelines_path: ClassVar[str] = "tests/pipelines"
+    test_pipelines_path: ClassVar[str] = "tests/test_pipelines"
     internal_llm_integrations_path: ClassVar[str] = f"{internal_library_root}/llm_integrations"
     exported_llm_integrations_path: ClassVar[str] = f"{exported_library_root}/llm_integrations"
     internal_llm_deck_path: ClassVar[str] = f"{internal_library_root}/llm_deck"

@@ -235,7 +235,7 @@ class PipeLLM(PipeOperator):
             output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
 
             if not output_concept_code:
-                raise RuntimeError(f"No output concept code provided for dynamic output pipe '{self.code}'")
+                output_concept_code = NativeConcept.TEXT.code
         else:
             output_concept_code = self.output_concept_code
 
