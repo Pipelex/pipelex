@@ -54,7 +54,6 @@ class LLMJobFactory:
         llm_job_config: Optional[LLMJobConfig] = None,
         job_metadata: Optional[JobMetadata] = None,
     ) -> LLMJob:
-        print(f"llm_prompt_factory:\n{llm_prompt_factory.desc}")
         log.debug(llm_prompt_arguments, title="llm_prompt_arguments")
         llm_prompt = await llm_prompt_factory.make_llm_prompt_from_args(**llm_prompt_arguments)
 

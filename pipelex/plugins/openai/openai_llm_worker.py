@@ -137,7 +137,6 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         openai_message: ChatCompletionMessage = response.choices[0].message
         response_text = openai_message.content
         if response_text is None:
-            print("This helper does not support tools, if we don't get content, something is wrong.")
             raise LLMCompletionError(f"OpenAI response message content is None: {response}\nmodel: {self.llm_engine.llm_model.desc}")
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
