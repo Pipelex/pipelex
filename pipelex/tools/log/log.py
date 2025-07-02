@@ -178,7 +178,6 @@ class Log:
         Args:
             level (LogLevel): The log level to set.
         """
-        # print(f"Setting default logs to {level=}")
         self.set_level_by_int(level_int=level.int_logging_level)
 
     def set_level_for_package(self, package_name: str, level: LogLevel):

@@ -74,8 +74,6 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         log.info(f"Starting dry run for {len(pipes)} pipes...")
 
         for pipe in pipes:
-            if pipe.code != "write_markdown_from_page_content_dpe":
-                continue
             try:
                 needed_inputs_for_factory = self._convert_to_working_memory_format(pipe.needed_inputs())
                 working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)

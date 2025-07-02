@@ -21,7 +21,7 @@ TEST_OUTPUTS_DIR = "temp/test_outputs"
 @pytest.fixture(scope="module", autouse=True)
 def reset_pipelex_config_fixture():
     # Code to run before each test
-    print("\n[magenta]pipelex setup[/magenta]")
+    print("[magenta]pipelex setup[/magenta]")
     try:
         pipelex_instance = pipelex.pipelex.Pipelex.make()
         config = get_config()
@@ -33,17 +33,15 @@ def reset_pipelex_config_fixture():
         pytest.exit(f"Critical Pipelex setup error: {exc}")
     yield
     # Code to run after each test
-    print("\n[magenta]pipelex teardown[/magenta]")
+    print("[magenta]pipelex teardown[/magenta]")
     pipelex_instance.teardown()
 
 
 @pytest.fixture(scope="function", autouse=True)
 def pretty():
     # Code to run before each test
-    print("\n")
     yield
     # Code to run after each test
-    print("\n")
 
 
 @pytest.fixture(scope="session", autouse=True)  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]

@@ -65,7 +65,6 @@ class RuntimeManager(BaseModel):
 
     def set_run_mode(self, run_mode: RunMode):
         self._run_mode = run_mode
-        # print(f"Set run mode to '{run_mode}'")
 
     def set_worker_mode(self, worker_mode: WorkerMode):
         self._worker_mode = worker_mode
