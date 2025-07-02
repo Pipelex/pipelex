@@ -184,6 +184,7 @@ class PipeCondition(PipeController):
             code="adhoc_for_pipe_condition",
             domain=self.domain,
             jinja2=self.applied_expression_template,
+            inputs=self.inputs,
         )
         jinja2_job_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(
