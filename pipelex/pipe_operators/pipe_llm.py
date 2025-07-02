@@ -7,7 +7,7 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.llm.llm_models.llm_deck_check import check_llm_setting_with_deck
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices
+from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.config import StaticValidationReaction, get_config
@@ -214,26 +214,6 @@ class PipeLLM(PipeOperator):
             for llm_setting in self.llm_choices.list_used_presets():
                 check_llm_setting_with_deck(llm_setting_or_preset_id=llm_setting)
 
-    @property
-    def llm_setting_main(self) -> LLMSetting:
-        return get_llm_deck().get_llm_setting_for_text(override=self.llm_choices)
-
-    @property
-    def llm_setting_for_object(self) -> LLMSetting:
-        return get_llm_deck().get_llm_setting_for_object(override=self.llm_choices)
-
-    @property
-    def llm_setting_for_object_direct(self) -> LLMSetting:
-        return get_llm_deck().get_llm_setting_for_object_direct(override=self.llm_choices)
-
-    @property
-    def llm_setting_for_object_list(self) -> LLMSetting:
-        return get_llm_deck().get_llm_setting_for_object_list(override=self.llm_choices)
-
-    @property
-    def llm_setting_for_object_list_direct(self) -> LLMSetting:
-        return get_llm_deck().get_llm_setting_for_object_list_direct(override=self.llm_choices)
-
     @override
     async def _run_operator_pipe(
         self,
@@ -279,15 +259,38 @@ class PipeLLM(PipeOperator):
         else:
             log.verbose(f"{self.class_name} generate a single '{output_concept_code}' (class '{output_concept.structure_class_name}')")
 
-        if not self.pipe_llm_prompt.prompting_style and (
-            llm_model := get_llm_deck().find_optional_llm_model(llm_handle=self.llm_setting_main.llm_handle)
-        ):
+        # Collect what LLM settings we have for this particular PipeLLM
+        llm_for_text_choice: Optional[LLMSettingOrPresetId] = None
+        llm_for_object_choice: Optional[LLMSettingOrPresetId] = None
+        if self.llm_choices:
+            llm_for_text_choice = self.llm_choices.for_text
+            llm_for_object_choice = self.llm_choices.for_object
+
+        # Choice of main LLM for text first from this PipeLLM setting (self.llm_choices)
+        # or from the llm_choice_overrides or fallback on the llm_choice_defaults
+        llm_setting_or_preset_id_for_text: LLMSettingOrPresetId = (
+            llm_for_text_choice or get_llm_deck().llm_choice_overrides.for_text or get_llm_deck().llm_choice_defaults.for_text
+        )
+        llm_setting_main: LLMSetting = get_llm_deck().get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_text)
+
+        # Choice of main LLM for object from this PipeLLM setting (self.llm_choices)
+        # OR FROM THE llm_for_text_choice (if any)
+        # then fallback on the llm_choice_overrides or llm_choice_defaults
+        llm_setting_or_preset_id_for_object: LLMSettingOrPresetId = (
+            llm_for_object_choice
+            or llm_for_text_choice
+            or get_llm_deck().llm_choice_overrides.for_object
+            or get_llm_deck().llm_choice_defaults.for_object
+        )
+        llm_setting_for_object: LLMSetting = get_llm_deck().get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_object)
+
+        if not self.pipe_llm_prompt.prompting_style and (llm_model := get_llm_deck().find_optional_llm_model(llm_handle=llm_setting_main.llm_handle)):
             llm_family = llm_model.llm_family
-            if self.llm_setting_main.prompting_target:
-                log.dev(f"prompting_target for '{self.llm_setting_main.llm_handle}' from setting: {self.llm_setting_main}")
+            if llm_setting_main.prompting_target:
+                log.dev(f"prompting_target for '{llm_setting_main.llm_handle}' from setting: {llm_setting_main}")
             else:
-                log.dev(f"prompting_target for '{self.llm_setting_main.llm_handle}' from llm_family: {llm_family}")
-            prompting_target = self.llm_setting_main.prompting_target or llm_family.prompting_target
+                log.dev(f"prompting_target for '{llm_setting_main.llm_handle}' from llm_family: {llm_family}")
+            prompting_target = llm_setting_main.prompting_target or llm_family.prompting_target
             self.pipe_llm_prompt.prompting_style = get_config().pipelex.prompting_config.get_prompting_style(
                 prompting_target=prompting_target,
             )
@@ -324,7 +327,7 @@ class PipeLLM(PipeOperator):
             generated_text: str = await content_generator.make_llm_text(
                 job_metadata=job_metadata,
                 llm_prompt_for_text=llm_prompt_1,
-                llm_setting_main=self.llm_setting_main,
+                llm_setting_main=llm_setting_main,
             )
 
             the_content = TextContent(
@@ -390,6 +393,8 @@ class PipeLLM(PipeOperator):
                 is_multiple_output=is_multiple_output,
                 fixed_nb_output=fixed_nb_output,
                 output_class_name=output_concept.structure_class_name,
+                llm_setting_main=llm_setting_main,
+                llm_setting_for_object=llm_setting_for_object,
                 llm_prompt_1=llm_prompt_1,
                 llm_prompt_2_factory=llm_prompt_2_factory,
                 content_generator=content_generator,
@@ -418,6 +423,8 @@ class PipeLLM(PipeOperator):
         is_multiple_output: bool,
         fixed_nb_output: Optional[int],
         output_class_name: str,
+        llm_setting_main: LLMSetting,
+        llm_setting_for_object: LLMSetting,
         llm_prompt_1: LLMPrompt,
         llm_prompt_2_factory: Optional[LLMPromptFactoryAbstract],
         content_generator: ContentGeneratorProtocol,
@@ -443,9 +450,9 @@ class PipeLLM(PipeOperator):
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_text=llm_prompt_1,
-                    llm_setting_main=self.llm_setting_main,
+                    llm_setting_main=llm_setting_main,
                     llm_prompt_factory_for_object_list=llm_prompt_2_factory,
-                    llm_setting_for_object_list=self.llm_setting_for_object_list,
+                    llm_setting_for_object_list=llm_setting_for_object,
                     nb_items=fixed_nb_output,
                 )
             else:
@@ -456,7 +463,7 @@ class PipeLLM(PipeOperator):
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_object_list=llm_prompt_1,
-                    llm_setting_for_object_list=self.llm_setting_for_object_list_direct,
+                    llm_setting_for_object_list=llm_setting_for_object,
                     nb_items=fixed_nb_output,
                 )
 
@@ -473,9 +480,9 @@ class PipeLLM(PipeOperator):
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_text=llm_prompt_1,
-                    llm_setting_main=self.llm_setting_main,
+                    llm_setting_main=llm_setting_main,
                     llm_prompt_factory_for_object=llm_prompt_2_factory,
-                    llm_setting_for_object=self.llm_setting_for_object,
+                    llm_setting_for_object=llm_setting_for_object,
                 )
             else:
                 # We're generating a single object directly
@@ -485,7 +492,7 @@ class PipeLLM(PipeOperator):
                     job_metadata=job_metadata,
                     object_class=content_class,
                     llm_prompt_for_object=llm_prompt_1,
-                    llm_setting_for_object=self.llm_setting_for_object_direct,
+                    llm_setting_for_object=llm_setting_for_object,
                 )
             the_content = generated_object
 

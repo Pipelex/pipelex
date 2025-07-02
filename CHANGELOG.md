@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.4.11] - 2025-06-30
+
+- **LLM Settings Simplification**: Streamlined LLM choice system by removing complex `for_object_direct`, `for_object_list`, and `for_object_list_direct` options. LLM selection now uses a simpler fallback pattern: specific choice → text choice → overrides → defaults.
+- **Image Model Updates**: Renamed `image_bytes` field to `base_64` in `PromptImageTypedBytes` for better consistency. Updated to use `CustomBaseModel` base class to benefit from bytes truncation when printing.
+
 ## [v0.4.10] - 2025-06-30
 
 - Fixed a bad import statement

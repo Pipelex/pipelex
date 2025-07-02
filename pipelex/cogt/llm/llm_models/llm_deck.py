@@ -3,7 +3,6 @@ from typing import Dict, Optional, Union
 from pydantic import field_validator, model_validator
 from typing_extensions import Self, override
 
-from pipelex import log
 from pipelex.cogt.exceptions import LLMDeckValidatonError, LLMHandleNotFoundError, LLMPresetNotFoundError, LLMSettingsValidationError
 from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
@@ -50,80 +49,6 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
             if not the_llm_preset:
                 raise LLMPresetNotFoundError(f"LLM preset '{llm_setting_or_preset_id}' not found in deck")
             return the_llm_preset
-
-    @override
-    def get_llm_setting_for_text(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
-        llm_setting: LLMSettingOrPresetId
-        if replacement := self.llm_choice_overrides.for_text:
-            log.warning(f"General llm setting override for text, '{self.llm_choice_defaults.for_text}' -> '{replacement}'")
-            llm_setting = replacement
-        elif override and (provided_override_for_text := override.for_text):
-            llm_setting = provided_override_for_text
-        elif self.llm_choice_defaults.for_text is None:
-            raise ConfigValidationError("llm_choices.for_text cannot be None")
-        else:
-            llm_setting = self.llm_choice_defaults.for_text
-
-        return self.get_llm_setting(llm_setting_or_preset_id=llm_setting)
-
-    @override
-    def get_llm_setting_for_object(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
-        log.debug(f"Getting LLM setting for object with provided_override: {override}")
-        llm_setting: LLMSettingOrPresetId
-        if replacement := self.llm_choice_overrides.for_object:
-            log.warning(f"General llm setting override for object, '{self.llm_choice_defaults.for_object}' -> '{replacement}'")
-            llm_setting = replacement
-        elif override and (provided_override_for_object := override.for_object):
-            llm_setting = provided_override_for_object
-        elif self.llm_choice_defaults.for_object is None:
-            raise ConfigValidationError("llm_choices.for_object cannot be None")
-        else:
-            llm_setting = self.llm_choice_defaults.for_object
-
-        return self.get_llm_setting(llm_setting_or_preset_id=llm_setting)
-
-    @override
-    def get_llm_setting_for_object_direct(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
-        log.debug(f"Getting LLM preset for object direct with provided_override: {override}")
-        llm_setting: LLMSettingOrPresetId
-        if replacement := self.llm_choice_overrides.for_object_direct:
-            log.warning(f"General choice override for LLM preset for structured, '{self.llm_choice_defaults.for_object_direct}' -> '{replacement}'")
-            llm_setting = replacement
-        elif override and (provided_override_for_object_direct := override.for_object_direct):
-            llm_setting = provided_override_for_object_direct
-        elif self.llm_choice_defaults.for_object_direct is None:
-            raise ConfigValidationError("llm_choices.for_object_direct cannot be None")
-        else:
-            llm_setting = self.llm_choice_defaults.for_object_direct
-
-        return self.get_llm_setting(llm_setting_or_preset_id=llm_setting)
-
-    @override
-    def get_llm_setting_for_object_list(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
-        llm_setting: LLMSettingOrPresetId
-        if replacement := self.llm_choice_overrides.for_object_list:
-            log.warning(f"General choice override for LLM preset for structured, '{self.llm_choice_defaults.for_object_list}' -> '{replacement}'")
-            llm_setting = replacement
-        elif override and (provided_override_for_object_list := override.for_object_list):
-            llm_setting = provided_override_for_object_list
-        elif self.llm_choice_defaults.for_object_list is None:
-            raise ConfigValidationError("llm_choices.for_object_list cannot be None")
-        else:
-            llm_setting = self.llm_choice_defaults.for_object_list
-
-        return self.get_llm_setting(llm_setting_or_preset_id=llm_setting)
-
-    @override
-    def get_llm_setting_for_object_list_direct(self, override: Optional[LLMSettingChoices] = None) -> LLMSetting:
-        llm_setting: LLMSettingOrPresetId
-        if override and (provided_override_for_object_list_direct := override.for_object_list_direct):
-            llm_setting = provided_override_for_object_list_direct
-        elif self.llm_choice_defaults.for_object_list_direct is None:
-            raise ConfigValidationError("llm_choices.for_object_list_direct cannot be None")
-        else:
-            llm_setting = self.llm_choice_defaults.for_object_list_direct
-
-        return self.get_llm_setting(llm_setting_or_preset_id=llm_setting)
 
     @override
     def find_llm_model(self, llm_handle: str) -> LLMModel:
@@ -202,12 +127,6 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
             raise ConfigValidationError("llm_choice_defaults.for_text cannot be None")
         if llm_choice_defaults.for_object is None:
             raise ConfigValidationError("llm_choice_defaults.for_object cannot be None")
-        if llm_choice_defaults.for_object_direct is None:
-            raise ConfigValidationError("llm_choice_defaults.for_object_direct cannot be None")
-        if llm_choice_defaults.for_object_list is None:
-            raise ConfigValidationError("llm_choice_defaults.for_object_list cannot be None")
-        if llm_choice_defaults.for_object_list_direct is None:
-            raise ConfigValidationError("llm_choice_defaults.for_object_list_direct cannot be None")
         return llm_choice_defaults
 
     @field_validator("llm_choice_overrides", mode="after")
@@ -217,12 +136,6 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
             value.for_text = None
         if value.for_object == LLM_PRESET_DISABLED:
             value.for_object = None
-        if value.for_object_direct == LLM_PRESET_DISABLED:
-            value.for_object_direct = None
-        if value.for_object_list == LLM_PRESET_DISABLED:
-            value.for_object_list = None
-        if value.for_object_list_direct == LLM_PRESET_DISABLED:
-            value.for_object_list_direct = None
         return value
 
     def add_llm_name_as_handle_with_defaults(self, llm_name: str):
@@ -235,11 +148,6 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
         for llm_preset_id, llm_setting in self.llm_presets.items():
             if llm_setting.llm_handle not in self.llm_handles:
                 raise LLMHandleNotFoundError(f"llm_handle '{llm_setting.llm_handle}' for llm_preset '{llm_preset_id}' not found in deck")
-        return self
-
-    @model_validator(mode="after")
-    def validate_llm_default_choices(self) -> Self:
-        self._validate_llm_choices(llm_choices=self.llm_choice_defaults)
         return self
 
     @model_validator(mode="after")

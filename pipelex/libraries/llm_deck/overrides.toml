@@ -7,6 +7,3 @@
 [llm_choice_overrides]
 for_text = "disabled"
 for_object = "disabled"
-for_object_direct = "disabled"
-for_object_list = "disabled"
-for_object_list_direct = "disabled"
