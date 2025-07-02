@@ -169,10 +169,15 @@ class PipeBatch(PipeController):
                 comment=f"PipeBatch.{method_name}() on branch_index of batch",
             )
 
+        from pipelex import pretty_print
+
+        pretty_print(output_stuff, title="output_stuff final batch")
+        pretty_print(working_memory, title="working_memory final batch")
         working_memory.set_new_main_stuff(
             stuff=output_stuff,
             name=output_name,
         )
+        pretty_print(working_memory, title="working_memory final batch 2")
 
         return PipeOutput(
             working_memory=working_memory,

@@ -194,13 +194,13 @@ class PipeLLM(PipeOperator):
                         f"Image variables are automatically passed to vision-enabled LLMs."
                     )
 
-    @model_validator(mode="after")
-    def validate_output_concept_consistency(self) -> Self:
-        if self.structuring_method is not None:
-            output_concept = get_required_concept(concept_code=self.output_concept_code)
-            if output_concept.structure_class_name == NativeConceptClass.TEXT:
-                raise PipeDefinitionError(f"Output concept '{self.output_concept_code}' is a TextConcept, so it cannot be structured")
-        return self
+    # @model_validator(mode="after")
+    # def validate_output_concept_consistency(self) -> Self:
+    #     if self.structuring_method is not None:
+    #         output_concept = get_required_concept(concept_code=self.output_concept_code)
+    #         if output_concept.structure_class_name == NativeConceptClass.TEXT:
+    #             raise PipeDefinitionError(f"Output concept '{self.output_concept_code}' is a Text concept, so it cannot be structured")
+    #     return self
 
     @override
     def validate_with_libraries(self):

@@ -53,6 +53,7 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
         class ObjectFactory(ModelFactory[schema]):  # type: ignore
             __model__ = schema
             __use_examples__ = True
+            __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
         obj = ObjectFactory.build()
         return obj

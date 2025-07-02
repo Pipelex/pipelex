@@ -64,7 +64,7 @@ class TestPipeOCR:
                 domain="generic",
                 inputs=PipeInputSpec(
                     root={
-                        "pdf": "PDF",
+                        "ocr_input": "PDF",
                     }
                 ),
                 should_include_images=True,
@@ -77,7 +77,7 @@ class TestPipeOCR:
             working_memory=WorkingMemoryFactory.make_from_pdf(
                 pdf_url=pdf_url,
                 concept_str=NativeConcept.PDF.code,
-                name="pdf",
+                name="ocr_input",
             ),
         )
         pipe_ocr_output: PipeOcrOutput = await get_pipe_router().run_pipe_job(

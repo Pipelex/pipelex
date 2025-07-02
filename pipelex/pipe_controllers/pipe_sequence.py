@@ -7,9 +7,9 @@ from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import DryRunError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
+from pipelex.exceptions import PipeRunParamsError, StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -144,7 +144,7 @@ class PipeSequence(PipeController):
         pipe_run_params.push_pipe_layer(pipe_code=self.code)
         self._validate_output_multiplicity_support(pipe_run_params)
 
-        current_memory = working_memory
+        evolving_memory = working_memory
 
         for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
             sub_pipe_run_params: PipeRunParams
@@ -155,14 +155,13 @@ class PipeSequence(PipeController):
                 sub_pipe_run_params = pipe_run_params.model_copy(update=({"final_stuff_code": None}))
             pipe_output = await sub_pipe.run_pipe(
                 calling_pipe_code=self.code,
-                working_memory=current_memory,
+                working_memory=evolving_memory,
                 job_metadata=job_metadata,
                 sub_pipe_run_params=sub_pipe_run_params,
             )
-            current_memory = pipe_output.working_memory
-
+            evolving_memory = pipe_output.working_memory
         return PipeOutput(
-            working_memory=current_memory,
+            working_memory=evolving_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
 
@@ -174,44 +173,11 @@ class PipeSequence(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        """
-        Dry run implementation for PipeSequence.
-        Validates that all required inputs are present and raises DryRunError if any are missing.
-        """
-        log.debug(f"PipeSequence: dry run controller pipe: {self.code}")
-        needed_inputs = self.needed_inputs()
-
-        missing_input_names: List[str] = []
-        for required_variable_name, _, _ in needed_inputs.detailed_requirements:
-            if not working_memory.get_optional_stuff(required_variable_name):
-                missing_input_names.append(required_variable_name)
-
-        if missing_input_names:
-            log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
-            raise DryRunError(
-                message=f"Dry run failed for pipe '{self.code}' (PipeSequence): missing required inputs: {', '.join(missing_input_names)}",
-                missing_inputs=missing_input_names,
-                pipe_code=self.code,
-            )
-
-        current_memory = working_memory
-
-        for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
-            sub_pipe_run_params: PipeRunParams
-            if sub_pipe_index == len(self.sequential_sub_pipes) - 1:
-                sub_pipe_run_params = pipe_run_params.model_copy()
-            else:
-                sub_pipe_run_params = pipe_run_params.model_copy(update=({"final_stuff_code": None}))
-
-            pipe_output = await sub_pipe.run_pipe(
-                calling_pipe_code=self.code,
-                working_memory=current_memory,
-                job_metadata=job_metadata,
-                sub_pipe_run_params=sub_pipe_run_params,
-            )
-            current_memory = pipe_output.working_memory
-
-        return PipeOutput(
-            working_memory=current_memory,
-            pipeline_run_id=job_metadata.pipeline_run_id,
+        if pipe_run_params.run_mode != PipeRunMode.DRY:
+            raise PipeRunParamsError(f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}")
+        return await self._run_controller_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
         )

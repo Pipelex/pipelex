@@ -34,7 +34,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         image_url: str,
         concept_str: str = NativeConcept.IMAGE.code,
-        name: Optional[str] = "image",
+        name: Optional[str] = "ocr_input",
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
             concept_str=concept_str,
@@ -48,7 +48,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         pdf_url: str,
         concept_str: str = NativeConcept.PDF.code,
-        name: Optional[str] = "pdf",
+        name: Optional[str] = "ocr_input",
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
             concept_str=concept_str,
@@ -147,6 +147,7 @@ class WorkingMemoryFactory(BaseModel):
                     class MockFactory(ModelFactory[structure_class]):  # type: ignore
                         __model__ = structure_class
                         __use_examples__ = True
+                        __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
                     mock_content = MockFactory.build()
                 else:

@@ -113,7 +113,6 @@ class SubPipe(BaseModel):
                     output_name=self.output_name,
                 )
             else:
-                print("djioqsjoqdjio")
                 sub_pipe_run_params.run_mode = PipeRunMode.LIVE
                 pipe_output = await get_pipe_router().run_pipe_code(
                     pipe_code=self.pipe_code,

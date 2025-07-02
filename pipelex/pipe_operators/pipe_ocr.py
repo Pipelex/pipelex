@@ -54,7 +54,7 @@ class PipeOcr(PipeOperator):
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        return PipeInputSpec(root={"image": "native.Image", "pdf": "native.PDF"})
+        return PipeInputSpec(root={"ocr_input": self.inputs.root["ocr_input"]})
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()
