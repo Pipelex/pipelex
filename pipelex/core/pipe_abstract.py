@@ -48,6 +48,10 @@ class PipeAbstract(ABC, BaseModel):
         return set()
 
     @abstractmethod
+    def needed_inputs(self) -> PipeInputSpec:
+        pass
+
+    @abstractmethod
     async def run_pipe(
         self,
         job_metadata: JobMetadata,

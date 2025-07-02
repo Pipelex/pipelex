@@ -93,6 +93,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     domain_code=domain_code,
                     template_str=pipe_blueprint.prompt_template,
                     template_name=pipe_blueprint.template_name,
+                    inputs=PipeInputSpec.make_from_dict(pipe_blueprint.inputs) if pipe_blueprint.inputs else PipeInputSpec.make_empty(),
                 )
             except Jinja2TemplateError as exc:
                 error_msg = f"Jinja2 syntax error in user prompt for pipe '{pipe_code}' in domain '{domain_code}': {exc}."

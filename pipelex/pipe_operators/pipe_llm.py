@@ -71,18 +71,38 @@ class PipeLLM(PipeOperator):
     system_prompt_to_structure: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
 
+    @override
     def needed_inputs(self) -> PipeInputSpec:
-        pipe_llm_prompt_needed_inputs = self.pipe_llm_prompt.needed_inputs()
-        # The images are not tagged in the prompt_template. Therefore if an image is provided in the
-        # inputs, it becomes a needed input.
+        # The images are not tagged in the prompt_template. 
+        # Therefore if an image is provided in the inputs, it becomes a needed input.
+        needed_inputs = PipeInputSpec.make_empty()
+        for input_name, concept_code in self.inputs.root.items():
+            needed_inputs.add_requirement(variable_name=input_name, concept_code=concept_code)
+
         concept_provider = get_concept_provider()
         for input_name, concept_code in self.inputs.root.items():
             if concept_provider.is_image_concept(concept_code=concept_code):
-                pipe_llm_prompt_needed_inputs.add_requirement(variable_name=input_name, concept_code=NativeConcept.IMAGE.code)
-        return pipe_llm_prompt_needed_inputs
+                needed_inputs.add_requirement(variable_name=input_name, concept_code=NativeConcept.IMAGE.code)
+        return needed_inputs
+    
+    @override
+    def required_variables(self) -> Set[str]:
+        required_variables: Set[str] = set()
+        required_variables.update(self.pipe_llm_prompt.required_variables())
+        required_variables = {variable_name for variable_name in required_variables if not variable_name.startswith("_")}
+        return required_variables
+
+    def _validate_required_variables(self) -> Self:
+        """This method checks that all required variables are in the inputs"""
+        required_variables = self.required_variables()
+        for required_variable_name in required_variables:
+            if required_variable_name not in self.inputs.variables:
+                raise PipeDefinitionError(f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}")
+        return self
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
+        self._validate_required_variables()
         self._validate_inputs()
         return self
 
@@ -216,12 +236,6 @@ class PipeLLM(PipeOperator):
     @property
     def llm_setting_for_object_list_direct(self) -> LLMSetting:
         return get_llm_deck().get_llm_setting_for_object_list_direct(override=self.llm_choices)
-
-    @override
-    def required_variables(self) -> Set[str]:
-        required_variables: Set[str] = set()
-        required_variables.update(self.pipe_llm_prompt.required_variables())
-        return required_variables
 
     @override
     async def _run_operator_pipe(
@@ -484,15 +498,15 @@ class PipeLLM(PipeOperator):
     async def _dry_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
-        working_memory: Optional[WorkingMemory] = None,
-        pipe_run_params: Optional[PipeRunParams] = None,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         content_generator_dry = ContentGeneratorDry()
         pipe_output = await self._run_operator_pipe(
             job_metadata=job_metadata,
-            working_memory=working_memory or WorkingMemoryFactory.make_empty(),
-            pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
             output_name=output_name,
             content_generator=content_generator_dry,
         )

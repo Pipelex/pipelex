@@ -93,6 +93,7 @@ class PipeLLMPrompt(PipeOperator):
         if self.system_prompt_pipe_jinja2:
             self.system_prompt_pipe_jinja2.validate_with_libraries()
 
+    @override
     def needed_inputs(self) -> PipeInputSpec:
         conceptless_required_variables: Set[str] = set()
         if self.user_pipe_jinja2:
@@ -100,7 +101,7 @@ class PipeLLMPrompt(PipeOperator):
         if self.system_prompt_pipe_jinja2:
             conceptless_required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
 
-        pipe_input_spec = PipeInputSpec(root={})
+        pipe_input_spec = PipeInputSpec.make_empty()
         for conceptless_required_variable in conceptless_required_variables:
             if conceptless_required_variable.startswith("_"):
                 # variables starting with _ are run parameters, not inputs
@@ -146,12 +147,13 @@ class PipeLLMPrompt(PipeOperator):
                 except WorkingMemoryVariableError as exc:
                     raise PipeInputError(f"Could not find a valid user image named '{user_image_name}' in the working_memory: {exc}") from exc
 
-                if base_64 := prompt_image_content.base_64:
-                    user_image = PromptImageFactory.make_prompt_image(base_64=base_64)
-                else:
-                    image_uri = prompt_image_content.url
-                    user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
-                prompt_user_images.append(user_image)
+                if prompt_image_content is not None: # An ImageContent can be optional..
+                    if base_64 := prompt_image_content.base_64:
+                        user_image = PromptImageFactory.make_prompt_image(base_64=base_64)
+                    else:
+                        image_uri = prompt_image_content.url
+                        user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
+                    prompt_user_images.append(user_image)
 
         ############################################################
         # User text

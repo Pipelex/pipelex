@@ -6,7 +6,10 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import log
-from pipelex.core.stuff_content import StuffContent, TextContent
+from pipelex import pretty_print
+from pipelex.core.concept_native import NativeConcept
+from pipelex.core.stuff_content import PageContent, StuffContent, TextContent
+from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from tests.pipelines.tricky_questions import ThoughtfulAnswer
 
@@ -15,6 +18,45 @@ from tests.pipelines.tricky_questions import ThoughtfulAnswer
 @pytest.mark.asyncio(loop_scope="class")
 class TestDryWorkingMemory:
     """Test WorkingMemory dry run functionality."""
+
+    async def test_make_for_dry_run_with_page_content(
+        self,
+        request: FixtureRequest,
+    ):
+        """Test that make_for_dry_run creates appropriate mocks for PageContent."""
+        log.info("Testing dry run with PageContent")
+
+        # Test the specific inputs requested by the user
+        needed_inputs = cast(
+            List[Tuple[str, str, Type[StuffContent]]],
+            [
+                ("page", NativeConcept.PAGE.code, PageContent),
+            ],
+        )
+
+        dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
+        # Verify working memory contains exactly this
+        assert len(dry_memory.root) == 1
+        assert dry_memory.get_optional_stuff("page") is not None
+
+        # Verify concept code is correct
+        page_stuff = dry_memory.get_stuff("page")
+        assert page_stuff.concept_code == NativeConcept.PAGE.code
+        assert page_stuff.stuff_name == "page"
+
+        # Verify structured content was created properly
+        page_content = page_stuff.content
+        assert isinstance(page_content, PageContent)
+        
+        # Verify PageContent has the expected structure
+        assert hasattr(page_content, "text_and_images")
+        assert hasattr(page_content, "page_view")
+        
+        # Verify text_and_images field exists and has mock data
+        assert page_content.text_and_images is not None
+        
+        # Verify page_view field exists (it's Optional so could be None)
+        assert hasattr(page_content, "page_view")
 
     async def test_make_for_dry_run_with_structured_content(
         self,

@@ -119,8 +119,9 @@ class WorkingMemory(BaseModel):
                     variable_name=name,
                     message=f"Stuff attribute not found in attribute path '{name}': {exc}",
                 ) from exc
-
-            if wanted_type is not None and not isinstance(stuff_content, wanted_type):
+            
+            # Sometimes, some stuff content are Optional, therefore can be None. So Do not impose a wanted type
+            if stuff_content is not None and wanted_type is not None and not isinstance(stuff_content, wanted_type):
                 raise WorkingMemoryTypeError(
                     variable_name=name,
                     message=f"Content at '{name}' is of type {type(stuff_content).__name__}, it should be {wanted_type.__name__}",

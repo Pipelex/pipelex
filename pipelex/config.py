@@ -49,6 +49,7 @@ class DryRunConfig(ConfigModel):
     nb_list_items: int
     nb_ocr_pages: int
     image_urls: List[str]
+    allowed_to_fail_pipes: List[str] = Field(default_factory=list)
 
     @field_validator("image_urls", mode="before")
     def validate_image_urls(cls, value: List[str]) -> List[str]:

@@ -16,6 +16,7 @@ from pipelex.exceptions import PipeInputError, PipeInputNotFoundError, WorkingMe
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.core.pipe_input_spec import PipeInputSpec
 
 
 class PipeBatch(PipeController):
@@ -27,6 +28,10 @@ class PipeBatch(PipeController):
     @override
     def pipe_dependencies(self) -> Set[str]:
         return set([self.branch_pipe_code])
+    
+    @override
+    def needed_inputs(self) -> PipeInputSpec:
+        return PipeInputSpec.make_empty()
 
     async def _run_batch_pipe(
         self,
@@ -97,6 +102,7 @@ class PipeBatch(PipeController):
             branch_pipe_run_params = pipe_run_params.deep_copy_with_final_stuff_code(final_stuff_code=branch_output_item_code)
 
             if pipe_run_params.run_mode == PipeRunMode.DRY:
+                branch_pipe_run_params.run_mode = PipeRunMode.DRY
                 task = sub_pipe.run_pipe(
                     job_metadata=job_metadata,
                     working_memory=branch_memory,

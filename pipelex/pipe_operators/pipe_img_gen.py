@@ -16,6 +16,7 @@ from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, Pi
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import ImageContent, ListContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import (
     PipeDefinitionError,
@@ -75,6 +76,16 @@ class PipeImgGen(PipeOperator):
     def validate_inputs(self) -> Self:
         self._validate_inputs()
         return self
+
+    @override
+    def needed_inputs(self) -> PipeInputSpec:
+        needed_inputs = PipeInputSpec.make_empty()
+        if self.imgg_prompt:
+            needed_inputs.add_requirement(variable_name="imgg_prompt", concept_code=NativeConcept.TEXT.code)
+        else:
+            for input_name, input_concept_code in self.inputs.items:
+                needed_inputs.add_requirement(variable_name=input_name, concept_code=input_concept_code)
+        return needed_inputs
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()
@@ -283,7 +294,7 @@ class PipeImgGen(PipeOperator):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        log.info(f"PipeImgGen: dry run operator pipe: {self.code}")
+        log.debug(f"PipeImgGen: dry run operator pipe: {self.code}")
         content_generator_dry = ContentGeneratorDry()
         pipe_output = await self._run_operator_pipe(
             job_metadata=job_metadata,

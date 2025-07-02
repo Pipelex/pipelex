@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
@@ -25,11 +25,9 @@ class SubPipe(BaseModel):
         working_memory: WorkingMemory,
         job_metadata: JobMetadata,
         sub_pipe_run_params: PipeRunParams,
-        is_dry_run: bool = False,
     ) -> PipeOutput:
         """Run or dry run a single operation self."""
-        run_type = "dry run" if is_dry_run else "run"
-        log.debug(f"SubPipe {self.pipe_code} to generate {self.output_name} ({run_type})")
+        log.debug(f"SubPipe {self.pipe_code} to generate {self.output_name}")
         # step_run_params.push_pipe_code(pipe_code=self.pipe_code)
         if self.output_multiplicity:
             sub_pipe_run_params.output_multiplicity = self.output_multiplicity
@@ -58,7 +56,7 @@ class SubPipe(BaseModel):
                 branch_pipe_code=self.pipe_code,
             )
             # This is the only line that changes between run and dry_run
-            if is_dry_run:
+            if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
                 sub_pipe_run_params.run_mode = PipeRunMode.DRY
                 pipe_output = await pipe_batch.run_pipe(
                     job_metadata=job_metadata,
@@ -76,7 +74,7 @@ class SubPipe(BaseModel):
                 )
         elif isinstance(pipe, PipeCondition):
             # This is the only line that changes between run and dry_run
-            if is_dry_run:
+            if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
                 sub_pipe_run_params.run_mode = PipeRunMode.DRY
                 pipe_output = await pipe.run_pipe(
                     job_metadata=job_metadata,
@@ -106,7 +104,7 @@ class SubPipe(BaseModel):
                 raise PipeInputError(f"Some required stuff(s) not found: {error_details}") from exc
             log.debug(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
             # This is the only line that changes between run and dry_run
-            if is_dry_run:
+            if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
                 sub_pipe_run_params.run_mode = PipeRunMode.DRY
                 pipe_output = await pipe.run_pipe(
                     job_metadata=job_metadata,
@@ -115,6 +113,7 @@ class SubPipe(BaseModel):
                     output_name=self.output_name,
                 )
             else:
+                print("djioqsjoqdjio")
                 sub_pipe_run_params.run_mode = PipeRunMode.LIVE
                 pipe_output = await get_pipe_router().run_pipe_code(
                     pipe_code=self.pipe_code,
@@ -132,5 +131,4 @@ class SubPipe(BaseModel):
                     pipe_layer=sub_pipe_run_params.pipe_layers,
                     comment="SubPipe on required_stuff",
                 )
-        pretty_print(pipe_output.main_stuff, title=f"Pipe output for {self.pipe_code} ({run_type})")
         return pipe_output

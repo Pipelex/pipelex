@@ -23,6 +23,7 @@ from pipelex.exceptions import (
     StaticValidationError,
     StaticValidationErrorType,
 )
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.hub import (
     get_concept_provider,
     get_content_generator,
@@ -50,6 +51,10 @@ class PipeOcr(PipeOperator):
     def validate_inputs(self) -> Self:
         self._validate_inputs()
         return self
+    
+    @override
+    def needed_inputs(self) -> PipeInputSpec:
+        return PipeInputSpec(root={"image": "native.Image", "pdf": "native.PDF"})
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()
@@ -228,7 +233,7 @@ class PipeOcr(PipeOperator):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        log.info(f"PipeOcr: dry run operator pipe: {self.code}")
+        log.debug(f"PipeOcr: dry run operator pipe: {self.code}")
         content_generator_dry = ContentGeneratorDry()
         pipe_output = await self._run_operator_pipe(
             job_metadata=job_metadata,

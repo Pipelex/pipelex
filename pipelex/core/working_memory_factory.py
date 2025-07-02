@@ -136,7 +136,7 @@ class WorkingMemoryFactory(BaseModel):
             WorkingMemory with mock objects for each needed input
         """
 
-        working_memory = WorkingMemory(root={})
+        working_memory = cls.make_empty()
 
         for variable_name, concept_code, structure_class in needed_inputs:
             log.debug(f"Creating dry run mock for '{variable_name}' with concept '{concept_code}' and class '{structure_class.__name__}'")

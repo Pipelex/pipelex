@@ -69,6 +69,7 @@ class PipeJinja2Factory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeJin
     def make_pipe_jinja2_from_template_str(
         cls,
         domain_code: str,
+        inputs: Optional[PipeInputSpec] = None,
         template_str: Optional[str] = None,
         template_name: Optional[str] = None,
     ) -> PipeJinja2:
@@ -82,12 +83,14 @@ class PipeJinja2Factory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeJin
                 domain=domain_code,
                 code="adhoc_pipe_jinja2_from_template_str",
                 jinja2=preprocessed_template,
+                inputs=inputs or PipeInputSpec.make_empty(),
             )
         elif template_name:
             return PipeJinja2(
                 domain=domain_code,
                 code="adhoc_pipe_jinja2_from_template_name",
                 jinja2_name=template_name,
+                inputs=inputs or PipeInputSpec.make_empty(),
             )
         else:
             raise PipeDefinitionError("Either template_str or template_name must be provided to make_pipe_jinja2_from_template_str")

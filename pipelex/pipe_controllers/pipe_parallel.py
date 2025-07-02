@@ -227,8 +227,7 @@ class PipeParallel(PipeController):
         Dry run implementation for PipeParallel.
         Validates that all required inputs are present and that all parallel sub-pipes can be dry run.
         """
-        log.info(f"PipeParallel: dry run controller pipe: {self.code}")
-
+        log.debug(f"PipeParallel: dry run controller pipe: {self.code}")
         # 1. Validate that all required inputs are present
         needed_inputs = self.needed_inputs()
         missing_input_names: List[str] = []
@@ -328,7 +327,6 @@ class PipeParallel(PipeController):
                 name=output_name,
             )
 
-        log.info(f"PipeParallel dry run successful: {len(self.parallel_sub_pipes)} sub-pipes validated")
         return PipeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
