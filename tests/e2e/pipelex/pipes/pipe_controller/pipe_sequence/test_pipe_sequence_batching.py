@@ -68,7 +68,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
 
     # Check that the ProductRating has meaningful values
     assert hasattr(rating_content, "overall_rating"), "Should have overall_rating attribute"
-    assert hasattr(rating_content, "total_reviews"), "Should have total_reviews attribute" 
+    assert hasattr(rating_content, "total_reviews"), "Should have total_reviews attribute"
     assert hasattr(rating_content, "explanation"), "Should have explanation attribute"
     assert isinstance(rating_content.overall_rating, float), f"Rating should be a float, got {type(rating_content.overall_rating)}"
     assert isinstance(rating_content.total_reviews, int), f"Total reviews should be an int, got {type(rating_content.total_reviews)}"
