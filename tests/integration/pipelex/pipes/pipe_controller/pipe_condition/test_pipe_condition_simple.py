@@ -70,7 +70,10 @@ class TestPipeConditionSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hello world" (11 chars > 5) -> expression="long" -> capitalize_long_text -> "LONG: HELLO WORLD"
-        assert final_result.content.text == "LONG: HELLO WORLD"
+        if pipe_run_mode == PipeRunMode.DRY:
+            assert "DRY RUN" in final_result.content.text
+        else:
+            assert final_result.content.text == "LONG: HELLO WORLD"
 
         # Verify working memory structure
         final_working_memory = pipe_output.working_memory
@@ -86,7 +89,10 @@ class TestPipeConditionSimple:
         final_result_in_memory = final_working_memory.get_stuff("condition_result")
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        assert final_result_in_memory.content.text == "LONG: HELLO WORLD"
+        if pipe_run_mode == PipeRunMode.DRY:
+            assert "DRY RUN" in final_result_in_memory.content.text
+        else:
+            assert final_result_in_memory.content.text == "LONG: HELLO WORLD"
         assert final_result_in_memory.concept_code == "native.Text"
 
     async def test_condition_short_text_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
@@ -133,7 +139,10 @@ class TestPipeConditionSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hi" (2 chars <= 5) -> expression="short" -> add_prefix_short_text -> "SHORT: hi"
-        assert final_result.content.text == "SHORT: hi"
+        if pipe_run_mode == PipeRunMode.DRY:
+            assert "DRY RUN" in final_result.content.text
+        else:
+            assert final_result.content.text == "SHORT: hi"
 
         # Verify working memory structure
         final_working_memory = pipe_output.working_memory
@@ -149,7 +158,10 @@ class TestPipeConditionSimple:
         final_result_in_memory = final_working_memory.get_stuff("condition_result")
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        assert final_result_in_memory.content.text == "SHORT: hi"
+        if pipe_run_mode == PipeRunMode.DRY:
+            assert "DRY RUN" in final_result_in_memory.content.text
+        else:
+            assert final_result_in_memory.content.text == "SHORT: hi"
         assert final_result_in_memory.concept_code == "native.Text"
 
     async def test_condition_dry_run_success(self, request: FixtureRequest):

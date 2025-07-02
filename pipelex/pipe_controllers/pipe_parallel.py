@@ -13,7 +13,7 @@ from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeDefinitionError, StaticValidationError, StaticValidationErrorType
+from pipelex.exceptions import DryRunError, PipeDefinitionError, StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -223,4 +223,113 @@ class PipeParallel(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        raise NotImplementedError("Dry run not yet implemented for PipeParallel")
+        """
+        Dry run implementation for PipeParallel.
+        Validates that all required inputs are present and that all parallel sub-pipes can be dry run.
+        """
+        log.info(f"PipeParallel: dry run controller pipe: {self.code}")
+
+        # 1. Validate that all required inputs are present
+        needed_inputs = self.needed_inputs()
+        missing_input_names: List[str] = []
+
+        for required_variable_name, _, _ in needed_inputs.detailed_requirements:
+            if not working_memory.get_optional_stuff(required_variable_name):
+                missing_input_names.append(required_variable_name)
+
+        if missing_input_names:
+            log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
+            raise DryRunError(
+                message=f"Dry run failed for pipe '{self.code}' (PipeParallel): missing required inputs: {', '.join(missing_input_names)}",
+                missing_inputs=missing_input_names,
+                pipe_code=self.code,
+            )
+
+        # 2. Validate configuration
+        if not self.add_each_output and not self.combined_output:
+            raise DryRunError(
+                message=f"Dry run failed for pipe '{self.code}' (PipeParallel): requires either add_each_output or combined_output to be set",
+                missing_inputs=[],
+                pipe_code=self.code,
+            )
+
+        # 3. Validate that all parallel sub-pipes exist and can be dry run
+        tasks: List[Coroutine[Any, Any, PipeOutput]] = []
+
+        for sub_pipe in self.parallel_sub_pipes:
+            # Validate that sub-pipe exists
+            try:
+                get_required_pipe(pipe_code=sub_pipe.pipe_code)
+            except Exception as e:
+                log.error(f"Dry run failed: sub-pipe '{sub_pipe.pipe_code}' not found: {e}")
+                raise DryRunError(
+                    message=f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe.pipe_code}' not found: {e}",
+                    missing_inputs=[],
+                    pipe_code=self.code,
+                )
+
+            # Add dry run task for this sub-pipe
+            tasks.append(
+                sub_pipe.run_pipe(
+                    calling_pipe_code=self.code,
+                    job_metadata=job_metadata,
+                    working_memory=working_memory.make_deep_copy(),
+                    sub_pipe_run_params=pipe_run_params.make_deep_copy(),
+                )
+            )
+
+        # 4. Run all sub-pipes in dry mode
+        try:
+            pipe_outputs = await asyncio.gather(*tasks)
+        except Exception as e:
+            log.error(f"Dry run failed: parallel sub-pipe execution failed: {e}")
+            raise DryRunError(
+                message=f"Dry run failed for pipe '{self.code}' (PipeParallel): parallel sub-pipe execution failed: {e}",
+                missing_inputs=[],
+                pipe_code=self.code,
+            )
+
+        # 5. Process outputs as in the regular run
+        output_stuffs: Dict[str, Stuff] = {}
+        output_stuff_contents: Dict[str, StuffContent] = {}
+
+        for output_index, pipe_output in enumerate(pipe_outputs):
+            output_stuff = pipe_output.main_stuff
+            sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
+            if not sub_pipe_output_name:
+                raise DryRunError(
+                    message=f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe output name not specified",
+                    missing_inputs=[],
+                    pipe_code=self.code,
+                )
+
+            if self.add_each_output:
+                working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
+
+            if sub_pipe_output_name in output_stuffs:
+                raise DryRunError(
+                    message=f"Dry run failed for pipe '{self.code}' (PipeParallel): duplicate output name '{sub_pipe_output_name}'",
+                    missing_inputs=[],
+                    pipe_code=self.code,
+                )
+
+            output_stuffs[sub_pipe_output_name] = output_stuff
+            output_stuff_contents[sub_pipe_output_name] = output_stuff.content
+
+        # 6. Handle combined output if specified
+        if combined_output := self.combined_output:
+            combined_output_stuff = StuffFactory.combine_stuffs(
+                concept_code=combined_output,
+                stuff_contents=output_stuff_contents,
+                name=output_name,
+            )
+            working_memory.set_new_main_stuff(
+                stuff=combined_output_stuff,
+                name=output_name,
+            )
+
+        log.info(f"PipeParallel dry run successful: {len(self.parallel_sub_pipes)} sub-pipes validated")
+        return PipeOutput(
+            working_memory=working_memory,
+            pipeline_run_id=job_metadata.pipeline_run_id,
+        )

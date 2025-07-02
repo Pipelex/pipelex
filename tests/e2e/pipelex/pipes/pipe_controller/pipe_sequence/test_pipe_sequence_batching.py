@@ -2,7 +2,7 @@
 
 import pytest
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_factory import StuffFactory
@@ -49,7 +49,6 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
             pipe_code="analyze_reviews_sequence",
             working_memory=working_memory,
         )
-    pretty_print(pipe_output, title="pipe_output")
 
     # Basic output validation
     assert pipe_output is not None
@@ -64,10 +63,13 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     # Verify final product rating
     product_rating_stuff = pipe_output.working_memory.get_stuff("product_rating")
     assert product_rating_stuff is not None
-    assert isinstance(product_rating_stuff.content, ProductRating)
+    rating_content = product_rating_stuff.content
+    assert isinstance(rating_content, ProductRating)
 
     # Check that the ProductRating has meaningful values
-    rating_content = product_rating_stuff.content
+    assert hasattr(rating_content, "overall_rating"), "Should have overall_rating attribute"
+    assert hasattr(rating_content, "total_reviews"), "Should have total_reviews attribute" 
+    assert hasattr(rating_content, "explanation"), "Should have explanation attribute"
     assert isinstance(rating_content.overall_rating, float), f"Rating should be a float, got {type(rating_content.overall_rating)}"
     assert isinstance(rating_content.total_reviews, int), f"Total reviews should be an int, got {type(rating_content.total_reviews)}"
     assert len(rating_content.explanation) > 0, "Should have an explanation for the rating"
