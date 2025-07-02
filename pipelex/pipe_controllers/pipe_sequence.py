@@ -1,4 +1,4 @@
-from typing import List, Optional, Set, cast
+from typing import List, Optional, Set
 
 from pydantic import model_validator
 from typing_extensions import Self, override

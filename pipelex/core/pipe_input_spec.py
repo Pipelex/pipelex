@@ -1,6 +1,7 @@
 from typing import Callable, Dict, List, Set, Tuple
-from typing_extensions import Self
+
 from pydantic import Field, RootModel, field_validator
+from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.concept_code_factory import ConceptCodeFactory
@@ -59,7 +60,7 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
     @classmethod
     def make_empty(cls) -> Self:
         return cls(root={})
-    
+
     @classmethod
     def make_from_dict(cls, input_dict: Dict[str, str]) -> Self:
         return cls(root=input_dict)

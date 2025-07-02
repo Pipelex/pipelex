@@ -147,7 +147,7 @@ class PipeLLMPrompt(PipeOperator):
                 except WorkingMemoryVariableError as exc:
                     raise PipeInputError(f"Could not find a valid user image named '{user_image_name}' in the working_memory: {exc}") from exc
 
-                if prompt_image_content is not None: # An ImageContent can be optional..
+                if prompt_image_content is not None:  # An ImageContent can be optional..
                     if base_64 := prompt_image_content.base_64:
                         user_image = PromptImageFactory.make_prompt_image(base_64=base_64)
                     else:

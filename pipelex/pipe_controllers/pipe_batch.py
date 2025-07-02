@@ -6,6 +6,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
 from pipelex.core.stuff import Stuff
@@ -16,7 +17,6 @@ from pipelex.exceptions import PipeInputError, PipeInputNotFoundError, WorkingMe
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.core.pipe_input_spec import PipeInputSpec
 
 
 class PipeBatch(PipeController):
@@ -28,7 +28,7 @@ class PipeBatch(PipeController):
     @override
     def pipe_dependencies(self) -> Set[str]:
         return set([self.branch_pipe_code])
-    
+
     @override
     def needed_inputs(self) -> PipeInputSpec:
         return PipeInputSpec.make_empty()

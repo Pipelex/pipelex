@@ -18,16 +18,13 @@ from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import (
     PipeOutputMultiplicity,
-    PipeRunMode,
     PipeRunParamKey,
     PipeRunParams,
     output_multiplicity_to_apply,
 )
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import ListContent, StructuredContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,
@@ -73,7 +70,7 @@ class PipeLLM(PipeOperator):
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        # The images are not tagged in the prompt_template. 
+        # The images are not tagged in the prompt_template.
         # Therefore if an image is provided in the inputs, it becomes a needed input.
         needed_inputs = PipeInputSpec.make_empty()
         for input_name, concept_code in self.inputs.root.items():
@@ -84,7 +81,7 @@ class PipeLLM(PipeOperator):
             if concept_provider.is_image_concept(concept_code=concept_code):
                 needed_inputs.add_requirement(variable_name=input_name, concept_code=NativeConcept.IMAGE.code)
         return needed_inputs
-    
+
     @override
     def required_variables(self) -> Set[str]:
         required_variables: Set[str] = set()

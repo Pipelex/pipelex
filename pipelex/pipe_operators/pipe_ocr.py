@@ -12,6 +12,7 @@ from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
@@ -23,7 +24,6 @@ from pipelex.exceptions import (
     StaticValidationError,
     StaticValidationErrorType,
 )
-from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.hub import (
     get_concept_provider,
     get_content_generator,
@@ -51,7 +51,7 @@ class PipeOcr(PipeOperator):
     def validate_inputs(self) -> Self:
         self._validate_inputs()
         return self
-    
+
     @override
     def needed_inputs(self) -> PipeInputSpec:
         return PipeInputSpec(root={"image": "native.Image", "pdf": "native.PDF"})

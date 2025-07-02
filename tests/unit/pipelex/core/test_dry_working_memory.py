@@ -6,10 +6,8 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import log
-from pipelex import pretty_print
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff_content import PageContent, StuffContent, TextContent
-from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from tests.pipelines.tricky_questions import ThoughtfulAnswer
 
@@ -47,14 +45,14 @@ class TestDryWorkingMemory:
         # Verify structured content was created properly
         page_content = page_stuff.content
         assert isinstance(page_content, PageContent)
-        
+
         # Verify PageContent has the expected structure
         assert hasattr(page_content, "text_and_images")
         assert hasattr(page_content, "page_view")
-        
+
         # Verify text_and_images field exists and has mock data
         assert page_content.text_and_images is not None
-        
+
         # Verify page_view field exists (it's Optional so could be None)
         assert hasattr(page_content, "page_view")
 

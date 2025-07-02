@@ -27,6 +27,7 @@ class PipeParallel(PipeController):
     add_each_output: bool
     combined_output: Optional[str]
 
+    @override
     def needed_inputs(self, _visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         """
         Calculate the inputs needed by this PipeParallel.

@@ -70,7 +70,7 @@ class PipeJinja2(PipeOperator):
             if required_variable_name not in self.inputs.variables:
                 raise PipeDefinitionError(f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}")
         return self
-    
+
     @override
     def validate_with_libraries(self):
         if self.jinja2_name:
