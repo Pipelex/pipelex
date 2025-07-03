@@ -28,9 +28,9 @@ output = "CreativeIdea"
 nb_output = 5
 llm = "llm_for_creative_writing"
 prompt_template = """
-Generate {{ _nb_output }} creative and innovative ideas for the following topic:
+Generate $_nb_output creative and innovative ideas for the following topic:
 
-{{ topic|tag }}
+@topic
 
 Each idea should be:
 - Unique and original
@@ -49,7 +49,7 @@ llm = "llm_for_creative_writing"
 prompt_template = """
 Brainstorm creative concepts related to this topic. Generate as many good ideas as come to mind:
 
-{{ topic|tag }}
+@topic
 
 Each concept should be briefly described.
 """
@@ -62,7 +62,7 @@ llm = "llm_for_testing_gen_text"
 prompt_template = """
 Perform a detailed analysis of this creative idea:
 
-{{ single_idea|tag }}
+@single_idea
 
 Analyze:
 - Strengths and weaknesses
@@ -82,7 +82,7 @@ llm = "llm_for_testing_gen_text"
 prompt_template = """
 Based on these detailed analyses, rank all ideas from best to worst:
 
-{{ detailed_analyses|tag }}
+@detailed_analyses
 
 Provide:
 - Overall ranking (1st, 2nd, 3rd, etc.)
@@ -98,7 +98,7 @@ llm = "llm_for_testing_gen_text"
 prompt_template = """
 Based on this evaluation, select the single best idea and explain why it stands out:
 
-{{ evaluation|tag }}
+@evaluation
 
 Provide:
 1. The selected best idea

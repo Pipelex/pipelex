@@ -27,7 +27,7 @@ llm = "llm_for_testing_gen_text"
 prompt_template = """
 Analyze the length and structure of this document:
 
-{{ document.text|tag }}
+@document.text
 
 Provide a brief analysis focusing on:
 - Word count estimation
@@ -43,7 +43,7 @@ llm = "llm_for_testing_gen_text"
 prompt_template = """
 Analyze the content and themes of this document:
 
-{{ document.text|tag }}
+@document.text
 
 Provide a brief analysis focusing on:
 - Main themes and topics

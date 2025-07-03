@@ -63,11 +63,11 @@ inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
 Process this urgent technical document with immediate attention.
-Document type: {{ doc_request.document_type }}
-Priority: {{ doc_request.priority }}
-Complexity: {{ doc_request.complexity }}
-User level: {{ user_profile.user_level }}
-Department: {{ user_profile.department }}
+@doc_request.document_type
+@doc_request.priority
+@doc_request.complexity
+@user_profile.user_level
+@user_profile.department
 
 Output: "URGENT_TECHNICAL_PROCESSED"
 """
@@ -78,9 +78,9 @@ inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
 Process this complex technical document for expert user.
-Document type: {{ doc_request.document_type }}
-Complexity: {{ doc_request.complexity }}
-User level: {{ user_profile.user_level }}
+@doc_request.document_type
+@doc_request.complexity
+@user_profile.user_level
 
 Output: "EXPERT_TECHNICAL_PROCESSED"
 """
@@ -91,8 +91,8 @@ inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
 Process this standard technical document.
-Document type: {{ doc_request.document_type }}
-User level: {{ user_profile.user_level }}
+@doc_request.document_type
+@user_profile.user_level
 
 Output: "STANDARD_TECHNICAL_PROCESSED"
 """
@@ -104,8 +104,8 @@ inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
 Process this urgent business document.
-Priority: {{ doc_request.priority }}
-Department: {{ user_profile.department }}
+@doc_request.priority
+@user_profile.department
 
 Output: "URGENT_BUSINESS_PROCESSED"
 """
@@ -116,8 +116,8 @@ inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
 Process this finance business document.
-Department: {{ user_profile.department }}
-Document type: {{ doc_request.document_type }}
+@user_profile.department
+@doc_request.document_type
 
 Output: "FINANCE_BUSINESS_PROCESSED"
 """
@@ -128,8 +128,8 @@ inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
 Process this marketing business document.
-Department: {{ user_profile.department }}
-Language: {{ doc_request.language }}
+@user_profile.department
+@doc_request.language
 
 Output: "MARKETING_BUSINESS_PROCESSED"
 """
@@ -140,8 +140,8 @@ inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
 Process this general business document.
-Document type: {{ doc_request.document_type }}
-Department: {{ user_profile.department }}
+@doc_request.document_type
+@user_profile.department
 
 Output: "GENERAL_BUSINESS_PROCESSED"
 """
@@ -153,9 +153,9 @@ inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
 Process this complex legal document.
-Complexity: {{ doc_request.complexity }}
-User level: {{ user_profile.user_level }}
-Language: {{ doc_request.language }}
+@doc_request.complexity
+@user_profile.user_level
+@doc_request.language
 
 Output: "COMPLEX_LEGAL_PROCESSED"
 """
@@ -166,8 +166,8 @@ inputs = { doc_request = "DocumentRequest" }
 output = "native.Text"
 prompt_template = """
 Process this international legal document.
-Language: {{ doc_request.language }}
-Document type: {{ doc_request.document_type }}
+@doc_request.language
+@doc_request.document_type
 
 Output: "INTERNATIONAL_LEGAL_PROCESSED"
 """
@@ -178,8 +178,8 @@ inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
 Process this standard legal document.
-Document type: {{ doc_request.document_type }}
-User level: {{ user_profile.user_level }}
+@doc_request.document_type
+@user_profile.user_level
 
 Output: "STANDARD_LEGAL_PROCESSED"
 """

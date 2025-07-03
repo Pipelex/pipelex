@@ -32,7 +32,7 @@ prompt_template = """
 Put the first letter of a word that represents a color as a capital letter.
 Here is the word:
 
-{{ color|tag("color") }}
+@color
 
 Output only the word, nothing else.
 """
@@ -45,7 +45,7 @@ prompt_template = """
 Put the last letter of a word that represents a color as a capital letter.
 Here is the word:
 
-{{ capitalized_color|tag("color") }}
+@capitalized_color
 
 Output only the word, nothing else.
 """

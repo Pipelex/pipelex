@@ -31,7 +31,7 @@ PipeLLM = "Imagine a product of nature"
 inputs = { color = "Color" }
 output = "ProductOfNature"
 prompt_template = """
-Propose a product of nature of this color: {{ color|format("plain") }}.
+Propose a product of nature of this color: $color.
 Just state what it is in a single sentence.
 """
 
@@ -42,7 +42,7 @@ output = "FantasyScene"
 prompt_template = """
 Imagine a fantasy scene including the following products of nature:
 
-{{ product_of_nature|tag("products of nature") }}
+@product_of_nature
 
 Keep it short and concise, just one sentence.
 """

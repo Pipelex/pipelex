@@ -19,7 +19,7 @@ class TestPipeParallelValidation:
             pipe_llm_prompt=PipeLLMPrompt(
                 code="analyze_document_prompt",
                 domain="test_domain",
-                user_text="Analyze this document: {{ document }} with context: {{ context }}",
+                user_text="Analyze this document:  \n@context\n@document",
             ),
         )
 
