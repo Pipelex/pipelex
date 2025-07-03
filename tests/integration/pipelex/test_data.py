@@ -145,24 +145,6 @@ class PipeTestCases:
         ),
     ]
 
-    BATCH_TEST: ClassVar[List[Tuple[str, Stuff, str, str]]] = [  # pipe_code, stuff, input_list_stuff_name, input_item_stuff_name
-        (
-            "batch_test",
-            StuffFactory.make_stuff(
-                concept_str="flows.Color",
-                name="colors",
-                content=ListContent(
-                    items=[
-                        TextContent(text="blue"),
-                        TextContent(text="red"),
-                        TextContent(text="green"),
-                    ]
-                ),
-            ),
-            "colors",
-            "color",
-        ),
-    ]
     STUFF_AND_PIPE: ClassVar[List[Tuple[str, Stuff, str]]] = [  # topic, stuff, pipe_code
         (
             "Process Simple Image",

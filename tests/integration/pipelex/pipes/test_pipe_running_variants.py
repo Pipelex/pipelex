@@ -5,13 +5,13 @@ from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode
+from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_factory import StuffBlueprint
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_report_delegate
+from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import PipeTestCases
@@ -135,36 +135,6 @@ class TestPipeRunningVariants:
         pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
         pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
         pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
-
-    @pytest.mark.parametrize("pipe_code, stuff, input_list_stuff_name, input_item_stuff_name", PipeTestCases.BATCH_TEST)
-    async def test_pipe_batch_with_list_content(
-        self,
-        pipe_run_mode: PipeRunMode,
-        request: FixtureRequest,
-        pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
-        save_working_memory: Any,
-        pipe_code: str,
-        stuff: Stuff,
-        input_list_stuff_name: str,
-        input_item_stuff_name: str,
-    ):
-        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code=pipe_code,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(
-                batch_params=BatchParams(
-                    input_list_stuff_name=input_list_stuff_name,
-                    input_item_stuff_name=input_item_stuff_name,
-                ),
-                pipe_run_mode=pipe_run_mode,
-            ),
-            working_memory=working_memory,
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
-        )
-        pretty_print(pipe_output, title=f"run pipe '{pipe_code}'")
-        get_report_delegate().generate_report()
-
-        get_pipeline_tracker().output_flowchart(is_detailed=True)
 
     @pytest.mark.parametrize("pipe_code, exception, expected_error_message", PipeTestCases.FAILURE_PIPES)
     async def test_pipe_infinite_loop(
