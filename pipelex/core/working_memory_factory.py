@@ -11,8 +11,8 @@ from pipelex.core.stuff_content import ImageContent, PDFContent, StuffContent, T
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.exceptions import WorkingMemoryFactoryError
-from pipelex.tools.misc.json_utils import load_json_dict_from_path
 from pipelex.pipe_operators.pipe_ocr import PIPE_OCR_INPUT_NAME
+from pipelex.tools.misc.json_utils import load_json_dict_from_path
 
 
 class WorkingMemoryFactory(BaseModel):

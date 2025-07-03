@@ -8,10 +8,9 @@ from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import PageContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router
-from pipelex.pipe_operators.pipe_ocr import PipeOcr, PipeOcrOutput
+from pipelex.pipe_operators.pipe_ocr import PIPE_OCR_INPUT_NAME, PipeOcr, PipeOcrOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from tests.integration.pipelex.test_data import PipeOcrTestCases
-from pipelex.pipe_operators.pipe_ocr import PIPE_OCR_INPUT_NAME
 
 
 @pytest.mark.dry_runnable
