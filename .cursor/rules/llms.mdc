@@ -1,5 +1,5 @@
 ---
-description: Use LLM models with approrpiate settings. Define LLM handles. Define LLM parameters directly in PipeLLM or through presets.
+description: 
 globs: 
 alwaysApply: false
 ---
