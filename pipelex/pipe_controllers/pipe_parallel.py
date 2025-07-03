@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Coroutine, Dict, List, Optional, Set, cast
+from typing import Any, Coroutine, Dict, List, Optional, Set
 
 from pydantic import model_validator
 from typing_extensions import Self, override
@@ -8,12 +8,12 @@ from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunParams
+from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import DryRunError, PipeDefinitionError, StaticValidationError, StaticValidationErrorType
+from pipelex.exceptions import DryRunError, PipeDefinitionError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -28,59 +28,42 @@ class PipeParallel(PipeController):
     combined_output: Optional[str]
 
     @override
-    def needed_inputs(self, _visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
+    def needed_inputs(self) -> PipeInputSpec:
         """
         Calculate the inputs needed by this PipeParallel.
         This is the inputs needed by ALL parallel sub-pipes since they all run simultaneously.
         """
-        if _visited_pipes is None:
-            _visited_pipes = set()
+        needed_inputs = PipeInputSpec.make_empty()
 
-        # Prevent infinite recursion
-        if self.code in _visited_pipes:
-            return PipeInputSpec()
-        _visited_pipes.add(self.code)
+        for sub_pipe in self.parallel_sub_pipes:
+            pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
 
-        try:
-            needed_inputs = PipeInputSpec()
+            # Get the inputs needed by this parallel pipe
+            pipe_needed_inputs = pipe.needed_inputs()
 
-            for sub_pipe in self.parallel_sub_pipes:
-                pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
-
-                # Get the inputs needed by this parallel pipe
-                pipe_needed_inputs: PipeInputSpec
-                if hasattr(pipe, "needed_inputs") and callable(getattr(pipe, "needed_inputs")):
-                    needed_inputs_method = getattr(pipe, "needed_inputs")
-                    if pipe.__class__.__name__ in ("PipeSequence", "PipeCondition", "PipeParallel"):
-                        pipe_needed_inputs = cast(PipeInputSpec, needed_inputs_method(_visited_pipes=_visited_pipes.copy()))
-                    else:
-                        pipe_needed_inputs = cast(PipeInputSpec, needed_inputs_method())
-                else:
-                    # Fallback for pipes without needed_inputs method
-                    pipe_needed_inputs = pipe.inputs
-
-                # Handle batching: if this sub_pipe has batch_params, exclude the batch_as input
-                # since it's provided by the batching mechanism
-                if sub_pipe.batch_params:
-                    batch_as_input = sub_pipe.batch_params.input_item_stuff_name
-                    # Create a new PipeInputSpec without the batch_as input
-                    filtered_needed_inputs = PipeInputSpec()
-                    for var_name, concept_code in pipe_needed_inputs.root.items():
-                        if var_name != batch_as_input:
-                            filtered_needed_inputs.add_requirement(variable_name=var_name, concept_code=concept_code)
-                    pipe_needed_inputs = filtered_needed_inputs
-
-                # Add all inputs from this parallel pipe
+            # Handle batching: if this sub_pipe has batch_params, exclude the batch_as input
+            # since it's provided by the batching mechanism
+            if sub_pipe.batch_params:
+                batch_as_input = sub_pipe.batch_params.input_item_stuff_name
+                # Create a new PipeInputSpec without the batch_as input
+                filtered_needed_inputs = PipeInputSpec.make_empty()
                 for var_name, concept_code in pipe_needed_inputs.root.items():
-                    needed_inputs.add_requirement(variable_name=var_name, concept_code=concept_code)
+                    if var_name != batch_as_input:
+                        filtered_needed_inputs.add_requirement(variable_name=var_name, concept_code=concept_code)
+                pipe_needed_inputs = filtered_needed_inputs
 
-            return needed_inputs
-        finally:
-            _visited_pipes.discard(self.code)
+            # Add all inputs from this parallel pipe
+            for var_name, concept_code in pipe_needed_inputs.root.items():
+                needed_inputs.add_requirement(variable_name=var_name, concept_code=concept_code)
+
+        return needed_inputs
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
-        # Skip validation during model creation - it will be done in validate_with_libraries()
+        # Validate that either add_each_output or combined_output is set
+        if not self.add_each_output and not self.combined_output:
+            raise PipeDefinitionError(f"PipeParallel'{self.code}'requires either add_each_output or combined_output to be set")
+
         return self
 
     def _validate_inputs(self):
@@ -174,6 +157,7 @@ class PipeParallel(PipeController):
         output_stuffs: Dict[str, Stuff] = {}
         output_stuff_contents: Dict[str, StuffContent] = {}
 
+        # TODO: refactor this to use a specific function for this that can also be used in dry run
         for output_index, pipe_output in enumerate(pipe_outputs):
             output_stuff = pipe_output.main_stuff
             sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
@@ -229,7 +213,10 @@ class PipeParallel(PipeController):
         Validates that all required inputs are present and that all parallel sub-pipes can be dry run.
         """
         log.debug(f"PipeParallel: dry run controller pipe: {self.code}")
-        # 1. Validate that all required inputs are present
+        if pipe_run_params.run_mode != PipeRunMode.DRY:
+            raise PipeRunParamsError(f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}")
+
+        # 1. Validate that all required inputs are present in the working memory
         needed_inputs = self.needed_inputs()
         missing_input_names: List[str] = []
 
@@ -245,30 +232,17 @@ class PipeParallel(PipeController):
                 pipe_code=self.code,
             )
 
-        # 2. Validate configuration
-        if not self.add_each_output and not self.combined_output:
-            raise DryRunError(
-                message=f"Dry run failed for pipe '{self.code}' (PipeParallel): requires either add_each_output or combined_output to be set",
-                missing_inputs=[],
-                pipe_code=self.code,
-            )
-
-        # 3. Validate that all parallel sub-pipes exist and can be dry run
-        tasks: List[Coroutine[Any, Any, PipeOutput]] = []
-
+        # 2. Validate that all sub-pipes exist
         for sub_pipe in self.parallel_sub_pipes:
-            # Validate that sub-pipe exists
             try:
                 get_required_pipe(pipe_code=sub_pipe.pipe_code)
             except Exception as e:
-                log.error(f"Dry run failed: sub-pipe '{sub_pipe.pipe_code}' not found: {e}")
-                raise DryRunError(
-                    message=f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe.pipe_code}' not found: {e}",
-                    missing_inputs=[],
-                    pipe_code=self.code,
-                )
+                raise PipeDefinitionError(f"PipeParallel'{self.code}'sub-pipe '{sub_pipe.pipe_code}' not found") from e
 
-            # Add dry run task for this sub-pipe
+        # 3. Run all sub-pipes in dry mode
+        tasks: List[Coroutine[Any, Any, PipeOutput]] = []
+
+        for sub_pipe in self.parallel_sub_pipes:
             tasks.append(
                 sub_pipe.run_pipe(
                     calling_pipe_code=self.code,
@@ -278,7 +252,6 @@ class PipeParallel(PipeController):
                 )
             )
 
-        # 4. Run all sub-pipes in dry mode
         try:
             pipe_outputs = await asyncio.gather(*tasks)
         except Exception as e:
@@ -289,7 +262,7 @@ class PipeParallel(PipeController):
                 pipe_code=self.code,
             )
 
-        # 5. Process outputs as in the regular run
+        # 4. Process outputs as in the regular run
         output_stuffs: Dict[str, Stuff] = {}
         output_stuff_contents: Dict[str, StuffContent] = {}
 
@@ -316,7 +289,7 @@ class PipeParallel(PipeController):
             output_stuffs[sub_pipe_output_name] = output_stuff
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
 
-        # 6. Handle combined output if specified
+        # 5. Handle combined output if specified
         if combined_output := self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
                 concept_code=combined_output,

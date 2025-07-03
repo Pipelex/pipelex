@@ -48,7 +48,7 @@ def tag(context: Context, value: Any, tag_name: Optional[str] = None) -> Any:
     if isinstance(value, Undefined):
         # maybe we don't need this check
         if tag_name:
-            raise Jinja2ContextError(f"Jinja2 undefined value with tag_name '{tag_name}'.")
+            raise Jinja2ContextError(f"Jinja2 undefined value with tag_name '{tag_name}'")
         else:
             raise Jinja2ContextError("Jinja2 undefined value.")
 

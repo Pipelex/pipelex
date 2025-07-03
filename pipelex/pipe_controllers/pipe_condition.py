@@ -70,32 +70,25 @@ class PipeCondition(PipeController):
         1. Inputs needed by the condition expression/expression_template
         2. Inputs needed by ALL possible target pipes (since we don't know which will be chosen)
         """
-        needed_inputs = PipeInputSpec()
+        needed_inputs = PipeInputSpec.make_empty()
 
+        # 1. Add the variables from the expression/expression_template
         pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
             domain_code=self.domain,
             template_str=self.applied_expression_template,
             inputs=self.inputs,
         )
-        expression_required_vars = pipe_jinja2.required_variables()
 
-        # Add expression variables as needed inputs (excluding internal variables starting with _)
-        for var_name in expression_required_vars:
-            if not var_name.startswith("_"):
+        for var_name in pipe_jinja2.required_variables():
+            if not var_name.startswith("_"):  # exclude internal variables starting with `_`
                 # We don't know the concept code from just the variable name,
                 # so we'll use a generic placeholder that will be validated later
                 needed_inputs.add_requirement(variable_name=var_name, concept_code=f"{self.domain}.Unknown")
 
-        target_pipe_codes = list(self.pipe_map.values())
-        if self.default_pipe_code:
-            target_pipe_codes.append(self.default_pipe_code)
-
-        for pipe_code in target_pipe_codes:
+        # 2. Add the inputs needed by all possible target pipes
+        for pipe_code in self.pipe_map.values():
             pipe = get_required_pipe(pipe_code=pipe_code)
-
-            target_pipe_needed_inputs = pipe.needed_inputs()
-
-            for input_name, concept_code in target_pipe_needed_inputs.root.items():
+            for input_name, concept_code in pipe.needed_inputs().items:
                 needed_inputs.add_requirement(variable_name=input_name, concept_code=concept_code)
 
         return needed_inputs
@@ -103,7 +96,7 @@ class PipeCondition(PipeController):
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
         if not self.pipe_map:
-            raise ValueError(f"Pipe {self.code} (PipeCondition) must have at least one mapping in pipe_map")
+            raise ValueError(f"Pipe'{self.code}'(PipeCondition) must have at least one mapping in pipe_map")
 
         # Skip validation during model creation - it will be done in validate_with_libraries()
         return self
@@ -282,7 +275,7 @@ class PipeCondition(PipeController):
         """
         log.debug(f"PipeCondition: dry run controller pipe: {self.code}")
 
-        # 1. Validate that all required inputs are present
+        # 1. Validate that all required inputs are present in the working memory
         needed_inputs = self.needed_inputs()
         missing_input_names: List[str] = []
 
