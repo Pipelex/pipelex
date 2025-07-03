@@ -1,6 +1,5 @@
 from typing import Optional
 
-from pipelex import pretty_print
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import FORCE_DRY_RUN_MODE_ENV_KEY, PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
@@ -69,7 +68,6 @@ async def execute_pipeline(
         pipe_run_mode=pipe_run_mode,
     )
 
-    pretty_print(pipe, title=f"Running pipe '{pipe_code}'")
     if working_memory:
         working_memory.pretty_print_summary()
 
