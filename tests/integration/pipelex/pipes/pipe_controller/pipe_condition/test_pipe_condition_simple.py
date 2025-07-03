@@ -183,7 +183,7 @@ class TestPipeConditionSimple:
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
-
+        pretty_print(pipe_output)
         # Verify the dry run succeeded
         assert pipe_output is not None
         assert pipe_output.working_memory is not None

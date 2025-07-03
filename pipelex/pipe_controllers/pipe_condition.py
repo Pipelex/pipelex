@@ -36,20 +36,15 @@ class PipeCondition(PipeController):
     default_pipe_code: Optional[str] = None
     add_alias_from_expression_to: Optional[str] = None
 
+    #########################################################################################
+    # Validation
+    #########################################################################################
+
     @model_validator(mode="after")
     def validate_expression(self) -> Self:
         if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
             raise PipeDefinitionError("PipeCondition should have exactly one of expression_template or expression")
         return self
-
-    @property
-    def applied_expression_template(self) -> str:
-        if self.expression_template:
-            return self.expression_template
-        elif self.expression:
-            return "{{ " + self.expression + " }}"
-        else:
-            raise PipeExecutionError("No expression or expression_template provided")
 
     def _make_pipe_condition_details(self, evaluated_expression: str, chosen_pipe_code: str) -> PipeConditionDetails:
         return PipeConditionDetails(
@@ -60,6 +55,38 @@ class PipeCondition(PipeController):
             evaluated_expression=evaluated_expression,
             chosen_pipe_code=chosen_pipe_code,
         )
+
+    @property
+    def applied_expression_template(self) -> str:
+        if self.expression_template:
+            return self.expression_template
+        elif self.expression:
+            return "{{ " + self.expression + " }}"
+        else:
+            raise PipeExecutionError("No expression or expression_template provided")
+
+    #########################################################################################
+    # Inputs
+    #########################################################################################
+
+    @override
+    def required_variables(self) -> Set[str]:
+        required_variables: Set[str] = set()
+        # Add the variables from the expression/expression_template
+        pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
+            domain_code=self.domain,
+            template_str=self.applied_expression_template,
+            inputs=self.inputs,
+        )
+        required_variables.update(pipe_jinja2.required_variables())
+        return required_variables
+
+    def _validate_required_variables(self) -> Self:
+        required_variables = self.required_variables()
+        for required_variable_name in required_variables:
+            if required_variable_name not in self.inputs.variables:
+                raise PipeDefinitionError(f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}")
+        return self
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
@@ -97,6 +124,8 @@ class PipeCondition(PipeController):
     def validate_inputs(self) -> Self:
         if not self.pipe_map:
             raise ValueError(f"Pipe'{self.code}'(PipeCondition) must have at least one mapping in pipe_map")
+
+        self._validate_required_variables()
 
         # Skip validation during model creation - it will be done in validate_with_libraries()
         return self
@@ -337,4 +366,12 @@ class PipeCondition(PipeController):
                 pipe_code=self.code,
             )
 
-        return PipeOutput()
+        # Here, it should launch the dry run of all the pipes in the pipe_map
+        for pipe_code in self.pipe_map.values():
+            pipe = get_required_pipe(pipe_code=pipe_code)
+            await pipe.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+            )
+        return PipeOutput(working_memory=working_memory)

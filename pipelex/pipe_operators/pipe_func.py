@@ -1,4 +1,4 @@
-from typing import List, Optional, cast
+from typing import List, Optional, Set, cast
 
 from typing_extensions import override
 
@@ -20,6 +20,10 @@ class PipeFuncOutput(PipeOutput):
 
 class PipeFunc(PipeOperator):
     function_name: str
+
+    @override
+    def required_variables(self) -> Set[str]:
+        return set()
 
     @override
     def needed_inputs(self) -> PipeInputSpec:

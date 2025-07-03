@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from pydantic import model_validator
 from typing_extensions import Self, override
@@ -53,6 +53,10 @@ class PipeOcr(PipeOperator):
     def validate_inputs(self) -> Self:
         self._validate_inputs()
         return self
+
+    @override
+    def required_variables(self) -> Set[str]:
+        return {PIPE_OCR_INPUT_NAME}
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()

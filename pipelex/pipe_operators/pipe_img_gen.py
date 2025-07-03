@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Optional, Set, Union
 
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self, override
@@ -86,6 +86,10 @@ class PipeImgGen(PipeOperator):
             for input_name, input_concept_code in self.inputs.items:
                 needed_inputs.add_requirement(variable_name=input_name, concept_code=input_concept_code)
         return needed_inputs
+
+    @override
+    def required_variables(self) -> Set[str]:
+        return {"imgg_prompt"}
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()

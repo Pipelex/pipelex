@@ -28,6 +28,10 @@ class PipeParallel(PipeController):
     combined_output: Optional[str]
 
     @override
+    def required_variables(self) -> Set[str]:
+        return set()
+
+    @override
     def needed_inputs(self) -> PipeInputSpec:
         """
         Calculate the inputs needed by this PipeParallel.

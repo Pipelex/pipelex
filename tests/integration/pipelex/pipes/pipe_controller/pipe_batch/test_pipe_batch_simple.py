@@ -7,7 +7,7 @@ from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_run_params import BatchParams
+from pipelex.core.pipe_run_params import BatchParams, PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
@@ -22,7 +22,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestPipeBatchSimple:
     """Simple integration test for PipeBatch controller."""
 
-    async def test_simple_batch_processing(self, request: FixtureRequest):
+    async def test_simple_batch_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeBatch with a simple batch processing scenario."""
         # Create PipeBatch instance - it will call the uppercase_transformer pipe from the TOML
         pipe_batch = PipeBatch(
@@ -81,7 +81,7 @@ class TestPipeBatchSimple:
         pipe_output = await pipe_batch._run_controller_pipe(  # pyright: ignore[reportPrivateUsage]
             job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
             working_memory=working_memory,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             output_name="batch_result",
         )
 
@@ -101,7 +101,10 @@ class TestPipeBatchSimple:
         expected_results = ["UPPER: HELLO", "UPPER: WORLD", "UPPER: TEST"]
         for i, item in enumerate(output_list.items):
             assert isinstance(item, TextContent)
-            assert item.text == expected_results[i], f"Item {i}: expected '{expected_results[i]}', got '{item.text}'"
+            if pipe_run_mode != PipeRunMode.DRY:
+                assert item.text == expected_results[i], f"Item {i}: expected '{expected_results[i]}', got '{item.text}'"
+            else:
+                assert "DRY RUN" in item.text
 
         # Verify working memory contains all the expected elements
         final_working_memory = pipe_output.working_memory

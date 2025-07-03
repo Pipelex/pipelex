@@ -87,7 +87,10 @@ class TestPipeSequenceSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hello world" -> "HELLO WORLD" -> "PROCESSED: HELLO WORLD"
-        assert final_result.content.text == "PROCESSED: HELLO WORLD"
+        if pipe_run_mode != PipeRunMode.DRY:
+            assert final_result.content.text == "PROCESSED: HELLO WORLD"
+        else:
+            assert "DRY RUN" in final_result.content.text
 
         # Verify working memory contains all intermediate results
         final_working_memory = pipe_output.working_memory
@@ -96,19 +99,28 @@ class TestPipeSequenceSimple:
         original_input = final_working_memory.get_stuff("input_text")
         assert original_input is not None
         assert isinstance(original_input.content, TextContent)
-        assert original_input.content.text == "hello world"
+        if pipe_run_mode != PipeRunMode.DRY:
+            assert original_input.content.text == "hello world"
+        else:
+            assert "DRY RUN" in original_input.content.text
 
         # Intermediate result (capitalized_text) should be there
         capitalized_result = final_working_memory.get_stuff("capitalized_text")
         assert capitalized_result is not None
         assert isinstance(capitalized_result.content, TextContent)
-        assert capitalized_result.content.text == "HELLO WORLD"
+        if pipe_run_mode != PipeRunMode.DRY:
+            assert capitalized_result.content.text == "HELLO WORLD"
+        else:
+            assert "DRY RUN" in capitalized_result.content.text
 
         # Final result should be there (stored as final_text, which is the last SubPipe's output_name)
         final_result_in_memory = final_working_memory.get_stuff("final_text")
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        assert final_result_in_memory.content.text == "PROCESSED: HELLO WORLD"
+        if pipe_run_mode != PipeRunMode.DRY:
+            assert final_result_in_memory.content.text == "PROCESSED: HELLO WORLD"
+        else:
+            assert "DRY RUN" in final_result_in_memory.content.text
 
         # Verify working memory structure
         assert len(final_working_memory.root) == 3  # input, intermediate, final

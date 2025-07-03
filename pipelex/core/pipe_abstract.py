@@ -44,8 +44,9 @@ class PipeAbstract(ABC, BaseModel):
         required_concepts.update(self.inputs.concepts)
         return required_concepts
 
+    @abstractmethod
     def required_variables(self) -> Set[str]:
-        return set()
+        pass
 
     @abstractmethod
     def needed_inputs(self) -> PipeInputSpec:

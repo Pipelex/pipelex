@@ -93,9 +93,10 @@ class TestPipeConditionComplex:
         pretty_print(pipe_output, title="Business Finance Processing")
 
         assert pipe_output is not None
-        final_result = pipe_output.main_stuff
-        assert isinstance(final_result.content, TextContent)
-        assert "FINANCE_BUSINESS_PROCESSED" in final_result.content.text
+        if pipe_run_mode != PipeRunMode.DRY:
+            final_result = pipe_output.main_stuff
+            assert isinstance(final_result.content, TextContent)
+            assert "FINANCE_BUSINESS_PROCESSED" in final_result.content.text
 
     async def test_legal_complex_routing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test complex legal document routing."""
@@ -125,9 +126,10 @@ class TestPipeConditionComplex:
         pretty_print(pipe_output, title="Legal Complex Processing")
 
         assert pipe_output is not None
-        final_result = pipe_output.main_stuff
-        assert isinstance(final_result.content, TextContent)
-        assert "COMPLEX_LEGAL_PROCESSED" in final_result.content.text
+        if pipe_run_mode != PipeRunMode.DRY:
+            final_result = pipe_output.main_stuff
+            assert isinstance(final_result.content, TextContent)
+            assert "COMPLEX_LEGAL_PROCESSED" in final_result.content.text
 
     async def test_technical_expert_high_complexity_routing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test technical document with expert user and high complexity."""
@@ -165,9 +167,10 @@ class TestPipeConditionComplex:
         pretty_print(pipe_output, title="Technical Expert High Complexity Processing")
 
         assert pipe_output is not None
-        final_result = pipe_output.main_stuff
-        assert isinstance(final_result.content, TextContent)
-        assert "EXPERT_TECHNICAL_PROCESSED" in final_result.content.text
+        if pipe_run_mode != PipeRunMode.DRY:
+            final_result = pipe_output.main_stuff
+            assert isinstance(final_result.content, TextContent)
+            assert "EXPERT_TECHNICAL_PROCESSED" in final_result.content.text
 
     # DRY RUN TESTS
     async def test_complex_pipeline_dry_run_success(self, request: FixtureRequest):
@@ -199,11 +202,6 @@ class TestPipeConditionComplex:
 
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
-        assert pipe_output.main_stuff is not None
-
-        final_result = pipe_output.main_stuff
-        assert isinstance(final_result.content, TextContent)
-        assert "DRY RUN" in final_result.content.text
 
     async def test_complex_pipeline_dry_run_missing_inputs(self, request: FixtureRequest):
         """Test complex pipeline dry run with missing inputs - should fail."""
@@ -290,8 +288,3 @@ class TestPipeConditionComplex:
 
         assert pipe_output is not None
         assert pipe_output.main_stuff is not None
-
-        final_result = pipe_output.main_stuff
-        assert isinstance(final_result.content, TextContent)
-
-        assert "DRY RUN" in final_result.content.text

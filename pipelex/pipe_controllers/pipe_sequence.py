@@ -54,6 +54,10 @@ class PipeSequence(PipeController):
 
         return needed_inputs
 
+    @override
+    def required_variables(self) -> Set[str]:
+        return set()
+
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
         if len(self.sequential_sub_pipes) == 0:

@@ -101,7 +101,11 @@ class PipeJinja2(PipeOperator):
             jinja2_name=self.jinja2_name,
             jinja2=self.jinja2,
         )
-        return {variable_name for variable_name in required_variables if not variable_name.startswith("_") and variable_name != "preliminary_text"}
+        return {
+            variable_name
+            for variable_name in required_variables
+            if not variable_name.startswith("_") and variable_name != "preliminary_text" and variable_name != "place_holder"
+        }
 
     @override
     async def _run_operator_pipe(

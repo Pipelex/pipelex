@@ -54,4 +54,5 @@ class TestPipeConditionExpression:
         # Basic assertions
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
-        assert category in pipe_output.main_stuff_as_text.text
+        if pipe_run_mode != PipeRunMode.DRY:
+            assert category in pipe_output.main_stuff_as_text.text

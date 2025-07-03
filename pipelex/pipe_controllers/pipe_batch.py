@@ -30,6 +30,10 @@ class PipeBatch(PipeController):
         return set([self.branch_pipe_code])
 
     @override
+    def required_variables(self) -> Set[str]:
+        return set()
+
+    @override
     def needed_inputs(self) -> PipeInputSpec:
         return PipeInputSpec.make_empty()
 
