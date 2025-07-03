@@ -16,6 +16,5 @@ output = "CarDescription"
 prompt_template = """
 Given the reference to a car, generate a description of the car.
 
-Car:
-{{ car|tag }}
+@car
 """

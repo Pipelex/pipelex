@@ -28,7 +28,7 @@ Clean and normalize the following text by:
 - Fixing basic grammar and punctuation
 - Standardizing formatting
 
-{{ raw_text|tag }}
+@raw_text
 """
 
 [pipe.generate_summary]
@@ -39,5 +39,5 @@ llm = "llm_for_testing_gen_text"
 prompt_template = """
 Generate a concise summary of the following text in 2-3 sentences:
 
-{{ cleaned_text|tag }}
+@cleaned_text
 """

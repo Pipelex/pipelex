@@ -16,6 +16,5 @@ output = "AnimalDescription"
 prompt_template = """
 Given the reference to an animal, generate a description of the animal.
 
-Animal:
-{{ animal|tag }}
+@animal
 """

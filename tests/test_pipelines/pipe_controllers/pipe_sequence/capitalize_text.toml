@@ -8,7 +8,7 @@ inputs = { input_text = "Text" }
 output = "Text"
 prompt_template = """Transform the following text to uppercase:
 
-{{ input_text.text }}
+@input_text.text
 
 Return only the uppercase text, nothing else."""
 
@@ -18,6 +18,6 @@ inputs = { capitalized_text = "Text" }
 output = "Text"
 prompt_template = """Add the prefix "PROCESSED: " to the beginning of the following text:
 
-{{ capitalized_text.text }}
+@capitalized_text.text
 
 Return only the prefixed text, nothing else."""
