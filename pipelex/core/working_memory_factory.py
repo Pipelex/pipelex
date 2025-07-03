@@ -12,6 +12,7 @@ from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.exceptions import WorkingMemoryFactoryError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
+from pipelex.pipe_operators.pipe_ocr import PIPE_OCR_INPUT_NAME
 
 
 class WorkingMemoryFactory(BaseModel):
@@ -34,7 +35,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         image_url: str,
         concept_str: str = NativeConcept.IMAGE.code,
-        name: Optional[str] = "ocr_input",
+        name: Optional[str] = PIPE_OCR_INPUT_NAME,
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
             concept_str=concept_str,
@@ -48,7 +49,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         pdf_url: str,
         concept_str: str = NativeConcept.PDF.code,
-        name: Optional[str] = "ocr_input",
+        name: Optional[str] = PIPE_OCR_INPUT_NAME,
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
             concept_str=concept_str,

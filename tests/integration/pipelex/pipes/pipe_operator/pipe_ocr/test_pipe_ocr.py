@@ -11,6 +11,7 @@ from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_ocr import PipeOcr, PipeOcrOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from tests.integration.pipelex.test_data import PipeOcrTestCases
+from pipelex.pipe_operators.pipe_ocr import PIPE_OCR_INPUT_NAME
 
 
 @pytest.mark.dry_runnable
@@ -64,7 +65,7 @@ class TestPipeOCR:
                 domain="generic",
                 inputs=PipeInputSpec(
                     root={
-                        "ocr_input": "PDF",
+                        PIPE_OCR_INPUT_NAME: "PDF",
                     }
                 ),
                 should_include_images=True,
@@ -77,7 +78,7 @@ class TestPipeOCR:
             working_memory=WorkingMemoryFactory.make_from_pdf(
                 pdf_url=pdf_url,
                 concept_str=NativeConcept.PDF.code,
-                name="ocr_input",
+                name=PIPE_OCR_INPUT_NAME,
             ),
         )
         pipe_ocr_output: PipeOcrOutput = await get_pipe_router().run_pipe_job(
