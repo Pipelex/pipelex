@@ -10,7 +10,8 @@ from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.cases import Article, ImageTestCases
+from tests.cases import ImageTestCases
+from tests.test_pipelines.misc_tests.test_structures import Article
 
 
 @pytest.mark.dry_runnable
@@ -43,8 +44,7 @@ class TestImageInputs:
         # Verify output
         if pipe_run_mode != PipeRunMode.DRY:
             article = pipe_output.main_stuff_as(content_type=Article)
-            pretty_print(article, title="Article")
-            assert article.title == "The Solar System: An Overview"
+            assert article.title == "2037 AI-Lympics"
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
@@ -81,7 +81,7 @@ class TestImageInputs:
         if pipe_run_mode != PipeRunMode.DRY:
             article = pipe_output.main_stuff_as(content_type=Article)
             pretty_print(article, title="Article")
-            assert article.title == "The Solar System: An Overview"
+            assert article.title == "2037 AI-Lympics"
             assert article.description == "This is a test page"
         assert pipe_output is not None
         assert pipe_output.working_memory is not None

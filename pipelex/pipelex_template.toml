@@ -1,7 +1,7 @@
 [pipelex.aws_config]
 api_key_method = "env"
-# The possible values are "env" and "secret_provider". 
-# "env" means means that the env var are stored in your .env file. 
+# The possible values are "env" and "secret_provider".
+# "env" means means that the env var are stored in your .env file.
 # "secret_provider" means that the env var are stored in your Secret Manager (See the doc for injecting a secret provider).
 
 [cogt]
@@ -16,3 +16,4 @@ api_key_method = "env"
 [cogt.ocr_config]
 ocr_handles = ["mistral/mistral-ocr-latest"]
 page_output_text_file_name = "page_text.md"
+

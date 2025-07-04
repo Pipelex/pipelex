@@ -2,8 +2,6 @@
 
 from typing import ClassVar, List
 
-from pipelex.core.stuff_content import StructuredContent
-
 
 class PDFTestCases:
     """PDF document test constants."""
@@ -19,11 +17,3 @@ class PDFTestCases:
 
     # Remote URLs
     DOCUMENT_URLS: ClassVar[List[str]] = ["https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"]
-
-
-class Article(StructuredContent):
-    """Test model for article data."""
-
-    title: str
-    description: str
-    date: str
