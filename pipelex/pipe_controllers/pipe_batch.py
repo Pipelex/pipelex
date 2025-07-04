@@ -83,6 +83,7 @@ class PipeBatch(PipeController):
         item_stuffs: List[Stuff] = []
         required_stuff_lists: List[List[Stuff]] = []
         branch_output_item_codes: List[str] = []
+
         for branch_index, item in enumerate(input_content.items):
             branch_output_item_code = f"{batch_output_stuff_code}-branch-{branch_index}"
             branch_output_item_codes.append(branch_output_item_code)

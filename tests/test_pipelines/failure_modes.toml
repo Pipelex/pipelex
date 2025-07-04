@@ -11,10 +11,10 @@ prompt_template = """
 This is a dummy prompt, do whatever you want. Something funny but not a joke, ok?
 """
 
-# [pipe.infinite_loop_1]
-# PipeSequence = "This pipe will cause an infinite loop"
-# output = "Text"
-# steps = [
-#     { pipe = "dummy", result = "dummy_result" },
-#     { pipe = "infinite_loop_1", result = "disaster" },
-# ]
+[pipe.infinite_loop_1]
+PipeSequence = "This pipe will cause an infinite loop"
+output = "Text"
+steps = [
+    { pipe = "dummy", result = "dummy_result" },
+    { pipe = "infinite_loop_1", result = "disaster" },
+]

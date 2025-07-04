@@ -1,13 +1,13 @@
-from pipelex.core.concept_library import ConceptLibrary
 from pipelex.core.concept_native import NativeConcept
+from pipelex.hub import get_concept_provider
 
 
-class TestConceptLibraryIsNativeConcept:
-    """Test ConceptLibrary.is_native_concept method."""
+class Testget_concept_providerIsNativeConcept:
+    """Test get_concept_provider.is_native_concept method."""
 
     def test_is_native_concept_with_native_domain_prefix_true(self):
         """Test concept strings with native domain prefix return True."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         # Test with various native concepts that have explicit domain
         assert concept_library.is_native_concept("native.Text") is True
@@ -22,7 +22,7 @@ class TestConceptLibraryIsNativeConcept:
 
     def test_is_native_concept_with_non_native_domain_prefix_false(self):
         """Test concept strings with non-native domain prefix return False."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         # Test with various non-native domains
         assert concept_library.is_native_concept("custom.Text") is False
@@ -33,7 +33,7 @@ class TestConceptLibraryIsNativeConcept:
 
     def test_is_native_concept_without_domain_native_concept_names_true(self):
         """Test concept strings without domain that are native concept names return True."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         # Test all native concept names without domain
         native_names = NativeConcept.names()
@@ -42,7 +42,7 @@ class TestConceptLibraryIsNativeConcept:
 
     def test_is_native_concept_without_domain_non_native_names_false(self):
         """Test concept strings without domain that are not native concept names return False."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         # Test various non-native concept names without domain
         assert concept_library.is_native_concept("CustomConcept") is False
@@ -53,13 +53,13 @@ class TestConceptLibraryIsNativeConcept:
 
     def test_is_native_concept_empty_string(self):
         """Test empty string returns False."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         assert concept_library.is_native_concept("") is False
 
     def test_is_native_concept_invalid_domain_format(self):
         """Test concept strings with invalid domain format (multiple dots)."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         # These should be handled by the concept_str_contains_domain check
         # Multiple dots should not be considered as having a domain
@@ -68,13 +68,13 @@ class TestConceptLibraryIsNativeConcept:
 
     def test_is_native_concept_just_dot(self):
         """Test concept string that is just a dot."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         assert concept_library.is_native_concept(".") is False
 
     def test_is_native_concept_dot_at_start_or_end(self):
         """Test concept strings with dot at start or end."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         # .Text has domain="" and concept="Text", so domain != "native" -> False
         assert concept_library.is_native_concept(".Text") is False
@@ -87,7 +87,7 @@ class TestConceptLibraryIsNativeConcept:
 
     def test_is_native_concept_case_sensitivity(self):
         """Test that the function is case sensitive for domain checking."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         # Test case variations of native domain
         assert concept_library.is_native_concept("Native.Text") is False  # Capital N
@@ -102,7 +102,7 @@ class TestConceptLibraryIsNativeConcept:
 
     def test_is_native_concept_whitespace(self):
         """Test concept strings with whitespace."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         # Whitespace in concept names without domain should make it invalid (not in NativeConcept.names())
         assert concept_library.is_native_concept(" Text") is False
@@ -116,7 +116,7 @@ class TestConceptLibraryIsNativeConcept:
 
     def test_is_native_concept_special_characters(self):
         """Test concept strings with special characters."""
-        concept_library = ConceptLibrary()
+        concept_library = get_concept_provider()
 
         # Special characters should make it invalid
         assert concept_library.is_native_concept("native-Text") is False
@@ -126,7 +126,8 @@ class TestConceptLibraryIsNativeConcept:
 
     def test_native_concept_names_consistency(self):
         """Test that the function uses the correct native concept names."""
-        concept_library = ConceptLibrary()
+
+        concept_library = get_concept_provider()
 
         # Get the actual native concept names
         native_names = NativeConcept.names()
@@ -140,7 +141,8 @@ class TestConceptLibraryIsNativeConcept:
 
     def test_is_native_concept_common_examples(self):
         """Test that common native concept names work without domain prefix."""
-        concept_library = ConceptLibrary()
+
+        concept_library = get_concept_provider()
 
         # Test the most commonly used native concept names
         common_native_concepts = ["Text", "Image", "PDF", "Number", "Dynamic"]

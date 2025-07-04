@@ -99,10 +99,7 @@ class TestPipeSequenceSimple:
         original_input = final_working_memory.get_stuff("input_text")
         assert original_input is not None
         assert isinstance(original_input.content, TextContent)
-        if pipe_run_mode != PipeRunMode.DRY:
-            assert original_input.content.text == "hello world"
-        else:
-            assert "DRY RUN" in original_input.content.text
+        assert original_input.content.text == "hello world"
 
         # Intermediate result (capitalized_text) should be there
         capitalized_result = final_working_memory.get_stuff("capitalized_text")

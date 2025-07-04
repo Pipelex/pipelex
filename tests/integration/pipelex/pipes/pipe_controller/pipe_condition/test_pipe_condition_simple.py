@@ -57,7 +57,6 @@ class TestPipeConditionSimple:
         pipe_output = await pipe_condition.run_pipe(
             job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
             working_memory=working_memory,
-            output_name="condition_result",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
 
@@ -86,7 +85,7 @@ class TestPipeConditionSimple:
         assert original_input.content.text == "hello world"
 
         # Final result should be there with correct name and content
-        final_result_in_memory = final_working_memory.get_stuff("condition_result")
+        final_result_in_memory = final_working_memory.get_main_stuff()
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
         if pipe_run_mode == PipeRunMode.DRY:
@@ -127,7 +126,6 @@ class TestPipeConditionSimple:
             job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            output_name="condition_result",
         )
 
         # Verify the pipe executed successfully
@@ -155,7 +153,7 @@ class TestPipeConditionSimple:
         assert original_input.content.text == "hi"
 
         # Final result should be there with correct name and content
-        final_result_in_memory = final_working_memory.get_stuff("condition_result")
+        final_result_in_memory = final_working_memory.get_main_stuff()
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
         if pipe_run_mode == PipeRunMode.DRY:

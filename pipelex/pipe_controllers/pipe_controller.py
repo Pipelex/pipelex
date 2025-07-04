@@ -46,7 +46,6 @@ class PipeController(PipeAbstract):
                 )
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
-
         return pipe_output
 
     @abstractmethod

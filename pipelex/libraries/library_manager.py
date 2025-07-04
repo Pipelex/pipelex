@@ -8,13 +8,11 @@ from pydantic import ValidationError
 
 from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
+from pipelex.config import get_config
 from pipelex.core.concept_factory import ConceptFactory
-from pipelex.core.concept_library import ConceptLibrary
 from pipelex.core.domain import Domain
-from pipelex.core.domain_library import DomainLibrary
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_blueprint import PipeSpecificFactoryProtocol
-from pipelex.core.pipe_library import PipeLibrary
 from pipelex.exceptions import (
     ConceptLibraryError,
     LibraryError,
@@ -23,6 +21,7 @@ from pipelex.exceptions import (
     PipeLibraryError,
     StaticValidationError,
 )
+from pipelex.hub import get_concept_provider, get_domain_provider, get_pipe_provider
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
@@ -62,9 +61,9 @@ class LibraryManager:
     def __init__(self) -> None:
         # TODO : avoid having an Option LLMDeck: regroup with model provider
         self.llm_deck: Optional[LLMDeck] = None
-        self.domain_library = DomainLibrary()
-        self.concept_library = ConceptLibrary()
-        self.pipe_library = PipeLibrary()
+        self.domain_library = get_domain_provider()
+        self.concept_library = get_concept_provider()
+        self.pipe_library = get_pipe_provider()
 
     def teardown(self) -> None:
         self.llm_deck = None
@@ -79,6 +78,11 @@ class LibraryManager:
             library_paths += [LibraryConfig.test_pipelines_path]
         return library_paths
 
+    def load_failure_modes(self):
+        failure_modes_path = get_config().pipelex.library_config.failure_modes_path
+        if failure_modes_path:
+            self._load_combo_libraries(library_paths=[Path(failure_modes_path)])
+
     def load_libraries(self):
         log.debug("LibraryManager loading separate libraries")
         library_paths = self.libraries_paths()
@@ -91,7 +95,11 @@ class LibraryManager:
         native_concepts = ConceptFactory.list_native_concepts()
         self.concept_library.add_concepts(concepts=native_concepts)
 
-        self._load_combo_libraries(library_paths=library_paths)
+        toml_file_paths = self.list_toml_files_from_path(library_paths=library_paths)
+        # remove failure_modes_path from the list
+        failure_modes_path = get_config().pipelex.library_config.failure_modes_path
+        toml_file_paths = [path for path in toml_file_paths if path != Path(failure_modes_path)]
+        self._load_combo_libraries(library_paths=toml_file_paths)
 
     def load_deck(self) -> LLMDeck:
         llm_deck_paths = LibraryConfig.get_llm_deck_paths()
@@ -113,9 +121,7 @@ class LibraryManager:
         self.llm_deck = LLMDeck.model_validate(full_llm_deck_dict)
         return self.llm_deck
 
-    def _load_combo_libraries(self, library_paths: List[str]):
-        log.debug("LibraryManager loading combo libraries")
-        # Find all .toml files in the directories and their subdirectories
+    def list_toml_files_from_path(self, library_paths: List[str]) -> List[Path]:
         toml_file_paths: List[Path] = []
         for libraries_path in library_paths:
             # Use the existing utility function specifically for TOML files
@@ -128,9 +134,14 @@ class LibraryManager:
             if not found_file_paths:
                 log.warning(f"No TOML files found in library path: {libraries_path}")
             toml_file_paths.extend(found_file_paths)
+        return toml_file_paths
+
+    def _load_combo_libraries(self, library_paths: List[Path]):
+        log.debug("LibraryManager loading combo libraries")
+        # Find all .toml files in the directories and their subdirectories
 
         # First pass: load all domains
-        for toml_path in toml_file_paths:
+        for toml_path in library_paths:
             library_dict = load_toml_from_path(path=str(toml_path))
             library_name = toml_path.stem
             domain_code = library_dict.get("domain")
@@ -153,7 +164,7 @@ class LibraryManager:
             self.domain_library.add_domain_details(domain=domain)
 
         # Second pass: load all concepts
-        for toml_path in toml_file_paths:
+        for toml_path in library_paths:
             nb_concepts_before = len(self.concept_library.root)
             library_dict = load_toml_from_path(path=str(toml_path))
             library_name = toml_path.stem
@@ -165,7 +176,7 @@ class LibraryManager:
             log.verbose(f"Loaded {nb_concepts_loaded} concepts from '{toml_path.name}'")
 
         # Third pass: load all pipes
-        for toml_path in toml_file_paths:
+        for toml_path in library_paths:
             nb_pipes_before = len(self.pipe_library.root)
             try:
                 library_dict = load_toml_from_path(path=str(toml_path))

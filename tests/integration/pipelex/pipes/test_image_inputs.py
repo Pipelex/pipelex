@@ -26,7 +26,7 @@ class TestImageInputs:
         pipe_run_mode: PipeRunMode,
     ) -> None:
         """Test that an image is indeed given to the LLM, and that it can extract extact whats on the image."""
-        working_memory = WorkingMemoryFactory.make_from_image(image_url=ImageTestCases.IMAGE_FILE_PATH_PNG)
+        working_memory = WorkingMemoryFactory.make_from_image(name="image", image_url=ImageTestCases.IMAGE_FILE_PATH_PNG)
 
         # Run the pipe
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(

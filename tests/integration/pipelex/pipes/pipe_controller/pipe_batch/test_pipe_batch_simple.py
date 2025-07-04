@@ -128,9 +128,14 @@ class TestPipeBatchSimple:
         assert isinstance(batch_result.content, ListContent)
         result_list = cast(ListContent[TextContent], batch_result.content)  # type: ignore
         assert len(result_list.items) == 3
-        assert result_list.items[0].text == "UPPER: HELLO"
-        assert result_list.items[1].text == "UPPER: WORLD"
-        assert result_list.items[2].text == "UPPER: TEST"
+        if pipe_run_mode != PipeRunMode.DRY:
+            assert result_list.items[0].text == "UPPER: HELLO"
+            assert result_list.items[1].text == "UPPER: WORLD"
+            assert result_list.items[2].text == "UPPER: TEST"
+        else:
+            assert "DRY RUN" in result_list.items[0].text
+            assert "DRY RUN" in result_list.items[1].text
+            assert "DRY RUN" in result_list.items[2].text
 
         # Verify working memory structure
         assert len(final_working_memory.root) == 2

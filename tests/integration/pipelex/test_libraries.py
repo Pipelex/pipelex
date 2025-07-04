@@ -89,10 +89,7 @@ class TestLibraries:
         known_concept: str,
         known_pipe: str,
     ):
-        # Initialize and load libraries
         library_manager = LibraryManager()
-        library_manager.load_libraries()
-
         # Verify that libraries were loaded
         assert len(library_manager.concept_library.root) > 0, "No concepts were loaded"
         assert len(library_manager.pipe_library.root) > 0, "No pipes were loaded"

@@ -97,7 +97,10 @@ class TestPipeParallelSimple:
         assert sentiment_result is not None
         assert isinstance(sentiment_result.content, TextContent)
         # Should return one of: positive, negative, neutral
-        assert sentiment_result.content.text.lower() in ["positive", "negative", "neutral"]
+        if pipe_run_mode == PipeRunMode.DRY:
+            assert "DRY RUN" in sentiment_result.content.text
+        else:
+            assert sentiment_result.content.text.lower() in ["positive", "negative", "neutral"]
         assert sentiment_result.concept_code == "native.Text"
 
         # Verify word count result
@@ -106,7 +109,10 @@ class TestPipeParallelSimple:
         assert isinstance(word_count_result.content, TextContent)
         # Should be a number (as text)
         word_count_text = word_count_result.content.text.strip()
-        assert word_count_text.isdigit() or word_count_text in ["12", "thirteen", "twelve"]  # Allow for some variation
+        if pipe_run_mode == PipeRunMode.DRY:
+            assert "DRY RUN" in word_count_text
+        else:
+            assert word_count_text.isdigit() or word_count_text in ["12", "thirteen", "twelve"]  # Allow for some variation
         assert word_count_result.concept_code == "native.Text"
 
         # Verify keywords extraction result
@@ -192,7 +198,13 @@ class TestPipeParallelSimple:
 
         # For "Hello world" - word count should be around 2
         word_count_text = word_count_result.content.text.strip()
-        assert word_count_text in ["2", "two"] or word_count_text.isdigit()
+        if pipe_run_mode == PipeRunMode.DRY:
+            assert "DRY RUN" in word_count_text
+        else:
+            assert word_count_text in ["2", "two"] or word_count_text.isdigit()
 
         # Sentiment should be one of the valid values
-        assert sentiment_result.content.text.lower() in ["positive", "negative", "neutral"]
+        if pipe_run_mode == PipeRunMode.DRY:
+            assert "DRY RUN" in sentiment_result.content.text
+        else:
+            assert sentiment_result.content.text.lower() in ["positive", "negative", "neutral"]

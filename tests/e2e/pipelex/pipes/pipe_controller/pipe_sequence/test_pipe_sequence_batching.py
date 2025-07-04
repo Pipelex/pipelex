@@ -61,15 +61,10 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     pipe_output.working_memory.pretty_print_summary()
 
     # Verify final product rating
-    product_rating_stuff = pipe_output.working_memory.get_stuff("product_rating")
+    product_rating_stuff = pipe_output.working_memory.get_stuff_as("product_rating", ProductRating)
     assert product_rating_stuff is not None
-    rating_content = product_rating_stuff.content
-    assert isinstance(rating_content, ProductRating)
 
     # Check that the ProductRating has meaningful values
-    assert hasattr(rating_content, "overall_rating"), "Should have overall_rating attribute"
-    assert hasattr(rating_content, "total_reviews"), "Should have total_reviews attribute"
-    assert hasattr(rating_content, "explanation"), "Should have explanation attribute"
-    assert isinstance(rating_content.overall_rating, float), f"Rating should be a float, got {type(rating_content.overall_rating)}"
-    assert isinstance(rating_content.total_reviews, int), f"Total reviews should be an int, got {type(rating_content.total_reviews)}"
-    assert len(rating_content.explanation) > 0, "Should have an explanation for the rating"
+    assert isinstance(product_rating_stuff.overall_rating, float), f"Rating should be a float, got {type(product_rating_stuff.overall_rating)}"
+    assert isinstance(product_rating_stuff.total_reviews, int), f"Total reviews should be an int, got {type(product_rating_stuff.total_reviews)}"
+    assert len(product_rating_stuff.explanation) > 0, "Should have an explanation for the rating"

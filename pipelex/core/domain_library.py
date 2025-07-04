@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from pydantic import Field, RootModel
+from pydantic import RootModel
 from typing_extensions import override
 
 from pipelex import log
@@ -13,14 +13,18 @@ DomainLibraryRoot = Dict[str, Domain]
 
 
 class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
-    root: DomainLibraryRoot = Field(default_factory=dict)
-
+    @override
     def validate_with_libraries(self):
         pass
 
     def reset(self):
         self.root = {}
 
+    @classmethod
+    def make_empty(cls):
+        return cls(root={})
+
+    @override
     def add_domain_details(self, domain: Domain):
         domain_code = domain.code
         if existing_domain := self.root.get(domain_code):

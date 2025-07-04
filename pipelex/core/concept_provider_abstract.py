@@ -1,10 +1,15 @@
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Dict, List, Optional, Type
 
+from pydantic import Field
+
 from pipelex.core.concept import Concept
+
+ConceptLibraryRoot = Dict[str, Concept]
 
 
 class ConceptProviderAbstract(ABC):
+    root: ConceptLibraryRoot = Field(default_factory=dict)
     _instance: ClassVar[Optional["ConceptProviderAbstract"]] = None
 
     @abstractmethod
@@ -53,4 +58,20 @@ class ConceptProviderAbstract(ABC):
 
     @abstractmethod
     def is_concept_code_legal(self, concept_code: str) -> bool:
+        pass
+
+    @abstractmethod
+    def add_new_concept(self, concept: Concept) -> None:
+        pass
+
+    @abstractmethod
+    def add_concepts(self, concepts: List[Concept]) -> None:
+        pass
+
+    @abstractmethod
+    def validate_with_libraries(self) -> None:
+        pass
+
+    @abstractmethod
+    def is_native_concept(self, concept_str: str) -> bool:
         pass

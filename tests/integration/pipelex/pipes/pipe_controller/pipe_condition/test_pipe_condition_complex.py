@@ -63,7 +63,10 @@ class TestPipeConditionComplex:
 
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
-        assert "URGENT_TECHNICAL_PROCESSED" in final_result.content.text
+        if pipe_run_mode != PipeRunMode.DRY:
+            assert "URGENT_TECHNICAL_PROCESSED" in final_result.content.text
+        else:
+            assert "DRY RUN" in final_result.content.text
 
     async def test_business_finance_routing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test business document for finance department routing."""

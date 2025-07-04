@@ -146,6 +146,11 @@ class TestPipeRunningVariants:
         expected_error_message: str,
     ):
         pipe_code = "infinite_loop_1"
+        from pipelex.libraries.library_manager import LibraryManager
+
+        library_manager = LibraryManager()
+        library_manager.load_failure_modes()
+
         log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
         with pytest.raises(exception) as exc:
             await get_pipe_router().run_pipe_code(

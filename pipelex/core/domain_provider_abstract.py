@@ -26,3 +26,11 @@ class DomainProviderAbstract(ABC):
     @abstractmethod
     def teardown(self) -> None:
         pass
+
+    @abstractmethod
+    def add_domain_details(self, domain: Domain) -> None:
+        pass
+
+    @abstractmethod
+    def validate_with_libraries(self) -> None:
+        pass

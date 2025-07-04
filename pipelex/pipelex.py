@@ -18,6 +18,9 @@ from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
 from pipelex.config import PipelexConfig, get_config
+from pipelex.core.concept_library import ConceptLibrary
+from pipelex.core.domain_library import DomainLibrary
+from pipelex.core.pipe_library import PipeLibrary
 from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
@@ -144,10 +147,10 @@ class Pipelex:
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
 
         # pipelex libraries
+        self.pipelex_hub.set_domain_provider(domain_provider=DomainLibrary.make_empty())
+        self.pipelex_hub.set_concept_provider(concept_provider=ConceptLibrary.make_empty())
+        self.pipelex_hub.set_pipe_provider(pipe_provider=PipeLibrary.make_empty())
         self.library_manager = LibraryManager()
-        self.pipelex_hub.set_domain_provider(domain_provider=self.library_manager.domain_library)
-        self.pipelex_hub.set_concept_provider(concept_provider=self.library_manager.concept_library)
-        self.pipelex_hub.set_pipe_provider(pipe_provider=self.library_manager.pipe_library)
 
         # pipelex pipeline
         self.pipeline_tracker: PipelineTrackerProtocol
