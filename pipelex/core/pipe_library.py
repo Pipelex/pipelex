@@ -42,7 +42,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
                 pipe.validate_with_libraries()
             except (ConceptLibraryConceptNotFoundError, PipeLibraryPipeNotFoundError) as not_found_error:
                 raise PipeLibraryError(f"Missing dependency for pipe '{pipe.code}': {not_found_error}") from not_found_error
-        # asyncio.run(self.dry_run_all_pipes())
+        asyncio.run(self.dry_run_all_pipes())
 
     @classmethod
     def make_empty(cls):

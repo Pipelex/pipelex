@@ -1,5 +1,7 @@
 """Test pipe sequence functionality with batching operations."""
 
+from typing import cast
+
 import pytest
 
 from pipelex import log
@@ -61,7 +63,9 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     pipe_output.working_memory.pretty_print_summary()
 
     # Verify final product rating
-    product_rating_stuff = pipe_output.working_memory.get_stuff_as("product_rating", ProductRating)
+    stuff = pipe_output.working_memory.get_stuff("product_rating")
+    # Use cast to tell the type system what we know about the object
+    product_rating_stuff = cast(ProductRating, stuff.content)
     assert product_rating_stuff is not None
 
     # Check that the ProductRating has meaningful values
