@@ -22,3 +22,4 @@ prompt_template = """Add the prefix "SHORT: " to the beginning of the following 
 @input_text.text
 
 Return only the prefixed text, nothing else."""
+

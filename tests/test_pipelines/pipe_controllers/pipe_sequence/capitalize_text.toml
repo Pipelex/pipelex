@@ -21,3 +21,4 @@ prompt_template = """Add the prefix "PROCESSED: " to the beginning of the follow
 @capitalized_text.text
 
 Return only the prefixed text, nothing else."""
+

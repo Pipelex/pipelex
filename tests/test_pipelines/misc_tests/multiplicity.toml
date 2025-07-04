@@ -65,3 +65,4 @@ steps = [
     { pipe = "imagine_nature_product", result = "product_of_nature" },
     { pipe = "imagine_fantasy_scene_including_products_of_nature", result = "imgg_prompt" },
 ]
+

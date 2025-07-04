@@ -2,7 +2,8 @@ import asyncio
 from typing import Any, Coroutine, List, Optional, Set, cast
 
 import shortuuid
-from typing_extensions import override
+from pydantic import model_validator
+from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import get_config
@@ -29,13 +30,41 @@ class PipeBatch(PipeController):
     def pipe_dependencies(self) -> Set[str]:
         return set([self.branch_pipe_code])
 
+    @model_validator(mode="after")
+    def validate_required_variables(self) -> Self:
+        # Skip for now
+        return self
+
+    @override
+    def validate_with_libraries(self):
+        self._validate_required_variables()
+
+    def _validate_required_variables(self) -> Self:
+        # Now check that the required vairables ARE in the inputs of the pipe
+        required_variables = self.required_variables()
+        for variable_name in required_variables:
+            if variable_name not in self.inputs.root.keys():
+                raise PipeInputError(f"Input '{variable_name}' of pipe '{self.code}' is not in the inputs of the pipe '{self.branch_pipe_code}'")
+        return self
+
     @override
     def required_variables(self) -> Set[str]:
-        return set()
+        required_variables: Set[str] = set()
+        # 1. Check that the inputs of the pipe branch_pipe_code are in the inputs of the pipe
+        pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
+        for variable_name, _ in pipe.inputs.items:
+            required_variables.add(variable_name)
+        # 2. Check that the input_item_stuff_name is in the inputs of the pipe
+        if self.batch_params and self.batch_params.input_item_stuff_name:
+            required_variables.add(self.batch_params.input_item_stuff_name)
+        return required_variables
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        return PipeInputSpec.make_empty()
+        needed_inputs = PipeInputSpec.make_empty()
+        for variable_name, concept_code in self.inputs.items:
+            needed_inputs.add_requirement(variable_name, concept_code)
+        return needed_inputs
 
     async def _run_batch_pipe(
         self,

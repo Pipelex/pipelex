@@ -3,12 +3,17 @@ definition = "Simple pipes for testing PipeBatch integration"
 
 [concept]
 UppercaseText = "Text that has been transformed to uppercase"
-
-# [concept.TextList]
-# Concept = "List of Text"
-# structure = "ListContent"
+TextList = "List of Text"
 
 [pipe]
+[pipe.test_pipe_batch]
+PipeBatch = "Test pipe batch"
+inputs = { text_item = "Text", text_list = "TextList" }
+output = "UppercaseText"
+branch_pipe_code = "uppercase_transformer"
+input_list_name = "text_list"
+input_item_name = "text_item"
+
 [pipe.uppercase_transformer]
 PipeLLM = "Transform text to uppercase"
 inputs = { text_item = "Text" }
@@ -21,10 +26,3 @@ Transform the following text to uppercase and add the prefix "UPPER: ":
 Just return the transformed text, nothing else.
 """
 
-# [pipe.test_pipe_batch]
-# PipeBatch = "Test pipe batch"
-# inputs = { text_item = "Text", text_list = "TextList" }
-# output = "UppercaseText"
-# branch_pipe_code = "uppercase_transformer"
-# input_list_name = "text_list"
-# input_item_name = "text_item"

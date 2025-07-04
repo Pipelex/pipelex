@@ -11,3 +11,4 @@ This is a simple test prompt:
 """
 prompting_style = { tag_style = "square_brackets", text_format = "markdown" }
 template_category = "llm_prompt"
+

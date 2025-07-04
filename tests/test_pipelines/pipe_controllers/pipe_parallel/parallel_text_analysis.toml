@@ -32,3 +32,4 @@ prompt_template = """Extract the top 3 keywords from the following text. Return 
 @input_text.text
 
 Keywords:"""
+
