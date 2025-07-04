@@ -33,7 +33,7 @@ class PipeAbstract(ABC, BaseModel):
         return self.__class__.__name__
 
     def validate_with_libraries(self):
-        """ 
+        """
         Validate the pipe with the libraries, after the static validation
         """
         pass
