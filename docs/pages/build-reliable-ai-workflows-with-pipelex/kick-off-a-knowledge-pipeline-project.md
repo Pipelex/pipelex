@@ -151,4 +151,4 @@ your-project/
 └── requirements.txt           # Python dependencies
 ```
 
-The `pipelex_libraries` directory is where Pipelex looks for your pipeline definitions. This standardized structure means you can share libraries between projects, version control them separately, and maintain clean separation between your pipeline logic and application code.
+The `pipelex_libraries/pipelines` directory is where Pipelex looks for your pipeline definitions. This standardized structure means you can share libraries between projects, version control them separately, and maintain clean separation between your pipeline logic and application code.

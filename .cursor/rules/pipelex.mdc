@@ -1,21 +1,446 @@
 ---
-description: 
-globs: 
-alwaysApply: false
+alwaysApply: true
 ---
-Rules to write pipes:
+# Pipeline Guide
 
-- To write pipelines: [pipes.mdc](mdc:.cursor/rules/pipes.mdc)
+- Always first write your "plan" in natural langage, then transcribe it in pipelex.
+- You should ALWAYS RUN the terminal command `pipelex validate` when you are writing a `.toml` file. It will ensure the pipe is runnable. If not, iterate.
+- Please use POSIX standard for files. (enmpty lines, no trailing whitespaces, etc.)
 
-- To write the structure classes for concepts used in pipes with structured generations, check out:
-[structures.mdc](mdc:.cursor/rules/structures.mdc)
+# Pipeline Structure Guide
 
-- To write prompts using our telmplating syntax, check out:
-[prompt-templates.mdc](mdc:.cursor/rules/prompt-templates.mdc)
+## Pipeline File Naming
+- Files must be `.toml` for pipelines (Always add an empty line at the end of the file, and do not add trailing whitespaces to TOML files at all)
+- Files must be `.py` for structures
+- Use descriptive names in `snake_case`
 
-- To choose an llm preset or define a new one, check out:
-[llms.mdc](mdc:.cursor/rules/llms.mdc)
+## Pipeline File Structure
+A pipeline file has three main sections:
+1. Domain statement
+2. Concept definitions
+3. Pipe definitions
 
-# Important tip
+### Domain Statement
+```toml
+domain = "domain_name"
+definition = "Description of the domain" # Optional
+```
+Note: The domain name usually matches the toml filename for single-file domains. For multi-file domains, use the subdirectory name.
 
-Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.
+### Concept Definitions
+```toml
+[concept]
+ConceptName = "Description of the concept" # Should be the same name as the Structure ClassName you want to output
+```
+
+Important Rules:
+- Use PascalCase for concept names
+- Never use plurals (no "Stories", use "Story")
+- Avoid adjectives (no "LargeText", use "Text")
+- Don't redefine native concepts (Text, Image, PDF, TextAndImages, Number)
+yes 
+### Pipe Definitions
+
+## Pipe Base Structure
+
+```toml
+[pipe.your_pipe_name]
+PipeLLM = "A description of what your pipe does"
+inputs = { input_1 = "ConceptName1", input_2 = "ConceptName2" }
+output = "ConceptName"
+```
+
+DO NOT WRITE:
+```toml
+[pipe.your_pipe_name]
+type = "pipe_sequence"
+```
+
+But it should be:
+
+```toml
+[pipe.your_pipe_name]
+PipeSequence = "....."
+```
+
+The pipes will all have at least this base structure. 
+- `inputs`: Dictionnary of key behing the variable used in the prompts, and the value behing the ConceptName. It should ALSO LIST THE INPUTS OF THE INTERMEDIATE STEPS (if pipeSequence) or of the conditionnal pipes (if pipeCondition).
+So If you have this error:
+`StaticValidationError: missing_input_variable • domain='expense_validator' • pipe='validate_expense' • 
+variable='['ocr_input']'``
+That means that the pipe validate_expense is missing the input `ocr_input` because one of the subpipe is needing it.
+
+NEVER WRITE THE INPUTS BY BREAKING THE LINE LIKE THIS:
+<NEVER DO THIS>
+```toml
+inputs = {
+    input_1 = "ConceptName1",
+    input_2 = "ConceptName2"
+}
+```
+</NEVER DO THIS>
+
+- `output`: The name of the concept to output. The `ConceptName` should have the same name as the python class if you want structured output:
+
+# Structured Models Rules
+
+## Model Location and Registration
+
+- Create models for structured generations related to "some_domain" in `pipelex_libraries/pipelines/<some_domain>.py`
+- Models must inherit from `StructuredContent` or appropriate content type
+
+## Model Structure
+
+Concepts and their structure classes are meant to indicate an idea.
+A Concept MUST NEVER be a plural noun and you should never create a SomeConceptList: lists and arrays are implicitly handled by Pipelex according to the context. Just define SomeConcept.
+
+```python
+from datetime import datetime
+from typing import List, Optional
+from pydantic import Field
+
+from pipelex.core.stuff_content import StructuredContent
+
+# IMPORTANT: THE CLASS MUST BE A SUBCLASS OF StructuredContent
+class YourModel(StructuredContent): # Always be a subclass of StructuredContent
+    # Required fields
+    field1: str
+    field2: int
+
+    # Optional fields with defaults
+    field3: Optional[str] = Field(None, "Description of field3")
+    field4: List[str] = Field(default_factory=list)
+
+    # Date fields should remove timezone
+    date_field: Optional[datetime] = None
+```
+## Usage
+
+Structures are meant to indicate what class to use for a particular Concept. In general they use the same name as the concept.
+
+Structure classes defined within `pipelex_libraries/pipelines/` are automatically loaded into the class_registry when setting up Pipelex, no need to do it manually.
+
+
+## Best Practices for structures
+
+- Respect Pydantic v2 standards
+- Use type hints for all fields
+- Use `Field` declaration and write the description
+
+
+## Pipe Controllers and Pipe Operator
+
+Look at the Pipes we have in order to adapt it. Pipes are organized in two categories:
+
+1. **Controllers** - For flow control:
+   - `PipeSequence` - For creating a sequence of multiple steps
+   - `PipeCondition` - If the next pipe depends of the expression of a stuff in the working memory
+   - `PipeParallel` - For parallelizing pipes
+   - `PipeBatch` - For running pipes in Batch over a ListContent
+
+2. **Operators** - For specific tasks:
+   - `PipeLLM` - Generate Text and Objects (include Vision LLM)
+   - `PipeOcr` - OCR Pipe
+   - `PipeImgGen` - Generate Images
+   - `PipeFunc` - For running classic python scripts
+
+# PipeSequence Guide
+
+## Purpose
+PipeSequence executes multiple pipes in a defined order, where each step can use results from previous steps.
+
+## Basic Structure
+```toml
+[pipe.your_sequence_name]
+PipeSequence = "Description of what this sequence does"
+inputs = { input_name = "InputType" } # All the inputs of the sub pipes, except the ones generated by intermediate steps
+output = "OutputType"
+steps = [
+    { pipe = "first_pipe", result = "first_result" },
+    { pipe = "second_pipe", result = "second_result" },
+    { pipe = "final_pipe", result = "final_result" }
+]
+```
+
+## Key Components
+
+1. **Steps Array**: List of pipes to execute in sequence
+   - `pipe`: Name of the pipe to execute
+   - `result`: Name to assign to the pipe's output that will be in the working memory
+
+## Using PipeBatch in Steps
+
+You can use PipeBatch functionality within steps using `batch_over` and `batch_as`:
+
+```toml
+steps = [
+    { pipe = "process_items", batch_over = "input_list", batch_as = "current_item", result = "processed_items"
+    }
+]
+```
+
+1. **batch_over**: Specifies a `ListContent` field to iterate over. Each item in the list will be processed individually and IN PARALLEL by the pipe.
+   - Must be a `ListContent` type containing the items to process
+   - Can reference inputs or results from previous steps
+
+2. **batch_as**: Defines the name that will be used to reference the current item being processed
+   - This name can be used in the pipe's input mappings
+   - Makes each item from the batch available as a single element
+
+The result of a batched step will be a `ListContent` containing the outputs from processing each item.
+
+# PipeCondition Controller
+
+The PipeCondition controller allows you to implement conditional logic in your pipeline, choosing which pipe to execute based on an evaluated expression. It supports both direct expressions and expression templates.
+
+## Usage in TOML Configuration
+
+### Basic Usage with Direct Expression
+
+```toml
+[pipe.conditional_operation]
+PipeCondition = "A conditonal pipe to decide wheter..."
+inputs = { input_data = "CategoryInput" }
+output = "native.Text"
+expression = "input_data.category"
+
+[pipe.conditional_operation.pipe_map]
+small = "process_small"
+medium = "process_medium"
+large = "process_large"
+```
+or
+```toml
+[pipe.conditional_operation]
+PipeCondition = "A conditonal pipe to decide wheter..."
+inputs = { input_data = "CategoryInput" }
+output = "native.Text"
+expression_template = "{{ input_data.category }}" # Jinja2 code
+
+[pipe.conditional_operation.pipe_map]
+small = "process_small"
+medium = "process_medium"
+large = "process_large"
+```
+
+## Key Parameters
+
+- `expression`: Direct boolean or string expression (mutually exclusive with expression_template)
+- `expression_template`: Jinja2 template for more complex conditional logic (mutually exclusive with expression)
+- `pipe_map`: Dictionary mapping expression results to pipe codes : 
+1 - The key on the left (`small`, `medium`) is the result of `expression` or `expression_template`.
+2 - The value on the right (`process_small`, `process_medium`, ..) is the name of the pipce to trigger
+
+# PipeBatch Controller
+
+The PipeBatch controller allows you to apply a pipe operation to each element in a list of inputs in parallele. It is created via a PipeSequence.
+
+## Usage in TOML Configuration
+
+```toml
+[pipe.sequence_with_batch]
+PipeSequence = "A Sequence of pipes"
+inputs = { input_data = "ConceptName" }
+output = "OutputConceptName"
+steps = [
+    { pipe = "pipe_to_apply", batch_over = "input_list", batch_as = "current_item", result = "batch_results" }
+]
+```
+
+## Key Parameters
+
+- `pipe`: The pipe operation to apply to each element in the batch
+- `batch_over`: The name of the list in the context to iterate over
+- `batch_as`: The name to use for the current element in the pipe's context
+- `result`: Where to store the results of the batch operation
+
+# PipeLLM Guide
+
+## Purpose
+
+PipeLLM is used to:
+1. Generate text or objects with LLMs
+2. Process images with Vision LLMs
+
+## Basic Usage
+
+### Simple Text Generation
+```toml
+[pipe.write_story]
+PipeLLM = "Write a short story"
+output = "Text"
+prompt_template = """
+Write a short story about a programmer.
+"""
+```
+
+### Structured Data Extraction
+```toml
+[pipe.extract_info]
+PipeLLM = "Extract information"
+inputs = { text = "Text" }
+output = "PersonInfo"
+prompt_template = """
+Extract person information from this text:
+@text
+"""
+```
+
+### System Prompts
+Add system-level instructions:
+```toml
+[pipe.expert_analysis]
+PipeLLM = "Expert analysis"
+output = "Analysis"
+system_prompt = "You are a data analysis expert"
+prompt_template = "Analyze this data"
+```
+
+### Multiple Outputs
+Generate multiple results:
+```toml
+[pipe.generate_ideas]
+PipeLLM = "Generate ideas"
+output = "Idea"
+nb_output = 3  # Generate exactly 3 ideas
+# OR
+multiple_output = true  # Let the LLM decide how many to generate
+```
+
+### Vision Tasks
+Process images with VLMs:
+```toml
+[pipe.analyze_image]
+PipeLLM = "Analyze image"
+inputs = { image = "Image" } # `image` is the name of the stuff that contains the Image. If its in a stuff, you can add something like `{ "page.image": "Image" }
+output = "ImageAnalysis"
+prompt_template = "Describe what you see in this image"
+```
+
+# PipeOCR Guide
+
+## Purpose
+
+Extract text and images from an image or a PDF
+
+## Basic Usage
+
+### Simple Text Generation
+```toml
+[pipe.extract_info]
+PipeOcr = "extract the information"
+inputs = { ocr_input = "PDF" } # or { ocr_input = "Image" } if its an image. This is the only input
+output = "Page"
+```
+
+The input ALWAYS HAS TO BE `ocr_input` and the value is either of concept `Image` or `Pdf`.
+
+The output concept `Page` is a native concept, with the structure `PageContent`:
+It corresponds to 1 page. Therefore, the PipeOcr is outputing a `ListContent` of `Page`
+
+```python
+class TextAndImagesContent(StuffContent):
+    text: Optional[TextContent]
+    images: Optional[List[ImageContent]]
+
+class PageContent(StructuredContent): # CONCEPT IS "Page"
+    text_and_images: TextAndImagesContent
+    page_view: Optional[ImageContent] = None
+```
+- `text_and_images` are the text, and the related images found in the input image or PDF.
+- `page_view` is the screenshot of the whole pdf page/image.
+
+This rule explains how to write prompt templates in PipeLLM definitions.
+
+## Insert stuff inside a tagged block
+
+If the inserted text is supposedly long text, made of several lines or paragraphs, you want it inserted inside a block, possibly a block tagged and delimlited with proper syntax as one would do in a markdown documentation. To include stuff as a block, use the "@" prefix.
+
+Example template:
+```toml
+prompt_template = """
+Match the expense with its corresponding invoice:
+
+@expense
+
+@invoices
+"""
+```
+In this example, the expense data and the invoices data are obviously made of several lines each, that's why it makes sense to use the "@" prefix in order to have them delimited inside a block. Note that our preprocessor will automatically include the block's title, so it doens't need to be explictly written in the prompt template.
+
+**DO NOT write things like "Here is the expense: @expense".**
+**DO write simply "@expense" alone in an isolated line.**
+
+## Insert stuff inline
+
+If the inserted text is short text and it makes sense to have it inserted directly into a sentence, you want it inserted inline. To insert stuff inline, use the "$" prefix. This will insert the stuff without delimiters and the content will be rendered as plain text.
+
+Example template:
+```toml
+prompt_template = """
+Your goal is to summarize everything related to $topic in the provided text:
+
+@text
+
+Please provide only the summary, with no additional text or explanations.
+Your summary should not be longer than 2 sentences.
+"""
+```
+
+Here, $topic will be inserted inline, whereas @text will be a a delimited block.
+Be sure to make the proper choice of prefix for each insertion.
+
+**DO NOT write "$topic" alone in an isolated line.**
+**DO write things like "Write an essay about $topic" included in an actual sentence.**
+
+# Example to start a pipe when its done
+
+Here is an example of how to start a pipe:
+```python
+import asyncio
+
+from pipelex import pretty_print
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.hub import get_pipeline_tracker, get_report_delegate
+from pipelex.pipelex import Pipelex
+from pipelex.core.stuff_factory import StuffFactory
+from pipelex.pipeline.execute import execute_pipeline
+
+from pipelex_libraries.pipelines.examples.extract_gantt.gantt import GanttChart
+
+SAMPLE_NAME = "extract_gantt"
+IMAGE_URL = "assets/gantt/gantt_tree_house.png"
+
+
+async def extract_gantt(image_url: str) -> GanttChart:
+    # Create Working Memory
+    stuff = StuffFactory.make_from_image(
+        image_url=image_url,
+        concept_str="gantt.GanttImage",
+        name="gantt_chart_image",
+    )
+    working_memory = WorkingMemoryFactory.make_from_multiple_stuff([stuff])
+
+    # Run the pipe
+    pipe_output = await execute_pipeline(
+        pipe_code="extract_gantt_by_steps",
+        working_memory=working_memory,
+    )
+    # Output the result
+    return pipe_output.main_stuff_as(content_type=GanttChart)
+
+
+# start Pipelex
+Pipelex.make()
+
+# run sample using asyncio
+gantt_chart = asyncio.run(extract_gantt(IMAGE_URL))
+
+# Display cost report (tokens used and cost)
+get_report_delegate().generate_report()
+# output results
+pretty_print(gantt_chart, title="Gantt Chart")
+get_pipeline_tracker().output_flowchart()
+```
+
+ALWAYS RUN `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate until it works.

@@ -53,23 +53,23 @@ output = "ConceptName"
 
 The pipes will all have at least this base structure. 
 - `inputs`: Dictionnary of key behing the variable used in the prompts, and the value behing the ConceptName
-- `output`: The name of the concept to output. The `ConceptName` should have the same name as the python class if you want structured output. Look on how to do that here: [structures.mdc](mdc:.cursor/rules/structures.mdc)
+- `output`: The name of the concept to output. The `ConceptName` should have the same name as the python class if you want structured output. Look on how to do that here: [structures.mdc](structures.mdc)
 
 ## Pipe Controllers and Pipe Operator
 
 Look at the Pipes we have in order to adapt it. Pipes are organized in two categories:
 
 1. **Controllers** - For flow control:
-   - `PipeSequence` - See [pipe-sequence.mdc](mdc:.cursor/rules/pipe-sequence.mdc): For creating a sequence of multiple steps
-   - `PipeCondition` - See [pipe-condition.mdc](mdc:.cursor/rules/pipe-condition.mdc): If the next pipe depends of the expression of a stuff in the working memory
-   - `PipeParallel` - See [pipe-parallel.mdc](mdc:.cursor/rules/pipe-parallel.mdc): For parallelizing pipes
-   - `PipeBatch` - See [pipe-batch.mdc](mdc:.cursor/rules/pipe-batch.mdc): For running pipes in Batch over a ListContent
+   - `PipeSequence` - See [pipe-sequence.mdc](pipe-sequence.mdc): For creating a sequence of multiple steps
+   - `PipeCondition` - See [pipe-condition.mdc](pipe-condition.mdc): If the next pipe depends of the expression of a stuff in the working memory
+   - `PipeParallel` - See [pipe-parallel.mdc](pipe-parallel.mdc): For parallelizing pipes
+   - `PipeBatch` - See [pipe-batch.mdc](pipe-batch.mdc): For running pipes in Batch over a ListContent
 
 2. **Operators** - For specific tasks:
-   - `PipeLLM` - See [pipe-llm.mdc](mdc:.cursor/rules/pipe-llm.mdc): Generate Text and Objects (include Vision LLM)
-   - `PipeOcr` - See [pipe-ocr.mdc](mdc:.cursor/rules/pipe-ocr.mdc): OCR Pipe
-   - `PipeImgGen` - See [pipe-imgg.mdc](mdc:.cursor/rules/pipe-imgg.mdc): Generate Images
-   - `PipeFunc` - See [pipe-func.mdc](mdc:.cursor/rules/pipe-func.mdc): For running classic python scripts
+   - `PipeLLM` - See [pipe-llm.mdc](pipe-llm.mdc): Generate Text and Objects (include Vision LLM)
+   - `PipeOcr` - See [pipe-ocr.mdc](pipe-ocr.mdc): OCR Pipe
+   - `PipeImgGen` - See [pipe-imgg.mdc](pipe-imgg.mdc): Generate Images
+   - `PipeFunc` - See [pipe-func.mdc](pipe-func.mdc): For running classic python scripts
 
 When building a pipeline:
 1. Always define controllers first, then operators

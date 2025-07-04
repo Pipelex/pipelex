@@ -10,7 +10,7 @@ This document outlines our test-driven development (TDD) process and the tools a
 ## TDD Cycle
 
 1. **Write a Test First**
-[pytest.mdc](mdc:.cursor/rules/pytest.mdc)
+[pytest.mdc](pytest.mdc)
 
 2. **Write the Code**
    - Implement the minimum amount of code needed to pass the test
@@ -18,10 +18,10 @@ This document outlines our test-driven development (TDD) process and the tools a
    - Keep it simple - don't write more than needed
 
 3. **Run Linting and Type Checking**
-[standards.mdc](mdc:.cursor/rules/standards.mdc)
+[standards.mdc](standards.mdc)
 
 4. **Refactor if needed**
-If the code needs refactoring, with the best practices [best_practices.mdc](mdc:.cursor/rules/best_practices.mdc)
+If the code needs refactoring, with the best practices [best_practices.mdc](best_practices.mdc)
 
 5. **Validate tests**
 

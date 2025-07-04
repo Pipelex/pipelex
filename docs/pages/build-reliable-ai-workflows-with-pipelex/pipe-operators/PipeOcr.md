@@ -26,7 +26,7 @@ The `PageContent` object has the following structure:
 | Parameter                   | Type    | Description                                                                                                                              | Required |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `PipeOcr`                   | string  | A descriptive name for the OCR operation.                                                                           | Yes      |
-| `inputs`                    | dictionary  | The input concept(s) for the OCR operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
+| `inputs`                    | Fixed  | The input for the PipeOcr is the key `ocr_input` and the value is either of concept `Image` or `Pdf`.                                                     | Yes       |
 | `output`                    | string  | The output concept produced by the OCR operation.                                                | Yes      |
 | `should_include_images`     | boolean | If `true`, any images found within the document pages will be extracted and included in the output. Defaults to `false`.                 | No       |
 | `should_include_page_views` | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
@@ -44,7 +44,7 @@ ExtractedPages = "A list of pages extracted from a document by OCR"
 
 [pipe.extract_text_from_document]
 PipeOcr = "Extract text from a scanned document"
-inputs = { document = "ScannedDocument" }
+inputs = { ocr_input = "ScannedDocument" }
 output = "ExtractedText"
 should_include_page_views = true
 page_views_dpi = 200

@@ -86,7 +86,7 @@ class LibraryManager:
     def load_libraries(self):
         log.debug("LibraryManager loading separate libraries")
         library_paths = self.libraries_paths()
-        self._validate_toml_files()
+        # self._validate_toml_files()
         for library_path in library_paths:
             ClassRegistryUtils.register_classes_in_folder(
                 folder_path=library_path,

@@ -53,6 +53,35 @@ def validate_toml_file(path: str) -> None:
         _validate_toml_content(content, path)
 
 
+def _clean_trailing_whitespace(content: str) -> str:
+    """Clean trailing whitespace from TOML content.
+    
+    This function:
+    1. Removes trailing whitespace from all lines
+    2. Ensures exactly one empty line at EOF (two newline characters)
+    3. If no empty line at EOF, removes trailing whitespace from last non-empty line
+    
+    Args:
+        content: The TOML content to clean
+        
+    Returns:
+        The cleaned TOML content with trailing whitespace removed and an empty line at EOF
+    """
+    # Split into lines and clean each line
+    lines = [line.rstrip() for line in content.splitlines()]
+    
+    # Remove trailing empty lines
+    while lines and not lines[-1]:
+        lines.pop()
+        
+    # If we have lines and the last line has trailing whitespace, remove it
+    if lines:
+        lines[-1] = lines[-1].rstrip()
+        
+    # Join with newlines and ensure an empty line at EOF (two newlines)
+    return "\n".join(lines) + "\n\n"
+
+
 def load_toml_from_path(path: str) -> Dict[str, Any]:
     """Load TOML from path.
 
@@ -67,8 +96,17 @@ def load_toml_from_path(path: str) -> Dict[str, Any]:
     """
     try:
         with open(path, "r", encoding="utf-8") as file:
-            dict_from_toml = toml.load(file)
-            return dict_from_toml
+            content = file.read()
+            
+        cleaned_content = _clean_trailing_whitespace(content)
+        
+        # If content changed, write it back
+        if content != cleaned_content:
+            with open(path, "w", encoding="utf-8") as file:
+                file.write(cleaned_content)
+                
+        dict_from_toml = toml.loads(cleaned_content)
+        return dict_from_toml
     except toml.TomlDecodeError as exc:
         raise toml.TomlDecodeError(f"TOML parsing error in file '{path}': {exc}", exc.doc, exc.pos) from exc
 
