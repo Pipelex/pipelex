@@ -24,9 +24,6 @@ class ClassRegistryUtils:
             include_imported=is_include_imported,
         )
 
-        # Clean up sys.modules to prevent memory leaks
-        del sys.modules[module.__name__]
-
         get_class_registry().register_classes(classes=classes_to_register)
 
     @classmethod

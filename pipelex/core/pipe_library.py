@@ -80,7 +80,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         # Get the list of pipes that are allowed to fail from config
         allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
 
-        log.info(f"Starting thread-based dry run for {len(pipes)} pipes...")
+        log.info(f"Starting dry run for {len(pipes)} pipes...")
 
         # Define a function that will run in a thread
         def run_pipe_in_thread(pipe: PipeAbstract) -> Tuple[str, str]:
@@ -140,7 +140,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         # Filter out pipes that are allowed to fail
         unexpected_failures = [pipe for pipe in failed_pipes if pipe not in allowed_to_fail_pipes]
 
-        log.info(f"Thread-based dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed")
+        log.info(f"Dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed, in {time.time() - start_time:.2f} seconds")
 
         if unexpected_failures:
             raise Exception(f"Dry run failed with {len(unexpected_failures)} unexpected pipe failures: {', '.join(unexpected_failures)}")
@@ -148,7 +148,6 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         if failed_pipes and not unexpected_failures:
             log.info("All failures were expected (allowed by config)")
 
-        log.info(f"Finished thread-based dry run in {time.time() - start_time:.2f} seconds")
         return results
 
     def _convert_to_working_memory_format(self, needed_inputs_spec: PipeInputSpec) -> List[Tuple[str, str, Type[StuffContent]]]:
