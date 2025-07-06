@@ -3,6 +3,7 @@ from typing import Optional
 
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.core.pipe_abstract import PipeAbstract, PipeType
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
@@ -33,6 +34,9 @@ class PipeOperator(PipeAbstract):
 
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
+                if self.class_name not in ["PipeJinja2", "PipeLLMPrompt"]:
+                    prefix = f"Running {self.class_name} pipe:".ljust(32)
+                    log.info(f"{prefix} '{self.code}'")
                 pipe_output = await self._run_operator_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
@@ -40,6 +44,8 @@ class PipeOperator(PipeAbstract):
                     output_name=output_name,
                 )
             case PipeRunMode.DRY:
+                prefix = f"Dry running {self.class_name} pipe:".ljust(32)
+                log.info(f"{prefix} '{self.code}'")
                 pipe_output = await self._dry_run_operator_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
