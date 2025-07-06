@@ -35,8 +35,12 @@ class PipeOperator(PipeAbstract):
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
                 if self.class_name not in ["PipeJinja2", "PipeLLMPrompt"]:
-                    prefix = f"Running {self.class_name} pipe:".ljust(32)
-                    log.info(f"{prefix} '{self.code}'")
+                    name = self.class_name
+                    indent_level = len(pipe_run_params.pipe_stack)
+                    indent = "   " * indent_level
+                    label = f"{indent}{name}: {self.code}".ljust(60)
+                    output = self.output_concept_code.split(".")[-1]
+                    log.info(f"{label} → {output}")
                 pipe_output = await self._run_operator_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
@@ -44,8 +48,12 @@ class PipeOperator(PipeAbstract):
                     output_name=output_name,
                 )
             case PipeRunMode.DRY:
-                prefix = f"Dry running {self.class_name} pipe:".ljust(32)
-                log.info(f"{prefix} '{self.code}'")
+                name = f"Dry {self.class_name}"
+                indent_level = len(pipe_run_params.pipe_stack)
+                indent = "   " * indent_level
+                label = f"{indent}{name}: {self.code}".ljust(60)
+                output = self.output_concept_code.split(".")[-1]
+                log.info(f"{label} → {output}")
                 pipe_output = await self._dry_run_operator_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
