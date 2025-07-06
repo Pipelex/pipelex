@@ -32,7 +32,7 @@ class PipeController(PipeAbstract):
 
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
-                indent_level = len(pipe_run_params.pipe_stack)
+                indent_level = len(pipe_run_params.pipe_stack) - 1
                 indent = "   " * indent_level
                 label = f"{indent}{self.class_name}: {self.code}".ljust(60)
                 output = self.output_concept_code.split(".")[-1]
@@ -45,7 +45,7 @@ class PipeController(PipeAbstract):
                 )
             case PipeRunMode.DRY:
                 name = f"Dry {self.class_name}"
-                indent_level = len(pipe_run_params.pipe_stack)
+                indent_level = len(pipe_run_params.pipe_stack) - 1
                 indent = "   " * indent_level
                 label = f"{indent}{name}: {self.code}".ljust(60)
                 output = self.output_concept_code.split(".")[-1]
