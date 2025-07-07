@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Type
 
-from pydantic import RootModel
+from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex import log
@@ -17,6 +17,8 @@ ConceptLibraryRoot = Dict[str, Concept]
 
 
 class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
+    root: ConceptLibraryRoot = Field(default_factory=dict)
+
     @override
     def validate_with_libraries(self):
         for concept in self.root.values():

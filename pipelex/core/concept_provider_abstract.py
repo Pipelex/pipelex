@@ -9,9 +9,6 @@ ConceptLibraryRoot = Dict[str, Concept]
 
 
 class ConceptProviderAbstract(ABC):
-    root: ConceptLibraryRoot = Field(default_factory=dict)
-    _instance: ClassVar[Optional["ConceptProviderAbstract"]] = None
-
     @abstractmethod
     def get_concept(self, concept_code: str) -> Optional[Concept]:
         pass

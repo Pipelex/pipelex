@@ -10,9 +10,12 @@ from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.config import get_config
 from pipelex.core.concept_factory import ConceptFactory
+from pipelex.core.concept_library import ConceptLibrary
 from pipelex.core.domain import Domain
+from pipelex.core.domain_library import DomainLibrary
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_blueprint import PipeSpecificFactoryProtocol
+from pipelex.core.pipe_library import PipeLibrary
 from pipelex.exceptions import (
     ConceptLibraryError,
     LibraryError,
@@ -58,12 +61,19 @@ class LibraryManager:
         "prompt_template_to_structure",
     ]
 
-    def __init__(self) -> None:
+    @classmethod
+    def make_empty(cls) -> "LibraryManager":
+        domain_library = DomainLibrary.make_empty()
+        concept_library = ConceptLibrary.make_empty()
+        pipe_library = PipeLibrary.make_empty()
+        return cls(domain_library=domain_library, concept_library=concept_library, pipe_library=pipe_library)
+
+    def __init__(self, domain_library: DomainLibrary, concept_library: ConceptLibrary, pipe_library: PipeLibrary) -> None:
         # TODO : avoid having an Option LLMDeck: regroup with model provider
         self.llm_deck: Optional[LLMDeck] = None
-        self.domain_library = get_domain_provider()
-        self.concept_library = get_concept_provider()
-        self.pipe_library = get_pipe_provider()
+        self.domain_library = domain_library
+        self.concept_library = concept_library
+        self.pipe_library = pipe_library
 
     def teardown(self) -> None:
         self.llm_deck = None
@@ -80,8 +90,7 @@ class LibraryManager:
 
     def load_failure_modes(self):
         failure_modes_path = get_config().pipelex.library_config.failure_modes_path
-        if failure_modes_path:
-            self._load_combo_libraries(library_paths=[Path(failure_modes_path)])
+        self.load_combo_libraries(library_paths=[Path(failure_modes_path)])
 
     def load_libraries(self):
         log.debug("LibraryManager loading separate libraries")
@@ -99,7 +108,7 @@ class LibraryManager:
         # remove failure_modes_path from the list
         failure_modes_path = get_config().pipelex.library_config.failure_modes_path
         toml_file_paths = [path for path in toml_file_paths if path != Path(failure_modes_path)]
-        self._load_combo_libraries(library_paths=toml_file_paths)
+        self.load_combo_libraries(library_paths=toml_file_paths)
 
     def load_deck(self) -> LLMDeck:
         llm_deck_paths = LibraryConfig.get_llm_deck_paths()
@@ -136,7 +145,7 @@ class LibraryManager:
             toml_file_paths.extend(found_file_paths)
         return toml_file_paths
 
-    def _load_combo_libraries(self, library_paths: List[Path]):
+    def load_combo_libraries(self, library_paths: List[Path]):
         log.debug("LibraryManager loading combo libraries")
         # Find all .toml files in the directories and their subdirectories
 

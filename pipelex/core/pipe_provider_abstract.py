@@ -9,9 +9,6 @@ PipeLibraryRoot = Dict[str, PipeAbstract]
 
 
 class PipeProviderAbstract(ABC):
-    root: PipeLibraryRoot = Field(default_factory=dict)
-    _instance: ClassVar[Optional["PipeProviderAbstract"]] = None
-
     @abstractmethod
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
         pass

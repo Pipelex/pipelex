@@ -1,9 +1,14 @@
+from pathlib import Path
 from typing import Any, Optional, Tuple, Type
 
 import pytest
 from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
+from pipelex.config import get_config
+from pipelex.core.concept_library import ConceptLibrary
+from pipelex.core.domain_library import DomainLibrary
+from pipelex.core.pipe_library import PipeLibrary
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
@@ -12,6 +17,7 @@ from pipelex.core.stuff_factory import StuffBlueprint
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
+from pipelex.libraries.library_manager import LibraryManager
 from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import PipeTestCases
@@ -145,11 +151,9 @@ class TestPipeRunningVariants:
         exception: Type[Exception],
         expected_error_message: str,
     ):
-        pipe_code = "infinite_loop_1"
-        from pipelex.libraries.library_manager import LibraryManager
-
-        library_manager = LibraryManager()
-        library_manager.load_failure_modes()
+        failure_modes_path = get_config().pipelex.library_config.failure_modes_path
+        library_manager = LibraryManager.make_empty()
+        library_manager.load_combo_libraries(library_paths=[Path(failure_modes_path)])
 
         log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
         with pytest.raises(exception) as exc:

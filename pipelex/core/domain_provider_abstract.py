@@ -5,8 +5,6 @@ from pipelex.core.domain import Domain
 
 
 class DomainProviderAbstract(ABC):
-    _instance: ClassVar[Optional["DomainProviderAbstract"]] = None
-
     @abstractmethod
     def get_domain(self, domain_code: str) -> Optional[Domain]:
         pass
