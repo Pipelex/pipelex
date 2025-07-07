@@ -12,8 +12,13 @@ from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import StuffContent, TextContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_class_registry, get_concept_provider
+from pipelex.hub import get_class_registry, get_concept_provider, get_pipe_provider
 from pipelex.pipeline.job_metadata import JobMetadata
+
+
+async def dry_run_all_pipes():
+    all_pipes = get_pipe_provider().get_pipes()
+    await dry_run_pipes(pipes=all_pipes)
 
 
 # TODO: add a function to dry run a single pipe, make it callable as a param of `pipelex validate`

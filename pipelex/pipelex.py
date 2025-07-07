@@ -1,4 +1,3 @@
-import asyncio
 from importlib.metadata import metadata
 from typing import Any, ClassVar, List, Optional, Type
 

@@ -12,7 +12,7 @@ from pipelex import log, pretty_print
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
 from pipelex.hub import get_pipe_provider
 from pipelex.libraries.library_config import LibraryConfig
-from pipelex.pipe_works.pipe_dry import dry_run_pipes
+from pipelex.pipe_works.pipe_dry import dry_run_all_pipes
 from pipelex.pipelex import Pipelex
 from pipelex.tools.config.manager import config_manager
 
@@ -81,8 +81,7 @@ def validate() -> None:
     LibraryConfig.export_libraries()
     pipelex_instance = Pipelex.make()
     pipelex_instance.validate_libraries()
-    all_pipes = pipelex_instance.library_manager.pipe_library.get_pipes()
-    asyncio.run(dry_run_pipes(pipes=all_pipes))
+    asyncio.run(dry_run_all_pipes())
     log.info("Setup sequence passed OK, config and pipelines are validated.")
 
 

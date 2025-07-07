@@ -1,7 +1,6 @@
 import pytest
 
-from pipelex.hub import get_pipe_provider
-from pipelex.pipe_works.pipe_dry import dry_run_pipes
+from pipelex.pipe_works.pipe_dry import dry_run_all_pipes
 from pipelex.pipelex import Pipelex
 
 
@@ -19,5 +18,4 @@ class TestFundamentals:
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_dry_run_all_pipes(self):
-        all_pipes = get_pipe_provider().get_pipes()
-        await dry_run_pipes(pipes=all_pipes)
+        await dry_run_all_pipes()
