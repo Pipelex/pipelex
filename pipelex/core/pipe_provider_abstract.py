@@ -30,11 +30,3 @@ class PipeProviderAbstract(ABC):
     @abstractmethod
     def pretty_list_pipes(self) -> None:
         pass
-
-    @abstractmethod
-    def add_new_pipe(self, pipe: PipeAbstract) -> None:
-        pass
-
-    @abstractmethod
-    def validate_with_libraries(self) -> None:
-        pass

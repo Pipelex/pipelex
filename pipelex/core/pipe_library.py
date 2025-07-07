@@ -16,7 +16,6 @@ PipeLibraryRoot = Dict[str, PipeAbstract]
 
 
 class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
-    @override
     def validate_with_libraries(self):
         concept_provider = get_concept_provider()
         for pipe in self.root.values():
@@ -38,7 +37,6 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     def make_empty(cls):
         return cls(root={})
 
-    @override
     def add_new_pipe(self, pipe: PipeAbstract):
         name = pipe.code
         pipe.inputs.set_default_domain(domain=pipe.domain)
