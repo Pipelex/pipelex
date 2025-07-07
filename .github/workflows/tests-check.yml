@@ -38,5 +38,8 @@ jobs:
       - name: Install dependencies
         run: PYTHON_VERSION=${{ matrix.python-version }} make install
 
+      - name: Boot test
+        run: make t TEST=TestBoot
+
       - name: Run tests
         run: make gha-tests
