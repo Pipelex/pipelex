@@ -7,6 +7,7 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff_content import StuffContent
 from pipelex.exceptions import ConceptCodeError, ConceptDomainError, ConceptError, StructureClassError
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
@@ -129,3 +130,11 @@ class Concept(BaseModel):
     @property
     def node_name(self) -> str:
         return self.code
+
+    @classmethod
+    def is_native_concept(cls, concept_str: str) -> bool:
+        if Concept.concept_str_contains_domain(concept_str=concept_str):
+            domain = Concept.extract_domain_from_str(concept_str=concept_str)
+            return domain == SpecialDomain.NATIVE.value
+        else:
+            return concept_str in NativeConcept.names()

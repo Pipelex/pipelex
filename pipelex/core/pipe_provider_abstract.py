@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, List, Optional
-
-from pydantic import Field
+from typing import Dict, List, Optional
 
 from pipelex.core.pipe_abstract import PipeAbstract
 
@@ -9,9 +7,6 @@ PipeLibraryRoot = Dict[str, PipeAbstract]
 
 
 class PipeProviderAbstract(ABC):
-    root: PipeLibraryRoot = Field(default_factory=dict)
-    _instance: ClassVar[Optional["PipeProviderAbstract"]] = None
-
     @abstractmethod
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
         pass
@@ -34,12 +29,4 @@ class PipeProviderAbstract(ABC):
 
     @abstractmethod
     def pretty_list_pipes(self) -> None:
-        pass
-
-    @abstractmethod
-    def add_new_pipe(self, pipe: PipeAbstract) -> None:
-        pass
-
-    @abstractmethod
-    def validate_with_libraries(self) -> None:
         pass

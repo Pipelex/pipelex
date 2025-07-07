@@ -5,14 +5,18 @@ from typing import Any, ClassVar, Dict, List, Optional, Type
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
 from kajson.kajson_manager import KajsonManager
 from pydantic import ValidationError
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.config import get_config
 from pipelex.core.concept_factory import ConceptFactory
+from pipelex.core.concept_library import ConceptLibrary
 from pipelex.core.domain import Domain
+from pipelex.core.domain_library import DomainLibrary
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_blueprint import PipeSpecificFactoryProtocol
+from pipelex.core.pipe_library import PipeLibrary
 from pipelex.exceptions import (
     ConceptLibraryError,
     LibraryError,
@@ -21,8 +25,8 @@ from pipelex.exceptions import (
     PipeLibraryError,
     StaticValidationError,
 )
-from pipelex.hub import get_concept_provider, get_domain_provider, get_pipe_provider
 from pipelex.libraries.library_config import LibraryConfig
+from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.json_utils import deep_update
@@ -49,7 +53,7 @@ class LibraryComponent(StrEnum):
                 return PipeLibraryError
 
 
-class LibraryManager:
+class LibraryManager(LibraryManagerAbstract):
     allowed_root_attributes: ClassVar[List[str]] = [
         "domain",
         "definition",
@@ -58,13 +62,25 @@ class LibraryManager:
         "prompt_template_to_structure",
     ]
 
-    def __init__(self) -> None:
+    @classmethod
+    def make_empty(cls) -> "LibraryManager":
+        domain_library = DomainLibrary.make_empty()
+        concept_library = ConceptLibrary.make_empty()
+        pipe_library = PipeLibrary.make_empty()
+        return cls(domain_library=domain_library, concept_library=concept_library, pipe_library=pipe_library)
+
+    def __init__(self, domain_library: DomainLibrary, concept_library: ConceptLibrary, pipe_library: PipeLibrary) -> None:
         # TODO : avoid having an Option LLMDeck: regroup with model provider
         self.llm_deck: Optional[LLMDeck] = None
-        self.domain_library = get_domain_provider()
-        self.concept_library = get_concept_provider()
-        self.pipe_library = get_pipe_provider()
+        self.domain_library = domain_library
+        self.concept_library = concept_library
+        self.pipe_library = pipe_library
 
+    @override
+    def setup(self) -> None:
+        pass
+
+    @override
     def teardown(self) -> None:
         self.llm_deck = None
         self.pipe_library.teardown()
@@ -79,9 +95,8 @@ class LibraryManager:
         return library_paths
 
     def load_failure_modes(self):
-        failure_modes_path = get_config().pipelex.library_config.failure_modes_path
-        if failure_modes_path:
-            self._load_combo_libraries(library_paths=[Path(failure_modes_path)])
+        failing_pipelines_path = get_config().pipelex.library_config.failing_pipelines_path
+        self.load_combo_libraries(library_paths=[Path(failing_pipelines_path)])
 
     def load_libraries(self):
         log.debug("LibraryManager loading separate libraries")
@@ -96,10 +111,10 @@ class LibraryManager:
         self.concept_library.add_concepts(concepts=native_concepts)
 
         toml_file_paths = self.list_toml_files_from_path(library_paths=library_paths)
-        # remove failure_modes_path from the list
-        failure_modes_path = get_config().pipelex.library_config.failure_modes_path
-        toml_file_paths = [path for path in toml_file_paths if path != Path(failure_modes_path)]
-        self._load_combo_libraries(library_paths=toml_file_paths)
+        # remove failing_pipelines_path from the list
+        failing_pipelines_path = get_config().pipelex.library_config.failing_pipelines_path
+        toml_file_paths = [path for path in toml_file_paths if path != Path(failing_pipelines_path)]
+        self.load_combo_libraries(library_paths=toml_file_paths)
 
     def load_deck(self) -> LLMDeck:
         llm_deck_paths = LibraryConfig.get_llm_deck_paths()
@@ -136,7 +151,8 @@ class LibraryManager:
             toml_file_paths.extend(found_file_paths)
         return toml_file_paths
 
-    def _load_combo_libraries(self, library_paths: List[Path]):
+    @override
+    def load_combo_libraries(self, library_paths: List[Path]):
         log.debug("LibraryManager loading combo libraries")
         # Find all .toml files in the directories and their subdirectories
 
@@ -282,6 +298,7 @@ class LibraryManager:
         if self.llm_deck is None:
             raise LibraryError("LLM deck is not loaded")
 
+        self.llm_deck.validate_llm_presets()
         LLMDeck.final_validate(deck=self.llm_deck)
         self.concept_library.validate_with_libraries()
         self.pipe_library.validate_with_libraries()

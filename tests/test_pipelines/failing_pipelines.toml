@@ -1,6 +1,6 @@
 
 
-domain = "failure_modes"
+domain = "failing_pipelines"
 
 [pipe]
 [pipe.dummy]

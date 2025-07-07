@@ -1,12 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from pipelex.core.domain import Domain
 
 
 class DomainProviderAbstract(ABC):
-    _instance: ClassVar[Optional["DomainProviderAbstract"]] = None
-
     @abstractmethod
     def get_domain(self, domain_code: str) -> Optional[Domain]:
         pass
@@ -25,12 +23,4 @@ class DomainProviderAbstract(ABC):
 
     @abstractmethod
     def teardown(self) -> None:
-        pass
-
-    @abstractmethod
-    def add_domain_details(self, domain: Domain) -> None:
-        pass
-
-    @abstractmethod
-    def validate_with_libraries(self) -> None:
         pass

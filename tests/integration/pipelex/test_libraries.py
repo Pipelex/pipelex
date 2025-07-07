@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex import pretty_print
+from pipelex.config import get_config
 from pipelex.core.concept_library import ConceptLibrary
 from pipelex.core.pipe_library import PipeLibrary
 from pipelex.libraries.library_manager import LibraryManager
@@ -89,7 +90,10 @@ class TestLibraries:
         known_concept: str,
         known_pipe: str,
     ):
-        library_manager = LibraryManager()
+        library_manager = LibraryManager.make_empty()
+        test_pipelines_path = get_config().pipelex.library_config.test_pipelines_path
+        test_library_paths = library_manager.list_toml_files_from_path(library_paths=[test_pipelines_path])
+        library_manager.load_combo_libraries(library_paths=test_library_paths)
         # Verify that libraries were loaded
         assert len(library_manager.concept_library.root) > 0, "No concepts were loaded"
         assert len(library_manager.pipe_library.root) > 0, "No pipes were loaded"

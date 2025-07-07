@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Type
 
-from pydantic import RootModel
+from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex import log
@@ -17,7 +17,8 @@ ConceptLibraryRoot = Dict[str, Concept]
 
 
 class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
-    @override
+    root: ConceptLibraryRoot = Field(default_factory=dict)
+
     def validate_with_libraries(self):
         for concept in self.root.values():
             for domain_concept_code in concept.refines:
@@ -82,14 +83,12 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     def list_concepts_by_domain(self, domain: str) -> List[Concept]:
         return [concept for key, concept in self.root.items() if key.startswith(f"{domain}.")]
 
-    @override
     def add_new_concept(self, concept: Concept):
         name = concept.code
         if name in self.root:
             raise ConceptLibraryError(f"Concept '{name}' already exists in the library")
         self.root[name] = concept
 
-    @override
     def add_concepts(self, concepts: List[Concept]):
         for concept in concepts:
             self.add_new_concept(concept=concept)
@@ -123,7 +122,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def get_required_concept(self, concept_code: str) -> Concept:
-        if self.is_native_concept(concept_str=concept_code):
+        if Concept.is_native_concept(concept_str=concept_code):
             if Concept.concept_str_contains_domain(concept_str=concept_code):
                 domain, concept_code = Concept.extract_domain_and_concept_from_str(concept_str=concept_code)
                 concept_code = f"{domain}.{concept_code}"
@@ -170,11 +169,3 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
         refines_image = self.is_compatible_by_concept_code(tested_concept_code=concept.code, wanted_concept_code=NativeConcept.IMAGE.code)
         return is_image_class or refines_image
-
-    @override
-    def is_native_concept(self, concept_str: str) -> bool:
-        if Concept.concept_str_contains_domain(concept_str=concept_str):
-            domain = Concept.extract_domain_from_str(concept_str=concept_str)
-            return domain == SpecialDomain.NATIVE.value
-        else:
-            return concept_str in NativeConcept.names()

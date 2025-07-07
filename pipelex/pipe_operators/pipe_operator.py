@@ -38,7 +38,7 @@ class PipeOperator(PipeAbstract):
                     name = self.class_name
                     indent_level = len(pipe_run_params.pipe_stack) - 1
                     indent = "   " * indent_level
-                    label = f"{indent}{name}: {self.code}".ljust(60)
+                    label = f"{indent}{name}: {self.code}".ljust(80)
                     output = self.output_concept_code.split(".")[-1]
                     log.info(f"{label} → {output}")
                 pipe_output = await self._run_operator_pipe(
@@ -51,7 +51,7 @@ class PipeOperator(PipeAbstract):
                 name = f"Dry {self.class_name}"
                 indent_level = len(pipe_run_params.pipe_stack) - 1
                 indent = "   " * indent_level
-                label = f"{indent}{name}: {self.code}".ljust(60)
+                label = f"{indent}{name}: {self.code}".ljust(80)
                 output = self.output_concept_code.split(".")[-1]
                 log.info(f"{label} → {output}")
                 pipe_output = await self._dry_run_operator_pipe(

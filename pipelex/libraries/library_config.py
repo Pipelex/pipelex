@@ -22,7 +22,7 @@ class LibraryConfig(ConfigModel):
     exported_templates_path: ClassVar[str] = f"{exported_library_root}/templates"
     internal_plugins_path: ClassVar[str] = f"{internal_library_root}/plugins"
     exported_plugins_path: ClassVar[str] = f"{exported_library_root}/plugins"
-    failure_modes_path: ClassVar[str] = "tests/test_pipelines/failure_modes.toml"
+    failing_pipelines_path: ClassVar[str] = "tests/test_pipelines/failing_pipelines.toml"
 
     @classmethod
     def get_llm_deck_paths(cls) -> List[str]:

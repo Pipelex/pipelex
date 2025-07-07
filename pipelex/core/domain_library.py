@@ -13,7 +13,6 @@ DomainLibraryRoot = Dict[str, Domain]
 
 
 class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
-    @override
     def validate_with_libraries(self):
         pass
 
@@ -24,7 +23,6 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
     def make_empty(cls):
         return cls(root={})
 
-    @override
     def add_domain_details(self, domain: Domain):
         domain_code = domain.code
         if existing_domain := self.root.get(domain_code):

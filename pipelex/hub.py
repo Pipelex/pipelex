@@ -21,6 +21,7 @@ from pipelex.core.domain import Domain
 from pipelex.core.domain_provider_abstract import DomainProviderAbstract
 from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_provider_abstract import PipeProviderAbstract
+from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerProtocol
 from pipelex.pipeline.pipeline import Pipeline
@@ -64,6 +65,7 @@ class PipelexHub:
         self._concept_provider: Optional[ConceptProviderAbstract] = None
         self._pipe_provider: Optional[PipeProviderAbstract] = None
         self._pipe_router: Optional[PipeRouterProtocol] = None
+        self._library_manager: Optional[LibraryManagerAbstract] = None
 
         # pipeline
         self._pipeline_tracker: Optional[PipelineTrackerProtocol] = None
@@ -168,6 +170,9 @@ class PipelexHub:
 
     def set_activity_manager(self, activity_manager: ActivityManagerProtocol):
         self._activity_manager = activity_manager
+
+    def set_library_manager(self, library_manager: LibraryManagerAbstract):
+        self._library_manager = library_manager
 
     ############################################################
     # Getters
@@ -282,8 +287,16 @@ class PipelexHub:
 
     def get_activity_manager(self) -> ActivityManagerProtocol:
         if self._activity_manager is None:
-            raise RuntimeError("ActivityManager is not initialized")
+            raise RuntimeError("Activity manager is not set. You must initialize Pipelex first.")
         return self._activity_manager
+
+    def get_required_library_manager(self) -> LibraryManagerAbstract:
+        if self._library_manager is None:
+            raise RuntimeError("Library manager is not set. You must initialize Pipelex first.")
+        return self._library_manager
+
+    def get_optional_library_manager(self) -> Optional[LibraryManagerAbstract]:
+        return self._library_manager
 
 
 # Shorthand functions for accessing the singleton
@@ -454,3 +467,7 @@ def get_activity_manager() -> ActivityManagerProtocol:
 
 def get_pipeline(pipeline_run_id: str) -> Pipeline:
     return get_pipeline_manager().get_pipeline(pipeline_run_id=pipeline_run_id)
+
+
+def get_library_manager() -> LibraryManagerAbstract:
+    return get_pipelex_hub().get_required_library_manager()
