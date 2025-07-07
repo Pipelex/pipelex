@@ -72,18 +72,21 @@ class PipeCondition(PipeController):
     @override
     def required_variables(self) -> Set[str]:
         required_variables: Set[str] = set()
-        # Add the variables from the expression/expression_template
+        # Variables from the expression/expression_template
         pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
             domain_code=self.domain,
             template_str=self.applied_expression_template,
             inputs=self.inputs,
         )
         required_variables.update(pipe_jinja2.required_variables())
+
+        # Variables from the pipe_map
+        for pipe_code in self.pipe_dependencies():
+            required_variables.update(get_required_pipe(pipe_code=pipe_code).required_variables())
         return required_variables
 
     def _validate_required_variables(self) -> Self:
-        required_variables = self.required_variables()
-        for required_variable_name in required_variables:
+        for required_variable_name in self.required_variables():
             if required_variable_name not in self.inputs.variables:
                 raise PipeDefinitionError(f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}")
         return self
@@ -124,8 +127,6 @@ class PipeCondition(PipeController):
     def validate_inputs(self) -> Self:
         if not self.pipe_map:
             raise ValueError(f"Pipe'{self.code}'(PipeCondition) must have at least one mapping in pipe_map")
-
-        self._validate_required_variables()
 
         # Skip validation during model creation - it will be done in validate_with_libraries()
         return self
@@ -181,6 +182,7 @@ class PipeCondition(PipeController):
         This is called after all pipes and concepts are available.
         """
         self._validate_inputs()
+        self._validate_required_variables()
 
     @override
     def pipe_dependencies(self) -> Set[str]:
