@@ -24,7 +24,7 @@ dependencies = [
     "instructor>=1.8.3",
     "jinja2>=3.1.4",
     "json2html>=1.3.0",
-    "kajson==0.2.3",
+    "kajson @ git+https://github.com/Pipelex/kajson.git@refactor/Proper-Singleton",
     "markdown>=3.6",
     "networkx>=3.4.2",
     "openai>=1.60.1",
@@ -284,3 +284,6 @@ packages = ["pipelex"]
 
 [tool.hatch.build.targets.sdist.force-include]
 "pyproject.toml" = "pipelex/pyproject.toml"
+
+[tool.hatch.metadata]
+allow-direct-references = true

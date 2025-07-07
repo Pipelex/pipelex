@@ -889,14 +889,10 @@ wheels = [
 
 [[package]]
 name = "kajson"
-version = "0.2.3"
-source = { registry = "https://pypi.org/simple" }
+version = "0.3.0"
+source = { git = "https://github.com/Pipelex/kajson.git?rev=refactor%2FProper-Singleton#de8d4a8f5a45feb3b473ab8ccba0c38ca692b391" }
 dependencies = [
     { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/70/8f/72a203f9aabb272091ce078e52a127d064ed89c7b5aba098f3210d4f6ffc/kajson-0.2.3.tar.gz", hash = "sha256:45a18d298d3b193dc904a53493a20069aefba68fe93432455a01cdd92c8dcaf4", size = 20134, upload-time = "2025-06-26T13:52:05.208Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b3/8e/798196dd104b3d02779cdb1627f10c704780f6b279124cf2e4633cc69da5/kajson-0.2.3-py3-none-any.whl", hash = "sha256:4df631383e898f30c8f13f49b1c58cc2d69e2629bb828728817c3edb675da065", size = 26240, upload-time = "2025-06-26T13:52:03.962Z" },
 ]
 
 [[package]]
@@ -1619,7 +1615,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.4.12"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1713,7 +1709,7 @@ requires-dist = [
     { name = "instructor", specifier = ">=1.8.3" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
-    { name = "kajson", specifier = "==0.2.3" },
+    { name = "kajson", git = "https://github.com/Pipelex/kajson.git?rev=refactor%2FProper-Singleton" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "mistralai", marker = "extra == 'mistralai'", specifier = "==1.5.2" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = "==1.6.1" },
