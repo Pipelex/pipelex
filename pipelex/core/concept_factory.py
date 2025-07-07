@@ -82,26 +82,33 @@ class ConceptFactory:
         return the_concept
 
     @classmethod
-    def make_concept_from_definition(
+    def make_concept_from_definition_str(
         cls,
         domain_code: str,
-        code: str,
+        concept_str: str,
         definition: str,
     ) -> Concept:
         structure_class_name: str
-        if Concept.is_valid_structure_class(structure_class_name=code):
+        refines: List[str]
+        if Concept.concept_str_contains_domain(concept_str=concept_str):
+            concept_name = Concept.extract_concept_name_from_str(concept_str=concept_str)
+        else:
+            concept_name = concept_str
+        if Concept.is_valid_structure_class(structure_class_name=concept_name):
             # structure is set implicitly, by the concept's code
-            structure_class_name = code
+            structure_class_name = concept_name
+            refines = []
         else:
             structure_class_name = TextContent.__name__
+            refines = [NativeConcept.TEXT.code]
 
         try:
             the_concept = Concept(
-                code=ConceptCodeFactory.make_concept_code(domain_code, code),
+                code=ConceptCodeFactory.make_concept_code(domain_code, concept_name),
                 domain=domain_code,
                 definition=definition,
                 structure_class_name=structure_class_name,
-                refines=[NativeConcept.TEXT.code],
+                refines=refines,
             )
             return Concept.model_validate(the_concept)
         except ValidationError as e:
