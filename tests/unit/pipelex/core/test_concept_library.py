@@ -1,6 +1,5 @@
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
-from pipelex.hub import get_concept_provider
 
 
 class Testget_concept_providerIsNativeConcept:
