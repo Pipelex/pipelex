@@ -147,9 +147,9 @@ class TestPipeRunningVariants:
         exception: Type[Exception],
         expected_error_message: str,
     ):
-        failure_modes_path = get_config().pipelex.library_config.failure_modes_path
+        failing_pipelines_path = get_config().pipelex.library_config.failing_pipelines_path
         library_manager = get_library_manager()
-        library_manager.load_combo_libraries(library_paths=[Path(failure_modes_path)])
+        library_manager.load_combo_libraries(library_paths=[Path(failing_pipelines_path)])
 
         log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
         with pytest.raises(exception) as exc:

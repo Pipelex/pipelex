@@ -95,8 +95,8 @@ class LibraryManager(LibraryManagerAbstract):
         return library_paths
 
     def load_failure_modes(self):
-        failure_modes_path = get_config().pipelex.library_config.failure_modes_path
-        self.load_combo_libraries(library_paths=[Path(failure_modes_path)])
+        failing_pipelines_path = get_config().pipelex.library_config.failing_pipelines_path
+        self.load_combo_libraries(library_paths=[Path(failing_pipelines_path)])
 
     def load_libraries(self):
         log.debug("LibraryManager loading separate libraries")
@@ -111,9 +111,9 @@ class LibraryManager(LibraryManagerAbstract):
         self.concept_library.add_concepts(concepts=native_concepts)
 
         toml_file_paths = self.list_toml_files_from_path(library_paths=library_paths)
-        # remove failure_modes_path from the list
-        failure_modes_path = get_config().pipelex.library_config.failure_modes_path
-        toml_file_paths = [path for path in toml_file_paths if path != Path(failure_modes_path)]
+        # remove failing_pipelines_path from the list
+        failing_pipelines_path = get_config().pipelex.library_config.failing_pipelines_path
+        toml_file_paths = [path for path in toml_file_paths if path != Path(failing_pipelines_path)]
         self.load_combo_libraries(library_paths=toml_file_paths)
 
     def load_deck(self) -> LLMDeck:
