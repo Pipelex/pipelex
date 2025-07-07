@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from pipelex.core.domain import Domain
 

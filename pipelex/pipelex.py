@@ -156,6 +156,8 @@ class Pipelex:
         self.pipelex_hub.set_concept_provider(concept_provider=concept_library)
         self.pipelex_hub.set_pipe_provider(pipe_provider=pipe_library)
         self.library_manager = LibraryManager(domain_library=domain_library, concept_library=concept_library, pipe_library=pipe_library)
+        self.library_manager.setup()
+        self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
         # pipelex pipeline
         self.pipeline_tracker: PipelineTrackerProtocol

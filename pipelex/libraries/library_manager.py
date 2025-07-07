@@ -5,6 +5,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Type
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
 from kajson.kajson_manager import KajsonManager
 from pydantic import ValidationError
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
@@ -24,8 +25,8 @@ from pipelex.exceptions import (
     PipeLibraryError,
     StaticValidationError,
 )
-from pipelex.hub import get_concept_provider, get_domain_provider, get_pipe_provider
 from pipelex.libraries.library_config import LibraryConfig
+from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.json_utils import deep_update
@@ -52,7 +53,7 @@ class LibraryComponent(StrEnum):
                 return PipeLibraryError
 
 
-class LibraryManager:
+class LibraryManager(LibraryManagerAbstract):
     allowed_root_attributes: ClassVar[List[str]] = [
         "domain",
         "definition",
@@ -75,6 +76,11 @@ class LibraryManager:
         self.concept_library = concept_library
         self.pipe_library = pipe_library
 
+    @override
+    def setup(self) -> None:
+        pass
+
+    @override
     def teardown(self) -> None:
         self.llm_deck = None
         self.pipe_library.teardown()
@@ -145,6 +151,7 @@ class LibraryManager:
             toml_file_paths.extend(found_file_paths)
         return toml_file_paths
 
+    @override
     def load_combo_libraries(self, library_paths: List[Path]):
         log.debug("LibraryManager loading combo libraries")
         # Find all .toml files in the directories and their subdirectories

@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Dict, List, Optional, Type
-
-from pydantic import Field
+from typing import Any, Dict, List, Optional, Type
 
 from pipelex.core.concept import Concept
 
