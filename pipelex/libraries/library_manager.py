@@ -298,6 +298,7 @@ class LibraryManager(LibraryManagerAbstract):
         if self.llm_deck is None:
             raise LibraryError("LLM deck is not loaded")
 
+        self.llm_deck.validate_llm_presets()
         LLMDeck.final_validate(deck=self.llm_deck)
         self.concept_library.validate_with_libraries()
         self.pipe_library.validate_with_libraries()

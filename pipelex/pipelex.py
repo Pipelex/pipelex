@@ -26,7 +26,6 @@ from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
-from pipelex.pipe_works.pipe_dry import dry_run_pipes
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager import ActivityManager
@@ -215,7 +214,7 @@ class Pipelex:
 
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}")
 
-    def finish_setup(self):
+    def setup_libraries(self):
         try:
             self.template_provider.setup()
             self.llm_model_provider.setup()
@@ -225,17 +224,20 @@ class Pipelex:
                     llm_deck.add_llm_name_as_handle_with_defaults(
                         llm_name=llm_model.llm_name,
                     )
-            llm_deck.validate_llm_presets()
             self.library_manager.load_libraries()
-            if self.library_manager.llm_deck is None:
-                raise PipelexSetupError("LLM deck is not loaded")
+            self.pipelex_hub.set_llm_deck_provider(llm_deck_provider=llm_deck)
+        except ValidationError as exc:
+            error_msg = format_pydantic_validation_error(exc)
+            raise PipelexSetupError(f"Error because of: {error_msg}") from exc
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_config().project_name}")
 
-            self.pipelex_hub.set_llm_deck_provider(llm_deck_provider=self.library_manager.llm_deck)
+    def validate_libraries(self):
+        try:
             self.library_manager.validate_libraries()
         except ValidationError as exc:
             error_msg = format_pydantic_validation_error(exc)
             raise PipelexSetupError(f"Error because of: {error_msg}") from exc
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} finish setup done for {get_config().project_name}")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_config().project_name}")
 
     def teardown(self):
         # pipelex
@@ -264,14 +266,11 @@ class Pipelex:
 
     # TODO: add kwargs to make() so that subclasses can employ specific parameters
     @classmethod
-    def make(cls, structure_classes: Optional[List[Type[Any]]] = None, dry_run_all_pipes: bool = False) -> Self:
+    def make(cls, structure_classes: Optional[List[Type[Any]]] = None) -> Self:
         pipelex_instance = cls()
         pipelex_instance.setup(structure_classes=structure_classes)
-        pipelex_instance.finish_setup()
+        pipelex_instance.setup_libraries()
         log.info(f"Pipelex {PACKAGE_VERSION} initialized.")
-        if dry_run_all_pipes:
-            all_pipes = pipelex_instance.library_manager.pipe_library.get_pipes()
-            asyncio.run(dry_run_pipes(pipes=all_pipes))
         return pipelex_instance
 
     @classmethod
