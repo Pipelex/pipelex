@@ -77,7 +77,7 @@ def init_config(
 def validate() -> None:
     """Run the setup sequence."""
     LibraryConfig.export_libraries()
-    Pipelex.make()
+    Pipelex.make(dry_run_all_pipes=True)
     log.info("Setup sequence passed OK, config and pipelines are validated.")
 
 

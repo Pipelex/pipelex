@@ -1,3 +1,4 @@
+import asyncio
 from importlib.metadata import metadata
 from typing import Any, ClassVar, List, Optional, Type
 
@@ -25,6 +26,7 @@ from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
+from pipelex.pipe_works.pipe_dry import dry_run_pipes
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager import ActivityManager
@@ -257,11 +259,14 @@ class Pipelex:
 
     # TODO: add kwargs to make() so that subclasses can employ specific parameters
     @classmethod
-    def make(cls, structure_classes: Optional[List[Type[Any]]] = None) -> Self:
+    def make(cls, structure_classes: Optional[List[Type[Any]]] = None, dry_run_all_pipes: bool = False) -> Self:
         pipelex_instance = cls()
         pipelex_instance.setup(structure_classes=structure_classes)
         pipelex_instance.finish_setup()
         log.info(f"Pipelex {PACKAGE_VERSION} initialized.")
+        if dry_run_all_pipes:
+            all_pipes = pipelex_instance.library_manager.pipe_library.get_pipes()
+            asyncio.run(dry_run_pipes(pipes=all_pipes))
         return pipelex_instance
 
     @classmethod
