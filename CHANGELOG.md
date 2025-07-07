@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.5.0] - 2025-07-07
+
+Draft:
+
+- `WorkingMemoryFactory`: added method `make_for_dry_run`: Takes an array of tuple (`stuff_name`, `concept_code`, `class_structure`) and generates with `polyfactory` a working memory with fake objects.
+- Completed dry run for `PipeCondition`, `PipeParallel`, `PipeBatch`. Added static validation for those as well. 
+- Added a config in the DryRunConfig: `allowed_to_fail_pipes` enables to list pipes that are allowed to fail the dry run, for example the pipe explicitly coded for creating an infinite loop 
+- `ConceptLibrary`: Added method `is_concept_code_legal`, that checks that the domain attached to the concept exists.
+- Added `pipe_type: PipeType` to pipes classes (CONTROLLER/OPERATOR)
+- `PipeLibrary`:  added method `dry_run_all_pipes` that runs the dry_run for all pipes.
+- Added validation of TOML files: Raise an error when there are trailing whitespaces, compilation blockers...
+
 ## [v0.4.11] - 2025-06-30
 
 - **LLM Settings Simplification**: Streamlined LLM choice system by removing complex `for_object_direct`, `for_object_list`, and `for_object_list_direct` options. LLM selection now uses a simpler fallback pattern: specific choice → text choice → overrides → defaults.

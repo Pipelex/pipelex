@@ -39,7 +39,7 @@ jobs:
         run: PYTHON_VERSION=${{ matrix.python-version }} make install
 
       - name: Boot test
-        run: make t TEST=TestFundamentals
+        run: make tp TEST=TestFundamentals
 
       - name: Run tests
         run: make gha-tests
