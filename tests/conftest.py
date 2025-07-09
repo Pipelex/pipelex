@@ -9,6 +9,8 @@ import pipelex.config
 import pipelex.pipelex
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.hub import get_concept_provider
 from tests.cases.registry import Fruit
 
 pytest_plugins = [
@@ -66,3 +68,9 @@ def cherry() -> Fruit:
 def blueberry() -> Fruit:
     """Blueberry fruit fixture."""
     return Fruit(name="blueberry", color="blue")
+
+
+@pytest.fixture(scope="module")
+def concept_provider() -> ConceptProviderAbstract:
+    """Concept provider fixture for testing concept compatibility."""
+    return get_concept_provider()

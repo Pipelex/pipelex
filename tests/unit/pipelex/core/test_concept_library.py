@@ -1,5 +1,6 @@
 from pipelex.core.concept import Concept
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
 
 
 class Testget_concept_providerIsNativeConcept:
@@ -128,3 +129,103 @@ class Testget_concept_providerIsNativeConcept:
 
             # And they should also work with the explicit "native." prefix
             assert Concept.is_native_concept(f"native.{concept_name}") is True, f"'native.{concept_name}' should also be recognized as native concept"
+
+
+class TestConceptLibraryCompatibility:
+    """Test ConceptLibrary compatibility methods."""
+
+    def test_is_compatible_by_concept_code_simple_text_concept_vs_text(self, concept_provider: ConceptProviderAbstract):
+        """Test that SimpleTextConcept (no structure) is compatible with native Text."""
+        # Test: SimpleTextConcept should be compatible with native Text (defaults to Text)
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.SimpleTextConcept", wanted_concept_code="native.Text"
+        )
+        assert result is True, "SimpleTextConcept should be compatible with native Text"
+
+    def test_is_compatible_by_concept_code_fundamentals_doc_vs_text(self, concept_provider: ConceptProviderAbstract):
+        """Test that FundamentalsDoc (custom structure) is not compatible with native Text."""
+        # Test: FundamentalsDoc should NOT be compatible with native Text (has custom structure)
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.FundamentalsDoc", wanted_concept_code="native.Text"
+        )
+        assert result is False, "FundamentalsDoc should not be compatible with native Text"
+
+    def test_is_compatible_by_concept_code_explicit_text_concept_vs_text(self, concept_provider: ConceptProviderAbstract):
+        """Test that ExplicitTextConcept (explicitly refines Text) is compatible with native Text."""
+        # Test: ExplicitTextConcept should be compatible with native Text
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.ExplicitTextConcept", wanted_concept_code="native.Text"
+        )
+        assert result is True, "ExplicitTextConcept should be compatible with native Text"
+
+    def test_is_compatible_by_concept_code_image_based_concept_vs_image(self, concept_provider: ConceptProviderAbstract):
+        """Test that ImageBasedConcept is compatible with native Image."""
+        # Test: ImageBasedConcept should be compatible with native Image
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.ImageBasedConcept", wanted_concept_code="native.Image"
+        )
+        assert result is True, "ImageBasedConcept should be compatible with native Image"
+
+    def test_is_compatible_by_concept_code_image_based_concept_vs_text(self, concept_provider: ConceptProviderAbstract):
+        """Test that ImageBasedConcept is not compatible with native Text."""
+        # Test: ImageBasedConcept should NOT be compatible with native Text
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.ImageBasedConcept", wanted_concept_code="native.Text"
+        )
+        assert result is False, "ImageBasedConcept should not be compatible with native Text"
+
+    def test_is_compatible_by_concept_code_documentation_concept_vs_fundamentals_doc(self, concept_provider: ConceptProviderAbstract):
+        """Test that DocumentationConcept is compatible with FundamentalsDoc."""
+        # Test: DocumentationConcept should be compatible with FundamentalsDoc
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.DocumentationConcept", wanted_concept_code="concept_library_tests.FundamentalsDoc"
+        )
+        assert result is True, "DocumentationConcept should be compatible with FundamentalsDoc"
+
+    def test_is_compatible_by_concept_code_specialized_doc_vs_fundamentals_doc(self, concept_provider: ConceptProviderAbstract):
+        """Test that SpecializedDoc is compatible with FundamentalsDoc."""
+        # Test: SpecializedDoc should be compatible with FundamentalsDoc
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.SpecializedDoc", wanted_concept_code="concept_library_tests.FundamentalsDoc"
+        )
+        assert result is True, "SpecializedDoc should be compatible with FundamentalsDoc"
+
+    def test_is_compatible_by_concept_code_multimedia_concept_vs_text(self, concept_provider: ConceptProviderAbstract):
+        """Test that MultiMediaConcept is compatible with Text (multiple inheritance)."""
+        # Test: MultiMediaConcept should be compatible with Text
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.MultiMediaConcept", wanted_concept_code="native.Text"
+        )
+        assert result is True, "MultiMediaConcept should be compatible with Text"
+
+    def test_is_compatible_by_concept_code_multimedia_concept_vs_image(self, concept_provider: ConceptProviderAbstract):
+        """Test that MultiMediaConcept is compatible with Image (multiple inheritance)."""
+        # Test: MultiMediaConcept should be compatible with Image
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.MultiMediaConcept", wanted_concept_code="native.Image"
+        )
+        assert result is True, "MultiMediaConcept should be compatible with Image"
+
+    def test_is_compatible_by_concept_code_independent_concept_vs_text(self, concept_provider: ConceptProviderAbstract):
+        """Test that IndependentConcept is not compatible with Text."""
+        # Test: IndependentConcept should NOT be compatible with Text (no refines)
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.IndependentConcept", wanted_concept_code="native.Text"
+        )
+        assert result is False, "IndependentConcept should not be compatible with Text"
+
+    def test_is_compatible_by_concept_code_derived_text_concept_vs_text(self, concept_provider: ConceptProviderAbstract):
+        """Test that DerivedTextConcept is compatible with Text (inheritance chain)."""
+        # Test: DerivedTextConcept should be compatible with Text (through ExplicitTextConcept)
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.DerivedTextConcept", wanted_concept_code="native.Text"
+        )
+        assert result is True, "DerivedTextConcept should be compatible with Text through inheritance chain"
+
+    def test_is_compatible_by_concept_code_derived_text_concept_vs_explicit_text(self, concept_provider: ConceptProviderAbstract):
+        """Test that DerivedTextConcept is compatible with ExplicitTextConcept (direct inheritance)."""
+        # Test: DerivedTextConcept should be compatible with ExplicitTextConcept
+        result = concept_provider.is_compatible_by_concept_code(
+            tested_concept_code="concept_library_tests.DerivedTextConcept", wanted_concept_code="concept_library_tests.ExplicitTextConcept"
+        )
+        assert result is True, "DerivedTextConcept should be compatible with ExplicitTextConcept"

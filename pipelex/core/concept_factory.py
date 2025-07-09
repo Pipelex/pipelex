@@ -89,6 +89,7 @@ class ConceptFactory:
         definition: str,
     ) -> Concept:
         structure_class_name: str
+        print(f"code: {code}", Concept.is_valid_structure_class(structure_class_name=code))
         if Concept.is_valid_structure_class(structure_class_name=code):
             # structure is set implicitly, by the concept's code
             structure_class_name = code
@@ -101,7 +102,7 @@ class ConceptFactory:
                 domain=domain_code,
                 definition=definition,
                 structure_class_name=structure_class_name,
-                refines=[NativeConcept.TEXT.code],
+                refines=[NativeConcept.TEXT.code] if structure_class_name == TextContent.__name__ else [],
             )
             return Concept.model_validate(the_concept)
         except ValidationError as e:
