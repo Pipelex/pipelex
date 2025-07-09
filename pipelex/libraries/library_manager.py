@@ -256,24 +256,29 @@ class LibraryManager(LibraryManagerAbstract):
                 continue
 
     def _load_concepts(self, domain_code: str, obj_dict: Dict[str, Any]):
-        for concept_code, concept_obj in obj_dict.items():
+        for concept_str, concept_obj in obj_dict.items():
             if isinstance(concept_obj, str):
                 # we only have a definition
-                concept_from_def = ConceptFactory.make_concept_from_definition(domain_code=domain_code, code=concept_code, definition=concept_obj)
+                definition = concept_obj
+                concept_from_def = ConceptFactory.make_concept_from_definition_str(
+                    domain_code=domain_code,
+                    concept_str=concept_str,
+                    definition=definition,
+                )
                 self.concept_library.add_new_concept(concept=concept_from_def)
             elif isinstance(concept_obj, dict):
                 # blueprint dict definition
                 concept_obj_dict: Dict[str, Any] = concept_obj
                 try:
                     concept_from_dict = ConceptFactory.make_from_details_dict(
-                        domain_code=domain_code, code=concept_code, details_dict=concept_obj_dict
+                        domain_code=domain_code, code=concept_str, details_dict=concept_obj_dict
                     )
                 except ValidationError as exc:
                     error_msg = format_pydantic_validation_error(exc)
-                    raise ConceptLibraryError(f"Error loading concept '{concept_code}' because of: {error_msg}") from exc
+                    raise ConceptLibraryError(f"Error loading concept '{concept_str}' because of: {error_msg}") from exc
                 self.concept_library.add_new_concept(concept=concept_from_dict)
             else:
-                raise ConceptLibraryError(f"Unexpected type for concept_code '{concept_code}' in domain '{domain_code}': {type(concept_obj)}")
+                raise ConceptLibraryError(f"Unexpected type for concept_code '{concept_str}' in domain '{domain_code}': {type(concept_obj)}")
 
     def _load_pipes(self, domain_code: str, obj_dict: Dict[str, Any]):
         for pipe_code, pipe_obj in obj_dict.items():

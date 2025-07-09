@@ -106,13 +106,22 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     @override
     def is_compatible_by_concept_code(self, tested_concept_code: str, wanted_concept_code: str) -> bool:
         if wanted_concept_code == NativeConcept.ANYTHING.code:
+            log.debug(
+                f"Concept '{tested_concept_code}' is compatible with '{wanted_concept_code}' "
+                f"because '{wanted_concept_code}' is '{NativeConcept.ANYTHING.code}'"
+            )
             return True
         tested_concept = self.get_required_concept(concept_code=tested_concept_code)
         wanted_concept = self.get_required_concept(concept_code=wanted_concept_code)
         if tested_concept.code == wanted_concept.code:
+            log.debug(f"Concept '{tested_concept_code}' is compatible with '{wanted_concept_code}' because they have the same code")
             return True
         for inherited_concept_code in tested_concept.refines:
             if self.is_compatible_by_concept_code(inherited_concept_code, wanted_concept_code):
+                log.debug(
+                    f"Concept '{tested_concept_code}' is compatible with '{wanted_concept_code}' "
+                    f"because '{tested_concept_code}' refines '{inherited_concept_code}' which is compatible with '{wanted_concept_code}'"
+                )
                 return True
         return False
 
@@ -134,9 +143,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
             if self.is_concept_implicit(concept_code=concept_code):
                 # The implicit concept is obviously coming with a domain (the one it is used in)
                 # TODO: replace this with a concept factory method make_implicit_concept
-                return ConceptFactory.make_concept_from_definition(
+                return ConceptFactory.make_concept_from_definition_str(
                     domain_code="implicit",
-                    code=Concept.extract_domain_and_concept_from_str(concept_str=concept_code)[1],
+                    concept_str=Concept.extract_domain_and_concept_from_str(concept_str=concept_code)[1],
                     definition=concept_code,
                 )
             else:

@@ -1,10 +1,11 @@
 from importlib.metadata import metadata
-from typing import Any, ClassVar, List, Optional, Type
+from typing import Any, List, Optional, Type, cast
 
 from dotenv import load_dotenv
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
+from kajson.singleton import MetaSingleton
 from pydantic import ValidationError
 from rich import print
 from typing_extensions import Self
@@ -55,39 +56,9 @@ PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
 PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 
 
-class Pipelex:
-    _pipelex_instance: ClassVar[Optional[Self]] = None
-
-    def __new__(
-        cls,
-        pipelex_cls: Optional[Type[Self]] = None,
-        pipelex_hub: Optional[PipelexHub] = None,
-        config_cls: Optional[Type[ConfigRoot]] = None,
-        ready_made_config: Optional[ConfigRoot] = None,
-        class_registry: Optional[ClassRegistryAbstract] = None,
-        template_provider: Optional[TemplateLibrary] = None,
-        llm_model_provider: Optional[LLMModelLibrary] = None,
-        inference_manager: Optional[InferenceManager] = None,
-        pipeline_manager: Optional[PipelineManager] = None,
-        pipeline_tracker: Optional[PipelineTracker] = None,
-        activity_manager: Optional[ActivityManagerProtocol] = None,
-        reporting_delegate: Optional[ReportingProtocol] = None,
-    ) -> Self:
-        if cls._pipelex_instance is not None:
-            raise RuntimeError(
-                "Pipelex is a singleton, it is instantiated only once. Its instance is private. All you need is accesible through the hub."
-            )
-        if pipelex_cls is None:
-            pipelex_cls = cls
-
-        if not issubclass(pipelex_cls, cls):
-            raise TypeError(f"{pipelex_cls!r} is not a subclass of {cls.__name__}")
-
-        return super().__new__(pipelex_cls)
-
+class Pipelex(metaclass=MetaSingleton):
     def __init__(
         self,
-        pipelex_cls: Optional[Type[Self]] = None,
         pipelex_hub: Optional[PipelexHub] = None,
         config_cls: Optional[Type[ConfigRoot]] = None,
         ready_made_config: Optional[ConfigRoot] = None,
@@ -153,7 +124,11 @@ class Pipelex:
         self.pipelex_hub.set_domain_provider(domain_provider=domain_library)
         self.pipelex_hub.set_concept_provider(concept_provider=concept_library)
         self.pipelex_hub.set_pipe_provider(pipe_provider=pipe_library)
-        self.library_manager = LibraryManager(domain_library=domain_library, concept_library=concept_library, pipe_library=pipe_library)
+        self.library_manager = LibraryManager(
+            domain_library=domain_library,
+            concept_library=concept_library,
+            pipe_library=pipe_library,
+        )
         self.library_manager.setup()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
@@ -178,7 +153,6 @@ class Pipelex:
             self.activity_manager = ActivityManagerNoOp()
         self.pipelex_hub.set_activity_manager(activity_manager=self.activity_manager)
 
-        Pipelex._pipelex_instance = self
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
     def setup(
@@ -257,10 +231,12 @@ class Pipelex:
         self.class_registry.teardown()
         func_registry.teardown()
 
-        Pipelex._pipelex_instance = None
         project_name = get_config().project_name
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_config().project_name} (except config & logs)")
         self.pipelex_hub.reset_config()
+        # Clear the singleton instance from metaclass
+        if self.__class__ in MetaSingleton.instances:
+            del MetaSingleton.instances[self.__class__]
         print(f"{PACKAGE_NAME} version {PACKAGE_VERSION} config reset done for {project_name}")
 
     # TODO: add kwargs to make() so that subclasses can employ specific parameters
@@ -274,10 +250,12 @@ class Pipelex:
 
     @classmethod
     def get_optional_instance(cls) -> Optional[Self]:
-        return cls._pipelex_instance
+        instance = MetaSingleton.instances.get(cls)
+        return cast(Optional[Self], instance)
 
     @classmethod
     def get_instance(cls) -> Self:
-        if cls._pipelex_instance is None:
+        instance = MetaSingleton.instances.get(cls)
+        if instance is None:
             raise RuntimeError("Pipelex is not initialized")
-        return cls._pipelex_instance
+        return cast(Self, instance)
