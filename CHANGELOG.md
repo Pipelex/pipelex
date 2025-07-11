@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.5.2] - 2025-07-11
+
+- log a warning when dry running a `PipeFunc`
+- Update Readme.md
+
 ## [v0.5.1] - 2025-07-09
 
 ## Fixed
