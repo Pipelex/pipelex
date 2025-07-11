@@ -41,3 +41,4 @@ is_vision_supported = true
 max_prompt_images = 3000
 cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
 platform_llm_id = { vertexai = "google/gemini-2.5-flash-preview-05-20" }
+

@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, ClassVar, Dict
 
 from jinja2 import TemplateSyntaxError
 from pydantic import Field, RootModel, ValidationError
@@ -23,10 +23,16 @@ class TemplateLibraryError(ToolException):
 
 class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
     root: TemplateLibraryRoot = Field(default_factory=dict)
+    library_config: ClassVar[LibraryConfig]
+
+    @classmethod
+    def make_empty(cls, config_folder_path: str) -> "TemplateLibrary":
+        cls.library_config = LibraryConfig(config_folder_path=config_folder_path)
+        return cls()
 
     @override
     def setup(self) -> None:
-        template_toml_paths = LibraryConfig.get_templates_paths()
+        template_toml_paths = self.library_config.get_templates_paths()
         for template_toml_path in template_toml_paths:
             self._load_from_toml(toml_path=template_toml_path)
         self.validate_templates(template_category=Jinja2TemplateCategory.LLM_PROMPT)

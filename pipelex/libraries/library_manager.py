@@ -61,20 +61,29 @@ class LibraryManager(LibraryManagerAbstract):
         "system_prompt_to_structure",
         "prompt_template_to_structure",
     ]
+    domain_library: DomainLibrary
+    concept_library: ConceptLibrary
+    pipe_library: PipeLibrary
+    llm_deck: Optional[LLMDeck] = None
+    library_config: ClassVar[LibraryConfig]
 
     @classmethod
-    def make_empty(cls) -> "LibraryManager":
-        domain_library = DomainLibrary.make_empty()
-        concept_library = ConceptLibrary.make_empty()
-        pipe_library = PipeLibrary.make_empty()
-        return cls(domain_library=domain_library, concept_library=concept_library, pipe_library=pipe_library)
+    def make_empty(cls, config_folder_path: str) -> "LibraryManager":
+        cls.domain_library = DomainLibrary.make_empty()
+        cls.concept_library = ConceptLibrary.make_empty()
+        cls.pipe_library = PipeLibrary.make_empty()
+        cls.library_config = LibraryConfig(config_folder_path=config_folder_path)
+        return cls()
 
-    def __init__(self, domain_library: DomainLibrary, concept_library: ConceptLibrary, pipe_library: PipeLibrary) -> None:
-        # TODO : avoid having an Option LLMDeck: regroup with model provider
-        self.llm_deck: Optional[LLMDeck] = None
-        self.domain_library = domain_library
-        self.concept_library = concept_library
-        self.pipe_library = pipe_library
+    @classmethod
+    def make(
+        cls, domain_library: DomainLibrary, concept_library: ConceptLibrary, pipe_library: PipeLibrary, config_folder_path: str
+    ) -> "LibraryManager":
+        cls.domain_library = domain_library
+        cls.concept_library = concept_library
+        cls.pipe_library = pipe_library
+        cls.library_config = LibraryConfig(config_folder_path=config_folder_path)
+        return cls()
 
     @override
     def setup(self) -> None:
@@ -88,10 +97,10 @@ class LibraryManager(LibraryManagerAbstract):
         self.domain_library.teardown()
 
     def libraries_paths(self) -> List[str]:
-        library_paths = [LibraryConfig.loaded_pipelines_path]
+        library_paths = [self.library_config.pipelines_path]
         if runtime_manager.is_unit_testing:
             log.debug("Registering test pipeline structures for unit testing")
-            library_paths += [LibraryConfig.test_pipelines_path]
+            library_paths += [self.library_config.test_pipelines_path]
         return library_paths
 
     def load_failure_modes(self):
@@ -117,7 +126,7 @@ class LibraryManager(LibraryManagerAbstract):
         self.load_combo_libraries(library_paths=toml_file_paths)
 
     def load_deck(self) -> LLMDeck:
-        llm_deck_paths = LibraryConfig.get_llm_deck_paths()
+        llm_deck_paths = self.library_config.get_llm_deck_paths()
         full_llm_deck_dict: Dict[str, Any] = {}
         if not llm_deck_paths:
             raise LLMDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
@@ -313,7 +322,7 @@ class LibraryManager(LibraryManagerAbstract):
         """Validate all TOML files used by the library manager for formatting issues."""
         log.debug("LibraryManager validating TOML file formatting")
 
-        llm_deck_paths = LibraryConfig.get_llm_deck_paths()
+        llm_deck_paths = self.library_config.get_llm_deck_paths()
         for llm_deck_path in llm_deck_paths:
             if os.path.exists(llm_deck_path):
                 try:
@@ -341,7 +350,7 @@ class LibraryManager(LibraryManagerAbstract):
                 log.error(f"TOML formatting issues in library file '{toml_path}': {exc}")
                 raise LibraryError(f"TOML validation failed for library file '{toml_path}': {exc}") from exc
 
-        template_paths = LibraryConfig.get_templates_paths()
+        template_paths = self.library_config.get_templates_paths()
         for template_path in template_paths:
             if os.path.exists(template_path):
                 try:

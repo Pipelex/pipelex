@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional
 
 from pydantic import Field, RootModel
 from typing_extensions import override
@@ -32,6 +32,12 @@ LLMModelLibraryRoot = List[LLMModel]
 
 class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
     root: LLMModelLibraryRoot = Field(default_factory=list)
+    library_config: ClassVar[LibraryConfig]
+
+    @classmethod
+    def make_empty(cls, config_folder_path: str) -> "LLMModelLibrary":
+        cls.library_config = LibraryConfig(config_folder_path=config_folder_path)
+        return cls()
 
     @override
     def setup(self):
@@ -63,7 +69,7 @@ class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
 
     @classmethod
     def load_llm_model_library_dict(cls) -> LLMModelLibraryDict:
-        libraries_path = LibraryConfig.exported_llm_integrations_path
+        libraries_path = cls.library_config.llm_integrations_path
         if not os.path.exists(libraries_path):
             raise LLMModelLibraryError(f"LLM model library path `{libraries_path}` not found. Please run `pipelex init-libraries` to create it.")
         llm_library: LLMModelLibraryDict = {}

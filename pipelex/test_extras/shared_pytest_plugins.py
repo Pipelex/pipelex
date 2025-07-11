@@ -13,7 +13,7 @@ def set_run_mode():
 
 @pytest.fixture(scope="session")
 def manage_pipelex_libraries():
-    LibraryConfig.export_libraries(overwrite=False)
+    LibraryConfig(config_folder_path="./pipelex_libraries").export_libraries(overwrite=False)
     yield
     # TODO: make it safe to erase/replace standard libraries in client projects without touching custom stuff
     # LibraryConfig.remove_libraries()
@@ -21,7 +21,7 @@ def manage_pipelex_libraries():
 
 @pytest.fixture(scope="session")
 def manage_pipelex_libraries_with_overwrite():
-    LibraryConfig.export_libraries(overwrite=True)
+    LibraryConfig(config_folder_path="./pipelex_libraries").export_libraries(overwrite=True)
     yield
     # TODO: make it safe to erase/replace standard libraries in client projects without touching custom stuff
     # LibraryConfig.remove_libraries()

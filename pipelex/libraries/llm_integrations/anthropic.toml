@@ -62,3 +62,4 @@ max_prompt_images = 100
 cost_per_million_tokens_usd = { input = 3.0, output = 15.0 }
 platform_llm_id = { anthropic = "claude-opus-4-20250514", bedrock_anthropic = "us.anthropic.claude-opus-4-20250514-v1:0" }
 default_platform = "anthropic"
+

@@ -47,7 +47,7 @@ def init_libraries(
     """
     try:
         # TODO: Have a more proper print message regarding the overwrited files (e.g. list of files that were overwritten or not)
-        LibraryConfig.export_libraries(overwrite=overwrite)
+        LibraryConfig(config_folder_path="pipelex/libraries").export_libraries(overwrite=overwrite)
         if overwrite:
             typer.echo("Successfully initialized pipelex libraries (all files overwritten)")
         else:
@@ -76,10 +76,15 @@ def init_config(
 
 
 @app.command()
-def validate() -> None:
+def validate(
+    relative_config_folder_path: Annotated[
+        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
+    ] = "pipelex_libraries",
+) -> None:
     """Run the setup sequence."""
-    LibraryConfig.export_libraries()
-    pipelex_instance = Pipelex.make()
+    config_folder_path = os.path.join(os.getcwd(), relative_config_folder_path)
+    LibraryConfig(config_folder_path=config_folder_path).export_libraries()
+    pipelex_instance = Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
     pipelex_instance.validate_libraries()
     asyncio.run(dry_run_all_pipes())
     log.info("Setup sequence passed OK, config and pipelines are validated.")
@@ -98,7 +103,7 @@ def show_config() -> None:
 @app.command()
 def list_pipes() -> None:
     """List all available pipes."""
-    Pipelex.make()
+    Pipelex.make(relative_config_folder_path="../../pipelex_libraries")
 
     try:
         get_pipe_provider().pretty_list_pipes()

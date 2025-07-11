@@ -25,7 +25,7 @@ def reset_pipelex_config_fixture():
     # Code to run before each test
     print("[magenta]pipelex setup[/magenta]")
     try:
-        pipelex_instance = pipelex.pipelex.Pipelex.make()
+        pipelex_instance = pipelex.pipelex.Pipelex.make(relative_config_folder_path="../pipelex/libraries")
         config = get_config()
         log.verbose(config, title="Test config")
         assert isinstance(config, pipelex.config.PipelexConfig)

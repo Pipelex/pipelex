@@ -23,3 +23,4 @@ is_gen_object_supported = true
 is_vision_supported = false
 cost_per_million_tokens_usd = { input = 0.15, output = 4 }
 platform_llm_id = { xai = "grok-3-mini-fast-latest" }
+

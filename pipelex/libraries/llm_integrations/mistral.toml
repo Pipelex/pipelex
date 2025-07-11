@@ -67,3 +67,4 @@ is_gen_object_supported = true
 is_vision_supported = true
 cost_per_million_tokens_usd = { input = 2.0, output = 6.0 }
 platform_llm_id = { mistral = "pixtral-large-latest" }
+

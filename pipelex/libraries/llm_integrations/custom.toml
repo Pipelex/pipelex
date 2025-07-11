@@ -27,3 +27,4 @@ is_vision_supported = false
 cost_per_million_tokens_usd = { input = 0, output = 0 }
 platform_llm_id = { custom_llm = "qwen3:8b" }
 # TODO: support <think> tokens
+

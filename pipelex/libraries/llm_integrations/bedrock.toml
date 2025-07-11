@@ -28,3 +28,4 @@ is_gen_object_supported = false
 # TODO: find out the actual cost per million tokens for nova on bedrock
 cost_per_million_tokens_usd = { input = 3.0, output = 15.0 }
 platform_llm_id = { bedrock = "us.amazon.nova-pro-v1:0" }
+

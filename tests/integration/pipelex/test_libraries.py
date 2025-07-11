@@ -90,7 +90,7 @@ class TestLibraries:
         known_concept: str,
         known_pipe: str,
     ):
-        library_manager = LibraryManager.make_empty()
+        library_manager = LibraryManager.make_empty(config_folder_path="pipelex_libraries")
         test_pipelines_path = get_config().pipelex.library_config.test_pipelines_path
         test_library_paths = library_manager.list_toml_files_from_path(library_paths=[test_pipelines_path])
         library_manager.load_combo_libraries(library_paths=test_library_paths)
