@@ -86,6 +86,10 @@ class LibraryManager(LibraryManagerAbstract):
         return cls()
 
     @override
+    def get_plugin_config_path(self) -> str:
+        return self.library_config.get_default_plugin_config_path()
+
+    @override
     def setup(self) -> None:
         pass
 

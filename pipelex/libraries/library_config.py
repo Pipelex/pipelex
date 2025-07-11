@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, List
+from typing import ClassVar, List
 
 from pipelex.tools.config.models import ConfigModel
 from pipelex.tools.misc.file_utils import copy_file_from_package, copy_folder_from_package, find_files_in_dir
@@ -52,14 +52,9 @@ class LibraryConfig(ConfigModel):
     def get_templates_paths(self) -> List[str]:
         return [str(path) for path in find_files_in_dir(dir_path=self.templates_path, pattern="*.toml", is_recursive=True)]
 
-    def get_plugin_config_path(self) -> str:
-        return f"{self.plugins_path}/plugin_config.toml"
-
-    @staticmethod
-    def get_default_plugin_config_path() -> str:
+    def get_default_plugin_config_path(self) -> str:
         """Get the default plugin config path."""
-        config = LibraryConfig(config_folder_path="pipelex_libraries")
-        return config.get_plugin_config_path()
+        return f"{self.plugins_path}/plugin_config.toml"
 
     def export_libraries(self, overwrite: bool = False) -> None:
         """Duplicate pipelex libraries files in the client project, preserving directory structure."""

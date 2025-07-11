@@ -168,7 +168,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
         self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
-        self.plugin_manager.setup()
+        self.plugin_manager.setup(library_config=self.library_manager.library_config)
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())
@@ -254,6 +254,7 @@ class Pipelex(metaclass=MetaSingleton):
             config_folder_path = os.path.abspath(os.path.join(caller_dir, relative_config_folder_path))
         else:
             config_folder_path = os.path.abspath(os.path.join(os.getcwd(), relative_config_folder_path))
+
         pipelex_instance = cls(config_folder_path=config_folder_path)
         pipelex_instance.setup()
         pipelex_instance.setup_libraries(relative_config_folder_path=relative_config_folder_path)

@@ -59,3 +59,4 @@ PipeImgGen = "Generate a photo"
 inputs = { prompt = "ImgGenPrompt" }
 output = "images.Photo"
 nb_steps = 8
+

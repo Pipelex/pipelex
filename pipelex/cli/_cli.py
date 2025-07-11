@@ -47,7 +47,7 @@ def init_libraries(
     """
     try:
         # TODO: Have a more proper print message regarding the overwrited files (e.g. list of files that were overwritten or not)
-        LibraryConfig(config_folder_path="pipelex/libraries").export_libraries(overwrite=overwrite)
+        LibraryConfig().export_libraries(overwrite=overwrite)
         if overwrite:
             typer.echo("Successfully initialized pipelex libraries (all files overwritten)")
         else:
@@ -101,9 +101,13 @@ def show_config() -> None:
 
 
 @app.command()
-def list_pipes() -> None:
+def list_pipes(
+    relative_config_folder_path: Annotated[
+        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
+    ] = "pipelex_libraries",
+) -> None:
     """List all available pipes."""
-    Pipelex.make(relative_config_folder_path="../../pipelex_libraries")
+    Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
 
     try:
         get_pipe_provider().pretty_list_pipes()
