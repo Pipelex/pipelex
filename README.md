@@ -31,7 +31,7 @@
 <div align="center">
   <h2 align="center">📜 The Knowledge Pipeline Manifesto</h2>
   <p align="center">
-    <a href="https://www.pipelex.com/post/the-knowledge-pipeline-manifesto"><strong>Read why we built Pipelex to transform unreliable AI workflows into deterministic pipelines 🔗</strong></a>
+    <a href="https://go.pipelex.com/manifesto"><strong>Read why we built Pipelex to transform unreliable AI workflows into deterministic pipelines 🔗</strong></a>
   </p>
 
   <h2 align="center">🚀 See Pipelex in Action</h2>
