@@ -80,4 +80,8 @@ class PipeFunc(PipeOperator):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        raise NotImplementedError("Dry run not yet implemented for PipeFunc")
+        log.warning("Dry run not yet implemented for PipeFunc")
+        return PipeFuncOutput(
+            working_memory=working_memory,
+            pipeline_run_id=job_metadata.pipeline_run_id,
+        )

@@ -36,7 +36,7 @@
 
   <h2 align="center">🚀 See Pipelex in Action</h2>
   <p align="center">
-    <a href="https://www.pipelex.com/demo"><strong>Checkout our Demo</strong></a>
+    <a href="https://go.pipelex.com/demo"><img src="https://go.pipelex.com/demo-thumbnail" alt="Pipelex Demo" width="600" style="max-width: 100%; height: auto;"></a>
   </p>
   
 </div>
