@@ -41,7 +41,7 @@ class Stuff(CustomBaseModel):
                 stuff_name = self.stuff_name or f"unnamed using concept code {self.concept_code}"
                 raise StuffError(
                     f"Cannot create stuff artefact for stuff {stuff_name} because reserved field {key} already exists in the stuff content. \
-                        Forbidden fields are: stuff_name, content_class, concept_code, stuff_code, content"
+                        Forbidden fields are: `stuff_name`, `content_class`, `concept_code`, `stuff_code`, `content`"
                 )
             artefact_dict[key] = value
 
