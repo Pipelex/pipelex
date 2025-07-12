@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.6.0] - 2025-07-12
+
+### Changed 
+- The `Pipelex.make()` now takes a `relative_config_folder_path` argument, which is considered to be a relative path to the current working directory, pointing to the config folder path of pipelex. The argument `from_file` indicates if the path is relative to the caller's file path. If False, the path is considered to be absolute from where the process was started.
+
+### Added
+- Added github action for inference tests
+- `load_json_list_from_path` function in `pipelex.tools.misc.file_utils`: Loads a JSON file and ensures it contains a list.
+
 ## [v0.5.2] - 2025-07-11
 
 - log a warning when dry running a `PipeFunc`
