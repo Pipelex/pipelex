@@ -3,6 +3,8 @@ from typing import ClassVar, List
 from pipelex.tools.config.models import ConfigModel
 from pipelex.tools.misc.file_utils import copy_file_from_package, copy_folder_from_package, find_files_in_dir
 
+PIPELEX_LIBRARIES_PATH = "libraries"
+
 
 class LibraryConfig(ConfigModel):
     package_name: ClassVar[str] = "pipelex"
@@ -61,32 +63,32 @@ class LibraryConfig(ConfigModel):
         # pipelines
         copy_folder_from_package(
             package_name=self.package_name,
-            folder_path_in_package="libraries/pipelines",
+            folder_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/pipelines",
             target_dir=self.base_pipelines_path,
             overwrite=overwrite,
         )
         copy_file_from_package(
             package_name=self.package_name,
-            file_path_in_package="libraries/__init__.py",
+            file_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/__init__.py",
             target_path=f"{self.config_folder_path}/__init__.py",
             overwrite=overwrite,
         )
         copy_file_from_package(
             package_name=self.package_name,
-            file_path_in_package="libraries/pipelines/__init__.py",
+            file_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/pipelines/__init__.py",
             target_path=f"{self.pipelines_path}/__init__.py",
             overwrite=overwrite,
         )
         copy_file_from_package(
             package_name=self.package_name,
-            file_path_in_package="libraries/pipelines/__init__.py",
+            file_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/pipelines/__init__.py",
             target_path=f"{self.base_pipelines_path}/__init__.py",
             overwrite=overwrite,
         )
         # llm_integrations
         copy_folder_from_package(
             package_name=self.package_name,
-            folder_path_in_package="libraries/llm_integrations",
+            folder_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/llm_integrations",
             target_dir=self.llm_integrations_path,
             overwrite=overwrite,
         )
@@ -94,7 +96,7 @@ class LibraryConfig(ConfigModel):
         # llm_deck
         copy_folder_from_package(
             package_name=self.package_name,
-            folder_path_in_package="libraries/llm_deck",
+            folder_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/llm_deck",
             target_dir=self.llm_deck_path,
             overwrite=overwrite,
             non_overwrite_files=["overrides.toml"],
@@ -103,7 +105,7 @@ class LibraryConfig(ConfigModel):
         # templates
         copy_folder_from_package(
             package_name=self.package_name,
-            folder_path_in_package="libraries/templates",
+            folder_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/templates",
             target_dir=self.templates_path,
             overwrite=overwrite,
         )
@@ -111,7 +113,7 @@ class LibraryConfig(ConfigModel):
         # plugins
         copy_folder_from_package(
             package_name=self.package_name,
-            folder_path_in_package="libraries/plugins",
+            folder_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/plugins",
             target_dir=self.plugins_path,
             overwrite=overwrite,
         )

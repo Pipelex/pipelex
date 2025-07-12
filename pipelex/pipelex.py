@@ -243,7 +243,7 @@ class Pipelex(metaclass=MetaSingleton):
     # TODO: add kwargs to make() so that subclasses can employ specific parameters
     @classmethod
     def make(cls, relative_config_folder_path: str, from_file: Optional[bool] = True) -> Self:
-        if from_file:
+        if from_file: # from_file means it's going to merge the relative_config_folder_path with the caller's file path
             current_frame = inspect.currentframe()
             if current_frame is None:
                 raise RuntimeError("Failed to get current frame")
