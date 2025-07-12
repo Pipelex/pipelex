@@ -128,6 +128,31 @@ def load_json_dict_from_path(path: str) -> Dict[Any, Any]:
         raise JsonTypeError(f"{path} is not a dict")
 
 
+def load_json_list_from_path(path: str) -> List[Any]:
+    """
+    Loads a JSON file and ensures it contains a list.
+
+    This function reads a JSON file and verifies that its content is a list.
+    It uses load_json_from_path internally and adds type checking.
+
+    Args:
+        path (str): The file path to the JSON file to be loaded.
+
+    Returns:
+        List[Any]: The parsed JSON content as a Python list.
+
+    Raises:
+        JsonTypeError: If the JSON content is not a list.
+        FileNotFoundError: If the file does not exist.
+        json.JSONDecodeError: If the file contains invalid JSON.
+    """
+    json_content: JsonContent = load_json_from_path(path)
+    if isinstance(json_content, list):
+        return json_content
+    else:
+        raise JsonTypeError(f"{path} is not a list")
+
+
 def deep_update(target_dict: Dict[str, Any], updates: Dict[str, Any]):
     """
     Recursively updates a dictionary with values from another dictionary.
