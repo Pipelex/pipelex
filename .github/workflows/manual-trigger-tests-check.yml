@@ -1,0 +1,66 @@
+name: Manual trigger tests check
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - "release/v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+
+jobs:
+  trigger-tests:
+    runs-on: ubuntu-latest
+    environment:
+      name: manual-trigger-tests-check
+      url: ${{ github.server_url }}/${{ github.repository }}/deployments/activity_log?environment=manual-trigger-tests-check
+    steps:
+      - name: Initialize check
+        run: |
+          echo "Initializing manual trigger tests check..."
+
+  matrix-test:
+    name: Manual trigger tests check
+    needs: [trigger-tests]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+      actions: read
+      repository-projects: read
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      ENV: dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::975050286103:role/GitHubActionsRole
+          aws-region: eu-west-3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Check UV installation
+        run: make check-uv
+
+      - name: Verify UV installation
+        run: uv --version
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=${{ matrix.python-version }} make install
+
+      - name: Boot test
+        run: make tp TEST=TestFundamentals
+
+      - name: Run tests
+        run: make run-manual-trigger-gha-tests

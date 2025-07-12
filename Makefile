@@ -222,7 +222,7 @@ run-all-tests: env
 run-manual-trigger-gha-tests: env
 	$(call PRINT_TITLE,"Running GHA tests")
 	@echo "• Running GHA unit tests for inference, llm, and not gha_disabled"
-	$(VENV_PYTEST) --exitfirst --quiet -m "not (gha_disabled or pipelex_api) and (inference or llm)" || [ $$? = 5 ]
+	$(VENV_PYTEST) --exitfirst --quiet -m "not gha_disabled and (inference or llm)" || [ $$? = 5 ]
 
 run-gha_disabled-tests: env
 	$(call PRINT_TITLE,"Running GHA disabled tests")
