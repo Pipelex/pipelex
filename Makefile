@@ -82,12 +82,19 @@ make to                       - Shorthand -> test-ocr
 make test-imgg                - Run unit tests only for imgg (with prints)
 make test-g					  - Shorthand -> test-imgg
 
+make check-unused-imports     - Check for unused imports without fixing
+make fix-unused-imports       - Fix unused imports with ruff
+make fui                      - Shorthand -> fix-unused-imports
+make check-TODOs              - Check for TODOs
+
+make docs                     - Serve documentation with mkdocs
+make docs-check               - Check documentation build with mkdocs
+make docs-deploy              - Deploy documentation with mkdocs
+
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
 make cc                       - Shorthand -> cleanderived check
 make li                       - Shorthand -> lock install
-make check-unused-imports     - Check for unused imports without fixing
-make fix-unused-imports       - Fix unused imports with ruff
 
 endef
 export HELP
@@ -101,7 +108,7 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs doc doc-check
+	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy
 
 all help:
 	@echo "$$HELP"
@@ -390,6 +397,41 @@ merge-check-mypy: env
 	$(VENV_MYPY) --config-file pyproject.toml
 
 ##########################################################################################
+### MISCELLANEOUS
+##########################################################################################
+
+check-unused-imports: env
+	$(call PRINT_TITLE,"Checking for unused imports without fixing")
+	$(VENV_RUFF) check --select=F401 --no-fix .
+
+fix-unused-imports: env
+	$(call PRINT_TITLE,"Fixing unused imports")
+	$(VENV_RUFF) check --select=F401 --fix .
+
+fui: fix-unused-imports
+	@echo "> done: fui = fix-unused-imports"
+
+check-TODOs: env
+	$(call PRINT_TITLE,"Checking for TODOs")
+	@$(VENV_RUFF) check --select=TD -v .
+
+##########################################################################################
+### DOCUMENTATION
+##########################################################################################
+
+docs: env
+	$(call PRINT_TITLE,"Serving documentation with mkdocs")
+	$(VENV_MKDOCS) serve
+
+docs-check: env
+	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
+	$(VENV_MKDOCS) build --strict
+
+docs-deploy: env
+	$(call PRINT_TITLE,"Deploying documentation with mkdocs")
+	$(VENV_MKDOCS) gh-deploy --force --clean
+
+##########################################################################################
 ### SHORTHANDS
 ##########################################################################################
 
@@ -411,24 +453,3 @@ v: init validate
 
 li: lock install
 	@echo "> done: lock install"
-
-check-TODOs: env
-	$(call PRINT_TITLE,"Checking for TODOs")
-	$(VENV_RUFF) check --select=TD .
-
-fix-unused-imports: env
-	$(call PRINT_TITLE,"Fixing unused imports")
-	$(VENV_RUFF) check --select=F401 --fix .
-
-doc: env
-	$(call PRINT_TITLE,"Serving documentation with mkdocs")
-	$(VENV_MKDOCS) serve
-
-doc-check: env
-	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
-	$(VENV_MKDOCS) build --strict
-
-doc-deploy: env
-	$(call PRINT_TITLE,"Deploying documentation with mkdocs")
-	$(VENV_MKDOCS) gh-deploy --force --clean
-	

@@ -33,4 +33,4 @@ jobs:
         run: uv pip install -e ".[docs]"
 
       - name: Deploy documentation
-        run: make doc-deploy
+        run: make docs-deploy
