@@ -33,7 +33,7 @@ body:
     id: proposal
     attributes:
       label: "Proposed solution"
-      placeholder: "Describe the feature you’d like to see."
+      placeholder: "Describe the feature you'd like to see."
     validations:
       required: false
 
@@ -41,7 +41,7 @@ body:
     id: alternatives
     attributes:
       label: "Alternatives considered"
-      placeholder: "Any work-arounds you’ve tried or other approaches you considered."
+      placeholder: "Any work-arounds you've tried or other approaches you considered."
     validations:
       required: false
 

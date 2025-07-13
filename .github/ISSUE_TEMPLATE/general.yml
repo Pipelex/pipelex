@@ -1,0 +1,50 @@
+name: "📝 General issue"
+description: "Use this for questions, docs tweaks, refactors, or anything that isn't a Bug or Feature request."
+type: Task
+labels:
+  - status:needs-triage
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Thanks for opening an issue!**  
+        This form is for ideas or tasks that don't fit the Bug or Feature templates.
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: "Before submitting"
+      options:
+        - label: "I've checked [open issues](issues?q=is%3Aissue%20state%3Aopen) and found no similar item"
+          required: true
+        - label: "It's not really a bug report or a feature request"
+          required: false
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "What would you like to discuss or change?"
+      placeholder: |
+        A clear, concise description of the question, enhancement, refactor, or documentation update.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "Relevant context (optional)"
+      placeholder: |
+        Links, screenshots, or any additional details that will help us understand.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Would you like to help drive or implement this?
+      options:
+        - "Not at this time"
+        - "Yes, I'd like to contribute"
+    validations:
+      required: false
