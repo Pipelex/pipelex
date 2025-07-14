@@ -146,6 +146,7 @@ class WorkingMemoryFactory(BaseModel):
                     # Create mock object using polyfactory
                     class MockFactory(ModelFactory[structure_class]):  # type: ignore
                         __model__ = structure_class
+                        __check_model__ = True
                         __use_examples__ = True
                         __allow_none_optionals__ = False  # Ensure Optional fields always get values
 

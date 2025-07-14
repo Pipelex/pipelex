@@ -61,6 +61,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
         class ObjectFactory(ModelFactory[object_class]):  # type: ignore
             __model__ = object_class
+            __check_model__ = True
             __use_examples__ = True
             __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
