@@ -87,7 +87,7 @@
   {
     "name": "area:tests",
     "color": "7FDA9E",
-    "description": "Unit / integration tests"
+    "description": "Unit / integration / e2e tests"
   },
   {
     "name": "good first issue",

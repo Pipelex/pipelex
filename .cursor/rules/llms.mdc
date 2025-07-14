@@ -20,7 +20,7 @@ An llm_handle matches the handle (an id of sorts) with the full specification of
 The declaration of llm_handles looks like this in toml syntax:
 ```toml
 [llm_handles]
-gpt-4o-2024-08-06 = { llm_name = "gpt-4o", llm_version = "2024-08-06" }
+gpt-4o-2024-11-20 = { llm_name = "gpt-4o", llm_version = "2024-11-20" }
 ```
 
 In mosty cases, we only want to use version "latest" and llm_platform_choice "default" in which case the declaration is simply a match of the llm_handle to the llm_name, like this:

@@ -22,7 +22,7 @@ An LLM handle is a unique identifier that maps to a specific LLM configuration. 
 
 ```toml
 [llm_handles]
-gpt-4o-2024-08-06 = { llm_name = "gpt-4o", llm_version = "2024-08-06" }
+gpt-4o-2024-11-20 = { llm_name = "gpt-4o", llm_version = "2024-11-20" }
 ```
 
 There's a much simpler syntax if you want a handle to the latest version and default platform:
