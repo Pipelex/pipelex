@@ -1,0 +1,102 @@
+[
+  {
+    "name": "priority:P0",
+    "color": "B60205",
+    "description": "Critical — stop the line"
+  },
+  {
+    "name": "priority:P1",
+    "color": "D93F0B",
+    "description": "High priority"
+  },
+  {
+    "name": "priority:P2",
+    "color": "E36209",
+    "description": "Normal priority"
+  },
+  {
+    "name": "priority:P3",
+    "color": "FBCA04",
+    "description": "Low priority"
+  },
+  {
+    "name": "status:needs-triage",
+    "color": "A2BFFC",
+    "description": "Awaiting triage"
+  },
+  {
+    "name": "status:needs-info",
+    "color": "1E90FF",
+    "description": "Needs more information"
+  },
+  {
+    "name": "status:blocked",
+    "color": "004385",
+    "description": "Work is blocked"
+  },
+  {
+    "name": "status:in-progress",
+    "color": "0969DA",
+    "description": "Currently being worked on"
+  },
+  {
+    "name": "status:review",
+    "color": "6CA4F8",
+    "description": "Awaiting code review"
+  },
+  {
+    "name": "status:done",
+    "color": "14866D",
+    "description": "Completed / merged"
+  },
+  {
+    "name": "status:duplicate",
+    "color": "6F42C1",
+    "description": "May close as soon as it's verified."
+  },
+  {
+    "name": "status:not-planned",
+    "color": "6A737D",
+    "description": "Signals a likely won't-fix before formal closure."
+  },
+  {
+    "name": "status:invalid",
+    "color": "E4E669",
+    "description": "Needs more info or out of scope."
+  },
+  {
+    "name": "area:api",
+    "color": "0E8A16",
+    "description": "Backend & public API"
+  },
+  {
+    "name": "area:cli",
+    "color": "1A7F37",
+    "description": "Command-line interface"
+  },
+  {
+    "name": "area:core",
+    "color": "005630",
+    "description": "Core library logic"
+  },
+  {
+    "name": "area:docs",
+    "color": "28A745",
+    "description": "Documentation"
+  },
+  {
+    "name": "area:tests",
+    "color": "7FDA9E",
+    "description": "Unit / integration tests"
+  },
+  {
+    "name": "good first issue",
+    "color": "FFD33D",
+    "description": "Great for new contributors"
+  },
+  {
+    "name": "help wanted",
+    "color": "FFEA7F",
+    "description": "Maintainers would love help"
+  }
+]
