@@ -264,3 +264,11 @@ class ApiSerializationError(Exception):
     """Exception raised when API serialization fails."""
 
     pass
+
+
+class StartPipelineException(Exception):
+    pass
+
+
+class ExecutePipelineException(Exception):
+    pass

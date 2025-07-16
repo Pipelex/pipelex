@@ -6,6 +6,7 @@ from pipelex.core.pipe_run_params import FORCE_DRY_RUN_MODE_ENV_KEY, PipeOutputM
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.exceptions import ExecutePipelineException
 from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -54,7 +55,7 @@ async def execute_pipeline(
     """
     # Can be either working_memory or compact_memory, but not both
     if working_memory and input_memory:
-        raise ValueError("Cannot pass both working_memory and compact_memory")
+        raise ExecutePipelineException(f"Cannot pass both working_memory and input_memory to `execute_pipeline` {pipe_code=}")
 
     if input_memory:
         working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
