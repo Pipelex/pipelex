@@ -76,16 +76,16 @@ class PipelexClient(PipelexProtocol):
         self,
         pipe_code: str,
         working_memory: Optional[WorkingMemory] = None,
-        compact_memory: Optional[CompactMemory] = None,
+        input_memory: Optional[CompactMemory] = None,
         output_name: Optional[str] = None,
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
     ) -> PipelineResponse:
-        if working_memory and compact_memory:
-            raise ValueError(f"working_memory and compact_memory cannot be provided together to the API execute_pipeline {pipe_code=}")
+        if working_memory and input_memory:
+            raise ValueError(f"working_memory and input_memory cannot be provided together to the API execute_pipeline {pipe_code=}")
 
-        if compact_memory is not None:
-            working_memory = WorkingMemoryFactory.make_from_compact_memory(compact_memory)
+        if input_memory is not None:
+            working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
             working_memory=working_memory,
             output_name=output_name,
@@ -100,16 +100,16 @@ class PipelexClient(PipelexProtocol):
         self,
         pipe_code: str,
         working_memory: Optional[WorkingMemory] = None,
-        compact_memory: Optional[CompactMemory] = None,
+        input_memory: Optional[CompactMemory] = None,
         output_name: Optional[str] = None,
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
     ) -> PipelineResponse:
-        if working_memory and compact_memory:
-            raise ValueError(f"working_memory and compact_memory cannot be provided together to the API start_pipeline {pipe_code=}")
+        if working_memory and input_memory:
+            raise ValueError(f"working_memory and input_memory cannot be provided together to the API start_pipeline {pipe_code=}")
 
-        if compact_memory is not None:
-            working_memory = WorkingMemoryFactory.make_from_compact_memory(compact_memory)
+        if input_memory is not None:
+            working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
 
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
             working_memory=working_memory,

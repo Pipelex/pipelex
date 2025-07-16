@@ -45,13 +45,13 @@ class PipelineRequest(BaseModel):
     Request for executing a pipeline.
 
     Attributes:
-        compact_memory (Optional[CompactMemory]): In the format of WorkingMemory.to_compact_memory()
+        input_memory (Optional[CompactMemory]): In the format of WorkingMemory.to_compact_memory()
         output_name (Optional[str]): Name of the output slot to write to
         output_multiplicity (Optional[PipeOutputMultiplicity]): Output multiplicity setting
         dynamic_output_concept_code (Optional[str]): Override for the dynamic output concept code
     """
 
-    compact_memory: Optional[CompactMemory] = None
+    input_memory: Optional[CompactMemory] = None
     output_name: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
     dynamic_output_concept_code: Optional[str] = None
@@ -70,7 +70,7 @@ class PipelineResponse(ApiResponse):
 
         Example of pipe_output:
         "pipe_output": {
-            "compact_memory": {
+            "input_memory": {
                 "text": {
                     "concept_code": "native.Text",
                     "content": "Some text........"
@@ -125,7 +125,7 @@ class PipelexProtocol(Protocol):
         self,
         pipe_code: str,
         working_memory: Optional[WorkingMemory] = None,
-        compact_memory: Optional[CompactMemory] = None,
+        input_memory: Optional[CompactMemory] = None,
         output_name: Optional[str] = None,
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
@@ -136,6 +136,7 @@ class PipelexProtocol(Protocol):
         Args:
             pipe_code (str): The code identifying the pipeline to execute
             working_memory (Optional[WorkingMemory]): Memory context passed to the pipeline
+            input_memory (Optional[CompactMemory]): Input memory passed to the pipeline
             output_name (Optional[str]): Target output slot name
             output_multiplicity (Optional[PipeOutputMultiplicity]): Output multiplicity setting
             dynamic_output_concept_code (Optional[str]): Override for dynamic output concept
@@ -153,7 +154,7 @@ class PipelexProtocol(Protocol):
         self,
         pipe_code: str,
         working_memory: Optional[WorkingMemory] = None,
-        compact_memory: Optional[CompactMemory] = None,
+        input_memory: Optional[CompactMemory] = None,
         output_name: Optional[str] = None,
         output_multiplicity: Optional[PipeOutputMultiplicity] = None,
         dynamic_output_concept_code: Optional[str] = None,
@@ -164,6 +165,7 @@ class PipelexProtocol(Protocol):
         Args:
             pipe_code (str): The code identifying the pipeline to execute
             working_memory (Optional[WorkingMemory]): Memory context passed to the pipeline
+            input_memory (Optional[CompactMemory]): Input memory passed to the pipeline
             output_name (Optional[str]): Target output slot name
             output_multiplicity (Optional[PipeOutputMultiplicity]): Output multiplicity setting
             dynamic_output_concept_code (Optional[str]): Override for dynamic output concept

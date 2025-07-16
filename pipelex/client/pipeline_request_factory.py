@@ -30,7 +30,7 @@ class PipelineRequestFactory:
         """
 
         return PipelineRequest(
-            compact_memory=ApiSerializer.serialize_working_memory_for_api(working_memory),
+            input_memory=ApiSerializer.serialize_working_memory_for_api(working_memory),
             output_name=output_name,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
@@ -48,7 +48,7 @@ class PipelineRequestFactory:
             PipelineRequest object with dictionary working_memory
         """
         return PipelineRequest(
-            compact_memory=request_body.get(COMPACT_MEMORY_KEY),
+            input_memory=request_body.get(COMPACT_MEMORY_KEY),
             output_name=request_body.get("output_name"),
             output_multiplicity=request_body.get("output_multiplicity"),
             dynamic_output_concept_code=request_body.get("dynamic_output_concept_code"),
