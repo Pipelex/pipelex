@@ -1,9 +1,11 @@
 from typing import Optional
 
+from pipelex.client.protocol import CompactMemory
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import FORCE_DRY_RUN_MODE_ENV_KEY, PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -13,6 +15,7 @@ from pipelex.tools.environment import get_optional_env
 async def execute_pipeline(
     pipe_code: str,
     working_memory: Optional[WorkingMemory] = None,
+    input_memory: Optional[CompactMemory] = None,
     output_name: Optional[str] = None,
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
     dynamic_output_concept_code: Optional[str] = None,
@@ -30,6 +33,8 @@ async def execute_pipeline(
         The code of the pipe to execute.
     working_memory:
         Optional ``WorkingMemory`` instance passed to the pipe.
+    input_memory:
+        Optional compact memory to pass to the pipe.
     output_name:
         Name of the output slot to write to.
     output_multiplicity:
@@ -47,6 +52,13 @@ async def execute_pipeline(
     Tuple[PipeOutput, str]
         A tuple containing the pipe output and the pipeline run ID.
     """
+    # Can be either working_memory or compact_memory, but not both
+    if working_memory and input_memory:
+        raise ValueError("Cannot pass both working_memory and compact_memory")
+
+    if input_memory:
+        working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
+
     if pipe_run_mode is None:
         if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
             pipe_run_mode = PipeRunMode(run_mode_from_env)

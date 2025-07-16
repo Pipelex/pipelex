@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, List, Optional, cast
 
 from pipelex.client.protocol import CompactMemory
 from pipelex.core.concept_native import NativeConcept
@@ -21,7 +21,7 @@ class ApiSerializer:
     FIELDS_TO_SKIP = ("__class__", "__module__")
 
     @classmethod
-    def serialize_working_memory_for_api(cls, working_memory: WorkingMemory) -> CompactMemory:
+    def serialize_working_memory_for_api(cls, working_memory: Optional[WorkingMemory] = None) -> CompactMemory:
         """
         Convert WorkingMemory to API-ready format using kajson with proper datetime handling.
 
@@ -32,6 +32,8 @@ class ApiSerializer:
             Dict ready for API transmission with datetime strings and no __class__/__module__
         """
         compact_memory: CompactMemory = {}
+        if working_memory is None:
+            return compact_memory
 
         for stuff_name, stuff in working_memory.root.items():
             if stuff.concept_code == NativeConcept.TEXT.code:

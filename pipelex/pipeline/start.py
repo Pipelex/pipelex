@@ -1,10 +1,12 @@
 import asyncio
 from typing import Optional
 
+from pipelex.client.protocol import CompactMemory
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -13,6 +15,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 async def start_pipeline(
     pipe_code: str,
     working_memory: Optional[WorkingMemory] = None,
+    input_memory: Optional[CompactMemory] = None,
     output_name: Optional[str] = None,
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
     dynamic_output_concept_code: Optional[str] = None,
@@ -31,6 +34,8 @@ async def start_pipeline(
         The code of the pipe to execute.
     working_memory:
         Optional ``WorkingMemory`` instance passed to the pipe.
+    input_memory:
+        Optional compact memory to pass to the pipe.
     output_name:
         Name of the output slot to write to.
     output_multiplicity:
@@ -45,6 +50,12 @@ async def start_pipeline(
         The ``pipeline_run_id`` of the newly started pipeline and a task that
         can be awaited to get the pipe output.
     """
+
+    if working_memory and input_memory:
+        raise ValueError("Cannot pass both working_memory and input_memory")
+
+    if input_memory:
+        working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
 
     pipeline = get_pipeline_manager().add_new_pipeline()
     pipeline_run_id = pipeline.pipeline_run_id

@@ -5,10 +5,11 @@ from polyfactory.factories.pydantic_factory import ModelFactory
 from pydantic import BaseModel
 
 from pipelex import log
+from pipelex.client.protocol import CompactMemory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, PDFContent, StuffContent, TextContent
-from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
+from pipelex.core.stuff_factory import StuffBlueprint, StuffContentFactory, StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.exceptions import WorkingMemoryFactoryError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
@@ -122,6 +123,31 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_memory_file(cls, memory_file_path: str) -> WorkingMemory:
         working_memory_dict = load_json_dict_from_path(memory_file_path)
         working_memory = WorkingMemory.model_validate(working_memory_dict)
+        return working_memory
+
+    @classmethod
+    def make_from_compact_memory(cls, compact_memory: CompactMemory) -> WorkingMemory:
+        """
+        Create a WorkingMemory from a compact memory dictionary.
+
+        Args:
+            compact_memory: Dictionary in the format from API serialization
+
+        Returns:
+            WorkingMemory object reconstructed from the compact format
+        """
+        working_memory = cls.make_empty()
+
+        for stuff_key, stuff_data in compact_memory.items():
+            concept_code = stuff_data.get("concept_code", "")
+            content_value = stuff_data.get("content", {})
+
+            content = StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(concept_code=concept_code, value=content_value)
+
+            stuff = StuffFactory.make_stuff(concept_str=concept_code, name=stuff_key, content=content)
+
+            working_memory.add_new_stuff(name=stuff_key, stuff=stuff)
+
         return working_memory
 
     @classmethod

@@ -4,6 +4,7 @@ from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.pipe_works.pipe_job import PipeJob
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -19,7 +20,7 @@ class PipeJobFactory:
         output_name: Optional[str] = None,
     ) -> PipeJob:
         job_metadata = job_metadata or JobMetadata()
-        working_memory = working_memory or WorkingMemory()
+        working_memory = working_memory or WorkingMemoryFactory.make_empty()
         if not pipe_run_params:
             pipe_run_params = PipeRunParamsFactory.make_run_params()
         return PipeJob(

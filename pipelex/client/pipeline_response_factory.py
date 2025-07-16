@@ -35,16 +35,16 @@ class PipelineResponseFactory:
         Returns:
             PipelineResponse with the pipe output serialized to reduced format
         """
-        reduced_output = None
+        compact_output = None
         if pipe_output is not None:
-            reduced_output = ApiSerializer.serialize_pipe_output_for_api(pipe_output=pipe_output)
+            compact_output = ApiSerializer.serialize_pipe_output_for_api(pipe_output=pipe_output)
 
         return PipelineResponse(
             pipeline_run_id=pipeline_run_id,
             created_at=created_at,
             pipeline_state=pipeline_state,
             finished_at=finished_at,
-            pipe_output=reduced_output,
+            pipe_output=compact_output,
             status=status,
             message=message,
             error=error,
