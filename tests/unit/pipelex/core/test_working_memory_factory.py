@@ -56,22 +56,19 @@ class TestWorkingMemoryFactory:
                         },
                         "images": [
                             {
-                                "url": "https://example.com/image1.jpg",
+                                "url": "mock_url",
                                 "caption": "First image showing data visualization",
                                 "source_prompt": "Generate a chart showing quarterly sales data",
                             },
                             {
-                                "url": (
-                                    "data:image/png;base64,"
-                                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
-                                ),
+                                "url": ("data:image/png;base64,mock_base64"),
                                 "caption": "Second image with base64 data",
-                                "base_64": ("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="),
+                                "base_64": ("mock_base64"),
                             },
                             {"url": "/local/path/diagram.png", "caption": "System architecture diagram"},
                         ],
                     },
-                    "page_view": {"url": "https://example.com/page_screenshot.png", "caption": "Full page screenshot"},
+                    "page_view": {"url": "mock_url", "caption": "Full page screenshot"},
                 },
             }
         }
@@ -103,14 +100,14 @@ class TestWorkingMemoryFactory:
         # Check first image
         first_image = images[0]
         assert isinstance(first_image, ImageContent)
-        assert first_image.url == "https://example.com/image1.jpg"
+        assert first_image.url == "mock_url"
         assert first_image.caption == "First image showing data visualization"
         assert first_image.source_prompt == "Generate a chart showing quarterly sales data"
 
         # Check second image (with base64)
         second_image = images[1]
         assert isinstance(second_image, ImageContent)
-        expected_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+        expected_base64 = "mock_base64"
         assert second_image.base_64 == expected_base64
         assert second_image.caption == "Second image with base64 data"
 
@@ -124,7 +121,7 @@ class TestWorkingMemoryFactory:
         page_view = page_content.page_view
         assert page_view is not None
         assert isinstance(page_view, ImageContent)
-        assert page_view.url == "https://example.com/page_screenshot.png"
+        assert page_view.url == "mock_url"
         assert page_view.caption == "Full page screenshot"
 
     def test_make_from_compact_memory_empty(self):
