@@ -7,10 +7,8 @@ from typing import Any, Dict, List, Optional, cast
 from pipelex.client.protocol import CompactMemory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.stuff_content import StuffContent, TextContent
-from pipelex.core.stuff_factory import StuffContentFactory
+from pipelex.core.stuff_content import TextContent
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import ApiSerializationError
 
 
 class ApiSerializer:
@@ -103,24 +101,3 @@ class ApiSerializer:
             return str(content)  # Convert Path to string representation
         else:
             return content
-
-    @classmethod
-    def make_stuff_content_from_api_data(cls, concept_code: str, value: Dict[str, Any] | str) -> StuffContent:
-        """
-        Create StuffContent from API data using concept code.
-
-        Args:
-            concept_code: The concept code to determine the content type
-            value: The content value from API
-
-        Returns:
-            StuffContent instance
-
-        Raises:
-            ApiSerializationError: If concept cannot be resolved or content creation fails
-        """
-        try:
-            return StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(concept_code=concept_code, value=value)
-
-        except Exception as exc:
-            raise ApiSerializationError(f"Failed to create StuffContent for concept '{concept_code}': {exc}") from exc
