@@ -37,7 +37,7 @@ class PipelineRequestFactory:
         )
 
     @staticmethod
-    def make_request_from_body(request_body: Dict[str, Any]) -> PipelineRequest:
+    def make_from_body(request_body: Dict[str, Any]) -> PipelineRequest:
         """
         Create a PipelineRequest from raw request body dictionary.
 
