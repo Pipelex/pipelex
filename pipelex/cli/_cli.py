@@ -67,22 +67,31 @@ app = typer.Typer(
 
 @app.command("init-libraries")
 def init_libraries(
+    directory: Annotated[str, typer.Argument(help="Directory where to create the pipelex_libraries folder")] = ".",
     overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
 ) -> None:
-    """Initialize pipelex libraries in the current directory.
+    """Initialize pipelex libraries in a pipelex_libraries folder in the specified directory.
 
     If overwrite is False, only create files that don't exist yet.
     If overwrite is True, all files will be overwritten even if they exist.
     """
     try:
-        # TODO: Have a more proper print message regarding the overwrited files (e.g. list of files that were overwritten or not)
-        LibraryConfig().export_libraries(overwrite=overwrite)
+        # Always create a pipelex_libraries folder in the specified directory
+        target_path = os.path.join(directory, "pipelex_libraries")
+
+        # Create the target directory if it doesn't exist
+        os.makedirs(directory, exist_ok=True)
+
+        # Create a LibraryConfig instance with the target path
+        library_config = LibraryConfig(config_folder_path=target_path)
+        library_config.export_libraries(overwrite=overwrite)
+
         if overwrite:
-            typer.echo("Successfully initialized pipelex libraries (all files overwritten)")
+            typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_path}' (all files overwritten)")
         else:
-            typer.echo("Successfully initialized pipelex libraries (only created non-existing files)")
+            typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_path}' (only created non-existing files)")
     except Exception as e:
-        raise PipelexCLIError(f"Failed to initialize libraries: {e}")
+        raise PipelexCLIError(f"Failed to initialize libraries at '{directory}': {e}")
 
 
 @app.command("init-config")
@@ -175,31 +184,6 @@ def list_pipes(
 
     except Exception as e:
         raise PipelexCLIError(f"Failed to list pipes: {e}")
-
-
-@app.command()
-def export_libraries(
-    directory: Annotated[str, typer.Argument(help="Directory where to create the pipelex_libraries folder")] = ".",
-    overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
-) -> None:
-    """Export pipelex libraries to a pipelex_libraries folder in the specified directory."""
-    try:
-        # Always create a pipelex_libraries folder in the specified directory
-        target_path = os.path.join(directory, "pipelex_libraries")
-
-        # Create the target directory if it doesn't exist
-        os.makedirs(directory, exist_ok=True)
-
-        # Create a LibraryConfig instance with the target path
-        library_config = LibraryConfig(config_folder_path=target_path)
-        library_config.export_libraries(overwrite=overwrite)
-
-        if overwrite:
-            typer.echo(f"✅ Successfully exported pipelex libraries to '{target_path}' (all files overwritten)")
-        else:
-            typer.echo(f"✅ Successfully exported pipelex libraries to '{target_path}' (only created non-existing files)")
-    except Exception as e:
-        raise PipelexCLIError(f"Failed to export libraries to '{directory}': {e}")
 
 
 def main() -> None:

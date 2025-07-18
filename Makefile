@@ -137,18 +137,11 @@ env: check-uv
 	fi
 	@echo "Using Python: $$($(VENV_PYTHON) --version) from $$(which $$(readlink -f $(VENV_PYTHON)))"
 
-init: env
-	$(call PRINT_TITLE,"Running pipelex init-libraries and init-config")
-	$(VENV_PIPELEX) init-libraries
-	$(VENV_PIPELEX) init-config
-
 install: env
 	$(call PRINT_TITLE,"Installing dependencies")
 	@. $(VIRTUAL_ENV)/bin/activate && \
 	uv sync --all-extras && \
-	$(VENV_PIPELEX) init-libraries && \
-	$(VENV_PIPELEX) init-config && \
-	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras and initialized Pipelex";
+	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras.";
 
 lock: env
 	$(call PRINT_TITLE,"Resolving dependencies without update")
@@ -163,7 +156,7 @@ update: env
 
 validate: env
 	$(call PRINT_TITLE,"Running setup sequence")
-	$(VENV_PIPELEX) validate
+	$(VENV_PIPELEX) validate -c pipelex/libraries
 
 build: env
 	$(call PRINT_TITLE,"Building the wheels")
@@ -439,16 +432,16 @@ check-unused-imports: env
 	$(call PRINT_TITLE,"Checking for unused imports without fixing")
 	$(VENV_RUFF) check --select=F401 --no-fix .
 
-c: init format lint pyright mypy
+c: format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: init cleanderived c
-	@echo "> done: cc = init cleanderived init format lint pyright mypy"
+cc: cleanderived c
+	@echo "> done: cc = cleanderived init format lint pyright mypy"
 
 check: cc check-unused-imports
 	@echo "> done: check"
 
-v: init validate
+v: validate
 	@echo "> done: v = validate"
 
 li: lock install
