@@ -1,5 +1,29 @@
 # Changelog
 
+## [v0.6.2] - 2024-01-01
+
+### Added
+- New `dry-run-pipe` command to dry run a single pipe by its code
+- New `show-pipe` command to display pipe definitions from the pipe library
+- New `is_pipelex_libraries_folder()` function to validate pipelex libraries folder structure
+- New `dry_run_single_pipe()` function for running individual pipe dry runs
+- Added `pipelex_template.toml` configuration file with feature flags for pipeline tracking, activity tracking, and reporting
+- Added `cocode==0.0.6` as a development dependency with editable path configuration
+
+### Changed
+- Updated `init-libraries` command to accept a directory argument and create `pipelex_libraries` folder in specified location
+- Modified `validate` command to check for valid pipelex libraries folder before proceeding
+- Updated Makefile targets to remove `init` dependency from `c`, `cc`, and `v` targets
+- Moved `init` target definition to a different location in Makefile
+- Updated `validate` command to use `-c pipelex/libraries` flag
+- Changed `.gitignore` pattern from `pipelex_libraries/` to `/pipelex_libraries`
+- Modified GitHub workflow to use `manual-trigger-tests-check` branch and commented out other triggers
+
+### Removed
+- Removed `init` target from multiple Makefile command dependencies
+- Removed initialization steps from `install` target in Makefile
+- Commented out `workflow_dispatch` trigger in GitHub workflow
+
 ## [v0.6.1] - 2025-07-16
 
 - Can execute pipelines with `input_memory`: It is a `CompactMemory: Dict[str, Dict[str, Any]]`
