@@ -17,6 +17,35 @@ from pipelex.pipelex import Pipelex
 from pipelex.tools.config.manager import config_manager
 
 
+def is_pipelex_libraries_folder(folder_path: str) -> bool:
+    """Check if the given folder path contains a valid pipelex libraries structure.
+
+    A valid pipelex libraries folder should contain the following subdirectories:
+    - pipelines
+    - llm_deck
+    - llm_integrations
+    - plugins
+    - templates
+
+    Args:
+        folder_path: Path to the folder to check
+
+    Returns:
+        True if the folder contains all required subdirectories, False otherwise
+    """
+    if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
+        return False
+
+    required_subdirs = ["pipelines", "llm_deck", "llm_integrations", "plugins", "templates"]
+
+    for subdir in required_subdirs:
+        subdir_path = os.path.join(folder_path, subdir)
+        if not os.path.exists(subdir_path) or not os.path.isdir(subdir_path):
+            return False
+
+    return True
+
+
 class PipelexCLI(TyperGroup):
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Optional[Command]:
@@ -79,11 +108,15 @@ def init_config(
 def validate(
     relative_config_folder_path: Annotated[
         str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
-    ] = "pipelex_libraries",
+    ] = "./pipelex_libraries",
 ) -> None:
     """Run the setup sequence."""
-    config_folder_path = os.path.join(os.getcwd(), relative_config_folder_path)
-    LibraryConfig(config_folder_path=config_folder_path).export_libraries()
+    # Check if pipelex libraries folder exists
+    if not is_pipelex_libraries_folder(relative_config_folder_path):
+        typer.echo(f"❌ No pipelex libraries folder found at '{relative_config_folder_path}'")
+        typer.echo("To create a pipelex libraries folder, run: pipelex init-libraries")
+        raise typer.Exit(1)
+
     pipelex_instance = Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
     pipelex_instance.validate_libraries()
     asyncio.run(dry_run_all_pipes())
@@ -114,6 +147,31 @@ def list_pipes(
 
     except Exception as e:
         raise PipelexCLIError(f"Failed to list pipes: {e}")
+
+
+@app.command()
+def export_libraries(
+    directory: Annotated[str, typer.Argument(help="Directory where to create the pipelex_libraries folder")] = ".",
+    overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
+) -> None:
+    """Export pipelex libraries to a pipelex_libraries folder in the specified directory."""
+    try:
+        # Always create a pipelex_libraries folder in the specified directory
+        target_path = os.path.join(directory, "pipelex_libraries")
+
+        # Create the target directory if it doesn't exist
+        os.makedirs(directory, exist_ok=True)
+
+        # Create a LibraryConfig instance with the target path
+        library_config = LibraryConfig(config_folder_path=target_path)
+        library_config.export_libraries(overwrite=overwrite)
+
+        if overwrite:
+            typer.echo(f"✅ Successfully exported pipelex libraries to '{target_path}' (all files overwritten)")
+        else:
+            typer.echo(f"✅ Successfully exported pipelex libraries to '{target_path}' (only created non-existing files)")
+    except Exception as e:
+        raise PipelexCLIError(f"Failed to export libraries to '{directory}': {e}")
 
 
 def main() -> None:
