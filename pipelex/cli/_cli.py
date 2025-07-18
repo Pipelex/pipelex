@@ -10,7 +10,7 @@ from typing_extensions import override
 
 from pipelex import log, pretty_print
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
-from pipelex.hub import get_pipe_provider, get_pipeline_tracker
+from pipelex.hub import get_pipe_provider, get_pipeline_tracker, get_required_pipe
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.pipe_works.pipe_dry import dry_run_all_pipes, dry_run_single_pipe
 from pipelex.pipelex import Pipelex
@@ -184,6 +184,22 @@ def list_pipes(
 
     except Exception as e:
         raise PipelexCLIError(f"Failed to list pipes: {e}")
+
+
+@app.command("show-pipe")
+def show_pipe(
+    pipe_code: Annotated[
+        str,
+        typer.Argument(help="Pipeline code to show definition for"),
+    ],
+    relative_config_folder_path: Annotated[
+        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
+    ] = "./pipelex_libraries",
+) -> None:
+    """Show pipe from the pipe library."""
+    Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+    pipe = get_required_pipe(pipe_code=pipe_code)
+    pretty_print(pipe, title=f"Pipe '{pipe_code}'")
 
 
 def main() -> None:
