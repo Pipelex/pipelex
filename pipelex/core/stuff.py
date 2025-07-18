@@ -18,7 +18,7 @@ from pipelex.core.stuff_content import (
     TextAndImagesContent,
     TextContent,
 )
-from pipelex.exceptions import StuffError
+from pipelex.exceptions import StuffContentValidationError, StuffError
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
@@ -106,9 +106,28 @@ class Stuff(CustomBaseModel):
 
     def content_as(self, content_type: Type[StuffContentType]) -> StuffContentType:
         """Get content with proper typing if it's of the expected type."""
-        if not isinstance(self.content, content_type):
-            raise TypeError(f"Content is of type '{type(self.content)}', instead of the expected '{content_type}'")
-        return self.content
+        # First try the direct isinstance check for performance
+        if isinstance(self.content, content_type):
+            return self.content
+
+        # If isinstance failed, try model validation approach
+        try:
+            # Check if class names match (quick filter before attempting validation)
+            if type(self.content).__name__ == content_type.__name__:
+                # Convert to dict and validate with the target class
+                content_dict = self.content.model_dump()
+                # Try to validate the content with the target class
+                validated_content = content_type.model_validate(content_dict)
+                log.debug(f"Model validation passed: converted {type(self.content).__name__} to {content_type.__name__}")
+                return validated_content
+        except Exception as e:
+            # If validation fails, raise our specific validation error
+            raise StuffContentValidationError(
+                original_type=type(self.content).__name__, target_type=content_type.__name__, validation_error=str(e)
+            ) from e
+
+        # If we get here, the types are genuinely different
+        raise TypeError(f"Content is of type '{type(self.content)}', instead of the expected '{content_type}'")
 
     def as_list_content(self) -> ListContent:  # pyright: ignore[reportMissingTypeArgument, reportUnknownParameterType]
         """Get content as ListContent with items of any type."""

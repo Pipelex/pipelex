@@ -157,6 +157,16 @@ class StuffError(PipelexError):
     pass
 
 
+class StuffContentValidationError(StuffError):
+    """Raised when content validation fails during type conversion."""
+
+    def __init__(self, original_type: str, target_type: str, validation_error: str):
+        self.original_type = original_type
+        self.target_type = target_type
+        self.validation_error = validation_error
+        super().__init__(f"Failed to validate content from {original_type} to {target_type}: {validation_error}")
+
+
 class PipeExecutionError(PipelexError):
     pass
 
