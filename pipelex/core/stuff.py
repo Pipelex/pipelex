@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, Type, Union
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -20,7 +20,7 @@ from pipelex.core.stuff_content import (
 )
 from pipelex.exceptions import StuffContentValidationError, StuffError
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
-from pipelex.tools.typing.pydantic_utils import CustomBaseModel
+from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
 
 
 class Stuff(CustomBaseModel):
@@ -114,19 +114,16 @@ class Stuff(CustomBaseModel):
         try:
             # Check if class names match (quick filter before attempting validation)
             if type(self.content).__name__ == content_type.__name__:
-                # Convert to dict and validate with the target class
-                content_dict = self.content.model_dump()
-                # Try to validate the content with the target class
+                content_dict = self.content.smart_dump()
                 validated_content = content_type.model_validate(content_dict)
                 log.debug(f"Model validation passed: converted {type(self.content).__name__} to {content_type.__name__}")
                 return validated_content
-        except Exception as e:
-            # If validation fails, raise our specific validation error
+        except ValidationError as exc:
+            formatted_error = format_pydantic_validation_error(exc)
             raise StuffContentValidationError(
-                original_type=type(self.content).__name__, target_type=content_type.__name__, validation_error=str(e)
-            ) from e
+                original_type=type(self.content).__name__, target_type=content_type.__name__, validation_error=formatted_error
+            ) from exc
 
-        # If we get here, the types are genuinely different
         raise TypeError(f"Content is of type '{type(self.content)}', instead of the expected '{content_type}'")
 
     def as_list_content(self) -> ListContent:  # pyright: ignore[reportMissingTypeArgument, reportUnknownParameterType]
