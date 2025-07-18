@@ -7,7 +7,7 @@ on:
       # - main
       # - dev
       # - "release/v[0-9]+.[0-9]+.[0-9]+"
-  workflow_dispatch:
+  # workflow_dispatch:
 
 jobs:
   trigger-tests:
