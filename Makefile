@@ -154,6 +154,11 @@ update: env
 	uv sync --all-extras && \
 	echo "Updated dependencies in ${VIRTUAL_ENV}";
 
+init: env
+	$(call PRINT_TITLE,"Running pipelex init-libraries and init-config")
+	$(VENV_PIPELEX) init-libraries
+	$(VENV_PIPELEX) init-config
+
 validate: env
 	$(call PRINT_TITLE,"Running setup sequence")
 	$(VENV_PIPELEX) validate -c pipelex/libraries
@@ -436,7 +441,7 @@ c: format lint pyright mypy
 	@echo "> done: c = check"
 
 cc: cleanderived c
-	@echo "> done: cc = cleanderived init format lint pyright mypy"
+	@echo "> done: cc = cleanderived format lint pyright mypy"
 
 check: cc check-unused-imports
 	@echo "> done: check"
