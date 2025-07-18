@@ -10,9 +10,9 @@ from typing_extensions import override
 
 from pipelex import log, pretty_print
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
-from pipelex.hub import get_pipe_provider
+from pipelex.hub import get_pipe_provider, get_pipeline_tracker
 from pipelex.libraries.library_config import LibraryConfig
-from pipelex.pipe_works.pipe_dry import dry_run_all_pipes
+from pipelex.pipe_works.pipe_dry import dry_run_all_pipes, dry_run_single_pipe
 from pipelex.pipelex import Pipelex
 from pipelex.tools.config.manager import config_manager
 
@@ -121,6 +121,34 @@ def validate(
     pipelex_instance.validate_libraries()
     asyncio.run(dry_run_all_pipes())
     log.info("Setup sequence passed OK, config and pipelines are validated.")
+
+
+@app.command()
+def dry_run_pipe(
+    pipe_code: Annotated[str, typer.Argument(help="The pipe code to dry run")],
+    relative_config_folder_path: Annotated[
+        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
+    ] = "./pipelex_libraries",
+) -> None:
+    """Dry run a single pipe."""
+    # Check if pipelex libraries folder exists
+    if not is_pipelex_libraries_folder(relative_config_folder_path):
+        typer.echo(f"❌ No pipelex libraries folder found at '{relative_config_folder_path}'")
+        typer.echo("To create a pipelex libraries folder, run: pipelex init-libraries")
+        raise typer.Exit(1)
+
+    try:
+        # Initialize Pipelex
+        pipelex_instance = Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+        pipelex_instance.validate_libraries()
+
+        # Run the single pipe dry run
+        asyncio.run(dry_run_single_pipe(pipe_code))
+        get_pipeline_tracker().output_flowchart()
+
+    except Exception as e:
+        typer.echo(f"❌ Error running dry run for pipe '{pipe_code}': {e}")
+        raise typer.Exit(1)
 
 
 @app.command()

@@ -21,6 +21,29 @@ async def dry_run_all_pipes():
     await dry_run_pipes(pipes=all_pipes)
 
 
+async def dry_run_single_pipe(pipe_code: str) -> str:
+    """
+    Dry run a single pipe by its code.
+
+    Args:
+        pipe_code: The code of the pipe to dry run
+
+    Returns:
+        Status string: "SUCCESS" or error message
+    """
+    try:
+        # Get the pipe using the hub function
+        pipe = get_pipe_provider().get_optional_pipe(pipe_code=pipe_code)
+        if not pipe:
+            return f"FAILED: Pipe '{pipe_code}' not found"
+
+        # Run the single pipe
+        result = await dry_run_pipes(pipes=[pipe])
+        return result.get(pipe_code, f"FAILED: No result for pipe '{pipe_code}'")
+    except Exception as e:
+        return f"FAILED: {str(e)}"
+
+
 # TODO: add a function to dry run a single pipe, make it callable as a param of `pipelex validate`
 async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
     """

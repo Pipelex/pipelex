@@ -1,3 +1,10 @@
+[pipelex]
+[pipelex.feature_config]
+# WIP/Experimental feature flags
+is_pipeline_tracking_enabled = true
+is_activity_tracking_enabled = true
+is_reporting_enabled = true
+
 [pipelex.aws_config]
 api_key_method = "env"
 # The possible values are "env" and "secret_provider".
