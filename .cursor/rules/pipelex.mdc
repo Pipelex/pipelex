@@ -444,3 +444,10 @@ get_pipeline_tracker().output_flowchart()
 ```
 
 ALWAYS RUN `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate until it works.
+
+# Error Handling & Validation
+
+## Validation Error Handling
+
+- Use `StuffContentValidationError` for handling content validation failures
+- Use `format_pydantic_validation_error` to format validation errors consistently

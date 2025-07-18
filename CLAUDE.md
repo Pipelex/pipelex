@@ -15,6 +15,12 @@ This python >=3.10 code is in the `pipelex` directory.
 - Add trailing commas to multi-line lists, dicts, function arguments, and tuples with >2 items (helps with cleaner diffs and prevents syntax errors when adding items)
 - All imports inside this repo's packages must be absolute package paths from the root
 
+## Error Handling & Validation
+
+- Use `StuffContentValidationError` for type validation failures
+- Apply `format_pydantic_validation_error` for formatting validation errors consistently
+
+
 ## Test file structure
 
 - Name test files with `test_` prefix
