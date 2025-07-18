@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.6.3] - 2025-07-18
+
+### Changed
+- Enhanced `Stuff.content_as()` method with improved type validation logic - now attempts model validation when `isinstance` check fails
+
 ## [v0.6.2] - 2025-07-18
 
 ### Added
