@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.6.4] - 2025-07-19
+
+- Fixed the `README.md` link to the documentation
+
 ## [v0.6.3] - 2025-07-18
 
 ### Changed

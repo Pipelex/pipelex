@@ -87,7 +87,7 @@ Pipelex is an **open-source Python library** with a hosted API launching soon. I
 
 # 🚀 Quick start
 
-> :books: Note that you can check out the [Pipelex Documentation](docs/Documentation.md) for more information and clone the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) repository for ready-to-run samples.
+> :books: Note that you can check out the [Pipelex Documentation](https://docs.pipelex.com/) for more information and clone the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) repository for ready-to-run examples.
 
 Follow these steps to get started:
 
