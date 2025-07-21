@@ -44,7 +44,6 @@ async def dry_run_single_pipe(pipe_code: str) -> str:
         return f"FAILED: {str(e)}"
 
 
-# TODO: add a function to dry run a single pipe, make it callable as a param of `pipelex validate`
 async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
     """
     Dry run all pipes in the library using ThreadPoolExecutor for true parallelism.
@@ -71,8 +70,12 @@ async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
         """Execute pipe.run_pipe in a thread and return its status."""
         try:
             # This function runs in a separate thread
-            needed_inputs_for_factory = _convert_to_working_memory_format(pipe.needed_inputs())
+            needed_inputs = pipe.needed_inputs()
+            log.debug(f"Needed inputs for {pipe.code}: {needed_inputs}")
+            needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=needed_inputs)
+            log.debug(f"Needed inputs for {pipe.code} converted to working memory format: {needed_inputs_for_factory}")
             working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
+            working_memory.pretty_print_summary()
 
             # Create a new event loop for this thread
             loop = asyncio.new_event_loop()
@@ -94,14 +97,14 @@ async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
 
             return result
 
-        except Exception as e:
-            error_msg = f"FAILED: {str(e)}"
+        except Exception as exc:
+            error_msg = f"FAILED: {str(exc)}"
 
             # Check if this pipe is allowed to fail
             if pipe.code in allowed_to_fail_pipes:
-                log.debug(f"✗ Pipe {pipe.code} dry run failed: {e} (this is normal, allowed by config)")
+                log.debug(f"✗ Pipe {pipe.code} dry run failed: {exc} (this is normal, allowed by config)")
             else:
-                log.error(f"✗ Pipe {pipe.code} dry run failed: {e}")
+                log.error(f"✗ Pipe {pipe.code} dry run failed: {exc}")
 
             return (pipe.code, error_msg)
 
@@ -118,16 +121,17 @@ async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
             pipe_code, status = await future
             results[pipe_code] = status
 
-    successful_pipes = [code for code, status in results.items() if status == "SUCCESS"]
-    failed_pipes = [code for code, status in results.items() if status != "SUCCESS"]
+    successful_pipes = [pipe_code for pipe_code, status in results.items() if status == "SUCCESS"]
+    failed_pipes = [pipe_code for pipe_code, status in results.items() if status != "SUCCESS"]
 
     # Filter out pipes that are allowed to fail
-    unexpected_failures = [pipe for pipe in failed_pipes if pipe not in allowed_to_fail_pipes]
+    unexpected_failures = {pipe_code: results[pipe_code] for pipe_code in failed_pipes if pipe_code not in allowed_to_fail_pipes}
 
     log.info(f"Dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed, in {time.time() - start_time:.2f} seconds")
 
     if unexpected_failures:
-        raise Exception(f"Dry run failed with {len(unexpected_failures)} unexpected pipe failures: {', '.join(unexpected_failures)}")
+        unexpected_failures_details = "\n".join([f"{pipe_code}: {results[pipe_code]}" for pipe_code in unexpected_failures])
+        raise Exception(f"Dry run failed with {len(unexpected_failures)} unexpected pipe failures: {unexpected_failures_details}")
 
     if failed_pipes and not unexpected_failures:
         log.info("All failures were expected (allowed by config)")

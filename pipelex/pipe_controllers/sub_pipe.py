@@ -28,6 +28,7 @@ class SubPipe(BaseModel):
     ) -> PipeOutput:
         """Run or dry run a single operation self."""
         log.debug(f"SubPipe {self.pipe_code} to generate {self.output_name}")
+        working_memory.pretty_print_summary()
         # step_run_params.push_pipe_code(pipe_code=self.pipe_code)
         if self.output_multiplicity:
             sub_pipe_run_params.output_multiplicity = self.output_multiplicity
@@ -102,7 +103,7 @@ class SubPipe(BaseModel):
                 sub_pipe_path_str = ".".join(sub_pipe_path)
                 error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
                 raise PipeInputError(f"Some required stuff(s) not found: {error_details}") from exc
-            log.debug(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
+            log.verbose(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
             # This is the only line that changes between run and dry_run
             if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
                 sub_pipe_run_params.run_mode = PipeRunMode.DRY
