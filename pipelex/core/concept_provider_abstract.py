@@ -54,3 +54,7 @@ class ConceptProviderAbstract(ABC):
     @abstractmethod
     def is_concept_code_legal(self, concept_code: str) -> bool:
         pass
+
+    @abstractmethod
+    def search_for_concept_in_domains(self, concept_name: str, search_domains: List[str]) -> Optional[Concept]:
+        pass

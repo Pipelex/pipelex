@@ -1,13 +1,22 @@
-from typing import Optional
+from typing import List, Optional
 
-from pipelex.client.protocol import CompactMemory
+from pipelex.client.protocol import ImplicitMemory
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import FORCE_DRY_RUN_MODE_ENV_KEY, PipeOutputMultiplicity, PipeRunMode
+from pipelex.core.pipe_run_params import (
+    FORCE_DRY_RUN_MODE_ENV_KEY,
+    PipeOutputMultiplicity,
+    PipeRunMode,
+)
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.exceptions import ExecutePipelineException
-from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
+from pipelex.exceptions import PipelineInputError
+from pipelex.hub import (
+    get_pipe_router,
+    get_pipeline_manager,
+    get_report_delegate,
+    get_required_pipe,
+)
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.environment import get_optional_env
@@ -16,7 +25,8 @@ from pipelex.tools.environment import get_optional_env
 async def execute_pipeline(
     pipe_code: str,
     working_memory: Optional[WorkingMemory] = None,
-    input_memory: Optional[CompactMemory] = None,
+    input_memory: Optional[ImplicitMemory] = None,
+    search_domains: Optional[List[str]] = None,
     output_name: Optional[str] = None,
     output_multiplicity: Optional[PipeOutputMultiplicity] = None,
     dynamic_output_concept_code: Optional[str] = None,
@@ -53,12 +63,19 @@ async def execute_pipeline(
     Tuple[PipeOutput, str]
         A tuple containing the pipe output and the pipeline run ID.
     """
-    # Can be either working_memory or compact_memory, but not both
-    if working_memory and input_memory:
-        raise ExecutePipelineException(f"Cannot pass both working_memory and input_memory to `execute_pipeline` {pipe_code=}")
+    search_domains = search_domains or []
+    pipe = get_required_pipe(pipe_code=pipe_code)
+    if pipe.domain not in search_domains:
+        search_domains.insert(0, pipe.domain)
 
-    if input_memory:
-        working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
+    # Can be either working_memory or compact_memory or neither, but not both
+    if working_memory and input_memory:
+        raise PipelineInputError(f"Cannot pass both working_memory and input_memory to `execute_pipeline` {pipe_code=}")
+    elif input_memory:
+        working_memory = WorkingMemoryFactory.make_from_implicit_memory(
+            implicit_memory=input_memory,
+            search_domains=search_domains,
+        )
 
     if pipe_run_mode is None:
         if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
@@ -69,7 +86,6 @@ async def execute_pipeline(
     pipeline = get_pipeline_manager().add_new_pipeline()
     pipeline_run_id = pipeline.pipeline_run_id
     get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
-    pipe = get_required_pipe(pipe_code=pipe_code)
 
     job_metadata = JobMetadata(
         pipeline_run_id=pipeline_run_id,

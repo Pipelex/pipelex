@@ -1,15 +1,15 @@
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, cast
 
 import shortuuid
 from polyfactory.factories.pydantic_factory import ModelFactory
 from pydantic import BaseModel
 
 from pipelex import log
-from pipelex.client.protocol import CompactMemory
+from pipelex.client.protocol import CompactMemory, ImplicitMemory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, PDFContent, StuffContent, TextContent
-from pipelex.core.stuff_factory import StuffBlueprint, StuffContentFactory, StuffFactory
+from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.exceptions import WorkingMemoryFactoryError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
@@ -126,7 +126,23 @@ class WorkingMemoryFactory(BaseModel):
         return working_memory
 
     @classmethod
-    def make_from_compact_memory(cls, compact_memory: CompactMemory) -> WorkingMemory:
+    def make_from_compact_memory(
+        cls,
+        compact_memory: CompactMemory,
+        search_domains: Optional[List[str]] = None,
+    ) -> WorkingMemory:
+        implicit_memory = cast(ImplicitMemory, compact_memory)
+        return cls.make_from_implicit_memory(
+            implicit_memory=implicit_memory,
+            search_domains=search_domains,
+        )
+
+    @classmethod
+    def make_from_implicit_memory(
+        cls,
+        implicit_memory: ImplicitMemory,
+        search_domains: Optional[List[str]] = None,
+    ) -> WorkingMemory:
         """
         Create a WorkingMemory from a compact memory dictionary.
 
@@ -138,13 +154,12 @@ class WorkingMemoryFactory(BaseModel):
         """
         working_memory = cls.make_empty()
 
-        for stuff_key, stuff_data in compact_memory.items():
-            concept_code = stuff_data.get("concept_code", "")
-            content_value = stuff_data.get("content", {})
-
-            content = StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(concept_code=concept_code, value=content_value)
-
-            stuff = StuffFactory.make_stuff(concept_str=concept_code, name=stuff_key, content=content)
+        for stuff_key, stuff_content_or_data in implicit_memory.items():
+            stuff = StuffFactory.make_stuff_from_stuff_content_using_search_domains(
+                name=stuff_key,
+                stuff_content_or_data=stuff_content_or_data,
+                search_domains=search_domains or [],
+            )
 
             working_memory.add_new_stuff(name=stuff_key, stuff=stuff)
 

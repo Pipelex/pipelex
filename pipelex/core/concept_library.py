@@ -5,6 +5,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concept import Concept
+from pipelex.core.concept_code_factory import ConceptCodeFactory
 from pipelex.core.concept_factory import ConceptFactory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
@@ -178,3 +179,12 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
         refines_image = self.is_compatible_by_concept_code(tested_concept_code=concept.code, wanted_concept_code=NativeConcept.IMAGE.code)
         return is_image_class or refines_image
+
+    @override
+    def search_for_concept_in_domains(self, concept_name: str, search_domains: List[str]) -> Optional[Concept]:
+        for domain in search_domains:
+            concept_code = ConceptCodeFactory.make_concept_code(domain=domain, code=concept_name)
+            if found_concept := self.get_concept(concept_code=concept_code):
+                return found_concept
+
+        return None
