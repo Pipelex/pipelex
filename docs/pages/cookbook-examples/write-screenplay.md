@@ -25,7 +25,7 @@ async def generate_screenplay(pitch: str):
     working_memory = WorkingMemoryFactory.make_from_single_stuff(pitch_stuff)
 
     # Run the pipe
-    pipe_output, _ = await execute_pipeline(
+    pipe_output = await execute_pipeline(
         pipe_code="generate_screenplay",
         working_memory=working_memory,
     )

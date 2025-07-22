@@ -33,7 +33,7 @@ async def optimize_tweet(draft_tweet_str: str, writing_style_str: str) -> Optimi
     )
 
     # Run the sequence pipe
-    pipe_output, _ = await execute_pipeline(
+    pipe_output = await execute_pipeline(
         pipe_code="optimize_tweet_sequence",
         working_memory=working_memory,
     )

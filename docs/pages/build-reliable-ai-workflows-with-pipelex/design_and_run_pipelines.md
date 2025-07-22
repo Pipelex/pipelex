@@ -138,7 +138,7 @@ async def main():
     )
 
     # Execute the pipeline and wait for the result
-    pipe_output, _ = await execute_pipeline(
+    pipe_output = await execute_pipeline(
         pipe_code="description_to_tagline",
         working_memory=working_memory,
     )

@@ -19,7 +19,7 @@ async def simple_ocr(pdf_url: str):
         concept_str="PDF",
         name="pdf",
     )
-    pipe_output, _ = await execute_pipeline(
+    pipe_output = await execute_pipeline(
         pipe_code="extract_page_contents_from_pdf",
         working_memory=working_memory,
     )

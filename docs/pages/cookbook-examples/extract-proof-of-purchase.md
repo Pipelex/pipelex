@@ -17,7 +17,7 @@ async def extract_proof_of_purchase(pdf_url: str) -> ProofOfPurchase:
         concept_str="PDF",
         name="pdf",
     )
-    pipe_output, _ = await execute_pipeline(
+    pipe_output = await execute_pipeline(
         pipe_code="power_extractor_proof_of_purchase",
         working_memory=working_memory,
     )

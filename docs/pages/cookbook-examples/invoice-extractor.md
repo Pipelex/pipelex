@@ -19,7 +19,7 @@ async def process_expense_report() -> ListContent[Invoice]:
         pdf_url=invoice_pdf_path,
         name="invoice_pdf",
     )
-    pipe_output, _ = await execute_pipeline(
+    pipe_output = await execute_pipeline(
         pipe_code="process_invoice",
         working_memory=working_memory,
     )

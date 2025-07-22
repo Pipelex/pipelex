@@ -40,7 +40,7 @@ from pipelex.pipelex import Pipelex
 
 async def create_character():
     # Run the script with execute_pipe
-    pipe_output, _ = await execute_pipeline(
+    pipe_output = await execute_pipeline(
         pipe_code="create_character",
     )
     # Print the output

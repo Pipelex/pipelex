@@ -25,7 +25,7 @@ from pipelex.pipeline.execute import execute_pipeline
 async def hello_world():
 
     # Execute the pipeline
-    pipe_output, _ = await execute_pipeline(
+    pipe_output = await execute_pipeline(
         pipe_code="hello_world",
     )
 
