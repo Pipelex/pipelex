@@ -3,7 +3,7 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
 from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
@@ -64,7 +64,15 @@ class TestPipeConditionSimple:
         )
 
         # Test with proper working memory - should SUCCEED or fail at expression evaluation (not missing inputs)
-        working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=[("user_status", "test_pipe_condition.CategoryInput", CategoryInput)])
+        working_memory = WorkingMemoryFactory.make_for_dry_run(
+            needed_inputs=[
+                TypedNamedInputRequirement(
+                    variable_name="user_status",
+                    concept_code="test_pipe_condition.CategoryInput",
+                    structure_class=CategoryInput,
+                )
+            ]
+        )
 
         try:
             pipe_output = await pipe_condition.run_pipe(

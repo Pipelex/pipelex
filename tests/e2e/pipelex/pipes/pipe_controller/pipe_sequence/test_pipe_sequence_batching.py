@@ -5,6 +5,7 @@ from typing import cast
 import pytest
 
 from pipelex import log
+from pipelex.core.pipe_input_spec import TypedNamedInputRequirement
 from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_factory import StuffFactory
@@ -24,7 +25,11 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     if pipe_run_mode == PipeRunMode.DRY:
         working_memory = WorkingMemoryFactory.make_for_dry_run(
             needed_inputs=[
-                ("document", "customer_feedback.Document", Document),
+                TypedNamedInputRequirement(
+                    variable_name="document",
+                    concept_code="customer_feedback.Document",
+                    structure_class=Document,
+                ),
             ]
         )
         pipe = get_required_pipe(pipe_code="analyze_reviews_sequence")

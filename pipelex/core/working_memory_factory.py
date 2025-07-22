@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.client.protocol import CompactMemory, ImplicitMemory
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.pipe_input_spec import TypedNamedInputRequirement
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ImageContent, PDFContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
@@ -166,7 +167,7 @@ class WorkingMemoryFactory(BaseModel):
         return working_memory
 
     @classmethod
-    def make_for_dry_run(cls, needed_inputs: List[Tuple[str, str, Type[StuffContent]]]) -> "WorkingMemory":
+    def make_for_dry_run(cls, needed_inputs: List[TypedNamedInputRequirement]) -> "WorkingMemory":
         """
         Create a WorkingMemory with mock objects for dry run mode.
 
@@ -179,14 +180,17 @@ class WorkingMemoryFactory(BaseModel):
 
         working_memory = cls.make_empty()
 
-        for variable_name, concept_code, structure_class in needed_inputs:
-            log.debug(f"Creating dry run mock for '{variable_name}' with concept '{concept_code}' and class '{structure_class.__name__}'")
+        for requirement in needed_inputs:
+            log.debug(
+                f"Creating dry run mock for '{requirement.variable_name}' with concept "
+                f"'{requirement.concept_code}' and class '{requirement.structure_class.__name__}'"
+            )
 
             try:
-                if structure_class:
+                if requirement.structure_class:
                     # Create mock object using polyfactory
-                    class MockFactory(ModelFactory[structure_class]):  # type: ignore
-                        __model__ = structure_class
+                    class MockFactory(ModelFactory[requirement.structure_class]):  # type: ignore
+                        __model__ = requirement.structure_class
                         __check_model__ = True
                         __use_examples__ = True
                         __allow_none_optionals__ = False  # Ensure Optional fields always get values
@@ -194,28 +198,30 @@ class WorkingMemoryFactory(BaseModel):
                     mock_content = MockFactory.build()
                 else:
                     # Fallback to text content
-                    mock_content = TextContent(text=f"DRY RUN: Mock content for '{variable_name}' ({concept_code})")
+                    mock_content = TextContent(text=f"DRY RUN: Mock content for '{requirement.variable_name}' ({requirement.concept_code})")
 
                 # Create stuff with mock content
                 mock_stuff = Stuff(
-                    stuff_name=variable_name,
+                    stuff_name=requirement.variable_name,
                     stuff_code=shortuuid.uuid()[:5],
-                    concept_code=concept_code,
+                    concept_code=requirement.concept_code,
                     content=mock_content,
                 )
 
-                working_memory.add_new_stuff(name=variable_name, stuff=mock_stuff)
+                working_memory.add_new_stuff(name=requirement.variable_name, stuff=mock_stuff)
 
             except Exception as e:
-                log.warning(f"Failed to create mock for '{variable_name}' ({concept_code}): {e}. Using fallback text content.")
+                log.warning(
+                    f"Failed to create mock for '{requirement.variable_name}' ({requirement.concept_code}): {e}. Using fallback text content."
+                )
                 # Create fallback text content
-                fallback_content = TextContent(text=f"DRY RUN: Fallback mock for '{variable_name}' ({concept_code})")
+                fallback_content = TextContent(text=f"DRY RUN: Fallback mock for '{requirement.variable_name}' ({requirement.concept_code})")
                 fallback_stuff = Stuff(
-                    stuff_name=variable_name,
+                    stuff_name=requirement.variable_name,
                     stuff_code=shortuuid.uuid()[:5],
-                    concept_code=concept_code,
+                    concept_code=requirement.concept_code,
                     content=fallback_content,
                 )
-                working_memory.add_new_stuff(name=variable_name, stuff=fallback_stuff)
+                working_memory.add_new_stuff(name=requirement.variable_name, stuff=fallback_stuff)
 
         return working_memory

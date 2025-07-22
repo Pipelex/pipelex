@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple, Type
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.pipe_abstract import PipeAbstract
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
 from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import StuffContent, TextContent
@@ -139,7 +139,7 @@ async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
     return results
 
 
-def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List[Tuple[str, str, Type[StuffContent]]]:
+def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List[TypedNamedInputRequirement]:
     """
     Convert PipeInputSpec to the format needed by WorkingMemoryFactory.make_for_dry_run.
 
@@ -149,29 +149,44 @@ def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List
     Returns:
         List of tuples (variable_name, concept_code, structure_class)
     """
-    needed_inputs_for_factory: List[Tuple[str, str, Type[StuffContent]]] = []
+    needed_inputs_for_factory: List[TypedNamedInputRequirement] = []
     concept_provider = get_concept_provider()
     class_registry = get_class_registry()
 
-    for required_variable_name, _, concept_code in needed_inputs_spec.detailed_requirements:
+    for named_input_requirement in needed_inputs_spec.named_input_requirements:
         try:
             # Get the concept and its structure class
-            concept = concept_provider.get_required_concept(concept_code=concept_code)
+            concept = concept_provider.get_required_concept(concept_code=named_input_requirement.concept_code)
             structure_class_name = concept.structure_class_name
 
             # Get the actual class from the registry
             structure_class = class_registry.get_class(name=structure_class_name)
 
             if structure_class and issubclass(structure_class, StuffContent):
-                needed_inputs_for_factory.append((required_variable_name, concept_code, structure_class))
+                typed_named_input_requirement = TypedNamedInputRequirement.make_from_named(
+                    named=named_input_requirement,
+                    structure_class=structure_class,
+                )
+                needed_inputs_for_factory.append(typed_named_input_requirement)
             else:
                 # Fallback to TextContent if we can't get the proper class
-                log.warning(f"Could not get structure class '{structure_class_name}' for concept '{concept_code}', falling back to TextContent")
-                needed_inputs_for_factory.append((required_variable_name, concept_code, TextContent))
+                log.warning(
+                    f"Could not get structure class '{structure_class_name}' for "
+                    f"concept '{named_input_requirement.concept_code}', falling back to TextContent"
+                )
+                text_typed_named_input_requirement = TypedNamedInputRequirement.make_from_named(
+                    named=named_input_requirement,
+                    structure_class=TextContent,
+                )
+                needed_inputs_for_factory.append(text_typed_named_input_requirement)
 
         except Exception as e:
             # Fallback to TextContent for any errors
-            log.warning(f"Error getting structure class for concept '{concept_code}': {e}, falling back to TextContent")
-            needed_inputs_for_factory.append((required_variable_name, concept_code, TextContent))
+            log.warning(f"Error getting structure class for concept '{named_input_requirement.concept_code}': {e}, falling back to TextContent")
+            text_typed_named_input_requirement = TypedNamedInputRequirement.make_from_named(
+                named=named_input_requirement,
+                structure_class=TextContent,
+            )
+            needed_inputs_for_factory.append(text_typed_named_input_requirement)
 
     return needed_inputs_for_factory

@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple, Type
 
 from pydantic import BaseModel, Field, RootModel, field_validator
 from typing_extensions import Self
@@ -6,12 +6,30 @@ from typing_extensions import Self
 from pipelex import log
 from pipelex.core.concept_code_factory import ConceptCodeFactory
 from pipelex.core.pipe_run_params import PipeOutputMultiplicity
+from pipelex.core.stuff_content import StuffContent
 from pipelex.exceptions import PipeInputNotFoundError
 
 
 class InputRequirement(BaseModel):
     concept_code: str
     multiplicity: Optional[PipeOutputMultiplicity] = None
+
+
+class NamedInputRequirement(InputRequirement):
+    variable_name: str
+    requirement_expression: Optional[str] = None
+
+
+class TypedNamedInputRequirement(NamedInputRequirement):
+    structure_class: Type[StuffContent]
+
+    @classmethod
+    def make_from_named(
+        cls,
+        named: NamedInputRequirement,
+        structure_class: Type[StuffContent],
+    ) -> "TypedNamedInputRequirement":
+        return cls(**named.model_dump(), structure_class=structure_class)
 
 
 PipeInputSpecRoot = Dict[str, InputRequirement]
@@ -105,9 +123,17 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
         return the_required_names
 
     @property
-    def detailed_requirements(self) -> List[Tuple[str, str, str]]:
-        the_requirements: List[Tuple[str, str, str]] = []
+    def named_input_requirements(self) -> List[NamedInputRequirement]:
+        the_requirements: List[NamedInputRequirement] = []
         for requirement_expression, requirement in self.root.items():
             required_variable_name = requirement_expression.split(".", 1)[0]
-            the_requirements.append((required_variable_name, requirement_expression, requirement.concept_code))
+            # TODO: refactor this with a proper class like InputRequirement
+            the_requirements.append(
+                NamedInputRequirement(
+                    variable_name=required_variable_name,
+                    requirement_expression=requirement_expression,
+                    concept_code=requirement.concept_code,
+                    multiplicity=requirement.multiplicity,
+                )
+            )
         return the_requirements

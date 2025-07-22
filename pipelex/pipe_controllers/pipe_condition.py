@@ -142,13 +142,13 @@ class PipeCondition(PipeController):
         the_needed_inputs = self.needed_inputs()
 
         # Check all required variables are in the inputs
-        for required_variable_name, _, _ in the_needed_inputs.detailed_requirements:
-            if required_variable_name not in self.inputs.variables:
+        for named_input_requirement in the_needed_inputs.named_input_requirements:
+            if named_input_requirement.variable_name not in self.inputs.variables:
                 missing_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
                     domain_code=self.domain,
                     pipe_code=self.code,
-                    variable_names=[required_variable_name],
+                    variable_names=[named_input_requirement.variable_name],
                 )
                 match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
                     case StaticValidationReaction.IGNORE:
@@ -310,9 +310,9 @@ class PipeCondition(PipeController):
         needed_inputs = self.needed_inputs()
         missing_input_names: List[str] = []
 
-        for required_variable_name, _, _ in needed_inputs.detailed_requirements:
-            if not working_memory.get_optional_stuff(required_variable_name):
-                missing_input_names.append(required_variable_name)
+        for named_input_requirement in needed_inputs.named_input_requirements:
+            if not working_memory.get_optional_stuff(named_input_requirement.variable_name):
+                missing_input_names.append(named_input_requirement.variable_name)
 
         if missing_input_names:
             log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
