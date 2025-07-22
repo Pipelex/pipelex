@@ -2,7 +2,7 @@ import asyncio
 import functools
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Tuple, Type
+from typing import Dict, List, Tuple
 
 from pipelex import log
 from pipelex.config import get_config

@@ -48,9 +48,7 @@ class PipeBatch(PipeController):
         required_variables = self.required_variables()
         for variable_name in required_variables:
             if variable_name not in self.inputs.root.keys():
-                raise PipeInputError(
-                    f"Input '{variable_name}' of pipe '{self.code}' is not in the inputs of the pipe '{self.branch_pipe_code}'"
-                )
+                raise PipeInputError(f"Input '{variable_name}' of pipe '{self.code}' is not in the inputs of the pipe '{self.branch_pipe_code}'")
         return self
 
     @override
@@ -77,30 +75,18 @@ class PipeBatch(PipeController):
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         """Common logic for running or dry-running a pipe in batch mode."""
-        batch_params = (
-            pipe_run_params.batch_params
-            or self.batch_params
-            or BatchParams.make_default()
-        )
+        batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_item_stuff_name = batch_params.input_item_stuff_name
         try:
-            input_item_concept_code = self.inputs.get_required_concept_code(
-                input_item_stuff_name
-            )
+            input_item_concept_code = self.inputs.get_required_concept_code(input_item_stuff_name)
         except PipeInputNotFoundError as exc:
             raise PipeInputError(
                 f"Batch input item stuff named '{input_item_stuff_name}' is not in this PipeBatch '{self.code}' input spec: {self.inputs}"
             ) from exc
 
         if pipe_run_params.final_stuff_code:
-            method_name = (
-                "dry_run_pipe"
-                if pipe_run_params.run_mode == PipeRunMode.DRY
-                else "_run_controller_pipe"
-            )
-            log.debug(
-                f"PipeBatch.{method_name}() final_stuff_code: {pipe_run_params.final_stuff_code}"
-            )
+            method_name = "dry_run_pipe" if pipe_run_params.run_mode == PipeRunMode.DRY else "_run_controller_pipe"
+            log.debug(f"PipeBatch.{method_name}() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
 
         pipe_run_params.push_pipe_layer(pipe_code=self.branch_pipe_code)
@@ -121,9 +107,7 @@ class PipeBatch(PipeController):
 
         # TODO: Make commented code work when inputing images named "a.b.c"
         sub_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
-        nb_history_items_limit = (
-            get_config().pipelex.tracker_config.applied_nb_items_limit
-        )
+        nb_history_items_limit = get_config().pipelex.tracker_config.applied_nb_items_limit
         batch_output_stuff_code = shortuuid.uuid()
         tasks: List[Coroutine[Any, Any, PipeOutput]] = []
         item_stuffs: List[Stuff] = []
@@ -144,23 +128,13 @@ class PipeBatch(PipeController):
             )
             item_stuffs.append(item_input_stuff)
             branch_memory = working_memory.make_deep_copy()
-            branch_memory.set_new_main_stuff(
-                stuff=item_input_stuff, name=input_item_stuff_name
-            )
+            branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
             required_variables = sub_pipe.required_variables()
-            required_stuffs = branch_memory.get_existing_stuffs(
-                names=required_variables
-            )
-            required_stuffs = [
-                required_stuff
-                for required_stuff in required_stuffs
-                if required_stuff.stuff_code != input_stuff_code
-            ]
+            required_stuffs = branch_memory.get_existing_stuffs(names=required_variables)
+            required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff_code]
             required_stuff_lists.append(required_stuffs)
-            branch_pipe_run_params = pipe_run_params.deep_copy_with_final_stuff_code(
-                final_stuff_code=branch_output_item_code
-            )
+            branch_pipe_run_params = pipe_run_params.deep_copy_with_final_stuff_code(final_stuff_code=branch_output_item_code)
 
             if pipe_run_params.run_mode == PipeRunMode.DRY:
                 branch_pipe_run_params.run_mode = PipeRunMode.DRY
@@ -197,11 +171,7 @@ class PipeBatch(PipeController):
             name=output_name,
         )
 
-        method_name = (
-            "dry_run_pipe"
-            if pipe_run_params.run_mode == PipeRunMode.DRY
-            else "run_pipe"
-        )
+        method_name = "dry_run_pipe" if pipe_run_params.run_mode == PipeRunMode.DRY else "run_pipe"
         for branch_index, (
             required_stuff_list,
             item_input_stuff,

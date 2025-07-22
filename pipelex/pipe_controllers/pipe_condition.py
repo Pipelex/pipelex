@@ -6,7 +6,7 @@ from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.pipe_input_spec import InputRequirement, PipeInputSpec
+from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory

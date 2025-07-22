@@ -1,6 +1,6 @@
 """Test dry working memory functionality."""
 
-from typing import List, Tuple, Type, cast
+from typing import List
 
 import pytest
 from pytest import FixtureRequest
@@ -8,7 +8,7 @@ from pytest import FixtureRequest
 from pipelex import log
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_input_spec import TypedNamedInputRequirement
-from pipelex.core.stuff_content import PageContent, StuffContent, TextContent
+from pipelex.core.stuff_content import PageContent, TextContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from tests.test_pipelines.tricky_questions import ThoughtfulAnswer
 
