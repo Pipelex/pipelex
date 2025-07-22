@@ -32,7 +32,7 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallel(
             domain="test_domain",
             code="parallel_document_processor",
-            inputs=PipeInputSpec(root={"document": "test_domain.document", "context": "test_domain.context"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"document": "test_domain.document", "context": "test_domain.context"}),
             output_concept_code="test_domain.ProcessedAnalysis",
             parallel_sub_pipes=[SubPipe(pipe_code="analyze_document", output_name="analysis_result")],
             add_each_output=True,
@@ -55,7 +55,7 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallel(
             domain="test_domain",
             code="test_parallel",
-            inputs=PipeInputSpec(root={"input_var": "test_domain.Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_var": "test_domain.Text"}),
             output_concept_code="test_domain.ProcessedText",
             parallel_sub_pipes=[SubPipe(pipe_code="test_pipe_1", output_name="result_1")],
             add_each_output=True,
@@ -66,7 +66,7 @@ class TestPipeParallelValidation:
         assert pipe_parallel.code == "test_parallel"
         assert pipe_parallel.domain == "test_domain"
         assert len(pipe_parallel.parallel_sub_pipes) == 1
-        assert pipe_parallel.inputs.root["input_var"] == "test_domain.Text"
+        assert pipe_parallel.inputs.root["input_var"].concept_code == "test_domain.Text"
         assert pipe_parallel.output_concept_code == "test_domain.ProcessedText"
         assert pipe_parallel.add_each_output is True
         assert pipe_parallel.combined_output is None
@@ -78,7 +78,7 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallel(
             domain="test_domain",
             code="parallel_document_processor",
-            inputs=PipeInputSpec(root={"document": "test_domain.Document", "context": "test_domain.Context"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"document": "test_domain.Document", "context": "test_domain.Context"}),
             output_concept_code="test_domain.ProcessedAnalysis",
             parallel_sub_pipes=[],  # No sub-pipes to avoid dependency issues
             add_each_output=True,

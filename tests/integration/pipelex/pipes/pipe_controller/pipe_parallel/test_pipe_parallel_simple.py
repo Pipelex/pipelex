@@ -28,7 +28,7 @@ class TestPipeParallelSimple:
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
             output_concept_code="Text",
             parallel_sub_pipes=[
                 SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
@@ -140,7 +140,7 @@ class TestPipeParallelSimple:
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
             output_concept_code="Text",
             parallel_sub_pipes=[
                 SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),

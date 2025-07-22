@@ -40,7 +40,7 @@ class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
             definition=pipe_blueprint.definition,
             ocr_engine=ocr_engine,
             output_concept_code=pipe_blueprint.output,
-            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
             should_include_images=pipe_blueprint.page_images,
             should_caption_images=pipe_blueprint.page_image_captions,
             should_include_page_views=pipe_blueprint.page_views,

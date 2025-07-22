@@ -26,7 +26,7 @@ class PipeSequenceFactory(PipeSpecificFactoryProtocol[PipeSequenceBlueprint, Pip
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             sequential_sub_pipes=pipe_steps,
         )

@@ -110,7 +110,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
 
             for pipe in domain_pipes:
                 inputs = pipe.inputs
-                formatted_inputs = [f"{name}: {_format_concept_code(concept_code, domain)}" for name, concept_code in inputs.items]
+                formatted_inputs = [f"{name}: {_format_concept_code(requirement.concept_code, domain)}" for name, requirement in inputs.items]
                 formatted_inputs_str = ", ".join(formatted_inputs)
                 output_code = _format_concept_code(pipe.output_concept_code, domain)
 

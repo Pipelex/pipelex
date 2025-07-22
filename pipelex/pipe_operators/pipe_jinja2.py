@@ -80,8 +80,8 @@ class PipeJinja2(PipeOperator):
     @override
     def needed_inputs(self) -> PipeInputSpec:
         needed_inputs = PipeInputSpec.make_empty()
-        for input_name, concept_code in self.inputs.root.items():
-            needed_inputs.add_requirement(variable_name=input_name, concept_code=concept_code)
+        for input_name, requirement in self.inputs.root.items():
+            needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
         return needed_inputs
 
     @property

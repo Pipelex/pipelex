@@ -29,7 +29,7 @@ class TestPipeBatchSimple:
             domain="test_integration",
             code="simple_batch",
             branch_pipe_code="uppercase_transformer",  # This exists in the TOML file
-            inputs=PipeInputSpec(root={"text_list": "Text", "text_item": "Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"text_list": "Text", "text_item": "Text"}),
             output_concept_code="test_integration.UppercaseText",
             batch_params=BatchParams(input_list_stuff_name="text_list", input_item_stuff_name="text_item"),
         )

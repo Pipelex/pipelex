@@ -61,10 +61,7 @@ class PipeBatch(PipeController):
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        needed_inputs = PipeInputSpec.make_empty()
-        for variable_name, concept_code in self.inputs.items:
-            needed_inputs.add_requirement(variable_name, concept_code)
-        return needed_inputs
+        return self.inputs
 
     async def _run_batch_pipe(
         self,

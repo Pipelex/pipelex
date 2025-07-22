@@ -28,11 +28,7 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_image",
                 domain="generic",
-                inputs=PipeInputSpec(
-                    root={
-                        "page_scan": "Image",
-                    }
-                ),
+                inputs=PipeInputSpec.make_from_dict(concepts_dict={"page_scan": "Image"}),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
@@ -62,11 +58,7 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_pdf",
                 domain="generic",
-                inputs=PipeInputSpec(
-                    root={
-                        PIPE_OCR_INPUT_NAME: "PDF",
-                    }
-                ),
+                inputs=PipeInputSpec.make_from_dict(concepts_dict={PIPE_OCR_INPUT_NAME: "PDF"}),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,

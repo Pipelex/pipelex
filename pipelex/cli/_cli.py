@@ -36,7 +36,13 @@ def is_pipelex_libraries_folder(folder_path: str) -> bool:
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return False
 
-    required_subdirs = ["pipelines", "llm_deck", "llm_integrations", "plugins", "templates"]
+    required_subdirs = [
+        "pipelines",
+        "llm_deck",
+        "llm_integrations",
+        "plugins",
+        "templates",
+    ]
 
     for subdir in required_subdirs:
         subdir_path = os.path.join(folder_path, subdir)
@@ -67,8 +73,18 @@ app = typer.Typer(
 
 @app.command("init-libraries")
 def init_libraries(
-    directory: Annotated[str, typer.Argument(help="Directory where to create the pipelex_libraries folder")] = ".",
-    overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
+    directory: Annotated[
+        str,
+        typer.Argument(help="Directory where to create the pipelex_libraries folder"),
+    ] = ".",
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            "-o",
+            help="Warning: If set, existing files will be overwritten.",
+        ),
+    ] = False,
 ) -> None:
     """Initialize pipelex libraries in a pipelex_libraries folder in the specified directory.
 
@@ -96,7 +112,10 @@ def init_libraries(
 
 @app.command("init-config")
 def init_config(
-    reset: Annotated[bool, typer.Option("--reset", "-r", help="Warning: If set, existing files will be overwritten.")] = False,
+    reset: Annotated[
+        bool,
+        typer.Option("--reset", "-r", help="Warning: If set, existing files will be overwritten."),
+    ] = False,
 ) -> None:
     """Initialize pipelex configuration in the current directory."""
     pipelex_template_path = os.path.join(config_manager.pipelex_root_dir, "pipelex_template.toml")
@@ -116,9 +135,11 @@ def init_config(
 @app.command()
 def validate(
     relative_config_folder_path: Annotated[
-        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
+        str,
+        typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path"),
     ] = "./pipelex_libraries",
 ) -> None:
+    print("DEBUG: Entered validate()")
     """Run the setup sequence."""
     # Check if pipelex libraries folder exists
     if not is_pipelex_libraries_folder(relative_config_folder_path):
@@ -136,7 +157,8 @@ def validate(
 def dry_run_pipe(
     pipe_code: Annotated[str, typer.Argument(help="The pipe code to dry run")],
     relative_config_folder_path: Annotated[
-        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
+        str,
+        typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path"),
     ] = "./pipelex_libraries",
 ) -> None:
     """Dry run a single pipe."""
@@ -165,7 +187,10 @@ def show_config() -> None:
     """Show the pipelex configuration."""
     try:
         final_config = config_manager.load_config()
-        pretty_print(final_config, title=f"Pipelex configuration for project: {config_manager.get_project_name()}")
+        pretty_print(
+            final_config,
+            title=f"Pipelex configuration for project: {config_manager.get_project_name()}",
+        )
     except Exception as e:
         raise PipelexConfigError(f"Error loading configuration: {e}")
 
@@ -173,7 +198,8 @@ def show_config() -> None:
 @app.command()
 def list_pipes(
     relative_config_folder_path: Annotated[
-        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
+        str,
+        typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path"),
     ] = "pipelex_libraries",
 ) -> None:
     """List all available pipes."""
@@ -193,7 +219,8 @@ def show_pipe(
         typer.Argument(help="Pipeline code to show definition for"),
     ],
     relative_config_folder_path: Annotated[
-        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
+        str,
+        typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path"),
     ] = "./pipelex_libraries",
 ) -> None:
     """Show pipe from the pipe library."""

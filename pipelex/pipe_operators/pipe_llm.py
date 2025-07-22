@@ -102,11 +102,11 @@ class PipeLLM(PipeOperator):
         needed_inputs = PipeInputSpec.make_empty()
         concept_provider = get_concept_provider()
 
-        for input_name, concept_code in self.inputs.items:
-            if concept_provider.is_image_concept(concept_code=concept_code):
+        for input_name, requirement in self.inputs.items:
+            if concept_provider.is_image_concept(concept_code=requirement.concept_code):
                 needed_inputs.add_requirement(variable_name=input_name, concept_code=NativeConcept.IMAGE.code)
             else:
-                needed_inputs.add_requirement(variable_name=input_name, concept_code=concept_code)
+                needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
 
         return needed_inputs
 

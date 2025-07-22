@@ -23,7 +23,7 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             code="test_condition_fail",
             domain="test_domain",
-            inputs=PipeInputSpec(root={"user_category": "test_pipe_condition.CategoryInput"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"user_category": "test_pipe_condition.CategoryInput"}),
             output_concept_code="native.Text",
             expression_template="{{ user_category.category }}",
             pipe_map={"small": "process_small", "medium": "process_medium", "large": "process_large"},
@@ -52,7 +52,7 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             code="test_condition_succeed",
             domain="test_domain",
-            inputs=PipeInputSpec(root={"user_status": "test_pipe_condition.CategoryInput"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"user_status": "test_pipe_condition.CategoryInput"}),
             output_concept_code="native.Text",
             expression_template="{{ user_status.category }}",
             pipe_map={

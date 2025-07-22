@@ -6,7 +6,7 @@ from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe_input_spec import InputRequirement, PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
@@ -118,8 +118,8 @@ class PipeCondition(PipeController):
         # 2. Add the inputs needed by all possible target pipes
         for pipe_code in self.pipe_map.values():
             pipe = get_required_pipe(pipe_code=pipe_code)
-            for input_name, concept_code in pipe.needed_inputs().items:
-                needed_inputs.add_requirement(variable_name=input_name, concept_code=concept_code)
+            for input_name, requirement in pipe.needed_inputs().items:
+                needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
 
         return needed_inputs
 

@@ -51,14 +51,14 @@ class PipeParallel(PipeController):
                 batch_as_input = sub_pipe.batch_params.input_item_stuff_name
                 # Create a new PipeInputSpec without the batch_as input
                 filtered_needed_inputs = PipeInputSpec.make_empty()
-                for var_name, concept_code in pipe_needed_inputs.root.items():
+                for var_name, requirement in pipe_needed_inputs.root.items():
                     if var_name != batch_as_input:
-                        filtered_needed_inputs.add_requirement(variable_name=var_name, concept_code=concept_code)
+                        filtered_needed_inputs.add_requirement(variable_name=var_name, concept_code=requirement.concept_code)
                 pipe_needed_inputs = filtered_needed_inputs
 
             # Add all inputs from this parallel pipe
-            for var_name, concept_code in pipe_needed_inputs.root.items():
-                needed_inputs.add_requirement(variable_name=var_name, concept_code=concept_code)
+            for var_name, requirement in pipe_needed_inputs.root.items():
+                needed_inputs.add_requirement(variable_name=var_name, concept_code=requirement.concept_code)
 
         return needed_inputs
 

@@ -83,8 +83,8 @@ class PipeImgGen(PipeOperator):
         if self.imgg_prompt:
             needed_inputs.add_requirement(variable_name="imgg_prompt", concept_code=NativeConcept.TEXT.code)
         else:
-            for input_name, input_concept_code in self.inputs.items:
-                needed_inputs.add_requirement(variable_name=input_name, concept_code=input_concept_code)
+            for input_name, requirement in self.inputs.items:
+                needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
         return needed_inputs
 
     @override
@@ -105,10 +105,10 @@ class PipeImgGen(PipeOperator):
                 return
 
         candidate_prompt_var_names: List[str] = []
-        for input_name, input_concept_code in self.inputs.items:
-            log.debug(f"Validating input '{input_name}' with concept code '{input_concept_code}'")
+        for input_name, requirement in self.inputs.items:
+            log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept_code}'")
             if concept_provider.is_compatible_by_concept_code(
-                tested_concept_code=input_concept_code,
+                tested_concept_code=requirement.concept_code,
                 wanted_concept_code=NativeConcept.TEXT.code,
             ):
                 self.img_gen_prompt_var_name = input_name
@@ -119,7 +119,7 @@ class PipeImgGen(PipeOperator):
                     domain_code=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
-                    provided_concept_code=input_concept_code,
+                    provided_concept_code=requirement.concept_code,
                     explanation="Only a text input can be provided for image gen prompt",
                 )
                 match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):

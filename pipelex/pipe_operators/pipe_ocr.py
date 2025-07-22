@@ -66,16 +66,18 @@ class PipeOcr(PipeOperator):
 
         # check that we have either an image or a pdf in inputs, at most one of them and nothing else
         candidate_prompt_var_names: List[str] = []
-        for input_name, input_concept_code in self.inputs.items:
-            log.debug(f"Validating input '{input_name}' with concept code '{input_concept_code}'")
+        for input_name, requirement in self.inputs.items:
+            log.debug(f"{input_name=}")
+            log.debug(f"{requirement=}")
+            log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept_code}'")
             if concept_provider.is_compatible_by_concept_code(
-                tested_concept_code=input_concept_code,
+                tested_concept_code=requirement.concept_code,
                 wanted_concept_code=NativeConcept.IMAGE.code,
             ):
                 self.image_stuff_name = input_name
                 candidate_prompt_var_names.append(input_name)
             elif concept_provider.is_compatible_by_concept_code(
-                tested_concept_code=input_concept_code,
+                tested_concept_code=requirement.concept_code,
                 wanted_concept_code=NativeConcept.PDF.code,
             ):
                 self.pdf_stuff_name = input_name
@@ -86,7 +88,7 @@ class PipeOcr(PipeOperator):
                     domain_code=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
-                    provided_concept_code=input_concept_code,
+                    provided_concept_code=requirement.concept_code,
                     explanation="For OCR you must provide either a pdf or an image or a concept that refines one of them",
                 )
                 match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
@@ -128,7 +130,7 @@ class PipeOcr(PipeOperator):
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        return PipeInputSpec.make_from_dict({PIPE_OCR_INPUT_NAME: self.inputs.root[PIPE_OCR_INPUT_NAME]})
+        return PipeInputSpec.make_from_dict({PIPE_OCR_INPUT_NAME: self.inputs.root[PIPE_OCR_INPUT_NAME].concept_code})
 
     @override
     async def _run_operator_pipe(
