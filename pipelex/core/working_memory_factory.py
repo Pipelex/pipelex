@@ -9,7 +9,7 @@ from pipelex.client.protocol import CompactMemory, ImplicitMemory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.pipe_input_spec import TypedNamedInputRequirement
 from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ImageContent, PDFContent, StuffContent, TextContent
+from pipelex.core.stuff_content import ImageContent, ListContent, PDFContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.exceptions import WorkingMemoryFactoryError
@@ -167,6 +167,22 @@ class WorkingMemoryFactory(BaseModel):
         return working_memory
 
     @classmethod
+    def _create_mock_content(cls, requirement: TypedNamedInputRequirement) -> StuffContent:
+        """Helper method to create mock content for a requirement."""
+        if requirement.structure_class:
+            # Create mock object using polyfactory
+            class MockFactory(ModelFactory[requirement.structure_class]):  # type: ignore
+                __model__ = requirement.structure_class
+                __check_model__ = True
+                __use_examples__ = True
+                __allow_none_optionals__ = False  # Ensure Optional fields always get values
+
+            return MockFactory.build()  # type: ignore
+        else:
+            # Fallback to text content
+            return TextContent(text=f"DRY RUN: Mock content for '{requirement.variable_name}' ({requirement.concept_code})")
+
+    @classmethod
     def make_for_dry_run(cls, needed_inputs: List[TypedNamedInputRequirement]) -> "WorkingMemory":
         """
         Create a WorkingMemory with mock objects for dry run mode.
@@ -187,28 +203,43 @@ class WorkingMemoryFactory(BaseModel):
             )
 
             try:
-                if requirement.structure_class:
-                    # Create mock object using polyfactory
-                    class MockFactory(ModelFactory[requirement.structure_class]):  # type: ignore
-                        __model__ = requirement.structure_class
-                        __check_model__ = True
-                        __use_examples__ = True
-                        __allow_none_optionals__ = False  # Ensure Optional fields always get values
+                if not requirement.multiplicity:
+                    mock_content = cls._create_mock_content(requirement)
 
-                    mock_content = MockFactory.build()
+                    # Create stuff with mock content
+                    mock_stuff = Stuff(
+                        stuff_name=requirement.variable_name,
+                        stuff_code=shortuuid.uuid()[:5],
+                        concept_code=requirement.concept_code,
+                        content=mock_content,
+                    )
+
+                    working_memory.add_new_stuff(name=requirement.variable_name, stuff=mock_stuff)
                 else:
-                    # Fallback to text content
-                    mock_content = TextContent(text=f"DRY RUN: Mock content for '{requirement.variable_name}' ({requirement.concept_code})")
+                    # Let's create a ListContent of multiple stuffs
+                    nb_stuffs: int
+                    if isinstance(requirement.multiplicity, bool):
+                        # TODO: make this configurable or use existing config variable
+                        nb_stuffs = 3
+                    else:
+                        nb_stuffs = requirement.multiplicity
 
-                # Create stuff with mock content
-                mock_stuff = Stuff(
-                    stuff_name=requirement.variable_name,
-                    stuff_code=shortuuid.uuid()[:5],
-                    concept_code=requirement.concept_code,
-                    content=mock_content,
-                )
+                    items: List[StuffContent] = []
+                    for _ in range(nb_stuffs):
+                        item_mock_content = cls._create_mock_content(requirement)
+                        items.append(item_mock_content)
 
-                working_memory.add_new_stuff(name=requirement.variable_name, stuff=mock_stuff)
+                    mock_list_content = ListContent[StuffContent](items=items)
+
+                    # Create stuff with mock content
+                    mock_stuff = Stuff(
+                        stuff_name=requirement.variable_name,
+                        stuff_code=shortuuid.uuid()[:5],
+                        concept_code=requirement.concept_code,
+                        content=mock_list_content,
+                    )
+
+                    working_memory.add_new_stuff(name=requirement.variable_name, stuff=mock_stuff)
 
             except Exception as e:
                 log.warning(
