@@ -56,16 +56,13 @@ make cleanenv                 - Remove virtual env and lock files
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanlibraries           - Remove pipelex_libraries
 make cleanall                 - Remove all -> cleanenv + cleanderived + cleanlibraries
-make reinitlibraries          - Remove pipelex_libraries and init libraries again
 
 make merge-check-ruff-lint    - Run ruff merge check without updating files
 make merge-check-ruff-format  - Run ruff merge check without updating files
 make merge-check-mypy         - Run mypy merge check without updating files
 make merge-check-pyright	  - Run pyright merge check without updating files
 
-make rl                       - Shorthand -> reinitlibraries
 make v                        - Shorthand -> validate
-make init                     - Run `pipelex init-libraries` and `pipelex init-config`
 make codex-tests              - Run tests for Codex (exit on first failure) (no inference, no codex_disabled)
 make gha-tests		          - Run tests for github actions (exit on first failure) (no inference, no gha_disabled)
 make test                     - Run unit tests (no inference)
@@ -154,11 +151,6 @@ update: env
 	uv sync --all-extras && \
 	echo "Updated dependencies in ${VIRTUAL_ENV}";
 
-init: env
-	$(call PRINT_TITLE,"Running pipelex init-libraries and init-config")
-	$(VENV_PIPELEX) init-libraries
-	$(VENV_PIPELEX) init-config
-
 validate: env
 	$(call PRINT_TITLE,"Running setup sequence")
 	$(VENV_PIPELEX) validate -c pipelex/libraries
@@ -195,12 +187,6 @@ cleanlibraries:
 	$(call PRINT_TITLE,"Erasing derived files and directories")
 	@find . -type d -wholename './pipelex_libraries' -exec rm -rf {} + && \
 	echo "Cleaned up pipelex_libraries";
-
-reinitlibraries: cleanlibraries init
-	@echo "Reinitialized pipelex_libraries";
-
-rl: reinitlibraries
-	@echo "> done: rl = reinitlibraries"
 
 cleanall: cleanderived cleanenv cleanlibraries
 	@echo "Cleaned up all derived files and directories";
