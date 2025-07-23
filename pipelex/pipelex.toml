@@ -32,7 +32,7 @@ silenced_problem_ids = ["azure_openai_no_stream_options"]
 caller_info_template = "file_line"
 is_caller_info_enabled = false
 
-log_mode = "rich"
+log_mode = "poor"
 
 poor_loggers = []
 generic_poor_logger = "#poor-log"
@@ -57,12 +57,12 @@ pipelex = "INFO"
 
 [pipelex.log_config.rich_log_config]
 is_show_time = false
-is_show_level = true
-is_link_path_enabled = true
+is_show_level = false
+is_link_path_enabled = false
 is_markup_enabled = false
 highlighter_name = "json"
-is_rich_tracebacks = true
-is_tracebacks_word_wrap = true
+is_rich_tracebacks = false
+is_tracebacks_word_wrap = false
 is_tracebacks_show_locals = false
 tracebacks_suppress = []
 keywords_to_hilight = []
