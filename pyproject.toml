@@ -45,9 +45,6 @@ dependencies = [
     "cocode==0.0.6",
 ]
 
-[tool.uv.sources]
-cocode = { path = "../cocode", editable = true }
-
 [project.urls]
 Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"
