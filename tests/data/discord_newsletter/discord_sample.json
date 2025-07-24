@@ -1,0 +1,163 @@
+[
+  {
+    "id": "1320057977847283834",
+    "name": "Introduce-Yourself",
+    "type": "text",
+    "position": 4,
+    "parent": "1348223201812938782",
+    "message_count": 5,
+    "messages": [
+      {
+        "author": "John Smith (TechCorp)",
+        "content": "## [**John Smith**](https://www.linkedin.com/in/john-smith/) (mostly on X https://x.com/johnsmith) \n\n*CTO @ [TechCorp](https://techcorp.com) · AI and search optimization.*\n\nI've been building software for 15 years now (love building also for fun), I am a dad, and I spend most of my free time doing fun stuff with the family. \n\nSpecial power: Been playing music for 20 years\n\n📍 Amsterdam, NL (CET)",
+        "attachments": [],
+        "embeds": [],
+        "link": "https://discord.com/channels/1320057304199987230/1320057977847283834/1392231464141193318"
+      },
+      {
+        "author": "Pierre Martin (DataFlow)",
+        "content": "## [**Pierre Martin**](https://www.linkedin.com/in/pierre-martin/)\n*Chief Technology Officer [DataFlow](https://dataflow.sh) · Tech consulting with a focus on Data and AI stuff*\nI've been in Tech for more than 25 years. I am software engineer at heart. I am the producer of \"Tech Talk\" podcast, I appear regularly on Tech Business for \"The Tech Reviews\", I've been Director of TechInstitute in Paris, I created a community call tech-meetup (https://tech-meetup.com). I've also been very active in Paris with the AI meetup.\nSpecial power: I am a super networker person. I can sail a boat, fly an airplane, I was also involved in various communities.\n📍 Paris, France (CET)",
+        "attachments": [],
+        "embeds": [],
+        "link": "https://discord.com/channels/1320057304199987230/1320057977847283834/1391681488709488711"
+      },
+      {
+        "author": "Alex Johnson (WorkflowAI)",
+        "content": "## [Alex Johnson](https://www.linkedin.com/in/alex-johnson/)\n\n*Co-founder & CTO @ [WorkflowAI](https://workflowai.com/)· WorkflowAI is an open-source language for repeatable AI workflows. Build modular pipes that connect like LEGO blocks, each using its optimal LLM. Turn custom AI code into shareable, versioned pipelines with guaranteed outputs. [Python library available now](https://github.com/WorkflowAI/workflowai), hosted API coming soon.*\nI'm a repeat entrepreneur in tech. Started in digital media distribution (music, VOD, peer-to-peer), then found success in social gaming (free-to-play games on Facebook and mobile). I was born in Sweden and speak Swedish fluently but I'm really a French guy.\n\nWorkflowAI is my first open-source project, so I'm in full learning mode.\n\nSpecial power: Modern rationality. Not Hollywood rationality (like Mr. Spock) but rather the art of fighting biases, seeking truth, and making decisions that work.\n\n📍 Paris, France (CET)",
+        "attachments": [],
+        "embeds": [],
+        "link": "https://discord.com/channels/1320057304199987230/1320057977847283834/1391085336188424363"
+      },
+      {
+        "author": "Mike Schmidt (AutoBot)",
+        "content": "## [**Mike Schmidt**](https://www.linkedin.com/in/mike-schmidt-890b96303/)\n*CTO & Co-founder @ [AutoBot](https://autobot.ai) · We enable AI Agents to control mobile apps & phones.*\nI'm a Tech builder passionate about decentralized compute, now building AutoBot's AI automation platform for Android.\nPreviously worked on blockchain projects, especially on various networks.\nSpecial power: Once ran 100m in under 11 seconds as a track & field athlete. Not quite superhero speed, but fast enough to turn heads :fast: \n📍 Berlin, Germany (CET)",
+        "attachments": [],
+        "embeds": [],
+        "link": "https://discord.com/channels/1320057304199987230/1320057977847283834/1390267363785441432"
+      },
+      {
+        "author": "Chris Wilson (AutoBot)",
+        "content": "## [**Chris Wilson**](https://www.linkedin.com/in/chris-wilson-22b4b8210/)\n*CEO & Co-founder @ [AutoBot](https://autobot.ai) · We enable AI Agents to control mobile apps & phones - We are open source with 3.2k GitHub stars in 9 weeks post-launch*\n\nOutside the startup grind, I'm passionate about travel and cooking - there's something therapeutic about finding fresh ingredients and turning them into a great meal. 🍄‍🟫\n\nWe recently incorporated in Delaware and successfully closed our Pre-Seed. Heading to SF/NY soon and excited to connect with some folks there. Please reach out 😄\n\n📍 Berlin, Germany (CET)",
+        "attachments": [],
+        "embeds": [],
+        "link": "https://discord.com/channels/1320057304199987230/1320057977847283834/1390259441852481547"
+      }
+    ]
+  },
+  {
+    "id": "1320059080857096214",
+    "name": "🧠-Knowledge",
+    "type": "text",
+    "position": 7,
+    "parent": "1320057304199987231",
+    "message_count": 2,
+    "messages": [
+      {
+        "author": "Robert Davis (AITech)",
+        "content": "Nice presentation",
+        "attachments": [],
+        "embeds": [],
+        "link": "https://discord.com/channels/1320057304199987230/1320059080857096214/1388797681568190514"
+      },
+      {
+        "author": "Robert Davis (AITech)",
+        "content": "https://youtube.com/watch?v=example123&feature=shared",
+        "attachments": [],
+        "embeds": [
+          {
+            "title": "Multimodal Open Source AI Models, From Online Demos to On-Device - ...",
+            "description": "",
+            "type": "video"
+          }
+        ],
+        "link": "https://discord.com/channels/1320057304199987230/1320059080857096214/1388797614740475906"
+      }
+    ]
+  },
+  {
+    "id": "1324834149965631569",
+    "name": "🎉-Achievements",
+    "type": "text",
+    "position": 10,
+    "parent": "1320057304199987231",
+    "message_count": 5,
+    "messages": [
+      {
+        "author": "Sam Moore (EdgeTech)",
+        "content": "https://www.edgetech.cloud/blog/posts/announcing-edge-functions",
+        "attachments": [],
+        "embeds": [
+          {
+            "title": "Announcing the new Edge Functions Components powered by WebAssembly...",
+            "description": "Developers can push edge functions to the EdgeTech Component Registry to generate HTTP responses at the edge.",
+            "type": "article"
+          }
+        ],
+        "link": "https://discord.com/channels/1320057304199987230/1324834149965631569/1392507684573675561"
+      },
+      {
+        "author": "Kevin Thompson (DataAnalytics)",
+        "content": "https://www.linkedin.com/posts/example-user_very-cool-to-see-our-joint-analysis-with-activity-7346527049613815808-8P9G?",
+        "attachments": [],
+        "embeds": [
+          {
+            "title": "Very cool to see our joint analysis with Cloud Services Provider...",
+            "description": "Very cool to see our joint analysis with Cloud Services Provider about GraphRAG being featured in AI Company's blog.\n\nOverall, their article presents the approaches of GraphRAG and Agentic Search side by side. \n\nI think we should go a step further by pointing out that these two approaches are closely intertwined : an agentic system could use G...",
+            "type": "article"
+          }
+        ],
+        "link": "https://discord.com/channels/1320057304199987230/1324834149965631569/1390327059057999893"
+      },
+      {
+        "author": "Julian Garcia (BackupTech)",
+        "content": "https://backuptech.io/posts/2025-06-27/modern-data-format-introducing-new-archive/",
+        "attachments": [],
+        "embeds": [
+          {
+            "title": "It doesn't make sense to wrap modern data in old formats, introducing new archive format...",
+            "description": "",
+            "type": "article"
+          }
+        ],
+        "link": "https://discord.com/channels/1320057304199987230/1324834149965631569/1388195527321194548"
+      },
+      {
+        "author": "Peter Chen (MLTech)",
+        "content": "No I didn't start as one, I did some for a startup which had a product that needed to integrate with CRMs 🙂\n\nIn reply to Kevin Thompson (DataAnalytics)'s message:\nDidn't you start as a CRM integrator 🙈",
+        "attachments": [],
+        "embeds": [],
+        "link": "https://discord.com/channels/1320057304199987230/1324834149965631569/1388135901829267559"
+      },
+      {
+        "author": "Kevin Thompson (DataAnalytics)",
+        "content": "Didn't you start as a CRM integrator 🙈",
+        "attachments": [],
+        "embeds": [],
+        "link": "https://discord.com/channels/1320057304199987230/1324834149965631569/1388124441887899648"
+      }
+    ]
+  },
+  {
+    "id": "1348214314829615116",
+    "name": "👁-Computer-Vision",
+    "type": "text",
+    "position": 16,
+    "parent": "1320057304199987231",
+    "message_count": 1,
+    "messages": [
+      {
+        "author": "Ryan Miller (VisionAI)",
+        "content": "Also this hasn't been posted enough either but I think https://example-ai.org/ is a really cool model and is open weights and really impressive performance as it lets you do anything essentially",
+        "attachments": [],
+        "embeds": [
+          {
+            "title": "EXAMPLE: Scalable Unified Multimodal Model",
+            "description": "A scalable unified multimodal model, revolutionizing how AI interacts with complex systems.",
+            "type": "article"
+          }
+        ],
+        "link": "https://discord.com/channels/1320057304199987230/1348214314829615116/1389575075795177473"
+      }
+    ]
+  }
+]
