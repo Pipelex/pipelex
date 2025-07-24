@@ -30,7 +30,7 @@ class PipeSequence(PipeController):
         generated_outputs: Set[str] = set()
 
         for sequential_sub_pipe in self.sequential_sub_pipes:
-            sub_pipe_needed_inputs = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code).needed_inputs()
+            sub_pipe_needed_inputs = get_required_pipe(pipe_code=sequential_sub_pipe.pipe.code).needed_inputs()
 
             # Handle batching: if this sub_pipe has batch_params, exclude the batch_as input
             # since it's provided by the batching mechanism
@@ -125,7 +125,7 @@ class PipeSequence(PipeController):
 
     @override
     def pipe_dependencies(self) -> Set[str]:
-        return set(sub_pipe.pipe_code for sub_pipe in self.sequential_sub_pipes)
+        return set(sub_pipe.pipe.code for sub_pipe in self.sequential_sub_pipes)
 
     @override
     async def _run_controller_pipe(

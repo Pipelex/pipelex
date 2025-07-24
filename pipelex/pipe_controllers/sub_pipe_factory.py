@@ -5,6 +5,7 @@ from typing_extensions import Self
 
 from pipelex.core.pipe_run_params import BatchParams, make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
+from pipelex.hub import get_required_pipe
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
 
@@ -47,8 +48,9 @@ class SubPipeBlueprint(BaseModel):
             input_list_name=self.batch_over,
             input_item_name=self.batch_as,
         )
+        pipe = get_required_pipe(self.pipe)
         return SubPipe(
-            pipe_code=self.pipe,
+            pipe=pipe,
             output_name=self.result,
             output_multiplicity=output_multiplicity,
             batch_params=batch_params,

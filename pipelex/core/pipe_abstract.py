@@ -9,6 +9,12 @@ from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.types import StrEnum
+
+
+class PipeType(StrEnum):
+    CONTROLLER = "controller"
+    OPERATOR = "operator"
 
 
 class PipeAbstract(ABC, BaseModel):

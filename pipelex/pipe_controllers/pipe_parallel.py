@@ -40,7 +40,7 @@ class PipeParallel(PipeController):
         needed_inputs = PipeInputSpec.make_empty()
 
         for sub_pipe in self.parallel_sub_pipes:
-            pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
+            pipe = get_required_pipe(pipe_code=sub_pipe.pipe.code)
 
             # Get the inputs needed by this parallel pipe
             pipe_needed_inputs = pipe.needed_inputs()
@@ -124,7 +124,7 @@ class PipeParallel(PipeController):
 
     @override
     def pipe_dependencies(self) -> Set[str]:
-        return set(sub_pipe.pipe_code for sub_pipe in self.parallel_sub_pipes)
+        return set(sub_pipe.pipe.code for sub_pipe in self.parallel_sub_pipes)
 
     @override
     async def _run_controller_pipe(
@@ -239,9 +239,9 @@ class PipeParallel(PipeController):
         # 2. Validate that all sub-pipes exist
         for sub_pipe in self.parallel_sub_pipes:
             try:
-                get_required_pipe(pipe_code=sub_pipe.pipe_code)
+                get_required_pipe(pipe_code=sub_pipe.pipe.code)
             except Exception as e:
-                raise PipeDefinitionError(f"PipeParallel'{self.code}'sub-pipe '{sub_pipe.pipe_code}' not found") from e
+                raise PipeDefinitionError(f"PipeParallel'{self.code}'sub-pipe '{sub_pipe.pipe.code}' not found") from e
 
         # 3. Run all sub-pipes in dry mode
         tasks: List[Coroutine[Any, Any, PipeOutput]] = []
