@@ -12,8 +12,9 @@ from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff_content import TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
-from pipelex.pipe_controllers.pipe_sequence import PipeSequence
-from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_controllers.pipe_sequence import PipeSequence, SubPipe
+from pipelex.pipe_operators.pipe_llm import PipeLLM
+from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -25,15 +26,42 @@ class TestPipeSequenceSimple:
 
     async def test_simple_sequence_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeSequence with a simple 2-step text transformation scenario."""
-        # Create PipeSequence instance - pipes are loaded from TOML files
+        # Create PipeLLM instance for capitalizing text
+        capitalize_pipe = PipeLLM(
+            domain="test_integration",
+            code="capitalize_text",
+            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            output_concept_code="Text",
+            pipe_llm_prompt=PipeLLMPrompt(
+                code="capitalize_text_prompt",
+                domain="test_integration",
+                user_text="Transform the following text to uppercase:\n\n@input_text.text\n\nReturn only the uppercase text, nothing else.",
+            ),
+        )
+
+        # Create PipeLLM instance for adding prefix
+        add_prefix_pipe = PipeLLM(
+            domain="test_integration",
+            code="add_prefix",
+            inputs=PipeInputSpec(root={"capitalized_text": "Text"}),
+            output_concept_code="Text",
+            pipe_llm_prompt=PipeLLMPrompt(
+                code="add_prefix_prompt",
+                domain="test_integration",
+                user_text="""Add the prefix "PROCESSED: " to the beginning of the following text:\n\n
+                @capitalized_text.text\n\nReturn only the prefixed text, nothing else.""",
+            ),
+        )
+
+        # Create PipeSequence instance using the PipeLLM instances
         pipe_sequence = PipeSequence(
             domain="test_integration",
             code="simple_sequence",
             inputs=PipeInputSpec(root={"input_text": "Text"}),
             output_concept_code="Text",
             sequential_sub_pipes=[
-                SubPipe(pipe_code="capitalize_text", output_name="capitalized_text"),
-                SubPipe(pipe_code="add_prefix", output_name="final_text"),
+                SubPipe(pipe=capitalize_pipe, output_name="capitalized_text"),
+                SubPipe(pipe=add_prefix_pipe, output_name="final_text"),
             ],
         )
 
@@ -51,9 +79,9 @@ class TestPipeSequenceSimple:
         assert pipe_sequence.domain == "test_integration"
         assert pipe_sequence.code == "simple_sequence"
         assert len(pipe_sequence.sequential_sub_pipes) == 2
-        assert pipe_sequence.sequential_sub_pipes[0].pipe_code == "capitalize_text"
+        assert pipe_sequence.sequential_sub_pipes[0].pipe.code == "capitalize_text"
         assert pipe_sequence.sequential_sub_pipes[0].output_name == "capitalized_text"
-        assert pipe_sequence.sequential_sub_pipes[1].pipe_code == "add_prefix"
+        assert pipe_sequence.sequential_sub_pipes[1].pipe.code == "add_prefix"
         assert pipe_sequence.sequential_sub_pipes[1].output_name == "final_text"
 
         # Verify the working memory has the correct structure

@@ -1,19 +1,30 @@
 from typing import List, Optional, Set
 
-from pydantic import model_validator
+from pydantic import BaseModel, model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.pipe_abstract import PipeAbstract
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.core.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
-from pipelex.exceptions import PipeRunParamsError, StaticValidationError, StaticValidationErrorType
-from pipelex.hub import get_required_pipe
+from pipelex.exceptions import PipeInputError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType, WorkingMemoryStuffNotFoundError
+from pipelex.hub import get_pipeline_tracker, get_required_pipe
+from pipelex.pipe_controllers.pipe_batch import PipeBatch
+from pipelex.pipe_controllers.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipeline.job_metadata import JobMetadata
+
+
+class SubPipe(BaseModel):
+    """Represents a single sub-pipe operation in a pipe controller."""
+
+    pipe: PipeAbstract
+    output_name: Optional[str] = None
+    output_multiplicity: Optional[PipeOutputMultiplicity] = None
+    batch_params: Optional[BatchParams] = None
 
 
 class PipeSequence(PipeController):
@@ -29,13 +40,13 @@ class PipeSequence(PipeController):
         needed_inputs = PipeInputSpec.make_empty()
         generated_outputs: Set[str] = set()
 
-        for sequential_sub_pipe in self.sequential_sub_pipes:
-            sub_pipe_needed_inputs = get_required_pipe(pipe_code=sequential_sub_pipe.pipe.code).needed_inputs()
+        for sub_pipe in self.sequential_sub_pipes:
+            sub_pipe_needed_inputs = get_required_pipe(pipe_code=sub_pipe.pipe.code).needed_inputs()
 
             # Handle batching: if this sub_pipe has batch_params, exclude the batch_as input
             # since it's provided by the batching mechanism
-            if sequential_sub_pipe.batch_params:
-                batch_as_input = sequential_sub_pipe.batch_params.input_item_stuff_name
+            if sub_pipe.batch_params:
+                batch_as_input = sub_pipe.batch_params.input_item_stuff_name
                 # Create a new PipeInputSpec without the batch_as input
                 filtered_needed_inputs = PipeInputSpec.make_empty()
                 for var_name, concept_code in sub_pipe_needed_inputs.items:
@@ -48,9 +59,9 @@ class PipeSequence(PipeController):
                 if var_name not in generated_outputs:
                     needed_inputs.add_requirement(variable_name=var_name, concept_code=concept_code)
 
-            # Add this step's output to generated outputs
-            if sequential_sub_pipe.output_name:
-                generated_outputs.add(sequential_sub_pipe.output_name)
+            # Add this sub_pipe's output to generated outputs
+            if sub_pipe.output_name:
+                generated_outputs.add(sub_pipe.output_name)
 
         return needed_inputs
 
@@ -61,7 +72,7 @@ class PipeSequence(PipeController):
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
         if len(self.sequential_sub_pipes) == 0:
-            raise ValueError(f"Pipe'{self.code}'(PipeSequence) must have at least 1 step")
+            raise ValueError(f"Pipe'{self.code}'(PipeSequence) must have at least 1 sub_pipe")
         return self
 
     def _validate_output_multiplicity_support(self, pipe_run_params: PipeRunParams) -> None:
@@ -127,6 +138,84 @@ class PipeSequence(PipeController):
     def pipe_dependencies(self) -> Set[str]:
         return set(sub_pipe.pipe.code for sub_pipe in self.sequential_sub_pipes)
 
+    async def _run_sub_pipe(
+        self,
+        sub_pipe: SubPipe,
+        working_memory: WorkingMemory,
+        job_metadata: JobMetadata,
+        sub_pipe_run_params: PipeRunParams,
+    ) -> PipeOutput:
+        """Run a single sub_pipe in the sequence."""
+        log.debug(f"SubPipe {sub_pipe.pipe.code} to generate {sub_pipe.pipe.output_concept_code}")
+
+        if sub_pipe.output_multiplicity:
+            sub_pipe_run_params.output_multiplicity = sub_pipe.output_multiplicity
+
+        if batch_params := sub_pipe.batch_params:
+            try:
+                input_list_stuff = working_memory.get_stuff(name=batch_params.input_list_stuff_name)
+            except WorkingMemoryStuffNotFoundError as exc:
+                raise PipeInputError(
+                    f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{sub_pipe.pipe.code}' "
+                    f"of pipe '{self.code}' not found in working memory: {exc}"
+                ) from exc
+
+            input_concept_code = input_list_stuff.concept_code
+            output_concept_code = sub_pipe.pipe.output_concept_code
+
+            required_pipe = get_required_pipe(pipe_code=sub_pipe.pipe.code)
+            pipe_batch_inputs = required_pipe.inputs
+            pipe_batch_inputs.add_requirement(variable_name=batch_params.input_list_stuff_name, concept_code=input_concept_code)
+            pipe_batch = PipeBatch(
+                domain=sub_pipe.pipe.domain,
+                code=sub_pipe.pipe.code,
+                inputs=pipe_batch_inputs,
+                output_concept_code=output_concept_code,
+                branch_pipe_code=sub_pipe.pipe.code,
+            )
+            pipe_output = await pipe_batch.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=sub_pipe_run_params,
+                output_name=sub_pipe.output_name,
+            )
+        elif isinstance(sub_pipe.pipe, PipeCondition):
+            pipe_output = await sub_pipe.pipe.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=sub_pipe_run_params,
+                output_name=sub_pipe.output_name,
+            )
+        else:
+            required_variables = sub_pipe.pipe.required_variables()
+            log.debug(required_variables, title=f"Required variables for {sub_pipe.pipe.code}")
+            required_stuff_names = set([required_variable for required_variable in required_variables if not required_variable.startswith("_")])
+            try:
+                required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
+            except WorkingMemoryStuffNotFoundError as exc:
+                sub_pipe_path = sub_pipe_run_params.pipe_layers + [sub_pipe.pipe.code]
+                sub_pipe_path_str = ".".join(sub_pipe_path)
+                error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
+                raise PipeInputError(f"Some required stuff(s) not found: {error_details}") from exc
+            log.debug(required_stuffs, title=f"Required stuffs for {sub_pipe.pipe.code}")
+
+            pipe_output = await sub_pipe.pipe.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=sub_pipe_run_params,
+                output_name=sub_pipe.output_name,
+            )
+            new_output_stuff = pipe_output.main_stuff
+            for stuff in required_stuffs:
+                get_pipeline_tracker().add_pipe_step(
+                    from_stuff=stuff,
+                    to_stuff=new_output_stuff,
+                    pipe_code=sub_pipe.pipe.code,
+                    pipe_layer=sub_pipe_run_params.pipe_layers,
+                    comment="SubPipe on required_stuff",
+                )
+        return pipe_output
+
     @override
     async def _run_controller_pipe(
         self,
@@ -142,13 +231,14 @@ class PipeSequence(PipeController):
 
         for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
             sub_pipe_run_params: PipeRunParams
-            # only the last step should apply the final_stuff_code
+            # only the last sub_pipe should apply the final_stuff_code
             if sub_pipe_index == len(self.sequential_sub_pipes) - 1:
                 sub_pipe_run_params = pipe_run_params.model_copy()
             else:
                 sub_pipe_run_params = pipe_run_params.model_copy(update=({"final_stuff_code": None}))
-            pipe_output = await sub_pipe.run_pipe(
-                calling_pipe_code=self.code,
+
+            pipe_output = await self._run_sub_pipe(
+                sub_pipe=sub_pipe,
                 working_memory=evolving_memory,
                 job_metadata=job_metadata,
                 sub_pipe_run_params=sub_pipe_run_params,

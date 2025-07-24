@@ -12,7 +12,9 @@ from pipelex.core.stuff_content import TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
-from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_controllers.pipe_sequence import SubPipe
+from pipelex.pipe_operators.pipe_llm import PipeLLM
+from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -24,16 +26,58 @@ class TestPipeParallelSimple:
 
     async def test_parallel_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeParallel running three text analysis pipes in parallel."""
-        # Create PipeParallel instance - pipes are loaded from TOML files
+        # Create PipeLLM instances for sentiment analysis
+        sentiment_pipe = PipeLLM(
+            domain="test_integration",
+            code="analyze_sentiment",
+            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            output_concept_code="Text",
+            pipe_llm_prompt=PipeLLMPrompt(
+                code="analyze_sentiment_prompt",
+                domain="test_integration",
+                user_text="""Analyze the sentiment of the following text and return only one word: positive, negative, or neutral.\n\n@
+                input_text.text\n\nSentiment:""",
+            ),
+        )
+
+        # Create PipeLLM instance for word counting
+        word_count_pipe = PipeLLM(
+            domain="test_integration",
+            code="count_words",
+            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            output_concept_code="Text",
+            pipe_llm_prompt=PipeLLMPrompt(
+                code="count_words_prompt",
+                domain="test_integration",
+                user_text="Count the number of words in the following text and return only the number:\n\n@input_text.text\n\nWord count:",
+            ),
+        )
+
+        # Create PipeLLM instance for keyword extraction
+        keywords_pipe = PipeLLM(
+            domain="test_integration",
+            code="extract_keywords",
+            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            output_concept_code="Text",
+            pipe_llm_prompt=PipeLLMPrompt(
+                code="extract_keywords_prompt",
+                domain="test_integration",
+                user_text="""
+                Extract the top 3 keywords from the following text. Return them as a comma-separated list:
+                \n\n@input_text.text\n\nKeywords:""",
+            ),
+        )
+
+        # Create PipeParallel instance using the PipeLLM instances
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
             inputs=PipeInputSpec(root={"input_text": "Text"}),
             output_concept_code="Text",
             parallel_sub_pipes=[
-                SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
-                SubPipe(pipe_code="count_words", output_name="word_count_result"),
-                SubPipe(pipe_code="extract_keywords", output_name="keywords_result"),
+                SubPipe(pipe=sentiment_pipe, output_name="sentiment_result"),
+                SubPipe(pipe=word_count_pipe, output_name="word_count_result"),
+                SubPipe(pipe=keywords_pipe, output_name="keywords_result"),
             ],
             add_each_output=True,
             combined_output=None,
@@ -56,11 +100,11 @@ class TestPipeParallelSimple:
         assert pipe_parallel.combined_output is None
 
         # Verify sub-pipes configuration
-        assert pipe_parallel.parallel_sub_pipes[0].pipe_code == "analyze_sentiment"
+        assert pipe_parallel.parallel_sub_pipes[0].pipe.code == "analyze_sentiment"
         assert pipe_parallel.parallel_sub_pipes[0].output_name == "sentiment_result"
-        assert pipe_parallel.parallel_sub_pipes[1].pipe_code == "count_words"
+        assert pipe_parallel.parallel_sub_pipes[1].pipe.code == "count_words"
         assert pipe_parallel.parallel_sub_pipes[1].output_name == "word_count_result"
-        assert pipe_parallel.parallel_sub_pipes[2].pipe_code == "extract_keywords"
+        assert pipe_parallel.parallel_sub_pipes[2].pipe.code == "extract_keywords"
         assert pipe_parallel.parallel_sub_pipes[2].output_name == "keywords_result"
 
         # Verify the working memory has the correct structure
@@ -136,6 +180,46 @@ class TestPipeParallelSimple:
 
     async def test_parallel_short_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeParallel with shorter text to verify consistent behavior."""
+        # Create PipeLLM instances for the parallel pipes
+        sentiment_pipe = PipeLLM(
+            domain="test_integration",
+            code="analyze_sentiment",
+            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            output_concept_code="Text",
+            pipe_llm_prompt=PipeLLMPrompt(
+                code="analyze_sentiment_prompt",
+                domain="test_integration",
+                user_text="""Analyze the sentiment of the following text and return only one word: positive, negative, or neutral.
+                \n\n@input_text.text\n\nSentiment:""",
+            ),
+        )
+
+        word_count_pipe = PipeLLM(
+            domain="test_integration",
+            code="count_words",
+            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            output_concept_code="Text",
+            pipe_llm_prompt=PipeLLMPrompt(
+                code="count_words_prompt",
+                domain="test_integration",
+                user_text="Count the number of words in the following text and return only the number:\n\n@input_text.text\n\nWord count:",
+            ),
+        )
+
+        keywords_pipe = PipeLLM(
+            domain="test_integration",
+            code="extract_keywords",
+            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            output_concept_code="Text",
+            pipe_llm_prompt=PipeLLMPrompt(
+                code="extract_keywords_prompt",
+                domain="test_integration",
+                user_text="""
+                Extract the top 3 keywords from the following text. Return them as a comma-separated list:\n\n@input_text.text\n\nKeywords:
+                """,
+            ),
+        )
+
         # Create PipeParallel instance
         pipe_parallel = PipeParallel(
             domain="test_integration",
@@ -143,9 +227,9 @@ class TestPipeParallelSimple:
             inputs=PipeInputSpec(root={"input_text": "Text"}),
             output_concept_code="Text",
             parallel_sub_pipes=[
-                SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
-                SubPipe(pipe_code="count_words", output_name="word_count_result"),
-                SubPipe(pipe_code="extract_keywords", output_name="keywords_result"),
+                SubPipe(pipe=sentiment_pipe, output_name="sentiment_result"),
+                SubPipe(pipe=word_count_pipe, output_name="word_count_result"),
+                SubPipe(pipe=keywords_pipe, output_name="keywords_result"),
             ],
             add_each_output=True,
             combined_output=None,

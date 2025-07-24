@@ -1,6 +1,6 @@
 from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
-from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_controllers.pipe_sequence import SubPipe
 from pipelex.pipe_operators.pipe_llm import PipeLLM
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 
@@ -34,14 +34,14 @@ class TestPipeParallelValidation:
             code="parallel_document_processor",
             inputs=PipeInputSpec(root={"document": "test_domain.document", "context": "test_domain.context"}),
             output_concept_code="test_domain.ProcessedAnalysis",
-            parallel_sub_pipes=[SubPipe(pipe_code="analyze_document", output_name="analysis_result")],
+            parallel_sub_pipes=[SubPipe(pipe=real_pipe, output_name="analysis_result")],
             add_each_output=True,
             combined_output=None,
         )
 
         # Verify the PipeParallel structure is correct
         assert len(pipe_parallel.parallel_sub_pipes) == 1
-        assert pipe_parallel.parallel_sub_pipes[0].pipe_code == "analyze_document"
+        assert pipe_parallel.parallel_sub_pipes[0].pipe.code == "analyze_document"
         assert pipe_parallel.parallel_sub_pipes[0].output_name == "analysis_result"
 
         # Verify PipeParallel has the expected structure
@@ -51,13 +51,25 @@ class TestPipeParallelValidation:
 
     def test_pipe_parallel_creation(self):
         """Test basic PipeParallel creation and structure"""
+        # Create a real PipeLLM pipe
+        test_pipe = PipeLLM(
+            domain="test_domain",
+            code="test_pipe_1",
+            output_concept_code="test_domain.ProcessedText",
+            pipe_llm_prompt=PipeLLMPrompt(
+                code="test_pipe_1_prompt",
+                domain="test_domain",
+                user_text="Process this input: @input_var",
+            ),
+        )
+
         # Create a simple PipeParallel with proper inputs
         pipe_parallel = PipeParallel(
             domain="test_domain",
             code="test_parallel",
             inputs=PipeInputSpec(root={"input_var": "test_domain.Text"}),
             output_concept_code="test_domain.ProcessedText",
-            parallel_sub_pipes=[SubPipe(pipe_code="test_pipe_1", output_name="result_1")],
+            parallel_sub_pipes=[SubPipe(pipe=test_pipe, output_name="result_1")],
             add_each_output=True,
             combined_output=None,
         )

@@ -8,8 +8,8 @@ from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
-from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
+from pipelex.pipe_controllers.pipe_sequence import SubPipe
+from pipelex.pipe_controllers.pipe_sequence_factory import SubPipeBlueprint
 
 
 class PipeParallelBlueprint(PipeBlueprint):

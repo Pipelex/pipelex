@@ -15,19 +15,11 @@ Choose {{ _nb_output }} colors.
 """
 llm = "llm_for_creative_writing"
 
-[pipe.sequence_for_batch_test]
-PipeSequence = "Sequence for parallel test"
-inputs = { color = "Color" }
-output = "Color"
-steps = [
-    { pipe = "capitalize_color", result = "capitalized_color" },
-    { pipe = "capitalize_last_letter", result = "capitalized_last_letter" },
-]
-
 [pipe.capitalize_color]
 PipeLLM = "Capitalize Colors"
 inputs = { color = "Color" }
 output = "Color"
+llm = "llm_for_testing_gen_text"
 prompt_template = """
 Put the first letter of a word that represents a color as a capital letter.
 Here is the word:
@@ -41,6 +33,7 @@ Output only the word, nothing else.
 PipeLLM = "Capitalize Last Letter"
 inputs = { capitalized_color = "Color" }
 output = "Color"
+llm = "llm_for_testing_gen_text"
 prompt_template = """
 Put the last letter of a word that represents a color as a capital letter.
 Here is the word:
@@ -49,4 +42,13 @@ Here is the word:
 
 Output only the word, nothing else.
 """
+
+[pipe.sequence_for_batch_test]
+PipeSequence = "Sequence for parallel test"
+inputs = { color = "Color" }
+output = "Color"
+steps = [
+    { pipe = "capitalize_color", result = "capitalized_color" },
+    { pipe = "capitalize_last_letter", result = "capitalized_last_letter" },
+]
 

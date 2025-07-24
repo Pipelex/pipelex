@@ -9,16 +9,6 @@ ProductRating = "Overall product rating based on reviews"
 Document = "A document containing multiple customer reviews"
 
 [pipe]
-[pipe.analyze_reviews_sequence]
-PipeSequence = "Process customer reviews with sentiment analysis"
-inputs = { document = "Document" }
-output = "ProductRating"
-steps = [
-    { pipe = "extract_individual_reviews", result = "review_list" },
-    { pipe = "analyze_review_sentiment", batch_over = "review_list", batch_as = "single_review", result = "sentiment_analyses" },
-    { pipe = "aggregate_review_results", result = "product_rating" },
-]
-
 [pipe.extract_individual_reviews]
 PipeLLM = "Extract individual reviews from document"
 inputs = { document = "Document" }
@@ -56,4 +46,14 @@ Based on these sentiment analyses, provide an overall product rating:
 
 Give a rating from 1-5 stars with explanation.
 """
+
+[pipe.analyze_reviews_sequence]
+PipeSequence = "Process customer reviews with sentiment analysis"
+inputs = { document = "Document" }
+output = "ProductRating"
+steps = [
+    { pipe = "extract_individual_reviews", result = "review_list" },
+    { pipe = "analyze_review_sentiment", batch_over = "review_list", batch_as = "single_review", result = "sentiment_analyses" },
+    { pipe = "aggregate_review_results", result = "product_rating" },
+]
 

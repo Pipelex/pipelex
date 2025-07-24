@@ -16,7 +16,7 @@ from pipelex.core.working_memory import WorkingMemory
 from pipelex.exceptions import DryRunError, PipeDefinitionError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_controllers.pipe_sequence import SubPipe
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -147,11 +147,10 @@ class PipeParallel(PipeController):
 
         for sub_pipe in self.parallel_sub_pipes:
             tasks.append(
-                sub_pipe.run_pipe(
-                    calling_pipe_code=self.code,
+                sub_pipe.pipe.run_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory.make_deep_copy(),
-                    sub_pipe_run_params=pipe_run_params.make_deep_copy(),
+                    pipe_run_params=pipe_run_params.make_deep_copy(),
                 )
             )
 
@@ -248,11 +247,10 @@ class PipeParallel(PipeController):
 
         for sub_pipe in self.parallel_sub_pipes:
             tasks.append(
-                sub_pipe.run_pipe(
-                    calling_pipe_code=self.code,
+                sub_pipe.pipe.run_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory.make_deep_copy(),
-                    sub_pipe_run_params=pipe_run_params.make_deep_copy(),
+                    pipe_run_params=pipe_run_params.make_deep_copy(),
                 )
             )
 
