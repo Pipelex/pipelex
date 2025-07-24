@@ -1,7 +1,7 @@
 import inspect
 import os
 from importlib.metadata import metadata
-from typing import Any, List, Optional, Type, cast
+from typing import Optional, Type, cast
 
 from dotenv import load_dotenv
 from kajson.class_registry import ClassRegistry
@@ -161,7 +161,6 @@ class Pipelex(metaclass=MetaSingleton):
         secrets_provider: Optional[SecretsProviderAbstract] = None,
         content_generator: Optional[ContentGeneratorProtocol] = None,
         pipe_router: Optional[PipeRouterProtocol] = None,
-        structure_classes: Optional[List[Type[Any]]] = None,
         storage_provider: Optional[StorageProviderAbstract] = None,
     ):
         # tools
@@ -176,9 +175,6 @@ class Pipelex(metaclass=MetaSingleton):
             log.debug("Registering test models for unit testing")
             self.class_registry.register_classes(PipelexTestModels.get_all_models())
         self.activity_manager.setup()
-
-        if structure_classes:
-            self.class_registry.register_classes(structure_classes)
 
         self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter())
 

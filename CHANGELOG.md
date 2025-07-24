@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.6.7] - 2025-07-24
+
+### Removed
+- Removed the `structure_classes` parameter from the `Pipelex` class.
+
 ## [v0.6.6] - 2025-07-24
 
 ### Added
