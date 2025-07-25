@@ -32,7 +32,7 @@ dependencies = [
     "pandas>=2.2.3",
     "pillow>=11.2.1",
     "polyfactory>=2.21.0",
-    "pypdfium2>=4.30.1",
+    "pypdfium2>=4.30.0,!=4.30.1",
     "pydantic==2.10.6",
     "python-dotenv>=1.0.1",
     "PyYAML>=6.0.2",
