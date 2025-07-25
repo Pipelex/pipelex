@@ -1,5 +1,29 @@
 # Changelog
 
+## [v0.6.7] - 2025-07-24
+
+### Removed
+- Removed the `structure_classes` parameter from the `Pipelex` class.
+
+## [v0.6.6] - 2025-07-24
+
+### Added
+- Added a new method `verify_content_type` in the `Stuff` class to verify and convert content to the expected type.
+- Added `cocode==0.0.6` to the development dependencies in `pyproject.toml`.
+
+### Changed
+- Updated `Stuff` class methods to use the new `verify_content_type` method for content verification.
+- Updated `vertexai.toml` to change LLM IDs from preview models to released models: `gemini-2.5-pro` and `gemini-2.5-flash`.
+
+### Removed
+- Removed `reinitlibraries`, `rl`, `v`, and `init` targets from the Makefile.
+
+## [v0.6.5] - 2025-07-21
+
+### Fixed
+
+- In the documentation, fixed the use of `execute_pipeline`.
+
 ## [v0.6.4] - 2025-07-19
 
 - Fixed the `README.md` link to the documentation

@@ -10,35 +10,12 @@ is_gen_object_supported = true
 is_vision_supported = true
 max_prompt_images = 3000
 cost_per_million_tokens_usd = { input = 0.0, output = 0.0 }
-platform_llm_id = { vertexai = "google/gemini-2.5-pro-preview-05-06" }
-
-# Update commented because the latest version is not yet on VertexAI
-
-# [gemini."gemini-2.5-pro"."2025-05-06"]
-# is_gen_object_supported = true
-# is_vision_supported = true
-# max_prompt_images = 3000
-# cost_per_million_tokens_usd = { input = 0.0, output = 0.0 }
-# platform_llm_id = { vertexai = "google/gemini-2.5-pro-preview-05-06" }
-
-# [gemini."gemini-2.5-pro".latest]
-# is_gen_object_supported = true
-# is_vision_supported = true
-# max_prompt_images = 3000
-# cost_per_million_tokens_usd = { input = 0.0, output = 0.0 }
-# platform_llm_id = { vertexai = "google/gemini-2.5-pro-preview-06-05" }
-
-[gemini."gemini-2.5-flash"."2025-04-17"]
-is_gen_object_supported = true
-is_vision_supported = true
-max_prompt_images = 3000
-cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
-platform_llm_id = { vertexai = "google/gemini-2.5-flash-preview-04-17" }
+platform_llm_id = { vertexai = "google/gemini-2.5-pro" }
 
 [gemini."gemini-2.5-flash".latest]
 is_gen_object_supported = true
 is_vision_supported = true
 max_prompt_images = 3000
 cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
-platform_llm_id = { vertexai = "google/gemini-2.5-flash-preview-05-20" }
+platform_llm_id = { vertexai = "google/gemini-2.5-flash" }
 

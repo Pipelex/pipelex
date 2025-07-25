@@ -1,5 +1,3 @@
-from typing import Any
-
 import pytest
 from rich import print
 from rich.console import Console
@@ -44,11 +42,6 @@ def pretty():
     # Code to run before each test
     yield
     # Code to run after each test
-
-
-@pytest.fixture(scope="session", autouse=True)  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
-def apply_manage_pipelex_libraries(manage_pipelex_libraries_with_overwrite: Any):  # pyright: ignore[reportUnknownParameterType]
-    return
 
 
 # Test data fixtures

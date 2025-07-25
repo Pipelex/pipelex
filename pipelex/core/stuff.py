@@ -106,25 +106,30 @@ class Stuff(CustomBaseModel):
 
     def content_as(self, content_type: Type[StuffContentType]) -> StuffContentType:
         """Get content with proper typing if it's of the expected type."""
+        return self.verify_content_type(self.content, content_type)
+
+    @classmethod
+    def verify_content_type(cls, content: StuffContent, content_type: Type[StuffContentType]) -> StuffContentType:
+        """Verify and convert content to the expected type."""
         # First try the direct isinstance check for performance
-        if isinstance(self.content, content_type):
-            return self.content
+        if isinstance(content, content_type):
+            return content
 
         # If isinstance failed, try model validation approach
         try:
             # Check if class names match (quick filter before attempting validation)
-            if type(self.content).__name__ == content_type.__name__:
-                content_dict = self.content.smart_dump()
+            if type(content).__name__ == content_type.__name__:
+                content_dict = content.smart_dump()
                 validated_content = content_type.model_validate(content_dict)
-                log.debug(f"Model validation passed: converted {type(self.content).__name__} to {content_type.__name__}")
+                log.debug(f"Model validation passed: converted {type(content).__name__} to {content_type.__name__}")
                 return validated_content
         except ValidationError as exc:
             formatted_error = format_pydantic_validation_error(exc)
             raise StuffContentValidationError(
-                original_type=type(self.content).__name__, target_type=content_type.__name__, validation_error=formatted_error
+                original_type=type(content).__name__, target_type=content_type.__name__, validation_error=formatted_error
             ) from exc
 
-        raise TypeError(f"Content is of type '{type(self.content)}', instead of the expected '{content_type}'")
+        raise TypeError(f"Content is of type '{type(content)}', instead of the expected '{content_type}'")
 
     def as_list_content(self) -> ListContent:  # pyright: ignore[reportMissingTypeArgument, reportUnknownParameterType]
         """Get content as ListContent with items of any type."""
@@ -146,9 +151,8 @@ class Stuff(CustomBaseModel):
         list_content: ListContent[StuffContentType] = self.content_as(content_type=ListContent)
 
         # Validate all items are of the expected type
-        for i, item in enumerate(list_content.items):
-            if not isinstance(item, item_type):
-                raise TypeError(f"Item {i} in list is of type {type(item)}, not {item_type}, in {self.stuff_name=} and {self.concept_code=}")
+        for item in list_content.items:
+            self.verify_content_type(item, item_type)
 
         return list_content
 
