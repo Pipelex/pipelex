@@ -24,7 +24,7 @@ class TestPipeSequenceValidation:
         pipe_sequence = PipeSequence(
             domain="test_domain",
             code="test_sequence",
-            inputs=PipeInputSpec(root={"text": "test_domain.Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"text": "test_domain.Text"}),
             output_concept_code="test_domain.ProcessedText",
             sequential_sub_pipes=[SubPipe(pipe=pipe_llm, output_name="intermediate_result")],
         )
@@ -64,11 +64,11 @@ class TestPipeSequenceValidation:
         pipe_sequence = PipeSequence(
             domain="test_domain",
             code="test_sequence",
-            inputs=PipeInputSpec(root={"initial_input": "test_domain.Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"initial_input": "test_domain.Text"}),
             output_concept_code="test_domain.FinalOutput",
             sequential_sub_pipes=[SubPipe(pipe=pipe_llm_1, output_name="intermediate"), SubPipe(pipe=pipe_llm_2, output_name="final_output")],
         )
 
         assert pipe_sequence.code == "test_sequence"
         assert len(pipe_sequence.sequential_sub_pipes) == 2
-        assert pipe_sequence.inputs.root["initial_input"] == "test_domain.Text"
+        assert pipe_sequence.inputs.root["initial_input"].concept_code == "test_domain.Text"

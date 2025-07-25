@@ -10,7 +10,7 @@ class TestPipeConditionValidation:
         pipe_condition = PipeCondition(
             domain="test_domain",
             code="test_condition",
-            inputs=PipeInputSpec(root={"input_var": "test_domain.Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_var": "test_domain.Text"}),
             output_concept_code="test_domain.ProcessedText",
             expression="input_var",
             pipe_map={"value1": "pipe_a", "value2": "pipe_b"},
@@ -29,7 +29,7 @@ class TestPipeConditionValidation:
         pipe_condition_template = PipeCondition(
             domain="test_domain",
             code="test_condition_template",
-            inputs=PipeInputSpec(root={"var": "test_domain.Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"var": "test_domain.Text"}),
             output_concept_code="test_domain.Result",
             expression_template="{{ var }}",
             pipe_map={"value": "target_pipe"},
@@ -39,7 +39,7 @@ class TestPipeConditionValidation:
         pipe_condition_expr = PipeCondition(
             domain="test_domain",
             code="test_condition_expr",
-            inputs=PipeInputSpec(root={"var": "test_domain.Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"var": "test_domain.Text"}),
             output_concept_code="test_domain.Result",
             expression="var",
             pipe_map={"value": "target_pipe"},

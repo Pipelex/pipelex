@@ -290,10 +290,8 @@ def purify_json(
         try:
             dict_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
         except Exception:
-            # print(f"Error: type {type(e)}", e)
             if is_warning_enabled:
                 data = {"!": data}
-            # dict_string = kajson.dumps(data, indent=indent, default=str)
             dict_string = json.dumps(data, indent=indent, default=str)
         pure_dict = json.loads(dict_string)
     return pure_dict, dict_string
@@ -350,7 +348,6 @@ def purify_json_list(
         try:
             list_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
         except Exception:
-            # print(f"Error: type {type(e)}", e)
             list_string = json.dumps(data, indent=indent, default=str)
         pure_list = json.loads(list_string)
     return pure_list, list_string
@@ -403,10 +400,8 @@ def purify_json_dict(data: Any, indent: Optional[int] = None, is_warning_enabled
         try:
             dict_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
         except Exception:
-            # print(f"Error: type {type(e)}", e)
             if is_warning_enabled:
                 data = {"!": data}
-            # dict_string = kajson.dumps(data, indent=indent, default=str)
             dict_string = json.dumps(data, indent=indent, default=str)
         pure_dict = json.loads(dict_string)
     return pure_dict, dict_string

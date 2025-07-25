@@ -31,7 +31,7 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             domain="test_integration",
             code="text_length_condition",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
             output_concept_code="Text",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
@@ -100,7 +100,7 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             domain="test_integration",
             code="text_length_condition",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
             output_concept_code="Text",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map={"long": "capitalize_long_text", "short": "add_prefix_short_text"},

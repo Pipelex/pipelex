@@ -1,5 +1,30 @@
 # Changelog
 
+## [v0.6.8] - 2025-07-25
+
+### Added
+- New method `make_stuff_using_concept_name_and_search_domains` in `StuffFactory` for creating stuff using concept names and search domains.
+- New method `make_stuff_from_stuff_content_using_search_domains` in `StuffFactory` for creating stuff from stuff content using search domains.
+- New method `make_from_implicit_memory` in `WorkingMemoryFactory` for creating working memory from implicit memory.
+- New method `create_mock_content` in `WorkingMemoryFactory` for creating mock content for requirements.
+
+### Changed
+- Refactored `PipeInputSpec` to use `InputRequirement` and `TypedNamedInputRequirement` classes instead of plain strings for input specifications.
+- Updated `WorkingMemoryFactory` to handle `ImplicitMemory` instead of `CompactMemory`.
+- Replaced `ExecutePipelineException` with `PipelineInputError` in `execute_pipeline` function.
+- Updated `PipeBatch`, `PipeCondition`, `PipeParallel`, `PipeSequence`, `PipeFunc`, `PipeImgGen`, `PipeJinja2`, `PipeLLM`, and `PipeOcr` classes to use `InputRequirement` for input handling.
+- Updated `PipeInputSpec` creation in various test files to use `make_from_dict` method.
+- Updated `pyproject.toml` to exclude `pypdfium2` version `4.30.1`.
+- Updated `Jinja2TemplateCategory` to handle HTML and Markdown templates differently.
+
+### Fixed
+- Corrected error messages in `StuffFactory` and `StuffContentFactory` to provide more detailed information about exceptions.
+
+## [v0.6.7] - 2025-07-24
+
+### Removed
+- Removed the `structure_classes` parameter from the `Pipelex` class.
+
 ## [v0.6.6] - 2025-07-24
 
 ### Added

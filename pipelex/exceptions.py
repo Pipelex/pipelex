@@ -280,5 +280,5 @@ class StartPipelineException(Exception):
     pass
 
 
-class ExecutePipelineException(Exception):
+class PipelineInputError(Exception):
     pass

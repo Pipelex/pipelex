@@ -1,15 +1,16 @@
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, cast
 
 import shortuuid
 from polyfactory.factories.pydantic_factory import ModelFactory
 from pydantic import BaseModel
 
 from pipelex import log
-from pipelex.client.protocol import CompactMemory
+from pipelex.client.protocol import CompactMemory, ImplicitMemory
 from pipelex.core.concept_native import NativeConcept
+from pipelex.core.pipe_input_spec import TypedNamedInputRequirement
 from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ImageContent, PDFContent, StuffContent, TextContent
-from pipelex.core.stuff_factory import StuffBlueprint, StuffContentFactory, StuffFactory
+from pipelex.core.stuff_content import ImageContent, ListContent, PDFContent, StuffContent, TextContent
+from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.exceptions import WorkingMemoryFactoryError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
@@ -126,7 +127,23 @@ class WorkingMemoryFactory(BaseModel):
         return working_memory
 
     @classmethod
-    def make_from_compact_memory(cls, compact_memory: CompactMemory) -> WorkingMemory:
+    def make_from_compact_memory(
+        cls,
+        compact_memory: CompactMemory,
+        search_domains: Optional[List[str]] = None,
+    ) -> WorkingMemory:
+        implicit_memory = cast(ImplicitMemory, compact_memory)
+        return cls.make_from_implicit_memory(
+            implicit_memory=implicit_memory,
+            search_domains=search_domains,
+        )
+
+    @classmethod
+    def make_from_implicit_memory(
+        cls,
+        implicit_memory: ImplicitMemory,
+        search_domains: Optional[List[str]] = None,
+    ) -> WorkingMemory:
         """
         Create a WorkingMemory from a compact memory dictionary.
 
@@ -138,20 +155,35 @@ class WorkingMemoryFactory(BaseModel):
         """
         working_memory = cls.make_empty()
 
-        for stuff_key, stuff_data in compact_memory.items():
-            concept_code = stuff_data.get("concept_code", "")
-            content_value = stuff_data.get("content", {})
-
-            content = StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(concept_code=concept_code, value=content_value)
-
-            stuff = StuffFactory.make_stuff(concept_str=concept_code, name=stuff_key, content=content)
+        for stuff_key, stuff_content_or_data in implicit_memory.items():
+            stuff = StuffFactory.make_stuff_from_stuff_content_using_search_domains(
+                name=stuff_key,
+                stuff_content_or_data=stuff_content_or_data,
+                search_domains=search_domains or [],
+            )
 
             working_memory.add_new_stuff(name=stuff_key, stuff=stuff)
 
         return working_memory
 
     @classmethod
-    def make_for_dry_run(cls, needed_inputs: List[Tuple[str, str, Type[StuffContent]]]) -> "WorkingMemory":
+    def create_mock_content(cls, requirement: TypedNamedInputRequirement) -> StuffContent:
+        """Helper method to create mock content for a requirement."""
+        if requirement.structure_class:
+            # Create mock object using polyfactory
+            class MockFactory(ModelFactory[requirement.structure_class]):  # type: ignore
+                __model__ = requirement.structure_class
+                __check_model__ = True
+                __use_examples__ = True
+                __allow_none_optionals__ = False  # Ensure Optional fields always get values
+
+            return MockFactory.build()  # type: ignore
+        else:
+            # Fallback to text content
+            return TextContent(text=f"DRY RUN: Mock content for '{requirement.variable_name}' ({requirement.concept_code})")
+
+    @classmethod
+    def make_for_dry_run(cls, needed_inputs: List[TypedNamedInputRequirement]) -> "WorkingMemory":
         """
         Create a WorkingMemory with mock objects for dry run mode.
 
@@ -164,43 +196,63 @@ class WorkingMemoryFactory(BaseModel):
 
         working_memory = cls.make_empty()
 
-        for variable_name, concept_code, structure_class in needed_inputs:
-            log.debug(f"Creating dry run mock for '{variable_name}' with concept '{concept_code}' and class '{structure_class.__name__}'")
+        for requirement in needed_inputs:
+            log.debug(
+                f"Creating dry run mock for '{requirement.variable_name}' with concept "
+                f"'{requirement.concept_code}' and class '{requirement.structure_class.__name__}'"
+            )
 
             try:
-                if structure_class:
-                    # Create mock object using polyfactory
-                    class MockFactory(ModelFactory[structure_class]):  # type: ignore
-                        __model__ = structure_class
-                        __check_model__ = True
-                        __use_examples__ = True
-                        __allow_none_optionals__ = False  # Ensure Optional fields always get values
+                if not requirement.multiplicity:
+                    mock_content = cls.create_mock_content(requirement)
 
-                    mock_content = MockFactory.build()
+                    # Create stuff with mock content
+                    mock_stuff = Stuff(
+                        stuff_name=requirement.variable_name,
+                        stuff_code=shortuuid.uuid()[:5],
+                        concept_code=requirement.concept_code,
+                        content=mock_content,
+                    )
+
+                    working_memory.add_new_stuff(name=requirement.variable_name, stuff=mock_stuff)
                 else:
-                    # Fallback to text content
-                    mock_content = TextContent(text=f"DRY RUN: Mock content for '{variable_name}' ({concept_code})")
+                    # Let's create a ListContent of multiple stuffs
+                    nb_stuffs: int
+                    if isinstance(requirement.multiplicity, bool):
+                        # TODO: make this configurable or use existing config variable
+                        nb_stuffs = 3
+                    else:
+                        nb_stuffs = requirement.multiplicity
 
-                # Create stuff with mock content
-                mock_stuff = Stuff(
-                    stuff_name=variable_name,
-                    stuff_code=shortuuid.uuid()[:5],
-                    concept_code=concept_code,
-                    content=mock_content,
+                    items: List[StuffContent] = []
+                    for _ in range(nb_stuffs):
+                        item_mock_content = cls.create_mock_content(requirement)
+                        items.append(item_mock_content)
+
+                    mock_list_content = ListContent[StuffContent](items=items)
+
+                    # Create stuff with mock content
+                    mock_stuff = Stuff(
+                        stuff_name=requirement.variable_name,
+                        stuff_code=shortuuid.uuid()[:5],
+                        concept_code=requirement.concept_code,
+                        content=mock_list_content,
+                    )
+
+                    working_memory.add_new_stuff(name=requirement.variable_name, stuff=mock_stuff)
+
+            except Exception as exc:
+                log.warning(
+                    f"Failed to create mock for '{requirement.variable_name}' ({requirement.concept_code}): {exc}. Using fallback text content."
                 )
-
-                working_memory.add_new_stuff(name=variable_name, stuff=mock_stuff)
-
-            except Exception as e:
-                log.warning(f"Failed to create mock for '{variable_name}' ({concept_code}): {e}. Using fallback text content.")
                 # Create fallback text content
-                fallback_content = TextContent(text=f"DRY RUN: Fallback mock for '{variable_name}' ({concept_code})")
+                fallback_content = TextContent(text=f"DRY RUN: Fallback mock for '{requirement.variable_name}' ({requirement.concept_code})")
                 fallback_stuff = Stuff(
-                    stuff_name=variable_name,
+                    stuff_name=requirement.variable_name,
                     stuff_code=shortuuid.uuid()[:5],
-                    concept_code=concept_code,
+                    concept_code=requirement.concept_code,
                     content=fallback_content,
                 )
-                working_memory.add_new_stuff(name=variable_name, stuff=fallback_stuff)
+                working_memory.add_new_stuff(name=requirement.variable_name, stuff=fallback_stuff)
 
         return working_memory

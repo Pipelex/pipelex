@@ -1,13 +1,14 @@
 """Test dry working memory functionality."""
 
-from typing import List, Tuple, Type, cast
+from typing import List
 
 import pytest
 from pytest import FixtureRequest
 
 from pipelex import log
 from pipelex.core.concept_native import NativeConcept
-from pipelex.core.stuff_content import PageContent, StuffContent, TextContent
+from pipelex.core.pipe_input_spec import TypedNamedInputRequirement
+from pipelex.core.stuff_content import PageContent, TextContent
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from tests.test_pipelines.tricky_questions import ThoughtfulAnswer
 
@@ -25,12 +26,13 @@ class TestDryWorkingMemory:
         log.info("Testing dry run with PageContent")
 
         # Test the specific inputs requested by the user
-        needed_inputs = cast(
-            List[Tuple[str, str, Type[StuffContent]]],
-            [
-                ("page", NativeConcept.PAGE.code, PageContent),
-            ],
-        )
+        needed_inputs = [
+            TypedNamedInputRequirement(
+                variable_name="page",
+                concept_code=NativeConcept.PAGE.code,
+                structure_class=PageContent,
+            ),
+        ]
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
         # Verify working memory contains exactly this
@@ -64,13 +66,18 @@ class TestDryWorkingMemory:
         log.info("Testing dry run with structured content (ThoughtfulAnswer)")
 
         # Use ThoughtfulAnswer from tricky questions domain
-        needed_inputs = cast(
-            List[Tuple[str, str, Type[StuffContent]]],
-            [
-                ("thoughtful_answer", "test_tricky_questions.ThoughtfulAnswer", ThoughtfulAnswer),
-                ("question", "answer.Question", TextContent),
-            ],
-        )
+        needed_inputs = [
+            TypedNamedInputRequirement(
+                variable_name="thoughtful_answer",
+                concept_code="test_tricky_questions.ThoughtfulAnswer",
+                structure_class=ThoughtfulAnswer,
+            ),
+            TypedNamedInputRequirement(
+                variable_name="question",
+                concept_code="answer.Question",
+                structure_class=TextContent,
+            ),
+        ]
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
@@ -110,13 +117,18 @@ class TestDryWorkingMemory:
         """Test that make_for_dry_run falls back to TextContent when needed."""
         log.info("Testing dry run with TextContent fallback")
 
-        needed_inputs = cast(
-            List[Tuple[str, str, Type[StuffContent]]],
-            [
-                ("question_analysis", "QuestionAnalysis", TextContent),
-                ("conclusion", "test_tricky_questions.ThoughtfulAnswerConclusion", TextContent),
-            ],
-        )
+        needed_inputs = [
+            TypedNamedInputRequirement(
+                variable_name="question_analysis",
+                concept_code="QuestionAnalysis",
+                structure_class=TextContent,
+            ),
+            TypedNamedInputRequirement(
+                variable_name="conclusion",
+                concept_code="test_tricky_questions.ThoughtfulAnswerConclusion",
+                structure_class=TextContent,
+            ),
+        ]
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
@@ -144,14 +156,23 @@ class TestDryWorkingMemory:
         """Test that make_for_dry_run handles mixed content types correctly."""
         log.info("Testing dry run with mixed content types")
 
-        needed_inputs = cast(
-            List[Tuple[str, str, Type[StuffContent]]],
-            [
-                ("thoughtful_answer", "test_tricky_questions.ThoughtfulAnswer", ThoughtfulAnswer),
-                ("raw_question", "answer.Question", TextContent),
-                ("analysis_result", "QuestionAnalysis", TextContent),
-            ],
-        )
+        needed_inputs = [
+            TypedNamedInputRequirement(
+                variable_name="thoughtful_answer",
+                concept_code="test_tricky_questions.ThoughtfulAnswer",
+                structure_class=ThoughtfulAnswer,
+            ),
+            TypedNamedInputRequirement(
+                variable_name="raw_question",
+                concept_code="answer.Question",
+                structure_class=TextContent,
+            ),
+            TypedNamedInputRequirement(
+                variable_name="analysis_result",
+                concept_code="QuestionAnalysis",
+                structure_class=TextContent,
+            ),
+        ]
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
@@ -182,7 +203,7 @@ class TestDryWorkingMemory:
         """Test that make_for_dry_run handles empty inputs gracefully."""
         log.info("Testing dry run with empty inputs")
 
-        needed_inputs = cast(List[Tuple[str, str, Type[StuffContent]]], [])
+        needed_inputs: List[TypedNamedInputRequirement] = []
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
@@ -200,14 +221,23 @@ class TestDryWorkingMemory:
         log.info("Testing dry run with realistic tricky questions pipeline scenario")
 
         # Simulate the conclude_tricky_question_by_steps pipeline needs
-        needed_inputs = cast(
-            List[Tuple[str, str, Type[StuffContent]]],
-            [
-                ("question", "answer.Question", TextContent),
-                ("question_analysis", "QuestionAnalysis", TextContent),
-                ("thoughtful_answer", "test_tricky_questions.ThoughtfulAnswer", ThoughtfulAnswer),
-            ],
-        )
+        needed_inputs = [
+            TypedNamedInputRequirement(
+                variable_name="question",
+                concept_code="answer.Question",
+                structure_class=TextContent,
+            ),
+            TypedNamedInputRequirement(
+                variable_name="question_analysis",
+                concept_code="QuestionAnalysis",
+                structure_class=TextContent,
+            ),
+            TypedNamedInputRequirement(
+                variable_name="thoughtful_answer",
+                concept_code="test_tricky_questions.ThoughtfulAnswer",
+                structure_class=ThoughtfulAnswer,
+            ),
+        ]
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 

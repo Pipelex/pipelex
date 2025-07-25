@@ -122,11 +122,11 @@ class PipeRunParams(BaseModel):
 
     @field_validator("params")
     @classmethod
-    def validate_param_keys(cls, v: Dict[str, Any]) -> Dict[str, Any]:
-        for key in v:
+    def validate_param_keys(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        for key in value:
             if not key.startswith("_"):
                 raise ValueError(f"Parameter key '{key}' must start with an underscore '_'")
-        return v
+        return value
 
     def make_deep_copy(self) -> Self:
         return self.model_copy(deep=True)

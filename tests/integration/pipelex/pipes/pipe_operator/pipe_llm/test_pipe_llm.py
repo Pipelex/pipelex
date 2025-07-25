@@ -67,7 +67,7 @@ class TestPipeLLM:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm_image",
                 domain="generic",
-                inputs=PipeInputSpec(root={stuff_name: stuff.concept_code}),
+                inputs=PipeInputSpec.make_from_dict(concepts_dict={stuff_name: stuff.concept_code}),
                 output_concept_code=NativeConcept.TEXT.code,
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm_image",

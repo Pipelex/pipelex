@@ -57,7 +57,7 @@ class TestPipeSequenceSimple:
         pipe_sequence = PipeSequence(
             domain="test_integration",
             code="simple_sequence",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
             output_concept_code="Text",
             sequential_sub_pipes=[
                 SubPipe(pipe=capitalize_pipe, output_name="capitalized_text"),

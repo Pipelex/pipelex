@@ -106,7 +106,7 @@ class Concept(BaseModel):
         if "." in concept_str:
             domain_code, concept_code = concept_str.split(".")
             return domain_code, concept_code
-        raise ConceptError(f"Could not extract domain and concept from concept code '{concept_str}'")
+        raise ConceptError(f"Could not extract domain and concept from '{concept_str}'")
 
     @classmethod
     def extract_concept_name_from_str(cls, concept_str: str) -> str:

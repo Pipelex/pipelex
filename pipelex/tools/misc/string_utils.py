@@ -173,7 +173,7 @@ def snake_to_pascal_case(snake_str: str) -> str:
         'HelloWorld'
     """
     components = snake_str.split("_")
-    return "".join(x.title() for x in components)
+    return "".join(component.title() for component in components)
 
 
 def snake_to_capitalize_first_letter(snake_str: str) -> str:

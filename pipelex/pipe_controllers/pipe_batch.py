@@ -14,7 +14,11 @@ from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import ListContent, StuffContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import MAIN_STUFF_NAME, WorkingMemory
-from pipelex.exceptions import PipeInputError, PipeInputNotFoundError, WorkingMemoryStuffNotFoundError
+from pipelex.exceptions import (
+    PipeInputError,
+    PipeInputNotFoundError,
+    WorkingMemoryStuffNotFoundError,
+)
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -61,10 +65,7 @@ class PipeBatch(PipeController):
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        needed_inputs = PipeInputSpec.make_empty()
-        for variable_name, concept_code in self.inputs.items:
-            needed_inputs.add_requirement(variable_name, concept_code)
-        return needed_inputs
+        return self.inputs
 
     async def _run_batch_pipe(
         self,

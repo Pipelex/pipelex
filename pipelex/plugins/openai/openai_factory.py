@@ -149,7 +149,7 @@ class OpenAIFactory:
     # https://platform.openai.com/tokenizer
     @staticmethod
     def make_logit_bias(nb_items: int, weight: int = 100) -> dict[str, int]:
-        logit_bias = {str(k): weight for k in range(15, 15 + nb_items + 1)}
+        logit_bias = {str(item): weight for item in range(15, 15 + nb_items + 1)}
         log.debug(f"logit_bias: {logit_bias}")
         return logit_bias
 

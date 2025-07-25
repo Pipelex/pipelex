@@ -17,8 +17,13 @@ class Jinja2TemplateCategory(StrEnum):
     @property
     def filters(self) -> Dict[Jinja2FilterName, Callable[[Context, Any, Optional[TextFormat]], Any]]:
         match self:
-            case Jinja2TemplateCategory.HTML | Jinja2TemplateCategory.MARKDOWN | Jinja2TemplateCategory.MERMAID:
+            case Jinja2TemplateCategory.MERMAID:
                 return {}
+            case Jinja2TemplateCategory.HTML | Jinja2TemplateCategory.MARKDOWN:
+                return {
+                    Jinja2FilterName.FORMAT: text_format,
+                    Jinja2FilterName.TAG: tag,
+                }
             case Jinja2TemplateCategory.LLM_PROMPT:
                 return {
                     Jinja2FilterName.FORMAT: text_format,

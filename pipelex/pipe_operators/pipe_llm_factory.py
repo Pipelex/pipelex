@@ -119,7 +119,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         pipe_llm_prompt = PipeLLMPrompt(
             code="adhoc_for_pipe_llm_prompt",
             domain=domain_code,
-            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
             system_prompt_pipe_jinja2=system_prompt_pipe_jinja2,
             system_prompt_verbatim_name=pipe_blueprint.system_prompt_name,
             system_prompt=pipe_blueprint.system_prompt or system_prompt,
@@ -144,7 +144,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec(root=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             pipe_llm_prompt=pipe_llm_prompt,
             llm_choices=llm_choices,

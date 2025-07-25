@@ -54,8 +54,8 @@ class ConceptFactory:
             details_dict["code"] = ConceptCodeFactory.make_concept_code(domain, code)
             try:
                 the_concept = Concept.model_validate(details_dict)
-            except ValidationError as e:
-                raise ConceptFactoryError(f"Error validating concept: {e}") from e
+            except ValidationError as exc:
+                raise ConceptFactoryError(f"Error validating concept: {exc}") from exc
             return the_concept
         else:
             return None
@@ -111,8 +111,8 @@ class ConceptFactory:
                 refines=refines,
             )
             return Concept.model_validate(the_concept)
-        except ValidationError as e:
-            raise ConceptFactoryError(f"Error validating concept: {e}") from e
+        except ValidationError as exc:
+            raise ConceptFactoryError(f"Error validating concept: {exc}") from exc
 
     @classmethod
     def make_concept_from_blueprint(

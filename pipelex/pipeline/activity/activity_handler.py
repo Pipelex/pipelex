@@ -122,10 +122,10 @@ class ActivityHandlerForResultFiles:
         # Save each item in the list
         items_dir = os.path.join(stuff_dir, f"{stuff_id}_items")
         ensure_path(items_dir)
-        for i, item in enumerate(content.items):
-            item_dir = os.path.join(items_dir, f"item_{i}")
+        for idx, item in enumerate(content.items):
+            item_dir = os.path.join(items_dir, f"item_{idx}")
             ensure_path(item_dir)
-            save_text_to_path(str(item), os.path.join(item_dir, f"{stuff_id}_item_{i}.txt"))
+            save_text_to_path(str(item), os.path.join(item_dir, f"{stuff_id}_item_{idx}.txt"))
 
         # Save rendered versions of the full list
         save_text_to_path(content.rendered_markdown(), os.path.join(stuff_dir, f"{stuff_id}.md"))

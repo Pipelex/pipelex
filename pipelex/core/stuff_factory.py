@@ -1,13 +1,19 @@
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, cast
 
 import shortuuid
 from pydantic import BaseModel, ValidationError
 
+from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concept import Concept
 from pipelex.core.concept_code_factory import ConceptCodeFactory
 from pipelex.core.concept_native import NativeConcept
 from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import StuffContent, StuffContentInitableFromStr, TextContent
+from pipelex.core.stuff_content import (
+    ListContent,
+    StuffContent,
+    StuffContentInitableFromStr,
+    TextContent,
+)
 from pipelex.exceptions import ConceptError, PipelexError
 from pipelex.hub import get_class_registry, get_concept_provider, get_required_concept
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -38,9 +44,9 @@ class StuffFactory:
     ) -> Stuff:
         try:
             concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
-        except ConceptError:
+        except ConceptError as exc:
             stuff_ref = name or code or "unnamed"
-            raise StuffFactoryError(f"Concept '{concept_str}' does not contain a domain, could not make stuff '{stuff_ref}'")
+            raise StuffFactoryError(f"Could not make stuff '{stuff_ref}': Could not make concept from '{concept_str}': {exc}") from exc
         if not name:
             name = cls.make_stuff_name(concept_code)
         return Stuff(
@@ -49,6 +55,24 @@ class StuffFactory:
             stuff_name=name,
             stuff_code=code or shortuuid.uuid()[:5],
         )
+
+    @classmethod
+    def make_stuff_using_concept_name_and_search_domains(
+        cls,
+        concept_name: str,
+        search_domains: List[str],
+        content: StuffContent,
+        name: Optional[str] = None,
+        code: Optional[str] = None,
+    ) -> Stuff:
+        concept_provider = get_concept_provider()
+        concept = concept_provider.search_for_concept_in_domains(
+            concept_name=concept_name,
+            search_domains=search_domains,
+        )
+        if not concept:
+            raise StuffFactoryError(f"Could not find a concept named '{concept_name}' in domains {search_domains}")
+        return cls.make_stuff_using_concept(concept=concept, content=content, name=name, code=code)
 
     @classmethod
     def make_stuff_using_concept(
@@ -164,6 +188,79 @@ class StuffFactory:
             name=name,
         )
 
+    @classmethod
+    def make_stuff_from_stuff_content_using_search_domains(
+        cls,
+        name: str,
+        stuff_content_or_data: StuffContentOrData,
+        search_domains: List[str],
+        code: Optional[str] = None,
+    ) -> Stuff:
+        content: StuffContent
+        concept_name: str
+        if isinstance(stuff_content_or_data, ListContent):
+            content = cast(ListContent[Any], stuff_content_or_data)
+            if len(content.items) == 0:
+                raise StuffFactoryError("ListContent in compact memory has no items")
+            concept_name = type(content.items[0]).__name__
+            try:
+                return cls.make_stuff_using_concept_name_and_search_domains(
+                    concept_name=concept_name,
+                    search_domains=search_domains,
+                    content=content,
+                    name=name,
+                    code=code,
+                )
+            except StuffFactoryError as exc:
+                raise StuffFactoryError(f"Could not make stuff for ListContent '{name}': {exc}") from exc
+        elif isinstance(stuff_content_or_data, StuffContent):
+            content = stuff_content_or_data
+            concept_name = type(content).__name__
+            try:
+                return cls.make_stuff_using_concept_name_and_search_domains(
+                    concept_name=concept_name,
+                    search_domains=search_domains,
+                    content=content,
+                    name=name,
+                    code=code,
+                )
+            except StuffFactoryError as exc:
+                raise StuffFactoryError(f"Could not make stuff for StuffContent '{name}': {exc}") from exc
+        elif isinstance(stuff_content_or_data, list):
+            items = stuff_content_or_data
+            if len(items) == 0:
+                raise StuffFactoryError("List in compact memory has no items")
+            first_item = items[0]
+            concept_name = type(first_item).__name__
+            content = ListContent[Any](items=items)
+            try:
+                return cls.make_stuff_using_concept_name_and_search_domains(
+                    concept_name=concept_name,
+                    search_domains=search_domains,
+                    content=content,
+                    name=name,
+                    code=code,
+                )
+            except StuffFactoryError as exc:
+                raise StuffFactoryError(f"Could not make stuff for list of StuffContent '{name}': {exc}") from exc
+        else:
+            stuff_content_dict: Dict[str, Any] = stuff_content_or_data
+            try:
+                concept_code = stuff_content_dict["concept_code"]
+                content_value = stuff_content_dict["content"]
+            except KeyError as exc:
+                raise StuffFactoryError(f"Stuff content data dict is badly formed: {exc}") from exc
+            content = StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(
+                concept_code=concept_code,
+                value=content_value,
+            )
+            return StuffFactory.make_stuff(
+                concept_str=concept_code,
+                name=name,
+                content=content,
+                code=code,
+            )
+
 
 class StuffContentFactoryError(PipelexError):
     pass
@@ -193,13 +290,12 @@ class StuffContentFactory:
         Create StuffContent from concept code, falling back to TextContent if no registry class is found.
         """
         concept = get_required_concept(concept_code=concept_code)
-        the_subclass_name = concept.structure_class_name
-        the_subclass = get_class_registry().get_class(name=the_subclass_name)
+        the_structure_class = get_class_registry().get_class(name=concept.structure_class_name)
 
-        if the_subclass is None:
+        if the_structure_class is None:
             return cls.make_content_from_value(stuff_content_subclass=TextContent, value=value)
 
-        if not issubclass(the_subclass, StuffContent):
-            raise StuffContentFactoryError(f"Concept '{concept_code}', subclass '{the_subclass}' is not a subclass of StuffContent")
+        if not issubclass(the_structure_class, StuffContent):
+            raise StuffContentFactoryError(f"Concept '{concept_code}', subclass '{the_structure_class}' is not a subclass of StuffContent")
 
-        return cls.make_content_from_value(stuff_content_subclass=the_subclass, value=value)
+        return cls.make_content_from_value(stuff_content_subclass=the_structure_class, value=value)

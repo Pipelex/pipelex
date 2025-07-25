@@ -138,10 +138,10 @@ class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
             llm_models_with_platform = [model for model in found_llm_models if llm_platform in model.platform_llm_id]
             if not llm_models_with_platform:
                 raise LLMModelProviderError(f"Model '{llm_name}' has no version for platform '{llm_platform}'")
-            llm_model = max(llm_models_with_platform, key=lambda m: m.version)
+            llm_model = max(llm_models_with_platform, key=lambda llm_model: llm_model.version)
         else:
             assert llm_platform_choice == DEFAULT_PLATFORM_INDICATOR
-            llm_model = max(found_llm_models, key=lambda m: m.version)
+            llm_model = max(found_llm_models, key=lambda llm_model: llm_model.version)
         return llm_model
 
     def _get_llm_model_latest_version(

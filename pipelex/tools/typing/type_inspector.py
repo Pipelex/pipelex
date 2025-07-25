@@ -233,7 +233,7 @@ def get_type_structure(
             if model_fields:
                 fields = model_fields.items()
             else:
-                fields = [(k, type_hints[k]) for k in sorted(type_hints.keys())]
+                fields = [(type_k, type_hints[type_k]) for type_k in sorted(type_hints.keys())]
 
             # Check if all fields are inherited
             parent_fields: Set[str] = set()

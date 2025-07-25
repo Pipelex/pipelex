@@ -102,11 +102,11 @@ class PipeLLM(PipeOperator):
         needed_inputs = PipeInputSpec.make_empty()
         concept_provider = get_concept_provider()
 
-        for input_name, concept_code in self.inputs.items:
-            if concept_provider.is_image_concept(concept_code=concept_code):
+        for input_name, requirement in self.inputs.items:
+            if concept_provider.is_image_concept(concept_code=requirement.concept_code):
                 needed_inputs.add_requirement(variable_name=input_name, concept_code=NativeConcept.IMAGE.code)
             else:
-                needed_inputs.add_requirement(variable_name=input_name, concept_code=concept_code)
+                needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
 
         return needed_inputs
 
@@ -134,13 +134,13 @@ class PipeLLM(PipeOperator):
 
         the_needed_inputs = self.needed_inputs()
         # check all required variables are in the inputs
-        for required_variable_name, requirement_expression, concept_code in the_needed_inputs.detailed_requirements:
-            if required_variable_name not in self.inputs.variables:
+        for named_input_requirement in the_needed_inputs.named_input_requirements:
+            if named_input_requirement.variable_name not in self.inputs.variables:
                 missing_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
                     domain_code=self.domain,
                     pipe_code=self.code,
-                    variable_names=[required_variable_name],
+                    variable_names=[named_input_requirement.variable_name],
                 )
                 match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
                     case StaticValidationReaction.IGNORE:
@@ -151,18 +151,18 @@ class PipeLLM(PipeOperator):
                         raise missing_input_var_error
 
             # there is one case where the needed input is of specific concept: the user_images
-            if concept_code == NativeConcept.IMAGE.code:
+            if named_input_requirement.concept_code == NativeConcept.IMAGE.code:
                 try:
-                    concept_code_of_declared_input = self.inputs.get_required_concept_code(variable_name=required_variable_name)
+                    concept_code_of_declared_input = self.inputs.get_required_concept_code(variable_name=named_input_requirement.variable_name)
                 except PipeInputNotFoundError as exc:
                     raise PipeInputError(
-                        f"Input variable '{required_variable_name}' is not in this PipeLLM '{self.code}' input spec: {self.inputs}"
+                        f"Input variable '{named_input_requirement.variable_name}' is not in this PipeLLM '{self.code}' input spec: {self.inputs}"
                     ) from exc
                 if not concept_provider.is_compatible_by_concept_code(
                     tested_concept_code=concept_code_of_declared_input,
-                    wanted_concept_code=concept_code,
+                    wanted_concept_code=named_input_requirement.concept_code,
                 ):
-                    if required_variable_name != requirement_expression:
+                    if named_input_requirement.variable_name != named_input_requirement.requirement_expression:
                         # the required_input is a sub-attribute of the required variable
                         # TODO: check that the sub-attribute is compatible with the concept code
                         # let's check at least that the input is a structured concept
@@ -181,7 +181,7 @@ class PipeLLM(PipeOperator):
                         error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
                         domain_code=self.domain,
                         pipe_code=self.code,
-                        variable_names=[required_variable_name],
+                        variable_names=[named_input_requirement.variable_name],
                         provided_concept_code=concept_code_of_declared_input,
                         explanation=explanation,
                     )

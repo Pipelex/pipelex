@@ -14,7 +14,7 @@ class FalConfig(ConfigModel):
     @field_validator("flux_map_quality_to_steps", "sdxl_lightning_map_quality_to_steps")
     @classmethod
     def validate_quality_mapping(cls, value: Dict[str, int]) -> Dict[str, int]:
-        valid_qualities = {q.value for q in Quality}
+        valid_qualities = {quality.value for quality in Quality}
         missing_qualities = valid_qualities - set(value.keys())
         invalid_qualities = set(value.keys()) - valid_qualities
 

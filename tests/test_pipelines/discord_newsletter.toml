@@ -1,0 +1,32 @@
+domain = "discord_newsletter"
+definition = "Discord newsletter generation pipeline"
+
+[concept]
+DiscordChannelUpdate = "A Discord channel with its messages for newsletter generation"
+ChannelSummary = "A summarized Discord channel for newsletter inclusion"
+Newsletter = "The final newsletter content with organized channel summaries"
+
+[pipe.write_discord_newsletter]
+PipeSequence = "Create a newsletter from Discord articles by summarizing channels and organizing content"
+inputs = { discord_channel_updates = "DiscordChannelUpdate" }
+output = "Newsletter"
+steps = [
+   { pipe = "summarize_discord_channel_update", batch_over = "discord_channel_updates", batch_as = "discord_channel_update", result = "channel_summaries" },
+]
+
+[pipe.summarize_discord_channel_update]
+PipeLLM = "Summarize a Discord channel's messages into newsletter-friendly content"
+inputs = { discord_channel_update = "DiscordChannelUpdate" }
+output = "ChannelSummary"
+system_prompt = "You are a newsletter editor who creates engaging summaries of Discord channel content. You extract key information, preserve important links, and write in a clear, concise style suitable for newsletter readers."
+prompt_template = """
+Analyze this Discord channel update and create a newsletter-friendly summary.
+
+Channel Information:
+@discord_channel_update
+
+The summary should be informative and engaging for newsletter readers who want to understand what happened in this channel during the week.
+Generate one or more summary items: each one can correspond to a single message or to a bunch of messages that were part of the same conversation.
+Each summary item should be in plain text, no bullet points. You can make some parts **bold** to highlight important information.
+"""
+

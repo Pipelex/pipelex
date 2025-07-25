@@ -51,14 +51,14 @@ class PipeParallel(PipeController):
                 batch_as_input = sub_pipe.batch_params.input_item_stuff_name
                 # Create a new PipeInputSpec without the batch_as input
                 filtered_needed_inputs = PipeInputSpec.make_empty()
-                for var_name, concept_code in pipe_needed_inputs.root.items():
+                for var_name, requirement in pipe_needed_inputs.root.items():
                     if var_name != batch_as_input:
-                        filtered_needed_inputs.add_requirement(variable_name=var_name, concept_code=concept_code)
+                        filtered_needed_inputs.add_requirement(variable_name=var_name, concept_code=requirement.concept_code)
                 pipe_needed_inputs = filtered_needed_inputs
 
             # Add all inputs from this parallel pipe
-            for var_name, concept_code in pipe_needed_inputs.root.items():
-                needed_inputs.add_requirement(variable_name=var_name, concept_code=concept_code)
+            for var_name, requirement in pipe_needed_inputs.root.items():
+                needed_inputs.add_requirement(variable_name=var_name, concept_code=requirement.concept_code)
 
         return needed_inputs
 
@@ -81,13 +81,13 @@ class PipeParallel(PipeController):
         the_needed_inputs = self.needed_inputs()
 
         # Check all required variables are in the inputs
-        for required_variable_name, _, _ in the_needed_inputs.detailed_requirements:
-            if required_variable_name not in self.inputs.variables:
+        for named_input_requirement in the_needed_inputs.named_input_requirements:
+            if named_input_requirement.variable_name not in self.inputs.variables:
                 missing_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
                     domain_code=self.domain,
                     pipe_code=self.code,
-                    variable_names=[required_variable_name],
+                    variable_names=[named_input_requirement.variable_name],
                 )
                 match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
                     case StaticValidationReaction.IGNORE:
@@ -223,9 +223,9 @@ class PipeParallel(PipeController):
         needed_inputs = self.needed_inputs()
         missing_input_names: List[str] = []
 
-        for required_variable_name, _, _ in needed_inputs.detailed_requirements:
-            if not working_memory.get_optional_stuff(required_variable_name):
-                missing_input_names.append(required_variable_name)
+        for named_input_requirement in needed_inputs.named_input_requirements:
+            if not working_memory.get_optional_stuff(named_input_requirement.variable_name):
+                missing_input_names.append(named_input_requirement.variable_name)
 
         if missing_input_names:
             log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
@@ -239,8 +239,8 @@ class PipeParallel(PipeController):
         for sub_pipe in self.parallel_sub_pipes:
             try:
                 get_required_pipe(pipe_code=sub_pipe.pipe.code)
-            except Exception as e:
-                raise PipeDefinitionError(f"PipeParallel'{self.code}'sub-pipe '{sub_pipe.pipe.code}' not found") from e
+            except Exception as exc:
+                raise PipeDefinitionError(f"PipeParallel'{self.code}'sub-pipe '{sub_pipe.pipe.code}' not found") from exc
 
         # 3. Run all sub-pipes in dry mode
         tasks: List[Coroutine[Any, Any, PipeOutput]] = []
@@ -256,10 +256,10 @@ class PipeParallel(PipeController):
 
         try:
             pipe_outputs = await asyncio.gather(*tasks)
-        except Exception as e:
-            log.error(f"Dry run failed: parallel sub-pipe execution failed: {e}")
+        except Exception as exc:
+            log.error(f"Dry run failed: parallel sub-pipe execution failed: {exc}")
             raise DryRunError(
-                message=f"Dry run failed for pipe '{self.code}' (PipeParallel): parallel sub-pipe execution failed: {e}",
+                message=f"Dry run failed for pipe '{self.code}' (PipeParallel): parallel sub-pipe execution failed: {exc}",
                 missing_inputs=[],
                 pipe_code=self.code,
             )

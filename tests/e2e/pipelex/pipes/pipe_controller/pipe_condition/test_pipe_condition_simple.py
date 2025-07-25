@@ -3,7 +3,7 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
 from pipelex.core.pipe_run_params import PipeRunMode
 from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.working_memory_factory import WorkingMemoryFactory
@@ -23,7 +23,7 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             code="test_condition_fail",
             domain="test_domain",
-            inputs=PipeInputSpec(root={"user_category": "test_pipe_condition.CategoryInput"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"user_category": "test_pipe_condition.CategoryInput"}),
             output_concept_code="native.Text",
             expression_template="{{ user_category.category }}",
             pipe_map={"small": "process_small", "medium": "process_medium", "large": "process_large"},
@@ -52,7 +52,7 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             code="test_condition_succeed",
             domain="test_domain",
-            inputs=PipeInputSpec(root={"user_status": "test_pipe_condition.CategoryInput"}),
+            inputs=PipeInputSpec.make_from_dict(concepts_dict={"user_status": "test_pipe_condition.CategoryInput"}),
             output_concept_code="native.Text",
             expression_template="{{ user_status.category }}",
             pipe_map={
@@ -64,7 +64,15 @@ class TestPipeConditionSimple:
         )
 
         # Test with proper working memory - should SUCCEED or fail at expression evaluation (not missing inputs)
-        working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=[("user_status", "test_pipe_condition.CategoryInput", CategoryInput)])
+        working_memory = WorkingMemoryFactory.make_for_dry_run(
+            needed_inputs=[
+                TypedNamedInputRequirement(
+                    variable_name="user_status",
+                    concept_code="test_pipe_condition.CategoryInput",
+                    structure_class=CategoryInput,
+                )
+            ]
+        )
 
         try:
             pipe_output = await pipe_condition.run_pipe(
@@ -79,11 +87,11 @@ class TestPipeConditionSimple:
             print("✅ Direct PipeCondition SUCCEEDED completely!")
             pretty_print(pipe_output)
 
-        except DryRunError as e:
+        except DryRunError as exc:
             # If it fails, it should NOT be due to missing inputs
-            assert "missing required inputs" not in str(e)
+            assert "missing required inputs" not in str(exc)
             # Should be due to expression evaluation or other validation
-            assert any(keyword in str(e) for keyword in ["expression", "evaluation", "empty result"])
-            print(f"✅ Direct PipeCondition passed input validation, failed at expression evaluation (expected): {e}")
+            assert any(keyword in str(exc) for keyword in ["expression", "evaluation", "empty result"])
+            print(f"✅ Direct PipeCondition passed input validation, failed at expression evaluation (expected): {exc}")
 
         print("✅ Direct PipeCondition test completed successfully!")
