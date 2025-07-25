@@ -1,14 +1,16 @@
-from typing import List, Optional, Set, cast
+from typing import List, Optional, Set, cast, get_type_hints
 
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
 from pipelex.core.pipe_output import PipeOutput
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuff_factory import StuffFactory
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.exceptions import DryRunError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.func_registry import func_registry
@@ -27,7 +29,7 @@ class PipeFunc(PipeOperator):
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        return PipeInputSpec.make_empty()
+        return self.inputs
 
     @override
     async def _run_operator_pipe(
@@ -80,7 +82,48 @@ class PipeFunc(PipeOperator):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        log.warning("Dry run not yet implemented for PipeFunc")
+        log.debug(f"Dry run for PipeFunc '{self.function_name}'")
+
+        function = func_registry.get_required_function(self.function_name)
+        if not callable(function):
+            raise ValueError(f"Function '{self.function_name}' is not callable")
+
+        # Check that all needed inputs are present in working memory
+        needed_inputs = self.needed_inputs()
+        for input_name, _ in needed_inputs.items:
+            if input_name not in working_memory.root:
+                raise DryRunError(
+                    f"Required input '{input_name}' not found in working memory for function '{self.function_name}' in pipe '{self.code}'"
+                )
+
+        try:
+            return_type = get_type_hints(function).get("return")
+
+            if return_type is None:
+                raise DryRunError(f"Function '{self.function_name}' has no return type annotation")
+            else:
+                if not issubclass(return_type, StuffContent):
+                    raise ValueError(f"Function '{self.function_name}' return type {return_type} is not a subclass of StuffContent")
+
+                requirement = TypedNamedInputRequirement(
+                    variable_name="mock_output", concept_code=f"mock.{return_type.__name__}", structure_class=return_type, multiplicity=False
+                )
+                mock_content = WorkingMemoryFactory.create_mock_content(requirement)
+
+        except Exception as e:
+            raise DryRunError(f"Failed to get type hints for function '{self.function_name}' in pipe '{self.code}': {e}")
+
+        output_stuff = StuffFactory.make_stuff(
+            name=output_name,
+            concept_str=self.output_concept_code,
+            content=mock_content,
+        )
+
+        working_memory.set_new_main_stuff(
+            stuff=output_stuff,
+            name=output_name,
+        )
+
         return PipeFuncOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,

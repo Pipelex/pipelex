@@ -167,7 +167,7 @@ class WorkingMemoryFactory(BaseModel):
         return working_memory
 
     @classmethod
-    def _create_mock_content(cls, requirement: TypedNamedInputRequirement) -> StuffContent:
+    def create_mock_content(cls, requirement: TypedNamedInputRequirement) -> StuffContent:
         """Helper method to create mock content for a requirement."""
         if requirement.structure_class:
             # Create mock object using polyfactory
@@ -204,7 +204,7 @@ class WorkingMemoryFactory(BaseModel):
 
             try:
                 if not requirement.multiplicity:
-                    mock_content = cls._create_mock_content(requirement)
+                    mock_content = cls.create_mock_content(requirement)
 
                     # Create stuff with mock content
                     mock_stuff = Stuff(
@@ -226,7 +226,7 @@ class WorkingMemoryFactory(BaseModel):
 
                     items: List[StuffContent] = []
                     for _ in range(nb_stuffs):
-                        item_mock_content = cls._create_mock_content(requirement)
+                        item_mock_content = cls.create_mock_content(requirement)
                         items.append(item_mock_content)
 
                     mock_list_content = ListContent[StuffContent](items=items)

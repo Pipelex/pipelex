@@ -127,11 +127,11 @@ async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
     # Filter out pipes that are allowed to fail
     unexpected_failures = {pipe_code: results[pipe_code] for pipe_code in failed_pipes if pipe_code not in allowed_to_fail_pipes}
 
-    log.info(f"Dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed, in {time.time() - start_time:.2f} seconds")
+    log.info(f"Dry run completed: '{len(successful_pipes)}' successful, '{len(failed_pipes)}' failed, in '{time.time() - start_time:.2f}' seconds")
 
     if unexpected_failures:
-        unexpected_failures_details = "\n".join([f"{pipe_code}: {results[pipe_code]}" for pipe_code in unexpected_failures])
-        raise Exception(f"Dry run failed with {len(unexpected_failures)} unexpected pipe failures: {unexpected_failures_details}")
+        unexpected_failures_details = "\n".join([f"'{pipe_code}': {results[pipe_code]}" for pipe_code in unexpected_failures])
+        raise Exception(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
 
     if failed_pipes and not unexpected_failures:
         log.info("All failures were expected (allowed by config)")
