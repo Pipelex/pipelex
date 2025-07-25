@@ -30,7 +30,7 @@ class TestPipeParallelSimple:
         sentiment_pipe = PipeLLM(
             domain="test_integration",
             code="analyze_sentiment",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="analyze_sentiment_prompt",
@@ -44,7 +44,7 @@ class TestPipeParallelSimple:
         word_count_pipe = PipeLLM(
             domain="test_integration",
             code="count_words",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="count_words_prompt",
@@ -57,7 +57,7 @@ class TestPipeParallelSimple:
         keywords_pipe = PipeLLM(
             domain="test_integration",
             code="extract_keywords",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="extract_keywords_prompt",
@@ -184,7 +184,7 @@ class TestPipeParallelSimple:
         sentiment_pipe = PipeLLM(
             domain="test_integration",
             code="analyze_sentiment",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="analyze_sentiment_prompt",
@@ -197,7 +197,7 @@ class TestPipeParallelSimple:
         word_count_pipe = PipeLLM(
             domain="test_integration",
             code="count_words",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="count_words_prompt",
@@ -209,7 +209,7 @@ class TestPipeParallelSimple:
         keywords_pipe = PipeLLM(
             domain="test_integration",
             code="extract_keywords",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="extract_keywords_prompt",

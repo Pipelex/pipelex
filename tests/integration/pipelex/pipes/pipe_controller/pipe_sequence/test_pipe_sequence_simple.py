@@ -30,7 +30,7 @@ class TestPipeSequenceSimple:
         capitalize_pipe = PipeLLM(
             domain="test_integration",
             code="capitalize_text",
-            inputs=PipeInputSpec(root={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="capitalize_text_prompt",
@@ -43,7 +43,7 @@ class TestPipeSequenceSimple:
         add_prefix_pipe = PipeLLM(
             domain="test_integration",
             code="add_prefix",
-            inputs=PipeInputSpec(root={"capitalized_text": "Text"}),
+            inputs=PipeInputSpec.make_from_dict({"capitalized_text": "Text"}),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="add_prefix_prompt",
