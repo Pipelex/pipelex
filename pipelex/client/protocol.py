@@ -9,7 +9,7 @@ from pipelex.core.stuff_content import StuffContent
 from pipelex.core.working_memory import WorkingMemory
 from pipelex.types import StrEnum
 
-StuffContentOrData = Dict[str, Any] | StuffContent | List[Any]
+StuffContentOrData = Dict[str, Any] | StuffContent | List[Any] | str
 ImplicitMemory = Dict[str, StuffContentOrData]
 CompactMemory = Dict[str, Dict[str, Any]]
 COMPACT_MEMORY_KEY = "compact_memory"

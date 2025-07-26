@@ -243,6 +243,12 @@ class StuffFactory:
                 )
             except StuffFactoryError as exc:
                 raise StuffFactoryError(f"Could not make stuff for list of StuffContent '{name}': {exc}") from exc
+        elif isinstance(stuff_content_or_data, str):
+            str_stuff: str = stuff_content_or_data
+            return StuffFactory.make_from_str(
+                str_value=str_stuff,
+                name=name,
+            )
         else:
             stuff_content_dict: Dict[str, Any] = stuff_content_or_data
             try:
