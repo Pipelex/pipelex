@@ -6,7 +6,8 @@ from pydantic import BaseModel, ValidationError
 from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concept import Concept
 from pipelex.core.concept_code_factory import ConceptCodeFactory
-from pipelex.core.concept_native import NativeConcept
+from pipelex.core.concept_factory import ConceptFactory
+from pipelex.core.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import (
     ListContent,
@@ -216,6 +217,15 @@ class StuffFactory:
         elif isinstance(stuff_content_or_data, StuffContent):
             content = stuff_content_or_data
             concept_name = type(content).__name__
+            if concept_name in NativeConceptClass.class_names():
+                native_concept_class = NativeConceptClass(concept_name)
+                concept = ConceptFactory.make_native_concept_from_native_concept_class(native_concept_class=native_concept_class)
+                return cls.make_stuff(
+                    concept_str=concept.code,
+                    content=content,
+                    name=name,
+                    code=code,
+                )
             try:
                 return cls.make_stuff_using_concept_name_and_search_domains(
                     concept_name=concept_name,

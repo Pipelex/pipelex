@@ -400,10 +400,8 @@ Here is an example of how to start a pipe:
 import asyncio
 
 from pipelex import pretty_print
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipeline_tracker, get_report_delegate
 from pipelex.pipelex import Pipelex
-from pipelex.core.stuff_factory import StuffFactory
 from pipelex.pipeline.execute import execute_pipeline
 
 from pipelex_libraries.pipelines.examples.extract_gantt.gantt import GanttChart
@@ -411,24 +409,16 @@ from pipelex_libraries.pipelines.examples.extract_gantt.gantt import GanttChart
 SAMPLE_NAME = "extract_gantt"
 IMAGE_URL = "assets/gantt/gantt_tree_house.png"
 
-
 async def extract_gantt(image_url: str) -> GanttChart:
-    # Create Working Memory
-    stuff = StuffFactory.make_from_image(
-        image_url=image_url,
-        concept_str="gantt.GanttImage",
-        name="gantt_chart_image",
-    )
-    working_memory = WorkingMemoryFactory.make_from_multiple_stuff([stuff])
-
     # Run the pipe
     pipe_output = await execute_pipeline(
         pipe_code="extract_gantt_by_steps",
-        working_memory=working_memory,
+        input_memory={
+            "gantt_chart_image": ImageContent(url=image_url),
+        },
     )
     # Output the result
     return pipe_output.main_stuff_as(content_type=GanttChart)
-
 
 # start Pipelex
 Pipelex.make()

@@ -15,6 +15,30 @@ class NativeConceptClass(StrEnum):
     LLM_PROMPT = "LLMPromptContent"
     PAGE = "PageContent"
 
+    @classmethod
+    def class_names(cls) -> List[str]:
+        return [code.value for code in cls]
+
+    @property
+    def native_concept(self) -> "NativeConcept":
+        match self:
+            case NativeConceptClass.DYNAMIC:
+                return NativeConcept.DYNAMIC
+            case NativeConceptClass.TEXT:
+                return NativeConcept.TEXT
+            case NativeConceptClass.IMAGE:
+                return NativeConcept.IMAGE
+            case NativeConceptClass.PDF:
+                return NativeConcept.PDF
+            case NativeConceptClass.TEXT_AND_IMAGES:
+                return NativeConcept.TEXT_AND_IMAGES
+            case NativeConceptClass.NUMBER:
+                return NativeConcept.NUMBER
+            case NativeConceptClass.LLM_PROMPT:
+                return NativeConcept.LLM_PROMPT
+            case NativeConceptClass.PAGE:
+                return NativeConcept.PAGE
+
 
 # Exceptionally, we use an Enum here (and not our usual StrEnum) to avoid confusion with
 # the concept_code which must have the form "native.ConceptName"
