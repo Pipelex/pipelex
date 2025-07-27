@@ -395,7 +395,36 @@ Be sure to make the proper choice of prefix for each insertion.
 
 # Example to start a pipe when its done
 
-Here is an example of how to start a pipe:
+Here are examples of how to start a pipe:
+```python
+import asyncio
+
+from pipelex.pipelex import Pipelex
+from pipelex.pipeline.execute import execute_pipeline
+
+async def main():
+    # First, initialize Pipelex (this loads all pipeline definitions)
+    Pipelex.make()
+
+    # Execute the pipeline and wait for the result
+    pipe_output = await execute_pipeline(
+        pipe_code="description_to_tagline",
+        input_memory={
+            "description": {
+                "concept": "ProductDescription",
+                "content": "EcoClean Pro is a revolutionary biodegradable cleaning solution that removes 99.9% of germs while being completely safe for children and pets. Made from plant-based ingredients.",
+            },
+        },
+    )
+
+    # Get the final output
+    tagline = pipe_output.main_stuff_as_str
+    print(f"Generated tagline: {tagline}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
 ```python
 import asyncio
 

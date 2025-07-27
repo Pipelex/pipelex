@@ -121,30 +121,27 @@ To run the `description_to_tagline` pipeline we defined above, you would call it
 
 ```python
 import asyncio
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
 async def main():
     # First, initialize Pipelex (this loads all pipeline definitions)
     Pipelex.make()
-    
-    # Create working memory with the pipeline's input
-    working_memory = WorkingMemoryFactory.make_from_text(
-        text="EcoClean Pro is a revolutionary biodegradable cleaning solution that removes 99.9% of germs while being completely safe for children and pets. Made from plant-based ingredients.",
-        concept_code="ProductDescription",
-        name="description"
-    )
 
     # Execute the pipeline and wait for the result
     pipe_output = await execute_pipeline(
         pipe_code="description_to_tagline",
-        working_memory=working_memory,
+        input_memory={
+            "description": {
+                "concept": "ProductDescription",
+                "content": "EcoClean Pro is a revolutionary biodegradable cleaning solution that removes 99.9% of germs while being completely safe for children and pets. Made from plant-based ingredients.",
+            },
+        },
     )
 
     # Get the final output
-    tagline = pipe_output.main_stuff_as(content_type=str)
+    tagline = pipe_output.main_stuff_as_str
     print(f"Generated tagline: {tagline}")
 
 if __name__ == "__main__":
