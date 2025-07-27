@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.6.9] - 2025-07-26
+
+### Changed
+
+Simplified input memory:
+
+- The concept code can now be provided with arg named `concept` in addition to `concept_code`
+- You can pass a simple string to create a `Text` stuff
+
+
 ## [v0.6.8] - 2025-07-25
 
 ### Added
