@@ -269,16 +269,24 @@ class StuffFactory:
                 content_value = stuff_content_dict["content"]
             except KeyError as exc:
                 raise StuffFactoryError(f"Stuff content data dict is badly formed: {exc}") from exc
-            content = StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(
-                concept_code=concept_code,
-                value=content_value,
-            )
-            return StuffFactory.make_stuff(
-                concept_str=concept_code,
-                name=name,
-                content=content,
-                code=code,
-            )
+            if isinstance(content_value, StuffContent):
+                return StuffFactory.make_stuff(
+                    concept_str=concept_code,
+                    name=name,
+                    content=content_value,
+                    code=code,
+                )
+            else:
+                content = StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(
+                    concept_code=concept_code,
+                    value=content_value,
+                )
+                return StuffFactory.make_stuff(
+                    concept_str=concept_code,
+                    name=name,
+                    content=content,
+                    code=code,
+                )
 
 
 class StuffContentFactoryError(PipelexError):
