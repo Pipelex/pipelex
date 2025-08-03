@@ -10,11 +10,24 @@ from pipelex.core.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.pipe_func import PipeFunc, PipeFuncOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
+from pipelex.tools.func_registry import func_registry
+from tests.cases.source_code import wrap_lines
 
 
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeFunc:
+    @classmethod
+    def setup_class(cls):
+        """Register test functions before running tests."""
+        func_registry.register_function(wrap_lines)
+
+    @classmethod
+    def teardown_class(cls):
+        """Clean up registered functions after tests."""
+        if func_registry.has_function("wrap_lines"):
+            func_registry.unregister_function_by_name("wrap_lines")
+
     async def test_wrap_lines_pipe_func(
         self,
         pipe_run_mode: PipeRunMode,
