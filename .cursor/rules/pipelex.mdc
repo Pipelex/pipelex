@@ -393,37 +393,7 @@ Be sure to make the proper choice of prefix for each insertion.
 **DO NOT write "$topic" alone in an isolated line.**
 **DO write things like "Write an essay about $topic" included in an actual sentence.**
 
-# Example to start a pipe when its done
-
-Here are examples of how to start a pipe:
-```python
-import asyncio
-
-from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
-
-async def main():
-    # First, initialize Pipelex (this loads all pipeline definitions)
-    Pipelex.make()
-
-    # Execute the pipeline and wait for the result
-    pipe_output = await execute_pipeline(
-        pipe_code="description_to_tagline",
-        input_memory={
-            "description": {
-                "concept": "ProductDescription",
-                "content": "EcoClean Pro is a revolutionary biodegradable cleaning solution that removes 99.9% of germs while being completely safe for children and pets. Made from plant-based ingredients.",
-            },
-        },
-    )
-
-    # Get the final output
-    tagline = pipe_output.main_stuff_as_str
-    print(f"Generated tagline: {tagline}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+# Example to execute a pipeline
 
 ```python
 import asyncio
@@ -438,16 +408,21 @@ from pipelex_libraries.pipelines.examples.extract_gantt.gantt import GanttChart
 SAMPLE_NAME = "extract_gantt"
 IMAGE_URL = "assets/gantt/gantt_tree_house.png"
 
+
 async def extract_gantt(image_url: str) -> GanttChart:
     # Run the pipe
     pipe_output = await execute_pipeline(
         pipe_code="extract_gantt_by_steps",
         input_memory={
-            "gantt_chart_image": ImageContent(url=image_url),
+            "gantt_chart_image": {
+                "concept": "gantt.GanttImage",
+                "content": ImageContent(url=image_url),
+            }
         },
     )
     # Output the result
     return pipe_output.main_stuff_as(content_type=GanttChart)
+
 
 # start Pipelex
 Pipelex.make()
@@ -462,12 +437,72 @@ pretty_print(gantt_chart, title="Gantt Chart")
 get_pipeline_tracker().output_flowchart()
 ```
 
-# Error Handling & Validation
+The input memory is a dictionary of key-value pairs, where the key is the name of the input variable and the value provides details to make it a stuff object. The relevant definitions are:
+```python
+StuffContentOrData = Dict[str, Any] | StuffContent | List[Any] | str
+ImplicitMemory = Dict[str, StuffContentOrData]
+```
+As you can seen, we made it so different ways can be used to define that stuff using structured content or data.
 
-## Validation Error Handling
+So here are a few concrete examples of calls to execute_pipeline with various ways to set up the input memory:
 
-- Use `StuffContentValidationError` for handling content validation failures
-- Use `format_pydantic_validation_error` to format validation errors consistently
+```python
+# Here we have a single input and it's a Text.
+# If you assign a string, by default it will be considered as a TextContent.
+    pipe_output = await execute_pipeline(
+        pipe_code="master_advisory_orchestrator",
+        input_memory={
+            "user_input": problem_description,
+        },
+    )
+
+# Here we have a single input and it's a PDF.
+# Because PDFContent is a native concept, we can use it directly as a value,
+# the system knows what content it corresponds to:
+    pipe_output = await execute_pipeline(
+        pipe_code="power_extractor_dpe",
+        input_memory={
+            "ocr_input": PDFContent(url=pdf_url),
+        },
+    )
+
+# Here we have a single input and it's an Image.
+# Because ImageContent is a native concept, we can use it directly as a value:
+    pipe_output = await execute_pipeline(
+        pipe_code="fashion_variation_pipeline",
+        input_memory={
+            "fashion_photo": ImageContent(url=image_url),
+        },
+    )
+
+# Here we have a single input, it's an image but
+# its actually a more specific concept gantt.GanttImage which refines Image,
+# so we must provide it using a dict with the concept and the content:
+    pipe_output = await execute_pipeline(
+        pipe_code="extract_gantt_by_steps",
+        input_memory={
+            "gantt_chart_image": {
+                "concept": "gantt.GanttImage",
+                "content": ImageContent(url=image_url),
+            }
+        },
+    )
+
+# Here is a more complex example with multiple inputs assigned using different ways:
+    pipe_output = await execute_pipeline(
+        pipe_code="retrieve_then_answer",
+        dynamic_output_concept_code="contracts.Fees",
+        input_memory={
+            "text": load_text_from_path(path=text_path),
+            "question": {
+                "concept": "answer.Question",
+                "content": question,
+            },
+            "client_instructions": client_instructions,
+        },
+    )
+```
 
 ALWAYS RUN `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate until it works.
-
+Then, create an example file to run the pipeline in the `examples` folder.
+But don't write documentation unless asked explicitly to.
