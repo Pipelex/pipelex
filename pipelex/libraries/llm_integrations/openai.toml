@@ -128,8 +128,7 @@ platform_llm_id = { openai = "o4-mini" }
 is_gen_object_supported = true
 is_vision_supported = true
 cost_per_million_tokens_usd = { input = 1.25, output = 10.0 }
-platform_llm_id = { azure_openai = "gpt-5-2025-08-07", openai = "gpt-5" }
-default_platform = "openai"
+platform_llm_id = { openai = "gpt-5" }
 
 [gpt-5.gpt-5-mini.latest]
 is_gen_object_supported = true

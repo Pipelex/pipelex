@@ -124,11 +124,11 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
 @pytest.fixture(
     params=[
         # LLMPlatform.ANTHROPIC,
-        # LLMPlatform.AZURE_OPENAI,
+        LLMPlatform.AZURE_OPENAI,
         # LLMPlatform.BEDROCK,
         # LLMPlatform.BEDROCK_ANTHROPIC,
         # LLMPlatform.MISTRAL,
-        LLMPlatform.OPENAI,
+        # LLMPlatform.OPENAI,
         # LLMPlatform.PERPLEXITY,
         # LLMPlatform.VERTEXAI,
         # LLMPlatform.CUSTOM_LLM,
@@ -142,10 +142,13 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
 
 @pytest.fixture(
     params=[
-        "gpt-5-mini",
-        "gpt-5-nano",
-        "gpt-5-chat-latest",
-        "gpt-5",
+        "gpt-5-mini-2025-08-07",
+        "gpt-5-nano-2025-08-07",
+        "gpt-5-chat-2025-08-07",
+        # "gpt-5-mini",
+        # "gpt-5-nano",
+        # "gpt-5-chat-latest",
+        # "gpt-5",
         # "gpt-4o-mini",
         # "open-mixtral-8x7b",
         # "google/gemini-2.0-flash",
