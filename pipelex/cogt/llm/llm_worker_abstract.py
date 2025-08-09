@@ -67,7 +67,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     ) -> str:
         log.debug("LLM Worker gen_text")
         log.verbose(llm_job.params_desc)
-        log.verbose(llm_job.llm_prompt.desc, title="llm_prompt")
+        log.verbose(llm_job.llm_prompt.desc(), title="llm_prompt")
 
         # metadata
         llm_job.job_metadata.unit_job_id = UnitJobId.LLM_GEN_TEXT
@@ -94,7 +94,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     ) -> BaseModelTypeVar:
         log.debug("LLM Worker gen_object")
         log.verbose(llm_job.params_desc)
-        log.verbose(llm_job.llm_prompt.desc, title="llm_prompt")
+        log.verbose(llm_job.llm_prompt.desc(), title="llm_prompt")
 
         # metadata
         llm_job.job_metadata.unit_job_id = UnitJobId.LLM_GEN_OBJECT
