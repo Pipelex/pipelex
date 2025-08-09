@@ -123,8 +123,8 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
 # TODO: build llm_id/platform combos dynalically from config data
 @pytest.fixture(
     params=[
-        # LLMPlatform.ANTHROPIC,
-        LLMPlatform.AZURE_OPENAI,
+        LLMPlatform.ANTHROPIC,
+        # LLMPlatform.AZURE_OPENAI,
         # LLMPlatform.BEDROCK,
         # LLMPlatform.BEDROCK_ANTHROPIC,
         # LLMPlatform.MISTRAL,
@@ -142,7 +142,7 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
 
 @pytest.fixture(
     params=[
-        "gpt-4o-mini",
+        # "gpt-4o-mini",
         # "open-mixtral-8x7b",
         # "google/gemini-2.0-flash",
         # "google/gemini-2.5-pro-preview-05-06",
@@ -153,11 +153,13 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
         # "o4-mini",
         # "bedrock-mistral-large",
         # "sonar",
-        # "claude-3-7-sonnet",
-        # "claude-4-sonnet",
-        # "claude-4-opus",
+        # "claude-3-7-sonnet-20250219",
+        # "claude-sonnet-4-20250514",
+        # "claude-opus-4-20250514",
+        "claude-opus-4-1-20250805",
         # "us.anthropic.claude-sonnet-4-20250514-v1:0",
         # "us.anthropic.claude-opus-4-20250514-v1:0",
+        # "us.anthropic.claude-opus-4-1-20250805-v1:0",
         # "sonar",
         # "sonar-pro",
         # "gemma3:4b",
