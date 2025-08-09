@@ -123,12 +123,12 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
 # TODO: build llm_id/platform combos dynalically from config data
 @pytest.fixture(
     params=[
-        LLMPlatform.ANTHROPIC,
+        # LLMPlatform.ANTHROPIC,
         # LLMPlatform.AZURE_OPENAI,
         # LLMPlatform.BEDROCK,
         # LLMPlatform.BEDROCK_ANTHROPIC,
         # LLMPlatform.MISTRAL,
-        # LLMPlatform.OPENAI,
+        LLMPlatform.OPENAI,
         # LLMPlatform.PERPLEXITY,
         # LLMPlatform.VERTEXAI,
         # LLMPlatform.CUSTOM_LLM,
@@ -142,6 +142,10 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
 
 @pytest.fixture(
     params=[
+        "gpt-5-mini",
+        "gpt-5-nano",
+        "gpt-5-chat-latest",
+        "gpt-5",
         # "gpt-4o-mini",
         # "open-mixtral-8x7b",
         # "google/gemini-2.0-flash",
@@ -156,7 +160,7 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
         # "claude-3-7-sonnet-20250219",
         # "claude-sonnet-4-20250514",
         # "claude-opus-4-20250514",
-        "claude-opus-4-1-20250805",
+        # "claude-opus-4-1-20250805",
         # "us.anthropic.claude-sonnet-4-20250514-v1:0",
         # "us.anthropic.claude-opus-4-20250514-v1:0",
         # "us.anthropic.claude-opus-4-1-20250805-v1:0",
