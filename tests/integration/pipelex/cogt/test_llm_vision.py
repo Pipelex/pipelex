@@ -25,7 +25,7 @@ class TestLLMVision:
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
             user_images=[prompt_image],
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=600, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -44,7 +44,7 @@ class TestLLMVision:
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
             user_images=[prompt_image],
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=200, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -62,7 +62,7 @@ class TestLLMVision:
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
             user_images=[prompt_image],
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=200, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -81,7 +81,7 @@ class TestLLMVision:
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_IMAGES_COMPARE_PROMPT,
             user_images=[prompt_image1, prompt_image2],
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=500, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=2000, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
