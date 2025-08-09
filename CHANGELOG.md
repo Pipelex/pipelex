@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- New LLM families `LLMFamily.GPT_5`, `LLMFamily.GPT_5_CHAT` and `LLMFamily.CLAUDE_4_1`
+- Added support for Claude 4.1 and GPT 5 models (inc. mini, nano, chat)
+
 ## [v0.6.10] - 2025-08-02
 
 ### Added

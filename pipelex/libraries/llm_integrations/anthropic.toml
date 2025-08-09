@@ -64,7 +64,7 @@ platform_llm_id = { anthropic = "claude-opus-4-20250514", bedrock_anthropic = "u
 default_platform = "anthropic"
 
 
-[claude-4.claude-4-1-opus.latest]
+["claude-4.1".claude-4-1-opus.latest]
 max_tokens = 32000
 is_gen_object_supported = true
 is_vision_supported = true
