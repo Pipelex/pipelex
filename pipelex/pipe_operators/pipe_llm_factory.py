@@ -9,10 +9,10 @@ from pipelex.core.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider, get_optional_domain
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm import PipeLLM, StructuringMethod
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
+from pipelex.pipe_operators.pipe_template import PipeTemplate
+from pipelex.pipe_operators.pipe_template_factory import PipeTemplateFactory
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
 
@@ -61,15 +61,15 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         pipe_code: str,
         pipe_blueprint: PipeLLMBlueprint,
     ) -> PipeLLM:
-        system_prompt_pipe_jinja2: Optional[PipeJinja2] = None
+        system_prompt_pipe_jinja2: Optional[PipeTemplate] = None
         system_prompt: Optional[str] = None
         if pipe_blueprint.system_prompt_template or pipe_blueprint.system_prompt_template_name:
             try:
-                system_prompt_pipe_jinja2 = PipeJinja2(
+                system_prompt_pipe_jinja2 = PipeTemplate(
                     code="adhoc_for_system_prompt",
                     domain=domain_code,
-                    jinja2=pipe_blueprint.system_prompt_template,
-                    jinja2_name=pipe_blueprint.system_prompt_template_name,
+                    template=pipe_blueprint.system_prompt_template,
+                    template_name=pipe_blueprint.system_prompt_template_name,
                 )
             except Jinja2TemplateError as exc:
                 error_msg = f"Jinja2 template error in system prompt for pipe '{pipe_code}' in domain '{domain_code}': {exc}."
@@ -83,10 +83,10 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             if domain := get_optional_domain(domain_code=domain_code):
                 system_prompt = domain.system_prompt
 
-        user_pipe_jinja2: Optional[PipeJinja2] = None
+        user_pipe_jinja2: Optional[PipeTemplate] = None
         if pipe_blueprint.prompt_template or pipe_blueprint.template_name:
             try:
-                user_pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
+                user_pipe_jinja2 = PipeTemplateFactory.make_pipe_jinja2_from_template_str(
                     domain_code=domain_code,
                     template_str=pipe_blueprint.prompt_template,
                     template_name=pipe_blueprint.template_name,
@@ -101,10 +101,10 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 raise PipeDefinitionError(error_msg) from exc
         elif pipe_blueprint.prompt is None and pipe_blueprint.prompt_name is None:
             # no jinja2 provided, no verbatim name, no fixed text, let's use the pipe code as jinja2 name
-            user_pipe_jinja2 = PipeJinja2(
+            user_pipe_jinja2 = PipeTemplate(
                 code="adhoc_for_user_prompt",
                 domain=domain_code,
-                jinja2_name=pipe_code,
+                template_name=pipe_code,
             )
 
         user_images: List[str] = []

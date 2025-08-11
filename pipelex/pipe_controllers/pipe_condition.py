@@ -23,8 +23,8 @@ from pipelex.exceptions import (
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
+from pipelex.pipe_operators.pipe_template import PipeJinja2Output, PipeTemplate
+from pipelex.pipe_operators.pipe_template_factory import PipeTemplateFactory
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
@@ -73,7 +73,7 @@ class PipeCondition(PipeController):
     def required_variables(self) -> Set[str]:
         required_variables: Set[str] = set()
         # Variables from the expression/expression_template
-        pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
+        pipe_jinja2 = PipeTemplateFactory.make_pipe_jinja2_from_template_str(
             domain_code=self.domain,
             template_str=self.applied_expression_template,
             inputs=self.inputs,
@@ -103,7 +103,7 @@ class PipeCondition(PipeController):
         needed_inputs = PipeInputSpec.make_empty()
 
         # 1. Add the variables from the expression/expression_template
-        pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
+        pipe_jinja2 = PipeTemplateFactory.make_pipe_jinja2_from_template_str(
             domain_code=self.domain,
             template_str=self.applied_expression_template,
             inputs=self.inputs,
@@ -204,10 +204,10 @@ class PipeCondition(PipeController):
         # TODO: restore pipe_layer feature
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
 
-        pipe_jinja2 = PipeJinja2(
+        pipe_jinja2 = PipeTemplate(
             code="adhoc_for_pipe_condition",
             domain=self.domain,
-            jinja2=self.applied_expression_template,
+            template=self.applied_expression_template,
             inputs=self.inputs,
         )
         jinja2_job_metadata = job_metadata.copy_with_update(
@@ -324,7 +324,7 @@ class PipeCondition(PipeController):
 
         # 2. Validate that the expression template is valid
         try:
-            pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
+            pipe_jinja2 = PipeTemplateFactory.make_pipe_jinja2_from_template_str(
                 domain_code=self.domain,
                 template_str=self.applied_expression_template,
                 inputs=self.inputs,

@@ -114,7 +114,7 @@ nav:
         - PipeLLM: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md
         - PipeOcr: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeOcr.md
         - PipeImgGen: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeImgGen.md
-        - PipeJinja2: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeJinja2.md
+        - PipeTemplate: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeTemplate.md
         - PipeFunc: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc.md
       - Pipe Controllers:
         - Overview: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/index.md

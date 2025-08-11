@@ -23,8 +23,8 @@ from pipelex.exceptions import (
     WorkingMemoryVariableError,
 )
 from pipelex.hub import get_class_registry, get_template
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_operators.pipe_template import PipeJinja2Output, PipeTemplate
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.type_inspector import get_type_structure
@@ -45,11 +45,11 @@ class PipeLLMPrompt(PipeOperator):
 
     prompting_style: Optional[PromptingStyle] = None
 
-    system_prompt_pipe_jinja2: Optional[PipeJinja2] = None
+    system_prompt_pipe_jinja2: Optional[PipeTemplate] = None
     system_prompt_verbatim_name: Optional[str] = None
     system_prompt: Optional[str] = None
 
-    user_pipe_jinja2: Optional[PipeJinja2] = None
+    user_pipe_jinja2: Optional[PipeTemplate] = None
     user_prompt_verbatim_name: Optional[str] = None
     user_text: Optional[str] = None
 
@@ -257,13 +257,13 @@ class PipeLLMPrompt(PipeOperator):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        pipe_jinja2: Optional[PipeJinja2],
+        pipe_jinja2: Optional[PipeTemplate],
         text_verbatim_name: Optional[str],
         fixed_text: Optional[str],
     ) -> Optional[str]:
         the_text: Optional[str]
         if pipe_jinja2:
-            log.verbose(f"Working with Jinja2 pipe '{pipe_jinja2.jinja2_name}'")
+            log.verbose(f"Working with Jinja2 pipe '{pipe_jinja2.template_name}'")
             if (prompting_style := self.prompting_style) and not pipe_jinja2.prompting_style:
                 pipe_jinja2.prompting_style = prompting_style
                 log.verbose(f"Setting prompting style to {prompting_style}")

@@ -34,7 +34,7 @@ class PipeOperator(PipeAbstract):
 
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
-                if self.class_name not in ["PipeJinja2", "PipeLLMPrompt"]:
+                if self.class_name not in ["PipeTemplate", "PipeLLMPrompt"]:
                     name = self.class_name
                     indent_level = len(pipe_run_params.pipe_stack) - 1
                     indent = "   " * indent_level

@@ -29,13 +29,13 @@ from pipelex.pipe_operators.pipe_func import PipeFunc
 from pipelex.pipe_operators.pipe_func_factory import PipeFuncFactory
 from pipelex.pipe_operators.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.pipe_img_gen_factory import PipeImgGenFactory
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm import PipeLLM
 from pipelex.pipe_operators.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 from pipelex.pipe_operators.pipe_ocr import PipeOcr
 from pipelex.pipe_operators.pipe_ocr_factory import PipeOcrFactory
+from pipelex.pipe_operators.pipe_template import PipeTemplate
+from pipelex.pipe_operators.pipe_template_factory import PipeTemplateFactory
 from pipelex.tools.registry_models import ModelType, RegistryModels
 
 
@@ -45,7 +45,7 @@ class PipelexRegistryModels(RegistryModels):
     PIPE_OPERATORS: ClassVar[List[PipeAbstractType]] = [
         PipeFunc,
         PipeImgGen,
-        PipeJinja2,
+        PipeTemplate,
         PipeLLM,
         PipeLLMPrompt,
         PipeOcr,
@@ -54,7 +54,7 @@ class PipelexRegistryModels(RegistryModels):
     PIPE_OPERATORS_FACTORY: ClassVar[List[PipeSpecificFactoryProtocol[Any, Any]]] = [
         PipeFuncFactory,
         PipeImgGenFactory,
-        PipeJinja2Factory,
+        PipeTemplateFactory,
         PipeLLMFactory,
         PipeOcrFactory,
     ]

@@ -12,7 +12,7 @@ Here are the primary pipe operators available in Pipelex:
 -   [**`PipeOcr`**](./PipeOcr.md): Performs Optical Character Recognition (OCR) on images and PDF documents to extract text and embedded images.
 -   [**`PipeImgGen`**](./PipeImgGen.md): Generates images from a text prompt using models like DALL-E 3 or Stable Diffusion.
 -   [**`PipeFunc`**](./PipeFunc.md): An escape hatch that allows you to execute any custom Python function, giving you maximum flexibility.
--   [**`PipeJinja2`**](./PipeJinja2.md): Renders a Jinja2 template using data from the working memory, perfect for creating formatted reports or complex prompts.
+-   [**`PipeTemplate`**](./PipeTemplate.md): Renders a Jinja2 template using data from the working memory, perfect for creating formatted reports or complex prompts.
 
 ## Overview
 

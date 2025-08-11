@@ -43,9 +43,9 @@ from pipelex.hub import (
     get_required_pipe,
     get_template,
 )
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_operators.pipe_template_factory import PipeTemplateFactory
 from pipelex.pipe_operators.piped_llm_prompt_factory import PipedLLMPromptFactory
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.types import StrEnum
@@ -350,7 +350,7 @@ class PipeLLM(PipeOperator):
                         # TODO: run_pipe() could get the domain at the same time as the pip_code
                         domain = get_required_domain(domain_code=pipe.domain)
                         prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
-                        user_pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_to_structure(
+                        user_pipe_jinja2 = PipeTemplateFactory.make_pipe_jinja2_to_structure(
                             domain_code=self.domain,
                             prompt_template_to_structure=prompt_template_to_structure,
                         )
@@ -373,7 +373,7 @@ class PipeLLM(PipeOperator):
                 else:
                     domain = Domain.make_default()
                 prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
-                user_pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_to_structure(
+                user_pipe_jinja2 = PipeTemplateFactory.make_pipe_jinja2_to_structure(
                     domain_code=self.domain,
                     prompt_template_to_structure=prompt_template_to_structure,
                 )

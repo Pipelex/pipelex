@@ -35,27 +35,27 @@ class PipeJinja2Output(PipeOutput):
         return self.main_stuff_as_text.text
 
 
-class PipeJinja2(PipeOperator):
+class PipeTemplate(PipeOperator):
     model_config = ConfigDict(extra="forbid", strict=False)
 
     adhoc_pipe_code: ClassVar[str] = "jinja2_render"
     output_concept_code: str = NativeConcept.TEXT.code
 
-    jinja2_name: Optional[str] = None
-    jinja2: Optional[str] = None
+    template_name: Optional[str] = None
+    template: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
     extra_context: Optional[Dict[str, Any]] = None
 
     @model_validator(mode="after")
     def validate_jinja2(self) -> Self:
-        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["jinja2_name", "jinja2"]):
-            raise PipeDefinitionError("PipeJinja2 should have exactly one of jinja2_name or jinja2")
-        if self.jinja2:
+        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["template_name", "template"]):
+            raise PipeDefinitionError("PipeTemplate should have exactly one of template_name or template")
+        if self.template:
             try:
-                check_jinja2_parsing(jinja2_template_source=self.jinja2, template_category=self.template_category)
+                check_jinja2_parsing(jinja2_template_source=self.template, template_category=self.template_category)
             except TemplateSyntaxError as exc:
-                raise Jinja2TemplateError(f"Could not parse Jinja2 template included in PipeJinja2: {exc}") from exc
+                raise Jinja2TemplateError(f"Could not parse Jinja2 template included in PipeTemplate: {exc}") from exc
         return self
 
     @model_validator(mode="after")
@@ -73,9 +73,9 @@ class PipeJinja2(PipeOperator):
 
     @override
     def validate_with_libraries(self):
-        if self.jinja2_name:
-            the_template = get_template(template_name=self.jinja2_name)
-            log.debug(f"Validated jinja2 template '{self.jinja2_name}':\n{the_template}")
+        if self.template_name:
+            the_template = get_template(template_name=self.template_name)
+            log.debug(f"Validated jinja2 template '{self.template_name}':\n{the_template}")
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
@@ -86,10 +86,10 @@ class PipeJinja2(PipeOperator):
 
     @property
     def desc(self) -> str:
-        if self.jinja2:
+        if self.template:
             return f"Jinja2 included template, prompting style {self.prompting_style}"
-        elif jinja2_name := self.jinja2_name:
-            return f"Jinja2 template '{jinja2_name}', prompting style {self.prompting_style}"
+        elif template_name := self.template_name:
+            return f"Jinja2 template '{template_name}', prompting style {self.prompting_style}"
         else:
             return "Jinja2 template not defined"
 
@@ -98,8 +98,8 @@ class PipeJinja2(PipeOperator):
         required_variables = detect_jinja2_required_variables(
             template_category=self.template_category,
             template_provider=get_template_provider(),
-            jinja2_name=self.jinja2_name,
-            jinja2=self.jinja2,
+            jinja2_name=self.template_name,
+            jinja2=self.template,
         )
         return {
             variable_name
@@ -119,7 +119,7 @@ class PipeJinja2(PipeOperator):
         content_generator = content_generator or get_content_generator()
         if pipe_run_params.is_multiple_output_required:
             raise PipeRunParamsError(
-                f"PipeJinja2 does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
+                f"PipeTemplate does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
             )
 
         context: Dict[str, Any] = working_memory.generate_stuff_artefact_dict()
@@ -130,8 +130,8 @@ class PipeJinja2(PipeOperator):
 
         jinja2_text = await content_generator.make_jinja2_text(
             context=context,
-            jinja2_name=self.jinja2_name,
-            jinja2=self.jinja2,
+            jinja2_name=self.template_name,
+            jinja2=self.template,
             prompting_style=self.prompting_style,
             template_category=self.template_category,
         )
@@ -168,10 +168,10 @@ class PipeJinja2(PipeOperator):
     ) -> PipeOutput:
         content_generator_used: ContentGeneratorProtocol
         if get_config().pipelex.dry_run_config.apply_to_jinja2_rendering:
-            log.debug(f"PipeJinja2: using dry run operator pipe for jinja2 rendering: {self.code}")
+            log.debug(f"PipeTemplate: using dry run operator pipe for jinja2 rendering: {self.code}")
             content_generator_used = ContentGeneratorDry()
         else:
-            log.debug(f"PipeJinja2: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
+            log.debug(f"PipeTemplate: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
             content_generator_used = get_content_generator()
 
         pipe_output = await self._run_operator_pipe(
