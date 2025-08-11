@@ -33,18 +33,18 @@ class PipeBlueprint(StructuredContent):
 
 PipeBlueprintType = TypeVar("PipeBlueprintType", bound="PipeBlueprint", contravariant=True)
 
-PipeType = TypeVar("PipeType", bound="PipeAbstract", covariant=True)
+PipeTypeVar = TypeVar("PipeTypeVar", bound="PipeAbstract", covariant=True)
 
 
 @runtime_checkable
-class PipeSpecificFactoryProtocol(Protocol[PipeBlueprintType, PipeType]):
+class PipeSpecificFactoryProtocol(Protocol[PipeBlueprintType, PipeTypeVar]):
     @classmethod
     def make_pipe_from_blueprint(
         cls,
         domain_code: str,
         pipe_code: str,
         pipe_blueprint: PipeBlueprintType,
-    ) -> PipeType: ...
+    ) -> PipeTypeVar: ...
 
     @classmethod
     def make_pipe_from_details_dict(
@@ -52,4 +52,4 @@ class PipeSpecificFactoryProtocol(Protocol[PipeBlueprintType, PipeType]):
         domain_code: str,
         pipe_code: str,
         details_dict: Dict[str, Any],
-    ) -> PipeType: ...
+    ) -> PipeTypeVar: ...
