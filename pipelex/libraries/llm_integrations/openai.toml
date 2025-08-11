@@ -77,7 +77,7 @@ default_platform = "openai"
 ["gpt-4.1"."gpt-4.1".latest]
 is_gen_object_supported = true
 is_vision_supported = true
-cost_per_million_tokens_usd = { input = 2, output = 8}
+cost_per_million_tokens_usd = { input = 2, output = 8 }
 platform_llm_id = { azure_openai = "gpt-4.1-2025-04-14", openai = "gpt-4.1" }
 default_platform = "openai"
 
@@ -110,7 +110,7 @@ platform_llm_id = { azure_openai = "o1-2024-12-17", openai = "o1" }
 [o.o3-mini.latest]
 is_gen_object_supported = true
 cost_per_million_tokens_usd = { input = 1.1, output = 4.4 }
-platform_llm_id = { azure_openai = "o3-mini-2025-01-31", openai = "o3-mini"}
+platform_llm_id = { azure_openai = "o3-mini-2025-01-31", openai = "o3-mini" }
 default_platform = "openai"
 
 [o.o3.latest]
@@ -122,6 +122,32 @@ platform_llm_id = { openai = "o3" }
 [o.o4-mini.latest]
 is_gen_object_supported = true
 cost_per_million_tokens_usd = { input = 1.1, output = 4.4 }
-platform_llm_id = { openai = "o4-mini"}
+platform_llm_id = { openai = "o4-mini" }
+
+[gpt-5.gpt-5.latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 1.25, output = 10.0 }
+platform_llm_id = { openai = "gpt-5" }
+
+[gpt-5.gpt-5-mini.latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 0.25, output = 2.0 }
+platform_llm_id = { azure_openai = "gpt-5-mini-2025-08-07", openai = "gpt-5-mini" }
+default_platform = "openai"
+
+[gpt-5.gpt-5-nano.latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 0.05, output = 0.4 }
+platform_llm_id = { azure_openai = "gpt-5-nano-2025-08-07", openai = "gpt-5-nano" }
+default_platform = "openai"
+
+[gpt-5-chat.gpt-5-chat.latest]
+is_gen_object_supported = false
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 1.25, output = 10.0 }
+platform_llm_id = { azure_openai = "gpt-5-chat-2025-08-07", openai = "gpt-5-chat-latest" }
 default_platform = "openai"
 

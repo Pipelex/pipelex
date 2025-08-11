@@ -11,7 +11,8 @@ llm_external_handles = []
 # or a complete blueprint including llm_version (defaulting to "latest") and llm_platform_choice (defaulting to "default").
 [llm_handles]
 gpt-4o-2024-11-20 = { llm_name = "gpt-4o", llm_version = "2024-11-20" }
-best-claude = "claude-4-opus"
+best-gpt = "gpt-5"
+best-claude = "claude-4-1-opus"
 best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-large"
 best-grok = "grok-3"

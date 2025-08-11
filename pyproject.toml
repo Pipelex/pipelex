@@ -1,6 +1,6 @@
 [project]
 name = "pipelex"
-version = "0.6.8"
+version = "0.6.10"
 description = "Pipelex is an open-source dev tool based on a simple declarative language that lets you define replicable, structured, composable LLM pipelines."
 authors = [{ name = "Evotis S.A.S.", email = "evotis@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -65,7 +65,7 @@ docs = [
 ]
 dev = [
     "boto3-stubs>=1.35.24",
-    "cocode==0.0.6",
+    "cocode>=0.0.10",
     "mypy>=1.11.2",
     "pyright==1.1.398",
     "pandas-stubs>=2.2.3.241126",

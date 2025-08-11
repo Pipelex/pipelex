@@ -463,15 +463,15 @@ wheels = [
 
 [[package]]
 name = "cocode"
-version = "0.0.6"
+version = "0.0.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pipelex", extra = ["anthropic", "bedrock", "google"] },
     { name = "pygithub" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d7/12/fd447343c362de95b06a7dc80b2a3635391f37136eee43497819d8f57d97/cocode-0.0.6.tar.gz", hash = "sha256:940aa57169bf829e5ac5660721bcf6acb4c36e0755433b91e097ac7ebd970e85", size = 36557, upload-time = "2025-07-21T07:36:59.46Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/65/e47ab07a9670bbc71d936aca9373af38592f93630431f5593107252bd0b4/cocode-0.0.10.tar.gz", hash = "sha256:5bd4481e13cf3c577f65b0bc9d9e1182dc9bec49486746db6faa5924622b8d8d", size = 42261, upload-time = "2025-08-03T01:50:08.534Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/c1/79141584533b58a71f191d45dc7acd7d72b9746250ed231bfad6458dadc0/cocode-0.0.6-py3-none-any.whl", hash = "sha256:b0b7eb427132e297e3325e9fcea65d2f052e3cd79e88540046cb60806e379dcb", size = 50071, upload-time = "2025-07-21T07:36:57.764Z" },
+    { url = "https://files.pythonhosted.org/packages/74/91/9b2130f764208e237ec2f47b71961f5b32c3e4b36acfa1ddf7613673ceef/cocode-0.0.10-py3-none-any.whl", hash = "sha256:759da265f945c197e11d650c0d13bb55bc2b0d72f78d52f223ebe26a6ceb229f", size = 57943, upload-time = "2025-08-03T01:50:06.929Z" },
 ]
 
 [[package]]
@@ -1748,7 +1748,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.6.7"
+version = "0.6.10"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1836,7 +1836,7 @@ requires-dist = [
     { name = "backports-strenum", marker = "python_full_version < '3.11' and extra == 'compat'", specifier = ">=1.3.0" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.34.131" },
     { name = "boto3-stubs", marker = "extra == 'dev'", specifier = ">=1.35.24" },
-    { name = "cocode", marker = "extra == 'dev'", specifier = "==0.0.6" },
+    { name = "cocode", marker = "extra == 'dev'", specifier = ">=0.0.10" },
     { name = "fal-client", marker = "extra == 'fal'", specifier = ">=0.4.1" },
     { name = "filetype", specifier = ">=1.2.0" },
     { name = "google-auth-oauthlib", marker = "extra == 'google'", specifier = ">=1.2.1" },

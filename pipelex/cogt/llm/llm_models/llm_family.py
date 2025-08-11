@@ -62,11 +62,14 @@ class LLMFamily(StrEnum):
     GPT_4_5 = "gpt-4.5"
     GPT_4_1 = "gpt-4.1"
     O_SERIES = "o"
+    GPT_5 = "gpt-5"
+    GPT_5_CHAT = "gpt-5-chat"
 
     CLAUDE_3 = "claude-3"
     CLAUDE_3_5 = "claude-3.5"
     CLAUDE_3_7 = "claude-3.7"
     CLAUDE_4 = "claude-4"
+    CLAUDE_4_1 = "claude-4.1"
 
     MISTRAL_7B = "mistral-7b"
     MISTRAL_8X7B = "mistral-8x7b"
@@ -102,10 +105,18 @@ class LLMFamily(StrEnum):
     def creator(self) -> LLMCreator:
         match self:
             case (
-                LLMFamily.GPT_4 | LLMFamily.GPT_3_5 | LLMFamily.GPT_3 | LLMFamily.O_SERIES | LLMFamily.GPT_4_5 | LLMFamily.GPT_4_1 | LLMFamily.GPT_4O
+                LLMFamily.GPT_4
+                | LLMFamily.GPT_3_5
+                | LLMFamily.GPT_3
+                | LLMFamily.O_SERIES
+                | LLMFamily.GPT_4_5
+                | LLMFamily.GPT_4_1
+                | LLMFamily.GPT_4O
+                | LLMFamily.GPT_5
+                | LLMFamily.GPT_5_CHAT
             ):
                 return LLMCreator.OPENAI
-            case LLMFamily.CLAUDE_3 | LLMFamily.CLAUDE_3_5 | LLMFamily.CLAUDE_3_7 | LLMFamily.CLAUDE_4:
+            case LLMFamily.CLAUDE_3 | LLMFamily.CLAUDE_3_5 | LLMFamily.CLAUDE_3_7 | LLMFamily.CLAUDE_4 | LLMFamily.CLAUDE_4_1:
                 return LLMCreator.ANTHROPIC
             case LLMFamily.BEDROCK_ANTHROPIC_CLAUDE:
                 return LLMCreator.ANTHROPIC

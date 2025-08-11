@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex.core.concept import Concept
 from pipelex.core.concept_code_factory import ConceptCodeFactory
-from pipelex.core.concept_native import NativeConcept
+from pipelex.core.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.domain import SpecialDomain
 from pipelex.core.stuff_content import TextContent
 from pipelex.exceptions import ConceptFactoryError, StructureClassError
@@ -178,6 +178,11 @@ class ConceptFactory:
             definition=definition,
             structure_class_name=native_concept.content_class_name,
         )
+
+    @classmethod
+    def make_native_concept_from_native_concept_class(cls, native_concept_class: NativeConceptClass) -> Concept:
+        native_concept = native_concept_class.native_concept
+        return cls.make_native_concept(native_concept=native_concept)
 
     @classmethod
     def list_native_concepts(cls) -> List[Concept]:

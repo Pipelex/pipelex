@@ -41,7 +41,7 @@ class Pet(BaseModel):
 
 class LLMVisionTestCases:
     VISION_USER_TEXT_1 = "Describe the provide image."
-    VISION_USER_TEXT_2 = "What is this image about ?"
+    VISION_USER_TEXT_2 = "What is this image about?"
     VISION_IMAGES_COMPARE_PROMPT = "Compare these two images"
 
     URL_WIKIPEDIA_ALAN_TURING = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Alan_Turing_%281912-1954%29_in_1936_at_Princeton_University_%28cropped%29.jpg/440px-Alan_Turing_%281912-1954%29_in_1936_at_Princeton_University_%28cropped%29.jpg"

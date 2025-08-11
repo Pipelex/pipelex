@@ -60,7 +60,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
 
         try:
             match self.llm_engine.llm_model.llm_family:
-                case LLMFamily.O_SERIES:
+                case LLMFamily.O_SERIES | LLMFamily.GPT_5:
                     # for o1 models, we must use temperature=1, and tokens limit is named max_completion_tokens
                     response = await self.openai_client_for_text.chat.completions.create(
                         model=self.llm_engine.llm_id,
@@ -85,6 +85,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.GPT_4_5
                     | LLMFamily.GPT_4_1
                     | LLMFamily.GPT_4O
+                    | LLMFamily.GPT_5_CHAT
                     | LLMFamily.CUSTOM_LLAMA_4
                     | LLMFamily.CUSTOM_GEMMA_3
                     | LLMFamily.CUSTOM_MISTRAL_SMALL_3_1
@@ -107,6 +108,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.CLAUDE_3_5
                     | LLMFamily.CLAUDE_3_7
                     | LLMFamily.CLAUDE_4
+                    | LLMFamily.CLAUDE_4_1
                     | LLMFamily.MISTRAL_7B
                     | LLMFamily.MISTRAL_8X7B
                     | LLMFamily.MISTRAL_LARGE
@@ -155,7 +157,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         )
         try:
             match self.llm_engine.llm_model.llm_family:
-                case LLMFamily.O_SERIES:
+                case LLMFamily.O_SERIES | LLMFamily.GPT_5:
                     # for o1 models, we must use temperature=1, and tokens limit is named max_completion_tokens
                     result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                         model=self.llm_engine.llm_id,
@@ -184,6 +186,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.GPT_4_5
                     | LLMFamily.GPT_4_1
                     | LLMFamily.GPT_4O
+                    | LLMFamily.GPT_5_CHAT
                     | LLMFamily.CUSTOM_LLAMA_4
                     | LLMFamily.CUSTOM_GEMMA_3
                     | LLMFamily.CUSTOM_MISTRAL_SMALL_3_1
@@ -208,6 +211,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.CLAUDE_3_5
                     | LLMFamily.CLAUDE_3_7
                     | LLMFamily.CLAUDE_4
+                    | LLMFamily.CLAUDE_4_1
                     | LLMFamily.MISTRAL_7B
                     | LLMFamily.MISTRAL_8X7B
                     | LLMFamily.MISTRAL_LARGE

@@ -155,7 +155,7 @@ class PipeTestCases:
         (
             "Extract page contents from PDF",
             SIMPLE_STUFF_PDF,
-            "extract_page_contents_from_pdf",
+            "ocr_page_contents_from_pdf",
         ),
     ]
     FAILURE_PIPES: ClassVar[List[Tuple[str, Type[Exception], str]]] = [

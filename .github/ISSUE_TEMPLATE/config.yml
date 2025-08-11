@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: 💡 Pipeline requests
+    url:  https://github.com/Pipelex/pipelex-cookbook/discussions/categories/ideas
+    about: "Please start an Idea Discussion in the Cookbook."
   - name: 💬 Ask a question
     url:  https://github.com/Pipelex/pipelex/discussions
     about: "Please start a Discussion instead of filing a blank issue."

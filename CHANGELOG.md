@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- New LLM families `LLMFamily.GPT_5`, `LLMFamily.GPT_5_CHAT` and `LLMFamily.CLAUDE_4_1`
+- Added support for Claude 4.1 and GPT 5 models (inc. mini, nano, chat)
+
+## [v0.6.10] - 2025-08-02
+
+### Added
+ - New test file for source code manipulation functions (tests/cases/source_code.py)
+ - New integration test for PipeFunc functionality (tests/integration/pipelex/pipes/pipe_operator/pipe_func/test_pipe_func.py)
+ - New package structure file for pipe_func tests (__init__.py)
+ - Simplified input memory creation for native concepts (Text, Image, PDF) in pipeline execution
+ - Added Pipeline requests link to GitHub issue template config
+
+### Changed
+ - Updated pipeline execution documentation and examples to use input_memory instead of working_memory
+ - Renamed pipeline from 'extract_page_contents_from_pdf' to 'ocr_page_contents_from_pdf'
+ - Renamed pipeline from 'extract_page_contents_and_views_from_pdf' to 'ocr_page_contents_and_views_from_pdf'
+ - Updated cocode dependency from version 0.0.6 to 0.0.9
+
+### Fixed
+ - Fixed typo in pipeline description ('aspage views' to 'as full page views')
+
+### Removed
+ - Removed WorkingMemoryFactory and StuffFactory imports from pipeline execution examples
+ - Removed working memory creation code from pipeline examples
+
+
+## [v0.6.9] - 2025-07-26
+
+### Changed
+
+Simplified input memory:
+
+- The concept code can now be provided with arg named `concept` in addition to `concept_code`
+- You can pass a simple string to create a `Text` stuff
+
+
 ## [v0.6.8] - 2025-07-25
 
 ### Added
@@ -393,7 +433,7 @@ is_reporting_enabled = true
 **Major Model Additions** - Claude 4 (Opus & Sonnet), Grok-3, and GPT-4 image generation are now in the house.
 
 ### Pipeline Base Library update
-- **New pipe** - `extract_page_contents_and_views_from_pdf` transferred from cookbook to base library (congrats on the promotion!). This pipe extracts text, linked images, **AND** page_view images (rendered pages) - it's very useful if you want to use Vision in follow-up pipes
+- **New pipe** - `ocr_page_contents_and_views_from_pdf` transferred from cookbook to base library (congrats on the promotion!). This pipe extracts text, linked images, **AND** page_view images (rendered pages) - it's very useful if you want to use Vision in follow-up pipes
 
 ### Added
 

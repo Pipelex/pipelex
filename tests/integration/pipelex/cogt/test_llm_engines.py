@@ -29,9 +29,11 @@ class TestLLMEngines:
         else:
             log.info(f"No object generation supported for this worker: '{llm_worker.desc}'")
 
-    async def test_one_llm_engine(self, llm_job_params: LLMJobParams, llm_handle: str):
+    async def test_one_llm_engine_by_llm_handle(self, llm_job_params: LLMJobParams, llm_handle: str):
+        log.info(f"Testing {llm_handle}")
         inference_manager = get_inference_manager()
         llm_worker = inference_manager.get_llm_worker(llm_handle=llm_handle)
+        log.info(f"LLM Worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             system_text=None,
             user_text=LLMTestConstants.USER_TEXT_SHORT,

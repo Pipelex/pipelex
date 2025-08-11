@@ -44,7 +44,7 @@ platform_llm_id = { anthropic = "claude-3-7-sonnet-20250219", bedrock_anthropic 
 default_platform = "anthropic"
 
 
-["claude-4".claude-4-sonnet.latest]
+[claude-4.claude-4-sonnet.latest]
 max_tokens = 64000
 is_gen_object_supported = true
 is_vision_supported = true
@@ -54,12 +54,22 @@ platform_llm_id = { anthropic = "claude-sonnet-4-20250514", bedrock_anthropic = 
 default_platform = "anthropic"
 
 
-["claude-4".claude-4-opus.latest]
+[claude-4.claude-4-opus.latest]
 max_tokens = 32000
 is_gen_object_supported = true
 is_vision_supported = true
 max_prompt_images = 100
 cost_per_million_tokens_usd = { input = 3.0, output = 15.0 }
 platform_llm_id = { anthropic = "claude-opus-4-20250514", bedrock_anthropic = "us.anthropic.claude-opus-4-20250514-v1:0" }
+default_platform = "anthropic"
+
+
+["claude-4.1".claude-4-1-opus.latest]
+max_tokens = 32000
+is_gen_object_supported = true
+is_vision_supported = true
+max_prompt_images = 100
+cost_per_million_tokens_usd = { input = 3.0, output = 15.0 }
+platform_llm_id = { anthropic = "claude-opus-4-1-20250805", bedrock_anthropic = "us.anthropic.claude-opus-4-1-20250805-v1:0" }
 default_platform = "anthropic"
 

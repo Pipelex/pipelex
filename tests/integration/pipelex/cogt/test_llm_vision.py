@@ -2,7 +2,7 @@ from typing import Tuple
 
 import pytest
 
-from pipelex import pretty_print
+from pipelex import log, pretty_print
 from pipelex.cogt.exceptions import LLMCapabilityError, PromptImageFormatError
 from pipelex.cogt.image.prompt_image import PromptImageBytes, PromptImagePath
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
@@ -21,10 +21,11 @@ class TestLLMVision:
     async def test_gen_text_from_vision_by_url(self, llm_handle_for_vision: str, topic: str, image_uri: str):
         prompt_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
         llm_worker = get_llm_worker(llm_handle=llm_handle_for_vision)
+        log.info(f"LLM Worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
             user_images=[prompt_image],
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=200, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -43,7 +44,7 @@ class TestLLMVision:
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
             user_images=[prompt_image],
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=200, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -61,7 +62,7 @@ class TestLLMVision:
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
             user_images=[prompt_image],
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=200, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -80,7 +81,7 @@ class TestLLMVision:
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_IMAGES_COMPARE_PROMPT,
             user_images=[prompt_image1, prompt_image2],
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=500, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=2000, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)

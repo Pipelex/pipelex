@@ -6,7 +6,8 @@ from pydantic import BaseModel, ValidationError
 from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concept import Concept
 from pipelex.core.concept_code_factory import ConceptCodeFactory
-from pipelex.core.concept_native import NativeConcept
+from pipelex.core.concept_factory import ConceptFactory
+from pipelex.core.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.stuff import Stuff
 from pipelex.core.stuff_content import (
     ListContent,
@@ -216,6 +217,15 @@ class StuffFactory:
         elif isinstance(stuff_content_or_data, StuffContent):
             content = stuff_content_or_data
             concept_name = type(content).__name__
+            if concept_name in NativeConceptClass.class_names():
+                native_concept_class = NativeConceptClass(concept_name)
+                concept = ConceptFactory.make_native_concept_from_native_concept_class(native_concept_class=native_concept_class)
+                return cls.make_stuff(
+                    concept_str=concept.code,
+                    content=content,
+                    name=name,
+                    code=code,
+                )
             try:
                 return cls.make_stuff_using_concept_name_and_search_domains(
                     concept_name=concept_name,
@@ -243,23 +253,40 @@ class StuffFactory:
                 )
             except StuffFactoryError as exc:
                 raise StuffFactoryError(f"Could not make stuff for list of StuffContent '{name}': {exc}") from exc
+        elif isinstance(stuff_content_or_data, str):
+            str_stuff: str = stuff_content_or_data
+            return StuffFactory.make_from_str(
+                str_value=str_stuff,
+                name=name,
+            )
         else:
             stuff_content_dict: Dict[str, Any] = stuff_content_or_data
             try:
-                concept_code = stuff_content_dict["concept_code"]
+                concept_code: Optional[str]
+                concept_code = stuff_content_dict.get("concept") or stuff_content_dict.get("concept_code")
+                if not concept_code:
+                    raise StuffFactoryError("Stuff content data dict is badly formed: no concept code")
                 content_value = stuff_content_dict["content"]
             except KeyError as exc:
                 raise StuffFactoryError(f"Stuff content data dict is badly formed: {exc}") from exc
-            content = StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(
-                concept_code=concept_code,
-                value=content_value,
-            )
-            return StuffFactory.make_stuff(
-                concept_str=concept_code,
-                name=name,
-                content=content,
-                code=code,
-            )
+            if isinstance(content_value, StuffContent):
+                return StuffFactory.make_stuff(
+                    concept_str=concept_code,
+                    name=name,
+                    content=content_value,
+                    code=code,
+                )
+            else:
+                content = StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(
+                    concept_code=concept_code,
+                    value=content_value,
+                )
+                return StuffFactory.make_stuff(
+                    concept_str=concept_code,
+                    name=name,
+                    content=content,
+                    code=code,
+                )
 
 
 class StuffContentFactoryError(PipelexError):

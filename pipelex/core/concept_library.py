@@ -107,7 +107,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     @override
     def is_compatible_by_concept_code(self, tested_concept_code: str, wanted_concept_code: str) -> bool:
         if wanted_concept_code == NativeConcept.ANYTHING.code:
-            log.debug(
+            log.verbose(
                 f"Concept '{tested_concept_code}' is compatible with '{wanted_concept_code}' "
                 f"because '{wanted_concept_code}' is '{NativeConcept.ANYTHING.code}'"
             )
@@ -115,11 +115,11 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         tested_concept = self.get_required_concept(concept_code=tested_concept_code)
         wanted_concept = self.get_required_concept(concept_code=wanted_concept_code)
         if tested_concept.code == wanted_concept.code:
-            log.debug(f"Concept '{tested_concept_code}' is compatible with '{wanted_concept_code}' because they have the same code")
+            log.verbose(f"Concept '{tested_concept_code}' is compatible with '{wanted_concept_code}' because they have the same code")
             return True
         for inherited_concept_code in tested_concept.refines:
             if self.is_compatible_by_concept_code(inherited_concept_code, wanted_concept_code):
-                log.debug(
+                log.verbose(
                     f"Concept '{tested_concept_code}' is compatible with '{wanted_concept_code}' "
                     f"because '{tested_concept_code}' refines '{inherited_concept_code}' which is compatible with '{wanted_concept_code}'"
                 )
