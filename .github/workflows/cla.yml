@@ -1,9 +1,5 @@
 name: "CLA Assistant bot"
 on:
-  issue_comment:
-    types: [created]
-  pull_request:
-    types: [opened, closed, synchronize]
   push:
     branches:
       - fix/cla-github-app
