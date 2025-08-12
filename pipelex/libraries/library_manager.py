@@ -156,11 +156,11 @@ class LibraryManager(LibraryManagerAbstract):
         log.debug("LibraryManager loading combo libraries")
 
         # 1. Load domains
-        self.load_domains_from_libraries(library_paths)
+        self.load_domains(library_paths)
         # 2. Load concepts
-        self.load_concepts_from_libraries(library_paths)
+        self.load_concepts(library_paths)
         # 3. Load pipes
-        self.load_pipes_from_libraries(library_paths)
+        self.load_pipes(library_paths)
 
     def load_deck(self) -> LLMDeck:
         llm_deck_paths = self.library_config.get_llm_deck_paths()
@@ -197,7 +197,7 @@ class LibraryManager(LibraryManagerAbstract):
             toml_file_paths.extend(found_file_paths)
         return toml_file_paths
 
-    def load_domains_from_libraries(self, library_paths: List[Path]):
+    def load_domains(self, library_paths: List[Path]):
         """Load all domains from the provided library paths."""
         log.debug("Loading domains from libraries")
         for toml_path in library_paths:
@@ -221,7 +221,7 @@ class LibraryManager(LibraryManagerAbstract):
             )
             self.domain_library.add_domain_details(domain=domain)
 
-    def load_concepts_from_libraries(self, library_paths: List[Path]):
+    def load_concepts(self, library_paths: List[Path]):
         """Load all concepts from the provided library paths."""
         log.debug("Loading concepts from libraries...")
 
@@ -260,7 +260,7 @@ class LibraryManager(LibraryManagerAbstract):
                 except ConceptLibraryError as exc:
                     raise LibraryError(f"Error loading concepts from library '{library_name}' at '{toml_path}': {exc}") from exc
 
-    def load_pipes_from_libraries(self, library_paths: List[Path]):
+    def load_pipes(self, library_paths: List[Path]):
         """Load all pipes from the provided library paths."""
         log.debug("Loading pipes from libraries...")
 
