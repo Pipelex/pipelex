@@ -259,7 +259,7 @@ class LibraryManager(LibraryManagerAbstract):
         for pipe_name, pipe_data in blueprint.pipe.items():
             try:
                 # pipe_data is guaranteed to be Dict[str, Any] by the blueprint schema
-                pipe = LibraryManager.make_pipe_from_details_dict(
+                pipe = LibraryManager.make_pipe_from_blueprint(
                     domain_code=blueprint.domain,
                     pipe_code=pipe_name,
                     details_dict=pipe_data.copy(),
@@ -384,17 +384,3 @@ Old syntax will be removed in v0.3.0.
             details_dict=details_dict,
         )
         return pipe_from_blueprint
-
-    @classmethod
-    def make_pipe_from_details_dict(
-        cls,
-        domain_code: str,
-        pipe_code: str,
-        details_dict: Dict[str, Any],
-    ) -> PipeAbstract:
-        # Delegate to the new make_pipe_from_blueprint method
-        return cls.make_pipe_from_blueprint(
-            domain_code=domain_code,
-            pipe_code=pipe_code,
-            details_dict=details_dict,
-        )
