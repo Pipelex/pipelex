@@ -64,7 +64,7 @@ class LibraryManager(LibraryManagerAbstract):
         "domain",
         "definition",
         "system_prompt",
-        "system_prompt_jto_structure",
+        "system_prompt_to_structure",
         "prompt_template_to_structure",
     ]
     domain_library: DomainLibrary
@@ -191,10 +191,7 @@ class LibraryManager(LibraryManagerAbstract):
         for toml_path in library_paths:
             nb_concepts_before = len(self.concept_library.root)
             blueprint = self._load_blueprint_from_file(toml_path)
-            try:
-                self._load_concepts_from_blueprint(blueprint=blueprint, file_path=str(toml_path))
-            except ConceptBlueprintError:
-                raise  # Re-raise with detailed error message
+            self._load_concepts_from_blueprint(blueprint=blueprint, file_path=str(toml_path))
             nb_concepts_loaded = len(self.concept_library.root) - nb_concepts_before
             log.verbose(f"Loaded {nb_concepts_loaded} concepts from '{toml_path.name}'")
 
@@ -202,13 +199,7 @@ class LibraryManager(LibraryManagerAbstract):
         for toml_path in library_paths:
             nb_pipes_before = len(self.pipe_library.root)
             blueprint = self._load_blueprint_from_file(toml_path)
-            try:
-                self._load_pipes_from_blueprint(blueprint=blueprint, file_path=str(toml_path))
-            except (PipeBlueprintError, StaticValidationError) as pipe_error:
-                if isinstance(pipe_error, StaticValidationError):
-                    pipe_error.file_path = str(toml_path)
-                    log.error(pipe_error.desc())
-                raise pipe_error
+            self._load_pipes_from_blueprint(blueprint=blueprint, file_path=str(toml_path))
             nb_pipes_loaded = len(self.pipe_library.root) - nb_pipes_before
             log.verbose(f"Loaded {nb_pipes_loaded} pipes from '{toml_path.name}'")
 
@@ -260,19 +251,22 @@ class LibraryManager(LibraryManagerAbstract):
         for pipe_name, pipe_data in blueprint.pipe.items():
             try:
                 # pipe_data is guaranteed to be Dict[str, Any] by the blueprint schema
-                pipe = LibraryManager.make_pipe_from_details_dict(
+                pipe = LibraryManager.make_pipe_from_blueprint(
                     domain_code=blueprint.domain,
                     pipe_code=pipe_name,
                     details_dict=pipe_data.copy(),
                 )
                 self.pipe_library.add_new_pipe(pipe=pipe)
-            except ValidationError as exc:
-                error_msg = format_pydantic_validation_error(exc)
+            except ValidationError as validation_error:
+                error_msg = format_pydantic_validation_error(validation_error)
                 raise PipeBlueprintError(
                     file_path=file_path,
                     pipe_name=pipe_name,
                     error_msg=error_msg,
-                ) from exc
+                ) from validation_error
+            except StaticValidationError as static_validation_error:
+                static_validation_error.file_path = file_path
+                raise static_validation_error
 
     def validate_libraries(self):
         log.debug("LibraryManager validating libraries")

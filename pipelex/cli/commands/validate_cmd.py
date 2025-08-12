@@ -6,11 +6,10 @@ from typing import Annotated
 import typer
 
 from pipelex import log
+from pipelex.cli.commands.common import is_pipelex_libraries_folder
 from pipelex.hub import get_pipeline_tracker
 from pipelex.pipe_works.pipe_dry import dry_run_all_pipes, dry_run_single_pipe
 from pipelex.pipelex import Pipelex
-
-from .common import is_pipelex_libraries_folder
 
 
 def do_validate(relative_config_folder_path: str = "./pipelex_libraries") -> None:
