@@ -24,13 +24,17 @@ steps = [
 [pipe.draft_pipeline_text]
 type = "PipeLLM"
 definition = "Generate a rough pipeline draft from natural language requirements"
-inputs = { draft_pipeline_rules = "Text", requirements = "Text", pipeline_name = "Text", domain = "Text" }
+inputs = { draft_pipeline_rules = "Text", create_structured_output_rules = "Text", requirements = "Text", pipeline_name = "Text", domain = "Text" }
 output = "PipelineDraftText"
 llm = "llm_to_pipelex"
 prompt_template = """
 You are a Pipelex pipeline architect. Build a pipeline draft text showing how we solve the problem.
 
 @draft_pipeline_rules
+
+@create_structured_output_rules
+
+create structured output please
 
 ---
 Name of the pipeline: $pipeline_name.
