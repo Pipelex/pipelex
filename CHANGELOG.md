@@ -3,6 +3,17 @@
 ## Unreleased
 
 ### Added
+ - New `PipeFactory` class for creating pipes from various sources
+ - New `LibraryManagerFactory` class for creating LibraryManager instances
+
+### Changed
+ - Refactored LibraryManager to extract pipe creation logic into separate PipeFactory class
+ - Split LibraryManager's `load_combo_libraries` method into separate methods for domains, concepts, and pipes
+
+### Security
+ - Enhanced CLA workflow security by replacing personal access token with GitHub App authentication
+
+### Added
 
 - New LLM families `LLMFamily.GPT_5`, `LLMFamily.GPT_5_CHAT` and `LLMFamily.CLAUDE_4_1`
 - Added support for Claude 4.1 and GPT 5 models (inc. mini, nano, chat)
