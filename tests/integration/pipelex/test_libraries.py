@@ -13,7 +13,6 @@ from pipelex import pretty_print
 from pipelex.config import get_config
 from pipelex.core.concept_library import ConceptLibrary
 from pipelex.core.pipe_library import PipeLibrary
-from pipelex.libraries.library_manager import LibraryManager
 from tests.integration.pipelex.test_data import LibraryTestCases
 
 
@@ -90,7 +89,9 @@ class TestLibraries:
         known_concept: str,
         known_pipe: str,
     ):
-        library_manager = LibraryManager.make_empty(config_folder_path="pipelex_libraries")
+        from pipelex.libraries.library_manager_factory import LibraryManagerFactory
+
+        library_manager = LibraryManagerFactory.make_empty(config_folder_path="pipelex_libraries")
         test_pipelines_path = get_config().pipelex.library_config.test_pipelines_path
         test_library_paths = library_manager.list_toml_files_from_path(library_paths=[test_pipelines_path])
         library_manager.load_combo_libraries(library_paths=test_library_paths)
