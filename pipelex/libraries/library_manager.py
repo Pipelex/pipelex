@@ -151,11 +151,10 @@ class LibraryManager(LibraryManagerAbstract):
         toml_file_paths = [path for path in toml_file_paths if path != Path(failing_pipelines_path)]
         self.load_combo_libraries(library_paths=toml_file_paths)
 
-    
     @override
     def load_combo_libraries(self, library_paths: List[Path]):
         log.debug("LibraryManager loading combo libraries")
-        
+
         # 1. Load domains
         self.load_domains_from_libraries(library_paths)
         # 2. Load concepts
