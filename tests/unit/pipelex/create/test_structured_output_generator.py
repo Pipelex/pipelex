@@ -4,7 +4,6 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.create.structured_output_generator import (
-    FieldType,
     StructuredOutputGenerator,
     generate_structured_output_from_inline_definition,
     generate_structured_outputs_from_toml_string,

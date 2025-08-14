@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import textwrap
 from typing import Any, ClassVar, Dict, List, Optional, Union
 
 import tomlkit
 
-from pipelex.core.stuff_content import StructuredContent
 from pipelex.types import StrEnum
 
 
