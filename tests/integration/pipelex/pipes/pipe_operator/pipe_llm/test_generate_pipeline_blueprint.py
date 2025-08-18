@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.pipe_run_params import PipeRunMode
+from pipelex.core.pipe.pipe_run_params import PipeRunMode
 from pipelex.create.helpers import get_support_file
 from pipelex.libraries.pipeline_blueprint import PipelineBlueprint
 from pipelex.pipeline.execute import execute_pipeline

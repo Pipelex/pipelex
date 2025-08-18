@@ -3,10 +3,10 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipe.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
+from pipelex.core.pipe.pipe_run_params import PipeRunMode
+from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.working_memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.exceptions import DryRunError
 from pipelex.pipe_controllers.pipe_condition import PipeCondition
 from pipelex.pipeline.job_metadata import JobMetadata

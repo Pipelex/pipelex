@@ -2,9 +2,9 @@
 
 import pytest
 
-from pipelex.core.concept_blueprint import ConceptBlueprint
-from pipelex.core.concept_factory import ConceptFactory
-from pipelex.core.stuff_content import StructuredContent
+from pipelex.core.concept.concept_blueprint import ConceptBlueprint
+from pipelex.core.concept.concept_factory import ConceptFactory
+from pipelex.core.stuff.stuff_content import StructuredContent
 from pipelex.exceptions import ConceptFactoryError, StructureClassError
 from pipelex.hub import get_class_registry
 

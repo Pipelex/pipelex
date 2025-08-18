@@ -4,9 +4,9 @@ from typing import Any, Dict, List, Optional, Protocol
 from pydantic import BaseModel
 from typing_extensions import runtime_checkable
 
-from pipelex.core.pipe_run_params import PipeOutputMultiplicity
-from pipelex.core.stuff_content import StuffContent
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.pipe.pipe_run_params import PipeOutputMultiplicity
+from pipelex.core.stuff.stuff_content import StuffContent
+from pipelex.core.working_memory.working_memory import WorkingMemory
 from pipelex.types import StrEnum
 
 StuffContentOrData = Dict[str, Any] | StuffContent | List[Any] | str

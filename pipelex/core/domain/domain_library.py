@@ -4,8 +4,8 @@ from pydantic import RootModel
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.domain import Domain
-from pipelex.core.domain_provider_abstract import DomainProviderAbstract
+from pipelex.core.domain.domain import Domain
+from pipelex.core.domain.domain_provider_abstract import DomainProviderAbstract
 from pipelex.exceptions import DomainLibraryError
 from pipelex.tools.misc.file_utils import save_text_to_path
 

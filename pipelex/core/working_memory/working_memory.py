@@ -5,10 +5,10 @@ from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
 from pipelex import log, pretty_print
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_artefact import StuffArtefact
-from pipelex.core.stuff_content import (
+from pipelex.core.concept.concept_native import NativeConcept
+from pipelex.core.stuff.stuff import Stuff
+from pipelex.core.stuff.stuff_artefact import StuffArtefact
+from pipelex.core.stuff.stuff_content import (
     HtmlContent,
     ImageContent,
     ListContent,

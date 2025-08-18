@@ -2,11 +2,11 @@ from typing import ClassVar, List, Tuple
 
 import pytest
 
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.stuff_content import HtmlContent, ImageContent, ListContent, NumberContent, TextAndImagesContent, TextContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.concept.concept_native import NativeConcept
+from pipelex.core.stuff.stuff_content import HtmlContent, ImageContent, ListContent, NumberContent, TextAndImagesContent, TextContent
+from pipelex.core.stuff.stuff_factory import StuffFactory
+from pipelex.core.working_memory.working_memory import WorkingMemory
+from pipelex.core.working_memory.working_memory_factory import WorkingMemoryFactory
 
 
 class TestWorkingMemoryData:

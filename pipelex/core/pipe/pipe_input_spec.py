@@ -4,9 +4,9 @@ from pydantic import BaseModel, Field, RootModel, field_validator
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.core.concept_code_factory import ConceptCodeFactory
-from pipelex.core.pipe_run_params import PipeOutputMultiplicity
-from pipelex.core.stuff_content import StuffContent
+from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
+from pipelex.core.pipe.pipe_run_params import PipeOutputMultiplicity
+from pipelex.core.stuff.stuff_content import StuffContent
 from pipelex.exceptions import PipeInputNotFoundError
 
 

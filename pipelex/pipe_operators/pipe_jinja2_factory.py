@@ -3,8 +3,8 @@ from typing import Any, Dict, Optional
 from typing_extensions import override
 
 from pipelex.config import get_config
-from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing

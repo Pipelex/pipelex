@@ -11,13 +11,13 @@ from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.stuff_content import ImageContent, ListContent, PageContent, TextAndImagesContent, TextContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.concept.concept_native import NativeConcept
+from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_output import PipeOutput
+from pipelex.core.pipe.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.core.stuff.stuff_content import ImageContent, ListContent, PageContent, TextAndImagesContent, TextContent
+from pipelex.core.stuff.stuff_factory import StuffFactory
+from pipelex.core.working_memory.working_memory import WorkingMemory
 from pipelex.exceptions import (
     PipeDefinitionError,
     StaticValidationError,

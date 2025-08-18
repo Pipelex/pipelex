@@ -11,21 +11,21 @@ from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoice
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.concept import Concept
-from pipelex.core.concept_code_factory import ConceptCodeFactory
-from pipelex.core.concept_native import NativeConcept, NativeConceptClass
-from pipelex.core.domain import Domain, SpecialDomain
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import (
+from pipelex.core.concept.concept import Concept
+from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
+from pipelex.core.concept.concept_native import NativeConcept, NativeConceptClass
+from pipelex.core.domain.domain import Domain, SpecialDomain
+from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_output import PipeOutput
+from pipelex.core.pipe.pipe_run_params import (
     PipeOutputMultiplicity,
     PipeRunParamKey,
     PipeRunParams,
     output_multiplicity_to_apply,
 )
-from pipelex.core.stuff_content import ListContent, StructuredContent, StuffContent, TextContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.stuff.stuff_content import ListContent, StructuredContent, StuffContent, TextContent
+from pipelex.core.stuff.stuff_factory import StuffFactory
+from pipelex.core.working_memory.working_memory import WorkingMemory
 from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,

@@ -2,8 +2,8 @@
 
 from typing import List
 
-from pipelex.core.stuff_content import TextContent
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.stuff.stuff_content import TextContent
+from pipelex.core.working_memory.working_memory import WorkingMemory
 
 
 def wrap_lines(working_memory: WorkingMemory) -> TextContent:

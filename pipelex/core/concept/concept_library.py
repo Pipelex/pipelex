@@ -4,13 +4,13 @@ from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.concept import Concept
-from pipelex.core.concept_code_factory import ConceptCodeFactory
-from pipelex.core.concept_factory import ConceptFactory
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
-from pipelex.core.domain import SpecialDomain
-from pipelex.core.stuff_content import ImageContent
+from pipelex.core.concept.concept import Concept
+from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
+from pipelex.core.concept.concept_factory import ConceptFactory
+from pipelex.core.concept.concept_native import NativeConcept
+from pipelex.core.concept.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.domain.domain import SpecialDomain
+from pipelex.core.stuff.stuff_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
 

@@ -1,4 +1,4 @@
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_controllers.pipe_condition import PipeCondition
 
 

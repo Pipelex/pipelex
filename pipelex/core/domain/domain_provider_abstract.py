@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
-from pipelex.core.domain import Domain
+from pipelex.core.domain.domain import Domain
 
 
 class DomainProviderAbstract(ABC):

@@ -1,6 +1,6 @@
-from pipelex.core.concept import Concept
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.concept.concept import Concept
+from pipelex.core.concept.concept_native import NativeConcept
+from pipelex.core.concept.concept_provider_abstract import ConceptProviderAbstract
 
 
 class Testget_concept_providerIsNativeConcept:

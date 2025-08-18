@@ -6,12 +6,12 @@ from typing import Dict, List, Tuple
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.pipe_abstract import PipeAbstract
-from pipelex.core.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import StuffContent, TextContent
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipe.pipe_abstract import PipeAbstract
+from pipelex.core.pipe.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
+from pipelex.core.pipe.pipe_run_params import PipeRunMode
+from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuff.stuff_content import StuffContent, TextContent
+from pipelex.core.working_memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_class_registry, get_concept_provider, get_pipe_provider
 from pipelex.pipeline.job_metadata import JobMetadata
 

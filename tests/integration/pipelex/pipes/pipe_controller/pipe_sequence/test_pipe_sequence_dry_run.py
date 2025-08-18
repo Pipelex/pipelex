@@ -4,14 +4,14 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ListContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipe.pipe_output import PipeOutput
+from pipelex.core.pipe.pipe_run_params import PipeRunMode
+from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuff.stuff import Stuff
+from pipelex.core.stuff.stuff_content import ListContent
+from pipelex.core.stuff.stuff_factory import StuffFactory
+from pipelex.core.working_memory.working_memory import WorkingMemory
+from pipelex.core.working_memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.json_utils import load_json_list_from_path

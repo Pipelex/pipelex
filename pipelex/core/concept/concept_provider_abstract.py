@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
 
-from pipelex.core.concept import Concept
+from pipelex.core.concept.concept import Concept
 
 ConceptLibraryRoot = Dict[str, Concept]
 

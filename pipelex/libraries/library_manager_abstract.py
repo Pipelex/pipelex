@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
 
-from pipelex.core.pipe_abstract import PipeAbstract
+from pipelex.core.pipe.pipe_abstract import PipeAbstract
 from pipelex.libraries.pipeline_blueprint import PipelineBlueprint
 
 

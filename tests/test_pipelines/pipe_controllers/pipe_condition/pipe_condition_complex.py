@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from pipelex.core.stuff_content import StructuredContent
+from pipelex.core.stuff.stuff_content import StructuredContent
 
 
 class DocumentRequest(StructuredContent):

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
-from pipelex.core.pipe_abstract import PipeAbstract
+from pipelex.core.pipe.pipe_abstract import PipeAbstract
 
 PipeLibraryRoot = Dict[str, PipeAbstract]
 

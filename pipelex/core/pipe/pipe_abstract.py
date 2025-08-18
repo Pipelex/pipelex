@@ -3,10 +3,10 @@ from typing import Optional, Set, Type
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_output import PipeOutput
+from pipelex.core.pipe.pipe_run_params import PipeRunParams
+from pipelex.core.working_memory.working_memory import WorkingMemory
 from pipelex.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
 

@@ -11,13 +11,13 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.config import get_config
-from pipelex.core.concept_factory import ConceptFactory
-from pipelex.core.concept_library import ConceptLibrary
-from pipelex.core.domain import Domain
-from pipelex.core.domain_library import DomainLibrary
-from pipelex.core.pipe_abstract import PipeAbstract
-from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
-from pipelex.core.pipe_library import PipeLibrary
+from pipelex.core.concept.concept_factory import ConceptFactory
+from pipelex.core.concept.concept_library import ConceptLibrary
+from pipelex.core.domain.domain import Domain
+from pipelex.core.domain.domain_library import DomainLibrary
+from pipelex.core.pipe.pipe_abstract import PipeAbstract
+from pipelex.core.pipe.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe.pipe_library import PipeLibrary
 from pipelex.exceptions import (
     ConceptLibraryError,
     LibraryError,

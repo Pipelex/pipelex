@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List
 
-from pipelex.core.domain import SpecialDomain
+from pipelex.core.domain.domain import SpecialDomain
 from pipelex.types import StrEnum
 
 

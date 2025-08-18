@@ -38,7 +38,7 @@ class StructuredOutputGenerator:
         self.imports = {
             "from typing import Optional, List, Dict, Any, Literal",
             "from enum import Enum",
-            "from pipelex.core.stuff_content import StructuredContent",
+            "from pipelex.core.stuff.stuff_content import StructuredContent",
             "from pydantic import Field",
         }
         self.enum_definitions: Dict[str, Dict[str, Any]] = {}  # Store enum definitions

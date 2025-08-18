@@ -2,8 +2,8 @@ from typing import Any, Dict, List
 
 from typing_extensions import override
 
-from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_controllers.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 

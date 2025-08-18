@@ -2,8 +2,8 @@ from typing import List, Type, TypeVar
 
 from pydantic import BaseModel, Field
 
-from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import (
+from pipelex.core.stuff.stuff import Stuff
+from pipelex.core.stuff.stuff_content import (
     HtmlContent,
     ImageContent,
     ListContent,
@@ -13,7 +13,7 @@ from pipelex.core.stuff_content import (
     TextAndImagesContent,
     TextContent,
 )
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.working_memory.working_memory import WorkingMemory
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 
 

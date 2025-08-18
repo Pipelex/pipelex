@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 
 from pipelex.client.protocol import CompactMemory
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.stuff_content import TextContent
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.concept.concept_native import NativeConcept
+from pipelex.core.pipe.pipe_output import PipeOutput
+from pipelex.core.stuff.stuff_content import TextContent
+from pipelex.core.working_memory.working_memory import WorkingMemory
 
 
 class ApiSerializer:

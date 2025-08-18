@@ -3,9 +3,9 @@ from typing import Any, Dict, Optional, Protocol, TypeVar
 from pydantic import ConfigDict, model_validator
 from typing_extensions import Self, runtime_checkable
 
-from pipelex.core.concept_code_factory import ConceptCodeFactory
-from pipelex.core.pipe_abstract import PipeAbstract
-from pipelex.core.stuff_content import StructuredContent
+from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
+from pipelex.core.pipe.pipe_abstract import PipeAbstract
+from pipelex.core.stuff.stuff_content import StructuredContent
 
 
 class PipeBlueprint(StructuredContent):

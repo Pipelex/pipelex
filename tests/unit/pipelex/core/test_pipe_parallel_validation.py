@@ -1,4 +1,4 @@
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_operators.pipe_llm import PipeLLM

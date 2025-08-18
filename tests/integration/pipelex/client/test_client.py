@@ -6,10 +6,10 @@ from pydantic import BaseModel
 from pipelex import pretty_print
 from pipelex.client.client import PipelexClient
 from pipelex.client.protocol import COMPACT_MEMORY_KEY, PipelineState
-from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import TextContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.stuff.stuff import Stuff
+from pipelex.core.stuff.stuff_content import TextContent
+from pipelex.core.stuff.stuff_factory import StuffFactory
+from pipelex.core.working_memory.working_memory import WorkingMemory
 
 
 class Example(BaseModel):
