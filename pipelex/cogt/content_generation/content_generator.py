@@ -46,7 +46,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_prompt_for_text: LLMPrompt,
     ) -> str:
         log.verbose(f"{self.__class__.__name__} make_llm_text: {llm_prompt_for_text}")
-        log.info(f"llm_setting_main: {llm_setting_main}")
+        log.verbose(f"llm_setting_main: {llm_setting_main}")
         llm_assignment = LLMAssignment(
             job_metadata=job_metadata,
             llm_setting=llm_setting_main,

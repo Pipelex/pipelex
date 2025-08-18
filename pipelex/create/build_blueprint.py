@@ -27,17 +27,17 @@ async def do_build_blueprint(
             "requirements": requirements,
             "draft_pipeline_rules": get_support_file(subpath="create/draft_pipelines.md"),
             "build_pipeline_rules": get_support_file(subpath="create/build_pipelines.md"),
+            "create_structured_output_rules": get_support_file(subpath="create/structures.md"),
         },
     )
+    pretty_print(pipe_output, title="Pipe Output")
     blueprint = pipe_output.main_stuff_as(content_type=PipelineBlueprint)
-    pretty_print(blueprint, title="Pipeline Blueprint")
     pipeline_draft = pipe_output.working_memory.get_stuff_as_str(name="pipeline_draft")
-    pretty_print(pipeline_draft, title="Pipeline Draft")
 
     # Save or display result
     output_path_base = output_path or "pipelex/libraries/pipelines/temp/gen_blueprint"
     draft_path = f"{output_path_base}_draft.md"
-    save_text_to_path(text=pipeline_draft, path=draft_path)
+    save_text_to_path(text=pipeline_draft, path=draft_path, create_directory=True)
     rough_toml_path = f"{output_path_base}_rough.toml"
     save_pipeline_blueprint_toml_to_path(blueprint=blueprint, path=rough_toml_path)
     rough_json_path = f"{output_path_base}_rough.json"

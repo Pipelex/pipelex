@@ -177,7 +177,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         # First pass: load all domains
         for toml_path in library_paths:
-            blueprint = self._load_blueprint_from_file(toml_path)
+            blueprint = self.load_blueprint_from_file(toml_path)
             domain = Domain(
                 code=blueprint.domain,
                 definition=blueprint.definition,
@@ -190,7 +190,7 @@ class LibraryManager(LibraryManagerAbstract):
         # Second pass: load all concepts
         for toml_path in library_paths:
             nb_concepts_before = len(self.concept_library.root)
-            blueprint = self._load_blueprint_from_file(toml_path)
+            blueprint = self.load_blueprint_from_file(toml_path)
             self._load_concepts_from_blueprint(blueprint=blueprint, file_path=str(toml_path))
             nb_concepts_loaded = len(self.concept_library.root) - nb_concepts_before
             log.verbose(f"Loaded {nb_concepts_loaded} concepts from '{toml_path.name}'")
@@ -198,12 +198,12 @@ class LibraryManager(LibraryManagerAbstract):
         # Third pass: load all pipes
         for toml_path in library_paths:
             nb_pipes_before = len(self.pipe_library.root)
-            blueprint = self._load_blueprint_from_file(toml_path)
+            blueprint = self.load_blueprint_from_file(toml_path)
             self._load_pipes_from_blueprint(blueprint=blueprint, file_path=str(toml_path))
             nb_pipes_loaded = len(self.pipe_library.root) - nb_pipes_before
             log.verbose(f"Loaded {nb_pipes_loaded} pipes from '{toml_path.name}'")
 
-    def _load_blueprint_from_file(self, toml_path: Path) -> PipelineBlueprint:
+    def load_blueprint_from_file(self, toml_path: Path) -> PipelineBlueprint:
         """Load and validate a pipeline blueprint from a TOML file."""
         try:
             toml_data = load_toml_from_path(path=str(toml_path))

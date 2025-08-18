@@ -10,11 +10,10 @@ ConceptBlueprint = "Details enabling to create a concept"
 PipeBlueprint = "Details enabling to create a pipe"
 
 [pipe]
-
 [pipe.build_blueprint]
 type = "PipeSequence"
 definition = "Build a pipeline blueprint from natural language requirements"
-inputs = { draft_pipeline_rules = "Text", build_pipeline_rules = "Text", requirements = "Text", pipeline_name = "Text", domain = "Text" }
+inputs = { draft_pipeline_rules = "Text", build_pipeline_rules = "Text", create_structured_output_rules = "Text", requirements = "Text", pipeline_name = "Text", domain = "Text" }
 output = "PipelineBlueprint"
 steps = [
     { pipe = "draft_pipeline_text", result = "pipeline_draft" },
@@ -24,7 +23,7 @@ steps = [
 [pipe.draft_pipeline_text]
 type = "PipeLLM"
 definition = "Generate a rough pipeline draft from natural language requirements"
-inputs = { draft_pipeline_rules = "Text", requirements = "Text", pipeline_name = "Text", domain = "Text" }
+inputs = { draft_pipeline_rules = "Text", create_structured_output_rules = "Text", requirements = "Text", pipeline_name = "Text", domain = "Text" }
 output = "PipelineDraftText"
 llm = "llm_to_pipelex"
 prompt_template = """
@@ -32,6 +31,9 @@ You are a Pipelex pipeline architect. Build a pipeline draft text showing how we
 
 @draft_pipeline_rules
 
+Do create structured output for better concept representation.
+
+@create_structured_output_rules
 ---
 Name of the pipeline: $pipeline_name.
 
