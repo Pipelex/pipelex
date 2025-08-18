@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
 
+from pipelex.core.pipe_abstract import PipeAbstract
+from pipelex.libraries.pipeline_blueprint import PipelineBlueprint
+
 
 class LibraryManagerAbstract(ABC):
     @abstractmethod
@@ -22,4 +25,8 @@ class LibraryManagerAbstract(ABC):
 
     @abstractmethod
     def validate_libraries(self) -> None:
+        pass
+
+    @abstractmethod
+    def load_combo_libraries_from_blueprint(self, blueprint: PipelineBlueprint) -> List[PipeAbstract]:
         pass

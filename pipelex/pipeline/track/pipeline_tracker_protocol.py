@@ -15,7 +15,8 @@ class PipelineTrackerProtocol(Protocol):
 
     def teardown(self): ...
 
-    # def reset(self): ...
+    def reset(self): ...
+
     def add_pipe_step(
         self,
         from_stuff: Optional[Stuff],
@@ -66,7 +67,7 @@ class PipelineTrackerProtocol(Protocol):
         title: Optional[str] = None,
         subtitle: Optional[str] = None,
         is_detailed: bool = False,
-    ): ...
+    ) -> Optional[str]: ...
 
 
 class PipelineTrackerNoOp(PipelineTrackerProtocol):
@@ -80,6 +81,10 @@ class PipelineTrackerNoOp(PipelineTrackerProtocol):
 
     @override
     def teardown(self) -> None:
+        pass
+
+    @override
+    def reset(self) -> None:
         pass
 
     @override

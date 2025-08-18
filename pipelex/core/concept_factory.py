@@ -1,9 +1,10 @@
 from inspect import getsource
 from typing import Any, Dict, List, Optional, Type, Union
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 
 from pipelex.core.concept import Concept
+from pipelex.core.concept_blueprint import ConceptBlueprint
 from pipelex.core.concept_code_factory import ConceptCodeFactory
 from pipelex.core.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.domain import SpecialDomain
@@ -11,15 +12,6 @@ from pipelex.core.stuff_content import TextContent
 from pipelex.create.structured_output_generator import generate_structured_output_from_inline_definition
 from pipelex.exceptions import ConceptFactoryError, StructureClassError
 from pipelex.hub import get_class_registry
-
-
-class ConceptBlueprint(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    definition: str
-    structure: Optional[Union[str, Dict[str, Any]]] = None
-    refines: Union[str, List[str]] = Field(default_factory=list)
-    domain: Optional[str] = None
 
 
 class ConceptFactory:

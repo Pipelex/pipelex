@@ -170,6 +170,28 @@ class LibraryManager(LibraryManagerAbstract):
             toml_file_paths.extend(found_file_paths)
         return toml_file_paths
 
+    def load_domain_from_blueprint(self, blueprint: PipelineBlueprint) -> Domain:
+        return Domain(
+            code=blueprint.domain,
+            definition=blueprint.definition,
+            system_prompt=blueprint.system_prompt,
+            system_prompt_to_structure=blueprint.system_prompt_to_structure,
+            prompt_template_to_structure=blueprint.prompt_template_to_structure,
+        )
+
+    @override
+    def load_combo_libraries_from_blueprint(self, blueprint: PipelineBlueprint) -> List[PipeAbstract]:
+        # First pass: load all domains
+        domain = self.load_domain_from_blueprint(blueprint=blueprint)
+        self.domain_library.add_domain_details(domain=domain)
+
+        # Second pass: load all concepts
+        self.load_concepts_from_blueprint(blueprint=blueprint, file_path="")
+
+        # Third pass: load all pipes
+        pipes = self.load_pipes_from_blueprint(blueprint=blueprint, file_path="")
+        return pipes
+
     @override
     def load_combo_libraries(self, library_paths: List[Path]):
         log.debug("LibraryManager loading combo libraries")
@@ -191,7 +213,7 @@ class LibraryManager(LibraryManagerAbstract):
         for toml_path in library_paths:
             nb_concepts_before = len(self.concept_library.root)
             blueprint = self.load_blueprint_from_file(toml_path)
-            self._load_concepts_from_blueprint(blueprint=blueprint, file_path=str(toml_path))
+            self.load_concepts_from_blueprint(blueprint=blueprint, file_path=str(toml_path))
             nb_concepts_loaded = len(self.concept_library.root) - nb_concepts_before
             log.verbose(f"Loaded {nb_concepts_loaded} concepts from '{toml_path.name}'")
 
@@ -199,7 +221,7 @@ class LibraryManager(LibraryManagerAbstract):
         for toml_path in library_paths:
             nb_pipes_before = len(self.pipe_library.root)
             blueprint = self.load_blueprint_from_file(toml_path)
-            self._load_pipes_from_blueprint(blueprint=blueprint, file_path=str(toml_path))
+            self.load_pipes_from_blueprint(blueprint=blueprint, file_path=str(toml_path))
             nb_pipes_loaded = len(self.pipe_library.root) - nb_pipes_before
             log.verbose(f"Loaded {nb_pipes_loaded} pipes from '{toml_path.name}'")
 
@@ -218,7 +240,7 @@ class LibraryManager(LibraryManagerAbstract):
         except Exception as exc:
             raise LibraryError(f"Failed to load TOML file '{toml_path}': {exc}") from exc
 
-    def _load_concepts_from_blueprint(self, blueprint: PipelineBlueprint, file_path: str):
+    def load_concepts_from_blueprint(self, blueprint: PipelineBlueprint, file_path: str):
         """Load concepts from a validated blueprint."""
         for concept_name, concept_data in blueprint.concept.items():
             try:
@@ -246,8 +268,9 @@ class LibraryManager(LibraryManagerAbstract):
                     error_msg=error_msg,
                 ) from exc
 
-    def _load_pipes_from_blueprint(self, blueprint: PipelineBlueprint, file_path: str):
+    def load_pipes_from_blueprint(self, blueprint: PipelineBlueprint, file_path: str) -> List[PipeAbstract]:
         """Load pipes from a validated blueprint."""
+        pipes: List[PipeAbstract] = []
         for pipe_name, pipe_data in blueprint.pipe.items():
             try:
                 # pipe_data is guaranteed to be Dict[str, Any] by the blueprint schema
@@ -257,6 +280,7 @@ class LibraryManager(LibraryManagerAbstract):
                     details_dict=pipe_data.copy(),
                 )
                 self.pipe_library.add_new_pipe(pipe=pipe)
+                pipes.append(pipe)
             except ValidationError as validation_error:
                 error_msg = format_pydantic_validation_error(validation_error)
                 raise PipeBlueprintError(
@@ -267,6 +291,7 @@ class LibraryManager(LibraryManagerAbstract):
             except StaticValidationError as static_validation_error:
                 static_validation_error.file_path = file_path
                 raise static_validation_error
+        return pipes
 
     @override
     def validate_libraries(self):

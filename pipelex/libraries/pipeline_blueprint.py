@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional, Union
 
 from pydantic import Field
 
-from pipelex.core.concept_factory import ConceptBlueprint
+from pipelex.core.concept_blueprint import ConceptBlueprint
 from pipelex.core.stuff_content import StructuredContent
 from pipelex.exceptions import LibraryError
 
