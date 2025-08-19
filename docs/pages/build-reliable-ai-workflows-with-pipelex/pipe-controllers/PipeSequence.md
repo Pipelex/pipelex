@@ -37,22 +37,22 @@ Each entry in the `steps` array is a table with the following keys:
 Let's imagine a pipeline that first extracts text from an image, then summarizes that text, and finally translates the summary into French.
 
 ```toml
-[pipe.extract_text_from_image]
+[pipes.extract_text_from_image]
 PipeOcr = "..." # (definition of the OCR pipe)
 output = "Text"
 
-[pipe.summarize_text]
+[pipes.summarize_text]
 PipeLLM = "..." # (definition of the summarization pipe)
 inputs = { text = "Text" }
 output = "Text"
 
-[pipe.translate_to_french]
+[pipes.translate_to_french]
 PipeLLM = "..." # (definition of the translation pipe)
 inputs = { text = "Text" }
 output = "Text"
 
 
-[pipe.image_to_french_summary]
+[pipes.image_to_french_summary]
 PipeSequence = "Extract, summarize, and translate text from an image"
 inputs = { image = "source.Image" }
 output = "target.FrenchText"

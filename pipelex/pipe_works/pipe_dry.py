@@ -38,7 +38,7 @@ async def dry_run_single_pipe(pipe_code: str) -> str:
             return f"FAILED: Pipe '{pipe_code}' not found"
 
         # Run the single pipe
-        result = await dry_run_pipes(pipes=[pipe])
+        result = await dry_run_pipes(pipes=[pipes])
         return result.get(pipe_code, f"FAILED: No result for pipe '{pipe_code}'")
     except Exception as exc:
         return f"FAILED: {str(exc)}"
@@ -57,7 +57,7 @@ async def dry_run_pipe(pipe: PipeAbstract):
     """
     Dry run a pipe.
     """
-    return await dry_run_pipes(pipes=[pipe])
+    return await dry_run_pipes(pipes=[pipes])
 
 
 async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:

@@ -41,20 +41,20 @@ Suppose you have a list of articles and you want to generate a summary for each 
 
 ```toml
 # The pipe that knows how to summarize one article
-[pipe.summarize_one_article]
+[pipes.summarize_one_article]
 PipeLLM = "Summarize a single article"
 inputs = { article = "ArticleText" }
 output = "ArticleSummary"
 prompt_template = "Please provide a one-sentence summary of the following article:\n\n@article_text"
 
 # The PipeBatch definition
-[pipe.summarize_all_articles]
+[pipes.summarize_all_articles]
 PipeBatch = "Summarize a batch of articles in parallel"
 inputs = { articles = "ArticleList" }  # This is the list to iterate over
 output = "SummaryList" # This will be the list of summaries
 branch_pipe_code = "summarize_one_article"
 
-[pipe.summarize_all_articles.batch_params]
+[pipes.summarize_all_articles.batch_params]
 input_item_stuff_name = "ArticleText" # Name of an item within the branch
 ```
 

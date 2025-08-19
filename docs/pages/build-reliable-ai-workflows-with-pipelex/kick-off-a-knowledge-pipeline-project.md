@@ -15,8 +15,8 @@ system_prompt = "You are a helpful assistant."
 Question = "A question that needs to be answered"
 Answer = "A response to a question"
 
-[pipe]
-[pipe.answer_question]
+[pipes]
+[pipes.answer_question]
 PipeLLM = "Answer a question"
 inputs = { question = "tutorial.Question" }
 output = "tutorial.Answer"
@@ -60,8 +60,8 @@ A domain consists of:
     Invoice = "A commercial document for a sale of products or services"
     InvoiceSummary = "A summary of an invoice with key details"
    
-    [pipe]
-    [pipe.summarize_invoice]
+    [pipes]
+    [pipes.summarize_invoice]
     PipeLLM = "Summarize an invoice to extract key information"
     inputs = { invoice = "finance.Invoice" }
     output = "finance.InvoiceSummary"

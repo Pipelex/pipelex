@@ -425,7 +425,7 @@ def get_pipes_by_domain(
     for pipe in pipes:
         if excluded_domains and pipe.domain in excluded_domains:
             continue
-        pipes_by_domain[pipe.domain].append(pipe.code)
+        pipes_by_domain[pipes.domain].append(pipe.code)
     return pipes_by_domain
 
 

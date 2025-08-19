@@ -197,15 +197,15 @@ Use the `refines` field to indicate when one concept is a more specific version 
 [concept]
 Document = "A written or printed record"
 
-[concept.Contract]
+[concepts.Contract]
 definition = "A legally binding agreement between parties"
 refines = "Document"
 
-[concept.EmploymentContract]
+[concepts.EmploymentContract]
 definition = "A contract between an employer and employee"
 refines = "Contract"
 
-[concept.NonCompeteClause]
+[concepts.NonCompeteClause]
 definition = "A contract clause restricting competitive activities"
 refines = "ContractClause"
 ```
@@ -220,7 +220,7 @@ Concept refinement helps in two ways:
 For example, a pipe that processes `Document` can also process `Contract` or `EmploymentContract`:
 
 ```toml
-[pipe.extract_key_points]
+[pipes.extract_key_points]
 PipeLLM = "Extract main points from any document"
 inputs = { doc = "Document" }  # Can accept Document, Contract, or EmploymentContract
 output = "KeyPoints"
@@ -237,24 +237,24 @@ domain = "content"
 [concept]
 Text = "Written content in natural language"
 
-[concept.Article]
+[concepts.Article]
 definition = "A written composition on a specific topic"
 refines = "Text"
 
-[concept.NewsArticle]
+[concepts.NewsArticle]
 definition = "An article reporting current events"
 refines = "Article"
 
-[concept.OpinionPiece]
+[concepts.OpinionPiece]
 definition = "An article expressing personal views"
 refines = "Article"
 
-[pipe.summarize_text]
+[pipes.summarize_text]
 PipeLLM = "Create a summary of any text"
 inputs = { content = "Text" }  # Works with Text, Article, NewsArticle, etc.
 output = "Summary"
 
-[pipe.extract_facts]
+[pipes.extract_facts]
 PipeLLM = "Extract factual claims from news"
 inputs = { article = "NewsArticle" }  # Specifically requires news articles
 output = "FactualClaims"

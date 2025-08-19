@@ -44,7 +44,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
             pipe.output_concept_code = f"{pipe.domain}.{pipe.output_concept_code}"
         if name in self.root:
             raise PipeLibraryError(f"Pipe '{name}' already exists in the library")
-        self.root[pipe.code] = pipe
+        self.root[pipes.code] = pipe
 
     def add_pipes(self, pipes: List[PipeAbstract]):
         for pipe in pipes:
@@ -132,7 +132,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
                     output_code,
                 )
 
-                pipes_dict[domain][pipe.code] = {
+                pipes_dict[domain][pipes.code] = {
                     "definition": pipe.definition or "",
                     "inputs": formatted_inputs_str,
                     "output": pipe.output_concept_code,

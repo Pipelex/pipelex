@@ -1,9 +1,9 @@
 domain = "test_integration"
 definition = "Test pipes for PipeParallel text analysis"
 
-[pipe]
+[pipes]
 
-[pipe.analyze_sentiment]
+[pipes.analyze_sentiment]
 type = "PipeLLM"
 definition = "Analyze sentiment of text"
 inputs = { input_text = "Text" }
@@ -14,7 +14,7 @@ prompt_template = """Analyze the sentiment of the following text and return only
 
 Sentiment:"""
 
-[pipe.count_words]
+[pipes.count_words]
 type = "PipeLLM"
 definition = "Count words in text"
 inputs = { input_text = "Text" }
@@ -25,7 +25,7 @@ prompt_template = """Count the number of words in the following text and return 
 
 Word count:"""
 
-[pipe.extract_keywords]
+[pipes.extract_keywords]
 type = "PipeLLM"
 definition = "Extract keywords from text"
 inputs = { input_text = "Text" }

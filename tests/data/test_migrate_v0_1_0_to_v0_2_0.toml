@@ -6,20 +6,20 @@ SimpleText = "A simple text concept"
 SimpleDoc = "A simple document concept"
 
 # Complex concepts with old syntax
-[concept.ComplexConcept]
+[concepts.ComplexConcept]
 Concept = "A complex concept with old syntax"
 refines = "Text"
 
-[concept.AnotherConcept]
+[concepts.AnotherConcept]
 Concept = "Another concept to test migration"
 structure = "CustomStructure"
 refines = ["Text", "Document"]
 
-[concept.AlreadyMigrated]
+[concepts.AlreadyMigrated]
 definition = "This one is already migrated"
 refines = "Text"
 
-[pipe.test_pipe]
+[pipes.test_pipe]
 PipeLLM = "A test pipe that generates simple text"
 inputs = { input_text = "SimpleText" }
 output = "SimpleDoc"

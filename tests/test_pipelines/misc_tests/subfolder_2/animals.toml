@@ -8,8 +8,8 @@ system_prompt = "You are an expert at describing animals based on their species,
 Animal = "An animal reference, including its species, breed, and age"
 AnimalDescription = "A detailed description of an animal"
 
-[pipe]
-[pipe.generate_animal_description]
+[pipes]
+[pipes.generate_animal_description]
 type = "PipeLLM"
 definition = "Generate a description of an animal"
 inputs = { animal = "Animal" }

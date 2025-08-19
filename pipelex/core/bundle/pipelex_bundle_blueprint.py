@@ -16,17 +16,19 @@ class PipelexBundleBlueprint(BaseModel):
     system_prompt_to_structure: Optional[str] = None
     prompt_template_to_structure: Optional[str] = None
 
-    concepts: Dict[str, ConceptBlueprint] = Field(default_factory=dict)
+    concepts: Optional[Dict[str, ConceptBlueprint]] = Field(default_factory=dict)
 
-    pipes: Dict[str, PipeBlueprint] = Field(default_factory=dict)
+    pipes: Optional[Dict[str, PipeBlueprint]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def model_validate_blueprint(self) -> Self:
         return self.validate_blueprint()
 
     def validate_blueprint(self) -> Self:
-        self.concepts = {
-            concept_name: ConceptBlueprint.model_validate(concept_blueprint) for concept_name, concept_blueprint in self.concepts.items()
-        }
-        self.pipes = {pipe_name: PipeBlueprint.model_validate(pipe_blueprint) for pipe_name, pipe_blueprint in self.pipes.items()}
+        if self.concepts is not None:
+            self.concepts = {
+                concept_name: ConceptBlueprint.model_validate(concept_blueprint) for concept_name, concept_blueprint in self.concepts.items()
+            }
+        if self.pipes is not None:
+            self.pipes = {pipe_name: PipeBlueprint.model_validate(pipe_blueprint) for pipe_name, pipe_blueprint in self.pipes.items()}
         return self

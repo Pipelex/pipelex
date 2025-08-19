@@ -5,8 +5,8 @@ definition = "Simple pipes for testing PipeBatch integration"
 UppercaseText = "Text that has been transformed to uppercase"
 TextList = "List of Text"
 
-[pipe]
-[pipe.test_pipe_batch]
+[pipes]
+[pipes.test_pipe_batch]
 type = "PipeBatch"
 definition = "Test pipe batch"
 inputs = { text_item = "Text", text_list = "TextList" }
@@ -15,7 +15,7 @@ branch_pipe_code = "uppercase_transformer"
 input_list_name = "text_list"
 input_item_name = "text_item"
 
-[pipe.uppercase_transformer]
+[pipes.uppercase_transformer]
 type = "PipeLLM"
 definition = "Transform text to uppercase"
 inputs = { text_item = "Text" }

@@ -71,7 +71,7 @@ Example:
 Buyer = "The person who made the purchase"
 PurchaseDocumentText = "Transcript of a receipt, invoice, or order confirmation"
 
-[pipe.extract_buyer]
+[pipes.extract_buyer]
 PipeLLM = "Extract buyer from purchase document"
 inputs = { purchase_document_text = "PurchaseDocumentText" }
 output = "Buyer"
@@ -164,8 +164,8 @@ OptimizedTweet = "A tweet optimized for Twitter/X engagement following best prac
 TweetAnalysis = "Analysis of the tweet's structure and potential improvements"
 WritingStyle = "A style of writing"
 
-[pipe]
-[pipe.analyze_tweet]
+[pipes]
+[pipes.analyze_tweet]
 PipeLLM = "Analyze the draft tweet and identify areas for improvement"
 inputs = { draft_tweet = "DraftTweet" }
 output = "TweetAnalysis"
@@ -193,7 +193,7 @@ For each criterion, provide:
 
 """
 
-[pipe.optimize_tweet]
+[pipes.optimize_tweet]
 PipeLLM = "Optimize the tweet based on the analysis"
 inputs = { draft_tweet = "DraftTweet", tweet_analysis = "TweetAnalysis", writing_style = "WritingStyle" }
 output = "OptimizedTweet"
@@ -227,7 +227,7 @@ Minimal emojis.
 Keep the core meaning of the original tweet.
 """
 
-[pipe.optimize_tweet_sequence]
+[pipes.optimize_tweet_sequence]
 PipeSequence = "Analyze and optimize a tech tweet in sequence"
 inputs = { draft_tweet = "DraftTweet", writing_style = "WritingStyle" }
 output = "OptimizedTweet"

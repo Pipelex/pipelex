@@ -7,8 +7,8 @@ RawText = "Raw input text to be processed"
 CleanedText = "Text that has been cleaned and normalized"
 SummaryText = "A summary of the processed text"
 
-[pipe]
-[pipe.simple_text_sequence]
+[pipes]
+[pipes.simple_text_sequence]
 type = "PipeSequence"
 definition = "Process text through cleaning and summarization"
 inputs = { raw_text = "RawText" }
@@ -18,7 +18,7 @@ steps = [
     { pipe = "generate_summary", result = "final_summary" },
 ]
 
-[pipe.clean_text]
+[pipes.clean_text]
 type = "PipeLLM"
 definition = "Clean and normalize the input text"
 inputs = { raw_text = "RawText" }
@@ -33,7 +33,7 @@ Clean and normalize the following text by:
 @raw_text
 """
 
-[pipe.generate_summary]
+[pipes.generate_summary]
 type = "PipeLLM"
 definition = "Generate a summary of the cleaned text"
 inputs = { cleaned_text = "CleanedText" }

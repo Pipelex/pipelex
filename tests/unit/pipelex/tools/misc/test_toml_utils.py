@@ -20,8 +20,8 @@ definition = "Test definition"
 [concept]
 TestConcept = "A test concept"
 
-[pipe]
-[pipe.test_pipe]
+[pipes]
+[pipes.test_pipe]
 PipeLLM = "Test pipe definition"
 prompt_template = '''
 This is a test prompt
@@ -58,7 +58,7 @@ definition = "Test"
         """Test detection of trailing whitespace after triple quotes."""
         toml_content = '''domain = "test"
 
-[pipe.test_pipe]
+[pipes.test_pipe]
 PipeLLM = "Test"
 prompt_template = """
 Output this only: "test"
@@ -152,7 +152,7 @@ TestConcept = "A test concept"
         toml_content = """domain = "test"   
 definition = "Test"	
 
-[pipe.test_pipe]
+[pipes.test_pipe]
 prompt_template = \"\"\"
 Output: "test"
 \"\"\" 
@@ -192,19 +192,19 @@ definition = "Simple test for PipeCondition functionality using expression"
 [concept]
 CategoryInput = "Input with a category field"
 
-[pipe]
-[pipe.basic_condition_by_category_2]
+[pipes]
+[pipes.basic_condition_by_category_2]
 PipeCondition = "Route based on category field using expression"
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
 
-[pipe.basic_condition_by_category_2.pipe_map]
+[pipes.basic_condition_by_category_2.pipe_map]
 small = "process_small_2"
 medium = "process_medium_2" 
 large = "process_large_2"
 
-[pipe.process_large_2]
+[pipes.process_large_2]
 PipeLLM = "Generate random text for large items"
 output = "native.Text"
 prompt_template = """

@@ -9,8 +9,8 @@ IdeaAnalysis = "Detailed analysis of a single creative idea"
 IdeaEvaluation = "An evaluation and ranking of creative ideas"
 BestIdea = "The top-ranked creative idea with justification"
 
-[pipe]
-[pipe.creative_ideation_sequence]
+[pipes]
+[pipes.creative_ideation_sequence]
 type = "PipeSequence"
 definition = "Generate multiple ideas, analyze each individually, then select the best"
 inputs = { topic = "CreativeTopic" }
@@ -22,7 +22,7 @@ steps = [
     { pipe = "select_best_idea", result = "final_best_idea" },
 ]
 
-[pipe.generate_multiple_ideas]
+[pipes.generate_multiple_ideas]
 type = "PipeLLM"
 definition = "Generate exactly 5 creative ideas for a topic"
 inputs = { topic = "CreativeTopic" }
@@ -42,7 +42,7 @@ Each idea should be:
 Ideas:
 """
 
-[pipe.brainstorm_concepts]
+[pipes.brainstorm_concepts]
 type = "PipeLLM"
 definition = "Brainstorm variable number of concepts"
 inputs = { topic = "CreativeTopic" }
@@ -57,7 +57,7 @@ Brainstorm creative concepts related to this topic. Generate as many good ideas 
 Each concept should be briefly described.
 """
 
-[pipe.analyze_single_idea]
+[pipes.analyze_single_idea]
 type = "PipeLLM"
 definition = "Analyze a single idea in detail"
 inputs = { single_idea = "CreativeIdea" }
@@ -78,7 +78,7 @@ Analyze:
 Provide a comprehensive assessment.
 """
 
-[pipe.evaluate_all_ideas]
+[pipes.evaluate_all_ideas]
 type = "PipeLLM"
 definition = "Evaluate and rank all analyzed ideas"
 inputs = { detailed_analyses = "IdeaAnalysis" }
@@ -95,7 +95,7 @@ Provide:
 - Key differentiators between top ideas
 """
 
-[pipe.select_best_idea]
+[pipes.select_best_idea]
 type = "PipeLLM"
 definition = "Select the best idea based on evaluation"
 inputs = { evaluation = "IdeaEvaluation" }

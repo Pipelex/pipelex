@@ -63,6 +63,8 @@ class PipelexSyntaxConverter(BaseModel):
 
     def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
         """Make a PipelexBundleBlueprint from the file_path or file_content"""
+        from pipelex import pretty_print
         file_content = self._load_toml_content()
         toml_data = self._parse_toml_content(file_content)
+        pretty_print(toml_data, title="toml_dataaaaaaaaaaa")
         return PipelexBundleBlueprint.model_validate(toml_data)

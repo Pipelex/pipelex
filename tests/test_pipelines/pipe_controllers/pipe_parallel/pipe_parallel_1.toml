@@ -7,8 +7,8 @@ LengthAnalysis = "Analysis of document length and structure"
 ContentAnalysis = "Analysis of document content and themes"
 CombinedAnalysis = "Combined analysis results from parallel processing"
 
-[pipe]
-[pipe.parallel_document_analysis]
+[pipes]
+[pipes.parallel_document_analysis]
 type = "PipeParallel"
 definition = "Analyze document length and content in parallel"
 inputs = { document = "DocumentInput" }
@@ -20,7 +20,7 @@ parallels = [
     { pipe = "analyze_content", result = "content_result" },
 ]
 
-[pipe.analyze_length]
+[pipes.analyze_length]
 type = "PipeLLM"
 definition = "Analyze document length and structure"
 inputs = { document = "DocumentInput" }
@@ -37,7 +37,7 @@ Provide a brief analysis focusing on:
 - Document organization
 """
 
-[pipe.analyze_content]
+[pipes.analyze_content]
 type = "PipeLLM"
 definition = "Analyze document content and themes"
 inputs = { document = "DocumentInput" }

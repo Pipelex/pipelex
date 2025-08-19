@@ -49,8 +49,8 @@ The pipeline definition is extremely simple - it's a single LLM call that genera
 domain = "quick_start"
 definition = "Discovering Pipelex"
 
-[pipe]
-[pipe.hello_world]
+[pipes]
+[pipes.hello_world]
 PipeLLM = "Write text about Hello World."
 output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }

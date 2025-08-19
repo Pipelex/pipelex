@@ -42,7 +42,7 @@ This example defines a pipe that takes a PDF, extracts text and full-page images
 ScannedDocument = "A document that has been scanned as a PDF"
 ExtractedPages = "A list of pages extracted from a document by OCR"
 
-[pipe.extract_text_from_document]
+[pipes.extract_text_from_document]
 PipeOcr = "Extract text from a scanned document"
 inputs = { ocr_input = "ScannedDocument" }
 output = "ExtractedText"

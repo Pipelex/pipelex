@@ -6,8 +6,8 @@ system_prompt = "You are an expert at describing flowers based on their species 
 Flower = "A flower reference, including its species and color"
 FlowerDescription = "A detailed description of a flower"
 
-[pipe]
-[pipe.generate_flower_description]
+[pipes]
+[pipes.generate_flower_description]
 type = "PipeLLM"
 definition = "Generate a description of a flower"
 inputs = { flower = "Flower" }

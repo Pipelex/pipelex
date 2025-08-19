@@ -15,7 +15,7 @@ A pipeline is composed of pipes. There are two fundamental types of pipes you wi
 
 The most common way to design a pipeline is by defining and composing pipes in a `.toml` configuration file. This provides a clear, declarative way to see the structure of your workflow.
 
-Each pipe, whether it's an operator or a controller, is defined in its own `[pipe.<pipe_name>]` table. The `<pipe_name>` becomes the unique identifier for that pipe.
+Each pipe, whether it's an operator or a controller, is defined in its own `[pipes.<pipe_name>]` table. The `<pipe_name>` becomes the unique identifier for that pipe.
 
 Let's look at a simple example. Imagine we want a workflow that:
 1.  Takes a product description.
@@ -35,7 +35,7 @@ ProductDescription = "A description of a product's features and benefits"
 Tagline = "A catchy marketing tagline"
 
 # 2. Define the pipe that does the work
-[pipe.generate_tagline]
+[pipes.generate_tagline]
 PipeLLM = "Generate a catchy tagline for a product"
 inputs = { description = "ProductDescription" }
 output = "Tagline"
@@ -65,7 +65,7 @@ Keyword = "A keyword extracted from a text"
 Tagline = "A catchy marketing tagline"
 
 # 2. Define operator pipes
-[pipe.extract_keywords]
+[pipes.extract_keywords]
 PipeLLM = "Extract keywords from a product description"
 inputs = { description = "ProductDescription" }
 output = "Keyword"
@@ -78,7 +78,7 @@ Please extract the most relevant keywords from the following product description
 Focus on features, benefits, and unique selling points.
 """
 
-[pipe.generate_tagline_from_keywords]
+[pipes.generate_tagline_from_keywords]
 PipeLLM = "Generate a tagline from keywords"
 inputs = { keywords = "Keyword" }
 output = "Tagline"
@@ -91,7 +91,7 @@ The tagline should be memorable, concise (under 10 words), and highlight the mai
 """
 
 # 3. This controller pipe defines the two-step pipeline
-[pipe.description_to_tagline]
+[pipes.description_to_tagline]
 PipeSequence = "From product description to tagline"
 inputs = { description = "ProductDescription" }
 output = "Tagline"
