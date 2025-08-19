@@ -1,10 +1,31 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
-from pydantic import BaseModel, Field, model_validator
-from typing_extensions import Self
+from pydantic import BaseModel, Field
 
 from pipelex.core.concept.concept_blueprint import ConceptBlueprint
-from pipelex.core.pipe.pipe_blueprint import PipeBlueprint
+from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchBlueprint
+from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionBlueprint
+from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint
+from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint
+from pipelex.pipe_operators.pipe_func_factory import PipeFuncBlueprint
+from pipelex.pipe_operators.pipe_img_gen_factory import PipeImgGenBlueprint
+from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint
+from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint
+from pipelex.pipe_operators.pipe_ocr_factory import PipeOcrBlueprint
+
+PipeBlueprintUnion = Union[
+    # Pipe operators
+    PipeFuncBlueprint,
+    PipeImgGenBlueprint,
+    PipeJinja2Blueprint,
+    PipeLLMBlueprint,
+    PipeOcrBlueprint,
+    # Pipe controllers
+    PipeBatchBlueprint,
+    PipeConditionBlueprint,
+    PipeParallelBlueprint,
+    PipeSequenceBlueprint,
+]
 
 
 class PipelexBundleBlueprint(BaseModel):
@@ -18,17 +39,4 @@ class PipelexBundleBlueprint(BaseModel):
 
     concepts: Optional[Dict[str, ConceptBlueprint]] = Field(default_factory=dict)
 
-    pipes: Optional[Dict[str, PipeBlueprint]] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def model_validate_blueprint(self) -> Self:
-        return self.validate_blueprint()
-
-    def validate_blueprint(self) -> Self:
-        if self.concepts is not None:
-            self.concepts = {
-                concept_name: ConceptBlueprint.model_validate(concept_blueprint) for concept_name, concept_blueprint in self.concepts.items()
-            }
-        if self.pipes is not None:
-            self.pipes = {pipe_name: PipeBlueprint.model_validate(pipe_blueprint) for pipe_name, pipe_blueprint in self.pipes.items()}
-        return self
+    pipes: Optional[Dict[str, PipeBlueprintUnion]] = Field(default_factory=dict)

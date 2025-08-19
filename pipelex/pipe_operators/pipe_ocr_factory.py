@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional
 
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
@@ -12,12 +13,11 @@ from pipelex.pipe_operators.pipe_ocr import PipeOcr
 
 
 class PipeOcrBlueprint(PipeBlueprint):
-    definition: Optional[str] = None
     ocr_platform: Optional[OcrPlatform] = None
     page_images: bool = False
     page_image_captions: bool = False
     page_views: bool = False
-    page_views_dpi: Optional[int] = None
+    page_views_dpi: Optional[int] = Field(default=None)
 
 
 class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):

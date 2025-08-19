@@ -7,6 +7,8 @@ from pipelex.core.pipe.pipe_abstract import PipeAbstract
 
 
 class PipeBlueprint(BaseModel):
+    """Simple data container for pipe blueprint information."""
+
     type: str
     definition: Optional[str] = None
     inputs: Optional[Dict[str, str]] = None

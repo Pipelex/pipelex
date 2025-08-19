@@ -24,6 +24,7 @@ from pipelex.exceptions import (
 )
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
+from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path, validate_toml_file
@@ -108,7 +109,7 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def setup(self) -> None:
-        self.load_libraries()
+        pass
 
     @override
     def teardown(self) -> None:
@@ -165,6 +166,8 @@ class LibraryManager(LibraryManagerAbstract):
     def load_libraries(self, library_paths: Optional[List[Path]] = None):
         self.load_deck()
         library_paths = library_paths or self._get_pipeline_library_paths()
+        for library_path in library_paths:
+            ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_path))
         for library_path in library_paths:
             toml_file_paths = self._list_toml_files_from_path(library_paths=[library_path])
             for toml_file_path in toml_file_paths:

@@ -28,9 +28,8 @@ class PipelexBundleFactory(BaseModel):
                 concepts[concept_name] = ConceptFactory.make_concept_from_blueprint(
                     domain=blueprint.domain, code=concept_name, concept_blueprint=concept_blueprint
                 )
-
         pipes: Dict[str, PipeAbstract] = {}
-        if blueprint.pipes is not None: 
+        if blueprint.pipes is not None:
             for pipe_name, pipe_blueprint in blueprint.pipes.items():
                 pipes[pipe_name] = PipeFactory.make_pipe_from_blueprint(
                     domain=blueprint.domain,

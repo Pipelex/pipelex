@@ -98,6 +98,7 @@ class PipeOcr(PipeOperator):
                         log.error(inadequate_input_concept_error.desc())
                     case StaticValidationReaction.RAISE:
                         raise inadequate_input_concept_error
+
         if len(candidate_prompt_var_names) > 1:
             too_many_candidate_inputs_error = StaticValidationError(
                 error_type=StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS,
