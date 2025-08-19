@@ -3,7 +3,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.pipe.pipe_run_params import PipeRunMode
 from pipelex.create.helpers import get_support_file
-from pipelex.libraries.pipeline_blueprint import PipelineBlueprint
+from pipelex.libraries.pipelines.meta.pipeline_draft import PipelexBundleBlueprint
 from pipelex.pipeline.execute import execute_pipeline
 
 
@@ -38,9 +38,9 @@ async def test_generate_pipeline_blueprint(pipe_run_mode: PipeRunMode, requireme
         pipe_run_mode=pipe_run_mode,
     )
 
-    blueprint = pipe_output.main_stuff_as(content_type=PipelineBlueprint)
-    assert isinstance(blueprint, PipelineBlueprint)
+    blueprint = pipe_output.main_stuff_as(content_type=PipelexBundleBlueprint)
+    assert isinstance(blueprint, PipelexBundleBlueprint)
     # Basic sanity checks
     assert isinstance(blueprint.domain, str) and blueprint.domain != ""
 
-    pretty_print(blueprint, title="PipelineBlueprint")
+    pretty_print(blueprint, title="PipelexBundleBlueprint")

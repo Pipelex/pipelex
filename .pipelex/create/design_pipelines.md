@@ -6,7 +6,7 @@ This section explains how to design pipelines for Pipelex.
 
 - Plan the pipeline in natural language (goal, inputs, steps, outputs).
 
-- Translate the plan into a `PipelineBlueprint` object graph: domain, concepts, pipes.
+- Translate the plan into a `PipelexBundleBlueprint` object graph: domain, concepts, pipes.
 
 - Define controllers first (`PipeSequence`, `PipeParallel`, `PipeCondition`), then operators (`PipeLLM`, `PipeOcr`, etc.).
 
@@ -16,9 +16,9 @@ This section explains how to design pipelines for Pipelex.
 
 - Choose appropriate native or structured output concepts.
 
-### Root blueprint object: PipelineBlueprint
+### Root blueprint object: PipelexBundleBlueprint
 
-`PipelineBlueprint` fields:
+`PipelexBundleBlueprint` fields:
 
 - `domain: str` — required. Single word or snake_case code for the domain.
 

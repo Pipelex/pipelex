@@ -1,34 +1,16 @@
 from typing import Any, Dict, Optional, Protocol, TypeVar
 
-from pydantic import ConfigDict, model_validator
-from typing_extensions import Self, runtime_checkable
+from pydantic import BaseModel
+from typing_extensions import runtime_checkable
 
-from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
 from pipelex.core.pipe.pipe_abstract import PipeAbstract
-from pipelex.core.stuff.stuff_content import StructuredContent
 
 
-class PipeBlueprint(StructuredContent):
-    model_config = ConfigDict(extra="forbid")
-
+class PipeBlueprint(BaseModel):
+    type: str
     definition: Optional[str] = None
     inputs: Optional[Dict[str, str]] = None
     output: str
-    domain: str
-
-    @model_validator(mode="after")
-    def add_domain_prefix(self) -> Self:
-        if self.inputs:
-            for input_name, input_concept_code in self.inputs.items():
-                self.inputs[input_name] = ConceptCodeFactory.make_concept_code_from_str(
-                    concept_str=input_concept_code,
-                    fallback_domain=self.domain,
-                )
-        self.output = ConceptCodeFactory.make_concept_code_from_str(
-            concept_str=self.output,
-            fallback_domain=self.domain,
-        )
-        return self
 
 
 PipeBlueprintType = TypeVar("PipeBlueprintType", bound="PipeBlueprint", contravariant=True)

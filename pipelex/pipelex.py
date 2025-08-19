@@ -27,7 +27,7 @@ from pipelex.core.pipe.pipe_library import PipeLibrary
 from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
-from pipelex.libraries.library_manager import LibraryManager
+from pipelex.libraries.library_manager_factory import LibraryManagerFactory
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager import ActivityManager
@@ -124,7 +124,8 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_domain_provider(domain_provider=domain_library)
         self.pipelex_hub.set_concept_provider(concept_provider=concept_library)
         self.pipelex_hub.set_pipe_provider(pipe_provider=pipe_library)
-        self.library_manager = LibraryManager.make(
+
+        self.library_manager = LibraryManagerFactory.make(
             domain_library=domain_library,
             concept_library=concept_library,
             pipe_library=pipe_library,

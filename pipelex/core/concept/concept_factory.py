@@ -1,5 +1,4 @@
-from inspect import getsource
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Union
 
 from pydantic import ValidationError
 
@@ -10,7 +9,7 @@ from pipelex.core.concept.concept_native import NativeConcept, NativeConceptClas
 from pipelex.core.domain.domain import SpecialDomain
 from pipelex.core.stuff.stuff_content import TextContent
 from pipelex.create.structured_output_generator import generate_structured_output_from_inline_definition
-from pipelex.exceptions import ConceptFactoryError, StructureClassError
+from pipelex.exceptions import ConceptFactoryError
 from pipelex.hub import get_class_registry
 
 
@@ -28,53 +27,6 @@ class ConceptFactory:
         return new_refines
 
     @classmethod
-    def make_from_details_dict_if_possible(
-        cls,
-        domain: str,
-        code: str,
-        details_dict: Dict[str, Any],
-    ) -> Optional[Concept]:
-        if concept_definition := details_dict.pop("Concept", None):
-            details_dict["definition"] = concept_definition
-            details_dict["refines"] = ConceptFactory.make_refines(domain=domain, refines=details_dict.pop("refines", []))
-            concept_blueprint = ConceptBlueprint.model_validate(details_dict)
-            the_concept = ConceptFactory.make_concept_from_blueprint(domain=domain, code=code, concept_blueprint=concept_blueprint)
-            return the_concept
-        elif "definition" in details_dict:
-            # legacy format
-            details_dict["domain"] = domain
-            details_dict["refines"] = ConceptFactory.make_refines(domain=domain, refines=details_dict.pop("refines", []))
-            details_dict["code"] = ConceptCodeFactory.make_concept_code(domain, code)
-            try:
-                the_concept = Concept.model_validate(details_dict)
-            except ValidationError as exc:
-                raise ConceptFactoryError(f"Error validating concept: {exc}") from exc
-            return the_concept
-        else:
-            return None
-
-    @classmethod
-    def make_from_details_dict(
-        cls,
-        domain_code: str,
-        code: str,
-        details_dict: Dict[str, Any],
-    ) -> Concept:
-        concept_definition = details_dict.pop("Concept", None)
-        if not concept_definition:
-            raise ConceptFactoryError(f"Concept '{code}' in domain '{domain_code}' has no definition")
-        details_dict["definition"] = concept_definition
-        details_dict["domain"] = domain_code
-        refines = ConceptFactory.make_refines(domain=domain_code, refines=details_dict.pop("refines", []))
-        if not refines and not details_dict.get("structure"):
-            # No structure? this refines Text
-            refines = [NativeConcept.TEXT.code]
-        details_dict["refines"] = refines
-        concept_blueprint = ConceptBlueprint.model_validate(details_dict)
-        the_concept = ConceptFactory.make_concept_from_blueprint(domain=domain_code, code=code, concept_blueprint=concept_blueprint)
-        return the_concept
-
-    @classmethod
     def make_concept_from_definition_str(
         cls,
         domain_code: str,
@@ -87,7 +39,7 @@ class ConceptFactory:
             concept_name = Concept.extract_concept_name_from_str(concept_str=concept_str)
         else:
             concept_name = concept_str
-        if Concept.is_valid_structure_class(structure_class_name=concept_name):
+        if ConceptBlueprint.is_valid_structure_class(structure_class_name=concept_name):
             # structure is set implicitly, by the concept's code
             structure_class_name = concept_name
             refines = []
@@ -118,10 +70,7 @@ class ConceptFactory:
         if structure := concept_blueprint.structure:
             if isinstance(structure, str):
                 # structure is set explicitly as a class name reference
-                if not Concept.is_valid_structure_class(structure_class_name=structure):
-                    raise StructureClassError(
-                        f"Structure class '{structure}' set for concept '{code}' in domain '{domain}' is not a registered subclass of StuffContent"
-                    )
+                # Blueprint should already be validated, so we trust the structure is valid
                 structure_class_name = structure
             else:
                 # structure is defined inline - generate Python class dynamically
@@ -144,13 +93,13 @@ class ConceptFactory:
 
                 except Exception as exc:
                     raise ConceptFactoryError(f"Error generating structure class for concept '{code}' in domain '{domain}': {exc}") from exc
-        elif Concept.is_valid_structure_class(structure_class_name=code):
-            # structure is set implicitly, by the concept's code
+        elif ConceptBlueprint.is_valid_structure_class(structure_class_name=code):
+            # Structure is set implicitly, by the concept's code
             structure_class_name = code
         else:
             structure_class_name = TextContent.__name__
 
-        refines_list = cls.make_refines(domain=domain, refines=concept_blueprint.refines)
+        refines_list = cls.make_refines(domain=domain, refines=concept_blueprint.refines or [])
 
         return Concept(
             code=ConceptCodeFactory.make_concept_code(domain, code),
@@ -203,11 +152,3 @@ class ConceptFactory:
                 continue
             concepts.append(cls.make_native_concept(native_concept=native_concept))
         return concepts
-
-    @classmethod
-    def get_concept_class_source_code(cls, concept_name: str, base_class: Type[Any]) -> str:
-        if not get_class_registry().has_class(concept_name):
-            raise RuntimeError(f"Class '{concept_name}' not found in registry")
-
-        cls = get_class_registry().get_required_subclass(name=concept_name, base_class=base_class)
-        return getsource(cls)

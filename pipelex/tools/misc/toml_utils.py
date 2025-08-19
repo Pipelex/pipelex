@@ -13,7 +13,7 @@ class TOMLValidationError(Exception):
     pass
 
 
-def _validate_toml_content(content: str, file_path: str) -> None:
+def validate_toml_content(content: str, file_path: Optional[str] = None) -> None:
     """Validate TOML content for common formatting issues."""
     lines = content.splitlines()
     issues: List[str] = []
@@ -52,7 +52,7 @@ def validate_toml_file(path: str) -> None:
     """
     with open(path, "r", encoding="utf-8") as file:
         content = file.read()
-        _validate_toml_content(content, path)
+        validate_toml_content(content, path)
 
 
 def clean_trailing_whitespace(content: str) -> str:

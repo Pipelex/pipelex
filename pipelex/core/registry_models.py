@@ -1,5 +1,6 @@
 from typing import Any, ClassVar, List
 
+from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.pipe.pipe_abstract import PipeAbstractType
 from pipelex.core.pipe.pipe_blueprint import PipeSpecificFactoryProtocol
 from pipelex.core.stuff.stuff import Stuff
@@ -17,7 +18,6 @@ from pipelex.core.stuff.stuff_content import (
     TextAndImagesContent,
     TextContent,
 )
-from pipelex.libraries.pipeline_blueprint import PipelineBlueprint
 from pipelex.libraries.pipelines.meta.pipeline_draft import PipelineDraft
 from pipelex.pipe_controllers.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchFactory
@@ -88,7 +88,7 @@ class PipelexRegistryModels(RegistryModels):
         PDFContent,
         TextAndImagesContent,
         PageContent,
-        PipelineBlueprint,
+        PipelexBundleBlueprint,
         PipelineDraft,
     ]
 
