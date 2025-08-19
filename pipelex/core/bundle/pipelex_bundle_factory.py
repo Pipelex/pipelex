@@ -32,7 +32,7 @@ class PipelexBundleFactory(BaseModel):
         if blueprint.pipes is not None:
             for pipe_name, pipe_blueprint in blueprint.pipes.items():
                 pipes[pipe_name] = PipeFactory.make_pipe_from_blueprint(
-                    domain=blueprint.domain,
+                    domain_code=blueprint.domain,
                     pipe_code=pipe_name,
                     pipe_blueprint=pipe_blueprint,
                 )

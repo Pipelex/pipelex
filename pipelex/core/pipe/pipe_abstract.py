@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Set, Type
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import Self
 
+from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
 from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe.pipe_output import PipeOutput
 from pipelex.core.pipe.pipe_run_params import PipeRunParams
@@ -20,6 +22,20 @@ class PipeAbstract(ABC, BaseModel):
     # TODO: support auto (implicit) input, it makes sense for pipe controllers
     inputs: PipeInputSpec = Field(default_factory=PipeInputSpec)
     output_concept_code: str
+
+    @model_validator(mode="after")
+    def add_domain_prefix(self) -> Self:
+        if self.inputs:
+            for input_name, input_requirement in self.inputs.items:
+                self.inputs.root[input_name].concept_code = ConceptCodeFactory.make_concept_code_from_str(
+                    concept_str=input_requirement.concept_code,
+                    fallback_domain="implicit",
+                )
+        self.output_concept_code = ConceptCodeFactory.make_concept_code_from_str(
+            concept_str=self.output_concept_code,
+            fallback_domain="implicit",
+        )
+        return self
 
     @property
     def class_name(self) -> str:

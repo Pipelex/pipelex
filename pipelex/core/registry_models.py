@@ -1,7 +1,7 @@
 from typing import Any, ClassVar, List
 
 from pipelex.core.pipe.pipe_abstract import PipeAbstractType
-from pipelex.core.pipe.pipe_blueprint import PipeSpecificFactoryProtocol
+from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
 from pipelex.core.stuff.stuff import Stuff
 from pipelex.core.stuff.stuff_content import (
     DynamicContent,
@@ -52,7 +52,7 @@ class PipelexRegistryModels(RegistryModels):
         PipeOcr,
     ]
 
-    PIPE_OPERATORS_FACTORY: ClassVar[List[PipeSpecificFactoryProtocol[Any, Any]]] = [
+    PIPE_OPERATORS_FACTORY: ClassVar[List[PipeFactoryProtocol[Any, Any]]] = [
         PipeFuncFactory,
         PipeImgGenFactory,
         PipeJinja2Factory,
@@ -67,7 +67,7 @@ class PipelexRegistryModels(RegistryModels):
         PipeSequence,
     ]
 
-    PIPE_CONTROLLERS_FACTORY: ClassVar[List[PipeSpecificFactoryProtocol[Any, Any]]] = [
+    PIPE_CONTROLLERS_FACTORY: ClassVar[List[PipeFactoryProtocol[Any, Any]]] = [
         PipeBatchFactory,
         PipeConditionFactory,
         PipeParallelFactory,

@@ -10,7 +10,6 @@ refines = "Text"
 
 [concepts.Photo]
 definition = "Photo"
-structure = "ImageContent"
 refines = "Image"
 
 [pipes]

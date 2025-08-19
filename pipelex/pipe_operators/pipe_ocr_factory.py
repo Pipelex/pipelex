@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from pydantic import Field
 from typing_extensions import override
@@ -7,7 +7,8 @@ from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.config import get_config
-from pipelex.core.pipe.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_operators.pipe_ocr import PipeOcr
 
@@ -20,7 +21,7 @@ class PipeOcrBlueprint(PipeBlueprint):
     page_views_dpi: Optional[int] = Field(default=None)
 
 
-class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
+class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
     @classmethod
     @override
     def make_pipe_from_blueprint(
@@ -45,19 +46,4 @@ class PipeOcrFactory(PipeSpecificFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
             should_caption_images=pipe_blueprint.page_image_captions,
             should_include_page_views=pipe_blueprint.page_views,
             page_views_dpi=pipe_blueprint.page_views_dpi or get_config().cogt.ocr_config.default_page_views_dpi,
-        )
-
-    @classmethod
-    @override
-    def make_pipe_from_details_dict(
-        cls,
-        domain_code: str,
-        pipe_code: str,
-        details_dict: Dict[str, Any],
-    ) -> PipeOcr:
-        pipe_blueprint = PipeOcrBlueprint.model_validate(details_dict)
-        return cls.make_pipe_from_blueprint(
-            domain_code=domain_code,
-            pipe_code=pipe_code,
-            pipe_blueprint=pipe_blueprint,
         )

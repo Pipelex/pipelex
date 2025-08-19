@@ -1,10 +1,11 @@
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
-from pipelex.core.pipe.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
@@ -53,7 +54,7 @@ class PipeLLMBlueprint(PipeBlueprint):
         return self
 
 
-class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
+class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
     @classmethod
     @override
     def make_pipe_from_blueprint(
@@ -157,19 +158,4 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             prompt_template_to_structure=pipe_blueprint.prompt_template_to_structure,
             system_prompt_to_structure=pipe_blueprint.system_prompt_to_structure,
             output_multiplicity=output_multiplicity,
-        )
-
-    @classmethod
-    @override
-    def make_pipe_from_details_dict(
-        cls,
-        domain_code: str,
-        pipe_code: str,
-        details_dict: Dict[str, Any],
-    ) -> PipeLLM:
-        pipe_blueprint = PipeLLMBlueprint.model_validate(details_dict)
-        return cls.make_pipe_from_blueprint(
-            domain_code=domain_code,
-            pipe_code=pipe_code,
-            pipe_blueprint=pipe_blueprint,
         )

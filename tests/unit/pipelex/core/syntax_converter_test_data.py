@@ -13,6 +13,7 @@ class SyntaxConverterTestCases:
         "simple_domain",
         """
 domain = "simple_test"
+definition = "A simple test domain"
 """,
         PipelexBundleBlueprint(
             domain="simple_test",

@@ -15,6 +15,14 @@ class ConceptBlueprint(BaseModel):
     structure: Optional[Union[str, Dict[str, Any]]] = None
     refines: Optional[Union[str, List[str]]] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def oneline_concept_validator(cls, data: Any) -> Any:
+        """Convert a simple string to ConceptBlueprint(definition=string)"""
+        if isinstance(data, str):
+            return {"definition": data}
+        return data
+
     @model_validator(mode="after")
     def model_validate_blueprint(self) -> Self:
         return self.validate_blueprint()

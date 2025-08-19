@@ -1,8 +1,7 @@
-from typing import Any, Dict
-
 from typing_extensions import override
 
-from pipelex.core.pipe.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_operators.pipe_func import PipeFunc
 
@@ -11,7 +10,7 @@ class PipeFuncBlueprint(PipeBlueprint):
     function_name: str
 
 
-class PipeFuncFactory(PipeSpecificFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
+class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
     @classmethod
     @override
     def make_pipe_from_blueprint(
@@ -27,19 +26,4 @@ class PipeFuncFactory(PipeSpecificFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
             inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             function_name=pipe_blueprint.function_name,
-        )
-
-    @classmethod
-    @override
-    def make_pipe_from_details_dict(
-        cls,
-        domain_code: str,
-        pipe_code: str,
-        details_dict: Dict[str, Any],
-    ) -> PipeFunc:
-        pipe_blueprint = PipeFuncBlueprint.model_validate(details_dict)
-        return cls.make_pipe_from_blueprint(
-            domain_code=domain_code,
-            pipe_code=pipe_code,
-            pipe_blueprint=pipe_blueprint,
         )

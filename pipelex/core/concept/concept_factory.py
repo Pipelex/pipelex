@@ -69,7 +69,10 @@ class ConceptFactory:
         structure_class_name: str
         if structure := concept_blueprint.structure:
             if isinstance(structure, str):
-                # structure is set explicitly as a class name reference
+                if not ConceptBlueprint.is_valid_structure_class(structure_class_name=structure):
+                    raise ConceptFactoryError(
+                        f"Structure class '{structure}' set for concept '{code}' in domain '{domain}' is not a registered subclass of StuffContent"
+                    )
                 # Blueprint should already be validated, so we trust the structure is valid
                 structure_class_name = structure
             else:
@@ -100,14 +103,14 @@ class ConceptFactory:
             structure_class_name = TextContent.__name__
 
         refines_list = cls.make_refines(domain=domain, refines=concept_blueprint.refines or [])
-
-        return Concept(
+        the_concept = Concept(
             code=ConceptCodeFactory.make_concept_code(domain, code),
             domain=domain,
             definition=concept_blueprint.definition,
             structure_class_name=structure_class_name,
             refines=refines_list,
         )
+        return the_concept
 
     @classmethod
     def make_native_concept(cls, native_concept: NativeConcept) -> Concept:

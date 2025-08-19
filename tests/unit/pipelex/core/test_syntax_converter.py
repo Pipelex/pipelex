@@ -26,5 +26,4 @@ class TestPipelexSyntaxConverter:
         converter = PipelexSyntaxConverter(file_content=toml_content)
 
         blueprint = converter.make_pipelex_bundle_blueprint()
-
         assert blueprint == expected_blueprint

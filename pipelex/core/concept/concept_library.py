@@ -138,7 +138,6 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
                 concept_code = f"{domain}.{concept_code}"
             else:
                 concept_code = f"{SpecialDomain.NATIVE.value}.{concept_code}"
-
         the_concept = self.get_concept(concept_code=concept_code)
         if not the_concept:
             if self.is_concept_implicit(concept_code=concept_code):
