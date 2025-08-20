@@ -109,7 +109,7 @@ SimpleData = "Simple data concept"
 definition = "Information about a person"
 
 [concepts.PersonInfo.structure]
-name = { type = "text", definition = "The name of the person", required = true }
+name = "The name of the person"
 age = { type = "number", definition = "The age of the person", required = true }
 birthdate = { type = "date", definition = "The birthdate of the person", required = true }
 """,
@@ -121,7 +121,7 @@ birthdate = { type = "date", definition = "The birthdate of the person", require
                 "PersonInfo": ConceptBlueprint(
                     definition="Information about a person",
                     structure={
-                        "name": ConceptStructureBlueprint(type="text", definition="The name of the person", required=True),
+                        "name": "The name of the person",
                         "age": ConceptStructureBlueprint(type="number", definition="The age of the person", required=True),
                         "birthdate": ConceptStructureBlueprint(type="date", definition="The birthdate of the person", required=True),
                     },
