@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import tomlkit
 
@@ -11,16 +11,6 @@ from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprintFie
 
 class StructuredOutputGenerator:
     """Generate Pydantic BaseModel classes from TOML structured output definitions."""
-
-    # Map high-level type names to Python types
-    TYPE_MAPPING: ClassVar[Dict[ConceptStructureBlueprintFieldType, str]] = {
-        ConceptStructureBlueprintFieldType.TEXT: "str",
-        ConceptStructureBlueprintFieldType.NUMBER: "float",
-        ConceptStructureBlueprintFieldType.INTEGER: "int",
-        ConceptStructureBlueprintFieldType.BOOLEAN: "bool",
-        ConceptStructureBlueprintFieldType.LIST: "List",
-        ConceptStructureBlueprintFieldType.DICT: "Dict",
-    }
 
     def __init__(self):
         self.imports = {

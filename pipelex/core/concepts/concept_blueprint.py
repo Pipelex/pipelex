@@ -35,14 +35,14 @@ class ConceptStructureBlueprint(BaseModel):
         """Validate the structure blueprint according to type rules."""
         # If type is None (array), choices must not be None
         if self.type is None and not self.choices:
-            raise ValueError("When type is None (array), choices must not be empty")
+            raise ConceptStructureBlueprintError("When type is None (array), choices must not be empty")
 
         # If type is "dict", key_type and value_type must not be empty
         if self.type == ConceptStructureBlueprintFieldType.DICT:
             if not self.key_type:
-                raise ValueError(f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty")
+                raise ConceptStructureBlueprintError(f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty")
             if not self.value_type:
-                raise ValueError(f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty")
+                raise ConceptStructureBlueprintError(f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty")
 
         return self
 

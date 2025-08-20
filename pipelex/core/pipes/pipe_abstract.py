@@ -25,6 +25,8 @@ class PipeAbstract(ABC, BaseModel):
 
     @model_validator(mode="before")
     @classmethod
+    # TODO: This is a hack to add the domain prefix to the concept code.
+    # Fix this with a more simple Concept Factory approach.
     def add_domain_prefix(cls, data: Dict[str, Any]) -> Dict[str, Any]:
         # Process output_concept_code - always present
         if "output_concept_code" in data:

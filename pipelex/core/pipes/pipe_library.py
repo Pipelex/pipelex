@@ -37,7 +37,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     def make_empty(cls):
         return cls(root={})
 
-    def add_pipe(self, pipe: PipeAbstract):
+    def add_new_pipe(self, pipe: PipeAbstract):
         name = pipe.code
         pipe.inputs.set_default_domain(domain=pipe.domain)
         if pipe.output_concept_code and "." not in pipe.output_concept_code:
@@ -48,7 +48,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
 
     def add_pipes(self, pipes: List[PipeAbstract]):
         for pipe in pipes:
-            self.add_pipe(pipe=pipe)
+            self.add_new_pipe(pipe=pipe)
 
     def add_or_update_pipe(self, pipe: PipeAbstract):
         name = pipe.code

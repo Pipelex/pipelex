@@ -66,11 +66,11 @@ class ConceptFactory:
         code: str,
         concept_blueprint: ConceptBlueprint,
     ) -> Concept:
-        refines_list: List[str]
+        current_refines: List[str]
         if concept_blueprint.refines:
-            refines_list = cls.make_refines(domain=domain, refines=concept_blueprint.refines)
+            current_refines = cls.make_refines(domain=domain, refines=concept_blueprint.refines)
         else:
-            refines_list = []
+            current_refines = []
 
         structure_class_name: str = code
         if concept_blueprint.structure:
@@ -78,8 +78,8 @@ class ConceptFactory:
                 # Structure is defined inline - generate Python class dynamically
                 if not Concept.is_valid_structure_class(structure_class_name=concept_blueprint.structure):
                     raise StructureClassError(
-                        f"Structure class '{concept_blueprint.structure}' set for concept '{code}' in domain '{domain}' \
-is not a registered subclass of StuffContent"
+                        f"Structure class '{concept_blueprint.structure}' set for concept '{code}' in domain '{domain}' "
+                        "is not a registered subclass of StuffContent"
                     )
                 structure_class_name = concept_blueprint.structure
             else:
@@ -88,7 +88,7 @@ is not a registered subclass of StuffContent"
                     # Generate Python class from inline definition
                     python_code = generate_structured_output_from_inline_definition(
                         class_name=code,
-                        fields_def=concept_blueprint.structure_to_field_def(),  # type: ignore[arg-type]
+                        fields_def=concept_blueprint.structure_to_field_def(),
                         enums=None,  # TODO: Handle enums if needed in the future
                     )
 
@@ -112,15 +112,15 @@ is not a registered subclass of StuffContent"
             else:
                 # Fallback to Text structure
                 structure_class_name = TextContent.__name__
-                refines_list = [NativeConcept.TEXT.code]
+                current_refines = [NativeConcept.TEXT.code]
 
-        refines_list = cls.make_refines(domain=domain, refines=refines_list)
+        refines = cls.make_refines(domain=domain, refines=current_refines)
         return Concept(
             code=ConceptCodeFactory.make_concept_code(domain, code),
             domain=domain,
             definition=concept_blueprint.definition,
             structure_class_name=structure_class_name,
-            refines=refines_list,
+            refines=refines,
         )
 
     @classmethod

@@ -31,7 +31,7 @@ class PipelexBundleFactory(BaseModel):
                         domain=blueprint.domain, code=concept_name, concept_blueprint=concept_blueprint_or_str
                     )
                 else:
-                    # Oneline concepts
+                    # One line concepts
                     concepts[concept_name] = ConceptFactory.make_concept_from_definition_str(
                         domain_code=blueprint.domain, concept_str=concept_name, definition=concept_blueprint_or_str
                     )
