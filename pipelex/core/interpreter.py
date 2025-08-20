@@ -62,8 +62,8 @@ class PipelexInterpreter(BaseModel):
         try:
             # Read the first few lines to check for "domain ="
             with open(file_path, "r", encoding="utf-8") as f:
-                # Read first 1000 characters (should be enough to find domain)
-                content = f.read(1000)
+                # Read first 100 characters (should be enough to find domain)
+                content = f.read(100)
                 # Remove leading whitespace and check if it starts with "domain ="
                 stripped_content = content.lstrip()
                 return stripped_content.startswith("domain =")
