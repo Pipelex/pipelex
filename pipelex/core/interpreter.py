@@ -22,6 +22,21 @@ class PipelexInterpreter(BaseModel):
     file_path: Optional[Path] = None
     file_content: Optional[str] = None
 
+    @model_validator(mode="after")
+    def check_file_path_or_file_content(self) -> Self:
+        """Need to check if there is at least one of file_path or file_content"""
+        if self.file_path is None and self.file_content is None:
+            raise ValueError("Either file_path or file_content must be provided")
+        return self
+
+    @model_validator(mode="after")
+    def validate_file_path(self) -> Self:
+        if self.file_path:
+            validate_toml_file(path=str(self.file_path))
+        if self.file_content:
+            validate_toml_content(content=self.file_content, file_path=str(self.file_path))
+        return self
+
     @staticmethod
     def is_pipelex_file(file_path: Path) -> bool:
         """Check if a file is a valid Pipelex TOML file.
@@ -55,21 +70,6 @@ class PipelexInterpreter(BaseModel):
         except Exception:
             # If we can't read the file, it's not a valid Pipelex file
             return False
-
-    @model_validator(mode="after")
-    def check_file_path_or_file_content(self) -> Self:
-        """Need to check if there is at least one of file_path or file_content"""
-        if self.file_path is None and self.file_content is None:
-            raise ValueError("Either file_path or file_content must be provided")
-        return self
-
-    @model_validator(mode="after")
-    def validate_file_path(self) -> Self:
-        if self.file_path:
-            validate_toml_file(path=str(self.file_path))
-        if self.file_content:
-            validate_toml_content(content=self.file_content, file_path=str(self.file_path))
-        return self
 
     def _load_toml_content(self) -> str:
         """Load TOML content from file_path or use file_content directly."""
