@@ -299,8 +299,9 @@ def dict_to_toml(data: Mapping[str, Any]) -> str:
     # Post-process to fix inline table spacing: {key = "value"} -> { key = "value" }
     import re
 
-    # Add space after opening brace and before closing brace
-    dumped_content = re.sub(r"\{([^}]+)\}", r"{ \1 }", dumped_content)
+    # Add space after opening brace and before closing brace for TOML inline tables only
+    # This regex matches TOML inline tables (containing = signs) but not Jinja2 templates
+    dumped_content = re.sub(r"\{([^}]*=[^}]*)\}", r"{ \1 }", dumped_content)
 
     return dumped_content
 

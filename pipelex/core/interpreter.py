@@ -11,6 +11,8 @@ from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionBluepri
 from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint
 from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint
 from pipelex.pipe_operators.pipe_func_factory import PipeFuncBlueprint
+from pipelex.pipe_operators.pipe_img_gen_factory import PipeImgGenBlueprint
+from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint
 from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint
 from pipelex.pipe_operators.pipe_ocr_factory import PipeOcrBlueprint
 from pipelex.tools.misc.toml_utils import clean_trailing_whitespace, dict_to_toml, validate_toml_content, validate_toml_file
@@ -195,6 +197,10 @@ class PipelexInterpreter(BaseModel):
             return PipelexInterpreter._serialize_ocr_pipe(pipe_blueprint, domain)
         elif isinstance(pipe_blueprint, PipeFuncBlueprint):
             return PipelexInterpreter._serialize_func_pipe(pipe_blueprint, domain)
+        elif isinstance(pipe_blueprint, PipeImgGenBlueprint):
+            return PipelexInterpreter._serialize_img_gen_pipe(pipe_blueprint, domain)
+        elif isinstance(pipe_blueprint, PipeJinja2Blueprint):
+            return PipelexInterpreter._serialize_jinja2_pipe(pipe_blueprint, domain)
         elif isinstance(pipe_blueprint, PipeSequenceBlueprint):
             return PipelexInterpreter._serialize_sequence_pipe(pipe_blueprint, domain)
         elif isinstance(pipe_blueprint, PipeConditionBlueprint):
@@ -253,6 +259,67 @@ class PipelexInterpreter(BaseModel):
         # Add optional fields only if they have values
         if pipe.inputs:
             result["inputs"] = PipelexInterpreter._serialize_inputs(pipe.inputs)
+
+        return result
+
+    @staticmethod
+    def _serialize_img_gen_pipe(pipe: PipeImgGenBlueprint, domain: str) -> Dict[str, Any]:
+        """Serialize PipeImgGen blueprint."""
+        result: Dict[str, Any] = {
+            "type": pipe.type,
+            "definition": pipe.definition,
+            "output": pipe.output,
+        }
+
+        # Add optional fields only if they have values
+        if pipe.inputs:
+            result["inputs"] = PipelexInterpreter._serialize_inputs(pipe.inputs)
+        if pipe.img_gen_prompt:
+            result["img_gen_prompt"] = pipe.img_gen_prompt
+        if pipe.imgg_handle:
+            result["imgg_handle"] = pipe.imgg_handle
+        if pipe.aspect_ratio:
+            result["aspect_ratio"] = pipe.aspect_ratio
+        if pipe.quality:
+            result["quality"] = pipe.quality
+        if pipe.nb_steps:
+            result["nb_steps"] = pipe.nb_steps
+        if pipe.guidance_scale:
+            result["guidance_scale"] = pipe.guidance_scale
+        if pipe.is_moderated is not None:
+            result["is_moderated"] = pipe.is_moderated
+        if pipe.safety_tolerance:
+            result["safety_tolerance"] = pipe.safety_tolerance
+        if pipe.is_raw is not None:
+            result["is_raw"] = pipe.is_raw
+        if pipe.seed:
+            result["seed"] = pipe.seed
+        if pipe.nb_output:
+            result["nb_output"] = pipe.nb_output
+
+        return result
+
+    @staticmethod
+    def _serialize_jinja2_pipe(pipe: PipeJinja2Blueprint, domain: str) -> Dict[str, Any]:
+        """Serialize PipeJinja2 blueprint."""
+        result: Dict[str, Any] = {
+            "type": pipe.type,
+            "definition": pipe.definition,
+            "output": pipe.output,
+        }
+
+        # Add optional fields only if they have values
+        if pipe.inputs:
+            result["inputs"] = PipelexInterpreter._serialize_inputs(pipe.inputs)
+        if pipe.jinja2_name:
+            result["jinja2_name"] = pipe.jinja2_name
+        if pipe.jinja2:
+            result["jinja2"] = pipe.jinja2
+        if pipe.prompting_style:
+            result["prompting_style"] = pipe.prompting_style
+        # Only include template_category if it's not the default value
+        if pipe.template_category and pipe.template_category.value != "llm_prompt":
+            result["template_category"] = pipe.template_category
 
         return result
 
