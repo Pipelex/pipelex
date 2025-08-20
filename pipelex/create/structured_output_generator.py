@@ -6,32 +6,20 @@ from typing import Any, ClassVar, Dict, List, Optional, Union
 
 import tomlkit
 
-from pipelex.types import StrEnum
-
-
-class FieldType(StrEnum):
-    """Supported field types for structured outputs."""
-
-    TEXT = "text"
-    NUMBER = "number"
-    INTEGER = "integer"
-    BOOLEAN = "boolean"
-    LIST = "list"
-    DICT = "dict"
-    ENUM = "enum"  # For referencing defined enums
+from pipelex.core.concept.concept_blueprint import ConceptStructureBlueprintFieldType
 
 
 class StructuredOutputGenerator:
     """Generate Pydantic BaseModel classes from TOML structured output definitions."""
 
     # Map high-level type names to Python types
-    TYPE_MAPPING: ClassVar[Dict[FieldType, str]] = {
-        FieldType.TEXT: "str",
-        FieldType.NUMBER: "float",
-        FieldType.INTEGER: "int",
-        FieldType.BOOLEAN: "bool",
-        FieldType.LIST: "List",
-        FieldType.DICT: "Dict",
+    TYPE_MAPPING: ClassVar[Dict[ConceptStructureBlueprintFieldType, str]] = {
+        ConceptStructureBlueprintFieldType.TEXT: "str",
+        ConceptStructureBlueprintFieldType.NUMBER: "float",
+        ConceptStructureBlueprintFieldType.INTEGER: "int",
+        ConceptStructureBlueprintFieldType.BOOLEAN: "bool",
+        ConceptStructureBlueprintFieldType.LIST: "List",
+        ConceptStructureBlueprintFieldType.DICT: "Dict",
     }
 
     def __init__(self):
@@ -170,9 +158,9 @@ class StructuredOutputGenerator:
         """
         # Handle simple string definitions (just the definition text)
         if isinstance(field_def, str):
-            field_def = {"type": FieldType.TEXT, "definition": field_def}
+            field_def = {"type": ConceptStructureBlueprintFieldType.TEXT, "definition": field_def}
 
-        field_type = field_def.get("type", FieldType.TEXT)
+        field_type = field_def.get("type", ConceptStructureBlueprintFieldType.TEXT)
         definition = field_def.get("definition", f"{field_name} field")
         required = field_def.get("required", False)
         default_value = field_def.get("default")
@@ -225,7 +213,7 @@ class StructuredOutputGenerator:
         # Convert string to FieldType if needed
         if isinstance(field_type, str):
             try:
-                field_type_enum = FieldType(field_type)
+                field_type_enum = ConceptStructureBlueprintFieldType(field_type)
             except ValueError:
                 # Unknown type, assume it's a custom type or class reference
                 return field_type
@@ -233,15 +221,15 @@ class StructuredOutputGenerator:
 
         # Use match/case for type handling
         match field_type:
-            case FieldType.TEXT:
+            case ConceptStructureBlueprintFieldType.TEXT:
                 return "str"
-            case FieldType.NUMBER:
+            case ConceptStructureBlueprintFieldType.NUMBER:
                 return "float"
-            case FieldType.INTEGER:
+            case ConceptStructureBlueprintFieldType.INTEGER:
                 return "int"
-            case FieldType.BOOLEAN:
+            case ConceptStructureBlueprintFieldType.BOOLEAN:
                 return "bool"
-            case FieldType.LIST:
+            case ConceptStructureBlueprintFieldType.LIST:
                 item_type = field_def.get("item_type", "Any")
                 # Check if item_type is an enum reference
                 if isinstance(item_type, str) and item_type in self.enum_definitions:
@@ -249,25 +237,25 @@ class StructuredOutputGenerator:
                 # Recursively handle item types
                 if isinstance(item_type, str):
                     try:
-                        item_type_enum = FieldType(item_type)
+                        item_type_enum = ConceptStructureBlueprintFieldType(item_type)
                         item_type = self._get_python_type(item_type_enum, {})
                     except ValueError:
                         # Keep as string if not a known FieldType
                         pass
                 return f"List[{item_type}]"
-            case FieldType.DICT:
+            case ConceptStructureBlueprintFieldType.DICT:
                 key_type = field_def.get("key_type", "str")
                 value_type = field_def.get("value_type", "Any")
                 # Recursively handle key and value types
                 if isinstance(key_type, str):
                     try:
-                        key_type_enum = FieldType(key_type)
+                        key_type_enum = ConceptStructureBlueprintFieldType(key_type)
                         key_type = self._get_python_type(key_type_enum, {})
                     except ValueError:
                         pass
                 if isinstance(value_type, str):
                     try:
-                        value_type_enum = FieldType(value_type)
+                        value_type_enum = ConceptStructureBlueprintFieldType(value_type)
                         value_type = self._get_python_type(value_type_enum, {})
                     except ValueError:
                         pass

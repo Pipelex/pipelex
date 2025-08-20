@@ -1,18 +1,29 @@
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Self
 
 from pipelex.exceptions import ConceptFactoryError
+from pipelex.types import StrEnum
 
 
 class ConceptStructureBlueprintError(ConceptFactoryError):
     pass
 
 
+class ConceptStructureBlueprintFieldType(StrEnum):
+    TEXT = "text"
+    LIST = "list"
+    DICT = "dict"
+    INTEGER = "integer"
+    BOOLEAN = "boolean"
+    NUMBER = "number"
+    DATE = "date"
+
+
 class ConceptStructureBlueprint(BaseModel):
     definition: str
-    type: Literal["text", "list", "dict", "integer", "boolean", "number", "date", None] = None
+    type: ConceptStructureBlueprintFieldType | None = None
     item_type: Optional[str] = None
     key_type: Optional[str] = None
     value_type: Optional[str] = None
@@ -27,11 +38,11 @@ class ConceptStructureBlueprint(BaseModel):
             raise ValueError("When type is None (array), choices must not be empty")
 
         # If type is "dict", key_type and value_type must not be empty
-        if self.type == "dict":
+        if self.type == ConceptStructureBlueprintFieldType.DICT:
             if not self.key_type:
-                raise ValueError("When type is 'dict', key_type must not be empty")
+                raise ValueError(f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty")
             if not self.value_type:
-                raise ValueError("When type is 'dict', value_type must not be empty")
+                raise ValueError(f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty")
 
         return self
 
@@ -65,6 +76,6 @@ class ConceptBlueprint(BaseModel):
                 result[key] = value.model_dump()
             else:
                 # This shouldn't happen based on the type hints, but handle it gracefully
-                result[key] = {"type": "text", "definition": value}
+                result[key] = {"type": ConceptStructureBlueprintFieldType.TEXT, "definition": value}
 
         return result

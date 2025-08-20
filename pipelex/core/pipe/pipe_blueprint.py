@@ -13,7 +13,7 @@ class PipeBlueprint(BaseModel):
     at runtime to ensure only valid pipe type values are allowed.
     """
 
-    type: Any
+    type: Any # TODO: Find a better way to handle this.
     definition: Optional[str] = None
     inputs: Optional[Dict[str, InputRequirementBlueprint]] = None
     output: str

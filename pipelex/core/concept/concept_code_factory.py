@@ -24,5 +24,4 @@ class ConceptCodeFactory:
         elif fallback_domain:
             return cls.make_concept_code(domain=fallback_domain, code=concept_str)
         else:
-            print("jidoqjdosdadazadzajiqoj", concept_str, domain, fallback_domain)
             raise ConceptFactoryError(f"Concept '{concept_str}' does not contain a domain and no fallback domain was provided")
