@@ -44,9 +44,9 @@ extra:
     - icon: fontawesome/brands/twitter
       link: https://x.com/PipelexAI
       name: Pipelex on X
-    - icon: fontawesome/brands/discord
-      link: https://go.pipelex.com/discord
-      name: Pipelex on Discord
+    # - icon: fontawesome/brands/discord
+    #   link: https://go.pipelex.com/discord
+    #   name: Pipelex on Discord
   generator: false
 
 plugins:
