@@ -1,25 +1,24 @@
 domain = "images"
 definition = "Generic image-related domain"
 
-[concept]
+[concepts]
 VisualDescription = "Visual description of something"
 
-[concept.ImgGenPrompt]
+[concepts.ImgGenPrompt]
 definition = "Prompt to generate an image"
 refines = "Text"
 
-[concept.Photo]
+[concepts.Photo]
 definition = "Photo"
-structure = "ImageContent"
 refines = "Image"
 
-[pipe]
+[pipes]
 
 #################################################################
 # Vision: PipeLLM taking images as input
 #################################################################
 
-[pipe.describe_image]
+[pipes.describe_image]
 type = "PipeLLM"
 definition = "Describe an image"
 inputs = { image = "Image" }
@@ -30,7 +29,7 @@ prompt_template = """
 Describe the provided image in great detail.
 """
 
-[pipe.describe_photo]
+[pipes.describe_photo]
 type = "PipeLLM"
 definition = "Describe a photo"
 inputs = { photo = "Photo" }
@@ -49,7 +48,7 @@ Describe the provided photo and how it was shot: scene, lighting, camera, etc.
 # PipeImgGen requires to have a single input
 # It can be named however you want,
 # but it must be either an ImgGenPrompt or a concept which refines ImgGenPrompt
-[pipe.generate_image]
+[pipes.generate_image]
 type = "PipeImgGen"
 definition = "Generate an image"
 inputs = { prompt = "ImgGenPrompt" }
@@ -57,7 +56,7 @@ output = "Image"
 nb_steps = 2
 
 
-[pipe.generate_photo]
+[pipes.generate_photo]
 type = "PipeImgGen"
 definition = "Generate a photo"
 inputs = { prompt = "ImgGenPrompt" }

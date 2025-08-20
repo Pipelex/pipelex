@@ -1,10 +1,11 @@
-from typing import Any, Dict, List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
-from pipelex.core.pipe.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
@@ -19,6 +20,7 @@ from pipelex.tools.typing.validation_utils import has_more_than_one_among_attrib
 
 
 class PipeLLMBlueprint(PipeBlueprint):
+    type: Literal["PipeLLM"] = "PipeLLM"
     system_prompt_template: Optional[str] = None
     system_prompt_template_name: Optional[str] = None
     system_prompt_name: Optional[str] = None
@@ -53,7 +55,7 @@ class PipeLLMBlueprint(PipeBlueprint):
         return self
 
 
-class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
+class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
     @classmethod
     @override
     def make_pipe_from_blueprint(
@@ -91,7 +93,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     domain_code=domain_code,
                     template_str=pipe_blueprint.prompt_template,
                     template_name=pipe_blueprint.template_name,
-                    inputs=PipeInputSpec.make_from_dict(pipe_blueprint.inputs) if pipe_blueprint.inputs else PipeInputSpec.make_empty(),
+                    inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
                 )
             except Jinja2TemplateError as exc:
                 error_msg = f"Jinja2 syntax error in user prompt for pipe '{pipe_code}' in domain '{domain_code}': {exc}."
@@ -114,8 +116,8 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
 
         user_images: List[str] = []
         if pipe_blueprint.inputs:
-            for stuff_name, concept_code in (pipe_blueprint.inputs).items():
-                concept = get_concept_provider().get_required_concept(concept_code=concept_code)
+            for stuff_name, requirement in (pipe_blueprint.inputs).items():
+                concept = get_concept_provider().get_required_concept(concept_code=requirement.concept_code)
                 if get_concept_provider().is_image_concept(concept_code=concept.code):
                     user_images.append(stuff_name)
                 else:
@@ -124,7 +126,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         pipe_llm_prompt = PipeLLMPrompt(
             code="adhoc_for_pipe_llm_prompt",
             domain=domain_code,
-            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
             system_prompt_pipe_jinja2=system_prompt_pipe_jinja2,
             system_prompt_verbatim_name=pipe_blueprint.system_prompt_name,
             system_prompt=pipe_blueprint.system_prompt or system_prompt,
@@ -149,7 +151,7 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             pipe_llm_prompt=pipe_llm_prompt,
             llm_choices=llm_choices,
@@ -157,19 +159,4 @@ class PipeLLMFactory(PipeSpecificFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             prompt_template_to_structure=pipe_blueprint.prompt_template_to_structure,
             system_prompt_to_structure=pipe_blueprint.system_prompt_to_structure,
             output_multiplicity=output_multiplicity,
-        )
-
-    @classmethod
-    @override
-    def make_pipe_from_details_dict(
-        cls,
-        domain_code: str,
-        pipe_code: str,
-        details_dict: Dict[str, Any],
-    ) -> PipeLLM:
-        pipe_blueprint = PipeLLMBlueprint.model_validate(details_dict)
-        return cls.make_pipe_from_blueprint(
-            domain_code=domain_code,
-            pipe_code=pipe_code,
-            pipe_blueprint=pipe_blueprint,
         )

@@ -14,16 +14,16 @@ from pipelex.tools.config.manager import config_manager
 def do_init_libraries(directory: str = ".", overwrite: bool = False) -> None:
     """Initialize pipelex libraries in a pipelex_libraries folder in the specified directory."""
     try:
-        target_path = os.path.join(directory, "pipelex_libraries")
+        target_dir = os.path.join(directory, "pipelex_libraries")
         os.makedirs(directory, exist_ok=True)
 
-        library_config = LibraryConfig(config_folder_path=target_path)
+        library_config = LibraryConfig(config_dir_path=target_dir)
         library_config.export_libraries(overwrite=overwrite)
 
         if overwrite:
-            typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_path}' (all files overwritten)")
+            typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_dir}' (all files overwritten)")
         else:
-            typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_path}' (only created non-existing files)")
+            typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_dir}' (only created non-existing files)")
     except Exception as exc:
         raise PipelexCLIError(f"Failed to initialize libraries at '{directory}': {exc}") from exc
 

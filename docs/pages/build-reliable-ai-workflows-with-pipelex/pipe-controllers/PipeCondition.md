@@ -36,37 +36,37 @@ Here's a basic example showing how PipeCondition routes based on input data:
 domain = "routing_example"
 definition = "Example of PipeCondition routing"
 
-[concept]
+[concepts]
 CategoryInput = "Input with a category field"
 
 # Define the PipeCondition first
-[pipe.route_by_category]
+[pipes.route_by_category]
 PipeCondition = "Route based on category field"
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
 
-[pipe.route_by_category.pipe_map]
+[pipes.route_by_category.pipe_map]
 small = "process_small"
 medium = "process_medium"
 large = "process_large"
 
 # Define the pipes that PipeCondition can route to
-[pipe.process_small]
+[pipes.process_small]
 PipeLLM = "Handle small category"
 output = "native.Text"
 prompt_template = """
 Output this only: "small"
 """
 
-[pipe.process_medium]
+[pipes.process_medium]
 PipeLLM = "Handle medium category"
 output = "native.Text"
 prompt_template = """
 Output this only: "medium"
 """
 
-[pipe.process_large]
+[pipes.process_large]
 PipeLLM = "Handle large category"
 output = "native.Text"
 prompt_template = """
@@ -84,18 +84,18 @@ How this works:
 ### Example: Routing with default fallback
 
 ```toml
-[pipe.route_with_fallback]
+[pipes.route_with_fallback]
 PipeCondition = "Route with default handling"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 expression = "classification.type"
 default_pipe_code = "process_unknown"
 
-[pipe.route_with_fallback.pipe_map]
+[pipes.route_with_fallback.pipe_map]
 invoice = "process_invoice"
 receipt = "process_receipt"
 
-[pipe.process_invoice]
+[pipes.process_invoice]
 PipeLLM = "Process invoice documents"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
@@ -103,7 +103,7 @@ prompt_template = """
 Process this invoice document...
 """
 
-[pipe.process_receipt]
+[pipes.process_receipt]
 PipeLLM = "Process receipt documents" 
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
@@ -111,7 +111,7 @@ prompt_template = """
 Process this receipt document...
 """
 
-[pipe.process_unknown]
+[pipes.process_unknown]
 PipeLLM = "Handle unknown document types"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"

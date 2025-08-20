@@ -1,15 +1,12 @@
 import re
 from typing import List, Tuple
 
-from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
-from pipelex import log
 from pipelex.core.concept.concept_native import NativeConcept
 from pipelex.core.domain.domain import SpecialDomain
-from pipelex.core.stuff.stuff_content import StuffContent
-from pipelex.exceptions import ConceptCodeError, ConceptDomainError, ConceptError, StructureClassError
+from pipelex.exceptions import ConceptCodeError, ConceptDomainError, ConceptError
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 
 
@@ -18,11 +15,12 @@ class Concept(BaseModel):
 
     code: str
     domain: str
-    structure_class_name: str
     definition: str
+    structure_class_name: str
     refines: List[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
+    # TODO: Refacto, its not clean
     def validate_code_domain(self) -> Self:
         if not Concept.concept_str_contains_domain(self.code):
             raise ConceptCodeError(f"Code must contain a dot (.) for concept with code '{self.code}' and domain '{self.domain}'")
@@ -82,24 +80,6 @@ class Concept(BaseModel):
             cls.validate_domain_syntax(domain=domain, code=full_code, domain_field=domain)
 
         return validated_refines
-
-    @field_validator("structure_class_name")
-    @classmethod
-    def validate_structure_class_name(cls, value: str) -> str:
-        if not cls.is_valid_structure_class(structure_class_name=value):
-            raise StructureClassError(f"Could not validate concept because structure_class_name '{value}' is not in class registry. ")
-        return value
-
-    @classmethod
-    def is_valid_structure_class(cls, structure_class_name: str) -> bool:
-        # we get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
-        if KajsonManager.get_class_registry().has_subclass(name=structure_class_name, base_class=StuffContent):
-            return True
-        else:
-            # we get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
-            if KajsonManager.get_class_registry().has_class(name=structure_class_name):
-                log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
-            return False
 
     @classmethod
     def extract_domain_and_concept_from_str(cls, concept_str: str) -> Tuple[str, str]:

@@ -122,11 +122,11 @@ The draft is converted into a formal TOML blueprint:
 domain = "image_processing"
 definition = "Generate opposite version of photo's main feature"
 
-[concept]
+[concepts]
 PhotoAnalysis = "Analysis of photo content and main features"
 OppositePhotoPrompt = "Prompt for generating opposite version of photo"
 
-[pipe.gen_photopposite]
+[pipes.gen_photopposite]
 PipeSequence = "Generate opposite version of photo's main feature"
 output = "Image"
 steps = [
@@ -135,7 +135,7 @@ steps = [
     { pipe = "render_opposite", result = "opposite_photo" }
 ]
 
-[pipe.analyze_photo]
+[pipes.analyze_photo]
 PipeLLM = "Analyze photo content and identify main feature"
 inputs = { photo = "Image" }
 output = "PhotoAnalysis"
@@ -147,7 +147,7 @@ Analyze this photo and identify its most important visual feature.
 Focus on the dominant element, color, mood, or characteristic that defines this image.
 """
 
-[pipe.create_opposite_concept]
+[pipes.create_opposite_concept]
 PipeLLM = "Create concept for opposite version"
 inputs = { analysis = "PhotoAnalysis" }
 output = "OppositePhotoPrompt"
@@ -159,7 +159,7 @@ Based on this photo analysis, create a detailed prompt for generating the opposi
 Describe what the opposite would look like, focusing on reversing the main feature while maintaining photo realism.
 """
 
-[pipe.render_opposite]
+[pipes.render_opposite]
 PipeImgGen = "Generate the opposite photo"
 inputs = { opposite_concept = "OppositePhotoPrompt" }
 output = "Image"

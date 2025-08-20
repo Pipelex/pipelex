@@ -10,7 +10,7 @@ The PipeBatch controller allows you to apply a pipe operation to each element in
 ## Usage in TOML Configuration
 
 ```toml
-[pipe.sequence_with_batch]
+[pipes.sequence_with_batch]
 PipeSequence = "A Sequence of pipes"
 inputs = { input_data = "ConceptName" }
 output = "OutputConceptName"

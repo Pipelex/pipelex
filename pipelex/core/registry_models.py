@@ -1,7 +1,7 @@
 from typing import Any, ClassVar, List
 
 from pipelex.core.pipe.pipe_abstract import PipeAbstractType
-from pipelex.core.pipe.pipe_blueprint import PipeSpecificFactoryProtocol
+from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
 from pipelex.core.stuff.stuff import Stuff
 from pipelex.core.stuff.stuff_content import (
     DynamicContent,
@@ -17,8 +17,7 @@ from pipelex.core.stuff.stuff_content import (
     TextAndImagesContent,
     TextContent,
 )
-from pipelex.libraries.pipeline_blueprint import PipelineBlueprint
-from pipelex.libraries.pipelines.meta.pipeline_draft import PipelineDraft
+from pipelex.libraries.pipelines.meta.pipeline_draft import PipelexBundleBlueprint, PipelineDraft
 from pipelex.pipe_controllers.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.pipe_condition import PipeCondition
@@ -53,7 +52,7 @@ class PipelexRegistryModels(RegistryModels):
         PipeOcr,
     ]
 
-    PIPE_OPERATORS_FACTORY: ClassVar[List[PipeSpecificFactoryProtocol[Any, Any]]] = [
+    PIPE_OPERATORS_FACTORY: ClassVar[List[PipeFactoryProtocol[Any, Any]]] = [
         PipeFuncFactory,
         PipeImgGenFactory,
         PipeJinja2Factory,
@@ -68,7 +67,7 @@ class PipelexRegistryModels(RegistryModels):
         PipeSequence,
     ]
 
-    PIPE_CONTROLLERS_FACTORY: ClassVar[List[PipeSpecificFactoryProtocol[Any, Any]]] = [
+    PIPE_CONTROLLERS_FACTORY: ClassVar[List[PipeFactoryProtocol[Any, Any]]] = [
         PipeBatchFactory,
         PipeConditionFactory,
         PipeParallelFactory,
@@ -88,7 +87,7 @@ class PipelexRegistryModels(RegistryModels):
         PDFContent,
         TextAndImagesContent,
         PageContent,
-        PipelineBlueprint,
+        PipelexBundleBlueprint,
         PipelineDraft,
     ]
 

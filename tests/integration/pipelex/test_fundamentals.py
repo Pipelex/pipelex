@@ -13,8 +13,7 @@ class TestFundamentals:
         pass
 
     def test_validate_libraries(self):
-        pipelex_instance = Pipelex.get_instance()
-        pipelex_instance.validate_libraries()
+        Pipelex.get_instance().validate_libraries()
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_dry_run_all_pipes(self):

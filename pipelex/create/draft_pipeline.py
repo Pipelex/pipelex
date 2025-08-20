@@ -6,10 +6,10 @@ import typer
 
 from pipelex import pretty_print
 from pipelex.create.helpers import get_support_file
-from pipelex.create.pipeline_toml import dict_to_toml, save_toml_to_path
 from pipelex.libraries.pipelines.meta.pipeline_draft import PipelineDraft
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import save_text_to_path
+from pipelex.tools.misc.toml_utils import dict_to_toml, save_toml_to_path
 
 
 async def do_draft_pipeline_text(

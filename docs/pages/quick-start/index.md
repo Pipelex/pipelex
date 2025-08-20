@@ -20,8 +20,8 @@ Run `pipelex init libraries` to create this directory if it doesn't exist. For n
 ```toml
 domain = "characters"
 
-[pipe]
-[pipe.create_character]
+[pipes]
+[pipes.create_character]
 PipeLLM = "Creates a character."
 output = "Text"
 prompt_template = """You are a book writer. Your task is to create a character.
@@ -66,7 +66,7 @@ python character.py
 ### Indicate your LLM selection explicitly using the `llm` attribute
 
 ```toml
-[pipe.create_character]
+[pipes.create_character]
 PipeLLM = "Create a character."
 output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
@@ -77,7 +77,7 @@ Think of it and then output the character description."""
 ### Or use an LLM preset from the LLM deck
 
 ```toml
-[pipe.create_character]
+[pipes.create_character]
 PipeLLM = "Create a character."
 output = "Text"
 llm = "llm_for_creative_writing"
@@ -127,11 +127,11 @@ It's time to specify that your output be a `Character` instance. Use the `output
 ```toml
 domain = "characters"
 
-[concept]
+[concepts]
 Character = "A character is a fiction story" # <- Define here your output concept so that it is linked to the class name
 
-[pipe]
-[pipe.create_character]
+[pipes]
+[pipes.create_character]
 PipeLLM = "Create a character. Get a structured result."
 output = "Character"    # <- This is the output concept for your pipe
 prompt_template = """You are a book writer. Your task is to create a character.
@@ -182,12 +182,12 @@ class CharacterMetadata(StructuredContent):
 💡 Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/). You can include a variable using the **classic** `{{ double.curly.braces }}`, and to make it simpler, we've added the possibility to just prefix your variable with the `@` symbol (recommended). Pipes declare their required inputs explicitly with the `inputs` table:
 
 ```toml
-[concept]
+[concepts]
 Character = "A character from a book"
 CharacterMetadata = "Metadata regarding a character."
 
-[pipe]
-[pipe.extract_character_1]
+[pipes]
+[pipes.extract_character_1]
 PipeLLM = "Get character information from a description."
 inputs = { character = "Character" }  # <- These are the inputs of your pipe, usable in the prompt_template
 output = "CharacterMetadata"

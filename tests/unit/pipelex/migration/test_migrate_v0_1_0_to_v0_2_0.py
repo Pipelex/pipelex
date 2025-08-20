@@ -19,20 +19,20 @@ class TestTomlMigrator:
         return """domain = "test"
 definition = "Test domain"
 
-[concept]
+[concepts]
 SimpleText = "A simple text concept"
 SimpleDoc = "A simple document concept"
 
-[concept.ComplexConcept]
+[concepts.ComplexConcept]
 Concept = "A complex concept with old syntax"
 refines = "Text"
 
-[concept.AnotherConcept]
+[concepts.AnotherConcept]
 Concept = "Another concept to test migration"
 structure = "CustomStructure"
 refines = ["Text", "Document"]
 
-[concept.AlreadyMigrated]
+[concepts.AlreadyMigrated]
 definition = "This one is already migrated"
 refines = "Text"
 """
@@ -43,31 +43,31 @@ refines = "Text"
         return """domain = "test"
 definition = "Test domain"
 
-[concept]
+[concepts]
 SimpleText = "A simple text concept"
 SimpleDoc = "A simple document concept"
 
-[concept.ComplexConcept]
+[concepts.ComplexConcept]
 definition = "A complex concept with old syntax"
 refines = "Text"
 
-[concept.AnotherConcept]
+[concepts.AnotherConcept]
 definition = "Another concept to test migration"
 structure = "CustomStructure"
 refines = ["Text", "Document"]
 
-[concept.AlreadyMigrated]
+[concepts.AlreadyMigrated]
 definition = "This one is already migrated"
 refines = "Text"
 """
 
     def test_pattern_matching(self, migrator: TomlMigrator) -> None:
         """Test that the regex pattern correctly identifies Concept = lines."""
-        test_content = """[concept.TestConcept]
+        test_content = """[concepts.TestConcept]
 Concept = "A test concept"
 refines = "Text"
 
-[concept.AnotherConcept]
+[concepts.AnotherConcept]
 definition = "Already migrated"
 Concept = "This should be caught"
 """
@@ -85,20 +85,20 @@ Concept = "This should be caught"
 
     def test_pattern_replacement(self, migrator: TomlMigrator) -> None:
         """Test that the regex pattern correctly replaces Concept = with definition =."""
-        test_content = """[concept.TestConcept]
+        test_content = """[concepts.TestConcept]
 Concept = "A test concept"
 refines = "Text"
 
-[concept.IndentedConcept]
+[concepts.IndentedConcept]
     Concept = "Indented concept"
     refines = "Text"
 """
 
-        expected_content = """[concept.TestConcept]
+        expected_content = """[concepts.TestConcept]
 definition = "A test concept"
 refines = "Text"
 
-[concept.IndentedConcept]
+[concepts.IndentedConcept]
     definition = "Indented concept"
     refines = "Text"
 """
@@ -143,18 +143,18 @@ prompt_template = "Define the Concept = whatever"
         """Test that migration ignores Concept = inside multiline strings."""
         test_content = '''domain = "test"
 
-[concept.ValidConcept]
+[concepts.ValidConcept]
 Concept = "This should be migrated"
 refines = "Text"
 
-[pipe.test_pipe]
+[pipes.test_pipe]
 prompt_template = """
 Transform this:
 Concept = "This should NOT be migrated because it's inside a multiline string"
 Do something with it.
 """
 
-[concept.AnotherValidConcept]
+[concepts.AnotherValidConcept]
 Concept = "This should also be migrated"
 refines = "Document"
 '''
@@ -176,16 +176,16 @@ refines = "Document"
         """Test that multiline string detection works with both double and single quotes."""
         test_content = """domain = "test"
 
-[concept.ValidConcept]
+[concepts.ValidConcept]
 Concept = "Should be migrated"
 
-[pipe.test_pipe]
+[pipes.test_pipe]
 prompt_template = '''
 This is a single-quote multiline string:
 Concept = "Should NOT be migrated"
 '''
 
-[concept.AnotherValidConcept]  
+[concepts.AnotherValidConcept]  
 Concept = "Should also be migrated"
 """
 
@@ -205,11 +205,11 @@ Concept = "Should also be migrated"
 
     def test_get_migration_preview(self, migrator: TomlMigrator) -> None:
         """Test getting preview of migration changes."""
-        test_content = """[concept.TestConcept]
+        test_content = """[concepts.TestConcept]
 Concept = "A test concept"
 refines = "Text"
 
-[concept.AnotherConcept]
+[concepts.AnotherConcept]
     Concept = "Another concept"
     refines = "Text"
 """
@@ -322,19 +322,19 @@ refines = "Text"
         """Test successful directory migration."""
         # Create files with different states
         file1 = tmp_path / "file1.toml"
-        file1.write_text("""[concept.Test1]
+        file1.write_text("""[concepts.Test1]
 Concept = "Old syntax file 1"
 """)
 
         file2 = tmp_path / "file2.toml"
-        file2.write_text("""[concept.Test2]
+        file2.write_text("""[concepts.Test2]
 definition = "Already migrated file 2"
 """)
 
         file3 = tmp_path / "file3.toml"
-        file3.write_text("""[concept.Test3]
+        file3.write_text("""[concepts.Test3]
 Concept = "Old syntax file 3"
-[concept.Test4]
+[concepts.Test4]
 Concept = "Another old concept"
 """)
 
@@ -362,7 +362,7 @@ Concept = "Another old concept"
         """Test directory migration in dry-run mode."""
         # Create file with old syntax
         test_file = tmp_path / "test.toml"
-        original_content = """[concept.Test]
+        original_content = """[concepts.Test]
 Concept = "Old syntax"
 """
         test_file.write_text(original_content)
@@ -405,7 +405,7 @@ class TestMigrateConceptSyntax:
         """Test the convenience function works correctly."""
         # Create test file
         test_file = tmp_path / "test.toml"
-        test_file.write_text("""[concept.Test]
+        test_file.write_text("""[concepts.Test]
 Concept = "Test concept"
 """)
 

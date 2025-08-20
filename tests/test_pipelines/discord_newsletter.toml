@@ -1,12 +1,12 @@
 domain = "discord_newsletter"
 definition = "Discord newsletter generation pipeline"
 
-[concept]
+[concepts]
 DiscordChannelUpdate = "A Discord channel with its messages for newsletter generation"
 ChannelSummary = "A summarized Discord channel for newsletter inclusion"
 Newsletter = "The final newsletter content with organized channel summaries"
 
-[pipe.write_discord_newsletter]
+[pipes.write_discord_newsletter]
 type = "PipeSequence"
 definition = "Create a newsletter from Discord articles by summarizing channels and organizing content"
 inputs = { discord_channel_updates = "DiscordChannelUpdate" }
@@ -15,7 +15,7 @@ steps = [
    { pipe = "summarize_discord_channel_update", batch_over = "discord_channel_updates", batch_as = "discord_channel_update", result = "channel_summaries" },
 ]
 
-[pipe.summarize_discord_channel_update]
+[pipes.summarize_discord_channel_update]
 type = "PipeLLM"
 definition = "Summarize a Discord channel's messages into newsletter-friendly content"
 inputs = { discord_channel_update = "DiscordChannelUpdate" }

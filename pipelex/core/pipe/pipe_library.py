@@ -37,7 +37,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     def make_empty(cls):
         return cls(root={})
 
-    def add_new_pipe(self, pipe: PipeAbstract):
+    def add_pipe(self, pipe: PipeAbstract):
         name = pipe.code
         pipe.inputs.set_default_domain(domain=pipe.domain)
         if pipe.output_concept_code and "." not in pipe.output_concept_code:
@@ -45,6 +45,10 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         if name in self.root:
             raise PipeLibraryError(f"Pipe '{name}' already exists in the library")
         self.root[pipe.code] = pipe
+
+    def add_pipes(self, pipes: List[PipeAbstract]):
+        for pipe in pipes:
+            self.add_pipe(pipe=pipe)
 
     def add_or_update_pipe(self, pipe: PipeAbstract):
         name = pipe.code

@@ -27,7 +27,7 @@ from pipelex.core.pipe.pipe_library import PipeLibrary
 from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
-from pipelex.libraries.library_manager import LibraryManager
+from pipelex.libraries.library_manager_factory import LibraryManagerFactory
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager import ActivityManager
@@ -61,7 +61,7 @@ PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 class Pipelex(metaclass=MetaSingleton):
     def __init__(
         self,
-        config_folder_path: str,
+        config_dir_path: str,
         # Dependency injection
         pipelex_hub: Optional[PipelexHub] = None,
         config_cls: Optional[Type[ConfigRoot]] = None,
@@ -74,7 +74,7 @@ class Pipelex(metaclass=MetaSingleton):
         activity_manager: Optional[ActivityManagerProtocol] = None,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> None:
-        self.config_folder_path = config_folder_path
+        self.config_dir_path = config_dir_path
         self.pipelex_hub = pipelex_hub or PipelexHub()
         set_pipelex_hub(self.pipelex_hub)
 
@@ -95,7 +95,7 @@ class Pipelex(metaclass=MetaSingleton):
         log.debug("Logs are configured")
 
         # tools
-        self.template_provider = template_provider or TemplateLibrary.make_empty(config_folder_path=config_folder_path)
+        self.template_provider = template_provider or TemplateLibrary.make_empty(config_dir_path=config_dir_path)
         self.pipelex_hub.set_template_provider(self.template_provider)
 
         self.class_registry = class_registry or ClassRegistry()
@@ -105,7 +105,7 @@ class Pipelex(metaclass=MetaSingleton):
         # cogt
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
-        self.llm_model_provider = llm_model_provider or LLMModelLibrary.make_empty(config_folder_path=config_folder_path)
+        self.llm_model_provider = llm_model_provider or LLMModelLibrary.make_empty(config_dir_path=config_dir_path)
         self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
@@ -124,13 +124,13 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_domain_provider(domain_provider=domain_library)
         self.pipelex_hub.set_concept_provider(concept_provider=concept_library)
         self.pipelex_hub.set_pipe_provider(pipe_provider=pipe_library)
-        self.library_manager = LibraryManager.make(
+
+        self.library_manager = LibraryManagerFactory.make(
             domain_library=domain_library,
             concept_library=concept_library,
             pipe_library=pipe_library,
-            config_folder_path=config_folder_path,
+            config_dir_path=config_dir_path,
         )
-        self.library_manager.setup()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
         # pipelex pipeline
@@ -188,6 +188,7 @@ class Pipelex(metaclass=MetaSingleton):
         try:
             self.template_provider.setup()
             self.llm_model_provider.setup()
+            self.library_manager.setup()
             llm_deck = self.library_manager.load_deck()
             for llm_model in self.llm_model_provider.get_all_llm_models():
                 if llm_model.version == LATEST_VERSION_NAME:
@@ -277,15 +278,15 @@ class Pipelex(metaclass=MetaSingleton):
                     raise PipelexSetupError("Could not find relative config folder path because of: Failed to get caller frame")
                 caller_file = current_frame.f_back.f_code.co_filename
                 caller_dir = os.path.dirname(os.path.abspath(caller_file))
-                config_folder_path = os.path.abspath(os.path.join(caller_dir, relative_config_folder_path))
+                config_dir_path = os.path.abspath(os.path.join(caller_dir, relative_config_folder_path))
             else:
-                config_folder_path = os.path.abspath(os.path.join(os.getcwd(), relative_config_folder_path))
+                config_dir_path = os.path.abspath(os.path.join(os.getcwd(), relative_config_folder_path))
         elif absolute_config_folder_path is not None:
-            config_folder_path = absolute_config_folder_path
+            config_dir_path = absolute_config_folder_path
         else:
-            config_folder_path = "./pipelex_libraries"
+            config_dir_path = "./pipelex_libraries"
 
-        pipelex_instance = cls(config_folder_path=config_folder_path)
+        pipelex_instance = cls(config_dir_path=config_dir_path)
         pipelex_instance.setup()
         pipelex_instance.setup_libraries()
         log.info(f"Pipelex {PACKAGE_VERSION} initialized.")

@@ -68,7 +68,7 @@ Once the function is registered, you can use it in your `.toml` file.
 This TOML snippet shows how to use the `combine_two_texts` function defined above. It assumes two previous pipes have produced outputs named `text_a` and `text_b`.
 
 ```toml
-[pipe.combine_them]
+[pipes.combine_them]
 PipeFunc = "Combine two text inputs using a custom Python function"
 function_name = "combine_two_texts"
 output = "ConcatenatedText"

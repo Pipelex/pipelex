@@ -1,19 +1,19 @@
 domain = "test_tricky_questions"
 definition = "Domain for testing tricky questions"
 
-[concept]
+[concepts]
 AnswerToAQuestion = "Answer to a question"
 Question = "A question"
 QuestionAnalysis = "Analysis of a question"
 ThoughtfulAnswerConclusion = "Conclusion of a thoughtful answer"
 
-[concept.ThoughtfulAnswer]
+[concepts.ThoughtfulAnswer]
 definition = "A thoughtful answer to a question"
 structure = "ThoughtfulAnswer"
 refines = "AnswerToAQuestion"
 
-[pipe]
-[pipe.analyse_question_tricky]
+[pipes]
+[pipes.analyse_question_tricky]
 type = "PipeLLM"
 definition = "Analyze a question to determine whether it's straightforward or tricky"
 inputs = { question = "Question" }
@@ -29,7 +29,7 @@ Please explain what you think and then give a rating between 0 to 100 of trickin
 If there's an obvious trap, state it without getting into details.
 """
 
-[pipe.answer_after_analysis]
+[pipes.answer_after_analysis]
 type = "PipeLLM"
 definition = "Answer knowingly after analyzing a question"
 inputs = { question = "Question", question_analysis = "QuestionAnalysis" }
@@ -48,7 +48,7 @@ Answer in 4 parts:
 4- the_answer: Then give a good answer expressed without mentioning the trap
 """
 
-[pipe.conclude_thoughtful_answer]
+[pipes.conclude_thoughtful_answer]
 type = "PipeJinja2"
 definition = "Conclude a thoughtful answer"
 inputs = { thoughtful_answer = "ThoughtfulAnswer" }
@@ -56,7 +56,7 @@ output = "ThoughtfulAnswerConclusion"
 jinja2 = "After analyzing the question, here is my answer: $thoughtful_answer.the_answer"
 
 
-[pipe.conclude_tricky_question_by_steps]
+[pipes.conclude_tricky_question_by_steps]
 type = "PipeSequence"
 definition = "Answer a tricky question by first analyzing its trickiness and then concluding"
 inputs = { question = "Question" }

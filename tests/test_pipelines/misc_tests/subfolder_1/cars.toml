@@ -4,12 +4,12 @@ domain = "cars"
 definition = "The test domain for handling car descriptions"
 system_prompt = "You are an expert at describing cars based on their brand, model, and year."
 
-[concept]
+[concepts]
 Car = "A car reference, including its brand, model, and year"
 CarDescription = "A detailed description of a car model"
 
-[pipe]
-[pipe.generate_car_description]
+[pipes]
+[pipes.generate_car_description]
 type = "PipeLLM"
 definition = "Generate a description of a car"
 inputs = { car = "Car" }

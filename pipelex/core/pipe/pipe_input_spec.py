@@ -1,6 +1,6 @@
-from typing import Callable, Dict, List, Optional, Set, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
-from pydantic import BaseModel, Field, RootModel, field_validator
+from pydantic import BaseModel, Field, RootModel, field_validator, model_validator
 from typing_extensions import Self
 
 from pipelex import log
@@ -8,6 +8,19 @@ from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
 from pipelex.core.pipe.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuff.stuff_content import StuffContent
 from pipelex.exceptions import PipeInputNotFoundError
+
+
+class InputRequirementBlueprint(BaseModel):
+    concept_code: str
+    multiplicity: Optional[PipeOutputMultiplicity] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_input(cls, data: Any) -> Any:
+        """If the incoming data is a string, convert it to a dict with concept_code."""
+        if isinstance(data, str):
+            return {"concept_code": data}
+        return data
 
 
 class InputRequirement(BaseModel):
@@ -93,11 +106,18 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
         return cls(root={})
 
     @classmethod
-    def make_from_dict(cls, concepts_dict: Dict[str, str]) -> Self:
-        the_dict: Dict[str, InputRequirement] = {
-            var_name: InputRequirement(concept_code=concept_code) for var_name, concept_code in concepts_dict.items()
-        }
-        return cls(root=the_dict)
+    def make_from_blueprint(cls, domain: str, blueprint: Dict[str, InputRequirementBlueprint]) -> Self:
+        for var_name, input_requirement_blueprint in blueprint.items():
+            concept_code = ConceptCodeFactory.make_concept_code_from_str(domain=domain, concept_str=input_requirement_blueprint.concept_code)
+            blueprint[var_name].concept_code = concept_code
+        return cls(
+            root={
+                var_name: InputRequirement(
+                    concept_code=input_requirement_blueprint.concept_code, multiplicity=input_requirement_blueprint.multiplicity
+                )
+                for var_name, input_requirement_blueprint in blueprint.items()
+            }
+        )
 
     @property
     def items(self) -> List[Tuple[str, InputRequirement]]:

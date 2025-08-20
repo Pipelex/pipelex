@@ -80,7 +80,7 @@ class Screenplay(StructuredContent):
 The `generate_screenplay` pipeline is a master `PipeSequence` that orchestrates a series of smaller, specialized pipes. This is a perfect example of how to build a complex, creative workflow by breaking it down into manageable steps.
 
 ```toml
-[pipe.generate_screenplay]
+[pipes.generate_screenplay]
 PipeSequence = "Generate a complete screenplay from a pitch"
 inputs = { pitch = "Pitch" }
 output = "FormattedScreenplay"
@@ -98,7 +98,7 @@ steps = [
 ]
 
 # This is the nested sequence that creates all the scenes for a single chapter.
-[pipe.create_scenes_sequence]
+[pipes.create_scenes_sequence]
 PipeSequence = "Create all scenes for a chapter sequentially"
 inputs = { chapter = "Chapter", characters = "CharacterList", detailed_pitch = "DetailedPitch" }
 output = "Chapter"

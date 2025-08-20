@@ -1,4 +1,4 @@
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_operators.pipe_llm import PipeLLM
@@ -32,7 +32,13 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallel(
             domain="test_domain",
             code="parallel_document_processor",
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"document": "test_domain.document", "context": "test_domain.context"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_domain",
+                blueprint={
+                    "document": InputRequirementBlueprint(concept_code="test_domain.document"),
+                    "context": InputRequirementBlueprint(concept_code="test_domain.context"),
+                },
+            ),
             output_concept_code="test_domain.ProcessedAnalysis",
             parallel_sub_pipes=[SubPipe(pipe_code="analyze_document", output_name="analysis_result")],
             add_each_output=True,
@@ -55,7 +61,9 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallel(
             domain="test_domain",
             code="test_parallel",
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_var": "test_domain.Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_domain", blueprint={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")}
+            ),
             output_concept_code="test_domain.ProcessedText",
             parallel_sub_pipes=[SubPipe(pipe_code="test_pipe_1", output_name="result_1")],
             add_each_output=True,
@@ -78,7 +86,13 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallel(
             domain="test_domain",
             code="parallel_document_processor",
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"document": "test_domain.Document", "context": "test_domain.Context"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_domain",
+                blueprint={
+                    "document": InputRequirementBlueprint(concept_code="test_domain.Document"),
+                    "context": InputRequirementBlueprint(concept_code="test_domain.Context"),
+                },
+            ),
             output_concept_code="test_domain.ProcessedAnalysis",
             parallel_sub_pipes=[],  # No sub-pipes to avoid dependency issues
             add_each_output=True,

@@ -5,7 +5,7 @@ from typing import cast
 import pytest
 from pytest import FixtureRequest
 
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.core.pipe.pipe_run_params import PipeRunMode
 from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff.stuff_content import TextContent
@@ -28,7 +28,9 @@ class TestPipeParallelSimple:
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             parallel_sub_pipes=[
                 SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
@@ -140,7 +142,9 @@ class TestPipeParallelSimple:
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             parallel_sub_pipes=[
                 SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),

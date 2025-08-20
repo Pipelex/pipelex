@@ -1,9 +1,10 @@
-from typing import Any, Dict, Optional
+from typing import Literal, Optional
 
 from typing_extensions import override
 
 from pipelex.config import get_config
-from pipelex.core.pipe.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
+from pipelex.core.pipe.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
@@ -14,13 +15,14 @@ from pipelex.tools.templating.templating_models import PromptingStyle
 
 
 class PipeJinja2Blueprint(PipeBlueprint):
+    type: Literal["PipeJinja2"] = "PipeJinja2"
     jinja2_name: Optional[str] = None
     jinja2: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
 
 
-class PipeJinja2Factory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
+class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
     @classmethod
     @override
     def make_pipe_from_blueprint(
@@ -42,27 +44,12 @@ class PipeJinja2Factory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeJin
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             jinja2_name=pipe_blueprint.jinja2_name,
             jinja2=preprocessed_template,
             prompting_style=pipe_blueprint.prompting_style,
             template_category=pipe_blueprint.template_category,
-        )
-
-    @classmethod
-    @override
-    def make_pipe_from_details_dict(
-        cls,
-        domain_code: str,
-        pipe_code: str,
-        details_dict: Dict[str, Any],
-    ) -> PipeJinja2:
-        pipe_blueprint = PipeJinja2Blueprint.model_validate(details_dict)
-        return cls.make_pipe_from_blueprint(
-            domain_code=domain_code,
-            pipe_code=pipe_code,
-            pipe_blueprint=pipe_blueprint,
         )
 
     @classmethod

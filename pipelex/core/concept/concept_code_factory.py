@@ -13,13 +13,16 @@ class ConceptCodeFactory:
         return f"{domain}.{code}"
 
     @classmethod
-    def make_concept_code_from_str(cls, concept_str: str, fallback_domain: Optional[str] = None) -> str:
+    def make_concept_code_from_str(cls, concept_str: str, domain: Optional[str] = None, fallback_domain: Optional[str] = None) -> str:
         if Concept.concept_str_contains_domain(concept_str=concept_str):
             return concept_str
         elif concept_str in NativeConcept.names():
             native_concept = NativeConcept(concept_str)
             return native_concept.code
+        elif domain:
+            return cls.make_concept_code(domain=domain, code=concept_str)
         elif fallback_domain:
             return cls.make_concept_code(domain=fallback_domain, code=concept_str)
         else:
+            print("jidoqjdosdadazadzajiqoj", concept_str, domain, fallback_domain)
             raise ConceptFactoryError(f"Concept '{concept_str}' does not contain a domain and no fallback domain was provided")

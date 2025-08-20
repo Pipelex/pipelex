@@ -38,7 +38,7 @@ The pipe can be configured to generate a single image or a list of images.
 This pipe generates one image of a futuristic car without requiring any input.
 
 ```toml
-[pipe.generate_car_image]
+[pipes.generate_car_image]
 PipeImgGen = "Generate a futuristic car image"
 output = "Image"
 imgg_prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
@@ -52,10 +52,10 @@ quality = "hd"
 This pipe takes a text prompt as input and generates three variations of the image.
 
 ```toml
-[concept]
+[concepts]
 ImagePrompt = "A text prompt for generating an image"
 
-[pipe.generate_logo_variations]
+[pipes.generate_logo_variations]
 PipeImgGen = "Generate three logo variations from a prompt"
 inputs = { prompt = "images.ImgGenPrompt" }
 output = "Image"

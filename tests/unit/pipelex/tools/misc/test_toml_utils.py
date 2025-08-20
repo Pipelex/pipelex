@@ -17,11 +17,11 @@ class TestTomlUtils:
 domain = "test_domain"
 definition = "Test definition"
 
-[concept]
+[concepts]
 TestConcept = "A test concept"
 
-[pipe]
-[pipe.test_pipe]
+[pipes]
+[pipes.test_pipe]
 PipeLLM = "Test pipe definition"
 prompt_template = '''
 This is a test prompt
@@ -35,8 +35,8 @@ This is a test prompt
         assert isinstance(result, dict)
         assert result["domain"] == "test_domain"
         assert result["definition"] == "Test definition"
-        assert "concept" in result
-        assert "pipe" in result
+        assert "concepts" in result
+        assert "pipes" in result
 
     def test_validate_toml_file_trailing_whitespace(self, tmp_path: Path) -> None:
         """Test detection of trailing whitespace."""
@@ -58,7 +58,7 @@ definition = "Test"
         """Test detection of trailing whitespace after triple quotes."""
         toml_content = '''domain = "test"
 
-[pipe.test_pipe]
+[pipes.test_pipe]
 PipeLLM = "Test"
 prompt_template = """
 Output this only: "test"
@@ -138,7 +138,7 @@ definition = "Test definition"
         toml_content = """domain = "test"
 definition = "Test definition"
 
-[concept]
+[concepts]
 TestConcept = "A test concept"
 """
         toml_file = tmp_path / "valid.toml"
@@ -152,7 +152,7 @@ TestConcept = "A test concept"
         toml_content = """domain = "test"   
 definition = "Test"	
 
-[pipe.test_pipe]
+[pipes.test_pipe]
 prompt_template = \"\"\"
 Output: "test"
 \"\"\" 
@@ -189,22 +189,22 @@ Output: "test"
         toml_content = '''domain = "test_pipe_condition_2"
 definition = "Simple test for PipeCondition functionality using expression"
 
-[concept]
+[concepts]
 CategoryInput = "Input with a category field"
 
-[pipe]
-[pipe.basic_condition_by_category_2]
+[pipes]
+[pipes.basic_condition_by_category_2]
 PipeCondition = "Route based on category field using expression"
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
 
-[pipe.basic_condition_by_category_2.pipe_map]
+[pipes.basic_condition_by_category_2.pipe_map]
 small = "process_small_2"
 medium = "process_medium_2" 
 large = "process_large_2"
 
-[pipe.process_large_2]
+[pipes.process_large_2]
 PipeLLM = "Generate random text for large items"
 output = "native.Text"
 prompt_template = """

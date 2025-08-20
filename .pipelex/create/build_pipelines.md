@@ -1,6 +1,6 @@
 # Building Pipelex Pipelines from Drafts
 
-This guide explains how to translate a markdown pipeline draft into a formal `PipelineBlueprint` structure that can be validated and executed by Pipelex.
+This guide explains how to translate a markdown pipeline draft into a formal `PipelexBundleBlueprint` structure that can be validated and executed by Pipelex.
 
 ## Overview
 

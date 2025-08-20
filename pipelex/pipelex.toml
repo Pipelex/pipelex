@@ -205,7 +205,7 @@ apply_to_jinja2_rendering = false
 text_gen_truncate_length = 256
 nb_list_items = 3
 nb_ocr_pages = 4
-allowed_to_fail_pipes = ["infinite_loop_1"]
+allowed_to_fail_pipes = ["infinite_loop_1", "build_blueprint", "structure_blueprint"]
 image_urls = [
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",

@@ -3,12 +3,12 @@
 domain = "test_multiplicity"
 definition = "Test library about multiplicity"
 
-[concept]
+[concepts]
 Color = "A color"
 ProductOfNature = "Something produced by Nature"
 FantasyScene = "A fantasy scene"
 
-[pipe.original_power_ranger_colors]
+[pipes.original_power_ranger_colors]
 type = "PipeLLM"
 definition = "Recall the colors of the original power rangers"
 output = "Color"
@@ -18,7 +18,7 @@ Remind me of the colors of the {{ _nb_output }} original power rangers.
 llm = "llm_for_creative_writing"
 nb_output = 5
 
-[pipe.alltime_power_ranger_colors]
+[pipes.alltime_power_ranger_colors]
 type = "PipeLLM"
 definition = "Recall the colors of all the power rangers"
 output = "Color"
@@ -28,7 +28,7 @@ Don't list the names of the characters or the name of the series: just list the 
 """
 llm = "llm_for_creative_writing"
 
-[pipe.imagine_nature_product]
+[pipes.imagine_nature_product]
 type = "PipeLLM"
 definition = "Imagine a product of nature"
 inputs = { color = "Color" }
@@ -38,7 +38,7 @@ Propose a product of nature of this color: $color.
 Just state what it is in a single sentence.
 """
 
-[pipe.imagine_fantasy_scene_including_products_of_nature]
+[pipes.imagine_fantasy_scene_including_products_of_nature]
 type = "PipeLLM"
 definition = "Imagine a fantasy scene including products of nature"
 inputs = { product_of_nature = "ProductOfNature" }
@@ -51,7 +51,7 @@ Imagine a fantasy scene including the following products of nature:
 Keep it short and concise, just one sentence.
 """
 
-[pipe.imagine_nature_scene_of_original_power_rangers_colors]
+[pipes.imagine_nature_scene_of_original_power_rangers_colors]
 type = "PipeSequence"
 definition = "Imagine nature scenes of Power Rangers colors"
 output = "Image"
@@ -62,7 +62,7 @@ steps = [
 ]
 
 
-[pipe.imagine_nature_scene_of_alltime_power_rangers_colors]
+[pipes.imagine_nature_scene_of_alltime_power_rangers_colors]
 type = "PipeSequence"
 definition = "Imagine nature scenes of Power Rangers colors"
 output = "Image"

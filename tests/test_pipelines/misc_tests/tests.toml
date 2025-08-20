@@ -3,12 +3,12 @@
 domain = "tests"
 definition = "This library is intended for testing purposes"
 
-[concept]
+[concepts]
 FictionCharacter = "A character in a fiction story"
 ArticleAndCritic = "An article and a critique of it"
 Complex = "A complex object"
 
-[pipe.simple_llm_test_from_image]
+[pipes.simple_llm_test_from_image]
 type = "PipeLLM"
 definition = "Simple LLM test from image"
 inputs = { image = "Image" }
@@ -17,7 +17,7 @@ prompt_template = """
 Describe the using rap lyrics, including puns and references to the image.
 """
 
-[pipe.test_no_input]
+[pipes.test_no_input]
 type = "PipeLLM"
 definition = "No Input"
 output = "Text"
@@ -26,7 +26,7 @@ prompt_template = """
 Explain that this is a test prompt which took no input from the user.
 """
 
-[pipe.test_no_input_that_could_be_long]
+[pipes.test_no_input_that_could_be_long]
 type = "PipeLLM"
 definition = "No Input but generates a text that could be long"
 output = "Text"

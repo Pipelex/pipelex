@@ -24,37 +24,37 @@ class TestMigrationE2E:
 definition = "AI-powered content analysis and processing"
 system_prompt = "You are an expert content analyst"
 
-[concept]
+[concepts]
 Text = "Written content in natural language"
 Document = "A structured document with metadata"
 Report = "An analytical report with findings"
 
-[concept.Article]
+[concepts.Article]
 Concept = "A written composition on a specific topic"
 refines = "Text"
 structure = "ArticleContent"
 
-[concept.NewsArticle]
+[concepts.NewsArticle]
 Concept = "An article reporting current events"
 refines = "Article"
 
-[concept.BlogPost]
+[concepts.BlogPost]
 definition = "A blog post with metadata"  # Already migrated
 refines = "Article"
 structure = "BlogPostContent"
 
-[concept.ContentAnalysis]
+[concepts.ContentAnalysis]
 Concept = "Analysis of content including sentiment, topics, and key insights"
 refines = "Report"
 structure = "ContentAnalysisReport"
 
-[pipe.analyze_text]
+[pipes.analyze_text]
 PipeLLM = "Analyze text content for sentiment and topics"
 inputs = { text_input = "Text" }
 output = "ContentAnalysis"
 prompt_template = "Analyze this text: @text_input"
 
-[pipe.extract_article_info]
+[pipes.extract_article_info]
 PipeLLM = "Extract structured information from articles"
 inputs = { article = "Article" }
 output = "ArticleMetadata"
@@ -71,11 +71,11 @@ prompt_template = "Extract metadata from: @article"
         old_syntax_file.write_text("""domain = "legacy"
 definition = "Legacy concept definitions"
 
-[concept.LegacyConcept]
+[concepts.LegacyConcept]
 Concept = "An old concept that needs migration"
 refines = "Text"
 
-[concept.AnotherLegacy]
+[concepts.AnotherLegacy]
 Concept = "Another legacy concept with complex refines"
 refines = ["Text", "Document"]
 structure = "LegacyStructure"
@@ -86,11 +86,11 @@ structure = "LegacyStructure"
         new_syntax_file.write_text("""domain = "modern"
 definition = "Modern concept definitions"
 
-[concept.ModernConcept]
+[concepts.ModernConcept]
 definition = "A modern concept with new syntax"
 refines = "Text"
 
-[concept.AdvancedConcept]
+[concepts.AdvancedConcept]
 definition = "An advanced concept with structure"
 refines = ["Text", "Document"]
 structure = "AdvancedStructure"
@@ -101,7 +101,7 @@ structure = "AdvancedStructure"
         pipes_only_file.write_text("""domain = "pipes_only"
 definition = "File with only pipe definitions"
 
-[pipe.simple_pipe]
+[pipes.simple_pipe]
 PipeLLM = "A simple pipe"
 inputs = { input_text = "Text" }
 output = "Document"
@@ -149,7 +149,7 @@ prompt_template = "Process: @input_text"
         # Verify pipes-only file was migrated (pipe syntax changed)
         pipes_content = pipes_only_file.read_text()
         assert 'domain = "pipes_only"' in pipes_content
-        assert "[pipe.simple_pipe]" in pipes_content
+        assert "[pipes.simple_pipe]" in pipes_content
         assert 'type = "PipeLLM"' in pipes_content
         assert 'definition = "A simple pipe"' in pipes_content
         assert "Concept =" not in pipes_content
@@ -184,41 +184,41 @@ domain = "formatting_test"
 definition = "Test various formatting scenarios"
 
 # Simple concepts
-[concept]
+[concepts]
 BasicConcept = "A basic concept"
 
 # Complex concepts with various formatting
-[concept.StandardConcept]
+[concepts.StandardConcept]
 Concept = "Standard formatting concept"
 refines = "Text"
 
-[concept.IndentedConcept]
+[concepts.IndentedConcept]
     Concept = "Concept with indentation"
     refines = "Text"
     structure = "IndentedStructure"
 
-[concept.TabIndentedConcept]
+[concepts.TabIndentedConcept]
 \tConcept = "Concept with tab indentation"
 \trefines = "Text"
 
-[concept.MixedIndentedConcept]
+[concepts.MixedIndentedConcept]
   \tConcept = "Concept with mixed indentation"
   \trefines = ["Text", "Document"]
 
-[concept.VariousSpacingConcept]
+[concepts.VariousSpacingConcept]
 Concept="No spaces around equals"
 refines = "Text"
 
-[concept.ExtraSpacingConcept]
+[concepts.ExtraSpacingConcept]
 Concept   =   "Extra spaces around equals"
 refines = "Text"
 
-[concept.AlreadyMigratedConcept]
+[concepts.AlreadyMigratedConcept]
 definition = "This should not change"
 refines = "Text"
 
 # Comment with Concept = in it (should not change)
-[pipe.test_pipe]
+[pipes.test_pipe]
 PipeLLM = "A pipe that mentions Concept = in description"
 inputs = { input_text = "Text" }
 output = "Document"
@@ -276,11 +276,11 @@ Process this: @input_text
         test_file = tmp_path / "dry_run_test.toml"
         original_content = """domain = "dry_run_test"
 
-[concept.TestConcept]
+[concepts.TestConcept]
 Concept = "This should not be changed in dry run"
 refines = "Text"
 
-[concept.AnotherConcept]
+[concepts.AnotherConcept]
 Concept = "Neither should this"
 refines = "Document"
 """
@@ -312,7 +312,7 @@ refines = "Document"
         """Test proper error handling when file operations fail."""
 
         test_file = tmp_path / "permission_test.toml"
-        test_file.write_text("""[concept.Test]
+        test_file.write_text("""[concepts.Test]
 Concept = "Test concept"
 """)
 

@@ -1,5 +1,4 @@
-from collections import defaultdict
-from typing import ClassVar, Dict, List, Optional, Type
+from typing import ClassVar, List, Optional, Type
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 
@@ -391,10 +390,6 @@ def get_secret(secret_id: str) -> str:
     return get_secrets_provider().get_secret(secret_id=secret_id)
 
 
-def get_domain_provider() -> DomainProviderAbstract:
-    return get_pipelex_hub().get_required_domain_provider()
-
-
 def get_domains(excluded_domains: Optional[List[str]] = None) -> List[Domain]:
     domains = get_pipelex_hub().get_required_domain_provider().get_domains()
     if excluded_domains:
@@ -415,18 +410,6 @@ def get_optional_domain(domain_code: str) -> Optional[Domain]:
 
 def get_pipe_provider() -> PipeProviderAbstract:
     return get_pipelex_hub().get_required_pipe_provider()
-
-
-def get_pipes_by_domain(
-    excluded_domains: Optional[List[str]] = None,
-) -> Dict[str, List[str]]:
-    pipes = get_pipe_provider().get_pipes()
-    pipes_by_domain: Dict[str, List[str]] = defaultdict(list)
-    for pipe in pipes:
-        if excluded_domains and pipe.domain in excluded_domains:
-            continue
-        pipes_by_domain[pipe.domain].append(pipe.code)
-    return pipes_by_domain
 
 
 def get_required_pipe(pipe_code: str) -> PipeAbstract:
