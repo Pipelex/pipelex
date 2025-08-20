@@ -47,6 +47,9 @@ class PipeImgGenOutput(PipeOutput):
         return the_urls
 
 
+DEFAULT_PROMPT_VAR_NAME = "prompt"
+
+
 class PipeImgGen(PipeOperator):
     output_concept_code: str = NativeConcept.IMAGE.code
     imgg_prompt: Optional[str] = None
@@ -92,7 +95,7 @@ class PipeImgGen(PipeOperator):
         if self.img_gen_prompt_var_name:
             return {self.img_gen_prompt_var_name}
         else:
-            return {"imgg_prompt"}
+            return {DEFAULT_PROMPT_VAR_NAME}
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()

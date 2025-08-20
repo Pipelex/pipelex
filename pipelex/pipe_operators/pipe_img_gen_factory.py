@@ -26,6 +26,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
     is_raw: Optional[bool] = None
     seed: Optional[Union[int, Literal["auto"]]] = None
     nb_output: Optional[int] = Field(default=None, ge=1)
+    img_gen_prompt_var_name: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_imgg_prompt_and_imgg_prompt_stuff_name(self) -> Self:
@@ -65,4 +66,5 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             safety_tolerance=pipe_blueprint.safety_tolerance,
             is_raw=pipe_blueprint.is_raw,
             seed=pipe_blueprint.seed,
+            img_gen_prompt_var_name=pipe_blueprint.img_gen_prompt_var_name,
         )
