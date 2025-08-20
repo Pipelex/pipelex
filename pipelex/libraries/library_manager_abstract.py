@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from pipelex.core.bundle.pipelex_bundle import PipelexBundle
+from pipelex.core.pipe.pipe_abstract import PipeAbstract
 
 
 class LibraryManagerAbstract(ABC):
@@ -31,5 +32,5 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def load_from_pipelex_bundle(self, pipelex_bundle: PipelexBundle) -> None:
+    def load_from_pipelex_bundle(self, pipelex_bundle: PipelexBundle) -> List[PipeAbstract]:
         pass

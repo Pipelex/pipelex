@@ -128,8 +128,16 @@ class TestInlineStructureConcepts:
 
     def test_invalid_string_reference_raises_error(self):
         """Test that invalid string references raise appropriate errors."""
-        with pytest.raises(StructureClassError, match="Structure class 'NonExistentClass' is not a registered subclass of StuffContent"):
-            _ = ConceptBlueprint(definition="Test invalid reference", structure="NonExistentClass")
+        with pytest.raises(
+            StructureClassError,
+            match="Structure class 'NonExistentClass' set for concept 'TestInvalidRef' in domain 'test_domain' is \
+not a registered subclass of StuffContent",
+        ):
+            _ = ConceptFactory.make_concept_from_blueprint(
+                domain="test_domain",
+                code="TestInvalidRef",
+                concept_blueprint=ConceptBlueprint(definition="Test invalid reference", structure="NonExistentClass"),
+            )
 
     def test_multiple_inline_structures_do_not_conflict(self):
         """Test that multiple inline structures with same field names don't conflict."""

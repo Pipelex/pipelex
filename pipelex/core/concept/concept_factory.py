@@ -9,7 +9,7 @@ from pipelex.core.concept.concept_native import NativeConcept, NativeConceptClas
 from pipelex.core.domain.domain import SpecialDomain
 from pipelex.core.stuff.stuff_content import TextContent
 from pipelex.create.structured_output_generator import generate_structured_output_from_inline_definition
-from pipelex.exceptions import ConceptFactoryError
+from pipelex.exceptions import ConceptFactoryError, StructureClassError
 from pipelex.hub import get_class_registry
 
 
@@ -39,7 +39,7 @@ class ConceptFactory:
             concept_name = Concept.extract_concept_name_from_str(concept_str=concept_str)
         else:
             concept_name = concept_str
-        if ConceptBlueprint.is_valid_structure_class(structure_class_name=concept_name):
+        if Concept.is_valid_structure_class(structure_class_name=concept_name):
             # structure is set implicitly, by the concept's code
             structure_class_name = concept_name
             refines = []
@@ -76,10 +76,10 @@ class ConceptFactory:
         if concept_blueprint.structure:
             if isinstance(concept_blueprint.structure, str):
                 # Structure is defined inline - generate Python class dynamically
-                if not ConceptBlueprint.is_valid_structure_class(structure_class_name=concept_blueprint.structure):
-                    raise ConceptFactoryError(
-                        f"Structure class '{concept_blueprint.structure}' set for concept '{code}' in domain '{domain}' is\
-                              not a registered subclass of StuffContent"
+                if not Concept.is_valid_structure_class(structure_class_name=concept_blueprint.structure):
+                    raise StructureClassError(
+                        f"Structure class '{concept_blueprint.structure}' set for concept '{code}' in domain '{domain}' \
+is not a registered subclass of StuffContent"
                     )
                 structure_class_name = concept_blueprint.structure
             else:
@@ -102,7 +102,7 @@ class ConceptFactory:
 
                 except Exception as exc:
                     raise ConceptFactoryError(f"Error generating structure class for concept '{code}' in domain '{domain}': {exc}") from exc
-        elif ConceptBlueprint.is_valid_structure_class(structure_class_name=code):
+        elif Concept.is_valid_structure_class(structure_class_name=code):
             # No structure defined on the blueprint, but the concept code is a valid structure class
             pass
         else:

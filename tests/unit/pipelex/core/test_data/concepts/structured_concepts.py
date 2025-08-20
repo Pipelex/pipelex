@@ -36,7 +36,41 @@ birthdate = { type = "date", definition = "The birthdate of the person", require
     ),
 )
 
+CONCEPTS_WITH_NAMED_STRUCTURES = (
+    "concepts_with_named_structures",
+    """domain = "named_structures"
+definition = "Domain with concepts using named structure references"
+
+[concepts]
+BasicInfo = "Basic information concept"
+
+[concepts.ProductInfo]
+definition = "Information about a product"
+structure = "ProductData"
+
+[concepts.OrderInfo]
+definition = "Information about an order"
+structure = "OrderData"
+""",
+    PipelexBundleBlueprint(
+        domain="named_structures",
+        definition="Domain with concepts using named structure references",
+        concepts={
+            "BasicInfo": "Basic information concept",
+            "ProductInfo": ConceptBlueprint(
+                definition="Information about a product",
+                structure="ProductData",
+            ),
+            "OrderInfo": ConceptBlueprint(
+                definition="Information about an order",
+                structure="OrderData",
+            ),
+        },
+    ),
+)
+
 # Export all structured concept test cases
 STRUCTURED_CONCEPT_TEST_CASES = [
     CONCEPTS_WITH_STRUCTURES,
+    CONCEPTS_WITH_NAMED_STRUCTURES,
 ]

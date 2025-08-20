@@ -6,6 +6,7 @@ from pydantic import BaseModel, model_validator
 from typing_extensions import Self
 
 from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.concept.concept_blueprint import ConceptBlueprint
 from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchBlueprint
 from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionBlueprint
 from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint
@@ -137,9 +138,12 @@ class PipelexInterpreter(BaseModel):
         return dict_to_toml(toml_data)
 
     @staticmethod
-    def _serialize_concepts(concepts: Dict[str, Any], domain: str) -> Dict[str, Any]:
+    def _serialize_concepts(concepts: Optional[Dict[str, ConceptBlueprint | str]], domain: str) -> Dict[str, Any]:
         """Serialize concepts section with domain context."""
         result: Dict[str, Any] = {}
+        if concepts is None:
+            return {}
+
         for concept_name, concept_blueprint in concepts.items():
             if isinstance(concept_blueprint, str):
                 # Simple string concept
@@ -148,24 +152,24 @@ class PipelexInterpreter(BaseModel):
                 # Complex ConceptBlueprint
                 if hasattr(concept_blueprint, "structure") and concept_blueprint.structure:
                     # Structured concept - create nested structure
-                    concept_data = {}
+                    concept_data: Dict[str, Any] = {}
                     if concept_blueprint.definition:
                         concept_data["definition"] = concept_blueprint.definition
                     if concept_blueprint.structure:
                         concept_data["structure"] = {}
-                        for field_name, field_value in concept_blueprint.structure.items():
-                            if isinstance(field_value, str):
-                                concept_data["structure"][field_name] = field_value
-                            else:
-                                # ConceptStructureBlueprint
-                                field_data = {}
-                                if hasattr(field_value, "type") and field_value.type:
+                        if isinstance(concept_blueprint.structure, str):
+                            concept_data["structure"] = concept_blueprint.structure
+                        else:
+                            for field_name, field_value in concept_blueprint.structure.items():
+                                if isinstance(field_value, str):
+                                    concept_data["structure"][field_name] = field_value
+                                else:
+                                    # ConceptStructureBlueprint
+                                    field_data: Dict[str, Any] = {}
                                     field_data["type"] = field_value.type
-                                if hasattr(field_value, "definition") and field_value.definition:
                                     field_data["definition"] = field_value.definition
-                                if hasattr(field_value, "required") and field_value.required is not None:
                                     field_data["required"] = field_value.required
-                                concept_data["structure"][field_name] = field_data
+                                    concept_data["structure"][field_name] = field_data
                     result[concept_name] = concept_data
                 elif hasattr(concept_blueprint, "refines") and concept_blueprint.refines:
                     # Concept with refines

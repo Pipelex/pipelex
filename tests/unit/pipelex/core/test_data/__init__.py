@@ -27,7 +27,7 @@ class InterpreterTestCases:
 
     # Aggregate all valid test cases from organized modules
     VALID_TEST_CASES: ClassVar[List[Tuple[str, str, PipelexBundleBlueprint]]] = [
-        # # Domain tests
+        # Domain tests
         *DOMAIN_TEST_CASES,
         # Concept tests
         *STRUCTURED_CONCEPT_TEST_CASES,

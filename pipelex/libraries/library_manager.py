@@ -13,6 +13,7 @@ from pipelex.core.concept.concept_factory import ConceptFactory
 from pipelex.core.concept.concept_library import ConceptLibrary
 from pipelex.core.domain.domain_library import DomainLibrary
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.core.pipe.pipe_abstract import PipeAbstract
 from pipelex.core.pipe.pipe_library import PipeLibrary
 from pipelex.exceptions import (
     ConceptLibraryError,
@@ -164,10 +165,11 @@ class LibraryManager(LibraryManagerAbstract):
         self.load_from_pipelex_bundle(pipelex_bundle=pipelex_bundle)
 
     @override
-    def load_from_pipelex_bundle(self, pipelex_bundle: PipelexBundle) -> None:
+    def load_from_pipelex_bundle(self, pipelex_bundle: PipelexBundle) -> List[PipeAbstract]:
         self.domain_library.add_domain(domain=pipelex_bundle.domain)
         self.concept_library.add_concepts(concepts=list(pipelex_bundle.concepts.values()))
         self.pipe_library.add_pipes(pipes=list(pipelex_bundle.pipes.values()))
+        return list(pipelex_bundle.pipes.values())
 
     @override
     def load_libraries(self, library_dirs: Optional[List[Path]] = None, library_file_paths: Optional[List[Path]] = None) -> None:
