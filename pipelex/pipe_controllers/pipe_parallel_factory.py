@@ -44,7 +44,7 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_blueprint(blueprint=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             parallel_sub_pipes=parallel_sub_pipes,
             add_each_output=pipe_blueprint.add_each_output,

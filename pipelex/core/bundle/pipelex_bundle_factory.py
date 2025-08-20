@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from pipelex.core.bundle.pipelex_bundle import PipelexBundle
 from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concept.concept import Concept
+from pipelex.core.concept.concept_blueprint import ConceptBlueprint
 from pipelex.core.concept.concept_factory import ConceptFactory
 from pipelex.core.domain.domain import Domain
 from pipelex.core.pipe.pipe_abstract import PipeAbstract
@@ -24,10 +25,17 @@ class PipelexBundleFactory(BaseModel):
         )
         concepts: Dict[str, Concept] = {}
         if blueprint.concepts is not None:
-            for concept_name, concept_blueprint in blueprint.concepts.items():
-                concepts[concept_name] = ConceptFactory.make_concept_from_blueprint(
-                    domain=blueprint.domain, code=concept_name, concept_blueprint=concept_blueprint
-                )
+            for concept_name, concept_blueprint_or_str in blueprint.concepts.items():
+                if isinstance(concept_blueprint_or_str, ConceptBlueprint):
+                    concepts[concept_name] = ConceptFactory.make_concept_from_blueprint(
+                        domain=blueprint.domain, code=concept_name, concept_blueprint=concept_blueprint_or_str
+                    )
+                else:
+                    # Oneline concepts
+                    concepts[concept_name] = ConceptFactory.make_concept_from_definition_str(
+                        domain_code=blueprint.domain, concept_str=concept_name, definition=concept_blueprint_or_str
+                    )
+
         pipes: Dict[str, PipeAbstract] = {}
         if blueprint.pipes is not None:
             for pipe_name, pipe_blueprint in blueprint.pipes.items():

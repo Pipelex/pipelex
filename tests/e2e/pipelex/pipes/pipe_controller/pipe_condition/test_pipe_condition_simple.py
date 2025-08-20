@@ -24,7 +24,7 @@ class TestPipeConditionSimple:
             code="test_condition_fail",
             domain="test_domain",
             inputs=PipeInputSpec.make_from_blueprint(
-                blueprint={"user_category": InputRequirementBlueprint(concept_code="test_pipe_condition.CategoryInput")}
+                domain="test_domain", blueprint={"user_category": InputRequirementBlueprint(concept_code="test_pipe_condition.CategoryInput")}
             ),
             output_concept_code="native.Text",
             expression_template="{{ user_category.category }}",
@@ -55,7 +55,7 @@ class TestPipeConditionSimple:
             code="test_condition_succeed",
             domain="test_domain",
             inputs=PipeInputSpec.make_from_blueprint(
-                blueprint={"user_status": InputRequirementBlueprint(concept_code="test_pipe_condition.CategoryInput")}
+                domain="test_domain", blueprint={"user_status": InputRequirementBlueprint(concept_code="test_pipe_condition.CategoryInput")}
             ),
             output_concept_code="native.Text",
             expression_template="{{ user_status.category }}",

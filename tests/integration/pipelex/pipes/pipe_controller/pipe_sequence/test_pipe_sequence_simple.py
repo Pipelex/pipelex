@@ -29,7 +29,9 @@ class TestPipeSequenceSimple:
         pipe_sequence = PipeSequence(
             domain="test_integration",
             code="simple_sequence",
-            inputs=PipeInputSpec.make_from_blueprint(blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             sequential_sub_pipes=[
                 SubPipe(pipe_code="capitalize_text", output_name="capitalized_text"),

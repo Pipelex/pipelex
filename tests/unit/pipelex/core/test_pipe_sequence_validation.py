@@ -11,7 +11,9 @@ class TestPipeSequenceValidation:
         pipe_sequence = PipeSequence(
             domain="test_domain",
             code="test_sequence",
-            inputs=PipeInputSpec.make_from_blueprint(blueprint={"text": InputRequirementBlueprint(concept_code="test_domain.Text")}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_domain", blueprint={"text": InputRequirementBlueprint(concept_code="test_domain.Text")}
+            ),
             output_concept_code="test_domain.ProcessedText",
             sequential_sub_pipes=[SubPipe(pipe_code="test_pipe_1", output_name="intermediate_result")],
         )
@@ -27,7 +29,9 @@ class TestPipeSequenceValidation:
         pipe_sequence = PipeSequence(
             domain="test_domain",
             code="test_sequence",
-            inputs=PipeInputSpec.make_from_blueprint(blueprint={"initial_input": InputRequirementBlueprint(concept_code="test_domain.Text")}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_domain", blueprint={"initial_input": InputRequirementBlueprint(concept_code="test_domain.Text")}
+            ),
             output_concept_code="test_domain.FinalOutput",
             sequential_sub_pipes=[SubPipe(pipe_code="step_1", output_name="intermediate"), SubPipe(pipe_code="step_2", output_name="final_output")],
         )

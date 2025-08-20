@@ -35,8 +35,8 @@ This is a test prompt
         assert isinstance(result, dict)
         assert result["domain"] == "test_domain"
         assert result["definition"] == "Test definition"
-        assert "concept" in result
-        assert "pipe" in result
+        assert "concepts" in result
+        assert "pipes" in result
 
     def test_validate_toml_file_trailing_whitespace(self, tmp_path: Path) -> None:
         """Test detection of trailing whitespace."""

@@ -34,6 +34,7 @@ async def test_generate_pipeline_blueprint(pipe_run_mode: PipeRunMode, requireme
             "requirements": requirements,
             "draft_pipeline_rules": get_support_file(subpath="create/draft_pipelines.md"),
             "build_pipeline_rules": get_support_file(subpath="create/build_pipelines.md"),
+            "create_structured_output_rules": get_support_file(subpath="create/structures.md"),
         },
         pipe_run_mode=pipe_run_mode,
     )

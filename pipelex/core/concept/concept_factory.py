@@ -66,25 +66,29 @@ class ConceptFactory:
         code: str,
         concept_blueprint: ConceptBlueprint,
     ) -> Concept:
-        if code == "BestIdea":
-            print("ijdqjidjqsoj", domain)
-        structure_class_name: str
-        if structure := concept_blueprint.structure:
-            if isinstance(structure, str):
-                if not ConceptBlueprint.is_valid_structure_class(structure_class_name=structure):
+        refines_list: List[str]
+        if concept_blueprint.refines:
+            refines_list = cls.make_refines(domain=domain, refines=concept_blueprint.refines)
+        else:
+            refines_list = []
+
+        structure_class_name: str = code
+        if concept_blueprint.structure:
+            if isinstance(concept_blueprint.structure, str):
+                # Structure is defined inline - generate Python class dynamically
+                if not ConceptBlueprint.is_valid_structure_class(structure_class_name=concept_blueprint.structure):
                     raise ConceptFactoryError(
-                        f"Structure class '{structure}' set for concept '{code}' in domain '{domain}' is not a registered subclass of StuffContent"
+                        f"Structure class '{concept_blueprint.structure}' set for concept '{code}' in domain '{domain}' is\
+                              not a registered subclass of StuffContent"
                     )
-                # Blueprint should already be validated, so we trust the structure is valid
-                structure_class_name = structure
+                structure_class_name = concept_blueprint.structure
             else:
-                # structure is defined inline - generate Python class dynamically
-                structure_class_name = code
+                # Structure is defined as a ConceptStructureBlueprint
                 try:
                     # Generate Python class from inline definition
                     python_code = generate_structured_output_from_inline_definition(
                         class_name=code,
-                        fields_def=structure,  # type: ignore[arg-type]
+                        fields_def=concept_blueprint.structure_to_field_def(),  # type: ignore[arg-type]
                         enums=None,  # TODO: Handle enums if needed in the future
                     )
 
@@ -99,20 +103,25 @@ class ConceptFactory:
                 except Exception as exc:
                     raise ConceptFactoryError(f"Error generating structure class for concept '{code}' in domain '{domain}': {exc}") from exc
         elif ConceptBlueprint.is_valid_structure_class(structure_class_name=code):
-            # Structure is set implicitly, by the concept's code
-            structure_class_name = code
+            # No structure defined on the blueprint, but the concept code is a valid structure class
+            pass
         else:
-            structure_class_name = TextContent.__name__
+            if concept_blueprint.refines:
+                # Has a refining element
+                pass
+            else:
+                # Fallback to Text structure
+                structure_class_name = TextContent.__name__
+                refines_list = [NativeConcept.TEXT.code]
 
-        refines_list = cls.make_refines(domain=domain, refines=concept_blueprint.refines or [])
-        the_concept = Concept(
+        refines_list = cls.make_refines(domain=domain, refines=refines_list)
+        return Concept(
             code=ConceptCodeFactory.make_concept_code(domain, code),
             domain=domain,
             definition=concept_blueprint.definition,
             structure_class_name=structure_class_name,
             refines=refines_list,
         )
-        return the_concept
 
     @classmethod
     def make_native_concept(cls, native_concept: NativeConcept) -> Concept:

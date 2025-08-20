@@ -30,10 +30,11 @@ class TestPipeBatchSimple:
             code="simple_batch",
             branch_pipe_code="uppercase_transformer",  # This exists in the TOML file
             inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration",
                 blueprint={
                     "text_list": InputRequirementBlueprint(concept_code="Text"),
                     "text_item": InputRequirementBlueprint(concept_code="Text"),
-                }
+                },
             ),
             output_concept_code="test_integration.UppercaseText",
             batch_params=BatchParams(input_list_stuff_name="text_list", input_item_stuff_name="text_item"),

@@ -26,9 +26,6 @@ class PipeAbstract(ABC, BaseModel):
     @model_validator(mode="before")
     @classmethod
     def add_domain_prefix(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        from pipelex import pretty_print
-
-        pretty_print(data, "djqijdq")
         # Process output_concept_code - always present
         if "output_concept_code" in data:
             data["output_concept_code"] = ConceptCodeFactory.make_concept_code_from_str(
@@ -38,18 +35,16 @@ class PipeAbstract(ABC, BaseModel):
             )
 
         # Process inputs - always present
-        inputs = data["inputs"]
-        if isinstance(inputs, PipeInputSpec):
-            pretty_print(cls, "djqijdqinputsdpqdzq,")
-            pretty_print(data, "ddatadatadatadatajqijdqinputsdpqdzq,")
-            for _, input_requirement in inputs.root.items():
-                input_requirement.concept_code = ConceptCodeFactory.make_concept_code_from_str(
-                    concept_str=input_requirement.concept_code,
-                    domain=data["domain"],
-                    fallback_domain=SpecialDomain.IMPLICIT,
-                )
+        if "inputs" in data:
+            inputs = data["inputs"]
+            if isinstance(inputs, PipeInputSpec):
+                for _, input_requirement in inputs.root.items():
+                    input_requirement.concept_code = ConceptCodeFactory.make_concept_code_from_str(
+                        concept_str=input_requirement.concept_code,
+                        domain=data["domain"],
+                        fallback_domain=SpecialDomain.IMPLICIT,
+                    )
 
-        pretty_print(data, "djqijdqfinish")
         return data
 
     @property

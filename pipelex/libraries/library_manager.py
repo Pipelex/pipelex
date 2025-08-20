@@ -74,6 +74,7 @@ class LibraryManager(LibraryManagerAbstract):
     @override
     def validate_libraries(self):
         log.debug("LibraryManager validating libraries")
+
         if self.llm_deck is None:
             raise LibraryError("LLM deck is not loaded")
 
@@ -109,7 +110,8 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def setup(self) -> None:
-        pass
+        native_concepts = ConceptFactory.list_native_concepts()
+        self.concept_library.add_concepts(concepts=native_concepts)
 
     @override
     def teardown(self) -> None:
@@ -165,9 +167,6 @@ class LibraryManager(LibraryManagerAbstract):
     @override
     def load_libraries(self, library_paths: Optional[List[Path]] = None):
         self.load_deck()
-
-        native_concepts = ConceptFactory.list_native_concepts()
-        self.concept_library.add_concepts(concepts=native_concepts)
 
         library_paths = library_paths or self._get_pipeline_library_paths()
         for library_path in library_paths:

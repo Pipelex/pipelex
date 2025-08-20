@@ -3,7 +3,7 @@
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concept.concept_blueprint import ConceptBlueprint
+from pipelex.core.concept.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 
 
 class SyntaxConverterTestCases:
@@ -78,20 +78,20 @@ domain = "refining_concepts"
 definition = "Domain with concepts that refine others"
 
 [concepts]
-Concept1 = "A concept"
-Concept2 = "A concept"
+Concept1 = "A concept1"
+Concept2 = "A concept2"
 
 [concepts.Concept3]
-definition = "A concept"
+definition = "A concept3"
 refines = "Concept2"
 """,
         PipelexBundleBlueprint(
             domain="refining_concepts",
             definition="Domain with concepts that refine others",
             concepts={
-                "Concept1": ConceptBlueprint(definition="A concept"),
-                "Concept2": ConceptBlueprint(definition="A concept"),
-                "Concept3": ConceptBlueprint(definition="A concept", refines="Concept2"),
+                "Concept1": "A concept1",
+                "Concept2": "A concept2",
+                "Concept3": ConceptBlueprint(definition="A concept3", refines="Concept2"),
             },
         ),
     )
@@ -117,13 +117,13 @@ birthdate = { type = "date", definition = "The birthdate of the person", require
             domain="structured_concepts",
             definition="Domain with structured concepts",
             concepts={
-                "SimpleData": ConceptBlueprint(definition="Simple data concept"),
+                "SimpleData": "Simple data concept",
                 "PersonInfo": ConceptBlueprint(
                     definition="Information about a person",
                     structure={
-                        "name": {"type": "text", "definition": "The name of the person", "required": True},
-                        "age": {"type": "number", "definition": "The age of the person", "required": True},
-                        "birthdate": {"type": "date", "definition": "The birthdate of the person", "required": True},
+                        "name": ConceptStructureBlueprint(type="text", definition="The name of the person", required=True),
+                        "age": ConceptStructureBlueprint(type="number", definition="The age of the person", required=True),
+                        "birthdate": ConceptStructureBlueprint(type="date", definition="The birthdate of the person", required=True),
                     },
                 ),
             },
@@ -175,6 +175,6 @@ TestConcept = "A test concept"
 
     # Collection of error test cases
     ERROR_TEST_CASES: ClassVar[List[Tuple[str, str]]] = [
-        # (INVALID_TOML_SYNTAX[0], INVALID_TOML_SYNTAX[1]),
-        # (MISSING_DOMAIN[0], MISSING_DOMAIN[1]),
+        (INVALID_TOML_SYNTAX[0], INVALID_TOML_SYNTAX[1]),
+        (MISSING_DOMAIN[0], MISSING_DOMAIN[1]),
     ]

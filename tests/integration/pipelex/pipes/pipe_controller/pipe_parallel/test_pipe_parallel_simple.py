@@ -28,7 +28,9 @@ class TestPipeParallelSimple:
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
-            inputs=PipeInputSpec.make_from_blueprint(blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             parallel_sub_pipes=[
                 SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
@@ -140,7 +142,9 @@ class TestPipeParallelSimple:
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
-            inputs=PipeInputSpec.make_from_blueprint(blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             parallel_sub_pipes=[
                 SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),

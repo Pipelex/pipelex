@@ -106,7 +106,10 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
         return cls(root={})
 
     @classmethod
-    def make_from_blueprint(cls, blueprint: Dict[str, InputRequirementBlueprint]) -> Self:
+    def make_from_blueprint(cls, domain: str, blueprint: Dict[str, InputRequirementBlueprint]) -> Self:
+        for var_name, input_requirement_blueprint in blueprint.items():
+            concept_code = ConceptCodeFactory.make_concept_code_from_str(domain=domain, concept_str=input_requirement_blueprint.concept_code)
+            blueprint[var_name].concept_code = concept_code
         return cls(
             root={
                 var_name: InputRequirement(

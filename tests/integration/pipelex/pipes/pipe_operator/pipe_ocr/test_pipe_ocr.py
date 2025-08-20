@@ -28,7 +28,7 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_image",
                 domain="generic",
-                inputs=PipeInputSpec.make_from_blueprint(blueprint={"page_scan": InputRequirementBlueprint(concept_code="Image")}),
+                inputs=PipeInputSpec.make_from_blueprint(domain="generic", blueprint={"page_scan": InputRequirementBlueprint(concept_code="Image")}),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
@@ -59,7 +59,7 @@ class TestPipeOCR:
                 code="adhoc_for_test_pipe_ocr_pdf",
                 domain="generic",
                 inputs=PipeInputSpec.make_from_blueprint(
-                    blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=NativeConcept.PDF.code)}
+                    domain="generic", blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=NativeConcept.PDF.code)}
                 ),
                 should_include_images=True,
                 should_caption_images=False,

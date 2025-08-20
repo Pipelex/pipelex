@@ -10,7 +10,9 @@ class TestPipeConditionValidation:
         pipe_condition = PipeCondition(
             domain="test_domain",
             code="test_condition",
-            inputs=PipeInputSpec.make_from_blueprint(blueprint={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_domain", blueprint={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")}
+            ),
             output_concept_code="test_domain.ProcessedText",
             expression="input_var",
             pipe_map={"value1": "pipe_a", "value2": "pipe_b"},
@@ -29,7 +31,9 @@ class TestPipeConditionValidation:
         pipe_condition_template = PipeCondition(
             domain="test_domain",
             code="test_condition_template",
-            inputs=PipeInputSpec.make_from_blueprint(blueprint={"var": InputRequirementBlueprint(concept_code="test_domain.Text")}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_domain", blueprint={"var": InputRequirementBlueprint(concept_code="test_domain.Text")}
+            ),
             output_concept_code="test_domain.Result",
             expression_template="{{ var }}",
             pipe_map={"value": "target_pipe"},
@@ -39,7 +43,9 @@ class TestPipeConditionValidation:
         pipe_condition_expr = PipeCondition(
             domain="test_domain",
             code="test_condition_expr",
-            inputs=PipeInputSpec.make_from_blueprint(blueprint={"var": InputRequirementBlueprint(concept_code="test_domain.Text")}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_domain", blueprint={"var": InputRequirementBlueprint(concept_code="test_domain.Text")}
+            ),
             output_concept_code="test_domain.Result",
             expression="var",
             pipe_map={"value": "target_pipe"},
