@@ -2,11 +2,11 @@ from typing import List, Tuple, Type
 
 import pytest
 
-from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.pipe.pipe_run_params import PipeRunMode
-from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff.stuff_content import StructuredContent
-from pipelex.core.working_memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory

@@ -2,7 +2,7 @@ from typing import Annotated, Dict, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from pipelex.core.concept.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchBlueprint
 from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionBlueprint
 from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint

@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional
 
-from pipelex.core.bundle.pipelex_bundle import PipelexBundle
-from pipelex.core.pipe.pipe_abstract import PipeAbstract
+from pipelex.core.bundles.pipelex_bundle import PipelexBundle
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
 
 class LibraryManagerAbstract(ABC):

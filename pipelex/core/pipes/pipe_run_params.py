@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.core.working_memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
+from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.types import StrEnum
 
 

@@ -2,10 +2,10 @@ from typing import List, Literal, Optional
 
 from typing_extensions import override
 
-from pipelex.core.concept.concept import Concept
-from pipelex.core.pipe.pipe_blueprint import PipeBlueprint
-from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel

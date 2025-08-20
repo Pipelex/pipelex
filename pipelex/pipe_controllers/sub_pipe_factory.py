@@ -3,7 +3,7 @@ from typing import Optional, Union
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import Self
 
-from pipelex.core.pipe.pipe_run_params import BatchParams, make_output_multiplicity
+from pipelex.core.pipes.pipe_run_params import BatchParams, make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list

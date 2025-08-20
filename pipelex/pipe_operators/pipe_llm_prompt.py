@@ -7,15 +7,15 @@ from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.core.concept.concept import Concept
-from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe.pipe_output import PipeOutput
-from pipelex.core.pipe.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff.stuff_content import ImageContent, LLMPromptContent, StuffContent
-from pipelex.core.stuff.stuff_factory import StuffFactory
-from pipelex.core.working_memory.working_memory import WorkingMemory
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import ImageContent, LLMPromptContent, StuffContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,

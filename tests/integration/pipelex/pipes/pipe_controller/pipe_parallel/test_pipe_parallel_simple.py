@@ -5,12 +5,12 @@ from typing import cast
 import pytest
 from pytest import FixtureRequest
 
-from pipelex.core.pipe.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
-from pipelex.core.pipe.pipe_run_params import PipeRunMode
-from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff.stuff_content import TextContent
-from pipelex.core.stuff.stuff_factory import StuffFactory
-from pipelex.core.working_memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipeline.job_metadata import JobMetadata

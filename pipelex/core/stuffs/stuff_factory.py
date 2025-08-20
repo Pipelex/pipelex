@@ -4,12 +4,12 @@ import shortuuid
 from pydantic import BaseModel, ValidationError
 
 from pipelex.client.protocol import StuffContentOrData
-from pipelex.core.concept.concept import Concept
-from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
-from pipelex.core.concept.concept_factory import ConceptFactory
-from pipelex.core.concept.concept_native import NativeConcept, NativeConceptClass
-from pipelex.core.stuff.stuff import Stuff
-from pipelex.core.stuff.stuff_content import (
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_code_factory import ConceptCodeFactory
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NativeConcept, NativeConceptClass
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content import (
     ListContent,
     StuffContent,
     StuffContentInitableFromStr,

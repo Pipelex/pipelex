@@ -1,6 +1,6 @@
 """PipeImgGen test cases."""
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_operators.pipe_img_gen_factory import PipeImgGenBlueprint
 
 PIPE_IMG_GEN = (

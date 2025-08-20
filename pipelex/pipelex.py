@@ -21,9 +21,9 @@ from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
 from pipelex.config import PipelexConfig, get_config
-from pipelex.core.concept.concept_library import ConceptLibrary
-from pipelex.core.domain.domain_library import DomainLibrary
-from pipelex.core.pipe.pipe_library import PipeLibrary
+from pipelex.core.concepts.concept_library import ConceptLibrary
+from pipelex.core.domains.domain_library import DomainLibrary
+from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub

@@ -4,9 +4,9 @@ from pydantic import ConfigDict, ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.concept.concept import Concept
-from pipelex.core.stuff.stuff_artefact import StuffArtefact
-from pipelex.core.stuff.stuff_content import (
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.stuffs.stuff_artefact import StuffArtefact
+from pipelex.core.stuffs.stuff_content import (
     HtmlContent,
     ImageContent,
     ListContent,

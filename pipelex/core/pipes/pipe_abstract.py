@@ -3,12 +3,12 @@ from typing import Any, Dict, Optional, Set, Type
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
-from pipelex.core.domain.domain import SpecialDomain
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe.pipe_output import PipeOutput
-from pipelex.core.pipe.pipe_run_params import PipeRunParams
-from pipelex.core.working_memory.working_memory import WorkingMemory
+from pipelex.core.concepts.concept_code_factory import ConceptCodeFactory
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeRunParams
 from pipelex.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
 

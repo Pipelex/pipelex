@@ -5,8 +5,8 @@ import toml
 from pydantic import BaseModel, model_validator
 from typing_extensions import Self
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concept.concept_blueprint import ConceptBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchBlueprint
 from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionBlueprint
 from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint

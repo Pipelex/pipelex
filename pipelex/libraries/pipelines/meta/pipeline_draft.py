@@ -2,8 +2,8 @@ from typing import Dict
 
 from pydantic import Field
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.stuff.stuff_content import StructuredContent
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 
 class PipeDraft(StructuredContent):

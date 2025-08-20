@@ -10,14 +10,14 @@ from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, ImggJobParams, Quality
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe.pipe_output import PipeOutput
-from pipelex.core.pipe.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, PipeRunParams, output_multiplicity_to_apply
-from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff.stuff_content import ImageContent, ListContent, StuffContent
-from pipelex.core.stuff.stuff_factory import StuffFactory
-from pipelex.core.working_memory.working_memory import WorkingMemory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, PipeRunParams, output_multiplicity_to_apply
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, StuffContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,

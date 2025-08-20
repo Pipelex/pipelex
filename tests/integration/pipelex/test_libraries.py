@@ -12,8 +12,8 @@ from rich.table import Table
 
 from pipelex import pretty_print
 from pipelex.config import get_config
-from pipelex.core.concept.concept_library import ConceptLibrary
-from pipelex.core.pipe.pipe_library import PipeLibrary
+from pipelex.core.concepts.concept_library import ConceptLibrary
+from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.libraries.library_manager_factory import LibraryManagerFactory
 from tests.integration.pipelex.test_data import LibraryTestCases
 

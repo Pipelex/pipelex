@@ -6,7 +6,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Union
 
 import tomlkit
 
-from pipelex.core.concept.concept_blueprint import ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprintFieldType
 
 
 class StructuredOutputGenerator:
@@ -26,7 +26,7 @@ class StructuredOutputGenerator:
         self.imports = {
             "from typing import Optional, List, Dict, Any, Literal",
             "from enum import Enum",
-            "from pipelex.core.stuff.stuff_content import StructuredContent",
+            "from pipelex.core.stuffs.stuff_content import StructuredContent",
             "from pydantic import Field",
         }
         self.enum_definitions: Dict[str, Dict[str, Any]] = {}  # Store enum definitions

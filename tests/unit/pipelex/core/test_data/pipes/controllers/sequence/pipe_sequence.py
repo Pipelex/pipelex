@@ -1,6 +1,6 @@
 """PipeSequence test cases."""
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 

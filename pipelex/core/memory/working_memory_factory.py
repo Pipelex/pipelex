@@ -6,12 +6,12 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.client.protocol import CompactMemory, ImplicitMemory
-from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.pipe.pipe_input_spec import TypedNamedInputRequirement
-from pipelex.core.stuff.stuff import Stuff
-from pipelex.core.stuff.stuff_content import ImageContent, ListContent, PDFContent, StuffContent, TextContent
-from pipelex.core.stuff.stuff_factory import StuffBlueprint, StuffFactory
-from pipelex.core.working_memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
+from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, PDFContent, StuffContent, TextContent
+from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.exceptions import WorkingMemoryFactoryError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
 

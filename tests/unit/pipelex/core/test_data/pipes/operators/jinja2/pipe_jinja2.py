@@ -1,6 +1,6 @@
 """PipeJinja2 test cases."""
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint
 
 PIPE_JINJA2 = (

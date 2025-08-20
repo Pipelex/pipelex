@@ -2,9 +2,9 @@ from typing import Literal
 
 from typing_extensions import override
 
-from pipelex.core.pipe.pipe_blueprint import PipeBlueprint
-from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_operators.pipe_func import PipeFunc
 
 

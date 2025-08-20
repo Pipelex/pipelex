@@ -2,10 +2,10 @@ from typing import Literal, Optional
 
 from typing_extensions import override
 
-from pipelex.core.pipe.pipe_blueprint import PipeBlueprint
-from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe.pipe_run_params import BatchParams
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_run_params import BatchParams
 from pipelex.pipe_controllers.pipe_batch import PipeBatch
 
 

@@ -4,10 +4,10 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
-from pipelex.core.pipe.pipe_blueprint import PipeBlueprint
-from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe.pipe_run_params import make_output_multiplicity
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider, get_optional_domain
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2

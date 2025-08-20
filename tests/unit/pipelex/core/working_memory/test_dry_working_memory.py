@@ -6,10 +6,10 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import log
-from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.pipe.pipe_input_spec import TypedNamedInputRequirement
-from pipelex.core.stuff.stuff_content import PageContent, TextContent
-from pipelex.core.working_memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
+from pipelex.core.stuffs.stuff_content import PageContent, TextContent
 from tests.test_pipelines.tricky_questions import ThoughtfulAnswer
 
 

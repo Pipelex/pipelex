@@ -1,7 +1,7 @@
 from typing import Optional
 
-from pipelex.core.concept.concept import Concept
-from pipelex.core.concept.concept_native import NativeConcept
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.exceptions import ConceptFactoryError
 
 

@@ -78,7 +78,7 @@ For each concept that needs structured output, create a corresponding Python cla
 from datetime import datetime
 from typing import List, Optional
 from pydantic import Field
-from pipelex.core.stuff.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 class Invoice(StructuredContent):
     invoice_number: str
@@ -99,7 +99,7 @@ Use Pydantic's validation features to ensure data quality:
 
 ```python
 from pydantic import field_validator
-from pipelex.core.stuff.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 class Employee(StructuredContent):
     name: str
@@ -129,7 +129,7 @@ Not all data is always available. Use Optional fields with sensible defaults:
 ```python
 from typing import Optional
 from datetime import datetime
-from pipelex.core.stuff.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 class Meeting(StructuredContent):
     title: str
@@ -158,7 +158,7 @@ Department = "An organizational unit within a company"  # No Python model => tex
 
 ```python
 # pipelex_libraries/pipelines/hr.py
-from pipelex.core.stuff.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 from datetime import datetime
 from typing import List, Optional
 
@@ -266,7 +266,7 @@ While TOML refinement is primarily semantic, you can mirror these relationships 
 
 ```python
 # pipelex_libraries/pipelines/content.py
-from pipelex.core.stuff.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 from datetime import datetime
 from typing import Optional, List
 

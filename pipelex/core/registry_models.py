@@ -1,9 +1,9 @@
 from typing import Any, ClassVar, List
 
-from pipelex.core.pipe.pipe_abstract import PipeAbstractType
-from pipelex.core.pipe.pipe_factory import PipeFactoryProtocol
-from pipelex.core.stuff.stuff import Stuff
-from pipelex.core.stuff.stuff_content import (
+from pipelex.core.pipes.pipe_abstract import PipeAbstractType
+from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content import (
     DynamicContent,
     HtmlContent,
     ImageContent,

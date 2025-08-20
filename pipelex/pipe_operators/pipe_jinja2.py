@@ -9,14 +9,14 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.config import get_config
-from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe.pipe_output import PipeOutput
-from pipelex.core.pipe.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff.stuff import Stuff
-from pipelex.core.stuff.stuff_content import TextContent
-from pipelex.core.working_memory.working_memory import WorkingMemory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
 from pipelex.hub import get_content_generator, get_template, get_template_provider
 from pipelex.pipe_operators.pipe_operator import PipeOperator

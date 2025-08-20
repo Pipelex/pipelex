@@ -2,14 +2,14 @@ from typing import Dict
 
 from pydantic import BaseModel
 
-from pipelex.core.bundle.pipelex_bundle import PipelexBundle
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concept.concept import Concept
-from pipelex.core.concept.concept_blueprint import ConceptBlueprint
-from pipelex.core.concept.concept_factory import ConceptFactory
-from pipelex.core.domain.domain import Domain
-from pipelex.core.pipe.pipe_abstract import PipeAbstract
-from pipelex.core.pipe.pipe_factory import PipeFactory
+from pipelex.core.bundles.pipelex_bundle import PipelexBundle
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.domains.domain import Domain
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.pipe_factory import PipeFactory
 
 
 class PipelexBundleFactory(BaseModel):

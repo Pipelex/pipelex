@@ -1,12 +1,12 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.pipe.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
-from pipelex.core.pipe.pipe_run_params import PipeRunMode
-from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff.stuff_content import PageContent
-from pipelex.core.working_memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import PageContent
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_ocr import PIPE_OCR_INPUT_NAME, PipeOcr, PipeOcrOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory

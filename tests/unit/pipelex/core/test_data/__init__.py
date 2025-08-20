@@ -2,7 +2,7 @@
 
 from typing import ClassVar, List, Tuple
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 # Import all test data from organized modules
 from .complex.multi_feature import COMPLEX_TEST_CASES

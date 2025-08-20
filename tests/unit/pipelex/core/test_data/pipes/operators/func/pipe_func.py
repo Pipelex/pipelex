@@ -1,6 +1,6 @@
 """PipeFunc test cases."""
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_operators.pipe_func_factory import PipeFuncBlueprint
 
 PIPE_FUNC = (

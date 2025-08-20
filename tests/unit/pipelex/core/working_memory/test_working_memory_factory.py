@@ -1,7 +1,7 @@
 from pipelex.client.protocol import CompactMemory
-from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.stuff.stuff_content import ImageContent, PageContent, TextAndImagesContent, TextContent
-from pipelex.core.working_memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.stuff_content import ImageContent, PageContent, TextAndImagesContent, TextContent
 
 
 class TestWorkingMemoryFactory:

@@ -1,7 +1,7 @@
 """Complex test cases combining multiple features."""
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.pipe.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
 from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint

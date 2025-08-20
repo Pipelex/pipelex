@@ -1,6 +1,6 @@
 """PipeLLM test cases."""
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint
 
 PIPE_LLM = (

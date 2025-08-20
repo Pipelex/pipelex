@@ -4,14 +4,14 @@ from typing import Dict
 
 import pytest
 
-from pipelex.core.concept.concept_blueprint import (
+from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptStructureBlueprint,
     ConceptStructureBlueprintFieldType,
     ConceptStructureBlueprintType,
 )
-from pipelex.core.concept.concept_factory import ConceptFactory
-from pipelex.core.stuff.stuff_content import StructuredContent
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.exceptions import StructureClassError
 from pipelex.hub import get_class_registry
 

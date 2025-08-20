@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from pipelex.core.stuff.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 
 class CategoryInput(StructuredContent):

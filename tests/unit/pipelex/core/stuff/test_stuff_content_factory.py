@@ -2,8 +2,8 @@ from typing import Any, ClassVar, Dict, List, Tuple
 
 import pytest
 
-from pipelex.core.stuff.stuff_content import StructuredContent, TextContent
-from pipelex.core.stuff.stuff_factory import StuffContentFactory
+from pipelex.core.stuffs.stuff_content import StructuredContent, TextContent
+from pipelex.core.stuffs.stuff_factory import StuffContentFactory
 
 
 class TestCases:

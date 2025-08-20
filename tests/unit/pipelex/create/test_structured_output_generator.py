@@ -31,7 +31,7 @@ active = { type = "boolean", definition = "Active status", default = true }
 
         # Check that basic structure is correct
         assert "from typing import Optional" in result
-        assert "from pipelex.core.stuff.stuff_content import StructuredContent" in result
+        assert "from pipelex.core.stuffs.stuff_content import StructuredContent" in result
         assert "from pydantic import Field" in result
         assert "class TestModel(StructuredContent):" in result
         assert '"""A test model"""' in result

@@ -6,9 +6,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.domain.domain import SpecialDomain
-from pipelex.core.stuff.stuff_content import StuffContent
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.exceptions import ConceptCodeError, ConceptDomainError, ConceptError
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 

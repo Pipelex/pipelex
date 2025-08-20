@@ -2,12 +2,12 @@ from typing import Any, Dict, List, Union
 
 from pydantic import ValidationError
 
-from pipelex.core.concept.concept import Concept
-from pipelex.core.concept.concept_blueprint import ConceptBlueprint
-from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
-from pipelex.core.concept.concept_native import NativeConcept, NativeConceptClass
-from pipelex.core.domain.domain import SpecialDomain
-from pipelex.core.stuff.stuff_content import TextContent
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_code_factory import ConceptCodeFactory
+from pipelex.core.concepts.concept_native import NativeConcept, NativeConceptClass
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.create.structured_output_generator import generate_structured_output_from_inline_definition
 from pipelex.exceptions import ConceptFactoryError, StructureClassError
 from pipelex.hub import get_class_registry

@@ -7,8 +7,8 @@ from rich.table import Table
 from typing_extensions import override
 
 from pipelex import pretty_print
-from pipelex.core.pipe.pipe_abstract import PipeAbstract
-from pipelex.core.pipe.pipe_provider_abstract import PipeProviderAbstract
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.pipe_provider_abstract import PipeProviderAbstract
 from pipelex.exceptions import ConceptError, ConceptLibraryConceptNotFoundError, PipeLibraryError, PipeLibraryPipeNotFoundError
 from pipelex.hub import get_concept_provider
 

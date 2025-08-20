@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter import PipelexInterpreter
 from tests.unit.pipelex.core.test_data import InterpreterTestCases
 

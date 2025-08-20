@@ -8,8 +8,8 @@ import networkx as nx
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.concept.concept import Concept
-from pipelex.core.stuff.stuff import Stuff
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.stuffs.stuff import Stuff
 from pipelex.exceptions import JobHistoryError
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.pipeline.track.flow_chart import PipelineFlowChart

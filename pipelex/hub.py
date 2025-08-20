@@ -14,12 +14,12 @@ from pipelex.cogt.llm.llm_models.llm_model_provider_abstract import (
 )
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
-from pipelex.core.concept.concept import Concept
-from pipelex.core.concept.concept_provider_abstract import ConceptProviderAbstract
-from pipelex.core.domain.domain import Domain
-from pipelex.core.domain.domain_provider_abstract import DomainProviderAbstract
-from pipelex.core.pipe.pipe_abstract import PipeAbstract
-from pipelex.core.pipe.pipe_provider_abstract import PipeProviderAbstract
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.domains.domain import Domain
+from pipelex.core.domains.domain_provider_abstract import DomainProviderAbstract
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.pipe_provider_abstract import PipeProviderAbstract
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerProtocol

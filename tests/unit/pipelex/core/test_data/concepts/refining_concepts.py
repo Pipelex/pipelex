@@ -1,7 +1,7 @@
 """Refining concept test cases."""
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concept.concept_blueprint import ConceptBlueprint
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 
 CONCEPTS_WITH_REFINES = (
     "concepts_with_refines",
