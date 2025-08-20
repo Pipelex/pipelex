@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from pipelex import log, pretty_print
+from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.create.helpers import get_support_file
 from pipelex.libraries.pipelines.meta.pipeline_draft import PipelexBundleBlueprintStuff
 from pipelex.pipeline.execute import execute_pipeline
@@ -38,7 +39,7 @@ async def do_build_blueprint(
     draft_path = f"{output_path_base}_draft.md"
     save_text_to_path(text=pipeline_draft, path=draft_path, create_directory=True)
     rough_toml_path = f"{output_path_base}_rough.toml"
-    save_as_json_to_path(object_to_save=blueprint, path=rough_toml_path)
+    save_text_to_path(text=PipelexInterpreter.make_toml_content(blueprint=blueprint), path=rough_toml_path)
     rough_json_path = f"{output_path_base}_rough.json"
     save_as_json_to_path(object_to_save=blueprint, path=rough_json_path)
     log.info(f"✅ Rough blueprint saved to '{output_path_base}'")

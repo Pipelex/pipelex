@@ -8,7 +8,7 @@ PipeDraft = "Rough solution to create a pipe"
 ConceptBlueprint = "Details enabling to create a concept"
 PipeBlueprint = "Details enabling to create a pipe"
 
-[concept.PipelexBundleBlueprint]
+[concepts.PipelexBundleBlueprint]
 definition = "Details enabling to create a pipeline"
 structure = "PipelexBundleBlueprintStuff"
 
