@@ -1,19 +1,19 @@
 domain = "meta"
 definition = "Meta domain is the domain of pipelines about pipelines"
 
-[concepts]
+[concept]
 PipelineDraft = "Rough solution to create a pipeline"
 PipelineDraftText = "Rough solution to create a pipeline in text format"
 PipeDraft = "Rough solution to create a pipe"
 ConceptBlueprint = "Details enabling to create a concept"
 PipeBlueprint = "Details enabling to create a pipe"
 
-[concepts.PipelexBundleBlueprint]
+[concept.PipelexBundleBlueprint]
 definition = "Details enabling to create a pipeline"
 structure = "PipelexBundleBlueprintStuff"
 
-[pipes]
-[pipes.build_blueprint]
+[pipe]
+[pipe.build_blueprint]
 type = "PipeSequence"
 definition = "Build a pipeline blueprint from natural language requirements"
 inputs = { draft_pipeline_rules = "Text", build_pipeline_rules = "Text", create_structured_output_rules = "Text", requirements = "Text", pipeline_name = "Text", domain = "Text" }
@@ -23,7 +23,7 @@ steps = [
     { pipe = "structure_blueprint", result = "pipeline_blueprint" },
 ]
 
-[pipes.draft_pipeline_text]
+[pipe.draft_pipeline_text]
 type = "PipeLLM"
 definition = "Generate a rough pipeline draft from natural language requirements"
 inputs = { draft_pipeline_rules = "Text", create_structured_output_rules = "Text", requirements = "Text", pipeline_name = "Text", domain = "Text" }
@@ -45,7 +45,7 @@ Domain: $domain.
 Requirements: $requirements
 """
 
-[pipes.structure_blueprint]
+[pipe.structure_blueprint]
 type = "PipeLLM"
 definition = "Generate a pipeline blueprint from natural language requirements"
 inputs = { build_pipeline_rules = "Text", pipeline_draft = "Text", pipeline_name = "Text", domain = "Text", requirements = "Text" }

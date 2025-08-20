@@ -1,11 +1,11 @@
 domain = "test_image_inputs"
 definition = "Test domain for verifying image input functionality"
 
-[concepts]
+[concept]
 Article = "Article"
 
-[pipes]
-[pipes.extract_article_from_image]
+[pipe]
+[pipe.extract_article_from_image]
 type = "PipeLLM"
 definition = "Describe a page content"
 inputs = { image = "Image" }
@@ -17,7 +17,7 @@ prompt_template = """
 Extract the text and the date of the article in the image.
 """
 
-[pipes.describe_page]
+[pipe.describe_page]
 type = "PipeLLM"
 definition = "Describe a page"
 inputs = { "page.page_view" = "Image", page = "Page" }

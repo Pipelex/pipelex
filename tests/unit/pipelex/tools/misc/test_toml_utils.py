@@ -13,19 +13,19 @@ from pipelex.tools.misc.toml_utils import (
 class TestTomlUtils:
     def test_load_toml_from_path_valid_file(self, tmp_path: Path) -> None:
         """Test loading a valid TOML file without issues."""
-        toml_content = """
-domain = "test_domain"
+        toml_content = """domain = "test_domain"
 definition = "Test definition"
 
-[concepts]
+[concept]
 TestConcept = "A test concept"
 
-[pipes]
-[pipes.test_pipe]
-PipeLLM = "Test pipe definition"
+[pipe]
+[pipe.test_pipe]
+type = "PipeLLM"
+definition = "Test pipe definition"
 prompt_template = '''
 This is a test prompt
-'''
+''' 
 """
         toml_file = tmp_path / "valid.toml"
         toml_file.write_text(toml_content)
@@ -35,8 +35,8 @@ This is a test prompt
         assert isinstance(result, dict)
         assert result["domain"] == "test_domain"
         assert result["definition"] == "Test definition"
-        assert "concepts" in result
-        assert "pipes" in result
+        assert "concept" in result
+        assert "pipe" in result
 
     def test_validate_toml_file_trailing_whitespace(self, tmp_path: Path) -> None:
         """Test detection of trailing whitespace."""
@@ -58,7 +58,7 @@ definition = "Test"
         """Test detection of trailing whitespace after triple quotes."""
         toml_content = '''domain = "test"
 
-[pipes.test_pipe]
+[pipe.test_pipe]
 PipeLLM = "Test"
 prompt_template = """
 Output this only: "test"
@@ -138,7 +138,7 @@ definition = "Test definition"
         toml_content = """domain = "test"
 definition = "Test definition"
 
-[concepts]
+[concept]
 TestConcept = "A test concept"
 """
         toml_file = tmp_path / "valid.toml"
@@ -152,7 +152,7 @@ TestConcept = "A test concept"
         toml_content = """domain = "test"   
 definition = "Test"	
 
-[pipes.test_pipe]
+[pipe.test_pipe]
 prompt_template = \"\"\"
 Output: "test"
 \"\"\" 
@@ -189,23 +189,25 @@ Output: "test"
         toml_content = '''domain = "test_pipe_condition_2"
 definition = "Simple test for PipeCondition functionality using expression"
 
-[concepts]
+[concept]
 CategoryInput = "Input with a category field"
 
-[pipes]
-[pipes.basic_condition_by_category_2]
-PipeCondition = "Route based on category field using expression"
+[pipe]
+[pipe.basic_condition_by_category_2]
+type = "PipeCondition"
+definition = "Route based on category field using expression"
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
 
-[pipes.basic_condition_by_category_2.pipe_map]
+[pipe.basic_condition_by_category_2.pipe_map]
 small = "process_small_2"
 medium = "process_medium_2" 
 large = "process_large_2"
 
-[pipes.process_large_2]
-PipeLLM = "Generate random text for large items"
+[pipe.process_large_2]
+type = "PipeLLM"
+definition = "Generate random text for large items"
 output = "native.Text"
 prompt_template = """
 Output this only: "large"
@@ -218,7 +220,7 @@ Output this only: "large"
 
         error_msg = str(exc_info.value)
         assert "Trailing whitespace after triple quotes" in error_msg
-        assert "Line 24" in error_msg  # The line with """ followed by space
+        assert "Line 26" in error_msg  # The line with """ followed by space
 
     def test_validate_toml_file_actual_problematic_file(self) -> None:
         """Test validation on the actual problematic file from the codebase."""

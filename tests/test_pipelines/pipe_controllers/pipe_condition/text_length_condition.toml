@@ -1,9 +1,9 @@
 domain = "test_integration"
 definition = "Test pipes for PipeCondition based on text length"
 
-[pipes]
+[pipe]
 
-[pipes.capitalize_long_text]
+[pipe.capitalize_long_text]
 type = "PipeLLM"
 definition = "Capitalize text for long inputs"
 inputs = { input_text = "Text" }
@@ -14,7 +14,7 @@ prompt_template = """Transform the following LONG text to uppercase and add "LON
 
 Return only the prefixed uppercase text, nothing else."""
 
-[pipes.add_prefix_short_text]
+[pipe.add_prefix_short_text]
 type = "PipeLLM"
 definition = "Add prefix for short text inputs"
 inputs = { input_text = "Text" }

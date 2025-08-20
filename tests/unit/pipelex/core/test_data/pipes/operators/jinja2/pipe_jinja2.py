@@ -8,7 +8,7 @@ PIPE_JINJA2 = (
     """domain = "test_pipes"
 definition = "Domain with template processing pipe"
 
-[pipes.process_template]
+[pipe.process_template]
 type = "PipeJinja2"
 definition = "Process a Jinja2 template"
 output = "Text"
@@ -17,7 +17,7 @@ jinja2 = "Hello {{ name }}!"
     PipelexBundleBlueprint(
         domain="test_pipes",
         definition="Domain with template processing pipe",
-        pipes={
+        pipe={
             "process_template": PipeJinja2Blueprint(
                 type="PipeJinja2",
                 definition="Process a Jinja2 template",

@@ -8,7 +8,7 @@ PIPE_LLM = (
     """domain = "test_pipes"
 definition = "Domain with pipe definitions"
 
-[pipes.generate_text]
+[pipe.generate_text]
 type = "PipeLLM"
 definition = "Generate text using LLM"
 output = "Text"
@@ -17,7 +17,7 @@ prompt_template = "Generate a story about a programmer"
     PipelexBundleBlueprint(
         domain="test_pipes",
         definition="Domain with pipe definitions",
-        pipes={
+        pipe={
             "generate_text": PipeLLMBlueprint(
                 type="PipeLLM",
                 definition="Generate text using LLM",

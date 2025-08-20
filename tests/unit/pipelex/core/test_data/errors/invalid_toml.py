@@ -7,7 +7,7 @@ INVALID_TOML_SYNTAX = (
     """domain = "invalid_syntax"
 definition = "Domain with invalid TOML syntax"
 
-[concepts]
+[concept]
 InvalidConcept = "This is missing a closing quote""",
     None,  # Should raise an exception
 )
@@ -17,7 +17,7 @@ MISSING_DOMAIN = (
     """# Missing domain field
 definition = "Domain without domain field"
 
-[concepts]
+[concept]
 TestConcept = "A test concept"
 """,
     None,  # Should raise an exception

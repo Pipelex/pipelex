@@ -8,7 +8,7 @@ PIPE_OCR = (
     """domain = "test_pipes"
 definition = "Domain with OCR pipe"
 
-[pipes.extract_text]
+[pipe.extract_text]
 type = "PipeOcr"
 definition = "Extract text from document"
 output = "Page"
@@ -16,7 +16,7 @@ output = "Page"
     PipelexBundleBlueprint(
         domain="test_pipes",
         definition="Domain with OCR pipe",
-        pipes={
+        pipe={
             "extract_text": PipeOcrBlueprint(
                 type="PipeOcr",
                 definition="Extract text from document",

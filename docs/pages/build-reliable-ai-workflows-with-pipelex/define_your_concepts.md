@@ -11,7 +11,7 @@ Every concept starts with a natural language definition. This definition serves 
 The simplest way to define a concept is with a descriptive sentence:
 
 ```toml
-[concepts]
+[concept]
 Invoice = "A commercial document issued by a seller to a buyer"
 Employee = "A person employed by an organization"
 ProductReview = "A customer's evaluation of a product or service"
@@ -55,7 +55,7 @@ Group concepts that naturally belong together in the same domain. A domain acts 
 domain = "finance"
 description = "Financial document processing"
 
-[concepts]
+[concept]
 Invoice = "A commercial document issued by a seller to a buyer"
 Receipt = "Proof of payment for goods or services"
 PurchaseOrder = "A buyer's formal request to purchase goods or services"
@@ -149,7 +149,7 @@ The connection between TOML definitions and Python models happens automatically 
 # pipelex_libraries/pipelines/hr.toml
 domain = "hr"
 
-[concepts]
+[concept]
 Employee = "A person employed by an organization"
 Meeting = "A scheduled gathering of people for discussion"
 PerformanceReview = "An evaluation of an employee's work performance"
@@ -194,18 +194,18 @@ Sometimes concepts build on each other. A `Contract` is a kind of `Document`. A 
 Use the `refines` field to indicate when one concept is a more specific version of another:
 
 ```toml
-[concepts]
+[concept]
 Document = "A written or printed record"
 
-[concepts.Contract]
+[concept.Contract]
 definition = "A legally binding agreement between parties"
 refines = "Document"
 
-[concepts.EmploymentContract]
+[concept.EmploymentContract]
 definition = "A contract between an employer and employee"
 refines = "Contract"
 
-[concepts.NonCompeteClause]
+[concept.NonCompeteClause]
 definition = "A contract clause restricting competitive activities"
 refines = "ContractClause"
 ```
@@ -220,7 +220,7 @@ Concept refinement helps in two ways:
 For example, a pipe that processes `Document` can also process `Contract` or `EmploymentContract`:
 
 ```toml
-[pipes.extract_key_points]
+[pipe.extract_key_points]
 PipeLLM = "Extract main points from any document"
 inputs = { doc = "Document" }  # Can accept Document, Contract, or EmploymentContract
 output = "KeyPoints"
@@ -234,27 +234,27 @@ Here's a complete example showing concept refinement in action:
 # pipelex_libraries/pipelines/content.toml
 domain = "content"
 
-[concepts]
+[concept]
 Text = "Written content in natural language"
 
-[concepts.Article]
+[concept.Article]
 definition = "A written composition on a specific topic"
 refines = "Text"
 
-[concepts.NewsArticle]
+[concept.NewsArticle]
 definition = "An article reporting current events"
 refines = "Article"
 
-[concepts.OpinionPiece]
+[concept.OpinionPiece]
 definition = "An article expressing personal views"
 refines = "Article"
 
-[pipes.summarize_text]
+[pipe.summarize_text]
 PipeLLM = "Create a summary of any text"
 inputs = { content = "Text" }  # Works with Text, Article, NewsArticle, etc.
 output = "Summary"
 
-[pipes.extract_facts]
+[pipe.extract_facts]
 PipeLLM = "Extract factual claims from news"
 inputs = { article = "NewsArticle" }  # Specifically requires news articles
 output = "FactualClaims"

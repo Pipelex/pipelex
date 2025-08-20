@@ -58,7 +58,7 @@ class GanttChart(StructuredContent):
 The `extract_gantt_by_steps` pipeline is a sequence of smaller, focused pipes. This is a great example of building a complex workflow from simple, reusable components.
 
 ```toml
-[pipes.extract_gantt_by_steps]
+[pipe.extract_gantt_by_steps]
 PipeSequence = "Extract all details from a gantt chart"
 inputs = { gantt_chart_image = "GanttChartImage" }
 output = "GanttChart"
@@ -74,7 +74,7 @@ steps = [
 ]
 
 # This is the pipe that extracts the details for a single task
-[pipes.extract_details_of_task]
+[pipe.extract_details_of_task]
 PipeLLM = "Extract the precise dates of the task, start_date and end_date"
 inputs = { gantt_chart_image = "GanttChartImage", gantt_timescale = "GanttTimescaleDescription", gantt_task_name = "GanttTaskName" }
 output = "GanttTaskDetails" # The output is structured as a GanttTaskDetails object

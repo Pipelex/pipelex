@@ -11,18 +11,18 @@ COMPLEX_PIPES = (
     """domain = "complex_domain"
 definition = "Domain with multiple pipe types"
 
-[concepts]
+[concept]
 InputData = "Input data concept"
 ProcessedData = "Processed data concept"
 
-[pipes.llm_pipe]
+[pipe.llm_pipe]
 type = "PipeLLM"
 definition = "Generate content"
 output = "ProcessedData"
 inputs = { data = "InputData" }
 prompt_template = "Process this data: @data"
 
-[pipes.sequence_pipe]
+[pipe.sequence_pipe]
 type = "PipeSequence"
 definition = "Sequential processing"
 output = "ProcessedData"
@@ -35,11 +35,11 @@ steps = [
     PipelexBundleBlueprint(
         domain="complex_domain",
         definition="Domain with multiple pipe types",
-        concepts={
+        concept={
             "InputData": "Input data concept",
             "ProcessedData": "Processed data concept",
         },
-        pipes={
+        pipe={
             "llm_pipe": PipeLLMBlueprint(
                 type="PipeLLM",
                 definition="Generate content",

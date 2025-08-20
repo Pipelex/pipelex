@@ -43,21 +43,21 @@ Each entry in the `parallels` array is a table with the following keys:
 Imagine you have a product description and you want to extract the product features and the product sentiment at the same time.
 
 ```toml
-[concepts.ProductAnalysis]
+[concept.ProductAnalysis]
 structure = "ProductAnalysis" # A Pydantic model with 'features' and 'sentiment' fields
 
-[pipes.extract_features]
+[pipe.extract_features]
 PipeLLM = "Extract features from text"
 inputs = { description = "ProductDescription" }
 output = "ProductFeatures"
 
-[pipes.analyze_sentiment]
+[pipe.analyze_sentiment]
 PipeLLM = "Analyze sentiment of text"
 inputs = { description = "ProductDescription" }
 output = "ProductSentiment"
 
 # The PipeParallel definition
-[pipes.analyze_product_in_parallel]
+[pipe.analyze_product_in_parallel]
 PipeParallel = "Extract features and sentiment at the same time"
 inputs = { description = "ProductDescription" }
 output = "ProductAnalysis" # This name is for the combined output

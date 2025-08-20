@@ -8,7 +8,7 @@ PIPE_IMG_GEN = (
     """domain = "test_pipes"
 definition = "Domain with image generation pipe"
 
-[pipes.generate_image]
+[pipe.generate_image]
 type = "PipeImgGen"
 definition = "Generate an image from a prompt"
 output = "Image"
@@ -17,7 +17,7 @@ img_gen_prompt = "A beautiful landscape"
     PipelexBundleBlueprint(
         domain="test_pipes",
         definition="Domain with image generation pipe",
-        pipes={
+        pipe={
             "generate_image": PipeImgGenBlueprint(
                 type="PipeImgGen",
                 definition="Generate an image from a prompt",

@@ -38,11 +38,11 @@ The `PageContent` object has the following structure:
 This example defines a pipe that takes a PDF, extracts text and full-page images, and outputs them as a list of pages.
 
 ```toml
-[concepts]
+[concept]
 ScannedDocument = "A document that has been scanned as a PDF"
 ExtractedPages = "A list of pages extracted from a document by OCR"
 
-[pipes.extract_text_from_document]
+[pipe.extract_text_from_document]
 PipeOcr = "Extract text from a scanned document"
 inputs = { ocr_input = "ScannedDocument" }
 output = "ExtractedText"

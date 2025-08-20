@@ -51,7 +51,7 @@ Report generated on: {{ report_date }}
 
 **Pipeline TOML definition:**
 ```toml
-[pipes.generate_weekly_report]
+[pipe.generate_weekly_report]
 PipeJinja2 = "Generate a formatted weekly report for a user"
 output = "WeeklyReportText"
 jinja2_name = "weekly_report.md"

@@ -2,12 +2,12 @@ domain = "flowers"
 definition = "A test domain related to flowers"
 system_prompt = "You are an expert at describing flowers based on their species and color."
 
-[concepts]
+[concept]
 Flower = "A flower reference, including its species and color"
 FlowerDescription = "A detailed description of a flower"
 
-[pipes]
-[pipes.generate_flower_description]
+[pipe]
+[pipe.generate_flower_description]
 type = "PipeLLM"
 definition = "Generate a description of a flower"
 inputs = { flower = "Flower" }

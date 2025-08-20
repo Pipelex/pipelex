@@ -11,12 +11,12 @@ domain = "tutorial"
 definition = "My first Pipelex library"
 system_prompt = "You are a helpful assistant."
 
-[concepts]
+[concept]
 Question = "A question that needs to be answered"
 Answer = "A response to a question"
 
-[pipes]
-[pipes.answer_question]
+[pipe]
+[pipe.answer_question]
 PipeLLM = "Answer a question"
 inputs = { question = "tutorial.Question" }
 output = "tutorial.Answer"
@@ -56,12 +56,12 @@ A domain consists of:
     ```toml
     domain = "finance"
    
-    [concepts]
+    [concept]
     Invoice = "A commercial document for a sale of products or services"
     InvoiceSummary = "A summary of an invoice with key details"
    
-    [pipes]
-    [pipes.summarize_invoice]
+    [pipe]
+    [pipe.summarize_invoice]
     PipeLLM = "Summarize an invoice to extract key information"
     inputs = { invoice = "finance.Invoice" }
     output = "finance.InvoiceSummary"

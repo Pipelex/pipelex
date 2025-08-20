@@ -1,14 +1,14 @@
 domain = "test_pipe_parallel"
 definition = "Simple test for PipeParallel functionality"
 
-[concepts]
+[concept]
 DocumentInput = "Input document with text content"
 LengthAnalysis = "Analysis of document length and structure"
 ContentAnalysis = "Analysis of document content and themes"
 CombinedAnalysis = "Combined analysis results from parallel processing"
 
-[pipes]
-[pipes.parallel_document_analysis]
+[pipe]
+[pipe.parallel_document_analysis]
 type = "PipeParallel"
 definition = "Analyze document length and content in parallel"
 inputs = { document = "DocumentInput" }
@@ -20,7 +20,7 @@ parallels = [
     { pipe = "analyze_content", result = "content_result" },
 ]
 
-[pipes.analyze_length]
+[pipe.analyze_length]
 type = "PipeLLM"
 definition = "Analyze document length and structure"
 inputs = { document = "DocumentInput" }
@@ -37,7 +37,7 @@ Provide a brief analysis focusing on:
 - Document organization
 """
 
-[pipes.analyze_content]
+[pipe.analyze_content]
 type = "PipeLLM"
 definition = "Analyze document content and themes"
 inputs = { document = "DocumentInput" }

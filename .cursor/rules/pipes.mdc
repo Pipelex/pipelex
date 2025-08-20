@@ -30,7 +30,7 @@ Note: The domain name usually matches the toml filename for single-file domains.
 
 ### Concept Definitions
 ```toml
-[concepts]
+[concept]
 ConceptName = "Description of the concept" # Should be the same name as the Structure ClassName you want to output
 ```
 
@@ -45,7 +45,7 @@ yes
 ## Pipe Base Structure
 
 ```toml
-[pipes.your_pipe_name]
+[pipe.your_pipe_name]
 PipeLLM = "A description of what your pipe does"
 inputs = { input_1 = "ConceptName1", input_2 = "ConceptName2" }
 output = "ConceptName"

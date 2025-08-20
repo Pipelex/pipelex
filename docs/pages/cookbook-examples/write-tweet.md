@@ -60,7 +60,7 @@ class OptimizedTweet(TextContent):
 This pipeline uses a two-step "analyze and optimize" sequence. The first pipe analyzes the draft tweet for common pitfalls, and the second pipe rewrites the tweet based on the analysis and a provided writing style. This is a powerful pattern for refining generated content.
 
 ```toml
-[pipes.optimize_tweet_sequence]
+[pipe.optimize_tweet_sequence]
 PipeSequence = "Analyze and optimize a tech tweet in sequence"
 inputs = { draft_tweet = "DraftTweet", writing_style = "WritingStyle" }
 output = "OptimizedTweet"
@@ -72,7 +72,7 @@ steps = [
 ]
 
 # This is the pipe that analyzes the draft tweet.
-[pipes.analyze_tweet]
+[pipe.analyze_tweet]
 PipeLLM = "Analyze the draft tweet and identify areas for improvement"
 inputs = { draft_tweet = "DraftTweet" }
 output = "TweetAnalysis"

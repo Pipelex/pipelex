@@ -63,7 +63,7 @@ llm_to_extract = {
 Here's how to use these configurations in your pipelines:
 
 ```toml
-[pipes.generate_response]
+[pipe.generate_response]
 PipeLLM = "Generate a creative response"
 inputs = { question = "Question" }
 output = "Response"
@@ -78,7 +78,7 @@ Generate a creative response to this question:
 @question
 """
 
-[pipes.extract_weather_data]
+[pipe.extract_weather_data]
 PipeLLM = "Extract structured weather data from text"
 inputs = { text = "Text" }
 output = "WeatherData"

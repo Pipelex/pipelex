@@ -8,18 +8,18 @@ CONCEPTS_WITH_REFINES = (
     """domain = "refining_concepts"
 definition = "Domain with concepts that refine others"
 
-[concepts]
+[concept]
 Concept1 = "A concept1"
 Concept2 = "A concept2"
 
-[concepts.Concept3]
+[concept.Concept3]
 definition = "A concept3"
 refines = "Concept2"
 """,
     PipelexBundleBlueprint(
         domain="refining_concepts",
         definition="Domain with concepts that refine others",
-        concepts={
+        concept={
             "Concept1": "A concept1",
             "Concept2": "A concept2",
             "Concept3": ConceptBlueprint(definition="A concept3", refines="Concept2"),

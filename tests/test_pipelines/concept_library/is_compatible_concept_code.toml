@@ -1,6 +1,6 @@
 domain = "concept_library_tests"
 
-[concepts]
+[concept]
 # Simple concept with no structure - should default to Text
 SimpleTextConcept = "A simple concept that should default to Text"
 
@@ -8,39 +8,39 @@ SimpleTextConcept = "A simple concept that should default to Text"
 FundamentalsDoc = "A comprehensive overview of the fundamental concepts and principles of software engineering."
 
 # Concept that explicitly refines Text
-[concepts.ExplicitTextConcept]
+[concept.ExplicitTextConcept]
 definition = "A concept that explicitly refines Text"
 refines = ["Text"]
 
 # Concept that refines Image
-[concepts.ImageBasedConcept]
+[concept.ImageBasedConcept]
 definition = "A concept based on images"
 refines = ["Image"]
 
 # Concept that refines FundamentalsDoc
-[concepts.DocumentationConcept]
+[concept.DocumentationConcept]
 definition = "A specialized documentation concept"
 structure = "DocumentationConcept"
 refines = ["FundamentalsDoc"]
 
 # Concept that refines both Text and Image (multiple inheritance)
-[concepts.MultiMediaConcept]
+[concept.MultiMediaConcept]
 definition = "A concept that combines text and images"
 structure = "MultiMediaConcept"
 refines = ["Text", "Image"]
 
 # Concept with custom structure that doesn't refine anything
-[concepts.IndependentConcept]
+[concept.IndependentConcept]
 definition = "An independent concept with custom structure"
 structure = "IndependentConcept"
 
 # Concept that refines a non-native concept
-[concepts.SpecializedDoc]
+[concept.SpecializedDoc]
 definition = "A specialized document that builds on FundamentalsDoc"
 refines = ["FundamentalsDoc"]
 
 # Chain of inheritance: Text -> ExplicitTextConcept -> DerivedTextConcept
-[concepts.DerivedTextConcept]
+[concept.DerivedTextConcept]
 definition = "A concept derived from ExplicitTextConcept"
 refines = ["ExplicitTextConcept"]
 

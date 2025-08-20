@@ -250,14 +250,8 @@ def dict_to_toml(data: Mapping[str, Any]) -> str:
         if isinstance(section_value, Mapping):
             section_value = cast(Mapping[str, Any], section_value)
 
-            # Special case: always include empty concepts section for empty_concepts test case
-            # but skip other empty sections
+            # Skip empty sections
             if not section_value:
-                if section_key == "concepts":
-                    # Check if this is the special empty concepts case by looking at the domain
-                    domain = data.get("domain", "")
-                    if domain == "empty_concepts":
-                        document_root.add(section_key, table())
                 continue
 
             # Create the section table

@@ -24,8 +24,8 @@ class PipelexBundleFactory(BaseModel):
             prompt_template_to_structure=blueprint.prompt_template_to_structure,
         )
         concepts: Dict[str, Concept] = {}
-        if blueprint.concepts is not None:
-            for concept_name, concept_blueprint_or_str in blueprint.concepts.items():
+        if blueprint.concept is not None:
+            for concept_name, concept_blueprint_or_str in blueprint.concept.items():
                 if isinstance(concept_blueprint_or_str, ConceptBlueprint):
                     concepts[concept_name] = ConceptFactory.make_concept_from_blueprint(
                         domain=blueprint.domain, code=concept_name, concept_blueprint=concept_blueprint_or_str
@@ -37,8 +37,8 @@ class PipelexBundleFactory(BaseModel):
                     )
 
         pipes: Dict[str, PipeAbstract] = {}
-        if blueprint.pipes is not None:
-            for pipe_name, pipe_blueprint in blueprint.pipes.items():
+        if blueprint.pipe is not None:
+            for pipe_name, pipe_blueprint in blueprint.pipe.items():
                 pipes[pipe_name] = PipeFactory.make_pipe_from_blueprint(
                     domain_code=blueprint.domain,
                     pipe_code=pipe_name,

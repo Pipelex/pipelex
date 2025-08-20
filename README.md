@@ -67,11 +67,11 @@ Pipelex uses TOML syntax, making workflows readable and shareable. Business prof
 
 Example:
 ```toml
-[concepts]
+[concept]
 Buyer = "The person who made the purchase"
 PurchaseDocumentText = "Transcript of a receipt, invoice, or order confirmation"
 
-[pipes.extract_buyer]
+[pipe.extract_buyer]
 PipeLLM = "Extract buyer from purchase document"
 inputs = { purchase_document_text = "PurchaseDocumentText" }
 output = "Buyer"
@@ -158,14 +158,14 @@ uv pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
 domain = "tech_tweet"
 definition = "A pipeline for optimizing tech tweets using Twitter/X best practices"
 
-[concepts]
+[concept]
 DraftTweet = "A draft version of a tech tweet that needs optimization"
 OptimizedTweet = "A tweet optimized for Twitter/X engagement following best practices"
 TweetAnalysis = "Analysis of the tweet's structure and potential improvements"
 WritingStyle = "A style of writing"
 
-[pipes]
-[pipes.analyze_tweet]
+[pipe]
+[pipe.analyze_tweet]
 PipeLLM = "Analyze the draft tweet and identify areas for improvement"
 inputs = { draft_tweet = "DraftTweet" }
 output = "TweetAnalysis"
@@ -193,7 +193,7 @@ For each criterion, provide:
 
 """
 
-[pipes.optimize_tweet]
+[pipe.optimize_tweet]
 PipeLLM = "Optimize the tweet based on the analysis"
 inputs = { draft_tweet = "DraftTweet", tweet_analysis = "TweetAnalysis", writing_style = "WritingStyle" }
 output = "OptimizedTweet"
@@ -227,7 +227,7 @@ Minimal emojis.
 Keep the core meaning of the original tweet.
 """
 
-[pipes.optimize_tweet_sequence]
+[pipe.optimize_tweet_sequence]
 PipeSequence = "Analyze and optimize a tech tweet in sequence"
 inputs = { draft_tweet = "DraftTweet", writing_style = "WritingStyle" }
 output = "OptimizedTweet"

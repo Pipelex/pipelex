@@ -7,14 +7,14 @@ SIMPLE_CONCEPTS = (
     """domain = "simple_concept"
 definition = "A simple concept"
 
-[concepts]
+[concept]
 Concept1 = "A concept"
 Concept2 = "A concept"
 """,
     PipelexBundleBlueprint(
         domain="simple_concept",
         definition="A simple concept",
-        concepts={
+        concept={
             "Concept1": "A concept",
             "Concept2": "A concept",
         },
@@ -25,10 +25,8 @@ EMPTY_CONCEPTS = (
     "empty_concepts",
     """domain = "empty_concepts"
 definition = "Domain with empty concept section"
-
-[concepts]
 """,
-    PipelexBundleBlueprint(domain="empty_concepts", definition="Domain with empty concept section", concepts={}),
+    PipelexBundleBlueprint(domain="empty_concepts", definition="Domain with empty concept section", concept={}),
 )
 
 # Export all simple concept test cases

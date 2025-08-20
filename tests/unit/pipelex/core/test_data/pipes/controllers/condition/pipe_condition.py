@@ -8,7 +8,7 @@ PIPE_CONDITION = (
     """domain = "test_pipes"
 definition = "Domain with conditional pipe"
 
-[pipes.conditional_process]
+[pipe.conditional_process]
 type = "PipeCondition"
 definition = "Process based on condition"
 output = "ProcessedData"
@@ -18,7 +18,7 @@ expression = "input_data.category"
     PipelexBundleBlueprint(
         domain="test_pipes",
         definition="Domain with conditional pipe",
-        pipes={
+        pipe={
             "conditional_process": PipeConditionBlueprint(
                 type="PipeCondition",
                 definition="Process based on condition",

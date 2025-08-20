@@ -8,7 +8,7 @@ PIPE_BATCH = (
     """domain = "test_pipes"
 definition = "Domain with batch pipe"
 
-[pipes.batch_process]
+[pipe.batch_process]
 type = "PipeBatch"
 definition = "Process items in batch"
 output = "ProcessedData"
@@ -19,7 +19,7 @@ input_item_name = "current_item"
     PipelexBundleBlueprint(
         domain="test_pipes",
         definition="Domain with batch pipe",
-        pipes={
+        pipe={
             "batch_process": PipeBatchBlueprint(
                 type="PipeBatch",
                 definition="Process items in batch",

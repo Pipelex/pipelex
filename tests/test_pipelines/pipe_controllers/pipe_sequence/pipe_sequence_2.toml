@@ -2,14 +2,14 @@ domain = "customer_feedback"
 definition = "Processing customer reviews and feedback"
 system_prompt = "You are an expert at analyzing customer feedback and sentiment"
 
-[concepts]
+[concept]
 CustomerReview = "A single customer review text"
 SentimentAnalysis = "Sentiment analysis result for a review"
 ProductRating = "Overall product rating based on reviews"
 Document = "A document containing multiple customer reviews"
 
-[pipes]
-[pipes.analyze_reviews_sequence]
+[pipe]
+[pipe.analyze_reviews_sequence]
 type = "PipeSequence"
 definition = "Process customer reviews with sentiment analysis"
 inputs = { document = "Document" }
@@ -20,7 +20,7 @@ steps = [
     { pipe = "aggregate_review_results", result = "product_rating" },
 ]
 
-[pipes.extract_individual_reviews]
+[pipe.extract_individual_reviews]
 type = "PipeLLM"
 definition = "Extract individual reviews from document"
 inputs = { document = "Document" }
@@ -33,7 +33,7 @@ Extract each individual customer review from this document as separate items:
 @document
 """
 
-[pipes.analyze_review_sentiment]
+[pipe.analyze_review_sentiment]
 type = "PipeLLM"
 definition = "Analyze sentiment of a single review"
 inputs = { single_review = "CustomerReview" }
@@ -47,7 +47,7 @@ Analyze the sentiment of this customer review:
 Provide sentiment (positive/negative/neutral) and confidence score.
 """
 
-[pipes.aggregate_review_results]
+[pipe.aggregate_review_results]
 type = "PipeLLM"
 definition = "Aggregate all review analyses into final rating"
 inputs = { sentiment_analyses = "SentimentAnalysis" }

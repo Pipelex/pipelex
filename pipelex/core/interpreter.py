@@ -128,12 +128,12 @@ class PipelexInterpreter(BaseModel):
             toml_data["prompt_template_to_structure"] = blueprint.prompt_template_to_structure
 
         # Concepts section - always include if concepts is not None
-        if blueprint.concepts is not None:
-            toml_data["concepts"] = PipelexInterpreter._serialize_concepts(blueprint.concepts, blueprint.domain)
+        if blueprint.concept is not None:
+            toml_data["concept"] = PipelexInterpreter._serialize_concepts(blueprint.concept, blueprint.domain)
 
         # Pipes section
-        if blueprint.pipes:
-            toml_data["pipes"] = PipelexInterpreter._serialize_pipes(blueprint.pipes, blueprint.domain)
+        if blueprint.pipe:
+            toml_data["pipe"] = PipelexInterpreter._serialize_pipes(blueprint.pipe, blueprint.domain)
 
         return dict_to_toml(toml_data)
 

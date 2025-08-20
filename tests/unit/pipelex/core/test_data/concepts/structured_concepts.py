@@ -8,13 +8,13 @@ CONCEPTS_WITH_STRUCTURES = (
     """domain = "structured_concepts"
 definition = "Domain with structured concepts"
 
-[concepts]
+[concept]
 SimpleData = "Simple data concept"
 
-[concepts.PersonInfo]
+[concept.PersonInfo]
 definition = "Information about a person"
 
-[concepts.PersonInfo.structure]
+[concept.PersonInfo.structure]
 name = "The name of the person"
 age = { type = "number", definition = "The age of the person", required = true }
 birthdate = { type = "date", definition = "The birthdate of the person", required = true }
@@ -22,7 +22,7 @@ birthdate = { type = "date", definition = "The birthdate of the person", require
     PipelexBundleBlueprint(
         domain="structured_concepts",
         definition="Domain with structured concepts",
-        concepts={
+        concept={
             "SimpleData": "Simple data concept",
             "PersonInfo": ConceptBlueprint(
                 definition="Information about a person",
@@ -41,21 +41,21 @@ CONCEPTS_WITH_NAMED_STRUCTURES = (
     """domain = "named_structures"
 definition = "Domain with concepts using named structure references"
 
-[concepts]
+[concept]
 BasicInfo = "Basic information concept"
 
-[concepts.ProductInfo]
+[concept.ProductInfo]
 definition = "Information about a product"
 structure = "ProductData"
 
-[concepts.OrderInfo]
+[concept.OrderInfo]
 definition = "Information about an order"
 structure = "OrderData"
 """,
     PipelexBundleBlueprint(
         domain="named_structures",
         definition="Domain with concepts using named structure references",
-        concepts={
+        concept={
             "BasicInfo": "Basic information concept",
             "ProductInfo": ConceptBlueprint(
                 definition="Information about a product",
