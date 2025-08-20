@@ -13,7 +13,7 @@ class PipeConditionBlueprint(PipeBlueprint):
     expression_template: Optional[str] = None
     expression: Optional[str] = None
     # TODO: make the values of pipe_map a Union[str, PipeAdapter] or something to set a specific alias
-    # TODO: Add a
+    # TODO: Add a Blueprint for the pipe_map
     pipe_map: Dict[str, str]
     default_pipe_code: Optional[str] = None
     add_alias_from_expression_to: Optional[str] = None

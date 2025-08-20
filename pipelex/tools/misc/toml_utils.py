@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Mapping, Optional, cast
 
 import toml
@@ -291,7 +292,6 @@ def dict_to_toml(data: Mapping[str, Any]) -> str:
     dumped_content = tomlkit.dumps(document_root)  # pyright: ignore[reportUnknownMemberType]
 
     # Post-process to fix inline table spacing: {key = "value"} -> { key = "value" }
-    import re
 
     # Add space after opening brace and before closing brace for TOML inline tables only
     # This regex matches TOML inline tables (containing = signs) but not Jinja2 templates
