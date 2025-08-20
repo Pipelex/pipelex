@@ -9,11 +9,11 @@ class LibraryManagerFactory:
     """Factory for creating LibraryManager instances."""
 
     @classmethod
-    def make_empty(cls, config_folder_path: str) -> "LibraryManager":
+    def make_empty(cls, config_dir_path: str) -> "LibraryManager":
         domain_library = DomainLibrary.make_empty()
         concept_library = ConceptLibrary.make_empty()
         pipe_library = PipeLibrary.make_empty()
-        library_config = LibraryConfig(config_folder_path=config_folder_path)
+        library_config = LibraryConfig(config_dir_path=config_dir_path)
 
         return LibraryManager(
             domain_library=domain_library,
@@ -24,11 +24,11 @@ class LibraryManagerFactory:
 
     @classmethod
     def make(
-        cls, domain_library: DomainLibrary, concept_library: ConceptLibrary, pipe_library: PipeLibrary, config_folder_path: str
+        cls, domain_library: DomainLibrary, concept_library: ConceptLibrary, pipe_library: PipeLibrary, config_dir_path: str
     ) -> "LibraryManager":
         """Create a LibraryManager with provided libraries."""
 
-        library_config = LibraryConfig(config_folder_path=config_folder_path)
+        library_config = LibraryConfig(config_dir_path=config_dir_path)
 
         return LibraryManager(
             domain_library=domain_library,

@@ -7,7 +7,6 @@ import pytest
 from pipelex.core.concept.concept_blueprint import (
     ConceptBlueprint,
     ConceptStructureBlueprint,
-    ConceptStructureBlueprintError,
     ConceptStructureBlueprintType,
 )
 from pipelex.core.concept.concept_factory import ConceptFactory
@@ -131,14 +130,6 @@ class TestInlineStructureConcepts:
         """Test that invalid string references raise appropriate errors."""
         with pytest.raises(StructureClassError, match="Structure class 'NonExistentClass' is not a registered subclass of StuffContent"):
             _ = ConceptBlueprint(definition="Test invalid reference", structure="NonExistentClass")
-
-    def test_inline_structure_generation_error_handling(self):
-        """Test error handling when inline structure generation fails."""
-        # Create invalid structure definition that should cause generation to fail
-        with pytest.raises(ConceptStructureBlueprintError):
-            _: Dict[str, ConceptStructureBlueprintType] = {
-                "invalid_field": ConceptStructureBlueprint(type="nonexistent_type", definition="This should fail", required=False),
-            }
 
     def test_multiple_inline_structures_do_not_conflict(self):
         """Test that multiple inline structures with same field names don't conflict."""

@@ -50,7 +50,10 @@ class PipeLLMBlueprint(PipeBlueprint):
                 ["prompt", "prompt_name", "prompt_template", "template_name"],
             ],
         ):
-            raise PipeDefinitionError(f"PipeLLMBlueprint should have no more than one of {excess_attributes_list} among them")
+            raise PipeDefinitionError(
+                f"PipeLLMBlueprint should have no more than one of {excess_attributes_list} among them, \
+                                      in pipe with prompt_template '{self.prompt_template}'"
+            )
         return self
 
 

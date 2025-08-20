@@ -9,12 +9,9 @@ from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.config import get_config
 from pipelex.core.bundle.pipelex_bundle import PipelexBundle
 from pipelex.core.bundle.pipelex_bundle_factory import PipelexBundleFactory
-from pipelex.core.concept.concept import Concept
 from pipelex.core.concept.concept_factory import ConceptFactory
 from pipelex.core.concept.concept_library import ConceptLibrary
-from pipelex.core.domain.domain import Domain
 from pipelex.core.domain.domain_library import DomainLibrary
-from pipelex.core.pipe.pipe_abstract import PipeAbstract
 from pipelex.core.pipe.pipe_library import PipeLibrary
 from pipelex.core.syntax_converter import PipelexSyntaxConverter
 from pipelex.exceptions import (
@@ -125,35 +122,99 @@ class LibraryManager(LibraryManagerAbstract):
         self.teardown()
         self.setup()
 
-    def _get_pipeline_library_paths(self) -> List[Path]:
-        library_paths = [self.library_config.pipelines_path]
-        toml_file_paths = self._list_toml_files_from_path(library_paths=[Path(path) for path in library_paths])
-
-        # Remove failing_pipelines_path from the list
-        failing_pipelines_path = get_config().pipelex.library_config.failing_pipelines_path
-        toml_file_paths = [path for path in toml_file_paths if path != Path(failing_pipelines_path)]
-
+    def get_pipeline_library_dirs(self) -> List[Path]:
+        library_dirs = [Path(self.library_config.pipelines_dir_path)]
         if runtime_manager.is_unit_testing:
             log.debug("Registering test pipeline structures for unit testing")
-            library_paths += [self.library_config.test_pipelines_path]
-        return [Path(path) for path in library_paths]
+            library_dirs += [Path(self.library_config.test_pipelines_dir_path)]
+        return library_dirs
 
-    def _list_toml_files_from_path(self, library_paths: List[Path]) -> List[Path]:
-        toml_file_paths: List[Path] = []
-        for libraries_path in library_paths:
-            # Use the existing utility function specifically for TOML files
-            found_file_paths = find_files_in_dir(
-                dir_path=str(libraries_path),
-                pattern="*.toml",
-                is_recursive=True,
-            )
-            log.debug(f"Searching for TOML files in {libraries_path}, found '{found_file_paths}'")
-            if not found_file_paths:
-                log.warning(f"No TOML files found in library path: {libraries_path}")
-            toml_file_paths.extend(found_file_paths)
-        return toml_file_paths
+    def _get_pipeline_library_paths(self) -> List[Path]:
+        library_dirs = self.get_pipeline_library_dirs()
+
+        # Get all valid Pipelex TOML files from the library directories
+        valid_toml_file_paths = self._get_library_file_paths(library_dirs)
+
+        # Remove failing_pipelines_path from the list
+        failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
+        failing_paths_set = {Path(fp) for fp in failing_pipelines_file_paths}
+        valid_toml_file_paths = [path for path in valid_toml_file_paths if path not in failing_paths_set]
+        return valid_toml_file_paths
+
+    def _get_library_dirs(self, paths: List[Path]) -> List[Path]:
+        """Extract and validate directory paths from a list of paths.
+
+        Args:
+            paths: List of paths that could be files or directories
+
+        Returns:
+            List of validated directory paths
+
+        Raises:
+            LibraryError: If a path doesn't exist
+        """
+        validated_dirs: List[Path] = []
+        for path in paths:
+            path = Path(path)
+            if not path.exists():
+                raise LibraryError(f"Path does not exist: {path}")
+            if path.is_dir():
+                validated_dirs.append(path)
+            # Silently skip files - we only want directories
+        return validated_dirs
+
+    def _get_library_file_paths(self, paths: List[Path]) -> List[Path]:
+        """Extract and validate Pipelex TOML files from a list of paths.
+
+        This function handles both files and directories:
+        - For files: validates they are Pipelex TOML files
+        - For directories: recursively finds all Pipelex TOML files within
+
+        Args:
+            paths: List of paths that could be files or directories
+
+        Returns:
+            List of validated Pipelex TOML file paths
+
+        Raises:
+            LibraryError: If a path doesn't exist
+        """
+        from pipelex.core.syntax_converter import PipelexSyntaxConverter
+
+        validated_files: List[Path] = []
+
+        for path in paths:
+            path = Path(path)
+            if not path.exists():
+                raise LibraryError(f"Path does not exist: {path}")
+
+            if path.is_file():
+                # Check if it's a valid Pipelex TOML file
+                if PipelexSyntaxConverter.is_pipelex_file(path):
+                    validated_files.append(path)
+                else:
+                    log.debug(f"Skipping non-Pipelex file: {path}")
+
+            elif path.is_dir():
+                # Find all TOML files in the directory
+                toml_files = find_files_in_dir(
+                    dir_path=str(path),
+                    pattern="*.toml",
+                    is_recursive=True,
+                )
+                # Filter to only include valid Pipelex files
+                for toml_file in toml_files:
+                    if PipelexSyntaxConverter.is_pipelex_file(toml_file):
+                        validated_files.append(toml_file)
+                    else:
+                        log.debug(f"Skipping non-Pipelex TOML file: {toml_file}")
+
+        return validated_files
 
     def load_from_file(self, toml_path: Path):
+        if not PipelexSyntaxConverter.is_pipelex_file(toml_path):
+            raise LibraryError(f"File is not a valid Pipelex TOML file: {toml_path}")
+
         converter = PipelexSyntaxConverter(file_path=toml_path)
         blueprint = converter.make_pipelex_bundle_blueprint()
         pipelex_bundle = PipelexBundleFactory.make_from_blueprint(blueprint=blueprint)
@@ -165,16 +226,32 @@ class LibraryManager(LibraryManagerAbstract):
         self.pipe_library.add_pipes(pipes=list(pipelex_bundle.pipes.values()))
 
     @override
-    def load_libraries(self, library_paths: Optional[List[Path]] = None):
-        self.load_deck()
+    def load_libraries(self, library_dirs: Optional[List[Path]] = None, library_file_paths: Optional[List[Path]] = None) -> None:
+        all_paths: List[Path] = []
 
-        library_paths = library_paths or self._get_pipeline_library_paths()
-        for library_path in library_paths:
-            ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_path))
-        for library_path in library_paths:
-            toml_file_paths = self._list_toml_files_from_path(library_paths=[library_path])
-            for toml_file_path in toml_file_paths:
-                self.load_from_file(toml_path=toml_file_path)
+        if library_dirs is not None or library_file_paths is not None:
+            if library_dirs is not None:
+                all_paths.extend([Path(d) for d in library_dirs])
+
+            if library_file_paths is not None:
+                all_paths.extend([Path(f) for f in library_file_paths])
+
+            # Get validated directories and TOML files
+            dirs_to_register = self._get_library_dirs(all_paths)
+            all_toml_paths = self._get_library_file_paths(all_paths)
+
+            # Register classes for the directories
+            for library_dir in dirs_to_register:
+                ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_dir))
+        else:
+            # Use default paths if no overrides provided
+            all_toml_paths = self._get_pipeline_library_paths()
+            for library_dir in self.get_pipeline_library_dirs():
+                ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_dir))
+
+        # Load all TOML files
+        for toml_file_path in all_toml_paths:
+            self.load_from_file(toml_path=toml_file_path)
 
     # TODO: move to LLMDeckManager
     def load_deck(self) -> LLMDeck:

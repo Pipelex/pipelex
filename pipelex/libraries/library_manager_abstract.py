@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 class LibraryManagerAbstract(ABC):
@@ -21,5 +21,5 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def load_libraries(self, library_paths: List[Path]) -> None:
+    def load_libraries(self, library_dirs: Optional[List[Path]] = None, library_file_paths: Optional[List[Path]] = None) -> None:
         pass

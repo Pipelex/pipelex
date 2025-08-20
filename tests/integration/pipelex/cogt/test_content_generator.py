@@ -125,7 +125,6 @@ class TestContentGenerator:
             context=context,
             jinja2="The answer is: {{ the_answer }}",
         )
-        pretty_print(jinja2_text, title="jinja2_text")
         assert isinstance(jinja2_text, str)
         assert jinja2_text == "The answer is: elementary, my dear Watson"
 

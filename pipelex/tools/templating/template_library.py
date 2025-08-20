@@ -26,8 +26,8 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
     library_config: ClassVar[LibraryConfig]
 
     @classmethod
-    def make_empty(cls, config_folder_path: str) -> "TemplateLibrary":
-        cls.library_config = LibraryConfig(config_folder_path=config_folder_path)
+    def make_empty(cls, config_dir_path: str) -> "TemplateLibrary":
+        cls.library_config = LibraryConfig(config_dir_path=config_dir_path)
         return cls()
 
     @override

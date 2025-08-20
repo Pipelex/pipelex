@@ -15,6 +15,40 @@ class PipelexSyntaxConverter(BaseModel):
     file_path: Optional[Path] = None
     file_content: Optional[str] = None
 
+    @staticmethod
+    def is_pipelex_file(file_path: Path) -> bool:
+        """Check if a file is a valid Pipelex TOML file.
+
+        Args:
+            file_path: Path to the file to check
+
+        Returns:
+            True if the file is a Pipelex file, False otherwise
+
+        Criteria:
+            - Has .toml extension
+            - Starts with "domain =" (ignoring leading whitespace)
+        """
+        # Check if it has .toml extension
+        if file_path.suffix != ".toml":
+            return False
+
+        # Check if file exists
+        if not file_path.exists() or not file_path.is_file():
+            return False
+
+        try:
+            # Read the first few lines to check for "domain ="
+            with open(file_path, "r", encoding="utf-8") as f:
+                # Read first 1000 characters (should be enough to find domain)
+                content = f.read(1000)
+                # Remove leading whitespace and check if it starts with "domain ="
+                stripped_content = content.lstrip()
+                return stripped_content.startswith("domain =")
+        except Exception:
+            # If we can't read the file, it's not a valid Pipelex file
+            return False
+
     @model_validator(mode="after")
     def check_file_path_or_file_content(self) -> Self:
         """Need to check if there is at least one of file_path or file_content"""

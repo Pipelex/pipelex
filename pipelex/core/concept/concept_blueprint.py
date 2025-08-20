@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -15,7 +15,7 @@ class ConceptStructureBlueprintError(ConceptFactoryError):
 
 class ConceptStructureBlueprint(BaseModel):
     definition: str
-    type: Optional[str] = None
+    type: Literal["text", "list", "dict", "integer", "boolean", "number", "date", None] = None
     item_type: Optional[str] = None
     key_type: Optional[str] = None
     value_type: Optional[str] = None
@@ -25,11 +25,6 @@ class ConceptStructureBlueprint(BaseModel):
     @model_validator(mode="after")
     def validate_structure_blueprint(self) -> Self:
         """Validate the structure blueprint according to type rules."""
-        # Validate that type is one of the allowed values
-        allowed_types = {"text", "list", "dict", "integer", "boolean", "number", "date", None}
-        if self.type not in allowed_types:
-            raise ConceptStructureBlueprintError(f"Type must be one of {allowed_types}, got '{self.type}'")
-
         # If type is None (array), choices must not be None
         if self.type is None and not self.choices:
             raise ValueError("When type is None (array), choices must not be empty")
