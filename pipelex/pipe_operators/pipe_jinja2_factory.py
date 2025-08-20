@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from typing_extensions import override
 
@@ -15,6 +15,7 @@ from pipelex.tools.templating.templating_models import PromptingStyle
 
 
 class PipeJinja2Blueprint(PipeBlueprint):
+    type: Literal["PipeJinja2"] = "PipeJinja2"
     jinja2_name: Optional[str] = None
     jinja2: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None

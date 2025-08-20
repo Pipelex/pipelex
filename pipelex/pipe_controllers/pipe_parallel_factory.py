@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from typing_extensions import override
 
@@ -14,6 +14,7 @@ from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 
 
 class PipeParallelBlueprint(PipeBlueprint):
+    type: Literal["PipeParallel"] = "PipeParallel"
     parallels: List[SubPipeBlueprint]
     add_each_output: bool = True
     combined_output: Optional[str] = None

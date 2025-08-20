@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 
 from typing_extensions import override
 
@@ -10,6 +10,7 @@ from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 
 
 class PipeSequenceBlueprint(PipeBlueprint):
+    type: Literal["PipeSequence"] = "PipeSequence"
     steps: List[SubPipeBlueprint]
 
 

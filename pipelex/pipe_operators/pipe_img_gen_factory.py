@@ -14,6 +14,7 @@ from pipelex.tools.typing.validation_utils import has_more_than_one_among_attrib
 
 
 class PipeImgGenBlueprint(PipeBlueprint):
+    type: Literal["PipeImgGen"] = "PipeImgGen"
     img_gen_prompt: Optional[str] = None
     imgg_handle: Optional[ImggHandle] = None
     aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)

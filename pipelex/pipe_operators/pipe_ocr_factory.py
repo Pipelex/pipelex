@@ -1,6 +1,5 @@
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import Field
 from typing_extensions import override
 
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
@@ -14,11 +13,12 @@ from pipelex.pipe_operators.pipe_ocr import PipeOcr
 
 
 class PipeOcrBlueprint(PipeBlueprint):
+    type: Literal["PipeOcr"] = "PipeOcr"
     ocr_platform: Optional[OcrPlatform] = None
-    page_images: bool = False
-    page_image_captions: bool = False
-    page_views: bool = False
-    page_views_dpi: Optional[int] = Field(default=None)
+    page_images: Optional[bool] = None
+    page_image_captions: Optional[bool] = None
+    page_views: Optional[bool] = None
+    page_views_dpi: Optional[int] = None
 
 
 class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
@@ -42,8 +42,8 @@ class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
             ocr_engine=ocr_engine,
             output_concept_code=pipe_blueprint.output,
             inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
-            should_include_images=pipe_blueprint.page_images,
-            should_caption_images=pipe_blueprint.page_image_captions,
-            should_include_page_views=pipe_blueprint.page_views,
+            should_include_images=pipe_blueprint.page_images or False,
+            should_caption_images=pipe_blueprint.page_image_captions or False,
+            should_include_page_views=pipe_blueprint.page_views or False,
             page_views_dpi=pipe_blueprint.page_views_dpi or get_config().cogt.ocr_config.default_page_views_dpi,
         )

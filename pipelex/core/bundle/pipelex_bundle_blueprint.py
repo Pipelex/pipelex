@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union
+from typing import Annotated, Dict, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -13,18 +13,21 @@ from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint
 from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint
 from pipelex.pipe_operators.pipe_ocr_factory import PipeOcrBlueprint
 
-PipeBlueprintUnion = Union[
-    # Pipe operators
-    PipeFuncBlueprint,
-    PipeImgGenBlueprint,
-    PipeJinja2Blueprint,
-    PipeLLMBlueprint,
-    PipeOcrBlueprint,
-    # Pipe controllers
-    PipeBatchBlueprint,
-    PipeConditionBlueprint,
-    PipeParallelBlueprint,
-    PipeSequenceBlueprint,
+PipeBlueprintUnion = Annotated[
+    Union[
+        # Pipe operators
+        PipeFuncBlueprint,
+        PipeImgGenBlueprint,
+        PipeJinja2Blueprint,
+        PipeLLMBlueprint,
+        PipeOcrBlueprint,
+        # Pipe controllers
+        PipeBatchBlueprint,
+        PipeConditionBlueprint,
+        PipeParallelBlueprint,
+        PipeSequenceBlueprint,
+    ],
+    Field(discriminator="type"),
 ]
 
 

@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Literal, Optional
 
 from typing_extensions import override
 
@@ -9,9 +9,11 @@ from pipelex.pipe_controllers.pipe_condition import PipeCondition
 
 
 class PipeConditionBlueprint(PipeBlueprint):
+    type: Literal["PipeCondition"] = "PipeCondition"
     expression_template: Optional[str] = None
     expression: Optional[str] = None
     # TODO: make the values of pipe_map a Union[str, PipeAdapter] or something to set a specific alias
+    # TODO: Add a
     pipe_map: Dict[str, str]
     default_pipe_code: Optional[str] = None
     add_alias_from_expression_to: Optional[str] = None

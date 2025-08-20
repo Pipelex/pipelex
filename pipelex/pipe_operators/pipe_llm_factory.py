@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import model_validator
 from typing_extensions import Self, override
@@ -20,6 +20,7 @@ from pipelex.tools.typing.validation_utils import has_more_than_one_among_attrib
 
 
 class PipeLLMBlueprint(PipeBlueprint):
+    type: Literal["PipeLLM"] = "PipeLLM"
     system_prompt_template: Optional[str] = None
     system_prompt_template_name: Optional[str] = None
     system_prompt_name: Optional[str] = None

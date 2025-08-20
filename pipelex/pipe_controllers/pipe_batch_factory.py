@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from typing_extensions import override
 
@@ -10,6 +10,7 @@ from pipelex.pipe_controllers.pipe_batch import PipeBatch
 
 
 class PipeBatchBlueprint(PipeBlueprint):
+    type: Literal["PipeBatch"] = "PipeBatch"
     branch_pipe_code: str
 
     input_list_name: Optional[str] = None
