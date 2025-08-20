@@ -20,11 +20,11 @@ best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-large"
 best-grok = "grok-3"
 
-cheap_llm_for_text = "gpt-5-nano"
-cheap_llm_for_object = "gpt-5-nano"
+cheap_llm_for_text = "gpt-4o-mini"
+cheap_llm_for_object = "gpt-4o-mini"
 
-base_llm_for_text = "gpt-5-nano"
-base_llm_for_object = "gpt-5-nano"
+base_llm_for_text = "gpt-4o-mini"
+base_llm_for_object = "gpt-4o-mini"
 
 
 ####################################################################################################
