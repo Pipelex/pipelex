@@ -198,7 +198,8 @@ class Pipelex(metaclass=MetaSingleton):
             self.library_manager.load_libraries()
             self.pipelex_hub.set_llm_deck_provider(llm_deck_provider=llm_deck)
         except ValidationError as exc:
-            raise PipelexSetupError(f"Could not setup libraries because of: {exc}") from exc
+            error_msg = format_pydantic_validation_error(exc)
+            raise PipelexSetupError(f"Could not setup libraries because of: {error_msg}") from exc
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_config().project_name}")
 
     def validate_libraries(self):
