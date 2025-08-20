@@ -176,7 +176,7 @@ class LibraryManager(LibraryManagerAbstract):
             for toml_file_path in toml_file_paths:
                 self.load_from_file(toml_path=toml_file_path)
 
-    # Todo: move to LLMDeckManager
+    # TODO: move to LLMDeckManager
     def load_deck(self) -> LLMDeck:
         llm_deck_paths = self.library_config.get_llm_deck_paths()
         full_llm_deck_dict: Dict[str, Any] = {}
@@ -196,20 +196,3 @@ class LibraryManager(LibraryManagerAbstract):
 
         self.llm_deck = LLMDeck.model_validate(full_llm_deck_dict)
         return self.llm_deck
-
-    def load_domain(self, domain: Domain) -> Domain:
-        self.domain_library.add_domain(domain=domain)
-        return domain
-
-    def load_concepts(self, concepts: List[Concept]) -> List[Concept]:
-        """Load concepts from a validated blueprint."""
-        for concept in concepts:
-            self.concept_library.add_new_concept(concept=concept)
-        return concepts
-
-    def load_pipes(self, pipes: List[PipeAbstract]) -> List[PipeAbstract]:
-        """Load pipes from a validated blueprint."""
-        for pipe in pipes:
-            self.pipe_library.add_pipe(pipe=pipe)
-
-        return pipes
