@@ -127,7 +127,7 @@ It's time to specify that your output be a `Character` instance. Use the `output
 ```toml
 domain = "characters"
 
-[concept]
+[concepts]
 Character = "A character is a fiction story" # <- Define here your output concept so that it is linked to the class name
 
 [pipes]
@@ -182,7 +182,7 @@ class CharacterMetadata(StructuredContent):
 💡 Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/). You can include a variable using the **classic** `{{ double.curly.braces }}`, and to make it simpler, we've added the possibility to just prefix your variable with the `@` symbol (recommended). Pipes declare their required inputs explicitly with the `inputs` table:
 
 ```toml
-[concept]
+[concepts]
 Character = "A character from a book"
 CharacterMetadata = "Metadata regarding a character."
 

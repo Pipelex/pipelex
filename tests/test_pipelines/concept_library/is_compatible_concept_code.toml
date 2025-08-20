@@ -1,6 +1,6 @@
 domain = "concept_library_tests"
 
-[concept]
+[concepts]
 # Simple concept with no structure - should default to Text
 SimpleTextConcept = "A simple concept that should default to Text"
 

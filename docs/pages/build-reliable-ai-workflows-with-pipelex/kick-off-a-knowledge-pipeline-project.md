@@ -11,7 +11,7 @@ domain = "tutorial"
 definition = "My first Pipelex library"
 system_prompt = "You are a helpful assistant."
 
-[concept]
+[concepts]
 Question = "A question that needs to be answered"
 Answer = "A response to a question"
 
@@ -56,7 +56,7 @@ A domain consists of:
     ```toml
     domain = "finance"
    
-    [concept]
+    [concepts]
     Invoice = "A commercial document for a sale of products or services"
     InvoiceSummary = "A summary of an invoice with key details"
    

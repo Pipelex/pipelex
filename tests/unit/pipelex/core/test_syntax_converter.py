@@ -13,8 +13,8 @@ class TestPipelexSyntaxConverter:
     def test_init_with_both_file_path_and_content(self, tmp_path: Path):
         """Test initialization with both file_path and file_content."""
         test_file = tmp_path / "test.toml"
-        test_file.write_text("domain = 'test'\n[concept]\n")
-        content = "domain = 'other'\n[concept]\n"
+        test_file.write_text("domain = 'test'\n[concepts]\n")
+        content = "domain = 'other'\n[concepts]\n"
 
         converter = PipelexSyntaxConverter(file_path=test_file, file_content=content)
         assert converter.file_path == test_file

@@ -4,7 +4,7 @@ domain = "animals"
 definition = "The test domain for handling animal descriptions"
 system_prompt = "You are an expert at describing animals based on their species, breed, and age."
 
-[concept]
+[concepts]
 Animal = "An animal reference, including its species, breed, and age"
 AnimalDescription = "A detailed description of an animal"
 

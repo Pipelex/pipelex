@@ -91,8 +91,8 @@ class TestLibraries:
         known_concept: str,
         known_pipe: str,
     ):
-        library_manager = LibraryManagerFactory.make_empty(config_folder_path="pipelex_libraries")
-        test_pipelines_path = [Path(path) for path in get_config().pipelex.library_config.test_pipelines_path]
+        library_manager = LibraryManagerFactory.make_empty(config_folder_path="pipelex/libraries")
+        test_pipelines_path = [Path(get_config().pipelex.library_config.test_pipelines_path)]
         library_manager.load_libraries(library_paths=test_pipelines_path)
         # Verify that libraries were loaded
         assert len(library_manager.concept_library.root) > 0, "No concepts were loaded"

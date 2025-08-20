@@ -144,7 +144,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
                 # The implicit concept is obviously coming with a domain (the one it is used in)
                 # TODO: replace this with a concept factory method make_implicit_concept
                 return ConceptFactory.make_concept_from_definition_str(
-                    domain_code="implicit",
+                    domain_code=SpecialDomain.IMPLICIT,
                     concept_str=Concept.extract_domain_and_concept_from_str(concept_str=concept_code)[1],
                     definition=concept_code,
                 )

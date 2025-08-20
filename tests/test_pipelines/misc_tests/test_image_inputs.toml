@@ -1,7 +1,7 @@
 domain = "test_image_inputs"
 definition = "Test domain for verifying image input functionality"
 
-[concept]
+[concepts]
 Article = "Article"
 
 [pipes]

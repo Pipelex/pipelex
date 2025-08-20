@@ -12,7 +12,7 @@ from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.core.pipe.pipe_output import PipeOutput
 from pipelex.core.pipe.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.stuff.stuff_content import ImageContent, ListContent, PageContent, TextAndImagesContent, TextContent
@@ -131,7 +131,9 @@ class PipeOcr(PipeOperator):
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        return PipeInputSpec.make_from_dict({PIPE_OCR_INPUT_NAME: self.inputs.root[PIPE_OCR_INPUT_NAME].concept_code})
+        return PipeInputSpec.make_from_blueprint(
+            blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=self.inputs.root[PIPE_OCR_INPUT_NAME].concept_code)}
+        )
 
     @override
     async def _run_operator_pipe(

@@ -1,7 +1,7 @@
 domain = "images"
 definition = "Generic image-related domain"
 
-[concept]
+[concepts]
 VisualDescription = "Visual description of something"
 
 [concepts.ImgGenPrompt]

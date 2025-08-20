@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Self
 
 from pipelex import log
+from pipelex.core.concept.concept_native import NativeConcept, NativeConceptClass
 from pipelex.core.stuff.stuff_content import StuffContent
 
 
@@ -20,7 +21,7 @@ class ConceptBlueprint(BaseModel):
     def oneline_concept_validator(cls, data: Any) -> Any:
         """Convert a simple string to ConceptBlueprint(definition=string)"""
         if isinstance(data, str):
-            return {"definition": data}
+            return {"definition": data, "structure": NativeConceptClass.TEXT, "refines": [NativeConcept.TEXT]}
         return data
 
     @model_validator(mode="after")

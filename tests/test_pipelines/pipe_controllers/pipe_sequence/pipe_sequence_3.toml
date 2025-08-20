@@ -2,7 +2,7 @@ domain = "creative_ideation"
 definition = "Creative ideation pipeline with multiple outputs, batching, and evaluation"
 system_prompt = "You are a creative brainstorming expert who generates and evaluates ideas"
 
-[concept]
+[concepts]
 CreativeTopic = "A topic or theme for creative ideation"
 CreativeIdea = "A single creative idea or concept"
 IdeaAnalysis = "Detailed analysis of a single creative idea"

@@ -1,7 +1,7 @@
 domain = "meta"
 definition = "Meta domain is the domain of pipelines about pipelines"
 
-[concept]
+[concepts]
 PipelineDraft = "Rough solution to create a pipeline"
 PipelineDraftText = "Rough solution to create a pipeline in text format"
 PipeDraft = "Rough solution to create a pipe"

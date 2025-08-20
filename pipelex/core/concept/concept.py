@@ -15,11 +15,12 @@ class Concept(BaseModel):
 
     code: str
     domain: str
-    structure_class_name: str
     definition: str
+    structure_class_name: str
     refines: List[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
+    # TODO: Refacto, its not clean
     def validate_code_domain(self) -> Self:
         if not Concept.concept_str_contains_domain(self.code):
             raise ConceptCodeError(f"Code must contain a dot (.) for concept with code '{self.code}' and domain '{self.domain}'")

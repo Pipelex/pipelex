@@ -3,7 +3,7 @@
 domain = "test_multiplicity"
 definition = "Test library about multiplicity"
 
-[concept]
+[concepts]
 Color = "A color"
 ProductOfNature = "Something produced by Nature"
 FantasyScene = "A fantasy scene"

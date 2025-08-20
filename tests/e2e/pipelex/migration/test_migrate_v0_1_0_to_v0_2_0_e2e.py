@@ -24,7 +24,7 @@ class TestMigrationE2E:
 definition = "AI-powered content analysis and processing"
 system_prompt = "You are an expert content analyst"
 
-[concept]
+[concepts]
 Text = "Written content in natural language"
 Document = "A structured document with metadata"
 Report = "An analytical report with findings"
@@ -184,7 +184,7 @@ domain = "formatting_test"
 definition = "Test various formatting scenarios"
 
 # Simple concepts
-[concept]
+[concepts]
 BasicConcept = "A basic concept"
 
 # Complex concepts with various formatting

@@ -2,7 +2,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.core.concept.concept_native import NativeConcept
-from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipe.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.core.pipe.pipe_run_params import PipeRunMode
 from pipelex.core.pipe.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuff.stuff_content import PageContent
@@ -28,7 +28,7 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_image",
                 domain="generic",
-                inputs=PipeInputSpec.make_from_dict(concepts_dict={"page_scan": "Image"}),
+                inputs=PipeInputSpec.make_from_blueprint(blueprint={"page_scan": InputRequirementBlueprint(concept_code="Image")}),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
@@ -58,7 +58,9 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_pdf",
                 domain="generic",
-                inputs=PipeInputSpec.make_from_dict(concepts_dict={PIPE_OCR_INPUT_NAME: "PDF"}),
+                inputs=PipeInputSpec.make_from_blueprint(
+                    blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=NativeConcept.PDF.code)}
+                ),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,

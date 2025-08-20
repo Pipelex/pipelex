@@ -19,7 +19,7 @@ class TestTomlMigrator:
         return """domain = "test"
 definition = "Test domain"
 
-[concept]
+[concepts]
 SimpleText = "A simple text concept"
 SimpleDoc = "A simple document concept"
 
@@ -43,7 +43,7 @@ refines = "Text"
         return """domain = "test"
 definition = "Test domain"
 
-[concept]
+[concepts]
 SimpleText = "A simple text concept"
 SimpleDoc = "A simple document concept"
 

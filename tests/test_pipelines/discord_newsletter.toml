@@ -1,7 +1,7 @@
 domain = "discord_newsletter"
 definition = "Discord newsletter generation pipeline"
 
-[concept]
+[concepts]
 DiscordChannelUpdate = "A Discord channel with its messages for newsletter generation"
 ChannelSummary = "A summarized Discord channel for newsletter inclusion"
 Newsletter = "The final newsletter content with organized channel summaries"

@@ -29,7 +29,7 @@ Note: The domain name usually matches the toml filename for single-file domains.
 
 ### Concept Definitions
 ```toml
-[concept]
+[concepts]
 ConceptName = "Description of the concept" # Should be the same name as the Structure ClassName you want to output
 ```
 

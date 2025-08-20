@@ -1,7 +1,7 @@
 domain = "test_pipe_condition_complex"
 definition = "Complex document processing pipeline with multiple inputs and nested PipeConditions"
 
-[concept]
+[concepts]
 DocumentRequest = "Document processing request with type, priority, language, and complexity"
 UserProfile = "User profile with level and department information"
 ProcessingContext = "Combined processing context"

@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Set, Type
+from typing import Any, Dict, Optional, Set, Type
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from typing_extensions import Self
 
 from pipelex.core.concept.concept_code_factory import ConceptCodeFactory
+from pipelex.core.domain.domain import SpecialDomain
 from pipelex.core.pipe.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipe.pipe_output import PipeOutput
 from pipelex.core.pipe.pipe_run_params import PipeRunParams
@@ -23,19 +23,34 @@ class PipeAbstract(ABC, BaseModel):
     inputs: PipeInputSpec = Field(default_factory=PipeInputSpec)
     output_concept_code: str
 
-    @model_validator(mode="after")
-    def add_domain_prefix(self) -> Self:
-        if self.inputs:
-            for input_name, input_requirement in self.inputs.items:
-                self.inputs.root[input_name].concept_code = ConceptCodeFactory.make_concept_code_from_str(
+    @model_validator(mode="before")
+    @classmethod
+    def add_domain_prefix(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        from pipelex import pretty_print
+
+        pretty_print(data, "djqijdq")
+        # Process output_concept_code - always present
+        if "output_concept_code" in data:
+            data["output_concept_code"] = ConceptCodeFactory.make_concept_code_from_str(
+                domain=data["domain"],
+                concept_str=data["output_concept_code"],
+                fallback_domain=SpecialDomain.IMPLICIT,
+            )
+
+        # Process inputs - always present
+        inputs = data["inputs"]
+        if isinstance(inputs, PipeInputSpec):
+            pretty_print(cls, "djqijdqinputsdpqdzq,")
+            pretty_print(data, "ddatadatadatadatajqijdqinputsdpqdzq,")
+            for _, input_requirement in inputs.root.items():
+                input_requirement.concept_code = ConceptCodeFactory.make_concept_code_from_str(
                     concept_str=input_requirement.concept_code,
-                    fallback_domain="implicit",
+                    domain=data["domain"],
+                    fallback_domain=SpecialDomain.IMPLICIT,
                 )
-        self.output_concept_code = ConceptCodeFactory.make_concept_code_from_str(
-            concept_str=self.output_concept_code,
-            fallback_domain="implicit",
-        )
-        return self
+
+        pretty_print(data, "djqijdqfinish")
+        return data
 
     @property
     def class_name(self) -> str:

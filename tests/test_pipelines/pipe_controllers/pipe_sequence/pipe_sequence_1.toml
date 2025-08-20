@@ -2,7 +2,7 @@ domain = "simple_text_processing"
 definition = "Simple text processing pipeline without batching"
 system_prompt = "You are an expert at text analysis and processing"
 
-[concept]
+[concepts]
 RawText = "Raw input text to be processed"
 CleanedText = "Text that has been cleaned and normalized"
 SummaryText = "A summary of the processed text"

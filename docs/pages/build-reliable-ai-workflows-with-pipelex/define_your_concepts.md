@@ -11,7 +11,7 @@ Every concept starts with a natural language definition. This definition serves 
 The simplest way to define a concept is with a descriptive sentence:
 
 ```toml
-[concept]
+[concepts]
 Invoice = "A commercial document issued by a seller to a buyer"
 Employee = "A person employed by an organization"
 ProductReview = "A customer's evaluation of a product or service"
@@ -55,7 +55,7 @@ Group concepts that naturally belong together in the same domain. A domain acts 
 domain = "finance"
 description = "Financial document processing"
 
-[concept]
+[concepts]
 Invoice = "A commercial document issued by a seller to a buyer"
 Receipt = "Proof of payment for goods or services"
 PurchaseOrder = "A buyer's formal request to purchase goods or services"
@@ -149,7 +149,7 @@ The connection between TOML definitions and Python models happens automatically 
 # pipelex_libraries/pipelines/hr.toml
 domain = "hr"
 
-[concept]
+[concepts]
 Employee = "A person employed by an organization"
 Meeting = "A scheduled gathering of people for discussion"
 PerformanceReview = "An evaluation of an employee's work performance"
@@ -194,7 +194,7 @@ Sometimes concepts build on each other. A `Contract` is a kind of `Document`. A 
 Use the `refines` field to indicate when one concept is a more specific version of another:
 
 ```toml
-[concept]
+[concepts]
 Document = "A written or printed record"
 
 [concepts.Contract]
@@ -234,7 +234,7 @@ Here's a complete example showing concept refinement in action:
 # pipelex_libraries/pipelines/content.toml
 domain = "content"
 
-[concept]
+[concepts]
 Text = "Written content in natural language"
 
 [concepts.Article]

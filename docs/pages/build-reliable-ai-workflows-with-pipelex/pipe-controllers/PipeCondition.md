@@ -36,7 +36,7 @@ Here's a basic example showing how PipeCondition routes based on input data:
 domain = "routing_example"
 definition = "Example of PipeCondition routing"
 
-[concept]
+[concepts]
 CategoryInput = "Input with a category field"
 
 # Define the PipeCondition first

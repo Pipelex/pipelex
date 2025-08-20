@@ -2,7 +2,7 @@ domain = "customer_feedback"
 definition = "Processing customer reviews and feedback"
 system_prompt = "You are an expert at analyzing customer feedback and sentiment"
 
-[concept]
+[concepts]
 CustomerReview = "A single customer review text"
 SentimentAnalysis = "Sentiment analysis result for a review"
 ProductRating = "Overall product rating based on reviews"

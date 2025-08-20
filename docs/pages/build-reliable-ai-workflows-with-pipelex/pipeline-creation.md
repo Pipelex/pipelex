@@ -122,7 +122,7 @@ The draft is converted into a formal TOML blueprint:
 domain = "image_processing"
 definition = "Generate opposite version of photo's main feature"
 
-[concept]
+[concepts]
 PhotoAnalysis = "Analysis of photo content and main features"
 OppositePhotoPrompt = "Prompt for generating opposite version of photo"
 

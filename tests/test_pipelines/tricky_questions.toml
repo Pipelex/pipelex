@@ -1,7 +1,7 @@
 domain = "test_tricky_questions"
 definition = "Domain for testing tricky questions"
 
-[concept]
+[concepts]
 AnswerToAQuestion = "Answer to a question"
 Question = "A question"
 QuestionAnalysis = "Analysis of a question"

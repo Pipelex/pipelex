@@ -17,7 +17,7 @@ class TestTomlUtils:
 domain = "test_domain"
 definition = "Test definition"
 
-[concept]
+[concepts]
 TestConcept = "A test concept"
 
 [pipes]
@@ -138,7 +138,7 @@ definition = "Test definition"
         toml_content = """domain = "test"
 definition = "Test definition"
 
-[concept]
+[concepts]
 TestConcept = "A test concept"
 """
         toml_file = tmp_path / "valid.toml"
@@ -189,7 +189,7 @@ Output: "test"
         toml_content = '''domain = "test_pipe_condition_2"
 definition = "Simple test for PipeCondition functionality using expression"
 
-[concept]
+[concepts]
 CategoryInput = "Input with a category field"
 
 [pipes]

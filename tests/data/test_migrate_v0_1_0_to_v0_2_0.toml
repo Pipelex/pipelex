@@ -1,7 +1,7 @@
 domain = "test"
 definition = "Test domain"
 
-[concept]
+[concepts]
 SimpleText = "A simple text concept"
 SimpleDoc = "A simple document concept"
 

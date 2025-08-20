@@ -1,7 +1,7 @@
 domain = "test_integration"
 definition = "Simple pipes for testing PipeBatch integration"
 
-[concept]
+[concepts]
 UppercaseText = "Text that has been transformed to uppercase"
 TextList = "List of Text"
 

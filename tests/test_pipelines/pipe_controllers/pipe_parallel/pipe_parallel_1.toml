@@ -1,7 +1,7 @@
 domain = "test_pipe_parallel"
 definition = "Simple test for PipeParallel functionality"
 
-[concept]
+[concepts]
 DocumentInput = "Input document with text content"
 LengthAnalysis = "Analysis of document length and structure"
 ContentAnalysis = "Analysis of document content and themes"

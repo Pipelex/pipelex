@@ -3,7 +3,7 @@
 domain = "documents"
 definition = "The domain of documents that can comprise pages, text, images, etc. in PDF or other formats"
 
-[concept]
+[concepts]
 TextAndImagesContent = "A content that comprises text and images where the text can include local links to the images"
 
 [pipes]

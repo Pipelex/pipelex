@@ -30,7 +30,7 @@ domain = "marketing"
 definition = "Marketing content generation domain"
 
 # 1. Define the concepts used in our pipes
-[concept]
+[concepts]
 ProductDescription = "A description of a product's features and benefits"
 Tagline = "A catchy marketing tagline"
 
@@ -59,7 +59,7 @@ domain = "marketing"
 definition = "Marketing content generation domain"
 
 # 1. Define concepts
-[concept]
+[concepts]
 ProductDescription = "A description of a product's features and benefits"
 Keyword = "A keyword extracted from a text"
 Tagline = "A catchy marketing tagline"

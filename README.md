@@ -67,7 +67,7 @@ Pipelex uses TOML syntax, making workflows readable and shareable. Business prof
 
 Example:
 ```toml
-[concept]
+[concepts]
 Buyer = "The person who made the purchase"
 PurchaseDocumentText = "Transcript of a receipt, invoice, or order confirmation"
 
@@ -158,7 +158,7 @@ uv pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
 domain = "tech_tweet"
 definition = "A pipeline for optimizing tech tweets using Twitter/X best practices"
 
-[concept]
+[concepts]
 DraftTweet = "A draft version of a tech tweet that needs optimization"
 OptimizedTweet = "A tweet optimized for Twitter/X engagement following best practices"
 TweetAnalysis = "Analysis of the tweet's structure and potential improvements"

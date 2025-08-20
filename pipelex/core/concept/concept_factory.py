@@ -22,7 +22,7 @@ class ConceptFactory:
             concept_str_list = refines
         new_refines: List[str] = []
         for concept_str in concept_str_list:
-            concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str, fallback_domain=domain)
+            concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str, domain=domain, fallback_domain=domain)
             new_refines.append(concept_code)
         return new_refines
 
@@ -66,6 +66,8 @@ class ConceptFactory:
         code: str,
         concept_blueprint: ConceptBlueprint,
     ) -> Concept:
+        if code == "BestIdea":
+            print("ijdqjidjqsoj", domain)
         structure_class_name: str
         if structure := concept_blueprint.structure:
             if isinstance(structure, str):

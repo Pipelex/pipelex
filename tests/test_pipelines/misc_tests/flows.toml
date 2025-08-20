@@ -3,7 +3,7 @@
 domain = "flows"
 definition = "A collection of pipes that are used to test the flow of a pipeline"
 
-[concept]
+[concepts]
 Color = "A color"
 
 [pipes]

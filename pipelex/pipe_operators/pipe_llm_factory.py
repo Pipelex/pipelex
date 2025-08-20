@@ -92,7 +92,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     domain_code=domain_code,
                     template_str=pipe_blueprint.prompt_template,
                     template_name=pipe_blueprint.template_name,
-                    inputs=PipeInputSpec.make_from_dict(pipe_blueprint.inputs) if pipe_blueprint.inputs else PipeInputSpec.make_empty(),
+                    inputs=PipeInputSpec.make_from_blueprint(blueprint=pipe_blueprint.inputs or {}),
                 )
             except Jinja2TemplateError as exc:
                 error_msg = f"Jinja2 syntax error in user prompt for pipe '{pipe_code}' in domain '{domain_code}': {exc}."
@@ -115,8 +115,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
 
         user_images: List[str] = []
         if pipe_blueprint.inputs:
-            for stuff_name, concept_code in (pipe_blueprint.inputs).items():
-                concept = get_concept_provider().get_required_concept(concept_code=concept_code)
+            for stuff_name, requirement in (pipe_blueprint.inputs).items():
+                concept = get_concept_provider().get_required_concept(concept_code=requirement.concept_code)
                 if get_concept_provider().is_image_concept(concept_code=concept.code):
                     user_images.append(stuff_name)
                 else:
@@ -125,7 +125,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         pipe_llm_prompt = PipeLLMPrompt(
             code="adhoc_for_pipe_llm_prompt",
             domain=domain_code,
-            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_blueprint(blueprint=pipe_blueprint.inputs or {}),
             system_prompt_pipe_jinja2=system_prompt_pipe_jinja2,
             system_prompt_verbatim_name=pipe_blueprint.system_prompt_name,
             system_prompt=pipe_blueprint.system_prompt or system_prompt,
@@ -150,7 +150,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_blueprint(blueprint=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             pipe_llm_prompt=pipe_llm_prompt,
             llm_choices=llm_choices,

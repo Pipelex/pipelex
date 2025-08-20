@@ -52,7 +52,7 @@ quality = "hd"
 This pipe takes a text prompt as input and generates three variations of the image.
 
 ```toml
-[concept]
+[concepts]
 ImagePrompt = "A text prompt for generating an image"
 
 [pipes.generate_logo_variations]

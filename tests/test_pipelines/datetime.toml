@@ -1,5 +1,5 @@
 domain = "event"
 
-[concept]
+[concepts]
 DateTimeEvent = "A date time event with start and end time"
 

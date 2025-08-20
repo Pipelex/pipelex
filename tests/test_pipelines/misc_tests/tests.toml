@@ -3,7 +3,7 @@
 domain = "tests"
 definition = "This library is intended for testing purposes"
 
-[concept]
+[concepts]
 FictionCharacter = "A character in a fiction story"
 ArticleAndCritic = "An article and a critique of it"
 Complex = "A complex object"

@@ -1,7 +1,7 @@
 domain = "test_pipe_condition"
 definition = "Simple test for PipeCondition functionality"
 
-[concept]
+[concepts]
 CategoryInput = "Input with a category field"
 
 [pipes]
