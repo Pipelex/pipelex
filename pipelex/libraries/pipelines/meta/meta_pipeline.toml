@@ -14,7 +14,7 @@ PipeBlueprint = "Details enabling to create a pipe"
 type = "PipeSequence"
 definition = "Build a pipeline blueprint from natural language requirements"
 inputs = { draft_pipeline_rules = "Text", build_pipeline_rules = "Text", create_structured_output_rules = "Text", requirements = "Text", pipeline_name = "Text", domain = "Text" }
-output = "PipelexBundleBlueprint"
+output = "PipelexBlueprint"
 steps = [
     { pipe = "draft_pipeline_text", result = "pipeline_draft" },
     { pipe = "structure_blueprint", result = "pipeline_blueprint" },
@@ -46,7 +46,7 @@ Requirements: $requirements
 type = "PipeLLM"
 definition = "Generate a pipeline blueprint from natural language requirements"
 inputs = { build_pipeline_rules = "Text", pipeline_draft = "Text", pipeline_name = "Text", domain = "Text", requirements = "Text" }
-output = "PipelexBundleBlueprint"
+output = "PipelexBlueprint"
 llm = "llm_to_pipelex"
 # structuring_method = "preliminary_text"
 prompt_template = """

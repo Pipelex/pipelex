@@ -2,7 +2,7 @@ from typing import Dict
 
 from pydantic import Field
 
-from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint as PipelexBundleBlueprintCore
+from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.stuff.stuff_content import StructuredContent
 
 
@@ -28,7 +28,7 @@ class PipelineDraft(StructuredContent):
     pipe: Dict[str, PipeDraft] = Field(default_factory=dict)
 
 
-class PipelexBundleBlueprint(PipelexBundleBlueprintCore, StructuredContent):
+class PipelexBundleBlueprintStuff(PipelexBundleBlueprint, StructuredContent):
     """Complete blueprint of a pipelex bundle TOML file."""
 
     pass
