@@ -122,94 +122,36 @@ class LibraryManager(LibraryManagerAbstract):
         self.teardown()
         self.setup()
 
-    def get_pipeline_library_dirs(self) -> List[Path]:
+    def _get_pipeline_library_dirs(self) -> List[Path]:
         library_dirs = [Path(self.library_config.pipelines_dir_path)]
         if runtime_manager.is_unit_testing:
             log.debug("Registering test pipeline structures for unit testing")
             library_dirs += [Path(self.library_config.test_pipelines_dir_path)]
         return library_dirs
 
-    def _get_pipeline_library_paths(self) -> List[Path]:
-        library_dirs = self.get_pipeline_library_dirs()
+    def _get_pipelex_toml_files_from_dirs(self, dirs: List[Path]) -> List[Path]:
+        """Get all valid Pipelex TOML files from the given directories."""
 
-        # Get all valid Pipelex TOML files from the library directories
-        valid_toml_file_paths = self._get_library_file_paths(library_dirs)
+        all_toml_paths: List[Path] = []
+        for dir_path in dirs:
+            if not dir_path.exists():
+                raise LibraryError(f"Directory does not exist: {dir_path}")
 
-        # Remove failing_pipelines_path from the list
-        failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
-        failing_paths_set = {Path(fp) for fp in failing_pipelines_file_paths}
-        valid_toml_file_paths = [path for path in valid_toml_file_paths if path not in failing_paths_set]
-        return valid_toml_file_paths
+            # Find all TOML files in the directory
+            toml_files = find_files_in_dir(
+                dir_path=str(dir_path),
+                pattern="*.toml",
+                is_recursive=True,
+            )
 
-    def _get_library_dirs(self, paths: List[Path]) -> List[Path]:
-        """Extract and validate directory paths from a list of paths.
-
-        Args:
-            paths: List of paths that could be files or directories
-
-        Returns:
-            List of validated directory paths
-
-        Raises:
-            LibraryError: If a path doesn't exist
-        """
-        validated_dirs: List[Path] = []
-        for path in paths:
-            path = Path(path)
-            if not path.exists():
-                raise LibraryError(f"Path does not exist: {path}")
-            if path.is_dir():
-                validated_dirs.append(path)
-            # Silently skip files - we only want directories
-        return validated_dirs
-
-    def _get_library_file_paths(self, paths: List[Path]) -> List[Path]:
-        """Extract and validate Pipelex TOML files from a list of paths.
-
-        This function handles both files and directories:
-        - For files: validates they are Pipelex TOML files
-        - For directories: recursively finds all Pipelex TOML files within
-
-        Args:
-            paths: List of paths that could be files or directories
-
-        Returns:
-            List of validated Pipelex TOML file paths
-
-        Raises:
-            LibraryError: If a path doesn't exist
-        """
-        from pipelex.core.syntax_converter import PipelexSyntaxConverter
-
-        validated_files: List[Path] = []
-
-        for path in paths:
-            path = Path(path)
-            if not path.exists():
-                raise LibraryError(f"Path does not exist: {path}")
-
-            if path.is_file():
-                # Check if it's a valid Pipelex TOML file
-                if PipelexSyntaxConverter.is_pipelex_file(path):
-                    validated_files.append(path)
+            # Filter to only include valid Pipelex files
+            for toml_file in toml_files:
+                if PipelexSyntaxConverter.is_pipelex_file(toml_file):
+                    all_toml_paths.append(toml_file)
                 else:
-                    log.debug(f"Skipping non-Pipelex file: {path}")
+                    log.debug(f"Skipping non-Pipelex TOML file: {toml_file}")
 
-            elif path.is_dir():
-                # Find all TOML files in the directory
-                toml_files = find_files_in_dir(
-                    dir_path=str(path),
-                    pattern="*.toml",
-                    is_recursive=True,
-                )
-                # Filter to only include valid Pipelex files
-                for toml_file in toml_files:
-                    if PipelexSyntaxConverter.is_pipelex_file(toml_file):
-                        validated_files.append(toml_file)
-                    else:
-                        log.debug(f"Skipping non-Pipelex TOML file: {toml_file}")
-
-        return validated_files
+        return all_toml_paths
 
     def load_from_file(self, toml_path: Path):
         if not PipelexSyntaxConverter.is_pipelex_file(toml_path):
@@ -227,29 +169,24 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def load_libraries(self, library_dirs: Optional[List[Path]] = None, library_file_paths: Optional[List[Path]] = None) -> None:
-        all_paths: List[Path] = []
+        dirs_to_use: List[Path] = self._get_pipeline_library_dirs()
+        all_toml_paths: List[Path] = self._get_pipelex_toml_files_from_dirs(dirs_to_use)
 
-        if library_dirs is not None or library_file_paths is not None:
-            if library_dirs is not None:
-                all_paths.extend([Path(d) for d in library_dirs])
+        # Remove failing pipelines from the list
+        failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
+        failing_paths_set = {Path(fp) for fp in failing_pipelines_file_paths}
+        all_toml_paths = [path for path in all_toml_paths if path not in failing_paths_set]
 
-            if library_file_paths is not None:
-                all_paths.extend([Path(f) for f in library_file_paths])
+        if library_dirs is not None:
+            dirs_to_use = library_dirs
 
-            # Get validated directories and TOML files
-            dirs_to_register = self._get_library_dirs(all_paths)
-            all_toml_paths = self._get_library_file_paths(all_paths)
+        # Register classes in the directories
+        for library_dir in dirs_to_use:
+            ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_dir))
 
-            # Register classes for the directories
-            for library_dir in dirs_to_register:
-                ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_dir))
-        else:
-            # Use default paths if no overrides provided
-            all_toml_paths = self._get_pipeline_library_paths()
-            for library_dir in self.get_pipeline_library_dirs():
-                ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_dir))
+        if library_file_paths is not None:
+            all_toml_paths = library_file_paths
 
-        # Load all TOML files
         for toml_file_path in all_toml_paths:
             self.load_from_file(toml_path=toml_file_path)
 
