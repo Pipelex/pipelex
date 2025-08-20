@@ -6,10 +6,10 @@ from pydantic import BaseModel, model_validator
 from typing_extensions import Self
 
 from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.tools.misc.toml_utils import clean_trailing_whitespace, validate_toml_content, validate_toml_file
+from pipelex.tools.misc.toml_utils import clean_trailing_whitespace, dict_to_toml, validate_toml_content, validate_toml_file
 
 
-class PipelexSyntaxConverter(BaseModel):
+class PipelexInterpreter(BaseModel):
     """TOML -> PipelexBundleBlueprint"""
 
     file_path: Optional[Path] = None
@@ -100,3 +100,10 @@ class PipelexSyntaxConverter(BaseModel):
         file_content = self._load_toml_content()
         toml_data = self._parse_toml_content(file_content)
         return PipelexBundleBlueprint.model_validate(toml_data)
+
+    @staticmethod
+    def make_toml_content(blueprint: PipelexBundleBlueprint) -> str:
+        """Convert a PipelexBundleBlueprint to properly formatted TOML content."""
+        data = blueprint.model_dump()
+        toml_content = dict_to_toml(data)
+        return toml_content

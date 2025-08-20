@@ -1,4 +1,4 @@
-"""Test data for PipelexSyntaxConverter tests."""
+"""Test data for PipelexInterpreter tests."""
 
 from typing import ClassVar, List, Tuple
 
@@ -6,13 +6,12 @@ from pipelex.core.bundle.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concept.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 
 
-class SyntaxConverterTestCases:
-    """Test cases for PipelexSyntaxConverter with TOML content and expected blueprints."""
+class InterpreterTestCases:
+    """Test cases for PipelexInterpreter with TOML content and expected blueprints."""
 
     SIMPLE_DOMAIN = (
         "simple_domain",
-        """
-domain = "simple_test"
+        """domain = "simple_test"
 definition = "A simple test domain"
 """,
         PipelexBundleBlueprint(
@@ -23,8 +22,7 @@ definition = "A simple test domain"
 
     SIMPLE_DOMAIN_WITH_CONCEPTS = (
         "simple_domain_with_concepts",
-        """
-domain = "simple_test"
+        """domain = "simple_test"
 definition = "A simple test domain"
 """,
         PipelexBundleBlueprint(
@@ -35,8 +33,7 @@ definition = "A simple test domain"
 
     DOMAIN_WITH_SYSTEM_PROMPTS = (
         "domain_with_system_prompts",
-        """
-domain = "system_prompt_test"
+        """domain = "system_prompt_test"
 definition = "A domain with system prompts"
 system_prompt = "You are an expert assistant"
 system_prompt_to_structure = "Generate structured output"
@@ -53,8 +50,7 @@ prompt_template_to_structure = "Structure the following data: ..."
 
     SIMPLE_CONCEPTS = (
         "simple_concept",
-        """
-domain = "simple_concept"
+        """domain = "simple_concept"
 definition = "A simple concept"
 
 [concepts]
@@ -73,8 +69,7 @@ Concept2 = "A concept"
 
     CONCEPTS_WITH_REFINES = (
         "concepts_with_refines",
-        """
-domain = "refining_concepts"
+        """domain = "refining_concepts"
 definition = "Domain with concepts that refine others"
 
 [concepts]
@@ -98,8 +93,7 @@ refines = "Concept2"
 
     CONCEPTS_WITH_STRUCTURES = (
         "concepts_with_structures",
-        """
-domain = "structured_concepts"
+        """domain = "structured_concepts"
 definition = "Domain with structured concepts"
 
 [concepts]
@@ -132,8 +126,7 @@ birthdate = { type = "date", definition = "The birthdate of the person", require
 
     EMPTY_CONCEPTS = (
         "empty_concepts",
-        """
-domain = "empty_concepts"
+        """domain = "empty_concepts"
 definition = "Domain with empty concept section"
 
 [concepts]
@@ -144,8 +137,7 @@ definition = "Domain with empty concept section"
     ####### ERROR TEST CASES #######
     INVALID_TOML_SYNTAX = (
         "invalid_toml_syntax",
-        """
-domain = "invalid_syntax"
+        """domain = "invalid_syntax"
 definition = "Domain with invalid TOML syntax"
 
 [concepts]

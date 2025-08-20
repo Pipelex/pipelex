@@ -12,8 +12,8 @@ from pipelex.core.bundle.pipelex_bundle_factory import PipelexBundleFactory
 from pipelex.core.concept.concept_factory import ConceptFactory
 from pipelex.core.concept.concept_library import ConceptLibrary
 from pipelex.core.domain.domain_library import DomainLibrary
+from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipe.pipe_library import PipeLibrary
-from pipelex.core.syntax_converter import PipelexSyntaxConverter
 from pipelex.exceptions import (
     ConceptLibraryError,
     LibraryError,
@@ -146,23 +146,25 @@ class LibraryManager(LibraryManagerAbstract):
 
             # Filter to only include valid Pipelex files
             for toml_file in toml_files:
-                if PipelexSyntaxConverter.is_pipelex_file(toml_file):
+                if PipelexInterpreter.is_pipelex_file(toml_file):
                     all_toml_paths.append(toml_file)
                 else:
                     log.debug(f"Skipping non-Pipelex TOML file: {toml_file}")
 
         return all_toml_paths
 
-    def load_from_file(self, toml_path: Path):
-        if not PipelexSyntaxConverter.is_pipelex_file(toml_path):
+    @override
+    def load_from_file(self, toml_path: Path) -> None:
+        if not PipelexInterpreter.is_pipelex_file(toml_path):
             raise LibraryError(f"File is not a valid Pipelex TOML file: {toml_path}")
 
-        converter = PipelexSyntaxConverter(file_path=toml_path)
+        converter = PipelexInterpreter(file_path=toml_path)
         blueprint = converter.make_pipelex_bundle_blueprint()
         pipelex_bundle = PipelexBundleFactory.make_from_blueprint(blueprint=blueprint)
         self.load_from_pipelex_bundle(pipelex_bundle=pipelex_bundle)
 
-    def load_from_pipelex_bundle(self, pipelex_bundle: PipelexBundle):
+    @override
+    def load_from_pipelex_bundle(self, pipelex_bundle: PipelexBundle) -> None:
         self.domain_library.add_domain(domain=pipelex_bundle.domain)
         self.concept_library.add_concepts(concepts=list(pipelex_bundle.concepts.values()))
         self.pipe_library.add_pipes(pipes=list(pipelex_bundle.pipes.values()))
