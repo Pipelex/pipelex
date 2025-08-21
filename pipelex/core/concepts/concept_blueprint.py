@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.tools.misc.string_utils import is_pascal_case
 from pipelex.types import StrEnum
 
@@ -116,10 +116,10 @@ class ConceptBlueprint(BaseModel):
     @staticmethod
     def extract_non_native_refines(refines: Union[str, List[str]]) -> List[str]:
         if isinstance(refines, str) and "." not in refines:
-            if refines not in [native_concept.value for native_concept in NativeConcept]:
+            if refines not in [native_concept.value for native_concept in NativeConceptEnum]:
                 return [refines]
             else:
                 return []
         elif isinstance(refines, list):
-            return [refine for refine in refines if refine not in [native_concept.value for native_concept in NativeConcept]]
+            return [refine for refine in refines if refine not in [native_concept.value for native_concept in NativeConceptEnum]]
         return []

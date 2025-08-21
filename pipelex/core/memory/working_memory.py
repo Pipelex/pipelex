@@ -5,8 +5,6 @@ from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
 from pipelex import log, pretty_print
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import (
@@ -16,7 +14,6 @@ from pipelex.core.stuffs.stuff_content import (
     MermaidContent,
     NumberContent,
     PDFContent,
-    StuffContent,
     StuffContentType,
     TextAndImagesContent,
     TextContent,
@@ -27,7 +24,6 @@ from pipelex.exceptions import (
     WorkingMemoryStuffNotFoundError,
     WorkingMemoryTypeError,
 )
-from pipelex.tools.misc.json_utils import save_as_json_to_path
 
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
@@ -65,11 +61,6 @@ class WorkingMemory(BaseModel):
 
     def make_deep_copy(self) -> Self:
         return self.model_copy(deep=True)
-
-    def generate_full_stuff_dict(self) -> StuffDict:
-        full_stuff_dict: StuffDict = self.root.copy()
-        full_stuff_dict.update({alias: self.root[target] for alias, target in self.aliases.items()})
-        return full_stuff_dict
 
     def generate_stuff_artefact_dict(self) -> StuffArtefactDict:
         artefact_dict: StuffArtefactDict = {}
@@ -236,50 +227,9 @@ class WorkingMemory(BaseModel):
     def list_keys(self) -> List[str]:
         return list(self.root.keys()) + list(self.aliases.keys())
 
-    ################################################################################################
-    # Export methods
-    ################################################################################################
-
-    def content_dict(self) -> Dict[str, StuffContent]:
-        result = {name: stuff.content for name, stuff in self.root.items()}
-        # Include aliased content
-        result.update({alias: self.root[target].content for alias, target in self.aliases.items()})
-        return result
-
     def pretty_print(self):
         for name, stuff in self.root.items():
             pretty_print(stuff.content.rendered_plain(), title=f"{name}: {stuff.concept.code}")
-
-    def update_from_strings_from_dict(self, context_dict: Dict[str, Any]) -> "WorkingMemory":
-        update_stuff_dict: StuffDict = {}
-        for name, str_content in context_dict.items():
-            if not isinstance(str_content, str):
-                continue
-            stuff_content: StuffContent
-            if str_content.startswith("http"):
-                if ".png" in str_content or ".jpg" in str_content or ".jpeg" in str_content:
-                    stuff_content = ImageContent(url=str_content)
-                else:
-                    log.warning(f"Skipping unknown URL content: {str_content}")
-                    continue
-            else:
-                stuff_content = TextContent(text=str_content)
-            update_stuff_dict[name] = Stuff(
-                stuff_name=name,
-                stuff_code="",
-                concept=Concept(
-                    code=NativeConcept.TEXT.value,
-                    domain="generic",
-                    definition=NativeConcept.TEXT.value,
-                    structure_class_name=NativeConcept.TEXT.value,
-                ),
-                content=stuff_content,
-            )
-        self.root.update(update_stuff_dict)
-        return self
-
-    def save_to_memory_file(self, memory_file_path: str):
-        save_as_json_to_path(self.model_dump(serialize_as_any=True), memory_file_path)
 
     ################################################################################################
     # Stuff accessors

@@ -6,8 +6,8 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import log
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
 from pipelex.core.stuffs.stuff_content import PageContent, TextContent
@@ -30,7 +30,9 @@ class TestDryWorkingMemory:
         needed_inputs = [
             TypedNamedInputRequirement(
                 variable_name="page",
-                concept=Concept(code=NativeConcept.PAGE.value, domain="test_tricky_questions", definition="Page", structure_class_name="Page"),
+                concept=ConceptFactory.make(
+                    concept_code=NativeConceptEnum.PAGE.value, domain="test_tricky_questions", definition="Page", structure_class_name="Page"
+                ),
                 structure_class=PageContent,
             ),
         ]
@@ -42,7 +44,7 @@ class TestDryWorkingMemory:
 
         # Verify concept code is correct
         page_stuff = dry_memory.get_stuff("page")
-        assert page_stuff.concept.code == NativeConcept.PAGE.value
+        assert page_stuff.concept.code == NativeConceptEnum.PAGE.value
         assert page_stuff.stuff_name == "page"
 
         # Verify structured content was created properly
@@ -70,8 +72,8 @@ class TestDryWorkingMemory:
         needed_inputs = [
             TypedNamedInputRequirement(
                 variable_name="thoughtful_answer",
-                concept=Concept(
-                    code="test_tricky_questions.ThoughtfulAnswer",
+                concept=ConceptFactory.make(
+                    concept_code="ThoughtfulAnswer",
                     domain="test_tricky_questions",
                     definition="Thoughtful answer",
                     structure_class_name="ThoughtfulAnswer",
@@ -80,7 +82,7 @@ class TestDryWorkingMemory:
             ),
             TypedNamedInputRequirement(
                 variable_name="question",
-                concept=Concept(code="answer.Question", domain="test_tricky_questions", definition="Question", structure_class_name="Question"),
+                concept=ConceptFactory.make(concept_code="Question", domain="answer", definition="Question", structure_class_name="Question"),
                 structure_class=TextContent,
             ),
         ]
@@ -126,15 +128,18 @@ class TestDryWorkingMemory:
         needed_inputs = [
             TypedNamedInputRequirement(
                 variable_name="question_analysis",
-                concept=Concept(
-                    code="QuestionAnalysis", domain="test_tricky_questions", definition="Question analysis", structure_class_name="QuestionAnalysis"
+                concept=ConceptFactory.make(
+                    concept_code="QuestionAnalysis",
+                    domain="test_tricky_questions",
+                    definition="Question analysis",
+                    structure_class_name="QuestionAnalysis",
                 ),
                 structure_class=TextContent,
             ),
             TypedNamedInputRequirement(
                 variable_name="conclusion",
-                concept=Concept(
-                    code="test_tricky_questions.ThoughtfulAnswerConclusion",
+                concept=ConceptFactory.make(
+                    concept_code="ThoughtfulAnswerConclusion",
                     domain="test_tricky_questions",
                     definition="Thoughtful answer conclusion",
                     structure_class_name="ThoughtfulAnswerConclusion",
@@ -172,8 +177,8 @@ class TestDryWorkingMemory:
         needed_inputs = [
             TypedNamedInputRequirement(
                 variable_name="thoughtful_answer",
-                concept=Concept(
-                    code="test_tricky_questions.ThoughtfulAnswer",
+                concept=ConceptFactory.make(
+                    concept_code="ThoughtfulAnswer",
                     domain="test_tricky_questions",
                     definition="Thoughtful answer",
                     structure_class_name="ThoughtfulAnswer",
@@ -182,13 +187,16 @@ class TestDryWorkingMemory:
             ),
             TypedNamedInputRequirement(
                 variable_name="raw_question",
-                concept=Concept(code="answer.Question", domain="test_tricky_questions", definition="Question", structure_class_name="Question"),
+                concept=ConceptFactory.make(concept_code="Question", domain="answer", definition="Question", structure_class_name="Question"),
                 structure_class=TextContent,
             ),
             TypedNamedInputRequirement(
                 variable_name="analysis_result",
-                concept=Concept(
-                    code="QuestionAnalysis", domain="test_tricky_questions", definition="Question analysis", structure_class_name="QuestionAnalysis"
+                concept=ConceptFactory.make(
+                    concept_code="QuestionAnalysis",
+                    domain="test_tricky_questions",
+                    definition="Question analysis",
+                    structure_class_name="QuestionAnalysis",
                 ),
                 structure_class=TextContent,
             ),
@@ -244,20 +252,23 @@ class TestDryWorkingMemory:
         needed_inputs = [
             TypedNamedInputRequirement(
                 variable_name="question",
-                concept=Concept(code="answer.Question", domain="test_tricky_questions", definition="Question", structure_class_name="Question"),
+                concept=ConceptFactory.make(concept_code="Question", domain="answer", definition="Question", structure_class_name="Question"),
                 structure_class=TextContent,
             ),
             TypedNamedInputRequirement(
                 variable_name="question_analysis",
-                concept=Concept(
-                    code="QuestionAnalysis", domain="test_tricky_questions", definition="Question analysis", structure_class_name="QuestionAnalysis"
+                concept=ConceptFactory.make(
+                    concept_code="QuestionAnalysis",
+                    domain="test_tricky_questions",
+                    definition="Question analysis",
+                    structure_class_name="QuestionAnalysis",
                 ),
                 structure_class=TextContent,
             ),
             TypedNamedInputRequirement(
                 variable_name="thoughtful_answer",
-                concept=Concept(
-                    code="test_tricky_questions.ThoughtfulAnswer",
+                concept=ConceptFactory.make(
+                    concept_code="ThoughtfulAnswer",
                     domain="test_tricky_questions",
                     definition="Thoughtful answer",
                     structure_class_name="ThoughtfulAnswer",

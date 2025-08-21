@@ -6,6 +6,7 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.create.structured_output_generator import StructureGenerator
@@ -48,6 +49,10 @@ class Concept(BaseModel):
     @property
     def node_name(self) -> str:
         return self.code
+
+    @classmethod
+    def is_native_concept_code(cls, concept_code: str) -> bool:
+        return concept_code in [native_concept.value for native_concept in NativeConceptEnum]
 
     @classmethod
     def is_native_concept(cls, concept: "Concept") -> bool:

@@ -6,16 +6,16 @@ from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import DryRunError, PipeDefinitionError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
-from pipelex.hub import get_pipeline_tracker, get_required_pipe
+from pipelex.hub import get_concept_provider, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -38,7 +38,7 @@ class PipeParallel(PipeController):
         Calculate the inputs needed by this PipeParallel.
         This is the inputs needed by ALL parallel sub-pipes since they all run simultaneously.
         """
-        needed_inputs = PipeInputSpec.make_empty()
+        needed_inputs = PipeInputSpecFactory.make_empty()
 
         for sub_pipe in self.parallel_sub_pipes:
             pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
@@ -51,7 +51,7 @@ class PipeParallel(PipeController):
             if sub_pipe.batch_params:
                 batch_as_input = sub_pipe.batch_params.input_item_stuff_name
                 # Create a new PipeInputSpec without the batch_as input
-                filtered_needed_inputs = PipeInputSpec.make_empty()
+                filtered_needed_inputs = PipeInputSpecFactory.make_empty()
                 for var_name, requirement in pipe_needed_inputs.root.items():
                     if var_name != batch_as_input:
                         filtered_needed_inputs.add_requirement(variable_name=var_name, concept=requirement.concept)
@@ -86,7 +86,7 @@ class PipeParallel(PipeController):
             if named_input_requirement.variable_name not in self.inputs.variables:
                 missing_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain_code=self.domain,
+                    domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[named_input_requirement.variable_name],
                 )
@@ -103,7 +103,7 @@ class PipeParallel(PipeController):
             if input_name not in the_needed_inputs.required_names:
                 extraneous_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain_code=self.domain,
+                    domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
                 )
@@ -185,7 +185,7 @@ class PipeParallel(PipeController):
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
         if combined_output := self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
-                concept=Concept(code=combined_output, domain=self.domain, definition=combined_output, structure_class_name=combined_output),
+                concept=get_concept_provider().get_required_concept(concept_code=combined_output),
                 stuff_contents=output_stuff_contents,
                 name=output_name,
             )
@@ -297,7 +297,7 @@ class PipeParallel(PipeController):
         # 5. Handle combined output if specified
         if combined_output := self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
-                concept=Concept(code=combined_output, domain=self.domain, definition=combined_output, structure_class_name=combined_output),
+                concept=get_concept_provider().get_required_concept(concept_code=combined_output),
                 stuff_contents=output_stuff_contents,
                 name=output_name,
             )

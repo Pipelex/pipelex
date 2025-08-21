@@ -2,8 +2,8 @@ from typing import ClassVar, List, Tuple
 
 import pytest
 
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_content import HtmlContent, ImageContent, ListContent, NumberContent, TextAndImagesContent, TextContent
@@ -58,37 +58,39 @@ class TestWorkingMemory:
     @pytest.fixture
     def single_text_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single text content."""
-        return WorkingMemoryFactory.make_from_text(text=TestWorkingMemoryData.SAMPLE_TEXT, concept_str=NativeConcept.TEXT.value, name="sample_text")
+        return WorkingMemoryFactory.make_from_text(
+            text=TestWorkingMemoryData.SAMPLE_TEXT, concept_code=NativeConceptEnum.TEXT.value, name="sample_text"
+        )
 
     @pytest.fixture
     def single_image_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single image content."""
         return WorkingMemoryFactory.make_from_image(
-            image_url=TestWorkingMemoryData.SAMPLE_IMAGE_URL, concept_str="gantt.GanttImage", name="gantt_chart_image"
+            image_url=TestWorkingMemoryData.SAMPLE_IMAGE_URL, concept_code="gantt.GanttImage", name="gantt_chart_image"
         )
 
     @pytest.fixture
     def single_pdf_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single PDF content."""
-        return WorkingMemoryFactory.make_from_pdf(pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL, concept_str="PDF", name="pdf_document")
+        return WorkingMemoryFactory.make_from_pdf(pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL, concept_code="PDF", name="pdf_document")
 
     @pytest.fixture
     def multiple_stuff_memory(self) -> WorkingMemory:
         """Create WorkingMemory with multiple stuff items."""
         text_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             name="question",
             content=TextContent(text="What are the aerodynamic features?"),
         )
 
         document_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             name="document",
             content=TextContent(text=TestWorkingMemoryData.SAMPLE_TEXT),
         )
 
         image_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Image", domain="generic", definition="native.Image", structure_class_name="native.Image"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE]),
             name="diagram",
             content=ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
         )
@@ -99,13 +101,13 @@ class TestWorkingMemory:
     def memory_with_aliases(self) -> WorkingMemory:
         """Create WorkingMemory with aliases."""
         text_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             name="primary_text",
             content=TextContent(text="Primary content"),
         )
 
         secondary_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             name="secondary_text",
             content=TextContent(text="Secondary content"),
         )
@@ -130,7 +132,7 @@ class TestWorkingMemory:
         )
 
         complex_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.List", domain="generic", definition="native.List", structure_class_name="native.List"),
+            concept=ConceptFactory.make(concept_code="List", domain="native", definition="native.List", structure_class_name="ListContent"),
             name="mixed_list",
             content=complex_content,
         )
@@ -146,9 +148,7 @@ class TestWorkingMemory:
         )
 
         stuff = StuffFactory.make_stuff(
-            concept=Concept(
-                code="native.TextAndImages", domain="generic", definition="native.TextAndImages", structure_class_name="native.TextAndImages"
-            ),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT_AND_IMAGES]),
             name="project_overview",
             content=text_and_images_content,
         )
@@ -164,7 +164,7 @@ class TestWorkingMemory:
         )
 
         stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Html", domain="generic", definition="native.Html", structure_class_name="native.Html"),
+            concept=ConceptFactory.make(concept_code="Html", domain="native", definition="native.Html", structure_class_name="HtmlContent"),
             name="test_report",
             content=html_content,
         )
@@ -177,7 +177,7 @@ class TestWorkingMemory:
         number_content = NumberContent(number=3.14159)
 
         stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Number", domain="generic", definition="native.Number", structure_class_name="native.Number"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.NUMBER]),
             name="pi_value",
             content=number_content,
         )
@@ -192,7 +192,7 @@ class TestWorkingMemory:
 
         # Check stuff retrieval
         stuff = single_text_memory.get_stuff("sample_text")
-        assert stuff.concept.code == NativeConcept.TEXT.value
+        assert stuff.concept.code == NativeConceptEnum.TEXT.value
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == TestWorkingMemoryData.SAMPLE_TEXT
 

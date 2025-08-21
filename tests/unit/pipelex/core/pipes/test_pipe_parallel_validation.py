@@ -1,5 +1,6 @@
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_operators.pipe_llm import PipeLLM
@@ -16,11 +17,11 @@ class TestPipeParallelValidation:
             domain="test_domain",
             code="analyze_document",
             # Let PipeLLM infer inputs from prompt template - no explicit inputs
-            output=Concept(code="test_domain.Analysis", domain="test_domain", definition="Analysis", structure_class_name="Analysis"),
+            output=ConceptFactory.make(concept_code="Analysis", domain="test_domain", definition="Analysis", structure_class_name="Analysis"),
             pipe_llm_prompt=PipeLLMPrompt(
                 code="analyze_document_prompt",
                 domain="test_domain",
-                output=Concept(code="test_domain.Analysis", domain="test_domain", definition="Analysis", structure_class_name="Analysis"),
+                output=ConceptFactory.make(concept_code="Analysis", domain="test_domain", definition="Analysis", structure_class_name="Analysis"),
                 user_text="Analyze this document:  \n@context\n@document",
             ),
         )
@@ -34,15 +35,15 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallel(
             domain="test_domain",
             code="parallel_document_processor",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_domain",
                 blueprint={
                     "document": InputRequirementBlueprint(concept_code="test_domain.document"),
                     "context": InputRequirementBlueprint(concept_code="test_domain.context"),
                 },
             ),
-            output=Concept(
-                code="test_domain.ProcessedAnalysis", domain="test_domain", definition="Processed analysis", structure_class_name="ProcessedAnalysis"
+            output=ConceptFactory.make(
+                concept_code="ProcessedAnalysis", domain="test_domain", definition="Processed analysis", structure_class_name="ProcessedAnalysis"
             ),
             parallel_sub_pipes=[SubPipe(pipe_code="analyze_document", output_name="analysis_result")],
             add_each_output=True,
@@ -65,10 +66,12 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallel(
             domain="test_domain",
             code="test_parallel",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_domain", blueprint={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output=Concept(code="test_domain.ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"),
+            output=ConceptFactory.make(
+                concept_code="ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"
+            ),
             parallel_sub_pipes=[SubPipe(pipe_code="test_pipe_1", output_name="result_1")],
             add_each_output=True,
             combined_output=None,
@@ -90,15 +93,15 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallel(
             domain="test_domain",
             code="parallel_document_processor",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_domain",
                 blueprint={
                     "document": InputRequirementBlueprint(concept_code="test_domain.Document"),
                     "context": InputRequirementBlueprint(concept_code="test_domain.Context"),
                 },
             ),
-            output=Concept(
-                code="test_domain.ProcessedAnalysis", domain="test_domain", definition="Processed analysis", structure_class_name="ProcessedAnalysis"
+            output=ConceptFactory.make(
+                concept_code="ProcessedAnalysis", domain="test_domain", definition="Processed analysis", structure_class_name="ProcessedAnalysis"
             ),
             parallel_sub_pipes=[],  # No sub-pipes to avoid dependency issues
             add_each_output=True,

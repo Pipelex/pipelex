@@ -4,7 +4,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -41,11 +41,11 @@ class TestPipeSequenceDryRun:
 
         # Create Stuff object for the discord channel updates list
         discord_updates_stuff = StuffFactory.make_stuff(
-            concept=Concept(
-                code="discord_newsletter.DiscordChannelUpdate",
-                domain="generic",
+            concept=ConceptFactory.make(
+                concept_code="DiscordChannelUpdate",
+                domain="discord_newsletter",
                 definition="discord_newsletter.DiscordChannelUpdate",
-                structure_class_name="discord_newsletter.DiscordChannelUpdate",
+                structure_class_name="DiscordChannelUpdate",
             ),
             content=discord_channel_updates,
             name="discord_channel_updates",

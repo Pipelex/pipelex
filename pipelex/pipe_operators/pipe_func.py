@@ -3,7 +3,7 @@ from typing import List, Optional, Set, cast, get_type_hints
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
@@ -108,8 +108,8 @@ class PipeFunc(PipeOperator):
 
                 requirement = TypedNamedInputRequirement(
                     variable_name="mock_output",
-                    concept=Concept(
-                        code=f"mock.{return_type.__name__}",
+                    concept=ConceptFactory.make(
+                        concept_code=f"mock.{return_type.__name__}",
                         domain="generic",
                         definition=f"mock.{return_type.__name__}",
                         structure_class_name=return_type.__name__,
@@ -124,7 +124,7 @@ class PipeFunc(PipeOperator):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept=Concept(code=self.output.code, domain="generic", definition=self.output.code, structure_class_name=self.output.code),
+            concept=self.output,
             content=mock_content,
         )
 

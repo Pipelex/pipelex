@@ -6,7 +6,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConcept
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.stuffs.stuff_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
@@ -25,25 +25,33 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
                 if refine not in self.root.keys():
                     raise ConceptLibraryError(f"Concept '{concept.code}' refines '{refine}' but no concept with the code '{refine}' exists")
 
+    @override
     def setup(self):
-        native_concepts = self.get_native_concepts()
+        native_concepts = [
+            ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[native_concept]) for native_concept in NativeConceptEnum
+        ]
         self.add_concepts(native_concepts)
 
+    @override
     def reset(self):
+        self.root = {}
+        self.setup()
+
+    @override
+    def teardown(self):
         self.root = {}
 
     @classmethod
     def make_empty(cls):
         return cls(root={})
 
-    @classmethod
-    def get_native_concept(cls, native_concept: NativeConcept) -> Concept:
-        return ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[native_concept])
+    @override
+    def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
+        return self.get_required_concept(concept_code=native_concept.value)
 
-    @classmethod
-    def get_native_concepts(cls) -> List[Concept]:
+    def get_native_concepts(self) -> List[Concept]:
         """Create all native concepts from the hardcoded data"""
-        return [cls.get_native_concept(native_concept=native_concept) for native_concept in NativeConcept]
+        return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptEnum]
 
     @override
     def is_concept_implicit(self, concept_code: str) -> bool:
@@ -87,17 +95,13 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def get_required_concept(self, concept_code: str) -> Concept:
-        if concept_code not in self.root:
+        if "." not in concept_code:
+            if not Concept.is_native_concept_code(concept_code=concept_code):
+                raise ConceptLibraryError(f"Concept code '{concept_code}' is not a native concept")
+        try:
+            return self.root[concept_code]
+        except KeyError:
             raise ConceptLibraryConceptNotFoundError(f"Concept code was not found and is not implicit: '{concept_code}'")
-        return self.root[concept_code]
-
-    @override
-    def get_concepts_dict(self) -> Dict[str, Concept]:
-        return self.root
-
-    @override
-    def teardown(self) -> None:
-        self.root = {}
 
     @override
     def get_class(self, concept_code: str) -> Optional[Type[Any]]:
@@ -115,7 +119,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
             return False
         pydantic_model = self.get_class(concept_code=concept.structure_class_name)
         is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
-        refines_image = self.is_compatible_by_concept_code(tested_concept_code=concept.code, wanted_concept_code="native.Image")
+        refines_image = self.is_compatible(tested_concept=concept, wanted_concept=self.get_native_concept(native_concept=NativeConceptEnum.IMAGE))
         return is_image_class or refines_image
 
     @override

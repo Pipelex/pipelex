@@ -1,10 +1,11 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import PageContent
@@ -29,19 +30,19 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_image",
                 domain="generic",
-                inputs=PipeInputSpec.make_from_blueprint(domain="generic", blueprint={"page_scan": InputRequirementBlueprint(concept_code="Image")}),
+                inputs=PipeInputSpecFactory.make_from_blueprint(
+                    domain="generic", blueprint={"page_scan": InputRequirementBlueprint(concept_code="Image")}
+                ),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
                 page_views_dpi=72,
-                output=Concept(
-                    code=NativeConcept.TEXT_AND_IMAGES.value, domain="generic", definition="TextAndImages", structure_class_name="TextAndImages"
-                ),
+                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT_AND_IMAGES]),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_image(
                 image_url=image_url,
-                concept_str="ocr.PageScan",
+                concept_code="ocr.PageScan",
                 name="page_scan",
             ),
         )
@@ -61,21 +62,19 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_pdf",
                 domain="generic",
-                inputs=PipeInputSpec.make_from_blueprint(
-                    domain="generic", blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=NativeConcept.PDF.value)}
+                inputs=PipeInputSpecFactory.make_from_blueprint(
+                    domain="generic", blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=NativeConceptEnum.PDF.value)}
                 ),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
                 page_views_dpi=72,
-                output=Concept(
-                    code=NativeConcept.TEXT_AND_IMAGES.value, domain="generic", definition="TextAndImages", structure_class_name="TextAndImages"
-                ),
+                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT_AND_IMAGES]),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_pdf(
                 pdf_url=pdf_url,
-                concept_str=NativeConcept.PDF.value,
+                concept_code=NativeConceptEnum.PDF.value,
                 name=PIPE_OCR_INPUT_NAME,
             ),
         )

@@ -2,10 +2,10 @@ from typing import List, Literal
 
 from typing_extensions import override
 
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
+from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 
@@ -18,20 +18,18 @@ class PipeSequenceBlueprint(PipeBlueprint):
 class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequence]):
     @classmethod
     @override
-    def make_pipe_from_blueprint(
+    def make_from_blueprint(
         cls,
-        domain_code: str,
+        domain: str,
         pipe_code: str,
         pipe_blueprint: PipeSequenceBlueprint,
     ) -> PipeSequence:
         pipe_steps = [step.make_sub_pipe() for step in pipe_blueprint.steps]
         return PipeSequence(
-            domain=domain_code,
+            domain=domain,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
-            output=Concept(
-                code=pipe_blueprint.output, domain="generic", definition=pipe_blueprint.output, structure_class_name=pipe_blueprint.output
-            ),
+            inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
+            output=get_concept_provider().get_required_concept(concept_code=pipe_blueprint.output),
             sequential_sub_pipes=pipe_steps,
         )

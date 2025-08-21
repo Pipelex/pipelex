@@ -6,9 +6,11 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -32,10 +34,10 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             code="text_length_condition",
             domain="test_integration",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
             ),
-            output=Concept(code="Text", domain="generic", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make(concept_code="Text", domain="generic", definition="Text", structure_class_name="Text"),
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map=[
                 PipeConditionPipeMap(expression_result="long", pipe_code="capitalize_long_text"),
@@ -43,7 +45,7 @@ class TestPipeConditionSimple:
             ],
         )
         input_text_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             content=TextContent(text="hello world"),  # 11 characters
             name="input_text",
         )
@@ -108,10 +110,10 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             domain="test_integration",
             code="text_length_condition",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
             ),
-            output=Concept(code="Text", domain="generic", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make(concept_code="Text", domain="generic", definition="Text", structure_class_name="Text"),
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map=[
                 PipeConditionPipeMap(expression_result="long", pipe_code="capitalize_long_text"),
@@ -121,7 +123,7 @@ class TestPipeConditionSimple:
 
         # Create test data - short text input (<= 5 characters)
         input_text_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             content=TextContent(text="hi"),  # 2 characters
             name="input_text",
         )
@@ -180,11 +182,11 @@ class TestPipeConditionSimple:
         # Create test data using CategoryInput for the real pipe basic_condition_by_category_2
         category_input = CategoryInput(category="small")
         input_data_stuff = StuffFactory.make_stuff(
-            concept=Concept(
-                code="test_pipe_condition_2.CategoryInput",
-                domain="generic",
+            concept=ConceptFactory.make(
+                concept_code="CategoryInput",
+                domain="test_pipe_condition_2",
                 definition="test_pipe_condition_2.CategoryInput",
-                structure_class_name="test_pipe_condition_2.CategoryInput",
+                structure_class_name="CategoryInput",
             ),
             content=category_input,
             name="input_data",
@@ -247,11 +249,11 @@ class TestPipeConditionSimple:
         # Create test data using CategoryInput for the medium category
         category_input = CategoryInput(category="medium")
         input_data_stuff = StuffFactory.make_stuff(
-            concept=Concept(
-                code="test_pipe_condition_2.CategoryInput",
-                domain="generic",
+            concept=ConceptFactory.make(
+                concept_code="CategoryInput",
+                domain="test_pipe_condition_2",
                 definition="test_pipe_condition_2.CategoryInput",
-                structure_class_name="test_pipe_condition_2.CategoryInput",
+                structure_class_name="CategoryInput",
             ),
             content=category_input,
             name="input_data",

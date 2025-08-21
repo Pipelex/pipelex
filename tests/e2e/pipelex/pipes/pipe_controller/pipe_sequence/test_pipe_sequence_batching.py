@@ -5,7 +5,7 @@ from typing import cast
 import pytest
 
 from pipelex import log
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -28,11 +28,11 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
             needed_inputs=[
                 TypedNamedInputRequirement(
                     variable_name="document",
-                    concept=Concept(
-                        code="customer_feedback.Document",
-                        domain="generic",
+                    concept=ConceptFactory.make(
+                        concept_code="Document",
+                        domain="customer_feedback",
                         definition="customer_feedback.Document",
-                        structure_class_name="customer_feedback.Document",
+                        structure_class_name="Document",
                     ),
                     structure_class=Document,
                 ),
@@ -47,11 +47,11 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     else:
         document_stuff = StuffFactory.make_stuff(
             name="document",
-            concept=Concept(
-                code="customer_feedback.Document",
-                domain="generic",
+            concept=ConceptFactory.make(
+                concept_code="Document",
+                domain="customer_feedback",
                 definition="customer_feedback.Document",
-                structure_class_name="customer_feedback.Document",
+                structure_class_name="Document",
             ),
             content=Document(
                 text="Review 1: Great product! Love the quality and fast shipping. 5 stars!\n\n\

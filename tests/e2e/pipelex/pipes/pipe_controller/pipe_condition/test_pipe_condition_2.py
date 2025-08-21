@@ -2,7 +2,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -32,11 +32,11 @@ class TestPipeConditionExpression:
         # Create input data
         category_input = CategoryInput(category=category)
         stuff = StuffFactory.make_stuff(
-            concept=Concept(
-                code="test_pipe_condition.CategoryInput",
-                domain="generic",
+            concept=ConceptFactory.make(
+                concept_code="CategoryInput",
+                domain="test_pipe_condition",
                 definition="test_pipe_condition.CategoryInput",
-                structure_class_name="test_pipe_condition.CategoryInput",
+                structure_class_name="CategoryInput",
             ),
             content=category_input,
             name="input_data",

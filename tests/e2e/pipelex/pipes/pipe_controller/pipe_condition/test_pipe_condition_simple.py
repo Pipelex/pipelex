@@ -3,10 +3,11 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec, TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.exceptions import DryRunError
@@ -25,10 +26,10 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             code="test_condition_fail",
             domain="test_domain",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_domain", blueprint={"user_category": InputRequirementBlueprint(concept_code="test_pipe_condition.CategoryInput")}
             ),
-            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             expression_template="{{ user_category.category }}",
             pipe_map=[
                 PipeConditionPipeMap(expression_result="small", pipe_code="process_small"),
@@ -60,10 +61,10 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             code="test_condition_succeed",
             domain="test_domain",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_domain", blueprint={"user_status": InputRequirementBlueprint(concept_code="test_pipe_condition.CategoryInput")}
             ),
-            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             expression_template="{{ user_status.category }}",
             pipe_map=[
                 PipeConditionPipeMap(expression_result="active", pipe_code="process_small"),
@@ -78,9 +79,9 @@ class TestPipeConditionSimple:
             needed_inputs=[
                 TypedNamedInputRequirement(
                     variable_name="user_status",
-                    concept=Concept(
-                        code="test_pipe_condition.CategoryInput",
-                        domain="test_domain",
+                    concept=ConceptFactory.make(
+                        concept_code="CategoryInput",
+                        domain="test_pipe_condition",
                         definition="CategoryInput",
                         structure_class_name="CategoryInput",
                     ),

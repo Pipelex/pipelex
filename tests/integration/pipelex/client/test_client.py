@@ -6,7 +6,8 @@ from pydantic import BaseModel
 from pipelex import pretty_print
 from pipelex.client.client import PipelexClient
 from pipelex.client.protocol import COMPACT_MEMORY_KEY, PipelineState
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import TextContent
@@ -31,7 +32,7 @@ class TestPipelexApiClient:
                 pipe_code="retrieve_excerpts",
                 memory=[
                     StuffFactory.make_stuff(
-                        concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+                        concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
                         name="text",
                         content=TextContent(
                             text="""
@@ -76,8 +77,8 @@ class TestPipelexApiClient:
                         ),
                     ),
                     StuffFactory.make_stuff(
-                        concept=Concept(
-                            code="answer.Question", domain="generic", definition="answer.Question", structure_class_name="answer.Question"
+                        concept=ConceptFactory.make(
+                            concept_code="Question", domain="answer", definition="answer.Question", structure_class_name="Question"
                         ),
                         name="question",
                         content=TextContent(text="Aerodynamic features?"),

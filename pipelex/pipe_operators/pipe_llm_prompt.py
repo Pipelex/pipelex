@@ -8,9 +8,11 @@ from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -22,7 +24,7 @@ from pipelex.exceptions import (
     PipeRunParamsError,
     WorkingMemoryVariableError,
 )
-from pipelex.hub import get_class_registry, get_template
+from pipelex.hub import get_class_registry, get_concept_provider, get_template
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
@@ -41,7 +43,9 @@ class PipeLLMPromptOutput(PipeOutput):
 class PipeLLMPrompt(PipeOperator):
     adhoc_pipe_code: ClassVar[str] = "adhoc_pipe_code_for_prompt_llm"
 
-    output: Concept = Concept(code=NativeConcept.LLM_PROMPT.value, domain="native", definition="LLMPrompt", structure_class_name="LLMPrompt")
+    output: Concept = ConceptFactory.make_native_concept(
+        native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.LLM_PROMPT],
+    )
 
     prompting_style: Optional[PromptingStyle] = None
 
@@ -101,18 +105,15 @@ class PipeLLMPrompt(PipeOperator):
         if self.system_prompt_pipe_jinja2:
             conceptless_required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
 
-        pipe_input_spec = PipeInputSpec.make_empty()
+        pipe_input_spec = PipeInputSpecFactory.make_empty()
         for conceptless_required_variable in conceptless_required_variables:
             if conceptless_required_variable.startswith("_"):
                 # variables starting with _ are run parameters, not inputs
                 continue
             pipe_input_spec.add_requirement(
                 variable_name=conceptless_required_variable,
-                concept=Concept(
-                    code=NativeConcept.ANYTHING.value,
-                    domain="native",
-                    definition=NativeConcept.ANYTHING.value,
-                    structure_class_name=NativeConcept.ANYTHING.value,
+                concept=ConceptFactory.make_native_concept(
+                    native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.ANYTHING],
                 ),
             )
 
@@ -180,11 +181,8 @@ class PipeLLMPrompt(PipeOperator):
         # Append output structure prompt if needed
         if pipe_run_params.dynamic_output_concept_code:
             user_text += PipeLLMPrompt.get_output_structure_prompt(
-                output_concept=Concept(
-                    code=pipe_run_params.dynamic_output_concept_code,
-                    domain="generic",
-                    definition=pipe_run_params.dynamic_output_concept_code,
-                    structure_class_name=pipe_run_params.dynamic_output_concept_code,
+                output_concept=get_concept_provider().get_required_concept(
+                    concept_code=pipe_run_params.dynamic_output_concept_code,
                 ),
                 is_with_preliminary_text=pipe_run_params.is_with_preliminary_text or False,
             )

@@ -10,10 +10,11 @@ from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, ImggJobParams, Quality
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, PipeRunParams, output_multiplicity_to_apply
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -52,7 +53,7 @@ DEFAULT_PROMPT_VAR_NAME = "prompt"
 
 
 class PipeImgGen(PipeOperator):
-    output_concept_code: str = NativeConcept.IMAGE.value
+    output_concept_code: str = NativeConceptEnum.IMAGE.value
     imgg_prompt: Optional[str] = None
     # TODO: wrap this up in imgg llm_presets like for llm
     imgg_handle: Optional[ImggHandle] = None
@@ -83,12 +84,12 @@ class PipeImgGen(PipeOperator):
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        needed_inputs = PipeInputSpec.make_empty()
+        needed_inputs = PipeInputSpecFactory.make_empty()
         if self.imgg_prompt:
             needed_inputs.add_requirement(
                 variable_name="imgg_prompt",
-                concept=Concept(
-                    code=NativeConcept.TEXT.value, domain="native", definition=NativeConcept.TEXT.value, structure_class_name=NativeConcept.TEXT.value
+                concept=ConceptFactory.make_native_concept(
+                    native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT],
                 ),
             )
         else:
@@ -119,16 +120,16 @@ class PipeImgGen(PipeOperator):
         candidate_prompt_var_names: List[str] = []
         for input_name, requirement in self.inputs.items:
             log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
-            if concept_provider.is_compatible_by_concept_code(
-                tested_concept_code=requirement.concept.code,
-                wanted_concept_code=NativeConcept.TEXT.value,
+            if concept_provider.is_compatible(
+                tested_concept=requirement.concept,
+                wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.TEXT),
             ):
                 self.img_gen_prompt_var_name = input_name
                 candidate_prompt_var_names.append(input_name)
             else:
                 inadequate_input_concept_error = StaticValidationError(
                     error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
-                    domain_code=self.domain,
+                    domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
                     provided_concept_code=requirement.concept.code,
@@ -144,7 +145,7 @@ class PipeImgGen(PipeOperator):
         if len(candidate_prompt_var_names) > 1:
             too_many_candidate_inputs_error = StaticValidationError(
                 error_type=StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS,
-                domain_code=self.domain,
+                domain=self.domain,
                 pipe_code=self.code,
                 variable_names=candidate_prompt_var_names,
                 explanation="Only one text input can be provided for image gen prompt",
@@ -159,7 +160,7 @@ class PipeImgGen(PipeOperator):
         elif len(candidate_prompt_var_names) == 0:
             missing_input_var_error = StaticValidationError(
                 error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                domain_code=self.domain,
+                domain=self.domain,
                 pipe_code=self.code,
                 explanation="You must provide an image gen prompt either as attribute of the pipe or as a single text input",
             )
@@ -289,9 +290,7 @@ class PipeImgGen(PipeOperator):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept=Concept(
-                code=self.output_concept_code, domain="generic", definition=self.output_concept_code, structure_class_name=self.output_concept_code
-            ),
+            concept=get_concept_provider().get_required_concept(concept_code=self.output_concept_code),
             content=the_content,
         )
 

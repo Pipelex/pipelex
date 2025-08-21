@@ -15,9 +15,9 @@ PipeType = TypeVar("PipeType", bound="PipeAbstract", covariant=True)
 @runtime_checkable
 class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeType]):
     @classmethod
-    def make_pipe_from_blueprint(
+    def make_from_blueprint(
         cls,
-        domain_code: str,
+        domain: str,
         pipe_code: str,
         pipe_blueprint: PipeBlueprintType,
     ) -> PipeType: ...
@@ -26,9 +26,9 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeType]):
 class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
     @classmethod
     @override
-    def make_pipe_from_blueprint(
+    def make_from_blueprint(
         cls,
-        domain_code: str,
+        domain: str,
         pipe_code: str,
         pipe_blueprint: PipeBlueprint,
     ) -> PipeAbstract:
@@ -48,8 +48,8 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
                 f"Pipe '{pipe_code}' couldn't be created: factory '{factory_class_name}' is not a subclass of {type(PipeFactoryProtocol)}."
             ) from factory_inheritance_error
 
-        pipe_from_blueprint: PipeAbstract = pipe_factory.make_pipe_from_blueprint(
-            domain_code=domain_code,
+        pipe_from_blueprint: PipeAbstract = pipe_factory.make_from_blueprint(
+            domain=domain,
             pipe_code=pipe_code,
             pipe_blueprint=pipe_blueprint,
         )

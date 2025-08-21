@@ -2,7 +2,8 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -62,7 +63,7 @@ class TestImageInputs:
 
         # Create stuff from page content
         stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Page", domain="generic", definition="native.Page", structure_class_name="native.Page"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.PAGE]),
             content=page_content,
             name="page",
         )

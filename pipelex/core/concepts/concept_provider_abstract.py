@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
 
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 
 ConceptLibraryRoot = Dict[str, Concept]
 
@@ -28,15 +29,15 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_concepts_dict(self) -> Dict[str, Concept]:
-        pass
-
-    @abstractmethod
     def is_compatible(self, tested_concept: Concept, wanted_concept: Concept) -> bool:
         pass
 
     @abstractmethod
-    def is_compatible_by_concept_code(self, tested_concept_code: str, wanted_concept_code: str) -> bool:
+    def setup(self) -> None:
+        pass
+
+    @abstractmethod
+    def reset(self) -> None:
         pass
 
     @abstractmethod
@@ -44,17 +45,17 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_class(self, concept_code: str) -> Optional[Type[Any]]:
-        pass
-
-    @abstractmethod
     def is_image_concept(self, concept_code: str) -> bool:
         pass
 
     @abstractmethod
-    def is_concept_code_legal(self, concept_code: str) -> bool:
+    def search_for_concept_in_domains(self, concept_name: str, search_domains: List[str]) -> Optional[Concept]:
         pass
 
     @abstractmethod
-    def search_for_concept_in_domains(self, concept_name: str, search_domains: List[str]) -> Optional[Concept]:
+    def get_class(self, concept_code: str) -> Optional[Type[Any]]:
+        pass
+
+    @abstractmethod
+    def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
         pass

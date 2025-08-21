@@ -5,10 +5,11 @@ from typing import cast
 import pytest
 from pytest import FixtureRequest
 
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
@@ -30,10 +31,10 @@ class TestPipeParallelSimple:
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
             ),
-            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             parallel_sub_pipes=[
                 SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
                 SubPipe(pipe_code="count_words", output_name="word_count_result"),
@@ -45,7 +46,7 @@ class TestPipeParallelSimple:
 
         # Create test data
         input_text_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             content=TextContent(text="The weather is beautiful today. I love sunny days and outdoor activities."),
             name="input_text",
         )
@@ -144,10 +145,10 @@ class TestPipeParallelSimple:
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
             ),
-            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             parallel_sub_pipes=[
                 SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
                 SubPipe(pipe_code="count_words", output_name="word_count_result"),
@@ -159,7 +160,7 @@ class TestPipeParallelSimple:
 
         # Create test data - shorter text
         input_text_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             content=TextContent(text="Hello world"),
             name="input_text",
         )

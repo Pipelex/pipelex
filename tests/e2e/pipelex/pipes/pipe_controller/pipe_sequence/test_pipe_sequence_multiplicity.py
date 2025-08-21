@@ -3,7 +3,7 @@
 import pytest
 from pytest import FixtureRequest
 
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.stuffs.stuff_content import TextContent
@@ -20,11 +20,11 @@ class TestPipeSequenceMultiplicity:
         # Create test input
         topic_stuff = StuffFactory.make_stuff(
             name="topic",
-            concept=Concept(
-                code="creative_ideation.CreativeTopic",
-                domain="generic",
+            concept=ConceptFactory.make(
+                concept_code="CreativeTopic",
+                domain="creative_ideation",
                 definition="creative_ideation.CreativeTopic",
-                structure_class_name="creative_ideation.CreativeTopic",
+                structure_class_name="CreativeTopic",
             ),
             content=TextContent(text="Sustainable transportation solutions for urban areas"),
         )

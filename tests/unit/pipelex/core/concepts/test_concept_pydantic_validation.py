@@ -1,7 +1,7 @@
 import pytest
 
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.exceptions import ConceptCodeError, ConceptDomainError
 
 
@@ -10,8 +10,8 @@ class TestConceptPydanticFieldValidation:
 
     def test_concept_creation_with_valid_refines(self):
         """Test successful concept creation with valid refines list."""
-        concept = Concept(
-            code="test_domain.TestConcept",
+        concept = ConceptFactory.make(
+            concept_code="TestConcept",
             domain="test_domain",
             structure_class_name="TextContent",
             definition="A test concept",
@@ -21,82 +21,84 @@ class TestConceptPydanticFieldValidation:
 
     def test_concept_creation_with_empty_refines(self):
         """Test successful concept creation with empty refines list."""
-        concept = Concept(
-            code="test_domain.TestConcept", domain="test_domain", structure_class_name="TextContent", definition="A test concept", refines=[]
+        concept = ConceptFactory.make(
+            concept_code="TestConcept", domain="test_domain", structure_class_name="TextContent", definition="A test concept", refines=[]
         )
         assert concept.refines == []
 
     def test_concept_creation_with_default_refines(self):
         """Test successful concept creation without specifying refines (should default to empty list)."""
-        concept = Concept(code="test_domain.TestConcept", domain="test_domain", structure_class_name="TextContent", definition="A test concept")
+        concept = ConceptFactory.make(
+            concept_code="TestConcept", domain="test_domain", structure_class_name="TextContent", definition="A test concept"
+        )
         assert concept.refines == []
 
     def test_concept_creation_with_native_concept_refines(self):
-        """Test successful concept creation with NativeConcept string values in refines."""
-        concept = Concept(
-            code="test_domain.TestConcept",
+        """Test successful concept creation with NativeConceptEnum string values in refines."""
+        concept = ConceptFactory.make(
+            concept_code="TestConcept",
             domain="test_domain",
             structure_class_name="TextContent",
             definition="A test concept",
             refines=[
-                NativeConcept.TEXT.value,
-                NativeConcept.IMAGE.value,
-                NativeConcept.PDF.value,
+                NativeConceptEnum.TEXT.value,
+                NativeConceptEnum.IMAGE.value,
+                NativeConceptEnum.PDF.value,
             ],
         )
-        # NativeConcept strings should be converted to full codes
+        # NativeConceptEnum strings should be converted to full codes
         assert concept.refines == [
-            NativeConcept.TEXT.value,
-            NativeConcept.IMAGE.value,
-            NativeConcept.PDF.value,
+            NativeConceptEnum.TEXT.value,
+            NativeConceptEnum.IMAGE.value,
+            NativeConceptEnum.PDF.value,
         ]
 
     def test_concept_creation_with_mixed_refines(self):
-        """Test successful concept creation with mix of NativeConcept and domain.concept refines."""
-        concept = Concept(
-            code="test_domain.TestConcept",
+        """Test successful concept creation with mix of NativeConceptEnum and domain.concept refines."""
+        concept = ConceptFactory.make(
+            concept_code="TestConcept",
             domain="test_domain",
             structure_class_name="TextContent",
             definition="A test concept",
             refines=[
                 "valid_domain.ValidConcept",
-                NativeConcept.TEXT.value,
+                NativeConceptEnum.TEXT.value,
                 "another_domain.AnotherConcept",
-                NativeConcept.IMAGE.value,
+                NativeConceptEnum.IMAGE.value,
             ],
         )
         expected_refines = [
             "valid_domain.ValidConcept",
-            NativeConcept.TEXT.value,
+            NativeConceptEnum.TEXT.value,
             "another_domain.AnotherConcept",
-            NativeConcept.IMAGE.value,
+            NativeConceptEnum.IMAGE.value,
         ]
         assert concept.refines == expected_refines
 
     def test_concept_creation_with_only_native_concept_refines(self):
-        """Test successful concept creation with only NativeConcept values in refines."""
-        concept = Concept(
-            code="test_domain.TestConcept",
+        """Test successful concept creation with only NativeConceptEnum values in refines."""
+        concept = ConceptFactory.make(
+            concept_code="TestConcept",
             domain="test_domain",
             structure_class_name="TextContent",
             definition="A test concept",
             refines=[
-                NativeConcept.DYNAMIC.value,
-                NativeConcept.TEXT.value,
-                NativeConcept.NUMBER.value,
+                NativeConceptEnum.DYNAMIC.value,
+                NativeConceptEnum.TEXT.value,
+                NativeConceptEnum.NUMBER.value,
             ],
         )
         assert concept.refines == [
-            NativeConcept.DYNAMIC.value,
-            NativeConcept.TEXT.value,
-            NativeConcept.NUMBER.value,
+            NativeConceptEnum.DYNAMIC.value,
+            NativeConceptEnum.TEXT.value,
+            NativeConceptEnum.NUMBER.value,
         ]
 
     def test_concept_creation_with_refines_missing_dot(self):
         """Test concept creation fails when refines contain invalid codes missing dot."""
         with pytest.raises(ConceptCodeError) as exc_info:
-            Concept(
-                code="test_domain.TestConcept",
+            ConceptFactory.make(
+                concept_code="TestConcept",
                 domain="test_domain",
                 structure_class_name="TextContent",
                 definition="A test concept",
@@ -108,8 +110,8 @@ class TestConceptPydanticFieldValidation:
     def test_concept_creation_with_refines_invalid_domain(self):
         """Test concept creation fails when refines contain invalid domain format."""
         with pytest.raises(ConceptDomainError) as exc_info:
-            Concept(
-                code="test_domain.TestConcept",
+            ConceptFactory.make(
+                concept_code="TestConcept",
                 domain="test_domain",
                 structure_class_name="TextContent",
                 definition="A test concept",
@@ -121,8 +123,8 @@ class TestConceptPydanticFieldValidation:
     def test_concept_creation_with_refines_invalid_concept_code(self):
         """Test concept creation fails when refines contain invalid concept code format."""
         with pytest.raises(ConceptCodeError) as exc_info:
-            Concept(
-                code="test_domain.TestConcept",
+            ConceptFactory.make(
+                concept_code="TestConcept",
                 domain="test_domain",
                 structure_class_name="TextContent",
                 definition="A test concept",
@@ -134,8 +136,8 @@ class TestConceptPydanticFieldValidation:
     def test_concept_creation_with_multiple_refines_errors(self):
         """Test concept creation fails when multiple refines are invalid."""
         with pytest.raises(ConceptCodeError) as exc_info:
-            Concept(
-                code="test_domain.TestConcept",
+            ConceptFactory.make(
+                concept_code="TestConcept",
                 domain="test_domain",
                 structure_class_name="TextContent",
                 definition="A test concept",
@@ -152,8 +154,8 @@ class TestConceptPydanticFieldValidation:
     def test_concept_creation_with_mixed_valid_invalid_refines(self):
         """Test concept creation fails even when some refines are valid but others are invalid."""
         with pytest.raises(ConceptCodeError) as exc_info:
-            Concept(
-                code="test_domain.TestConcept",
+            ConceptFactory.make(
+                concept_code="TestConcept",
                 domain="test_domain",
                 structure_class_name="TextContent",
                 definition="A test concept",
@@ -168,8 +170,8 @@ class TestConceptPydanticFieldValidation:
     def test_concept_creation_with_refines_multiple_dots(self):
         """Test concept creation fails when refines contain codes with multiple dots."""
         with pytest.raises(ConceptCodeError) as exc_info:
-            Concept(
-                code="test_domain.TestConcept",
+            ConceptFactory.make(
+                concept_code="TestConcept",
                 domain="test_domain",
                 structure_class_name="TextContent",
                 definition="A test concept",
@@ -180,8 +182,8 @@ class TestConceptPydanticFieldValidation:
 
     def test_concept_creation_with_valid_complex_refines(self):
         """Test successful concept creation with more complex valid refines."""
-        concept = Concept(
-            code="my_domain.MyTestConcept",
+        concept = ConceptFactory.make(
+            concept_code="MyTestConcept",
             domain="my_domain",
             structure_class_name="TextContent",
             definition="A complex test concept",

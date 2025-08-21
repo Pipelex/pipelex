@@ -5,11 +5,11 @@ from typing_extensions import Self, override
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Quality
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.exceptions import PipeDefinitionError
+from pipelex.hub import get_concept_provider
 from pipelex.pipe_operators.pipe_img_gen import PipeImgGen
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
 
@@ -44,21 +44,19 @@ class PipeImgGenBlueprint(PipeBlueprint):
 class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
     @classmethod
     @override
-    def make_pipe_from_blueprint(
+    def make_from_blueprint(
         cls,
-        domain_code: str,
+        domain: str,
         pipe_code: str,
         pipe_blueprint: PipeImgGenBlueprint,
     ) -> PipeImgGen:
         output_multiplicity = pipe_blueprint.nb_output or 1
         return PipeImgGen(
-            domain=domain_code,
+            domain=domain,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
-            output=Concept(
-                code=pipe_blueprint.output, domain="generic", definition=pipe_blueprint.output, structure_class_name=pipe_blueprint.output
-            ),
+            inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
+            output=get_concept_provider().get_required_concept(concept_code=pipe_blueprint.output),
             output_multiplicity=output_multiplicity,
             imgg_prompt=pipe_blueprint.img_gen_prompt,
             imgg_handle=pipe_blueprint.imgg_handle,

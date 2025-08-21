@@ -2,8 +2,8 @@ from typing import List, Tuple, Type
 
 import pytest
 
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -35,7 +35,7 @@ class TestPipeLLMPrompt:
             domain="generic",
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             user_text=PipeTestCases.USER_PROMPT,
-            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
         )
 
         pipe_output: PipeLLMPromptOutput = await get_pipe_router().run_pipe_job(
@@ -52,9 +52,7 @@ class TestPipeLLMPrompt:
         assert pipe_output.llm_prompt.user_text is not None
         assert pipe_output.llm_prompt.user_text.endswith(
             PipeLLMPrompt.get_output_structure_prompt(
-                Concept(
-                    code=NativeConcept.TEXT.value, domain="native", definition=NativeConcept.TEXT.value, structure_class_name=NativeConcept.TEXT.value
-                ),
+                ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
                 is_with_preliminary_text=False,
             )
         )
@@ -70,7 +68,7 @@ class TestPipeLLMPrompt:
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             user_text=PipeTestCases.MULTI_IMG_DESC_PROMPT,
             user_images=[stuff_name],  # Just use the stuff name, the content will be extracted as ImageContent
-            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
         )
 
         pipe_output: PipeLLMPromptOutput = await get_pipe_router().run_pipe_job(
@@ -102,7 +100,12 @@ class TestPipeLLMPrompt:
                 domain="generic",
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 user_text=f"Generate content for {description}",
-                output=Concept(code=concept_code, domain="generic", definition=concept_code, structure_class_name=concept_code),
+                output=ConceptFactory.make(
+                    concept_code=concept_code.split(".")[1],
+                    domain=concept_code.split(".")[0],
+                    definition=concept_code,
+                    structure_class_name=concept_code.split(".")[1],
+                ),
             )
 
             pipe_output: PipeLLMPromptOutput = await get_pipe_router().run_pipe_job(
@@ -118,7 +121,12 @@ class TestPipeLLMPrompt:
 
             # Verify output structure is appended
             output_structure = pipe_llm_prompt.get_output_structure_prompt(
-                Concept(code=concept_code, domain="generic", definition=concept_code, structure_class_name=concept_code),
+                ConceptFactory.make(
+                    concept_code=concept_code.split(".")[1],
+                    domain=concept_code.split(".")[0],
+                    definition=concept_code,
+                    structure_class_name=concept_code.split(".")[1],
+                ),
                 is_with_preliminary_text=False,
             )
 
@@ -147,7 +155,7 @@ class TestPipeLLMPrompt:
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             user_text=PipeTestCases.USER_PROMPT,
             prompting_style=prompting_style,
-            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
         )
 
         pipe_output: PipeLLMPromptOutput = await get_pipe_router().run_pipe_job(
@@ -169,7 +177,7 @@ class TestPipeLLMPrompt:
                 code="test_validation_error",
                 domain="generic",
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
-                output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             )
         assert "must have exactly one of user_text" in str(exc_info.value)
 
@@ -181,7 +189,7 @@ class TestPipeLLMPrompt:
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 user_text=PipeTestCases.USER_PROMPT,
                 user_prompt_verbatim_name="some_template",
-                output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             )
         assert "must have exactly one of user_text" in str(exc_info.value)
 
@@ -193,6 +201,6 @@ class TestPipeLLMPrompt:
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 system_prompt_verbatim_name="some_template",
                 user_text=PipeTestCases.USER_PROMPT,
-                output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             )
         assert "got more than one of system_prompt" in str(exc_info.value)

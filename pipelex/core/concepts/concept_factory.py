@@ -1,8 +1,8 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.concepts.concept_native import NativeConcept, NativeConceptData
+from pipelex.core.concepts.concept_native import NativeConceptEnum, NativeConceptEnumData
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.create.structured_output_generator import generate_structured_output_from_blueprint_dict
@@ -12,7 +12,17 @@ from pipelex.hub import get_class_registry
 
 class ConceptFactory:
     @classmethod
-    def make_native_concept(cls, native_concept_data: NativeConceptData) -> Concept:
+    def make(cls, concept_code: str, domain: str, definition: str, structure_class_name: str, refines: Optional[List[str]] = None) -> Concept:
+        return Concept(
+            code=concept_code,
+            domain=domain,
+            definition=definition,
+            structure_class_name=structure_class_name,
+            refines=refines or [],
+        )
+
+    @classmethod
+    def make_native_concept(cls, native_concept_data: NativeConceptEnumData) -> Concept:
         return Concept(
             code=native_concept_data.code,
             domain=SpecialDomain.NATIVE,
@@ -23,8 +33,8 @@ class ConceptFactory:
     @classmethod
     def _make_refine(cls, domain: str, refine: str) -> str:
         if "." not in refine:
-            if refine in [native_concept.value for native_concept in NativeConcept]:
-                for native_concept in NativeConcept:
+            if refine in [native_concept.value for native_concept in NativeConceptEnum]:
+                for native_concept in NativeConceptEnum:
                     if native_concept.value == refine:
                         return f"{SpecialDomain.NATIVE.value}.{refine}"
             else:
@@ -40,25 +50,12 @@ class ConceptFactory:
         return []
 
     @classmethod
-    def make_concept_from_blueprint(
+    def make_from_blueprint(
         cls,
         domain: str,
         concept_code: str,
         concept_blueprint: ConceptBlueprint,
     ) -> Concept:
-        # Ok so the way to do it is. At this point, we know that we cannot have structure AND refines at the same time.
-        # Then if we have neither refine, neither structure, check the class registry. If there is a class, use it.
-        # structure_class_name is then the concept_code. If there is NO class, the fallback class is TextContent.__name__
-
-        # If we have refines:
-        # pass for now.
-
-        # If we have structure: If isintance(structure, str), check if the class is in the classregistry and that its valid.
-        # And the structure_class_name is the structure
-        # if (isinstance(structure, ConceptStructureBlueprint)): run the structure generator and put it in the class registry,
-        # then the structure_class_name of the concept is the concept_name
-        # If we have refines, validate that there is no structure related to the concept code in the class registry.
-
         structure_class_name: str
         current_refines: List[str] = []
 

@@ -6,10 +6,10 @@ from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.config import get_config
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
+from pipelex.hub import get_concept_provider
 from pipelex.pipe_operators.pipe_ocr import PipeOcr
 
 
@@ -25,9 +25,9 @@ class PipeOcrBlueprint(PipeBlueprint):
 class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
     @classmethod
     @override
-    def make_pipe_from_blueprint(
+    def make_from_blueprint(
         cls,
-        domain_code: str,
+        domain: str,
         pipe_code: str,
         pipe_blueprint: PipeOcrBlueprint,
     ) -> PipeOcr:
@@ -37,14 +37,12 @@ class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
                 ocr_engine = OcrEngineFactory.make_ocr_engine(ocr_handle=OcrHandle.MISTRAL_OCR)
 
         return PipeOcr(
-            domain=domain_code,
+            domain=domain,
             code=pipe_code,
             definition=pipe_blueprint.definition,
             ocr_engine=ocr_engine,
-            output=Concept(
-                code=pipe_blueprint.output, domain="generic", definition=pipe_blueprint.output, structure_class_name=pipe_blueprint.output
-            ),
-            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
+            output=get_concept_provider().get_required_concept(concept_code=pipe_blueprint.output),
+            inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
             should_include_images=pipe_blueprint.page_images or False,
             should_caption_images=pipe_blueprint.page_image_captions or False,
             should_include_page_views=pipe_blueprint.page_views or False,

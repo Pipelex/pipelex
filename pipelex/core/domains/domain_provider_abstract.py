@@ -6,11 +6,11 @@ from pipelex.core.domains.domain import Domain
 
 class DomainProviderAbstract(ABC):
     @abstractmethod
-    def get_domain(self, domain_code: str) -> Optional[Domain]:
+    def get_domain(self, domain: str) -> Optional[Domain]:
         pass
 
     @abstractmethod
-    def get_required_domain(self, domain_code: str) -> Domain:
+    def get_required_domain(self, domain: str) -> Domain:
         pass
 
     @abstractmethod

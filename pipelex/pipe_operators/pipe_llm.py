@@ -11,11 +11,11 @@ from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoice
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import Domain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import (
     PipeOutputMultiplicity,
@@ -97,13 +97,13 @@ class PipeLLM(PipeOperator):
         """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
         # The images are not tagged in the prompt_template.
         # Therefore if an image is provided in the inputs, it becomes a needed input.
-        needed_inputs = PipeInputSpec.make_empty()
+        needed_inputs = PipeInputSpecFactory.make_empty()
         concept_provider = get_concept_provider()
 
         for input_name, requirement in self.inputs.items:
             if concept_provider.is_image_concept(concept_code=requirement.concept.code):
                 needed_inputs.add_requirement(
-                    variable_name=input_name, concept=Concept(code="native.Image", domain="native", definition="Image", structure_class_name="Image")
+                    variable_name=input_name, concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE)
                 )
             else:
                 needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
@@ -138,7 +138,7 @@ class PipeLLM(PipeOperator):
             if named_input_requirement.variable_name not in self.inputs.variables:
                 missing_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain_code=self.domain,
+                    domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[named_input_requirement.variable_name],
                 )
@@ -151,16 +151,16 @@ class PipeLLM(PipeOperator):
                         raise missing_input_var_error
 
             # there is one case where the needed input is of specific concept: the user_images
-            if named_input_requirement.concept.code == "native.Image":
+            if named_input_requirement.concept == get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE):
                 try:
                     concept_code_of_declared_input = self.inputs.get_required_concept_code(variable_name=named_input_requirement.variable_name)
                 except PipeInputNotFoundError as exc:
                     raise PipeInputError(
                         f"Input variable '{named_input_requirement.variable_name}' is not in this PipeLLM '{self.code}' input spec: {self.inputs}"
                     ) from exc
-                if not concept_provider.is_compatible_by_concept_code(
-                    tested_concept_code=concept_code_of_declared_input,
-                    wanted_concept_code=named_input_requirement.concept.code,
+                if not concept_provider.is_compatible(
+                    tested_concept=concept_provider.get_required_concept(concept_code=concept_code_of_declared_input),
+                    wanted_concept=named_input_requirement.concept,
                 ):
                     if named_input_requirement.variable_name != named_input_requirement.requirement_expression:
                         # the required_input is a sub-attribute of the required variable
@@ -179,7 +179,7 @@ class PipeLLM(PipeOperator):
 
                     inadequate_input_concept_error = StaticValidationError(
                         error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
-                        domain_code=self.domain,
+                        domain=self.domain,
                         pipe_code=self.code,
                         variable_names=[named_input_requirement.variable_name],
                         provided_concept_code=concept_code_of_declared_input,
@@ -197,7 +197,7 @@ class PipeLLM(PipeOperator):
             if input_name not in the_needed_inputs.required_names:
                 extraneous_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain_code=self.domain,
+                    domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
                 )
@@ -239,9 +239,7 @@ class PipeLLM(PipeOperator):
         else:
             output_concept_code = self.output.code
 
-        self.pipe_llm_prompt.output = Concept(
-            code=output_concept_code, domain="generic", definition=output_concept_code, structure_class_name=output_concept_code
-        )
+        self.pipe_llm_prompt.output = get_concept_provider().get_required_concept(concept_code=output_concept_code)
 
         applied_output_multiplicity, is_multiple_output, fixed_nb_output = output_multiplicity_to_apply(
             output_multiplicity_base=self.output_multiplicity,
@@ -328,7 +326,7 @@ class PipeLLM(PipeOperator):
         llm_prompt_1 = cast(PipeLLMPromptOutput, pipe_output).llm_prompt
 
         the_content: StuffContent
-        if output_concept.structure_class_name == NativeConcept.TEXT.value and not is_multiple_output:
+        if output_concept.structure_class_name == NativeConceptEnum.TEXT.value and not is_multiple_output:
             log.debug(f"PipeLLM generating a single text output: {self.class_name}_gen_text")
             generated_text: str = await content_generator.make_llm_text(
                 job_metadata=job_metadata,
@@ -352,10 +350,10 @@ class PipeLLM(PipeOperator):
                     case StructuringMethod.PRELIMINARY_TEXT:
                         pipe = get_required_pipe(pipe_code=self.code)
                         # TODO: run_pipe() could get the domain at the same time as the pip_code
-                        domain = get_required_domain(domain_code=pipe.domain)
+                        domain = get_required_domain(domain=pipe.domain)
                         prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
                         user_pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_to_structure(
-                            domain_code=self.domain,
+                            domain=self.domain,
                             prompt_template_to_structure=prompt_template_to_structure,
                         )
                         system_prompt = self.system_prompt_to_structure or domain.system_prompt
@@ -373,12 +371,12 @@ class PipeLLM(PipeOperator):
                 log.debug(f"PipeLLM pipe_code is '{self.code}' and is_default_text_then_structure")
                 # TODO: run_pipe() should get the domain along with the pip_code
                 if the_pipe := get_optional_pipe(pipe_code=self.code):
-                    domain = get_required_domain(domain_code=the_pipe.domain)
+                    domain = get_required_domain(domain=the_pipe.domain)
                 else:
                     domain = Domain.make_default()
                 prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
                 user_pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_to_structure(
-                    domain_code=self.domain,
+                    domain=self.domain,
                     prompt_template_to_structure=prompt_template_to_structure,
                 )
                 system_prompt = self.system_prompt_to_structure or domain.system_prompt

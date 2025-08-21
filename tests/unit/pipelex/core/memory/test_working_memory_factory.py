@@ -1,5 +1,5 @@
 from pipelex.client.protocol import CompactMemory
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_content import ImageContent, PageContent, TextAndImagesContent, TextContent
 
@@ -9,7 +9,7 @@ class TestWorkingMemoryFactory:
         """Test deserialization of compact memory with text content."""
         compact_memory: CompactMemory = {
             "text_item": {
-                "concept_code": NativeConcept.TEXT.value,
+                "concept_code": NativeConceptEnum.TEXT.value,
                 "content": "Hello, world!",
             }
         }
@@ -20,7 +20,7 @@ class TestWorkingMemoryFactory:
         assert "text_item" in working_memory.root
 
         stuff = working_memory.root["text_item"]
-        assert stuff.concept.code == NativeConcept.TEXT.value
+        assert stuff.concept.code == NativeConceptEnum.TEXT.value
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == "Hello, world!"
 
@@ -47,7 +47,7 @@ class TestWorkingMemoryFactory:
         """Test deserialization of compact memory with complex nested structured content."""
         compact_memory: CompactMemory = {
             "complex_page": {
-                "concept_code": NativeConcept.PAGE.value,
+                "concept_code": NativeConceptEnum.PAGE.value,
                 "content": {
                     "text_and_images": {
                         "text": {
@@ -79,7 +79,7 @@ class TestWorkingMemoryFactory:
         assert "complex_page" in working_memory.root
 
         stuff = working_memory.root["complex_page"]
-        assert stuff.concept.code == NativeConcept.PAGE.value
+        assert stuff.concept.code == NativeConceptEnum.PAGE.value
         assert isinstance(stuff.content, PageContent)
 
         # Verify text_and_images structure
@@ -137,11 +137,11 @@ class TestWorkingMemoryFactory:
         """Test deserialization of compact memory with multiple items."""
         compact_memory: CompactMemory = {
             "text1": {
-                "concept_code": NativeConcept.TEXT.value,
+                "concept_code": NativeConceptEnum.TEXT.value,
                 "content": "First text",
             },
             "text2": {
-                "concept_code": NativeConcept.TEXT.value,
+                "concept_code": NativeConceptEnum.TEXT.value,
                 "content": "Second text",
             },
             "structured": {

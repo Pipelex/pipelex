@@ -6,15 +6,14 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.client.protocol import CompactMemory, ImplicitMemory
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, PDFContent, StuffContent, TextContent
-from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import WorkingMemoryFactoryError
-from pipelex.tools.misc.json_utils import load_json_dict_from_path
+from pipelex.hub import get_required_concept
 
 
 class WorkingMemoryFactory(BaseModel):
@@ -22,25 +21,27 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_text(
         cls,
         text: str,
-        concept_str: str = NativeConcept.TEXT.value,
+        concept_code: str = NativeConceptEnum.TEXT.value,
         name: Optional[str] = "text",
     ) -> WorkingMemory:
-        stuff = StuffFactory.make_stuff(
-            concept=Concept(code=concept_str, domain="generic", definition=concept_str, structure_class_name=concept_str),
-            content=TextContent(text=text),
-            name=name,
+        return cls.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_required_concept(concept_code=concept_code),
+                content=TextContent(text=text),
+                name=name,
+            )
         )
-        return cls.make_from_single_stuff(stuff=stuff)
 
     @classmethod
     def make_from_image(
         cls,
         image_url: str,
-        concept_str: str = NativeConcept.IMAGE.value,
+        concept_code: str = NativeConceptEnum.IMAGE.value,
         name: Optional[str] = "image",
     ) -> WorkingMemory:
+        # TODO: validate that the concept is an image concept
         stuff = StuffFactory.make_stuff(
-            concept=Concept(code=concept_str, domain="generic", definition=concept_str, structure_class_name=concept_str),
+            concept=get_required_concept(concept_code=concept_code),
             content=ImageContent(url=image_url),
             name=name,
         )
@@ -50,33 +51,23 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_pdf(
         cls,
         pdf_url: str,
-        concept_str: str = NativeConcept.PDF.value,
+        concept_code: str = NativeConceptEnum.PDF.value,
         name: Optional[str] = "pdf",
     ) -> WorkingMemory:
-        stuff = StuffFactory.make_stuff(
-            concept=Concept(code=concept_str, domain="generic", definition=concept_str, structure_class_name=concept_str),
-            content=PDFContent(url=pdf_url),
-            name=name,
+        return cls.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_required_concept(concept_code=concept_code),
+                content=PDFContent(url=pdf_url),
+                name=name,
+            )
         )
-        return cls.make_from_single_stuff(stuff=stuff)
-
-    @classmethod
-    def make_from_stuff_and_name(cls, stuff: Stuff, name: str) -> WorkingMemory:
-        stuff_dict: StuffDict = {name: stuff}
-        aliases: Dict[str, str] = {MAIN_STUFF_NAME: name}
-        return WorkingMemory(root=stuff_dict, aliases=aliases)
-
-    @classmethod
-    def make_from_single_blueprint(cls, blueprint: StuffBlueprint) -> WorkingMemory:
-        stuff = StuffFactory.make_from_blueprint(blueprint=blueprint)
-        return cls.make_from_single_stuff(stuff=stuff)
 
     @classmethod
     def make_from_single_stuff(cls, stuff: Stuff) -> WorkingMemory:
-        name = stuff.stuff_name
-        if not name:
+        if not stuff.stuff_name:
             raise WorkingMemoryFactoryError(f"Cannot make_from_single_stuff because stuff has no name: {stuff}")
-        return cls.make_from_stuff_and_name(stuff=stuff, name=name)
+        stuff_dict: StuffDict = {stuff.stuff_name: stuff}
+        return WorkingMemory(root=stuff_dict, aliases={MAIN_STUFF_NAME: stuff.stuff_name})
 
     @classmethod
     def make_from_multiple_stuffs(
@@ -112,12 +103,7 @@ class WorkingMemoryFactory(BaseModel):
             stuff_dict[name] = Stuff(
                 stuff_name=name,
                 stuff_code="",
-                concept=Concept(
-                    code=NativeConcept.TEXT.value,
-                    domain="generic",
-                    definition=NativeConcept.TEXT.value,
-                    structure_class_name=NativeConcept.TEXT.value,
-                ),
+                concept=get_required_concept(concept_code=NativeConceptEnum.TEXT.value),
                 content=text_content,
             )
         return WorkingMemory(root=stuff_dict)
@@ -125,12 +111,6 @@ class WorkingMemoryFactory(BaseModel):
     @classmethod
     def make_empty(cls) -> WorkingMemory:
         return WorkingMemory(root={})
-
-    @classmethod
-    def make_from_memory_file(cls, memory_file_path: str) -> WorkingMemory:
-        working_memory_dict = load_json_dict_from_path(memory_file_path)
-        working_memory = WorkingMemory.model_validate(working_memory_dict)
-        return working_memory
 
     @classmethod
     def make_from_compact_memory(

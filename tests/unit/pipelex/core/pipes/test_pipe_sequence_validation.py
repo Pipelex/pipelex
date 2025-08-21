@@ -1,5 +1,6 @@
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.pipe_controllers.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 
@@ -12,10 +13,12 @@ class TestPipeSequenceValidation:
         pipe_sequence = PipeSequence(
             domain="test_domain",
             code="test_sequence",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_domain", blueprint={"text": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output=Concept(code="test_domain.ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"),
+            output=ConceptFactory.make(
+                concept_code="ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"
+            ),
             sequential_sub_pipes=[SubPipe(pipe_code="test_pipe_1", output_name="intermediate_result")],
         )
 
@@ -30,10 +33,12 @@ class TestPipeSequenceValidation:
         pipe_sequence = PipeSequence(
             domain="test_domain",
             code="test_sequence",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_domain", blueprint={"initial_input": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output=Concept(code="test_domain.FinalOutput", domain="test_domain", definition="Final output", structure_class_name="FinalOutput"),
+            output=ConceptFactory.make(
+                concept_code="FinalOutput", domain="test_domain", definition="Final output", structure_class_name="FinalOutput"
+            ),
             sequential_sub_pipes=[SubPipe(pipe_code="step_1", output_name="intermediate"), SubPipe(pipe_code="step_2", output_name="final_output")],
         )
 

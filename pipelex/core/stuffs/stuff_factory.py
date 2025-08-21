@@ -5,7 +5,8 @@ from pydantic import BaseModel, ValidationError
 
 from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import (
     ListContent,
@@ -69,16 +70,12 @@ class StuffFactory:
 
     @classmethod
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
-        if isinstance(blueprint.content, str) and get_concept_provider().is_compatible_by_concept_code(
-            tested_concept_code=blueprint.concept_code, wanted_concept_code=NativeConcept.TEXT.value
+        if isinstance(blueprint.content, str) and get_concept_provider().is_compatible(
+            tested_concept=get_concept_provider().get_required_concept(concept_code=blueprint.concept_code),
+            wanted_concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.TEXT),
         ):
             the_stuff = cls.make_stuff(
-                concept=Concept(
-                    code=NativeConcept.TEXT.value,
-                    domain="generic",
-                    definition=NativeConcept.TEXT.value,
-                    structure_class_name=NativeConcept.TEXT.value,
-                ),
+                concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
                 content=TextContent(text=blueprint.content),
                 name=blueprint.stuff_name,
             )
@@ -87,9 +84,7 @@ class StuffFactory:
                 concept_code=blueprint.concept_code, value=blueprint.content
             )
             the_stuff = cls.make_stuff(
-                concept=Concept(
-                    code=blueprint.concept_code, domain="generic", definition=blueprint.concept_code, structure_class_name=blueprint.concept_code
-                ),
+                concept=get_concept_provider().get_required_concept(concept_code=blueprint.concept_code),
                 content=the_stuff_content,
                 name=blueprint.stuff_name,
             )
@@ -217,12 +212,7 @@ class StuffFactory:
         elif isinstance(stuff_content_or_data, str):
             str_stuff: str = stuff_content_or_data
             return StuffFactory.make_stuff(
-                concept=Concept(
-                    code=NativeConcept.TEXT.value,
-                    domain="generic",
-                    definition=NativeConcept.TEXT.value,
-                    structure_class_name=NativeConcept.TEXT.value,
-                ),
+                concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
                 content=TextContent(text=str_stuff),
                 name=name,
             )
@@ -237,7 +227,7 @@ class StuffFactory:
                 raise StuffFactoryError(f"Stuff content data dict is badly formed: {exc}") from exc
             if isinstance(content_value, StuffContent):
                 return StuffFactory.make_stuff(
-                    concept=Concept(code=concept_code, domain="generic", definition=concept_code, structure_class_name=concept_code),
+                    concept=get_concept_provider().get_required_concept(concept_code=concept_code),
                     name=name,
                     content=content_value,
                     code=code,
@@ -248,7 +238,7 @@ class StuffFactory:
                     value=content_value,
                 )
                 return StuffFactory.make_stuff(
-                    concept=Concept(code=concept_code, domain="generic", definition=concept_code, structure_class_name=concept_code),
+                    concept=get_concept_provider().get_required_concept(concept_code=concept_code),
                     name=name,
                     content=content,
                     code=code,

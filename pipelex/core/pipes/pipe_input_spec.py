@@ -1,7 +1,6 @@
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
 from pydantic import BaseModel, Field, RootModel, field_validator, model_validator
-from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
@@ -97,30 +96,6 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
 
     def add_requirement(self, variable_name: str, concept: Concept, multiplicity: Optional[PipeOutputMultiplicity] = None):
         self.root[variable_name] = InputRequirement(concept=concept, multiplicity=multiplicity)
-
-    @classmethod
-    def make_empty(cls) -> Self:
-        return cls(root={})
-
-    @classmethod
-    def make_from_blueprint(cls, domain: str, blueprint: Dict[str, InputRequirementBlueprint]) -> Self:
-        for var_name, input_requirement_blueprint in blueprint.items():
-            concept_code = f"{domain}.{input_requirement_blueprint.concept_code}"
-            blueprint[var_name].concept_code = concept_code
-        return cls(
-            root={
-                var_name: InputRequirement(
-                    concept=Concept(
-                        code=input_requirement_blueprint.concept_code,
-                        domain=domain,
-                        definition=input_requirement_blueprint.concept_code,
-                        structure_class_name=input_requirement_blueprint.concept_code,
-                    ),
-                    multiplicity=input_requirement_blueprint.multiplicity,
-                )
-                for var_name, input_requirement_blueprint in blueprint.items()
-            }
-        )
 
     @property
     def items(self) -> List[Tuple[str, InputRequirement]]:

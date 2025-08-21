@@ -6,9 +6,11 @@ from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
 from pipelex.exceptions import (
@@ -75,7 +77,7 @@ class PipeCondition(PipeController):
         required_variables: Set[str] = set()
         # Variables from the expression/expression_template
         pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
-            domain_code=self.domain,
+            domain=self.domain,
             template_str=self.applied_expression_template,
             inputs=self.inputs,
         )
@@ -101,11 +103,11 @@ class PipeCondition(PipeController):
         1. Inputs needed by the condition expression/expression_template
         2. Inputs needed by ALL possible target pipes (since we don't know which will be chosen)
         """
-        needed_inputs = PipeInputSpec.make_empty()
+        needed_inputs = PipeInputSpecFactory.make_empty()
 
         # 1. Add the variables from the expression/expression_template
         pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
-            domain_code=self.domain,
+            domain=self.domain,
             template_str=self.applied_expression_template,
             inputs=self.inputs,
         )
@@ -116,11 +118,8 @@ class PipeCondition(PipeController):
                 # so we'll use a generic placeholder that will be validated later
                 needed_inputs.add_requirement(
                     variable_name=var_name,
-                    concept=Concept(
-                        code=f"{self.domain}.Unknown",
-                        domain="generic",
-                        definition=f"{self.domain}.Unknown",
-                        structure_class_name=f"{self.domain}.Unknown",
+                    concept=ConceptFactory.make_native_concept(
+                        native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.ANYTHING],
                     ),
                 )
 
@@ -155,7 +154,7 @@ class PipeCondition(PipeController):
             if named_input_requirement.variable_name not in self.inputs.variables:
                 missing_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain_code=self.domain,
+                    domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[named_input_requirement.variable_name],
                 )
@@ -172,7 +171,7 @@ class PipeCondition(PipeController):
             if input_name not in the_needed_inputs.required_names:
                 extraneous_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain_code=self.domain,
+                    domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
                 )
@@ -342,7 +341,7 @@ class PipeCondition(PipeController):
         # 2. Validate that the expression template is valid
         try:
             pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
-                domain_code=self.domain,
+                domain=self.domain,
                 template_str=self.applied_expression_template,
                 inputs=self.inputs,
             )

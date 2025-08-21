@@ -6,9 +6,11 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
@@ -30,10 +32,10 @@ class TestPipeSequenceSimple:
         pipe_sequence = PipeSequence(
             domain="test_integration",
             code="simple_sequence",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
             ),
-            output=Concept(code="Text", domain="test_integration", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make(concept_code="Text", domain="test_integration", definition="Text", structure_class_name="Text"),
             sequential_sub_pipes=[
                 SubPipe(pipe_code="capitalize_text", output_name="capitalized_text"),
                 SubPipe(pipe_code="add_prefix", output_name="final_text"),
@@ -42,7 +44,7 @@ class TestPipeSequenceSimple:
 
         # Create test data - single text input
         input_text_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             content=TextContent(text="hello world"),
             name="input_text",
         )

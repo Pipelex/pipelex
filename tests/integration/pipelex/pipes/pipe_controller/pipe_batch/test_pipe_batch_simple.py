@@ -6,10 +6,11 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import ListContent, StuffContent, TextContent
@@ -31,14 +32,14 @@ class TestPipeBatchSimple:
             domain="test_integration",
             code="simple_batch",
             branch_pipe_code="uppercase_transformer",  # This exists in the TOML file
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_integration",
                 blueprint={
                     "text_list": InputRequirementBlueprint(concept_code="Text"),
                     "text_item": InputRequirementBlueprint(concept_code="Text"),
                 },
             ),
-            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             batch_params=BatchParams(input_list_stuff_name="text_list", input_item_stuff_name="text_item"),
         )
 
@@ -50,7 +51,7 @@ class TestPipeBatchSimple:
         ]
 
         text_list_stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             content=ListContent[StuffContent](items=cast(List[StuffContent], text_items)),
             name="text_list",
         )

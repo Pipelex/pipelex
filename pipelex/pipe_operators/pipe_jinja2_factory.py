@@ -3,11 +3,12 @@ from typing import Literal, Optional
 from typing_extensions import override
 
 from pipelex.config import get_config
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.exceptions import PipeDefinitionError
+from pipelex.hub import get_concept_provider
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
@@ -26,9 +27,9 @@ class PipeJinja2Blueprint(PipeBlueprint):
 class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
     @classmethod
     @override
-    def make_pipe_from_blueprint(
+    def make_from_blueprint(
         cls,
-        domain_code: str,
+        domain: str,
         pipe_code: str,
         pipe_blueprint: PipeJinja2Blueprint,
     ) -> PipeJinja2:
@@ -42,13 +43,11 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
         else:
             preprocessed_template = None
         return PipeJinja2(
-            domain=domain_code,
+            domain=domain,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
-            output=Concept(
-                code=pipe_blueprint.output, domain="generic", definition=pipe_blueprint.output, structure_class_name=pipe_blueprint.output
-            ),
+            inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
+            output=get_concept_provider().get_required_concept(concept_code=pipe_blueprint.output),
             jinja2_name=pipe_blueprint.jinja2_name,
             jinja2=preprocessed_template,
             prompting_style=pipe_blueprint.prompting_style,
@@ -58,7 +57,7 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
     @classmethod
     def make_pipe_jinja2_from_template_str(
         cls,
-        domain_code: str,
+        domain: str,
         inputs: Optional[PipeInputSpec] = None,
         template_str: Optional[str] = None,
         template_name: Optional[str] = None,
@@ -70,17 +69,17 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
                 template_category=Jinja2TemplateCategory.LLM_PROMPT,
             )
             return PipeJinja2(
-                domain=domain_code,
+                domain=domain,
                 code="adhoc_pipe_jinja2_from_template_str",
                 jinja2=preprocessed_template,
-                inputs=inputs or PipeInputSpec.make_empty(),
+                inputs=inputs or PipeInputSpecFactory.make_empty(),
             )
         elif template_name:
             return PipeJinja2(
-                domain=domain_code,
+                domain=domain,
                 code="adhoc_pipe_jinja2_from_template_name",
                 jinja2_name=template_name,
-                inputs=inputs or PipeInputSpec.make_empty(),
+                inputs=inputs or PipeInputSpecFactory.make_empty(),
             )
         else:
             raise PipeDefinitionError("Either template_str or template_name must be provided to make_pipe_jinja2_from_template_str")
@@ -88,13 +87,13 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
     @classmethod
     def make_pipe_jinja2_to_structure(
         cls,
-        domain_code: str,
+        domain: str,
         prompt_template_to_structure: Optional[str],
     ) -> PipeJinja2:
         jinja2_name = prompt_template_to_structure or get_config().pipelex.generic_template_names.structure_from_preliminary_text_user
         prompting_style = PromptingStyle.make_default_prompting_style()
         return PipeJinja2(
-            domain=domain_code,
+            domain=domain,
             code="adhoc_pipe_jinja2_to_structure",
             jinja2_name=jinja2_name,
             prompting_style=prompting_style,

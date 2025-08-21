@@ -12,7 +12,6 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_factory import StuffBlueprint
 from pipelex.hub import get_library_manager, get_pipe_router, get_report_delegate
 from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -25,34 +24,6 @@ from tests.integration.pipelex.test_data import PipeTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeRunningVariants:
-    @pytest.mark.parametrize("topic, blueprint, pipe_code", PipeTestCases.BLUEPRINT_AND_PIPE)
-    async def test_pipe_from_blueprint(
-        self,
-        pipe_run_mode: PipeRunMode,
-        request: FixtureRequest,
-        pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
-        save_working_memory: Any,
-        topic: str,
-        blueprint: StuffBlueprint,
-        pipe_code: str,
-    ):
-        log.verbose(blueprint, title=f"{topic}: start from '{blueprint.stuff_name}', run pipe '{pipe_code}'")
-        working_memory = WorkingMemoryFactory.make_from_single_blueprint(blueprint=blueprint)
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code=pipe_code,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            working_memory=working_memory,
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
-        )
-        log.verbose(pipe_output, title="pipe_output")
-        pretty_print(pipe_output, title="pipe_output")
-
-        # Save stuff context
-        result_dir_path, _ = pipe_result_handler
-        await save_working_memory(pipe_output, result_dir_path)
-
-        get_report_delegate().generate_report()
-
     @pytest.mark.parametrize("topic, stuff, pipe_code", PipeTestCases.STUFF_AND_PIPE)
     async def test_pipe_from_stuff(
         self,

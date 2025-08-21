@@ -397,13 +397,13 @@ def get_domains(excluded_domains: Optional[List[str]] = None) -> List[Domain]:
     return domains
 
 
-def get_required_domain(domain_code: str) -> Domain:
-    return get_pipelex_hub().get_required_domain_provider().get_required_domain(domain_code=domain_code)
+def get_required_domain(domain: str) -> Domain:
+    return get_pipelex_hub().get_required_domain_provider().get_required_domain(domain=domain)
 
 
-def get_optional_domain(domain_code: str) -> Optional[Domain]:
+def get_optional_domain(domain: str) -> Optional[Domain]:
     if domain_provider := get_pipelex_hub().get_optional_domain_provider():
-        return domain_provider.get_domain(domain_code=domain_code)
+        return domain_provider.get_domain(domain=domain)
     else:
         return None
 

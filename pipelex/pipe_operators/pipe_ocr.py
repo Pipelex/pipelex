@@ -11,9 +11,10 @@ from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, PageContent, TextAndImagesContent, TextContent
@@ -70,22 +71,22 @@ class PipeOcr(PipeOperator):
             log.debug(f"{input_name=}")
             log.debug(f"{requirement=}")
             log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
-            if concept_provider.is_compatible_by_concept_code(
-                tested_concept_code=requirement.concept.code,
-                wanted_concept_code=NativeConcept.IMAGE.value,
+            if concept_provider.is_compatible(
+                tested_concept=requirement.concept,
+                wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.IMAGE),
             ):
                 self.image_stuff_name = input_name
                 candidate_prompt_var_names.append(input_name)
-            elif concept_provider.is_compatible_by_concept_code(
-                tested_concept_code=requirement.concept.code,
-                wanted_concept_code=NativeConcept.PDF.value,
+            elif concept_provider.is_compatible(
+                tested_concept=requirement.concept,
+                wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.PDF),
             ):
                 self.pdf_stuff_name = input_name
                 candidate_prompt_var_names.append(input_name)
             else:
                 inadequate_input_concept_error = StaticValidationError(
                     error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
-                    domain_code=self.domain,
+                    domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
                     provided_concept_code=requirement.concept.code,
@@ -102,7 +103,7 @@ class PipeOcr(PipeOperator):
         if len(candidate_prompt_var_names) > 1:
             too_many_candidate_inputs_error = StaticValidationError(
                 error_type=StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS,
-                domain_code=self.domain,
+                domain=self.domain,
                 pipe_code=self.code,
                 variable_names=candidate_prompt_var_names,
                 explanation="Only one image or pdf can be provided for OCR",
@@ -117,7 +118,7 @@ class PipeOcr(PipeOperator):
         elif len(candidate_prompt_var_names) == 0:
             missing_input_var_error = StaticValidationError(
                 error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                domain_code=self.domain,
+                domain=self.domain,
                 pipe_code=self.code,
                 explanation="For OCR you must provide either a pdf or an image or a concept that refines one of them",
             )
@@ -131,7 +132,7 @@ class PipeOcr(PipeOperator):
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        return PipeInputSpec.make_from_blueprint(
+        return PipeInputSpecFactory.make_from_blueprint(
             domain=self.domain,
             blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=self.inputs.root[PIPE_OCR_INPUT_NAME].concept.code)},
         )

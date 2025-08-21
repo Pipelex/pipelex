@@ -3,10 +3,11 @@ from typing import List
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
@@ -30,13 +31,13 @@ class TestPipeLLM:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm",
                 domain="generic",
-                output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm",
                     domain="generic",
                     system_prompt=PipeTestCases.SYSTEM_PROMPT,
                     user_text=PipeTestCases.USER_PROMPT,
-                    output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+                    output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
                 ),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -69,16 +70,16 @@ class TestPipeLLM:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm_image",
                 domain="generic",
-                inputs=PipeInputSpec.make_from_blueprint(
+                inputs=PipeInputSpecFactory.make_from_blueprint(
                     domain="generic", blueprint={stuff_name: InputRequirementBlueprint(concept_code=stuff.concept.code)}
                 ),
-                output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm_image",
                     domain="generic",
                     system_prompt=PipeTestCases.SYSTEM_PROMPT,
                     user_text=PipeTestCases.MULTI_IMG_DESC_PROMPT,
-                    output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+                    output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
                 ),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

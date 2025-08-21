@@ -2,8 +2,8 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.hub import get_pipe_router
@@ -31,12 +31,7 @@ class TestPipeImgg:
                 domain="generic",
                 imgg_handle=imgg_handle,
                 imgg_prompt=image_desc,
-                output=Concept(
-                    code=NativeConcept.IMAGE.value,
-                    domain="native",
-                    definition=NativeConcept.IMAGE.value,
-                    structure_class_name=NativeConcept.IMAGE.value,
-                ),
+                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE]),
                 output_multiplicity=False,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

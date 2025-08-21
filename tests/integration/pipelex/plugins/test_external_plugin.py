@@ -11,8 +11,8 @@ from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.hub import get_inference_manager, get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.pipe_llm import PipeLLM, PipeLLMOutput
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
@@ -91,13 +91,13 @@ class TestExternalPlugin:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm_with_external_llm_handle",
                 domain="generic",
-                output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm_with_external_llm_handle",
                     domain="generic",
                     system_prompt=PipeTestCases.SYSTEM_PROMPT,
                     user_text=PipeTestCases.USER_PROMPT,
-                    output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
+                    output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
                 ),
                 llm_choices=LLMSettingChoices.make_completed_with_defaults(
                     for_text=LLMSetting(

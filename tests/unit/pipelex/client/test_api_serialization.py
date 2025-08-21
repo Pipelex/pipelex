@@ -8,8 +8,8 @@ import pytest
 from pydantic import BaseModel
 
 from pipelex.client.api_serializer import ApiSerializer
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_content import NumberContent, TextContent
@@ -61,8 +61,8 @@ class TestApiSerialization:
         )
 
         stuff = StuffFactory.make_stuff(
-            concept=Concept(
-                code="event.DateTimeEvent", domain="generic", definition="event.DateTimeEvent", structure_class_name="event.DateTimeEvent"
+            concept=ConceptFactory.make(
+                concept_code="DateTimeEvent", domain="event", definition="event.DateTimeEvent", structure_class_name="DateTimeEvent"
             ),
             name="project_meeting",
             content=datetime_event,
@@ -73,9 +73,7 @@ class TestApiSerialization:
     def text_content_memory(self) -> WorkingMemory:
         """Create WorkingMemory with text content."""
         stuff = StuffFactory.make_stuff(
-            concept=Concept(
-                code=NativeConcept.TEXT.value, domain="generic", definition=NativeConcept.TEXT.value, structure_class_name=NativeConcept.TEXT.value
-            ),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             name="sample_text",
             content=TextContent(text="Sample text content"),
         )
@@ -86,7 +84,7 @@ class TestApiSerialization:
         """Create WorkingMemory with number content."""
         number_content = NumberContent(number=3.14159)
         stuff = StuffFactory.make_stuff(
-            concept=Concept(code="native.Number", domain="generic", definition="native.Number", structure_class_name="native.Number"),
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.NUMBER]),
             name="pi_value",
             content=number_content,
         )
@@ -150,7 +148,7 @@ class TestApiSerialization:
         assert "sample_text" in compact_memory
 
         text_blueprint = compact_memory["sample_text"]
-        assert text_blueprint["concept_code"] == NativeConcept.TEXT.value
+        assert text_blueprint["concept_code"] == NativeConceptEnum.TEXT.value
         assert isinstance(text_blueprint["content"], str)
         assert text_blueprint["content"] == "Sample text content"
 

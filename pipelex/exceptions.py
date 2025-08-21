@@ -22,7 +22,7 @@ class StaticValidationError(Exception):
     def __init__(
         self,
         error_type: StaticValidationErrorType,
-        domain_code: str,
+        domain: str,
         pipe_code: Optional[str] = None,
         variable_names: Optional[List[str]] = None,
         required_concept_codes: Optional[List[str]] = None,
@@ -31,7 +31,7 @@ class StaticValidationError(Exception):
         explanation: Optional[str] = None,
     ):
         self.error_type = error_type
-        self.domain_code = domain_code
+        self.domain = domain
         self.pipe_code = pipe_code
         self.variable_names = variable_names
         self.required_concept_codes = required_concept_codes
@@ -41,7 +41,7 @@ class StaticValidationError(Exception):
         super().__init__()
 
     def desc(self) -> str:
-        msg = f"{self.error_type} • domain='{self.domain_code}'"
+        msg = f"{self.error_type} • domain='{self.domain}'"
         if self.pipe_code:
             msg += f" • pipe='{self.pipe_code}'"
         if self.variable_names:

@@ -7,7 +7,6 @@ from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -20,7 +19,7 @@ from pipelex.exceptions import (
     PipeInputNotFoundError,
     WorkingMemoryStuffNotFoundError,
 )
-from pipelex.hub import get_pipeline_tracker, get_required_pipe
+from pipelex.hub import get_concept_provider, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -123,9 +122,7 @@ class PipeBatch(PipeController):
             branch_input_item_code = f"{input_stuff_code}-branch-{branch_index}"
             item_input_stuff = StuffFactory.make_stuff(
                 code=branch_input_item_code,
-                concept=Concept(
-                    code=input_item_concept_code, domain="generic", definition=input_item_concept_code, structure_class_name=input_item_concept_code
-                ),
+                concept=get_concept_provider().get_required_concept(concept_code=input_item_concept_code),
                 content=item,
                 name=input_item_stuff_name,
             )
@@ -169,7 +166,7 @@ class PipeBatch(PipeController):
         list_content: ListContent[StuffContent] = ListContent(items=output_items)
         output_stuff = StuffFactory.make_stuff(
             code=output_stuff_code,
-            concept=Concept(code=self.output.code, domain=self.output.domain, definition=self.output.code, structure_class_name=self.output.code),
+            concept=self.output,
             content=list_content,
             name=output_name,
         )

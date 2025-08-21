@@ -10,9 +10,11 @@ from pipelex.cogt.content_generation.content_generator_dry import ContentGenerat
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -40,8 +42,8 @@ class PipeJinja2(PipeOperator):
     model_config = ConfigDict(extra="forbid", strict=False)
 
     adhoc_pipe_code: ClassVar[str] = "jinja2_render"
-    output: Concept = Concept(
-        code=NativeConcept.TEXT.value, domain="generic", definition=NativeConcept.TEXT.value, structure_class_name=NativeConcept.TEXT.value
+    output: Concept = ConceptFactory.make_native_concept(
+        native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT],
     )
 
     jinja2_name: Optional[str] = None
@@ -82,7 +84,7 @@ class PipeJinja2(PipeOperator):
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
-        needed_inputs = PipeInputSpec.make_empty()
+        needed_inputs = PipeInputSpecFactory.make_empty()
         for input_name, requirement in self.inputs.root.items():
             needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
         return needed_inputs

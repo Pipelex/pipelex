@@ -1,5 +1,6 @@
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.pipe_controllers.pipe_condition import PipeCondition, PipeConditionPipeMap
 
 
@@ -11,10 +12,12 @@ class TestPipeConditionValidation:
         pipe_condition = PipeCondition(
             domain="test_domain",
             code="test_condition",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_domain", blueprint={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output=Concept(code="test_domain.ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"),
+            output=ConceptFactory.make(
+                concept_code="ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"
+            ),
             expression="input_var",
             pipe_map=[
                 PipeConditionPipeMap(expression_result="value1", pipe_code="pipe_a"),
@@ -35,10 +38,10 @@ class TestPipeConditionValidation:
         pipe_condition_template = PipeCondition(
             domain="test_domain",
             code="test_condition_template",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_domain", blueprint={"var": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output=Concept(code="test_domain.Result", domain="test_domain", definition="Result", structure_class_name="Result"),
+            output=ConceptFactory.make(concept_code="Result", domain="test_domain", definition="Result", structure_class_name="Result"),
             expression_template="{{ var }}",
             pipe_map=[PipeConditionPipeMap(expression_result="value", pipe_code="target_pipe")],
         )
@@ -47,10 +50,10 @@ class TestPipeConditionValidation:
         pipe_condition_expr = PipeCondition(
             domain="test_domain",
             code="test_condition_expr",
-            inputs=PipeInputSpec.make_from_blueprint(
+            inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain="test_domain", blueprint={"var": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output=Concept(code="test_domain.Result", domain="test_domain", definition="Result", structure_class_name="Result"),
+            output=ConceptFactory.make(concept_code="Result", domain="test_domain", definition="Result", structure_class_name="Result"),
             expression="var",
             pipe_map=[PipeConditionPipeMap(expression_result="value", pipe_code="target_pipe")],
         )
