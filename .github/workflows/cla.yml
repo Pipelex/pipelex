@@ -22,7 +22,9 @@ jobs:
           app-id: ${{ secrets.CLA_GH_APP_ID }}
           private-key: ${{ secrets.CLA_GH_APP_PRIVATE_KEY }}
           owner: Pipelex
-          repositories: cla-signatures
+          repositories: |
+            cla-signatures
+            pipelex
 
       - name: "CLA Assistant"
         if: (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'

@@ -13,7 +13,7 @@ from tests.cases import TemplateTestCases
 
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipeJinja2:
+class TestPipeTemplate:
     @pytest.mark.parametrize("template", TemplateTestCases.TEMPLATE_FOR_ANY)
     async def test_pipe_template_for_any(
         self,

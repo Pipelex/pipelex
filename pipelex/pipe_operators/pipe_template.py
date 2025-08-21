@@ -21,7 +21,7 @@ from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
 from pipelex.hub import get_content_generator, get_template, get_template_provider
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
+from pipelex.tools.templating.jinja2_errors import TemplateError
 from pipelex.tools.templating.template_category import TemplateCategory
 from pipelex.tools.templating.template_parsing import check_template_parsing
 from pipelex.tools.templating.template_required_variables import detect_template_required_variables
@@ -55,7 +55,7 @@ class PipeTemplate(PipeOperator):
             try:
                 check_template_parsing(template_source=self.template, template_category=self.template_category)
             except TemplateSyntaxError as exc:
-                raise Jinja2TemplateError(f"Could not parse Jinja2 template included in PipeTemplate: {exc}") from exc
+                raise TemplateError(f"Could not parse Jinja2 template included in PipeTemplate: {exc}") from exc
         return self
 
     @model_validator(mode="after")
@@ -87,11 +87,11 @@ class PipeTemplate(PipeOperator):
     @property
     def desc(self) -> str:
         if self.template:
-            return f"Jinja2 included template, prompting style {self.prompting_style}"
+            return f"Template included prompting style {self.prompting_style}"
         elif template_name := self.template_name:
-            return f"Jinja2 template '{template_name}', prompting style {self.prompting_style}"
+            return f"Template '{template_name}', prompting style {self.prompting_style}"
         else:
-            return "Jinja2 template not defined"
+            return "Template not defined"
 
     @override
     def required_variables(self) -> Set[str]:

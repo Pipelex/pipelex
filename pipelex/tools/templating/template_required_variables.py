@@ -7,7 +7,7 @@ from jinja2.exceptions import (
 )
 
 from pipelex.tools.templating.jinja2_environment import make_jinja2_env_from_template_provider
-from pipelex.tools.templating.jinja2_errors import Jinja2DetectVariablesError, Jinja2StuffError, make_jinja2_error_explanation
+from pipelex.tools.templating.jinja2_errors import TemplateDetectVariablesError, TemplateStuffError, make_jinja2_error_explanation
 from pipelex.tools.templating.template_category import TemplateCategory
 from pipelex.tools.templating.template_provider_abstract import TemplateProviderAbstract
 
@@ -44,19 +44,19 @@ def detect_template_required_variables(
     elif template_name:
         template_source = loader.get_source(jinja2_env, template_name)[0]
     else:
-        raise Jinja2StuffError("No template or template_name provided")
+        raise TemplateStuffError("No template or template_name provided")
 
     try:
         parsed_ast = jinja2_env.parse(template_source)
         undeclared_variables = meta.find_undeclared_variables(parsed_ast)
-    except Jinja2StuffError as stuff_error:
+    except TemplateStuffError as stuff_error:
         explanation = make_jinja2_error_explanation(template_name=template_name, template_text=template_source)
-        raise Jinja2DetectVariablesError(f"Jinja2 detect variables — stuff error: '{stuff_error}' {explanation}") from stuff_error
+        raise TemplateDetectVariablesError(f"Jinja2 detect variables — stuff error: '{stuff_error}' {explanation}") from stuff_error
     except TemplateSyntaxError as syntax_error:
         explanation = make_jinja2_error_explanation(template_name=template_name, template_text=template_source)
-        raise Jinja2DetectVariablesError(f"Jinja2 detect variables — syntax error: '{syntax_error}' {explanation}") from syntax_error
+        raise TemplateDetectVariablesError(f"Jinja2 detect variables — syntax error: '{syntax_error}' {explanation}") from syntax_error
     except UndefinedError as undef_error:
         explanation = make_jinja2_error_explanation(template_name=template_name, template_text=template_source)
-        raise Jinja2DetectVariablesError(f"Jinja2 detect variables — undefined error: '{undef_error}' {explanation}") from undef_error
+        raise TemplateDetectVariablesError(f"Jinja2 detect variables — undefined error: '{undef_error}' {explanation}") from undef_error
 
     return undeclared_variables

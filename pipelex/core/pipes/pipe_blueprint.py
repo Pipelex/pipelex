@@ -17,7 +17,7 @@ class AllowedPipeTypes(StrEnum):
     # Pipe Operators
     PIPE_FUNC = "PipeFunc"
     PIPE_IMG_GEN = "PipeImgGen"
-    PIPE_JINJA2 = "PipeJinja2"
+    PIPE_TEMPLATE = "PipeTemplate"
     PIPE_LLM = "PipeLLM"
     PIPE_OCR = "PipeOcr"
     # Pipe Controller

@@ -215,7 +215,7 @@ class PipeCondition(PipeController):
                 job_category=JobCategory.TEMPLATE_JOB,
             )
         )
-        log.debug(f"Jinja2 expression: {self.applied_expression_template}")
+        log.debug(f"Template expression: {self.applied_expression_template}")
         # evaluated_expression = (
         #     await pipe_template.run_pipe(
         #         job_metadata=template_job_metadata,

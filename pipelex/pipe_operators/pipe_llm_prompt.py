@@ -281,7 +281,7 @@ class PipeLLMPrompt(PipeOperator):
     ) -> Optional[str]:
         the_text: Optional[str]
         if pipe_template:
-            log.verbose(f"Working with Jinja2 pipe '{pipe_template.template_name}'")
+            log.verbose(f"Working with Template pipe '{pipe_template.template_name}'")
             if (prompting_style := self.prompting_style) and not pipe_template.prompting_style:
                 pipe_template.prompting_style = prompting_style
                 log.verbose(f"Setting prompting style to {prompting_style}")

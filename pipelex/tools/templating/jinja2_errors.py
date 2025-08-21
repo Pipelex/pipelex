@@ -3,11 +3,11 @@ from typing import Optional
 from pipelex.tools.exceptions import ToolException
 
 
-class Jinja2TemplateError(ToolException):
+class TemplateError(ToolException):
     pass
 
 
-class Jinja2StuffError(ToolException):
+class TemplateStuffError(ToolException):
     pass
 
 
@@ -15,11 +15,11 @@ class Jinja2ContextError(ToolException):
     pass
 
 
-class Jinja2RenderError(ToolException):
+class TemplateRenderError(ToolException):
     pass
 
 
-class Jinja2DetectVariablesError(ToolException):
+class TemplateDetectVariablesError(ToolException):
     pass
 
 

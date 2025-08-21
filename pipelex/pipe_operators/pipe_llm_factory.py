@@ -14,7 +14,7 @@ from pipelex.pipe_operators.pipe_llm import PipeLLM, StructuringMethod
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 from pipelex.pipe_operators.pipe_template import PipeTemplate
 from pipelex.pipe_operators.pipe_template_factory import PipeTemplateFactory
-from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
+from pipelex.tools.templating.jinja2_errors import TemplateError
 from pipelex.tools.templating.template_provider_abstract import TemplateNotFoundError
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
 
@@ -74,8 +74,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     template=pipe_blueprint.system_prompt_template,
                     template_name=pipe_blueprint.system_prompt_template_name,
                 )
-            except Jinja2TemplateError as exc:
-                error_msg = f"Jinja2 template error in system prompt for pipe '{pipe_code}' in domain '{domain_code}': {exc}."
+            except TemplateError as exc:
+                error_msg = f"Template error in system prompt for pipe '{pipe_code}' in domain '{domain_code}': {exc}."
                 if pipe_blueprint.system_prompt_template:
                     error_msg += f"\nThe system prompt template is:\n{pipe_blueprint.system_prompt_template}"
                 else:
@@ -95,8 +95,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     template_name=pipe_blueprint.template_name,
                     inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
                 )
-            except Jinja2TemplateError as exc:
-                error_msg = f"Jinja2 syntax error in user prompt for pipe '{pipe_code}' in domain '{domain_code}': {exc}."
+            except TemplateError as exc:
+                error_msg = f"Template error in user prompt for pipe '{pipe_code}' in domain '{domain_code}': {exc}."
                 if pipe_blueprint.prompt_template:
                     error_msg += f"\nThe prompt template is:\n{pipe_blueprint.prompt_template}"
                 else:

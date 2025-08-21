@@ -9,8 +9,8 @@ PIPE_TEMPLATE = (
 definition = "Domain with template processing pipe"
 
 [pipe.process_template]
-type = "PipeJinja2"
-definition = "Process a Jinja2 template"
+type = "PipeTemplate"
+definition = "Process a template"
 output = "Text"
 template = "Hello {{ name }}!"
 """,
@@ -20,7 +20,7 @@ template = "Hello {{ name }}!"
         pipe={
             "process_template": PipeTemplateBlueprint(
                 type="PipeTemplate",
-                definition="Process a Jinja2 template",
+                definition="Process a template",
                 output="Text",
                 template="Hello {{ name }}!",
             ),

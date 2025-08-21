@@ -17,7 +17,7 @@ class TomlMigrator:
         "PipeOcr",
         "PipeImgGen",
         "PipeFunc",
-        "PipeJinja2",
+        "PipeTemplate",
         "PipeLLMPrompt",
         "PipeSequence",
         "PipeBatch",

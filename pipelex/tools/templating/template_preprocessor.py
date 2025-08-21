@@ -2,7 +2,7 @@ import re
 from re import Match
 from typing import List
 
-from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
+from pipelex.tools.templating.jinja2_errors import TemplateError
 from pipelex.tools.templating.jinja2_filters import ALLOWED_FILTERS
 
 
@@ -31,7 +31,7 @@ def _detect_non_existent_filters(template_str: str) -> None:
             invalid_filters.append(filter_name)
 
     if invalid_filters:
-        raise Jinja2TemplateError(f"Invalid Jinja2 filters found: {invalid_filters}. Only the following filters are allowed: {ALLOWED_FILTERS}")
+        raise TemplateError(f"Invalid Jinja2 filters found: {invalid_filters}. Only the following filters are allowed: {ALLOWED_FILTERS}")
 
 
 # Handle @variable patterns
