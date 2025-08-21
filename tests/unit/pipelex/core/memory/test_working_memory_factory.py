@@ -9,7 +9,7 @@ class TestWorkingMemoryFactory:
         """Test deserialization of compact memory with text content."""
         compact_memory: CompactMemory = {
             "text_item": {
-                "concept_code": NativeConcept.TEXT.code,
+                "concept_code": NativeConcept.TEXT.value,
                 "content": "Hello, world!",
             }
         }
@@ -20,7 +20,7 @@ class TestWorkingMemoryFactory:
         assert "text_item" in working_memory.root
 
         stuff = working_memory.root["text_item"]
-        assert stuff.concept_code == NativeConcept.TEXT.code
+        assert stuff.concept_code == NativeConcept.TEXT.value
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == "Hello, world!"
 
@@ -137,11 +137,11 @@ class TestWorkingMemoryFactory:
         """Test deserialization of compact memory with multiple items."""
         compact_memory: CompactMemory = {
             "text1": {
-                "concept_code": NativeConcept.TEXT.code,
+                "concept_code": NativeConcept.TEXT.value,
                 "content": "First text",
             },
             "text2": {
-                "concept_code": NativeConcept.TEXT.code,
+                "concept_code": NativeConcept.TEXT.value,
                 "content": "Second text",
             },
             "structured": {

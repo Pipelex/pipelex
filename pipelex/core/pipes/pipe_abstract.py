@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional, Set, Type
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from pipelex.core.concepts.concept_code_factory import ConceptCodeFactory
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
@@ -19,35 +18,34 @@ class PipeAbstract(ABC, BaseModel):
     code: str
     domain: str
     definition: Optional[str] = None
-    # TODO: support auto (implicit) input, it makes sense for pipe controllers
     inputs: PipeInputSpec = Field(default_factory=PipeInputSpec)
     output_concept_code: str
 
-    @model_validator(mode="before")
-    @classmethod
-    # TODO: This is a hack to add the domain prefix to the concept code.
-    # Fix this with a more simple Concept Factory approach.
-    def add_domain_prefix(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        # Process output_concept_code - always present
-        if "output_concept_code" in data:
-            data["output_concept_code"] = ConceptCodeFactory.make_concept_code_from_str(
-                domain=data["domain"],
-                concept_str=data["output_concept_code"],
-                fallback_domain=SpecialDomain.IMPLICIT,
-            )
+    # @model_validator(mode="before")
+    # @classmethod
+    # # TODO: This is a hack to add the domain prefix to the concept code.
+    # # Fix this with a more simple Concept Factory approach.
+    # def add_domain_prefix(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+    #     # Process output_concept_code - always present
+    #     if "output_concept_code" in data:
+    #         data["output_concept_code"] = ConceptCodeFactory.make_concept_code_from_str(
+    #             domain=data["domain"],
+    #             concept_str=data["output_concept_code"],
+    #             fallback_domain=SpecialDomain.IMPLICIT,
+    #         )
 
-        # Process inputs - always present
-        if "inputs" in data:
-            inputs = data["inputs"]
-            if isinstance(inputs, PipeInputSpec):
-                for _, input_requirement in inputs.root.items():
-                    input_requirement.concept_code = ConceptCodeFactory.make_concept_code_from_str(
-                        concept_str=input_requirement.concept_code,
-                        domain=data["domain"],
-                        fallback_domain=SpecialDomain.IMPLICIT,
-                    )
+    #     # Process inputs - always present
+    #     if "inputs" in data:
+    #         inputs = data["inputs"]
+    #         if isinstance(inputs, PipeInputSpec):
+    #             for _, input_requirement in inputs.root.items():
+    #                 input_requirement.concept_code = ConceptCodeFactory.make_concept_code_from_str(
+    #                     concept_str=input_requirement.concept_code,
+    #                     domain=data["domain"],
+    #                     fallback_domain=SpecialDomain.IMPLICIT,
+    #                 )
 
-        return data
+    #     return data
 
     @property
     def class_name(self) -> str:

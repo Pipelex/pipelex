@@ -43,7 +43,7 @@ if __name__ == "__main__":
         # Create stuff with the source code
         source_text_stuff = StuffFactory.make_stuff(
             name="source_text",
-            concept_str=NativeConcept.TEXT.code,
+            concept_str=NativeConcept.TEXT.value,
             content=TextContent(text=sample_code),
         )
 
@@ -55,7 +55,7 @@ if __name__ == "__main__":
             pipe=PipeFunc(
                 code="wrap_lines",
                 domain="source_code",
-                output_concept_code=NativeConcept.TEXT.code,
+                output_concept_code=NativeConcept.TEXT.value,
                 function_name="wrap_lines",
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

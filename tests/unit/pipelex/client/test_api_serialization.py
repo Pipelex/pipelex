@@ -65,7 +65,7 @@ class TestApiSerialization:
     @pytest.fixture
     def text_content_memory(self) -> WorkingMemory:
         """Create WorkingMemory with text content."""
-        return WorkingMemoryFactory.make_from_text(text="Sample text content", concept_str=NativeConcept.TEXT.code, name="sample_text")
+        return WorkingMemoryFactory.make_from_text(text="Sample text content", concept_str=NativeConcept.TEXT.value, name="sample_text")
 
     @pytest.fixture
     def number_content_memory(self) -> WorkingMemory:
@@ -132,7 +132,7 @@ class TestApiSerialization:
         assert "sample_text" in compact_memory
 
         text_blueprint = compact_memory["sample_text"]
-        assert text_blueprint["concept_code"] == NativeConcept.TEXT.code
+        assert text_blueprint["concept_code"] == NativeConcept.TEXT.value
         assert isinstance(text_blueprint["content"], str)
         assert text_blueprint["content"] == "Sample text content"
 

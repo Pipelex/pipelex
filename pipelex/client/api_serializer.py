@@ -34,7 +34,7 @@ class ApiSerializer:
             return compact_memory
 
         for stuff_name, stuff in working_memory.root.items():
-            if stuff.concept_code == NativeConcept.TEXT.code:
+            if stuff.concept_code == NativeConcept.TEXT.value:
                 stuff_content = cast(TextContent, stuff.content)
                 item_dict: Dict[str, Any] = {
                     "concept_code": stuff.concept_code,

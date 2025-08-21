@@ -266,7 +266,7 @@ class WorkingMemory(BaseModel):
             update_stuff_dict[name] = Stuff(
                 stuff_name=name,
                 stuff_code="",
-                concept_code=NativeConcept.TEXT.code,
+                concept_code=NativeConcept.TEXT.value,
                 content=stuff_content,
             )
         self.root.update(update_stuff_dict)

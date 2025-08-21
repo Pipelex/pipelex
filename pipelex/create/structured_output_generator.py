@@ -1,16 +1,14 @@
-"""Generate Pydantic BaseModel classes from TOML definitions for structured outputs."""
+"""Generate Pydantic BaseModel classes from concept structure blueprints for structured outputs."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
-import tomlkit
-
-from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 
 
-class StructuredOutputGenerator:
-    """Generate Pydantic BaseModel classes from TOML structured output definitions."""
+class StructureGenerator:
+    """Generate Pydantic BaseModel classes from concept structure blueprints."""
 
     def __init__(self):
         self.imports = {
@@ -21,50 +19,145 @@ class StructuredOutputGenerator:
         }
         self.enum_definitions: Dict[str, Dict[str, Any]] = {}  # Store enum definitions
 
-    def generate_from_toml(self, toml_content: str) -> str:
-        """Generate Python module content from TOML structure and enum definitions.
+    def generate_from_structure_blueprint(self, class_name: str, structure_blueprint: Dict[str, ConceptStructureBlueprint]) -> str:
+        """Generate Python module content from structure blueprint.
 
         Args:
-            toml_content: TOML content containing structure and enum definitions
+            class_name: Name of the class to generate
+            structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
 
         Returns:
             Generated Python module content
         """
-        data = tomlkit.parse(toml_content)
-
-        # Process enums first (if any)
-        enums: List[str] = []
-        if "enum" in data:
-            enum_defs = data["enum"]
-            for enum_name, enum_def in enum_defs.items():  # type: ignore[attr-defined,union-attr]
-                self.enum_definitions[str(enum_name)] = dict(enum_def)  # type: ignore[arg-type]
-                enum_code = self.generate_enum(str(enum_name), dict(enum_def))  # type: ignore[arg-type]
-                enums.append(enum_code)
-
-        # Process structures
-        if "structure" not in data:
-            raise ValueError("TOML must contain a 'structure' section")
-
-        structures = data["structure"]
-        classes: List[str] = []
-
-        for class_name, structure_def in structures.items():  # type: ignore[attr-defined,union-attr]
-            class_code = self.generate_class(str(class_name), dict(structure_def))  # type: ignore[arg-type]
-            classes.append(class_code)
+        # Generate the class
+        class_code = self._generate_class_from_blueprint(class_name, structure_blueprint)
 
         # Generate the complete module
         imports_section = "\n".join(sorted(self.imports))
 
-        # Combine enums and classes
-        all_definitions: List[str] = []
-        if enums:
-            all_definitions.extend(enums)
-        if classes:
-            all_definitions.extend(classes)
+        return f"{imports_section}\n\n\n{class_code}\n"
 
-        definitions_section = "\n\n\n".join(all_definitions)
+    def _generate_class_from_blueprint(self, class_name: str, structure_blueprint: Dict[str, ConceptStructureBlueprint]) -> str:
+        """Generate a class definition from ConceptStructureBlueprint.
 
-        return f"{imports_section}\n\n\n{definitions_section}\n"
+        Args:
+            class_name: Name of the class
+            structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
+
+        Returns:
+            Generated class code
+        """
+        # Generate class header
+        class_header = f'class {class_name}(StructuredContent):\n    """Generated {class_name} class"""\n'
+
+        # Generate fields
+        field_definitions: List[str] = []
+        for field_name, field_blueprint in structure_blueprint.items():
+            field_code = self._generate_field_from_blueprint(field_name, field_blueprint)
+            field_definitions.append(field_code)
+
+        if not field_definitions:
+            # Empty class with just pass
+            return class_header + "\n    pass"
+
+        fields_code = "\n".join(field_definitions)
+        return class_header + "\n" + fields_code
+
+    def _generate_field_from_blueprint(self, field_name: str, field_blueprint: ConceptStructureBlueprint) -> str:
+        """Generate a field definition from ConceptStructureBlueprint.
+
+        Args:
+            field_name: Name of the field
+            field_blueprint: ConceptStructureBlueprint instance
+
+        Returns:
+            Generated field code
+        """
+        # Determine Python type
+        if field_blueprint.choices:
+            # Inline choices - use Literal type
+            python_type = f"Literal[{', '.join(repr(c) for c in field_blueprint.choices)}]"
+        else:
+            # Handle complex types
+            python_type = self._get_python_type_from_blueprint(field_blueprint)
+
+        # Make optional if not required
+        if not field_blueprint.required:
+            python_type = f"Optional[{python_type}]"
+
+        # Generate Field parameters
+        field_params = [f'description="{field_blueprint.definition}"']
+
+        if field_blueprint.required:
+            if field_blueprint.default_value is not None:
+                field_params.insert(0, f"default={repr(field_blueprint.default_value)}")
+            else:
+                field_params.insert(0, "...")
+        else:
+            if field_blueprint.default_value is not None:
+                field_params.insert(0, f"default={repr(field_blueprint.default_value)}")
+            else:
+                field_params.insert(0, "default=None")
+
+        field_call = f"Field({', '.join(field_params)})"
+
+        return f"    {field_name}: {python_type} = {field_call}"
+
+    def _get_python_type_from_blueprint(self, field_blueprint: ConceptStructureBlueprint) -> str:
+        """Convert ConceptStructureBlueprint to Python type annotation.
+
+        Args:
+            field_blueprint: ConceptStructureBlueprint instance
+
+        Returns:
+            Python type annotation string
+        """
+        if field_blueprint.type is None:
+            # This should not happen based on validation, but handle gracefully
+            return "str"
+
+        # Use match/case for type handling
+        match field_blueprint.type:
+            case ConceptStructureBlueprintFieldType.TEXT:
+                return "str"
+            case ConceptStructureBlueprintFieldType.NUMBER:
+                return "float"
+            case ConceptStructureBlueprintFieldType.INTEGER:
+                return "int"
+            case ConceptStructureBlueprintFieldType.BOOLEAN:
+                return "bool"
+            case ConceptStructureBlueprintFieldType.LIST:
+                item_type = field_blueprint.item_type or "Any"
+                # Recursively handle item types if they're FieldType enums
+                try:
+                    item_type_enum = ConceptStructureBlueprintFieldType(item_type)
+                    # Create a temporary blueprint for the item type
+                    temp_blueprint = ConceptStructureBlueprint(definition="temp", type=item_type_enum)
+                    item_type = self._get_python_type_from_blueprint(temp_blueprint)
+                except ValueError:
+                    # Keep as string if not a known FieldType
+                    pass
+                return f"List[{item_type}]"
+            case ConceptStructureBlueprintFieldType.DICT:
+                key_type = field_blueprint.key_type or "str"
+                value_type = field_blueprint.value_type or "Any"
+                # Recursively handle key and value types
+                try:
+                    key_type_enum = ConceptStructureBlueprintFieldType(key_type)
+                    temp_blueprint = ConceptStructureBlueprint(definition="temp", type=key_type_enum)
+                    key_type = self._get_python_type_from_blueprint(temp_blueprint)
+                except ValueError:
+                    pass
+                try:
+                    value_type_enum = ConceptStructureBlueprintFieldType(value_type)
+                    temp_blueprint = ConceptStructureBlueprint(definition="temp", type=value_type_enum)
+                    value_type = self._get_python_type_from_blueprint(temp_blueprint)
+                except ValueError:
+                    pass
+                return f"Dict[{key_type}, {value_type}]"
+            case _:
+                # Unknown FieldType, assume it's a custom type
+                return str(field_blueprint.type)
 
     def generate_enum(self, enum_name: str, enum_def: Dict[str, Any]) -> str:
         """Generate an enum class definition.
@@ -255,72 +348,88 @@ class StructuredOutputGenerator:
                 return str(field_type)
 
 
-def generate_structured_outputs_from_toml_file(toml_file_path: str, output_file_path: str) -> None:
-    """Generate structured output Python module from TOML file.
-
-    Args:
-        toml_file_path: Path to input TOML file containing structure definitions
-        output_file_path: Path to output Python file
-    """
-    with open(toml_file_path, "r", encoding="utf-8") as f:
-        toml_content = f.read()
-
-    generator = StructuredOutputGenerator()
-    python_code = generator.generate_from_toml(toml_content)
-
-    with open(output_file_path, "w", encoding="utf-8") as f:
-        f.write(python_code)
-
-
-def generate_structured_outputs_from_toml_string(toml_content: str) -> str:
-    """Generate structured output Python code from TOML string.
-
-    Args:
-        toml_content: TOML content as string containing structure definitions
-
-    Returns:
-        Generated Python module content
-    """
-    generator = StructuredOutputGenerator()
-    return generator.generate_from_toml(toml_content)
+# COMMENTED OUT: TOML-based functions are no longer needed
+# def generate_structured_outputs_from_toml_file(toml_file_path: str, output_file_path: str) -> None:
+#     """Generate structured output Python module from TOML file.
+#
+#     Args:
+#         toml_file_path: Path to input TOML file containing structure definitions
+#         output_file_path: Path to output Python file
+#     """
+#     with open(toml_file_path, "r", encoding="utf-8") as f:
+#         toml_content = f.read()
+#
+#     generator = StructureGenerator()
+#     python_code = generator.generate_from_toml(toml_content)
+#
+#     with open(output_file_path, "w", encoding="utf-8") as f:
+#         f.write(python_code)
 
 
-def generate_structured_output_from_inline_definition(
-    class_name: str, fields_def: Dict[str, Any], enums: Optional[Dict[str, Dict[str, Any]]] = None
-) -> str:
-    """Generate structured output Python code from inline field definitions.
+# def generate_structured_outputs_from_toml_string(toml_content: str) -> str:
+#     """Generate structured output Python code from TOML string.
+#
+#     Args:
+#         toml_content: TOML content as string containing structure definitions
+#
+#     Returns:
+#         Generated Python module content
+#     """
+#     generator = StructureGenerator()
+#     return generator.generate_from_toml(toml_content)
+
+
+def generate_structured_output_from_blueprint_dict(class_name: str, structure_blueprint: Dict[str, ConceptStructureBlueprint]) -> str:
+    """Generate structured output Python code from ConceptStructureBlueprint dictionary.
 
     Args:
         class_name: Name of the class to generate
-        fields_def: Dictionary of field definitions (same format as TOML structure.fields)
-        enums: Optional dictionary of enum definitions to include
+        structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
 
     Returns:
         Generated Python module content
     """
-    generator = StructuredOutputGenerator()
+    generator = StructureGenerator()
+    return generator.generate_from_structure_blueprint(class_name, structure_blueprint)
 
-    # Add any provided enums
-    if enums:
-        for enum_name, enum_def in enums.items():
-            generator.enum_definitions[enum_name] = enum_def
 
-    # Create a structure definition from the inline fields
-    structure_def = {"definition": f"Generated {class_name} structure", "fields": fields_def}
-
-    # Generate the class
-    class_code = generator.generate_class(class_name, structure_def)
-
-    # Generate enums if any
-    enum_codes: List[str] = []
-    if enums:
-        for enum_name, enum_def in enums.items():
-            enum_code = generator.generate_enum(enum_name, enum_def)
-            enum_codes.append(enum_code)
-
-    # Combine everything
-    imports_section = "\n".join(sorted(generator.imports))
-    all_definitions: List[str] = enum_codes + [class_code] if enum_codes else [class_code]
-    definitions_section = "\n\n\n".join(all_definitions)
-
-    return f"{imports_section}\n\n\n{definitions_section}\n"
+# COMMENTED OUT: Legacy function using old format
+# def generate_structured_output_from_inline_definition(
+#     class_name: str, fields_def: Dict[str, Any], enums: Optional[Dict[str, Dict[str, Any]]] = None
+# ) -> str:
+#     """Generate structured output Python code from inline field definitions.
+#
+#     Args:
+#         class_name: Name of the class to generate
+#         fields_def: Dictionary of field definitions (same format as TOML structure.fields)
+#         enums: Optional dictionary of enum definitions to include
+#
+#     Returns:
+#         Generated Python module content
+#     """
+#     generator = StructureGenerator()
+#
+#     # Add any provided enums
+#     if enums:
+#         for enum_name, enum_def in enums.items():
+#             generator.enum_definitions[enum_name] = enum_def
+#
+#     # Create a structure definition from the inline fields
+#     structure_def = {"definition": f"Generated {class_name} structure", "fields": fields_def}
+#
+#     # Generate the class
+#     class_code = generator.generate_class(class_name, structure_def)
+#
+#     # Generate enums if any
+#     enum_codes: List[str] = []
+#     if enums:
+#         for enum_name, enum_def in enums.items():
+#             enum_code = generator.generate_enum(enum_name, enum_def)
+#             enum_codes.append(enum_code)
+#
+#     # Combine everything
+#     imports_section = "\n".join(sorted(generator.imports))
+#     all_definitions: List[str] = enum_codes + [class_code] if enum_codes else [class_code]
+#     definitions_section = "\n\n\n".join(all_definitions)
+#
+#     return f"{imports_section}\n\n\n{definitions_section}\n"

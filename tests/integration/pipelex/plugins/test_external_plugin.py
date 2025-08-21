@@ -90,7 +90,7 @@ class TestExternalPlugin:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm_with_external_llm_handle",
                 domain="generic",
-                output_concept_code=NativeConcept.TEXT.code,
+                output_concept_code=NativeConcept.TEXT.value,
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm_with_external_llm_handle",
                     domain="generic",

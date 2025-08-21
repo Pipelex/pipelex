@@ -1,16 +1,17 @@
 import re
-from typing import List, Tuple
+from typing import Dict, List
 
 from kajson.kajson_manager import KajsonManager
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.exceptions import ConceptCodeError, ConceptDomainError, ConceptError
-from pipelex.tools.misc.string_utils import pascal_case_to_sentence
+from pipelex.create.structured_output_generator import StructureGenerator
+from pipelex.exceptions import ConceptCodeError, ConceptDomainError
+from pipelex.tools.misc.string_utils import is_pascal_case, is_snake_case, pascal_case_to_sentence
 
 
 class Concept(BaseModel):
@@ -24,50 +25,22 @@ class Concept(BaseModel):
 
     @model_validator(mode="after")
     def validate_concept(self) -> Self:
-        self.validate_domain_syntax()
-        self.validate_concept_code_syntax()
+        if not is_snake_case(self.domain):
+            raise ConceptDomainError(
+                f"Domain must be snake_case (lowercase letters, numbers, and underscores only) for concept with domain '{self.domain}'"
+            )
+        if not is_pascal_case(self.code):
+            raise ConceptCodeError(f"Code must be PascalCase (letters and numbers only, starting with uppercase) for concept with code '{self.code}'")
 
+        self.validate_refines()
         return self
 
-    def validate_domain_syntax(self) -> None:
-        if not re.match(r"^[a-z][a-z0-9_]*$", self.domain):
-            raise ConceptDomainError(
-                f"Domain must be snake_case (lowercase letters, numbers, and underscores only) "
-                f"for concept with code '{self.code}' and domain '{self.domain}': {self.domain}"
-            )
-
-    def validate_concept_code_syntax(self) -> None:
-        if not re.match(r"^[A-Z][a-zA-Z0-9]*$", self.code):
-            raise ConceptCodeError(
-                f"Code must be PascalCase (letters and numbers only, starting with uppercase) "
-                f"for concept with code '{self.code}' and domain '{self.domain}': {self.code}"
-            )
-
-    @field_validator("refines")
-    def validate_refines(self, value: List[str]) -> List[str]:
-        validated_refines: List[str] = []
-
-        # for refine_code in value:
-        #     # Handle NativeConcept values directly without importing ConceptCodeFactory to avoid circular import
-        #     if not Concept.concept_str_contains_domain(refine_code):
-        #         # Check if it's a valid NativeConcept name
-        #         if refine_code in NativeConcept.names():
-        #             native_concept = NativeConcept(refine_code)
-        #             full_code = native_concept.code
-        #             validated_refines.append(full_code)
-        #             continue
-        #         else:
-        #             raise ConceptCodeError(f"Each refine code must contain a single dot (.), got: {refine_code}")
-        #     else:
-        #         # Already has domain, validate it directly
-        #         full_code = refine_code
-        #         validated_refines.append(full_code)
-
-        #     # Validate the domain and concept syntax for the full code
-        #     domain, code = cls.extract_domain_and_concept_from_str(concept_str=full_code)
-
-        return validated_refines
-
+    def validate_refines(self) -> None:
+        for refine in self.refines:
+            if not is_pascal_case(refine):
+                raise ConceptCodeError(
+                    f"Refine must be PascalCase (letters and numbers only, starting with uppercase) for concept with code '{refine}'"
+                )
 
     @classmethod
     def sentence_from_concept_code(cls, concept_code: str) -> str:
@@ -77,9 +50,10 @@ class Concept(BaseModel):
     def node_name(self) -> str:
         return self.code
 
-    def is_native_concept(self) -> bool:
-        return self.domain == SpecialDomain.NATIVE.value
-    
+    @classmethod
+    def is_native_concept(cls, concept: "Concept") -> bool:
+        return concept.domain == SpecialDomain.NATIVE.value
+
     @classmethod
     def is_valid_structure_class(cls, structure_class_name: str) -> bool:
         # We get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
@@ -90,3 +64,18 @@ class Concept(BaseModel):
             if KajsonManager.get_class_registry().has_class(name=structure_class_name):
                 log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
             return False
+
+    @classmethod
+    def get_structure(cls, class_name: str, structure_blueprint: Dict[str, ConceptStructureBlueprint]) -> str:
+        """Generate Python code from ConceptStructureBlueprint.
+
+        Args:
+            class_name: Name of the class to generate
+            structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
+
+        Returns:
+            Generated Python module content
+        """
+
+        generator = StructureGenerator()
+        return generator.generate_from_structure_blueprint(class_name, structure_blueprint)

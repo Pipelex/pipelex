@@ -57,7 +57,7 @@ class TestWorkingMemory:
     @pytest.fixture
     def single_text_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single text content."""
-        return WorkingMemoryFactory.make_from_text(text=TestWorkingMemoryData.SAMPLE_TEXT, concept_str=NativeConcept.TEXT.code, name="sample_text")
+        return WorkingMemoryFactory.make_from_text(text=TestWorkingMemoryData.SAMPLE_TEXT, concept_str=NativeConcept.TEXT.value, name="sample_text")
 
     @pytest.fixture
     def single_image_memory(self) -> WorkingMemory:
@@ -159,7 +159,7 @@ class TestWorkingMemory:
 
         # Check stuff retrieval
         stuff = single_text_memory.get_stuff("sample_text")
-        assert stuff.concept_code == NativeConcept.TEXT.code
+        assert stuff.concept_code == NativeConcept.TEXT.value
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == TestWorkingMemoryData.SAMPLE_TEXT
 

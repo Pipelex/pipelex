@@ -84,7 +84,7 @@ class PipeImgGen(PipeOperator):
     def needed_inputs(self) -> PipeInputSpec:
         needed_inputs = PipeInputSpec.make_empty()
         if self.imgg_prompt:
-            needed_inputs.add_requirement(variable_name="imgg_prompt", concept_code=NativeConcept.TEXT.code)
+            needed_inputs.add_requirement(variable_name="imgg_prompt", concept_code=NativeConcept.TEXT.value)
         else:
             for input_name, requirement in self.inputs.items:
                 needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
@@ -115,7 +115,7 @@ class PipeImgGen(PipeOperator):
             log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept_code}'")
             if concept_provider.is_compatible_by_concept_code(
                 tested_concept_code=requirement.concept_code,
-                wanted_concept_code=NativeConcept.TEXT.code,
+                wanted_concept_code=NativeConcept.TEXT.value,
             ):
                 self.img_gen_prompt_var_name = input_name
                 candidate_prompt_var_names.append(input_name)

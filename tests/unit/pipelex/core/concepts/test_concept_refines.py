@@ -11,7 +11,7 @@ class TestConceptRefinesValidationFunction:
         valid_refines = ["domain1.Concept1", "domain2.Concept2", NativeConcept.TEXT.value]
         result = Concept.validate_refines(valid_refines)
         # NativeConcept.TEXT.value ("Text") should be converted to its full code "native.Text"
-        expected = ["domain1.Concept1", "domain2.Concept2", NativeConcept.TEXT.code]
+        expected = ["domain1.Concept1", "domain2.Concept2", NativeConcept.TEXT.value]
         assert result == expected
 
     def test_validate_refines_empty_list(self):
@@ -31,7 +31,7 @@ class TestConceptRefinesValidationFunction:
         # The NativeConcept strings should be converted to full codes
         expected = [
             "domain1.Concept1",
-            NativeConcept.TEXT.code,
+            NativeConcept.TEXT.value,
             NativeConcept.IMAGE.code,
             NativeConcept.PDF.code,
         ]
@@ -46,7 +46,7 @@ class TestConceptRefinesValidationFunction:
         ]
         result = Concept.validate_refines(valid_refines)
         expected = [
-            NativeConcept.TEXT.code,
+            NativeConcept.TEXT.value,
             NativeConcept.IMAGE.code,
             NativeConcept.DYNAMIC.code,
         ]
@@ -63,7 +63,7 @@ class TestConceptRefinesValidationFunction:
         result = Concept.validate_refines(valid_refines)
         expected = [
             "my_domain.MyClass",
-            NativeConcept.TEXT.code,
+            NativeConcept.TEXT.value,
             "another_domain.AnotherClass",
             NativeConcept.IMAGE.code,
         ]

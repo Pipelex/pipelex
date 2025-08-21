@@ -1,12 +1,16 @@
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.tools.misc.string_utils import is_pascal_case
 from pipelex.types import StrEnum
+
 
 class ConceptBlueprintError(Exception):
     pass
+
 
 class ConceptStructureBlueprintError(Exception):
     pass
@@ -63,6 +67,21 @@ class ConceptBlueprint(BaseModel):
     structure: Optional[Union[str, Dict[str, ConceptStructureBlueprintType]]] = None
     refines: Optional[Union[str, List[str]]] = Field(default_factory=list)
 
+    @field_validator("refines", mode="after")
+    def validate_refines(self, refines: Union[str, List[str]]) -> Union[str, List[str]]:
+        if isinstance(refines, str):
+            if not is_pascal_case(refines):
+                raise ConceptBlueprintError(
+                    f"Refine must be PascalCase (letters and numbers only, starting with uppercase) for refine code '{refines}'"
+                )
+        else:
+            for refine in refines:
+                if not is_pascal_case(refine):
+                    raise ConceptBlueprintError(
+                        f"Refine must be PascalCase (letters and numbers only, starting with uppercase) for refine code '{refine}'"
+                    )
+        return refines
+
     @model_validator(mode="before")
     def forbiden_having_refines_and_structure(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         if values.get("refines") and values.get("structure"):
@@ -92,3 +111,14 @@ class ConceptBlueprint(BaseModel):
                 result[key] = {"type": ConceptStructureBlueprintFieldType.TEXT, "definition": value}
 
         return result
+
+    @staticmethod
+    def extract_non_native_refines(refines: Union[str, List[str]]) -> List[str]:
+        if isinstance(refines, str) and "." not in refines:
+            if refines not in [native_concept.value for native_concept in NativeConcept]:
+                return [refines]
+            else:
+                return []
+        elif isinstance(refines, list):
+            return [refine for refine in refines if refine not in [native_concept.value for native_concept in NativeConcept]]
+        return []

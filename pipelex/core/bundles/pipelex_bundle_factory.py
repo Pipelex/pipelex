@@ -34,7 +34,7 @@ class PipelexBundleFactory(BaseModel):
             for concept_name, concept_blueprint_or_str in blueprint.concept.items():
                 if isinstance(concept_blueprint_or_str, ConceptBlueprint):
                     concepts[concept_name] = ConceptFactory.make_concept_from_blueprint(
-                        domain=blueprint.domain, code=concept_name, concept_blueprint=concept_blueprint_or_str
+                        domain=blueprint.domain, concept_code=concept_name, concept_blueprint=concept_blueprint_or_str
                     )
                 else:
                     # One line concepts

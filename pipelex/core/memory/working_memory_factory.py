@@ -21,7 +21,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_text(
         cls,
         text: str,
-        concept_str: str = NativeConcept.TEXT.code,
+        concept_str: str = NativeConcept.TEXT.value,
         name: Optional[str] = "text",
     ) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
@@ -111,7 +111,7 @@ class WorkingMemoryFactory(BaseModel):
             stuff_dict[name] = Stuff(
                 stuff_name=name,
                 stuff_code="",
-                concept_code=NativeConcept.TEXT.code,
+                concept_code=NativeConcept.TEXT.value,
                 content=text_content,
             )
         return WorkingMemory(root=stuff_dict)

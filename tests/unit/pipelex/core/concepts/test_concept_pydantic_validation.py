@@ -46,7 +46,7 @@ class TestConceptPydanticFieldValidation:
         )
         # NativeConcept strings should be converted to full codes
         assert concept.refines == [
-            NativeConcept.TEXT.code,
+            NativeConcept.TEXT.value,
             NativeConcept.IMAGE.code,
             NativeConcept.PDF.code,
         ]
@@ -67,7 +67,7 @@ class TestConceptPydanticFieldValidation:
         )
         expected_refines = [
             "valid_domain.ValidConcept",
-            NativeConcept.TEXT.code,
+            NativeConcept.TEXT.value,
             "another_domain.AnotherConcept",
             NativeConcept.IMAGE.code,
         ]
@@ -88,7 +88,7 @@ class TestConceptPydanticFieldValidation:
         )
         assert concept.refines == [
             NativeConcept.DYNAMIC.code,
-            NativeConcept.TEXT.code,
+            NativeConcept.TEXT.value,
             NativeConcept.NUMBER.code,
         ]
 

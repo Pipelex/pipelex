@@ -1,6 +1,5 @@
-from typing import Dict, List, NamedTuple
+from typing import Dict, NamedTuple
 
-from pipelex.core.domains.domain import SpecialDomain
 from pipelex.types import StrEnum
 
 

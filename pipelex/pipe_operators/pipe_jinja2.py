@@ -39,7 +39,7 @@ class PipeJinja2(PipeOperator):
     model_config = ConfigDict(extra="forbid", strict=False)
 
     adhoc_pipe_code: ClassVar[str] = "jinja2_render"
-    output_concept_code: str = NativeConcept.TEXT.code
+    output_concept_code: str = NativeConcept.TEXT.value
 
     jinja2_name: Optional[str] = None
     jinja2: Optional[str] = None

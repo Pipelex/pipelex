@@ -34,7 +34,7 @@ class TestPipeLLMPrompt:
             domain="generic",
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             user_text=PipeTestCases.USER_PROMPT,
-            output_concept_code=NativeConcept.TEXT.code,
+            output_concept_code=NativeConcept.TEXT.value,
         )
 
         pipe_output: PipeLLMPromptOutput = await get_pipe_router().run_pipe_job(
@@ -50,7 +50,7 @@ class TestPipeLLMPrompt:
         assert pipe_output.llm_prompt is not None
         assert pipe_output.llm_prompt.user_text is not None
         assert pipe_output.llm_prompt.user_text.endswith(
-            PipeLLMPrompt.get_output_structure_prompt(NativeConcept.TEXT.code, is_with_preliminary_text=False)
+            PipeLLMPrompt.get_output_structure_prompt(NativeConcept.TEXT.value, is_with_preliminary_text=False)
         )
 
     async def test_prompt_with_images(self, pipe_run_mode: PipeRunMode):
@@ -64,7 +64,7 @@ class TestPipeLLMPrompt:
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             user_text=PipeTestCases.MULTI_IMG_DESC_PROMPT,
             user_images=[stuff_name],  # Just use the stuff name, the content will be extracted as ImageContent
-            output_concept_code=NativeConcept.TEXT.code,
+            output_concept_code=NativeConcept.TEXT.value,
         )
 
         pipe_output: PipeLLMPromptOutput = await get_pipe_router().run_pipe_job(
@@ -138,7 +138,7 @@ class TestPipeLLMPrompt:
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             user_text=PipeTestCases.USER_PROMPT,
             prompting_style=prompting_style,
-            output_concept_code=NativeConcept.TEXT.code,
+            output_concept_code=NativeConcept.TEXT.value,
         )
 
         pipe_output: PipeLLMPromptOutput = await get_pipe_router().run_pipe_job(
@@ -160,7 +160,7 @@ class TestPipeLLMPrompt:
                 code="test_validation_error",
                 domain="generic",
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
-                output_concept_code=NativeConcept.TEXT.code,
+                output_concept_code=NativeConcept.TEXT.value,
             )
         assert "must have exactly one of user_text" in str(exc_info.value)
 
@@ -172,7 +172,7 @@ class TestPipeLLMPrompt:
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 user_text=PipeTestCases.USER_PROMPT,
                 user_prompt_verbatim_name="some_template",
-                output_concept_code=NativeConcept.TEXT.code,
+                output_concept_code=NativeConcept.TEXT.value,
             )
         assert "must have exactly one of user_text" in str(exc_info.value)
 
@@ -184,6 +184,6 @@ class TestPipeLLMPrompt:
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 system_prompt_verbatim_name="some_template",
                 user_text=PipeTestCases.USER_PROMPT,
-                output_concept_code=NativeConcept.TEXT.code,
+                output_concept_code=NativeConcept.TEXT.value,
             )
         assert "got more than one of system_prompt" in str(exc_info.value)

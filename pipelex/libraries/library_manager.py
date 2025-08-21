@@ -9,7 +9,6 @@ from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.config import get_config
 from pipelex.core.bundles.pipelex_bundle import PipelexBundle
 from pipelex.core.bundles.pipelex_bundle_factory import PipelexBundleFactory
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.interpreter import PipelexInterpreter
@@ -108,8 +107,7 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def setup(self) -> None:
-        native_concepts = ConceptFactory.list_native_concepts()
-        self.concept_library.add_concepts(concepts=native_concepts)
+        pass
 
     @override
     def teardown(self) -> None:

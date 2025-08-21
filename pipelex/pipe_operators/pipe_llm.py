@@ -12,9 +12,8 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_code_factory import ConceptCodeFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, get_native_concept_code
-from pipelex.core.domains.domain import Domain, SpecialDomain
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConcept
+from pipelex.core.domains.domain import Domain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -77,14 +76,8 @@ class PipeLLM(PipeOperator):
 
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
-        if self.structuring_method is not None:
-            output_concept = get_required_concept(concept_code=self.output_concept_code)
-            if output_concept.structure_class_name == NATIVE_CONCEPTS_DATA["TEXT"].content_class_name:
-                concept_name = Concept.extract_concept_name_from_str(concept_str=self.output_concept_code)
-                raise PipeDefinitionError(
-                    f"Output concept '{self.output_concept_code}' is considered a Text concept, "
-                    f"so it cannot be structured. Maybe you forgot to add '{concept_name}' to the class registry?"
-                )
+        # if self.structuring_method is not None:
+        #     output_concept = get_required_concept(concept_code=self.output_concept_code)
         return self
 
     @override
@@ -109,7 +102,7 @@ class PipeLLM(PipeOperator):
 
         for input_name, requirement in self.inputs.items:
             if concept_provider.is_image_concept(concept_code=requirement.concept_code):
-                needed_inputs.add_requirement(variable_name=input_name, concept_code=NativeConceptHelper.get_concept_code("Image"))
+                needed_inputs.add_requirement(variable_name=input_name, concept_code="native.Image")
             else:
                 needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
 
@@ -156,7 +149,7 @@ class PipeLLM(PipeOperator):
                         raise missing_input_var_error
 
             # there is one case where the needed input is of specific concept: the user_images
-            if named_input_requirement.concept_code == NativeConceptHelper.get_concept_code("Image"):
+            if named_input_requirement.concept_code == "native.Image":
                 try:
                     concept_code_of_declared_input = self.inputs.get_required_concept_code(variable_name=named_input_requirement.variable_name)
                 except PipeInputNotFoundError as exc:
@@ -234,13 +227,13 @@ class PipeLLM(PipeOperator):
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {self.code}")
-        if self.output_concept_code == NativeConceptHelper.get_concept_code("Dynamic"):
+        if self.output_concept_code == "native.Dynamic":
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
             output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
 
             if not output_concept_code:
-                output_concept_code = NativeConceptHelper.get_concept_code("Text")
+                output_concept_code = "native.Text"
         else:
             output_concept_code = self.output_concept_code
 
@@ -331,7 +324,7 @@ class PipeLLM(PipeOperator):
         llm_prompt_1 = cast(PipeLLMPromptOutput, pipe_output).llm_prompt
 
         the_content: StuffContent
-        if output_concept.structure_class_name == NATIVE_CONCEPTS_DATA["TEXT"].content_class_name and not is_multiple_output:
+        if output_concept.structure_class_name == NativeConcept.TEXT.value and not is_multiple_output:
             log.debug(f"PipeLLM generating a single text output: {self.class_name}_gen_text")
             generated_text: str = await content_generator.make_llm_text(
                 job_metadata=job_metadata,

@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field, RootModel, field_validator, model_validat
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.core.concepts.concept_code_factory import ConceptCodeFactory
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.exceptions import PipeInputNotFoundError
@@ -75,7 +74,7 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
                 log.verbose(f"Sub-attribute {required_input} detected, using {transformed_key} as variable name")
 
             # Validate concept_code
-            concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=requirement.concept_code)
+            concept_code = requirement.concept_code
 
             if transformed_key in transformed_dict and transformed_dict[transformed_key] != requirement:
                 log.verbose(
@@ -108,7 +107,7 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
     @classmethod
     def make_from_blueprint(cls, domain: str, blueprint: Dict[str, InputRequirementBlueprint]) -> Self:
         for var_name, input_requirement_blueprint in blueprint.items():
-            concept_code = ConceptCodeFactory.make_concept_code_from_str(domain=domain, concept_str=input_requirement_blueprint.concept_code)
+            concept_code = f"{domain}.{input_requirement_blueprint.concept_code}"
             blueprint[var_name].concept_code = concept_code
         return cls(
             root={

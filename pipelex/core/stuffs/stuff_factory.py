@@ -6,7 +6,6 @@ from pydantic import BaseModel, ValidationError
 from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_code_factory import ConceptCodeFactory
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, find_native_concept_by_class_name, get_native_concept_code
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import (
