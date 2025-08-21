@@ -68,7 +68,8 @@ class ConceptBlueprint(BaseModel):
     refines: Optional[Union[str, List[str]]] = Field(default_factory=list)
 
     @field_validator("refines", mode="after")
-    def validate_refines(self, refines: Union[str, List[str]]) -> Union[str, List[str]]:
+    @classmethod
+    def validate_refines(cls, refines: Union[str, List[str]]) -> Union[str, List[str]]:
         if isinstance(refines, str):
             if not is_pascal_case(refines):
                 raise ConceptBlueprintError(
