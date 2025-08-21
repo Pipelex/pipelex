@@ -1,0 +1,15 @@
+domain = "test_template"
+definition = "This library is intended for testing templates"
+
+[pipe.template_test_1]
+type = "PipeTemplate"
+definition = "Template test 1"
+inputs = { text = "Text" }
+output = "Text"
+template = """
+This is a simple test prompt:
+@text
+"""
+prompting_style = { tag_style = "square_brackets", text_format = "markdown" }
+template_category = "llm_prompt"
+

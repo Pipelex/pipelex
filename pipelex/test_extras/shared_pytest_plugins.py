@@ -1,7 +1,7 @@
 import pytest
 from pytest import FixtureRequest, Parser
 
-from pipelex.core.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.tools.runtime_manager import RunMode, runtime_manager
 
 

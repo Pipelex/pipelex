@@ -6,7 +6,8 @@ Article = "Article"
 
 [pipe]
 [pipe.extract_article_from_image]
-PipeLLM = "Describe a page content"
+type = "PipeLLM"
+definition = "Describe a page content"
 inputs = { image = "Image" }
 output = "Article"
 system_prompt = """
@@ -17,7 +18,8 @@ Extract the text and the date of the article in the image.
 """
 
 [pipe.describe_page]
-PipeLLM = "Describe a page"
+type = "PipeLLM"
+definition = "Describe a page"
 inputs = { "page.page_view" = "Image", page = "Page" }
 output = "Article"
 system_prompt = """

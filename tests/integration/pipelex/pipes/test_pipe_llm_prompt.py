@@ -2,11 +2,11 @@ from typing import List, Tuple, Type
 
 import pytest
 
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import StructuredContent
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -49,7 +49,9 @@ class TestPipeLLMPrompt:
         assert pipe_output.main_stuff is not None
         assert pipe_output.llm_prompt is not None
         assert pipe_output.llm_prompt.user_text is not None
-        assert pipe_output.llm_prompt.user_text.endswith(PipeLLMPrompt.get_output_structure_prompt(NativeConcept.TEXT.code))
+        assert pipe_output.llm_prompt.user_text.endswith(
+            PipeLLMPrompt.get_output_structure_prompt(NativeConcept.TEXT.code, is_with_preliminary_text=False)
+        )
 
     async def test_prompt_with_images(self, pipe_run_mode: PipeRunMode):
         """Test prompt with image inputs."""
@@ -109,7 +111,7 @@ class TestPipeLLMPrompt:
             assert pipe_output.main_stuff is not None
 
             # Verify output structure is appended
-            output_structure = pipe_llm_prompt.get_output_structure_prompt(concept_code)
+            output_structure = pipe_llm_prompt.get_output_structure_prompt(concept_code, is_with_preliminary_text=False)
 
             assert pipe_output.llm_prompt is not None
             assert pipe_output.llm_prompt.user_text is not None

@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 
 from pydantic import Field
 
-from pipelex.core.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 
 class FundamentalsDoc(StructuredContent):

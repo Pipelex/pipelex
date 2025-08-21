@@ -3,13 +3,13 @@ from typing import List, Optional, Set, cast, get_type_hints
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeRunParams
+from pipelex.core.stuffs.stuff_content import ListContent, StuffContent, TextContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import DryRunError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata

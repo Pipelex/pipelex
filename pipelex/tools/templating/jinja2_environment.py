@@ -2,17 +2,17 @@ from typing import Tuple
 
 from jinja2 import BaseLoader, Environment, PackageLoader
 
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.jinja2_template_loader import Jinja2TemplateLoader
+from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.tools.templating.template_loader import TemplateLoader
 from pipelex.tools.templating.template_provider_abstract import TemplateProviderAbstract
 
 
 def make_jinja2_env_from_loader(
-    template_category: Jinja2TemplateCategory,
+    template_category: TemplateCategory,
     loader: BaseLoader,
 ) -> Environment:
     match template_category:
-        case Jinja2TemplateCategory.HTML:
+        case TemplateCategory.HTML:
             jinja2_env = Environment(
                 loader=loader,
                 enable_async=True,
@@ -20,7 +20,7 @@ def make_jinja2_env_from_loader(
                 trim_blocks=True,
                 lstrip_blocks=True,
             )
-        case Jinja2TemplateCategory.MARKDOWN:
+        case TemplateCategory.MARKDOWN:
             jinja2_env = Environment(
                 loader=loader,
                 enable_async=True,
@@ -28,7 +28,7 @@ def make_jinja2_env_from_loader(
                 trim_blocks=True,
                 lstrip_blocks=True,
             )
-        case Jinja2TemplateCategory.MERMAID:
+        case TemplateCategory.MERMAID:
             jinja2_env = Environment(
                 loader=loader,
                 enable_async=True,
@@ -36,7 +36,7 @@ def make_jinja2_env_from_loader(
                 trim_blocks=False,
                 lstrip_blocks=False,
             )
-        case Jinja2TemplateCategory.LLM_PROMPT:
+        case TemplateCategory.LLM_PROMPT:
             jinja2_env = Environment(
                 loader=loader,
                 enable_async=True,
@@ -48,7 +48,7 @@ def make_jinja2_env_from_loader(
 
 
 def make_jinja2_env_from_package(
-    template_category: Jinja2TemplateCategory,
+    template_category: TemplateCategory,
     package_name: str,
     package_path: str,
 ) -> Tuple[Environment, BaseLoader]:
@@ -62,7 +62,7 @@ def make_jinja2_env_from_package(
 
 
 def make_jinja2_env_without_loader(
-    template_category: Jinja2TemplateCategory,
+    template_category: TemplateCategory,
 ) -> Environment:
     loader = BaseLoader()
     jinja2_env = make_jinja2_env_from_loader(template_category=template_category, loader=loader)
@@ -70,10 +70,10 @@ def make_jinja2_env_without_loader(
 
 
 def make_jinja2_env_from_template_provider(
-    template_category: Jinja2TemplateCategory,
+    template_category: TemplateCategory,
     template_provider: TemplateProviderAbstract,
 ) -> Tuple[Environment, BaseLoader]:
-    loader = Jinja2TemplateLoader(template_provider=template_provider)
+    loader = TemplateLoader(template_provider=template_provider)
     jinja2_env = make_jinja2_env_from_loader(template_category=template_category, loader=loader)
 
     filters = template_category.filters

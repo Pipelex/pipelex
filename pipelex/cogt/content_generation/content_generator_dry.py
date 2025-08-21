@@ -18,7 +18,7 @@ from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -180,23 +180,23 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         return generated_image_list
 
     @override
-    async def make_jinja2_text(
+    async def make_template_text(
         self,
         context: Dict[str, Any],
-        jinja2_name: Optional[str] = None,
-        jinja2: Optional[str] = None,
+        template_name: Optional[str] = None,
+        template: Optional[str] = None,
         prompting_style: Optional[PromptingStyle] = None,
-        template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
+        template_category: TemplateCategory = TemplateCategory.LLM_PROMPT,
     ) -> str:
-        # TODO: Use the code that checks if the jinja2 is a valid template
-        func_name = "make_jinja2_text"
+        # TODO: Use the code that checks if the template is a valid template
+        func_name = "make_template_text"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        jinja2_truncated = jinja2[: self._text_gen_truncate_length] if jinja2 else None
-        jinja2_text = (
-            f"DRY RUN: {func_name} • context={context} • jinja2_name={jinja2_name} • "
-            f"jinja2={jinja2_truncated} • prompting_style={prompting_style} • template_category={template_category}"
+        template_truncated = template[: self._text_gen_truncate_length] if template else None
+        template_text = (
+            f"DRY RUN: {func_name} • context={context} • template_name={template_name} • "
+            f"template={template_truncated} • prompting_style={prompting_style} • template_category={template_category}"
         )
-        return jinja2_text
+        return template_text
 
     @override
     async def make_ocr_extract_pages(

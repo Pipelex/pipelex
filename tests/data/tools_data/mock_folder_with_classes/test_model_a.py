@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from pipelex.core.stuff_content import StuffContent
+from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class ClassA(BaseModel):

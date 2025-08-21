@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import Field
 
-from pipelex.core.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 
 class Attachment(StructuredContent):

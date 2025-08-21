@@ -1,12 +1,12 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import PageContent
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import PageContent
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_ocr import PIPE_OCR_INPUT_NAME, PipeOcr, PipeOcrOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -28,7 +28,7 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_image",
                 domain="generic",
-                inputs=PipeInputSpec.make_from_dict(concepts_dict={"page_scan": "Image"}),
+                inputs=PipeInputSpec.make_from_blueprint(domain="generic", blueprint={"page_scan": InputRequirementBlueprint(concept_code="Image")}),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
@@ -58,7 +58,9 @@ class TestPipeOCR:
             pipe=PipeOcr(
                 code="adhoc_for_test_pipe_ocr_pdf",
                 domain="generic",
-                inputs=PipeInputSpec.make_from_dict(concepts_dict={PIPE_OCR_INPUT_NAME: "PDF"}),
+                inputs=PipeInputSpec.make_from_blueprint(
+                    domain="generic", blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=NativeConcept.PDF.code)}
+                ),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,

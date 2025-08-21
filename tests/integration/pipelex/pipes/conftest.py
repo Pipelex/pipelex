@@ -4,7 +4,7 @@ from typing import AsyncIterator, Awaitable, Callable
 import pytest_asyncio
 from pytest import FixtureRequest
 
-from pipelex.core.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_activity_manager
 from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, remove_folder

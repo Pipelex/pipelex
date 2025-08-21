@@ -23,7 +23,7 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
-from pipelex.core.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 class YourModel(StructuredContent): # Always be a subclass of StructuredContent
     # Required fields

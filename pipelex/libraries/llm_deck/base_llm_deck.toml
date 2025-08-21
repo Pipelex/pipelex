@@ -11,11 +11,20 @@ llm_external_handles = []
 # or a complete blueprint including llm_version (defaulting to "latest") and llm_platform_choice (defaulting to "default").
 [llm_handles]
 gpt-4o-2024-11-20 = { llm_name = "gpt-4o", llm_version = "2024-11-20" }
+base-claude = "claude-4-sonnet"
+base-gpt = "gpt-5"
+
 best-gpt = "gpt-5"
 best-claude = "claude-4-1-opus"
 best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-large"
 best-grok = "grok-3"
+
+cheap_llm_for_text = "gpt-4o-mini"
+cheap_llm_for_object = "gpt-4o-mini"
+
+base_llm_for_text = "gpt-4o-mini"
+base_llm_for_object = "gpt-4o-mini"
 
 
 ####################################################################################################
@@ -27,24 +36,24 @@ best-grok = "grok-3"
 ####################################################################################################
 # LLM Presets — General purpose
 
-cheap_llm_for_text = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
-cheap_llm_for_short_text = { llm_handle = "gpt-4o-mini", temperature = 0.5, max_tokens = 50 }
-cheap_llm_for_object = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
-cheap_llm_to_structure = { llm_handle = "gpt-4o-mini", temperature = 0.1 }
+cheap_llm_for_text = { llm_handle = "cheap_llm_for_text", temperature = 0.5 }
+cheap_llm_for_short_text = { llm_handle = "cheap_llm_for_text", temperature = 0.5, max_tokens = 50 }
+cheap_llm_for_object = { llm_handle = "cheap_llm_for_object", temperature = 0.5 }
+cheap_llm_to_structure = { llm_handle = "cheap_llm_for_object", temperature = 0.1 }
 
-llm_for_testing_gen_text = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
-llm_for_testing_gen_object = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
+llm_for_testing_gen_text = { llm_handle = "base_llm_for_text", temperature = 0.5 }
+llm_for_testing_gen_object = { llm_handle = "base_llm_for_object", temperature = 0.5 }
 
 ####################################################################################################
 # LLM Presets — Specific skills
 
 # Generation skills
-llm_for_factual_writing = { llm_handle = "gpt-4o", temperature = 0.1 }
+llm_for_factual_writing = { llm_handle = "base-gpt", temperature = 0.1 }
 llm_for_creative_writing = { llm_handle = "best-claude", temperature = 0.9 }
 
 # Reasoning skills
-llm_to_reason_short = { llm_handle = "best-claude", temperature = 0.5, max_tokens = 500 }
-llm_to_reason = { llm_handle = "o4-mini", temperature = 1 }
+llm_to_reason_short = { llm_handle = "base-claude", temperature = 0.5, max_tokens = 500 }
+llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
 llm_to_reason_on_diagram = { llm_handle = "best-claude", temperature = 0.5 }
 
 # Search and answer skills
@@ -55,7 +64,9 @@ llm_to_enrich = { llm_handle = "best-claude", temperature = 0.1 }
 llm_for_question_and_excerpt_reformulation = { llm_handle = "gpt-4o", temperature = 0.9 }
 
 # Engineering skills
-llm_to_engineer = { llm_handle = "best-claude", temperature = 0.5 }
+llm_to_engineer = { llm_handle = "best-claude", temperature = 0.2 }
+llm_to_pipelex = { llm_handle = "best-claude", temperature = 0.2 }
+# llm_to_pipelex = { llm_handle = "gpt-5-mini", temperature = 0.2 }
 
 # Image skills
 llm_to_write_imgg_prompt = { llm_handle = "best-claude", temperature = 0.2 }

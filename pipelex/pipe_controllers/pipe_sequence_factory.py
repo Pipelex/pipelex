@@ -1,11 +1,12 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import Self, override
 
-from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_run_params import BatchParams, make_output_multiplicity
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_run_params import BatchParams, make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_controllers.pipe_sequence import PipeSequence, SubPipe
@@ -60,10 +61,11 @@ class SubPipeBlueprint(BaseModel):
 
 
 class PipeSequenceBlueprint(PipeBlueprint):
+    type: Literal["PipeSequence"] = "PipeSequence"
     steps: List[SubPipeBlueprint]
 
 
-class PipeSequenceFactory(PipeSpecificFactoryProtocol[PipeSequenceBlueprint, PipeSequence]):
+class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequence]):
     @classmethod
     @override
     def make_pipe_from_blueprint(
@@ -77,22 +79,7 @@ class PipeSequenceFactory(PipeSpecificFactoryProtocol[PipeSequenceBlueprint, Pip
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             sequential_sub_pipes=pipe_steps,
-        )
-
-    @classmethod
-    @override
-    def make_pipe_from_details_dict(
-        cls,
-        domain_code: str,
-        pipe_code: str,
-        details_dict: Dict[str, Any],
-    ) -> PipeSequence:
-        pipe_blueprint = PipeSequenceBlueprint.model_validate(details_dict)
-        return cls.make_pipe_from_blueprint(
-            domain_code=domain_code,
-            pipe_code=pipe_code,
-            pipe_blueprint=pipe_blueprint,
         )

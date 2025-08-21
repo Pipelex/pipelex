@@ -153,7 +153,7 @@ update: env
 
 validate: env
 	$(call PRINT_TITLE,"Running setup sequence")
-	$(VENV_PIPELEX) validate -c pipelex/libraries
+	$(VENV_PIPELEX) validate all -c pipelex/libraries
 
 build: env
 	$(call PRINT_TITLE,"Building the wheels")
@@ -418,10 +418,6 @@ docs-deploy: env
 ##########################################################################################
 ### SHORTHANDS
 ##########################################################################################
-
-check-unused-imports: env
-	$(call PRINT_TITLE,"Checking for unused imports without fixing")
-	$(VENV_RUFF) check --select=F401 --no-fix .
 
 c: format lint pyright mypy
 	@echo "> done: c = check"

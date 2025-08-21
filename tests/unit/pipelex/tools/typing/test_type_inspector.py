@@ -4,7 +4,7 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 from pytest import FixtureRequest
 
-from pipelex.core.stuff_content import ListContent, StructuredContent, TextContent
+from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent, TextContent
 from pipelex.tools.typing.type_inspector import get_type_structure
 from pipelex.types import StrEnum
 

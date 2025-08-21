@@ -8,11 +8,11 @@ import pytest
 from pydantic import BaseModel
 
 from pipelex.client.api_serializer import ApiSerializer
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.stuff_content import NumberContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.stuff_content import NumberContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from tests.test_pipelines.datetime import DateTimeEvent
 
 

@@ -10,7 +10,8 @@ CarDescription = "A detailed description of a car model"
 
 [pipe]
 [pipe.generate_car_description]
-PipeLLM = "Generate a description of a car"
+type = "PipeLLM"
+definition = "Generate a description of a car"
 inputs = { car = "Car" }
 output = "CarDescription"
 prompt_template = """

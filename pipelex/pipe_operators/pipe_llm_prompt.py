@@ -7,15 +7,15 @@ from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.core.concept import Concept
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import ImageContent, LLMPromptContent, StuffContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import ImageContent, LLMPromptContent, StuffContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,
@@ -24,7 +24,7 @@ from pipelex.exceptions import (
 )
 from pipelex.hub import get_class_registry, get_template
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_operators.pipe_template import PipeJinja2Output, PipeTemplate
+from pipelex.pipe_operators.pipe_template import PipeTemplate, PipeTemplateOutput
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.type_inspector import get_type_structure
@@ -45,11 +45,11 @@ class PipeLLMPrompt(PipeOperator):
 
     prompting_style: Optional[PromptingStyle] = None
 
-    system_prompt_pipe_jinja2: Optional[PipeTemplate] = None
+    system_prompt_pipe_template: Optional[PipeTemplate] = None
     system_prompt_verbatim_name: Optional[str] = None
     system_prompt: Optional[str] = None
 
-    user_pipe_jinja2: Optional[PipeTemplate] = None
+    user_pipe_template: Optional[PipeTemplate] = None
     user_prompt_verbatim_name: Optional[str] = None
     user_text: Optional[str] = None
 
@@ -61,23 +61,23 @@ class PipeLLMPrompt(PipeOperator):
             obj=self,
             attributes_list=[
                 "user_text",
-                "user_pipe_jinja2",
+                "user_pipe_template",
                 "user_prompt_verbatim_name",
             ],
         ):
             raise PipeDefinitionError(
-                f"PipeLLMPrompt user text must have exactly one of user_text, user_pipe_jinja2 or user_prompt_verbatim_name: {self}"
+                f"PipeLLMPrompt user text must have exactly one of user_text, user_pipe_template or user_prompt_verbatim_name: {self}"
             )
         if has_more_than_one_among_attributes_from_list(
             obj=self,
             attributes_list=[
                 "system_prompt",
-                "system_prompt_pipe_jinja2",
+                "system_prompt_pipe_template",
                 "system_prompt_verbatim_name",
             ],
         ):
             raise PipeDefinitionError(
-                f"PipeLLMPrompt system got more than one of system_prompt, system_prompt_pipe_jinja2, system_prompt_verbatim_name: {self}"
+                f"PipeLLMPrompt system got more than one of system_prompt, system_prompt_pipe_template, system_prompt_verbatim_name: {self}"
             )
         return self
 
@@ -88,18 +88,18 @@ class PipeLLMPrompt(PipeOperator):
         if self.system_prompt_verbatim_name:
             get_template(template_name=self.system_prompt_verbatim_name)
 
-        if self.user_pipe_jinja2:
-            self.user_pipe_jinja2.validate_with_libraries()
-        if self.system_prompt_pipe_jinja2:
-            self.system_prompt_pipe_jinja2.validate_with_libraries()
+        if self.user_pipe_template:
+            self.user_pipe_template.validate_with_libraries()
+        if self.system_prompt_pipe_template:
+            self.system_prompt_pipe_template.validate_with_libraries()
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
         conceptless_required_variables: Set[str] = set()
-        if self.user_pipe_jinja2:
-            conceptless_required_variables.update(self.user_pipe_jinja2.required_variables())
-        if self.system_prompt_pipe_jinja2:
-            conceptless_required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
+        if self.user_pipe_template:
+            conceptless_required_variables.update(self.user_pipe_template.required_variables())
+        if self.system_prompt_pipe_template:
+            conceptless_required_variables.update(self.system_prompt_pipe_template.required_variables())
 
         pipe_input_spec = PipeInputSpec.make_empty()
         for conceptless_required_variable in conceptless_required_variables:
@@ -113,10 +113,10 @@ class PipeLLMPrompt(PipeOperator):
     @override
     def required_variables(self) -> Set[str]:
         required_variables: Set[str] = set()
-        if self.user_pipe_jinja2:
-            required_variables.update(self.user_pipe_jinja2.required_variables())
-        if self.system_prompt_pipe_jinja2:
-            required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
+        if self.user_pipe_template:
+            required_variables.update(self.user_pipe_template.required_variables())
+        if self.system_prompt_pipe_template:
+            required_variables.update(self.system_prompt_pipe_template.required_variables())
         if self.user_images:
             user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
             required_variables.update(user_images_top_object_name)
@@ -161,19 +161,25 @@ class PipeLLMPrompt(PipeOperator):
         user_text = await self._unravel_text(
             job_metadata=job_metadata,
             working_memory=working_memory,
-            pipe_jinja2=self.user_pipe_jinja2,
+            pipe_template=self.user_pipe_template,
             text_verbatim_name=self.user_prompt_verbatim_name,
             fixed_text=self.user_text,
             pipe_run_params=pipe_run_params,
         )
         if not user_text:
-            raise ValueError("For user_text we need either a pipe_jinja2, a text_verbatim_name or a fixed user_text")
+            raise ValueError("For user_text we need either a pipe_template, a text_verbatim_name or a fixed user_text")
 
         # Append output structure prompt if needed
         if pipe_run_params.dynamic_output_concept_code:
-            user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=pipe_run_params.dynamic_output_concept_code)
+            user_text += PipeLLMPrompt.get_output_structure_prompt(
+                output_concept=pipe_run_params.dynamic_output_concept_code,
+                is_with_preliminary_text=pipe_run_params.is_with_preliminary_text or False,
+            )
         else:
-            user_text += PipeLLMPrompt.get_output_structure_prompt(output_concept=self.output_concept_code)
+            user_text += PipeLLMPrompt.get_output_structure_prompt(
+                output_concept=self.output_concept_code,
+                is_with_preliminary_text=pipe_run_params.is_with_preliminary_text or False,
+            )
 
         log.verbose(f"User text with {self.output_concept_code=}:\n {user_text}")
 
@@ -183,7 +189,7 @@ class PipeLLMPrompt(PipeOperator):
         system_text = await self._unravel_text(
             job_metadata=job_metadata,
             working_memory=working_memory,
-            pipe_jinja2=self.system_prompt_pipe_jinja2,
+            pipe_template=self.system_prompt_pipe_template,
             text_verbatim_name=self.system_prompt_verbatim_name,
             fixed_text=self.system_prompt,
             pipe_run_params=pipe_run_params,
@@ -231,7 +237,7 @@ class PipeLLMPrompt(PipeOperator):
         )
 
     @staticmethod
-    def get_output_structure_prompt(output_concept: str) -> str:
+    def get_output_structure_prompt(output_concept: str, is_with_preliminary_text: bool) -> str:
         class_name = Concept.extract_concept_name_from_str(concept_str=output_concept)
         output_class = get_class_registry().get_class(class_name)
         if not output_class:
@@ -242,14 +248,26 @@ class PipeLLMPrompt(PipeOperator):
         if not class_structure:
             return ""
 
-        output_structure_prompt = (
-            f"\n\n---\nRequested output format: The output should be the following class: {class_name}\n"
-            f"{chr(10).join(class_structure)}\n"
-            "You do NOT need to output a formatted JSON object, another LLM will take care of that. "
-            "If you cannot find a value that is Optional, output None for that field."
-            "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
-            "DO NOT create information. If the information is not present, output None."
-        )
+        class_structure_str = "\n".join(class_structure)
+
+        # TODO: use proper prompt templating for this
+        if is_with_preliminary_text:
+            output_structure_prompt = (
+                f"\n\n---\nRequested output format: The requested output will be used to define the following class: {class_name}\n"
+                f"{class_structure_str}\n"
+                "You do NOT need to output a formatted JSON object, another LLM will take care of that. "
+                "If you cannot find a value that is Optional, output None for that field. "
+                "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
+                "DO NOT create information. If the information is not present, output None."
+            )
+        else:
+            output_structure_prompt = (
+                f"\n\n---\nRequested output format: The output must conform to the following BaseModel: {class_name}\n"
+                f"{class_structure_str}\n"
+                "If you cannot find a value that is Optional, output None for that field. "
+                "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
+                "DO NOT create information. If the information is not present, output None."
+            )
         return output_structure_prompt
 
     async def _unravel_text(
@@ -257,37 +275,37 @@ class PipeLLMPrompt(PipeOperator):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        pipe_jinja2: Optional[PipeTemplate],
+        pipe_template: Optional[PipeTemplate],
         text_verbatim_name: Optional[str],
         fixed_text: Optional[str],
     ) -> Optional[str]:
         the_text: Optional[str]
-        if pipe_jinja2:
-            log.verbose(f"Working with Jinja2 pipe '{pipe_jinja2.template_name}'")
-            if (prompting_style := self.prompting_style) and not pipe_jinja2.prompting_style:
-                pipe_jinja2.prompting_style = prompting_style
+        if pipe_template:
+            log.verbose(f"Working with Jinja2 pipe '{pipe_template.template_name}'")
+            if (prompting_style := self.prompting_style) and not pipe_template.prompting_style:
+                pipe_template.prompting_style = prompting_style
                 log.verbose(f"Setting prompting style to {prompting_style}")
 
-            jinja2_job_metadata = job_metadata.copy_with_update(
+            template_job_metadata = job_metadata.copy_with_update(
                 updated_metadata=JobMetadata(
-                    job_category=JobCategory.JINJA2_JOB,
+                    job_category=JobCategory.TEMPLATE_JOB,
                 )
             )
             # the_text = (
-            #     await pipe_jinja2.run_pipe(
-            #         job_metadata=jinja2_job_metadata,
+            #     await pipe_template.run_pipe(
+            #         job_metadata=template_job_metadata,
             #         working_memory=working_memory,
             #         pipe_run_params=pipe_run_params,
             #     )
             # ).rendered_text
             # TODO: restore the possibility above, without need to explicitly cast the output
-            pipe_output: PipeOutput = await pipe_jinja2.run_pipe(
-                job_metadata=jinja2_job_metadata,
+            pipe_output: PipeOutput = await pipe_template.run_pipe(
+                job_metadata=template_job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
             )
-            pipe_jinja2_output = cast(PipeJinja2Output, pipe_output)
-            the_text = pipe_jinja2_output.rendered_text
+            pipe_template_output = cast(PipeTemplateOutput, pipe_output)
+            the_text = pipe_template_output.rendered_text
 
         elif text_verbatim_name:
             user_text_verbatim = get_template(

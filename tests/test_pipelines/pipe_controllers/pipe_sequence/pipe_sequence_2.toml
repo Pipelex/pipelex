@@ -9,8 +9,20 @@ ProductRating = "Overall product rating based on reviews"
 Document = "A document containing multiple customer reviews"
 
 [pipe]
+[pipe.analyze_reviews_sequence]
+type = "PipeSequence"
+definition = "Process customer reviews with sentiment analysis"
+inputs = { document = "Document" }
+output = "ProductRating"
+steps = [
+    { pipe = "extract_individual_reviews", result = "review_list" },
+    { pipe = "analyze_review_sentiment", batch_over = "review_list", batch_as = "single_review", result = "sentiment_analyses" },
+    { pipe = "aggregate_review_results", result = "product_rating" },
+]
+
 [pipe.extract_individual_reviews]
-PipeLLM = "Extract individual reviews from document"
+type = "PipeLLM"
+definition = "Extract individual reviews from document"
 inputs = { document = "Document" }
 output = "CustomerReview"
 nb_output = 1
@@ -22,7 +34,8 @@ Extract each individual customer review from this document as separate items:
 """
 
 [pipe.analyze_review_sentiment]
-PipeLLM = "Analyze sentiment of a single review"
+type = "PipeLLM"
+definition = "Analyze sentiment of a single review"
 inputs = { single_review = "CustomerReview" }
 output = "SentimentAnalysis"
 llm = "llm_for_testing_gen_text"
@@ -35,7 +48,8 @@ Provide sentiment (positive/negative/neutral) and confidence score.
 """
 
 [pipe.aggregate_review_results]
-PipeLLM = "Aggregate all review analyses into final rating"
+type = "PipeLLM"
+definition = "Aggregate all review analyses into final rating"
 inputs = { sentiment_analyses = "SentimentAnalysis" }
 output = "ProductRating"
 llm = "llm_for_testing_gen_text"
@@ -46,14 +60,4 @@ Based on these sentiment analyses, provide an overall product rating:
 
 Give a rating from 1-5 stars with explanation.
 """
-
-[pipe.analyze_reviews_sequence]
-PipeSequence = "Process customer reviews with sentiment analysis"
-inputs = { document = "Document" }
-output = "ProductRating"
-steps = [
-    { pipe = "extract_individual_reviews", result = "review_list" },
-    { pipe = "analyze_review_sentiment", batch_over = "review_list", batch_as = "single_review", result = "sentiment_analyses" },
-    { pipe = "aggregate_review_results", result = "product_rating" },
-]
 

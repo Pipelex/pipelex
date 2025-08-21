@@ -1,10 +1,11 @@
-from typing import Any, Dict, List, Optional
+from typing import List, Literal, Optional
 
 from typing_extensions import override
 
-from pipelex.core.concept import Concept
-from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
@@ -13,12 +14,13 @@ from pipelex.pipe_controllers.pipe_sequence_factory import SubPipeBlueprint
 
 
 class PipeParallelBlueprint(PipeBlueprint):
+    type: Literal["PipeParallel"] = "PipeParallel"
     parallels: List[SubPipeBlueprint]
     add_each_output: bool = True
     combined_output: Optional[str] = None
 
 
-class PipeParallelFactory(PipeSpecificFactoryProtocol[PipeParallelBlueprint, PipeParallel]):
+class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParallel]):
     @classmethod
     @override
     def make_pipe_from_blueprint(
@@ -43,24 +45,9 @@ class PipeParallelFactory(PipeSpecificFactoryProtocol[PipeParallelBlueprint, Pip
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             parallel_sub_pipes=parallel_sub_pipes,
             add_each_output=pipe_blueprint.add_each_output,
             combined_output=pipe_blueprint.combined_output,
-        )
-
-    @classmethod
-    @override
-    def make_pipe_from_details_dict(
-        cls,
-        domain_code: str,
-        pipe_code: str,
-        details_dict: Dict[str, Any],
-    ) -> PipeParallel:
-        pipe_blueprint = PipeParallelBlueprint.model_validate(details_dict)
-        return cls.make_pipe_from_blueprint(
-            domain_code=domain_code,
-            pipe_code=pipe_code,
-            pipe_blueprint=pipe_blueprint,
         )

@@ -6,12 +6,12 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import TextContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipe_controllers.pipe_sequence import PipeSequence, SubPipe
 from pipelex.pipe_operators.pipe_llm import PipeLLM
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
@@ -30,7 +30,9 @@ class TestPipeSequenceSimple:
         capitalize_pipe = PipeLLM(
             domain="test_integration",
             code="capitalize_text",
-            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="capitalize_text_prompt",
@@ -43,7 +45,9 @@ class TestPipeSequenceSimple:
         add_prefix_pipe = PipeLLM(
             domain="test_integration",
             code="add_prefix",
-            inputs=PipeInputSpec.make_from_dict({"capitalized_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"capitalized_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="add_prefix_prompt",
@@ -57,7 +61,9 @@ class TestPipeSequenceSimple:
         pipe_sequence = PipeSequence(
             domain="test_integration",
             code="simple_sequence",
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             sequential_sub_pipes=[
                 SubPipe(pipe=capitalize_pipe, output_name="capitalized_text"),

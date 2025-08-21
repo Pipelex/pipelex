@@ -6,20 +6,20 @@ The `DryRunConfig` class controls how Pipelex behaves during dry runs.
 
 ```python
 class DryRunConfig(ConfigModel):
-    apply_to_jinja2_rendering: bool
+    apply_to_template_rendering: bool
     text_gen_truncate_length: int
 ```
 
 ### Fields
 
-- `apply_to_jinja2_rendering`: When true, simulates Jinja2 template rendering during dry runs
+- `apply_to_template_rendering`: When true, simulates Jinja2 template rendering during dry runs
 - `text_gen_truncate_length`: Maximum length of generated text during dry runs
 
 ## Example Configuration
 
 ```toml
 [pipelex.dry_run_config]
-apply_to_jinja2_rendering = true
+apply_to_template_rendering = true
 text_gen_truncate_length = 100
 ```
 
@@ -27,7 +27,7 @@ text_gen_truncate_length = 100
 
 ### Template Rendering
 
-When `apply_to_jinja2_rendering` is true:
+When `apply_to_template_rendering` is true:
 
 - Templates are processed but not actually rendered
 - Variables are validated

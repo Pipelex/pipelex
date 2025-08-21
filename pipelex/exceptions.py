@@ -25,6 +25,7 @@ class StaticValidationError(Exception):
         domain_code: str,
         pipe_code: Optional[str] = None,
         variable_names: Optional[List[str]] = None,
+        required_concept_codes: Optional[List[str]] = None,
         provided_concept_code: Optional[str] = None,
         file_path: Optional[str] = None,
         explanation: Optional[str] = None,
@@ -33,6 +34,7 @@ class StaticValidationError(Exception):
         self.domain_code = domain_code
         self.pipe_code = pipe_code
         self.variable_names = variable_names
+        self.required_concept_codes = required_concept_codes
         self.provided_concept_code = provided_concept_code
         self.file_path = file_path
         self.explanation = explanation
@@ -44,6 +46,8 @@ class StaticValidationError(Exception):
             msg += f" • pipe='{self.pipe_code}'"
         if self.variable_names:
             msg += f" • variable='{self.variable_names}'"
+        if self.required_concept_codes:
+            msg += f" • required_concept_codes='{self.required_concept_codes}'"
         if self.provided_concept_code:
             msg += f" • provided_concept_code='{self.provided_concept_code}'"
         if self.file_path:

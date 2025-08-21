@@ -5,9 +5,9 @@ from typing_extensions import override
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract, make_empty_prompt
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipeline.job_metadata import JobMetadata
 

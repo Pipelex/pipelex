@@ -8,8 +8,8 @@ from pipelex import log
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.tools.exceptions import ToolException
 from pipelex.tools.misc.toml_utils import load_toml_from_path
-from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.tools.templating.template_parsing import check_template_parsing
 from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.template_provider_abstract import TemplateNotFoundError, TemplateProviderAbstract
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -26,8 +26,8 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
     library_config: ClassVar[LibraryConfig]
 
     @classmethod
-    def make_empty(cls, config_folder_path: str) -> "TemplateLibrary":
-        cls.library_config = LibraryConfig(config_folder_path=config_folder_path)
+    def make_empty(cls, config_dir_path: str) -> "TemplateLibrary":
+        cls.library_config = LibraryConfig(config_dir_path=config_dir_path)
         return cls()
 
     @override
@@ -35,7 +35,7 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
         template_toml_paths = self.library_config.get_templates_paths()
         for template_toml_path in template_toml_paths:
             self._load_from_toml(toml_path=template_toml_path)
-        self.validate_templates(template_category=Jinja2TemplateCategory.LLM_PROMPT)
+        self.validate_templates(template_category=TemplateCategory.LLM_PROMPT)
 
     @override
     def teardown(self) -> None:
@@ -83,11 +83,11 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
                 error_msg = format_pydantic_validation_error(exc)
                 raise TemplateLibraryError(f"Error loading concept '{name}' of domain '{domain}' because of: {error_msg}") from exc
 
-    def validate_templates(self, template_category: Jinja2TemplateCategory):
+    def validate_templates(self, template_category: TemplateCategory):
         for template_name, template in self.root.items():
             try:
-                check_jinja2_parsing(
-                    jinja2_template_source=template,
+                check_template_parsing(
+                    template_source=template,
                     template_category=template_category,
                 )
             except TemplateSyntaxError as exc:

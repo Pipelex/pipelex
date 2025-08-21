@@ -1,15 +1,15 @@
 from typing import List, Optional
 
 from pipelex.client.protocol import ImplicitMemory
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import (
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import (
     FORCE_DRY_RUN_MODE_ENV_KEY,
     PipeOutputMultiplicity,
     PipeRunMode,
 )
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.exceptions import PipelineInputError
 from pipelex.hub import (
     get_pipe_router,

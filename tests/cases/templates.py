@@ -7,16 +7,16 @@ from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle,
 from .registry import Fruit
 
 
-class JINJA2TestCases:
-    """Jinja2 template test constants."""
+class TemplateTestCases:
+    """Template test constants."""
 
     # Template names
-    JINJA2_NAME: ClassVar[List[str]] = [
-        "jinja2_test_template",
+    TEMPLATE_NAME: ClassVar[List[str]] = [
+        "test_template",
     ]
 
     # Basic templates
-    JINJA2_FOR_ANY: ClassVar[List[str]] = [
+    TEMPLATE_FOR_ANY: ClassVar[List[str]] = [
         "I want a {{ place_holder }} cocktail.",
     ]
 
@@ -56,7 +56,7 @@ Format filter spreadsheet:
 {{ place_holder | format("spreadsheet") }}
 """
 
-    JINJA2_ALL_METHODS = """
+    TEMPLATE_ALL_METHODS = """
 Direct (no filter):
 {{ place_holder }}
 
@@ -78,7 +78,7 @@ Format filter html:
 """
 
     # Template collections
-    JINJA2_FOR_STUFF: ClassVar[List[str]] = [
+    TEMPLATE_FOR_STUFF: ClassVar[List[str]] = [
         JINJA2_FILTER_TAG,
         JINJA2_FILTER_FORMAT,
         JINJA2_FILTER_FORMAT_PLAIN,
@@ -86,7 +86,7 @@ Format filter html:
         JINJA2_FILTER_FORMAT_MARKDOWN,
         JINJA2_FILTER_FORMAT_HTML,
         JINJA2_FILTER_FORMAT_SPREADSHEET,
-        JINJA2_ALL_METHODS,
+        TEMPLATE_ALL_METHODS,
     ]
 
     # Style configurations

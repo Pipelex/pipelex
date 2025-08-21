@@ -1,5 +1,4 @@
-from collections import defaultdict
-from typing import ClassVar, Dict, List, Optional, Type
+from typing import ClassVar, List, Optional, Type
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 
@@ -15,12 +14,12 @@ from pipelex.cogt.llm.llm_models.llm_model_provider_abstract import (
 )
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
-from pipelex.core.concept import Concept
-from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
-from pipelex.core.domain import Domain
-from pipelex.core.domain_provider_abstract import DomainProviderAbstract
-from pipelex.core.pipe_abstract import PipeAbstract
-from pipelex.core.pipe_provider_abstract import PipeProviderAbstract
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.domains.domain import Domain
+from pipelex.core.domains.domain_provider_abstract import DomainProviderAbstract
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.pipe_provider_abstract import PipeProviderAbstract
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerProtocol
@@ -391,10 +390,6 @@ def get_secret(secret_id: str) -> str:
     return get_secrets_provider().get_secret(secret_id=secret_id)
 
 
-def get_domain_provider() -> DomainProviderAbstract:
-    return get_pipelex_hub().get_required_domain_provider()
-
-
 def get_domains(excluded_domains: Optional[List[str]] = None) -> List[Domain]:
     domains = get_pipelex_hub().get_required_domain_provider().get_domains()
     if excluded_domains:
@@ -415,18 +410,6 @@ def get_optional_domain(domain_code: str) -> Optional[Domain]:
 
 def get_pipe_provider() -> PipeProviderAbstract:
     return get_pipelex_hub().get_required_pipe_provider()
-
-
-def get_pipes_by_domain(
-    excluded_domains: Optional[List[str]] = None,
-) -> Dict[str, List[str]]:
-    pipes = get_pipe_provider().get_pipes()
-    pipes_by_domain: Dict[str, List[str]] = defaultdict(list)
-    for pipe in pipes:
-        if excluded_domains and pipe.domain in excluded_domains:
-            continue
-        pipes_by_domain[pipe.domain].append(pipe.code)
-    return pipes_by_domain
 
 
 def get_required_pipe(pipe_code: str) -> PipeAbstract:

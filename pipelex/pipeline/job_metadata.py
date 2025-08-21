@@ -12,7 +12,7 @@ class JobCategory(StrEnum):
     LLM_JOB = "llm_job"
     IMGG_JOB = "imgg_job"
     PROMPTING_JOB = "prompting_job"
-    JINJA2_JOB = "jinja2_job"
+    TEMPLATE_JOB = "template_job"
     OCR_JOB = "ocr_job"
 
 

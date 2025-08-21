@@ -1,8 +1,15 @@
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
+
+import re
+from typing import Any, Dict, List, Mapping, Optional, cast
 
 import toml
+import tomlkit
+from tomlkit import array, document, inline_table, table
+from tomlkit import string as tk_string
 
 from pipelex.tools.misc.file_utils import path_exists
+from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 
 
 class TOMLValidationError(Exception):
@@ -11,7 +18,7 @@ class TOMLValidationError(Exception):
     pass
 
 
-def _validate_toml_content(content: str, file_path: str) -> None:
+def validate_toml_content(content: str, file_path: Optional[str] = None) -> None:
     """Validate TOML content for common formatting issues."""
     lines = content.splitlines()
     issues: List[str] = []
@@ -50,10 +57,10 @@ def validate_toml_file(path: str) -> None:
     """
     with open(path, "r", encoding="utf-8") as file:
         content = file.read()
-        _validate_toml_content(content, path)
+        validate_toml_content(content, path)
 
 
-def _clean_trailing_whitespace(content: str) -> str:
+def clean_trailing_whitespace(content: str) -> str:
     """Clean trailing whitespace from TOML content.
 
     This function:
@@ -98,7 +105,7 @@ def load_toml_from_path(path: str) -> Dict[str, Any]:
         with open(path, "r", encoding="utf-8") as file:
             content = file.read()
 
-        cleaned_content = _clean_trailing_whitespace(content)
+        cleaned_content = clean_trailing_whitespace(content)
 
         # If content changed, write it back
         if content != cleaned_content:
@@ -120,3 +127,188 @@ def failable_load_toml_from_path(path: str) -> Optional[Dict[str, Any]]:
     except toml.TomlDecodeError as exc:
         print(f"Failed to parse TOML file '{path}': {exc}")
         return None
+
+
+def make_toml_string(
+    text: str,
+    prefer_literal: bool = False,
+    force_multiline: bool = False,
+    ensure_trailing_newline: bool = True,
+    ensure_leading_blank_line_in_value: bool = False,
+):
+    """
+    Build a tomlkit string node.
+    - If `force_multiline` or the text contains '\\n', we emit a triple-quoted multiline string.
+    - When multiline, `ensure_trailing_newline` puts the closing quotes on their own line.
+    - When multiline, `ensure_leading_blank_line_in_value` inserts a real blank line at the start of the value.
+    """
+    needs_multiline = force_multiline or ("\n" in text)
+    normalized = text
+
+    if needs_multiline:
+        if ensure_leading_blank_line_in_value and not normalized.startswith("\n"):
+            normalized = "\n" + normalized
+        if ensure_trailing_newline and not normalized.endswith("\n"):
+            normalized = normalized + "\n"
+
+    use_literal = prefer_literal and ("'''" not in normalized)
+    return tk_string(normalized, multiline=needs_multiline, literal=use_literal)
+
+
+def _convert_to_inline(value: Any):
+    """Recursively convert Python values; dicts -> inline tables; lists kept as arrays."""
+    if isinstance(value, Mapping):
+        value = cast(Mapping[str, Any], value)
+        inline_table_obj = inline_table()
+        for key, value_item in value.items():
+            inline_table_obj[key] = _convert_to_inline(value_item)
+
+        return inline_table_obj
+
+    if isinstance(value, list):
+        value = cast(List[Any], value)
+        array_obj = array()
+        array_obj.multiline(True)  # set to False for single-line arrays
+        for element in value:
+            if isinstance(element, Mapping):
+                element = cast(Mapping[str, Any], element)
+                inline_element = inline_table()
+                for inner_key, inner_value in element.items():
+                    inline_element[inner_key] = _convert_to_inline(inner_value)
+                array_obj.append(inline_element)  # pyright: ignore[reportUnknownMemberType]
+            else:
+                array_obj.append(_convert_to_inline(element))  # pyright: ignore[reportUnknownMemberType]
+        return array_obj
+
+    if isinstance(value, str):
+        # Triple quotes if needed (or forced); closing quotes on their own line.
+        return make_toml_string(
+            value,
+            prefer_literal=False,  # flip to True for '''...'''
+            force_multiline=False,  # flip to True to force """...""" even without \n
+            ensure_trailing_newline=True,  # keep closing """ on its own line
+            ensure_leading_blank_line_in_value=False,  # flip to True to keep a blank first line
+        )
+    return value
+
+
+def _filter_empty_values(value: Any) -> Any:
+    """Filter out empty lists and None values from data structures."""
+    if isinstance(value, dict):
+        filtered: Dict[str, Any] = {}
+        for k, v in cast(Dict[str, Any], value).items():
+            filtered_v = _filter_empty_values(v)
+            # Keep empty dicts but skip empty lists and None values
+            if filtered_v is not None and (not isinstance(filtered_v, list) or filtered_v):
+                filtered[k] = filtered_v
+        return filtered
+    elif isinstance(value, list):
+        return [_filter_empty_values(item) for item in cast(List[Any], value) if _filter_empty_values(item) is not None]
+    else:
+        return value
+
+
+def _create_ordered_inline_table(data: Mapping[str, Any]) -> Any:
+    """Create an inline table with fields in the expected order."""
+    inline_table_obj = inline_table()
+
+    # Define the preferred order for concept structure fields
+    field_order = ["type", "definition", "required", "choices", "item_type", "key_type", "value_type"]
+
+    # Add fields in preferred order first
+    for field in field_order:
+        if field in data:
+            value = data[field]
+            # Skip empty lists
+            if isinstance(value, list) and not value:
+                continue
+            inline_table_obj[field] = _convert_to_inline(value)
+
+    # Add any remaining fields not in the preferred order
+    for key, value in data.items():
+        if key not in field_order:
+            # Skip empty lists
+            if isinstance(value, list) and not value:
+                continue
+            inline_table_obj[key] = _convert_to_inline(value)
+
+    return inline_table_obj
+
+
+def dict_to_toml(data: Mapping[str, Any]) -> str:
+    """Convert dictionary to TOML format matching Pipelex expectations."""
+    data = remove_none_values_from_dict(data=data)
+    data = _filter_empty_values(data)
+    document_root = document()
+
+    # Handle top-level fields first (domain, definition, system_prompt, etc.)
+    for key, value in data.items():
+        if not isinstance(value, Mapping):
+            document_root.add(key, _convert_to_inline(value))
+
+    # Handle sections (concepts, pipes)
+    for section_key, section_value in data.items():
+        if isinstance(section_value, Mapping):
+            section_value = cast(Mapping[str, Any], section_value)
+
+            # Skip empty sections
+            if not section_value:
+                continue
+
+            # Create the section table
+            section_table = table()
+
+            # Process each item in the section
+            for item_key, item_value in section_value.items():
+                if isinstance(item_value, str):
+                    # Simple string value (e.g., "SimpleData = 'Simple data concept'")
+                    section_table.add(item_key, _convert_to_inline(item_value))
+                elif isinstance(item_value, Mapping):
+                    # Complex object that needs its own table
+                    item_value = cast(Mapping[str, Any], item_value)
+                    item_table = table()
+
+                    # Handle the structure field specially
+                    for field_key, field_value in item_value.items():
+                        if field_key == "structure" and isinstance(field_value, Mapping):
+                            # Structure should be its own table [section.item.structure]
+                            structure_table = table()
+                            for struct_key, struct_value in cast(Mapping[str, Any], field_value).items():
+                                if isinstance(struct_value, Mapping):
+                                    structure_table.add(struct_key, _create_ordered_inline_table(cast(Mapping[str, Any], struct_value)))
+                                else:
+                                    structure_table.add(struct_key, _convert_to_inline(struct_value))
+                            item_table.add(field_key, structure_table)
+                        else:
+                            # Skip empty lists like refines = []
+                            if isinstance(field_value, list) and not field_value:
+                                continue
+                            item_table.add(field_key, _convert_to_inline(field_value))
+
+                    section_table.add(item_key, item_table)
+
+            document_root.add(section_key, section_table)
+
+    dumped_content = tomlkit.dumps(document_root)  # pyright: ignore[reportUnknownMemberType]
+
+    # Post-process to fix inline table spacing: {key = "value"} -> { key = "value" }
+
+    # Add space after opening brace and before closing brace for TOML inline tables only
+    # This regex matches TOML inline tables (containing = signs) but not Jinja2 templates
+    dumped_content = re.sub(r"\{([^}]*=[^}]*)\}", r"{ \1 }", dumped_content)
+
+    return dumped_content
+
+
+def save_toml_to_path(data: Dict[str, Any], path: str) -> None:
+    """Save dictionary as TOML to file path.
+
+    Args:
+        data: Dictionary to save as TOML
+        path: Path where to save the TOML file
+    """
+    data_cleaned = data
+    with open(path, "w", encoding="utf-8") as file:
+        toml_content: str = dict_to_toml(data=data_cleaned)
+        cleaned_content = clean_trailing_whitespace(toml_content)
+        file.write(cleaned_content)

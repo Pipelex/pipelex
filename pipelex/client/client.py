@@ -6,9 +6,9 @@ from typing_extensions import override
 from pipelex.client.pipeline_request_factory import PipelineRequestFactory
 from pipelex.client.pipeline_response_factory import PipelineResponseFactory
 from pipelex.client.protocol import CompactMemory, PipelexProtocol, PipelineResponse
-from pipelex.core.pipe_run_params import PipeOutputMultiplicity
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 from pipelex.exceptions import ClientAuthenticationError
 from pipelex.tools.environment import get_required_env
 

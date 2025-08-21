@@ -6,12 +6,12 @@ from typing import Dict, List, Tuple
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.pipe_abstract import PipeAbstract
-from pipelex.core.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import StuffContent, TextContent
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import StuffContent, TextContent
 from pipelex.hub import get_class_registry, get_concept_provider, get_pipe_provider
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -42,6 +42,22 @@ async def dry_run_single_pipe(pipe_code: str) -> str:
         return result.get(pipe_code, f"FAILED: No result for pipe '{pipe_code}'")
     except Exception as exc:
         return f"FAILED: {str(exc)}"
+
+
+async def dry_run_pipe_codes(pipe_codes: List[str]) -> Dict[str, str]:
+    """
+    Dry run a list of pipe codes.
+    """
+    pipe_provider = get_pipe_provider()
+    pipes = [pipe_provider.get_required_pipe(pipe_code=pipe_code) for pipe_code in pipe_codes]
+    return await dry_run_pipes(pipes=pipes)
+
+
+async def dry_run_pipe(pipe: PipeAbstract):
+    """
+    Dry run a pipe.
+    """
+    return await dry_run_pipes(pipes=[pipe])
 
 
 async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:

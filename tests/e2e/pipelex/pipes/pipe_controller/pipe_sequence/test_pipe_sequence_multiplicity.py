@@ -3,10 +3,10 @@
 import pytest
 from pytest import FixtureRequest
 
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.stuff_content import TextContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipeline.execute import execute_pipeline
 
 

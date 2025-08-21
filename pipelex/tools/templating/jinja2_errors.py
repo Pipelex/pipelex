@@ -23,12 +23,12 @@ class Jinja2DetectVariablesError(ToolException):
     pass
 
 
-def make_jinja2_error_explanation(jinja2_name: Optional[str], template_text: Optional[str]) -> str:
+def make_jinja2_error_explanation(template_name: Optional[str], template_text: Optional[str]) -> str:
     explanation = ""
-    if jinja2_name:
-        explanation += f"\nJinja2 name: '{jinja2_name}'\n"
+    if template_name:
+        explanation += f"\nTemplate name: '{template_name}'\n"
     if template_text:
         explanation += f"\ntemplate:\n\n{template_text}'\n"
     if not explanation:
-        explanation = "No template text or Jinja2 name"
+        explanation = "No template text or template name"
     return explanation

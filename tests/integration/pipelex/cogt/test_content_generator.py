@@ -50,7 +50,7 @@ Write a haiku about the meaning of life
 """
 
 
-# The ContentGenerator has features that xork without inference (jinja2) or with LLM, Image generation, OCR
+# The ContentGenerator has features that work without inference (jinja2) or with LLM, Image generation, OCR
 # So to run them all you need to bypass the marker restrictions defined in the pyproject.toml pytest section
 # like this:
 # pytest -m "" -k TestContentGenerator
@@ -116,18 +116,17 @@ class TestContentGenerator:
         pretty_print(image, title="make_image")
         assert isinstance(image, GeneratedImage)
 
-    async def test_make_jinja2_text(self, request: FixtureRequest):
+    async def test_make_template_text(self, request: FixtureRequest):
         context = {
             "the_answer": "elementary, my dear Watson",
         }
 
-        jinja2_text: str = await get_content_generator().make_jinja2_text(
+        template_text: str = await get_content_generator().make_template_text(
             context=context,
-            jinja2="The answer is: {{ the_answer }}",
+            template="The answer is: {{ the_answer }}",
         )
-        pretty_print(jinja2_text, title="jinja2_text")
-        assert isinstance(jinja2_text, str)
-        assert jinja2_text == "The answer is: elementary, my dear Watson"
+        assert isinstance(template_text, str)
+        assert template_text == "The answer is: elementary, my dear Watson"
 
     @pytest.mark.ocr
     @pytest.mark.inference

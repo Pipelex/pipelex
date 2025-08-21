@@ -30,7 +30,7 @@ This python >=3.10 code is in the `pipelex` directory.
 ## Testing
 
 - Always test with `make codex-tests` -> it runs pytest on our `tests/` directory using proper settings
-- If all unit tests pass, run `make validate` -> it runs a minimal version of our app with just the inits and data loading
+- If all unit tests pass, run `make validate` -> it runs a minimal version of our app with just the inits and data loading (`pipelex validate all` under the hood)
 
 ## PR Instructions
 

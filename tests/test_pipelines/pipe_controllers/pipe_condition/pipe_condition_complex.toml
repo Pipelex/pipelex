@@ -9,7 +9,8 @@ ProcessingContext = "Combined processing context"
 [pipe]
 # Main entry point - routes by document type first
 [pipe.complex_document_processor]
-PipeCondition = "Primary routing by document type"
+type = "PipeCondition"
+definition = "Primary routing by document type"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 expression_template = "{{ doc_request.document_type }}"
@@ -21,7 +22,8 @@ legal = "legal_document_router"
 
 # Technical document processing branch
 [pipe.technical_document_router]
-PipeCondition = "Route technical documents by priority and user level"
+type = "PipeCondition"
+definition = "Route technical documents by priority and user level"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 expression_template = "{% if doc_request.priority == 'urgent' %}urgent_tech{% elif user_profile.user_level == 'expert' and doc_request.complexity == 'high' %}expert_tech{% else %}standard_tech{% endif %}"
@@ -33,7 +35,8 @@ standard_tech = "standard_technical_processor"
 
 # Business document processing branch
 [pipe.business_document_router]
-PipeCondition = "Route business documents by department and priority"
+type = "PipeCondition"
+definition = "Route business documents by department and priority"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 expression_template = "{% if doc_request.priority == 'urgent' %}urgent_business{% elif user_profile.department == 'finance' %}finance_business{% elif user_profile.department == 'marketing' %}marketing_business{% else %}general_business{% endif %}"
@@ -46,7 +49,8 @@ general_business = "general_business_processor"
 
 # Legal document processing branch
 [pipe.legal_document_router]
-PipeCondition = "Route legal documents by complexity and user level"
+type = "PipeCondition"
+definition = "Route legal documents by complexity and user level"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 expression_template = "{% if doc_request.complexity == 'high' and user_profile.user_level != 'beginner' %}complex_legal{% elif doc_request.language != 'english' %}international_legal{% else %}standard_legal{% endif %}"
@@ -58,7 +62,8 @@ standard_legal = "standard_legal_processor"
 
 # Leaf processors - Technical
 [pipe.urgent_technical_processor]
-PipeLLM = "Process urgent technical documents with high priority"
+type = "PipeLLM"
+definition = "Process urgent technical documents with high priority"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
@@ -73,7 +78,8 @@ Output: "URGENT_TECHNICAL_PROCESSED"
 """
 
 [pipe.expert_technical_processor]
-PipeLLM = "Process complex technical documents for expert users"
+type = "PipeLLM"
+definition = "Process complex technical documents for expert users"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
@@ -86,7 +92,8 @@ Output: "EXPERT_TECHNICAL_PROCESSED"
 """
 
 [pipe.standard_technical_processor]
-PipeLLM = "Process standard technical documents"
+type = "PipeLLM"
+definition = "Process standard technical documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
@@ -99,7 +106,8 @@ Output: "STANDARD_TECHNICAL_PROCESSED"
 
 # Leaf processors - Business
 [pipe.urgent_business_processor]
-PipeLLM = "Process urgent business documents"
+type = "PipeLLM"
+definition = "Process urgent business documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
@@ -111,7 +119,8 @@ Output: "URGENT_BUSINESS_PROCESSED"
 """
 
 [pipe.finance_business_processor]
-PipeLLM = "Process finance business documents"
+type = "PipeLLM"
+definition = "Process finance business documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
@@ -123,7 +132,8 @@ Output: "FINANCE_BUSINESS_PROCESSED"
 """
 
 [pipe.marketing_business_processor]
-PipeLLM = "Process marketing business documents"
+type = "PipeLLM"
+definition = "Process marketing business documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
@@ -135,7 +145,8 @@ Output: "MARKETING_BUSINESS_PROCESSED"
 """
 
 [pipe.general_business_processor]
-PipeLLM = "Process general business documents"
+type = "PipeLLM"
+definition = "Process general business documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
@@ -148,7 +159,8 @@ Output: "GENERAL_BUSINESS_PROCESSED"
 
 # Leaf processors - Legal
 [pipe.complex_legal_processor]
-PipeLLM = "Process complex legal documents"
+type = "PipeLLM"
+definition = "Process complex legal documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """
@@ -161,7 +173,8 @@ Output: "COMPLEX_LEGAL_PROCESSED"
 """
 
 [pipe.international_legal_processor]
-PipeLLM = "Process international legal documents"
+type = "PipeLLM"
+definition = "Process international legal documents"
 inputs = { doc_request = "DocumentRequest" }
 output = "native.Text"
 prompt_template = """
@@ -173,7 +186,8 @@ Output: "INTERNATIONAL_LEGAL_PROCESSED"
 """
 
 [pipe.standard_legal_processor]
-PipeLLM = "Process standard legal documents"
+type = "PipeLLM"
+definition = "Process standard legal documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
 prompt_template = """

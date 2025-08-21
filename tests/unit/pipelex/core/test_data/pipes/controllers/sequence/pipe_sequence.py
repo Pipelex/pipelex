@@ -1,0 +1,40 @@
+"""PipeSequence test cases."""
+
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint, SubPipeBlueprint
+
+PIPE_SEQUENCE = (
+    "pipe_sequence",
+    """domain = "test_pipes"
+definition = "Domain with sequence pipe"
+
+[pipe.process_sequence]
+type = "PipeSequence"
+definition = "Process data in sequence"
+output = "ProcessedData"
+steps = [
+    { pipe = "step1", result = "intermediate1" },
+    { pipe = "step2", result = "final_result" },
+]
+""",
+    PipelexBundleBlueprint(
+        domain="test_pipes",
+        definition="Domain with sequence pipe",
+        pipe={
+            "process_sequence": PipeSequenceBlueprint(
+                type="PipeSequence",
+                definition="Process data in sequence",
+                output="ProcessedData",
+                steps=[
+                    SubPipeBlueprint(pipe="step1", result="intermediate1"),
+                    SubPipeBlueprint(pipe="step2", result="final_result"),
+                ],
+            ),
+        },
+    ),
+)
+
+# Export all PipeSequence test cases
+PIPE_SEQUENCE_TEST_CASES = [
+    PIPE_SEQUENCE,
+]

@@ -7,13 +7,13 @@ from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
-from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import ListContent, StuffContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import MAIN_STUFF_NAME, WorkingMemory
+from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content import ListContent, StuffContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeInputError,
     PipeInputNotFoundError,

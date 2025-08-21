@@ -4,18 +4,16 @@ from typing import Optional
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.pipe_abstract import PipeAbstract, PipeType
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.hub import get_activity_manager
 from pipelex.pipeline.activity.activity_models import ActivityReport
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeOperator(PipeAbstract):
-    pipe_type: PipeType = PipeType.OPERATOR
-
     @override
     async def run_pipe(
         self,

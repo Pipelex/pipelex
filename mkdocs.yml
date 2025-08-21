@@ -44,9 +44,9 @@ extra:
     - icon: fontawesome/brands/twitter
       link: https://x.com/PipelexAI
       name: Pipelex on X
-    - icon: fontawesome/brands/discord
-      link: https://go.pipelex.com/discord
-      name: Pipelex on Discord
+    # - icon: fontawesome/brands/discord
+    #   link: https://go.pipelex.com/discord
+    #   name: Pipelex on Discord
   generator: false
 
 plugins:
@@ -109,6 +109,7 @@ nav:
       - Kick off a Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md
       - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
       - Design and Run Pipelines: pages/build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md
+      - Pipeline Creation: pages/build-reliable-ai-workflows-with-pipelex/pipeline-creation.md
       - Pipe Operators:
         - Overview: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md
         - PipeLLM: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md
@@ -146,6 +147,7 @@ nav:
     - Tools:
       - CLI: pages/tools/cli.md
       - Logging: pages/tools/logging.md
+    - Migration: pages/migration/index.md
     - Advanced Customizations:
       - Overview: pages/advanced-customization/index.md
       - Secrets Provider: pages/advanced-customization/secrets-provider-injection.md

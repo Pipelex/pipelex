@@ -1,18 +1,20 @@
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
 from pydantic import Field, model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Quality
-from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_img_gen import PipeImgGen
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
 
 
 class PipeImgGenBlueprint(PipeBlueprint):
+    type: Literal["PipeImgGen"] = "PipeImgGen"
     img_gen_prompt: Optional[str] = None
     imgg_handle: Optional[ImggHandle] = None
     aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
@@ -24,6 +26,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
     is_raw: Optional[bool] = None
     seed: Optional[Union[int, Literal["auto"]]] = None
     nb_output: Optional[int] = Field(default=None, ge=1)
+    img_gen_prompt_var_name: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_imgg_prompt_and_imgg_prompt_stuff_name(self) -> Self:
@@ -37,7 +40,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
         return self
 
 
-class PipeImgGenFactory(PipeSpecificFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
+class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
     @classmethod
     @override
     def make_pipe_from_blueprint(
@@ -51,7 +54,7 @@ class PipeImgGenFactory(PipeSpecificFactoryProtocol[PipeImgGenBlueprint, PipeImg
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             output_multiplicity=output_multiplicity,
             imgg_prompt=pipe_blueprint.img_gen_prompt,
@@ -63,19 +66,5 @@ class PipeImgGenFactory(PipeSpecificFactoryProtocol[PipeImgGenBlueprint, PipeImg
             safety_tolerance=pipe_blueprint.safety_tolerance,
             is_raw=pipe_blueprint.is_raw,
             seed=pipe_blueprint.seed,
-        )
-
-    @classmethod
-    @override
-    def make_pipe_from_details_dict(
-        cls,
-        domain_code: str,
-        pipe_code: str,
-        details_dict: Dict[str, Any],
-    ) -> PipeImgGen:
-        pipe_blueprint = PipeImgGenBlueprint.model_validate(details_dict)
-        return cls.make_pipe_from_blueprint(
-            domain_code=domain_code,
-            pipe_code=pipe_code,
-            pipe_blueprint=pipe_blueprint,
+            img_gen_prompt_var_name=pipe_blueprint.img_gen_prompt_var_name,
         )

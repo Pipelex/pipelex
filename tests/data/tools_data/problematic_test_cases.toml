@@ -6,7 +6,8 @@ TestInput = "A test input concept"
 
 [pipe]
 [pipe.test_pipe_with_issues]
-PipeLLM = "Test pipe with trailing whitespace issues"
+type = "PipeLLM"
+definition = "Test pipe with trailing whitespace issues"
 inputs = { input_data = "TestInput" }
 output = "native.Text"
 prompt_template = """
@@ -14,7 +15,8 @@ This template has trailing whitespace after closing quotes
 """ 
 
 [pipe.another_problematic_pipe]
-PipeLLM = "Another pipe with issues"  
+type = "PipeLLM"
+definition = "Another pipe with issues"  
 output = "native.Text"
 prompt_template = """
 Multiple issues here

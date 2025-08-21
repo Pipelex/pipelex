@@ -10,7 +10,8 @@ AnimalDescription = "A detailed description of an animal"
 
 [pipe]
 [pipe.generate_animal_description]
-PipeLLM = "Generate a description of an animal"
+type = "PipeLLM"
+definition = "Generate a description of an animal"
 inputs = { animal = "Animal" }
 output = "AnimalDescription"
 prompt_template = """

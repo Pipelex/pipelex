@@ -5,12 +5,12 @@ from typing import cast
 import pytest
 from pytest import FixtureRequest
 
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import TextContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_sequence import SubPipe
 from pipelex.pipe_operators.pipe_llm import PipeLLM
@@ -30,7 +30,9 @@ class TestPipeParallelSimple:
         sentiment_pipe = PipeLLM(
             domain="test_integration",
             code="analyze_sentiment",
-            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="analyze_sentiment_prompt",
@@ -44,7 +46,9 @@ class TestPipeParallelSimple:
         word_count_pipe = PipeLLM(
             domain="test_integration",
             code="count_words",
-            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="count_words_prompt",
@@ -57,7 +61,9 @@ class TestPipeParallelSimple:
         keywords_pipe = PipeLLM(
             domain="test_integration",
             code="extract_keywords",
-            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="extract_keywords_prompt",
@@ -72,7 +78,9 @@ class TestPipeParallelSimple:
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             parallel_sub_pipes=[
                 SubPipe(pipe=sentiment_pipe, output_name="sentiment_result"),
@@ -184,7 +192,9 @@ class TestPipeParallelSimple:
         sentiment_pipe = PipeLLM(
             domain="test_integration",
             code="analyze_sentiment",
-            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="analyze_sentiment_prompt",
@@ -197,7 +207,9 @@ class TestPipeParallelSimple:
         word_count_pipe = PipeLLM(
             domain="test_integration",
             code="count_words",
-            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="count_words_prompt",
@@ -209,7 +221,9 @@ class TestPipeParallelSimple:
         keywords_pipe = PipeLLM(
             domain="test_integration",
             code="extract_keywords",
-            inputs=PipeInputSpec.make_from_dict({"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             pipe_llm_prompt=PipeLLMPrompt(
                 code="extract_keywords_prompt",
@@ -224,7 +238,9 @@ class TestPipeParallelSimple:
         pipe_parallel = PipeParallel(
             domain="test_integration",
             code="parallel_text_analyzer",
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             parallel_sub_pipes=[
                 SubPipe(pipe=sentiment_pipe, output_name="sentiment_result"),

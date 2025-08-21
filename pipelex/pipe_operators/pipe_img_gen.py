@@ -10,14 +10,14 @@ from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, ImggJobParams, Quality
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, PipeRunParams, output_multiplicity_to_apply
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import ImageContent, ListContent, StuffContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, PipeRunParams, output_multiplicity_to_apply
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, StuffContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,
@@ -45,6 +45,9 @@ class PipeImgGenOutput(PipeOutput):
         else:
             raise PipeRunParamsError(f"PipeImgGen output should be a ListContent or an ImageContent, got {type(content)}")
         return the_urls
+
+
+DEFAULT_PROMPT_VAR_NAME = "prompt"
 
 
 class PipeImgGen(PipeOperator):
@@ -89,7 +92,10 @@ class PipeImgGen(PipeOperator):
 
     @override
     def required_variables(self) -> Set[str]:
-        return {"imgg_prompt"}
+        if self.img_gen_prompt_var_name:
+            return {self.img_gen_prompt_var_name}
+        else:
+            return {DEFAULT_PROMPT_VAR_NAME}
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()
@@ -158,6 +164,8 @@ class PipeImgGen(PipeOperator):
                     log.error(missing_input_var_error.desc())
                 case StaticValidationReaction.RAISE:
                     raise missing_input_var_error
+        else:
+            self.img_gen_prompt_var_name = candidate_prompt_var_names[0]
 
     @override
     async def _run_operator_pipe(

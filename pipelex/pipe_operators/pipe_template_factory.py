@@ -1,39 +1,41 @@
-from typing import Any, Dict, Optional
+from typing import Literal, Optional
 
 from typing_extensions import override
 
 from pipelex.config import get_config
-from pipelex.core.pipe_blueprint import PipeBlueprint, PipeSpecificFactoryProtocol
-from pipelex.core.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.pipe_template import PipeTemplate
-from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.tools.templating.template_parsing import check_template_parsing
 from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.templating_models import PromptingStyle
 
 
-class PipeJinja2Blueprint(PipeBlueprint):
+class PipeTemplateBlueprint(PipeBlueprint):
+    type: Literal["PipeTemplate"] = "PipeTemplate"
     template_name: Optional[str] = None
     template: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None
-    template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
+    template_category: TemplateCategory = TemplateCategory.LLM_PROMPT
 
 
-class PipeTemplateFactory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeTemplate]):
+class PipeTemplateFactory(PipeFactoryProtocol[PipeTemplateBlueprint, PipeTemplate]):
     @classmethod
     @override
     def make_pipe_from_blueprint(
         cls,
         domain_code: str,
         pipe_code: str,
-        pipe_blueprint: PipeJinja2Blueprint,
+        pipe_blueprint: PipeTemplateBlueprint,
     ) -> PipeTemplate:
         preprocessed_template: Optional[str] = None
         if pipe_blueprint.template:
             preprocessed_template = preprocess_template(pipe_blueprint.template)
-            check_jinja2_parsing(
-                jinja2_template_source=preprocessed_template,
+            check_template_parsing(
+                template_source=preprocessed_template,
                 template_category=pipe_blueprint.template_category,
             )
         else:
@@ -42,7 +44,7 @@ class PipeTemplateFactory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeT
             domain=domain_code,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpec.make_from_dict(concepts_dict=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
             output_concept_code=pipe_blueprint.output,
             template_name=pipe_blueprint.template_name,
             template=preprocessed_template,
@@ -51,22 +53,7 @@ class PipeTemplateFactory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeT
         )
 
     @classmethod
-    @override
-    def make_pipe_from_details_dict(
-        cls,
-        domain_code: str,
-        pipe_code: str,
-        details_dict: Dict[str, Any],
-    ) -> PipeTemplate:
-        pipe_blueprint = PipeJinja2Blueprint.model_validate(details_dict)
-        return cls.make_pipe_from_blueprint(
-            domain_code=domain_code,
-            pipe_code=pipe_code,
-            pipe_blueprint=pipe_blueprint,
-        )
-
-    @classmethod
-    def make_pipe_jinja2_from_template_str(
+    def make_pipe_template_from_template_str(
         cls,
         domain_code: str,
         inputs: Optional[PipeInputSpec] = None,
@@ -75,9 +62,9 @@ class PipeTemplateFactory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeT
     ) -> PipeTemplate:
         if template_str:
             preprocessed_template = preprocess_template(template_str)
-            check_jinja2_parsing(
-                jinja2_template_source=preprocessed_template,
-                template_category=Jinja2TemplateCategory.LLM_PROMPT,
+            check_template_parsing(
+                template_source=preprocessed_template,
+                template_category=TemplateCategory.LLM_PROMPT,
             )
             return PipeTemplate(
                 domain=domain_code,
@@ -93,19 +80,19 @@ class PipeTemplateFactory(PipeSpecificFactoryProtocol[PipeJinja2Blueprint, PipeT
                 inputs=inputs or PipeInputSpec.make_empty(),
             )
         else:
-            raise PipeDefinitionError("Either template_str or template_name must be provided to make_pipe_jinja2_from_template_str")
+            raise PipeDefinitionError("Either template_str or template_name must be provided to make_pipe_template_from_template_str")
 
     @classmethod
-    def make_pipe_jinja2_to_structure(
+    def make_pipe_template_to_structure(
         cls,
         domain_code: str,
         prompt_template_to_structure: Optional[str],
     ) -> PipeTemplate:
-        jinja2_name = prompt_template_to_structure or get_config().pipelex.generic_template_names.structure_from_preliminary_text_user
+        template_name = prompt_template_to_structure or get_config().pipelex.generic_template_names.structure_from_preliminary_text_user
         prompting_style = PromptingStyle.make_default_prompting_style()
         return PipeTemplate(
             domain=domain_code,
-            code="adhoc_pipe_jinja2_to_structure",
-            template_name=jinja2_name,
+            code="adhoc_pipe_template_to_structure",
+            template_name=template_name,
             prompting_style=prompting_style,
         )

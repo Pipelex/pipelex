@@ -24,7 +24,7 @@ def make_mermaid_url(mermaid_code: str) -> str:
         },
     }
     encoded = encode_pako_from_string(json.dumps(as_dict))
-    url = f"https://mermaid.live/edit#{encoded}"
+    url = f"https://mermaid.ink/img/{encoded}"
     return url
 
 

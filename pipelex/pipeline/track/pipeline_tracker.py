@@ -8,8 +8,8 @@ import networkx as nx
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.concept import Concept
-from pipelex.core.stuff import Stuff
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.stuffs.stuff import Stuff
 from pipelex.exceptions import JobHistoryError
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
 from pipelex.pipeline.track.flow_chart import PipelineFlowChart
@@ -44,6 +44,11 @@ class PipelineTracker(PipelineTrackerProtocol):
         self.is_active = False
         self.nx_graph = nx.DiGraph()
         self.start_node = None
+
+    @override
+    def reset(self):
+        self.teardown()
+        self.setup()
 
     def _get_node_name(self, node: str) -> Optional[str]:
         node_attributes = self.nx_graph.nodes[node]
@@ -332,10 +337,10 @@ class PipelineTracker(PipelineTrackerProtocol):
             title_to_print += f" for {title}"
         print_mermaid_url(url=url, title=title_to_print)
 
-    def _print_mermaid_flowchart_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
+    def _print_mermaid_flowchart_url(self, title: Optional[str] = None, subtitle: Optional[str] = None) -> Optional[str]:
         if not self.nx_graph.nodes:
             log.info("No nodes in the pipeline tracker")
-            return
+            return None
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")
         flowchart = PipelineFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, tracker_config=self._tracker_config)
@@ -344,6 +349,7 @@ class PipelineTracker(PipelineTrackerProtocol):
         if title:
             title_to_print += f" for {title}"
         print_mermaid_url(url=url, title=title_to_print)
+        return url
 
     @override
     def output_flowchart(
@@ -351,8 +357,9 @@ class PipelineTracker(PipelineTrackerProtocol):
         title: Optional[str] = None,
         subtitle: Optional[str] = None,
         is_detailed: bool = False,
-    ):
+    ) -> Optional[str]:
         if is_detailed:
             self._print_mermaid_flowchart_code_and_url(title=title, subtitle=subtitle)
         else:
-            self._print_mermaid_flowchart_url(title=title, subtitle=subtitle)
+            return self._print_mermaid_flowchart_url(title=title, subtitle=subtitle)
+        return None

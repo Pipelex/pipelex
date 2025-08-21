@@ -40,7 +40,7 @@ All the secret keys used by `pipelex` are specified in the `.env.example` file. 
 
 In order to set the pipelex configuration files, you need to run 2 commands using the CLI (we recommend to run it at the root of your project):
 
-- `pipelex init-libraries`: This will create a `pipelex_libraries` folder, with the base llm configuration and the base pipelines. 
+- `pipelex init libraries`: This will create a `pipelex_libraries` folder, with the base llm configuration and the base pipelines. 
 This is the directory where you should add your pipelines. 
 
 The structure is like this:
@@ -58,7 +58,8 @@ The structure is like this:
 
 Learn more about pipelex_libraries in our [Libraries documentation](../build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md)
 
-- `pipelex init-config`: This cli command will create a `pipelex.toml` file at the root of the project, with basic configuration. This configuration file gathers all configuration for feature flags, logging, cost reporting, and so on... Learn more in our [Configuration documentation](../configuration/index.md)
+- `pipelex init config`: This cli command will create a `pipelex.toml` file at the root of the project, with basic configuration. This configuration file gathers all configuration for feature flags, logging, cost reporting, and so on... Learn more in our [Configuration documentation](../configuration/index.md)
 
 
-💡 _Any troubles? Have a look at our [Cookbook](https://github.com/Pipelex/pipelex-cookbook)! and come ask for help on our [Discord](https://go.pipelex.com/discord)_
+💡 _Any troubles? Have a look at our [Cookbook](https://github.com/Pipelex/pipelex-cookbook)! 
+<!-- and come ask for help on our [Discord](https://go.pipelex.com/discord)_ -->

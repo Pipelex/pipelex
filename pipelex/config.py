@@ -44,7 +44,7 @@ class PipeRunConfig(ConfigModel):
 
 
 class DryRunConfig(ConfigModel):
-    apply_to_jinja2_rendering: bool
+    apply_to_template_rendering: bool
     text_gen_truncate_length: int
     nb_list_items: int
     nb_ocr_pages: int

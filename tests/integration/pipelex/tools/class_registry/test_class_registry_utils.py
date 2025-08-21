@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.core.stuff_content import StuffContent
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.hub import get_class_registry
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from tests.cases import ClassRegistryTestCases

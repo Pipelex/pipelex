@@ -17,7 +17,7 @@ from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.hub import get_class_registry
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
 
 
@@ -117,12 +117,12 @@ class ImggAssignment(BaseModel):
     nb_images: int
 
 
-class Jinja2Assignment(BaseModel):
+class TemplateAssignment(BaseModel):
     context: Dict[str, Any]
-    jinja2_name: Optional[str] = None
-    jinja2: Optional[str] = None
+    template_name: Optional[str] = None
+    template: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None
-    template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
+    template_category: TemplateCategory = TemplateCategory.LLM_PROMPT
 
 
 class OcrAssignment(BaseModel):

@@ -61,7 +61,7 @@ exported_templates_path = "pipelex_libraries/templates"
 
 Use the CLI command to initialize libraries:
 ```bash
-pipelex init-libraries
+pipelex init libraries
 ```
 
 This will:
@@ -122,7 +122,7 @@ The library system includes specific error types:
 
 2. **Validation**:
 
-    - Run `pipelex validate` after making changes
+    - Run `pipelex validate all` after making changes
     - Check for domain consistency
     - Verify concept relationships
 

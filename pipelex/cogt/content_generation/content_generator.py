@@ -5,18 +5,18 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import (
     ImggAssignment,
-    Jinja2Assignment,
     LLMAssignment,
     LLMAssignmentFactory,
     ObjectAssignment,
     OcrAssignment,
+    TemplateAssignment,
     TextThenObjectAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.content_generation.imgg_generate import imgg_gen_image_list, imgg_gen_single_image
-from pipelex.cogt.content_generation.jinja2_generate import jinja2_gen_text
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
 from pipelex.cogt.content_generation.ocr_generate import ocr_gen_extract_pages
+from pipelex.cogt.content_generation.template_generate import template_gen_text
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams
@@ -31,7 +31,7 @@ from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -242,24 +242,24 @@ class ContentGenerator(ContentGeneratorProtocol):
         return generated_image_list
 
     @override
-    async def make_jinja2_text(
+    async def make_template_text(
         self,
         context: Dict[str, Any],
-        jinja2_name: Optional[str] = None,
-        jinja2: Optional[str] = None,
+        template_name: Optional[str] = None,
+        template: Optional[str] = None,
         prompting_style: Optional[PromptingStyle] = None,
-        template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
+        template_category: TemplateCategory = TemplateCategory.LLM_PROMPT,
     ) -> str:
-        jinja2_assignment = Jinja2Assignment(
+        template_assignment = TemplateAssignment(
             context=context,
-            jinja2_name=jinja2_name,
-            jinja2=jinja2,
+            template_name=template_name,
+            template=template,
             prompting_style=prompting_style,
             template_category=template_category,
         )
-        jinja2_text = await jinja2_gen_text(jinja2_assignment=jinja2_assignment)
-        log.dev(f"{self.__class__.__name__} jinja2: {jinja2_text}")
-        return jinja2_text
+        template_text = await template_gen_text(template_assignment=template_assignment)
+        log.dev(f"{self.__class__.__name__} template: {template_text}")
+        return template_text
 
     @override
     async def make_ocr_extract_pages(

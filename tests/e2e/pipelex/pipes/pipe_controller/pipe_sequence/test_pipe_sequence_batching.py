@@ -5,11 +5,11 @@ from typing import cast
 import pytest
 
 from pipelex import log
-from pipelex.core.pipe_input_spec import TypedNamedInputRequirement
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_required_pipe
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.job_metadata import JobMetadata

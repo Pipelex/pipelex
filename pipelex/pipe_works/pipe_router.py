@@ -3,9 +3,9 @@ from typing import Optional, cast
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.pipe_output import PipeOutputType
-from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_output import PipeOutputType
+from pipelex.core.pipes.pipe_run_params import PipeRunParams
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_works.pipe_job import PipeJob
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory

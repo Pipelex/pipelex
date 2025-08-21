@@ -9,7 +9,8 @@ SummaryText = "A summary of the processed text"
 
 [pipe]
 [pipe.simple_text_sequence]
-PipeSequence = "Process text through cleaning and summarization"
+type = "PipeSequence"
+definition = "Process text through cleaning and summarization"
 inputs = { raw_text = "RawText" }
 output = "SummaryText"
 steps = [
@@ -18,7 +19,8 @@ steps = [
 ]
 
 [pipe.clean_text]
-PipeLLM = "Clean and normalize the input text"
+type = "PipeLLM"
+definition = "Clean and normalize the input text"
 inputs = { raw_text = "RawText" }
 output = "CleanedText"
 llm = "llm_for_testing_gen_text"
@@ -32,7 +34,8 @@ Clean and normalize the following text by:
 """
 
 [pipe.generate_summary]
-PipeLLM = "Generate a summary of the cleaned text"
+type = "PipeLLM"
+definition = "Generate a summary of the cleaned text"
 inputs = { cleaned_text = "CleanedText" }
 output = "SummaryText"
 llm = "llm_for_testing_gen_text"

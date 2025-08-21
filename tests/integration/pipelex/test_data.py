@@ -1,15 +1,15 @@
 from typing import ClassVar, List, Optional, Tuple, Type
 
-from pipelex.core.pipe_run_params import PipeOutputMultiplicity
-from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import (
+from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content import (
     ImageContent,
     ListContent,
     PDFContent,
     StructuredContent,
     TextContent,
 )
-from pipelex.core.stuff_factory import StuffBlueprint, StuffFactory
+from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.exceptions import PipeStackOverflowError
 from pipelex.pipe_operators.pipe_ocr import PIPE_OCR_INPUT_NAME
 from tests.cases import ImageTestCases, PDFTestCases

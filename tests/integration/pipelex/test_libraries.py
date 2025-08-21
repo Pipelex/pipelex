@@ -2,6 +2,7 @@
 make t TEST=TestLibraries
 """
 
+from pathlib import Path
 from typing import Optional
 
 import pytest
@@ -11,9 +12,9 @@ from rich.table import Table
 
 from pipelex import pretty_print
 from pipelex.config import get_config
-from pipelex.core.concept_library import ConceptLibrary
-from pipelex.core.pipe_library import PipeLibrary
-from pipelex.libraries.library_manager import LibraryManager
+from pipelex.core.concepts.concept_library import ConceptLibrary
+from pipelex.core.pipes.pipe_library import PipeLibrary
+from pipelex.libraries.library_manager_factory import LibraryManagerFactory
 from tests.integration.pipelex.test_data import LibraryTestCases
 
 
@@ -90,10 +91,9 @@ class TestLibraries:
         known_concept: str,
         known_pipe: str,
     ):
-        library_manager = LibraryManager.make_empty(config_folder_path="pipelex_libraries")
-        test_pipelines_path = get_config().pipelex.library_config.test_pipelines_path
-        test_library_paths = library_manager.list_toml_files_from_path(library_paths=[test_pipelines_path])
-        library_manager.load_combo_libraries(library_paths=test_library_paths)
+        library_manager = LibraryManagerFactory.make_empty(config_dir_path="pipelex/libraries")
+        test_pipelines_dir = [Path(get_config().pipelex.library_config.test_pipelines_dir_path)]
+        library_manager.load_libraries(library_dirs=test_pipelines_dir)
         # Verify that libraries were loaded
         assert len(library_manager.concept_library.root) > 0, "No concepts were loaded"
         assert len(library_manager.pipe_library.root) > 0, "No pipes were loaded"

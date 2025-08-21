@@ -2,8 +2,8 @@ from typing import Any, Dict, Optional
 
 from pipelex.client.api_serializer import ApiSerializer
 from pipelex.client.protocol import COMPACT_MEMORY_KEY, PipelineRequest
-from pipelex.core.pipe_run_params import PipeOutputMultiplicity
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 
 
 class PipelineRequestFactory:

@@ -4,7 +4,8 @@ domain = "failing_pipelines"
 
 [pipe]
 [pipe.dummy]
-PipeLLM = "This pipe is a dummy pipe"
+type = "PipeLLM"
+definition = "This pipe is a dummy pipe"
 output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 1, max_tokens = 50 }
 prompt_template = """
@@ -12,7 +13,8 @@ This is a dummy prompt, do whatever you want. Something funny but not a joke, ok
 """
 
 [pipe.infinite_loop_1]
-PipeSequence = "This pipe will cause an infinite loop"
+type = "PipeSequence"
+definition = "This pipe will cause an infinite loop"
 output = "Text"
 steps = [
     { pipe = "dummy", result = "dummy_result" },

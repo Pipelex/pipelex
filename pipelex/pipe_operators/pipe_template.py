@@ -9,27 +9,27 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.config import get_config
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_content import TextContent
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
 from pipelex.hub import get_content_generator, get_template, get_template_provider
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
-from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
-from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.tools.templating.template_parsing import check_template_parsing
+from pipelex.tools.templating.template_required_variables import detect_template_required_variables
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
 
-class PipeJinja2Output(PipeOutput):
+class PipeTemplateOutput(PipeOutput):
     @property
     def rendered_text(self) -> str:
         return self.main_stuff_as_text.text
@@ -38,22 +38,22 @@ class PipeJinja2Output(PipeOutput):
 class PipeTemplate(PipeOperator):
     model_config = ConfigDict(extra="forbid", strict=False)
 
-    adhoc_pipe_code: ClassVar[str] = "jinja2_render"
+    adhoc_pipe_code: ClassVar[str] = "template_render"
     output_concept_code: str = NativeConcept.TEXT.code
 
     template_name: Optional[str] = None
     template: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None
-    template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
+    template_category: TemplateCategory = TemplateCategory.LLM_PROMPT
     extra_context: Optional[Dict[str, Any]] = None
 
     @model_validator(mode="after")
-    def validate_jinja2(self) -> Self:
+    def validate_template(self) -> Self:
         if not has_exactly_one_among_attributes_from_list(self, attributes_list=["template_name", "template"]):
             raise PipeDefinitionError("PipeTemplate should have exactly one of template_name or template")
         if self.template:
             try:
-                check_jinja2_parsing(jinja2_template_source=self.template, template_category=self.template_category)
+                check_template_parsing(template_source=self.template, template_category=self.template_category)
             except TemplateSyntaxError as exc:
                 raise Jinja2TemplateError(f"Could not parse Jinja2 template included in PipeTemplate: {exc}") from exc
         return self
@@ -75,7 +75,7 @@ class PipeTemplate(PipeOperator):
     def validate_with_libraries(self):
         if self.template_name:
             the_template = get_template(template_name=self.template_name)
-            log.debug(f"Validated jinja2 template '{self.template_name}':\n{the_template}")
+            log.debug(f"Validated template '{self.template_name}':\n{the_template}")
 
     @override
     def needed_inputs(self) -> PipeInputSpec:
@@ -95,11 +95,11 @@ class PipeTemplate(PipeOperator):
 
     @override
     def required_variables(self) -> Set[str]:
-        required_variables = detect_jinja2_required_variables(
+        required_variables = detect_template_required_variables(
             template_category=self.template_category,
             template_provider=get_template_provider(),
-            jinja2_name=self.template_name,
-            jinja2=self.template,
+            template_name=self.template_name,
+            template=self.template,
         )
         return {
             variable_name
@@ -115,7 +115,7 @@ class PipeTemplate(PipeOperator):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
         content_generator: Optional[ContentGeneratorProtocol] = None,
-    ) -> PipeJinja2Output:
+    ) -> PipeTemplateOutput:
         content_generator = content_generator or get_content_generator()
         if pipe_run_params.is_multiple_output_required:
             raise PipeRunParamsError(
@@ -128,16 +128,16 @@ class PipeTemplate(PipeOperator):
         if self.extra_context:
             context.update(**self.extra_context)
 
-        jinja2_text = await content_generator.make_jinja2_text(
+        template_text = await content_generator.make_template_text(
             context=context,
-            jinja2_name=self.template_name,
-            jinja2=self.template,
+            template_name=self.template_name,
+            template=self.template,
             prompting_style=self.prompting_style,
             template_category=self.template_category,
         )
-        log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")
-        assert isinstance(jinja2_text, str)
-        the_content = TextContent(text=jinja2_text)
+        log.verbose(f"Jinja2 rendered text:\n{template_text}")
+        assert isinstance(template_text, str)
+        the_content = TextContent(text=template_text)
 
         output_stuff = Stuff(
             concept_code=self.output_concept_code,
@@ -151,7 +151,7 @@ class PipeTemplate(PipeOperator):
             name=output_name,
         )
 
-        pipe_output = PipeJinja2Output(
+        pipe_output = PipeTemplateOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
@@ -167,11 +167,11 @@ class PipeTemplate(PipeOperator):
         output_name: Optional[str] = None,
     ) -> PipeOutput:
         content_generator_used: ContentGeneratorProtocol
-        if get_config().pipelex.dry_run_config.apply_to_jinja2_rendering:
-            log.debug(f"PipeTemplate: using dry run operator pipe for jinja2 rendering: {self.code}")
+        if get_config().pipelex.dry_run_config.apply_to_template_rendering:
+            log.debug(f"PipeTemplate: using dry run operator pipe for template rendering: {self.code}")
             content_generator_used = ContentGeneratorDry()
         else:
-            log.debug(f"PipeTemplate: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
+            log.debug(f"PipeTemplate: using regular operator pipe for template rendering (dry run not applied to template): {self.code}")
             content_generator_used = get_content_generator()
 
         pipe_output = await self._run_operator_pipe(

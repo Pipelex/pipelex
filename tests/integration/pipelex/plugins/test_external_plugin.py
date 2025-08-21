@@ -11,7 +11,7 @@ from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.core.concept_native import NativeConcept
+from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.hub import get_inference_manager, get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.pipe_llm import PipeLLM, PipeLLMOutput
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt

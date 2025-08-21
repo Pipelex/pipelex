@@ -6,13 +6,13 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import TextContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import DryRunError
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_controllers.pipe_condition import PipeCondition
@@ -31,7 +31,9 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             domain="test_integration",
             code="text_length_condition",
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
@@ -100,7 +102,9 @@ class TestPipeConditionSimple:
         pipe_condition = PipeCondition(
             domain="test_integration",
             code="text_length_condition",
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"input_text": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
+            ),
             output_concept_code="Text",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map={"long": "capitalize_long_text", "short": "add_prefix_short_text"},

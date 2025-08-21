@@ -69,7 +69,7 @@ A domain consists of:
 
 2.  **Python Models** (`.py`)
     ```python
-    from pipelex.core.stuff_content import StructuredContent
+    from pipelex.core.stuffs.stuff_content import StructuredContent
     from pydantic import Field
     from typing import List
     from datetime import date
@@ -110,7 +110,7 @@ A domain consists of:
 When using a domain in your code, you refer to concepts with `domain.ConceptName`:
 
 ```python
-from pipelex.core.stuff_factory import StuffFactory
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 
 # The concept_code combines domain and concept names
 invoice_stuff = StuffFactory.make_stuff(

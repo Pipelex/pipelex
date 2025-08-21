@@ -6,13 +6,13 @@ from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.config import get_config
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff import Stuff
-from pipelex.core.stuff_factory import StuffBlueprint
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_factory import StuffBlueprint
 from pipelex.hub import get_library_manager, get_pipe_router, get_report_delegate
 from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -147,9 +147,11 @@ class TestPipeRunningVariants:
         exception: Type[Exception],
         expected_error_message: str,
     ):
-        failing_pipelines_path = get_config().pipelex.library_config.failing_pipelines_path
+        failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
         library_manager = get_library_manager()
-        library_manager.load_combo_libraries(library_paths=[Path(failing_pipelines_path)])
+        library_manager.load_libraries(
+            library_file_paths=[Path(failing_pipeline_file_path) for failing_pipeline_file_path in failing_pipelines_file_paths]
+        )
 
         log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
         with pytest.raises(exception) as exc:

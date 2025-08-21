@@ -4,7 +4,8 @@ definition = "Test pipes for PipeCondition based on text length"
 [pipe]
 
 [pipe.capitalize_long_text]
-PipeLLM = "Capitalize text for long inputs"
+type = "PipeLLM"
+definition = "Capitalize text for long inputs"
 inputs = { input_text = "Text" }
 output = "Text"
 prompt_template = """Transform the following LONG text to uppercase and add "LONG: " prefix:
@@ -14,7 +15,8 @@ prompt_template = """Transform the following LONG text to uppercase and add "LON
 Return only the prefixed uppercase text, nothing else."""
 
 [pipe.add_prefix_short_text]
-PipeLLM = "Add prefix for short text inputs"
+type = "PipeLLM"
+definition = "Add prefix for short text inputs"
 inputs = { input_text = "Text" }
 output = "Text"
 prompt_template = """Add the prefix "SHORT: " to the beginning of the following text:

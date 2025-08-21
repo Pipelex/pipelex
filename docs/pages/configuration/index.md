@@ -5,13 +5,13 @@
 Pipelex uses a TOML-based configuration system. The main configuration file `pipelex.toml` must be located at the root of your project. You can create this file by running:
 
 ```bash
-pipelex init-config
+pipelex init config
 ```
 
 💡 **Important Notes**:
 
-1. `pipelex init-config` creates a **template** configuration file with sample settings. It does not include all possible configuration options - it's meant as a starting point.
-2. Using `pipelex init-config --reset` will **overwrite** your existing `pipelex.toml` file without warning. Make sure to backup your configuration before using this flag.
+1. `pipelex init config` creates a **template** configuration file with sample settings. It does not include all possible configuration options - it's meant as a starting point.
+2. Using `pipelex init config --reset` will **overwrite** your existing `pipelex.toml` file without warning. Make sure to backup your configuration before using this flag.
 
 For a complete list of all possible configuration options, refer to the configuration group documentation below.
 
@@ -69,5 +69,5 @@ NB: The run_mode unit_test is used for testing purposes.
 1. **Version Control**: Include your base `pipelex.toml` in version control
 2. **Environment Overrides**: Use environment-specific files for sensitive or environment-dependent settings
 3. **Documentation**: Comment any custom settings for team reference
-4. **Validation**: Run `pipelex validate` after making configuration changes
+4. **Validation**: Run `pipelex validate all` after making configuration changes
 5. **Gitignore**: Add local and sensitive override files to `.gitignore`

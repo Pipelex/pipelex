@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 
 from pipelex.client.api_serializer import ApiSerializer
 from pipelex.client.protocol import PipelineResponse, PipelineState
-from pipelex.core.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_output import PipeOutput
 
 
 class PipelineResponseFactory:

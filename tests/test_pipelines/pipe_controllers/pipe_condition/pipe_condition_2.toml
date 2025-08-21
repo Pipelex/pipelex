@@ -6,7 +6,8 @@ CategoryInput = "Input with a category field"
 
 [pipe]
 [pipe.basic_condition_by_category_2]
-PipeCondition = "Route based on category field using expression"
+type = "PipeCondition"
+definition = "Route based on category field using expression"
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
@@ -17,21 +18,24 @@ medium = "process_medium_2"
 large = "process_large_2"
 
 [pipe.process_small_2]
-PipeLLM = "Generate random text for small items"
+type = "PipeLLM"
+definition = "Generate random text for small items"
 output = "native.Text"
 prompt_template = """
 Output this only: "small"
 """
 
 [pipe.process_medium_2]
-PipeLLM = "Generate random text for medium items"
+type = "PipeLLM"
+definition = "Generate random text for medium items"
 output = "native.Text"
 prompt_template = """
 Output this only: "medium"
 """
 
 [pipe.process_large_2]
-PipeLLM = "Generate random text for large items"
+type = "PipeLLM"
+definition = "Generate random text for large items"
 output = "native.Text"
 prompt_template = """
 Output this only: "large"

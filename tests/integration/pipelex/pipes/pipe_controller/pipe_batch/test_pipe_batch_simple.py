@@ -6,12 +6,12 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_run_params import BatchParams, PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff_content import ListContent, StuffContent, TextContent
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_run_params import BatchParams, PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff_content import ListContent, StuffContent, TextContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipe_controllers.pipe_batch import PipeBatch
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -29,7 +29,13 @@ class TestPipeBatchSimple:
             domain="test_integration",
             code="simple_batch",
             branch_pipe_code="uppercase_transformer",  # This exists in the TOML file
-            inputs=PipeInputSpec.make_from_dict(concepts_dict={"text_list": "Text", "text_item": "Text"}),
+            inputs=PipeInputSpec.make_from_blueprint(
+                domain="test_integration",
+                blueprint={
+                    "text_list": InputRequirementBlueprint(concept_code="Text"),
+                    "text_item": InputRequirementBlueprint(concept_code="Text"),
+                },
+            ),
             output_concept_code="test_integration.UppercaseText",
             batch_params=BatchParams(input_list_stuff_name="text_list", input_item_stuff_name="text_item"),
         )

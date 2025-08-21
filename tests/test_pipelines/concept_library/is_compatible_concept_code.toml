@@ -9,38 +9,38 @@ FundamentalsDoc = "A comprehensive overview of the fundamental concepts and prin
 
 # Concept that explicitly refines Text
 [concept.ExplicitTextConcept]
-Concept = "A concept that explicitly refines Text"
+definition = "A concept that explicitly refines Text"
 refines = ["Text"]
 
 # Concept that refines Image
 [concept.ImageBasedConcept]
-Concept = "A concept based on images"
+definition = "A concept based on images"
 refines = ["Image"]
 
 # Concept that refines FundamentalsDoc
 [concept.DocumentationConcept]
-Concept = "A specialized documentation concept"
+definition = "A specialized documentation concept"
 structure = "DocumentationConcept"
 refines = ["FundamentalsDoc"]
 
 # Concept that refines both Text and Image (multiple inheritance)
 [concept.MultiMediaConcept]
-Concept = "A concept that combines text and images"
+definition = "A concept that combines text and images"
 structure = "MultiMediaConcept"
 refines = ["Text", "Image"]
 
 # Concept with custom structure that doesn't refine anything
 [concept.IndependentConcept]
-Concept = "An independent concept with custom structure"
+definition = "An independent concept with custom structure"
 structure = "IndependentConcept"
 
 # Concept that refines a non-native concept
 [concept.SpecializedDoc]
-Concept = "A specialized document that builds on FundamentalsDoc"
+definition = "A specialized document that builds on FundamentalsDoc"
 refines = ["FundamentalsDoc"]
 
 # Chain of inheritance: Text -> ExplicitTextConcept -> DerivedTextConcept
 [concept.DerivedTextConcept]
-Concept = "A concept derived from ExplicitTextConcept"
+definition = "A concept derived from ExplicitTextConcept"
 refines = ["ExplicitTextConcept"]
 

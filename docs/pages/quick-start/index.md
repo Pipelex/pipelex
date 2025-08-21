@@ -14,7 +14,7 @@ For illustration purposes, let's build **a character generator**. Each example r
 ### Write your first pipeline
 
 First, create a `.toml` library file in the `pipelex_libraries/pipelines` directory to store your pipe definition.
-Run `pipelex init-libraries` to create this directory if it doesn't exist. For now, keep all your pipeline definitions inside that folder only.
+Run `pipelex init libraries` to create this directory if it doesn't exist. For now, keep all your pipeline definitions inside that folder only.
 
 `character.toml`
 ```toml
@@ -104,7 +104,7 @@ Using the [Pydantic BaseModel](https://docs.pydantic.dev/latest/) syntax, define
 
 `pipelex_libraries/pipelines/characters.py`
 ```python
-from pipelex.core.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 # Define the structure of your output here
 # This class must inherit from StructuredContent
@@ -160,7 +160,7 @@ We want to extract structured information from the description field. Thus we ha
 
 ```python
 # pipelex_libraries/pipelines/character_model.py
-from pipelex.core.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 # input class
 class Character(StructuredContent):
@@ -208,8 +208,8 @@ Learn more about how we use Jinja in the [PipeLLM documentation](../build-reliab
 ```python
 import asyncio
 
-from pipelex.core.stuff_factory import StuffFactory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 

@@ -3,12 +3,12 @@ from typing import List
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuff import Stuff
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.stuffs.stuff import Stuff
 from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.pipe_llm import PipeLLM, PipeLLMOutput
 from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
@@ -67,7 +67,9 @@ class TestPipeLLM:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm_image",
                 domain="generic",
-                inputs=PipeInputSpec.make_from_dict(concepts_dict={stuff_name: stuff.concept_code}),
+                inputs=PipeInputSpec.make_from_blueprint(
+                    domain="generic", blueprint={stuff_name: InputRequirementBlueprint(concept_code=stuff.concept_code)}
+                ),
                 output_concept_code=NativeConcept.TEXT.code,
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm_image",

@@ -39,7 +39,7 @@ Extract person information from this text:
 Place your Pydantic models in `pipelex_libraries/pipelines/your_models.py`:
 
 ```python
-from pipelex.core.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 class PersonInfo(StructuredContent): # The output models always have to be subclass of StructuredContent
     name: str

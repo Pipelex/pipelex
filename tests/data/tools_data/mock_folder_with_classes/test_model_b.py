@@ -1,4 +1,4 @@
-from pipelex.core.stuff_content import StructuredContent, StuffContent
+from pipelex.core.stuffs.stuff_content import StructuredContent, StuffContent
 
 
 class Class2(StuffContent):

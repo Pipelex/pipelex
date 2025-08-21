@@ -2,9 +2,9 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.core.concept_native import NativeConcept
-from pipelex.core.pipe_run_params import PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.pipe_img_gen import PipeImgGen, PipeImgGenOutput
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory

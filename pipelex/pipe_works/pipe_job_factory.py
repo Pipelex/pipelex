@@ -1,10 +1,10 @@
 from typing import Optional
 
-from pipelex.core.pipe_abstract import PipeAbstract
-from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.pipe_run_params import PipeRunParams
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipe_works.pipe_job import PipeJob
 from pipelex.pipeline.job_metadata import JobMetadata
 

@@ -2,11 +2,11 @@ import asyncio
 from typing import Optional
 
 from pipelex.client.protocol import CompactMemory
-from pipelex.core.pipe_output import PipeOutput
-from pipelex.core.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
-from pipelex.core.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
+from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.exceptions import StartPipelineException
 from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory

@@ -7,7 +7,7 @@ import pipelex.config
 import pipelex.pipelex
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.hub import get_concept_provider
 from tests.cases.registry import Fruit
 
