@@ -1,6 +1,7 @@
 import pytest
 
 from pipelex import log, pretty_print
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -43,7 +44,9 @@ if __name__ == "__main__":
         # Create stuff with the source code
         source_text_stuff = StuffFactory.make_stuff(
             name="source_text",
-            concept_str=NativeConcept.TEXT.value,
+            concept=Concept(
+                code=NativeConcept.TEXT.value, domain="generic", definition=NativeConcept.TEXT.value, structure_class_name=NativeConcept.TEXT.value
+            ),
             content=TextContent(text=sample_code),
         )
 
@@ -55,7 +58,12 @@ if __name__ == "__main__":
             pipe=PipeFunc(
                 code="wrap_lines",
                 domain="source_code",
-                output_concept_code=NativeConcept.TEXT.value,
+                output=Concept(
+                    code=NativeConcept.TEXT.value,
+                    domain="generic",
+                    definition=NativeConcept.TEXT.value,
+                    structure_class_name=NativeConcept.TEXT.value,
+                ),
                 function_name="wrap_lines",
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

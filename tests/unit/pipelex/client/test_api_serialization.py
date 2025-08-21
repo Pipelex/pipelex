@@ -8,10 +8,11 @@ import pytest
 from pydantic import BaseModel
 
 from pipelex.client.api_serializer import ApiSerializer
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.stuffs.stuff_content import NumberContent
+from pipelex.core.stuffs.stuff_content import NumberContent, TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from tests.test_pipelines.datetime import DateTimeEvent
 
@@ -59,19 +60,36 @@ class TestApiSerialization:
             created_at=datetime(2024, 1, 1, 9, 0, 0),
         )
 
-        stuff = StuffFactory.make_stuff(concept_str="event.DateTimeEvent", name="project_meeting", content=datetime_event)
+        stuff = StuffFactory.make_stuff(
+            concept=Concept(
+                code="event.DateTimeEvent", domain="generic", definition="event.DateTimeEvent", structure_class_name="event.DateTimeEvent"
+            ),
+            name="project_meeting",
+            content=datetime_event,
+        )
         return WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
     @pytest.fixture
     def text_content_memory(self) -> WorkingMemory:
         """Create WorkingMemory with text content."""
-        return WorkingMemoryFactory.make_from_text(text="Sample text content", concept_str=NativeConcept.TEXT.value, name="sample_text")
+        stuff = StuffFactory.make_stuff(
+            concept=Concept(
+                code=NativeConcept.TEXT.value, domain="generic", definition=NativeConcept.TEXT.value, structure_class_name=NativeConcept.TEXT.value
+            ),
+            name="sample_text",
+            content=TextContent(text="Sample text content"),
+        )
+        return WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
     @pytest.fixture
     def number_content_memory(self) -> WorkingMemory:
         """Create WorkingMemory with number content."""
         number_content = NumberContent(number=3.14159)
-        stuff = StuffFactory.make_stuff(concept_str="native.Number", name="pi_value", content=number_content)
+        stuff = StuffFactory.make_stuff(
+            concept=Concept(code="native.Number", domain="generic", definition="native.Number", structure_class_name="native.Number"),
+            name="pi_value",
+            content=number_content,
+        )
         return WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
     def test_serialize_working_memory_with_datetime(self, datetime_content_memory: WorkingMemory):

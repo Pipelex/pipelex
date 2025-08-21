@@ -40,8 +40,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     def add_new_pipe(self, pipe: PipeAbstract):
         name = pipe.code
         pipe.inputs.set_default_domain(domain=pipe.domain)
-        if pipe.output_concept_code and "." not in pipe.output_concept_code:
-            pipe.output_concept_code = f"{pipe.domain}.{pipe.output_concept_code}"
+        if pipe.output.code and "." not in pipe.output.code:
+            pipe.output.code = f"{pipe.domain}.{pipe.output.code}"
         if name in self.root:
             raise PipeLibraryError(f"Pipe '{name}' already exists in the library")
         self.root[pipe.code] = pipe
@@ -53,8 +53,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     def add_or_update_pipe(self, pipe: PipeAbstract):
         name = pipe.code
         pipe.inputs.set_default_domain(domain=pipe.domain)
-        if pipe.output_concept_code and "." not in pipe.output_concept_code:
-            pipe.output_concept_code = f"{pipe.domain}.{pipe.output_concept_code}"
+        if pipe.output.code and "." not in pipe.output.code:
+            pipe.output.code = f"{pipe.domain}.{pipe.output.code}"
         self.root[name] = pipe
 
     @override
@@ -121,9 +121,9 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
 
             for pipe in domain_pipes:
                 inputs = pipe.inputs
-                formatted_inputs = [f"{name}: {_format_concept_code(requirement.concept_code, domain)}" for name, requirement in inputs.items]
+                formatted_inputs = [f"{name}: {_format_concept_code(requirement.concept.code, domain)}" for name, requirement in inputs.items]
                 formatted_inputs_str = ", ".join(formatted_inputs)
-                output_code = _format_concept_code(pipe.output_concept_code, domain)
+                output_code = _format_concept_code(pipe.output.code, domain)
 
                 table.add_row(
                     pipe.code,
@@ -135,7 +135,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
                 pipes_dict[domain][pipe.code] = {
                     "definition": pipe.definition or "",
                     "inputs": formatted_inputs_str,
-                    "output": pipe.output_concept_code,
+                    "output": pipe.output.code,
                 }
 
             pretty_print(table)

@@ -12,7 +12,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConcept
+from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.domains.domain import Domain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
@@ -101,10 +101,12 @@ class PipeLLM(PipeOperator):
         concept_provider = get_concept_provider()
 
         for input_name, requirement in self.inputs.items:
-            if concept_provider.is_image_concept(concept_code=requirement.concept_code):
-                needed_inputs.add_requirement(variable_name=input_name, concept_code="native.Image")
+            if concept_provider.is_image_concept(concept_code=requirement.concept.code):
+                needed_inputs.add_requirement(
+                    variable_name=input_name, concept=Concept(code="native.Image", domain="native", definition="Image", structure_class_name="Image")
+                )
             else:
-                needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
+                needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
 
         return needed_inputs
 
@@ -149,7 +151,7 @@ class PipeLLM(PipeOperator):
                         raise missing_input_var_error
 
             # there is one case where the needed input is of specific concept: the user_images
-            if named_input_requirement.concept_code == "native.Image":
+            if named_input_requirement.concept.code == "native.Image":
                 try:
                     concept_code_of_declared_input = self.inputs.get_required_concept_code(variable_name=named_input_requirement.variable_name)
                 except PipeInputNotFoundError as exc:
@@ -158,7 +160,7 @@ class PipeLLM(PipeOperator):
                     ) from exc
                 if not concept_provider.is_compatible_by_concept_code(
                     tested_concept_code=concept_code_of_declared_input,
-                    wanted_concept_code=named_input_requirement.concept_code,
+                    wanted_concept_code=named_input_requirement.concept.code,
                 ):
                     if named_input_requirement.variable_name != named_input_requirement.requirement_expression:
                         # the required_input is a sub-attribute of the required variable
@@ -227,7 +229,7 @@ class PipeLLM(PipeOperator):
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {self.code}")
-        if self.output_concept_code == "native.Dynamic":
+        if self.output.code == "native.Dynamic":
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
             output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
@@ -235,9 +237,11 @@ class PipeLLM(PipeOperator):
             if not output_concept_code:
                 output_concept_code = "native.Text"
         else:
-            output_concept_code = self.output_concept_code
+            output_concept_code = self.output.code
 
-        self.pipe_llm_prompt.output_concept_code = output_concept_code
+        self.pipe_llm_prompt.output = Concept(
+            code=output_concept_code, domain="generic", definition=output_concept_code, structure_class_name=output_concept_code
+        )
 
         applied_output_multiplicity, is_multiple_output, fixed_nb_output = output_multiplicity_to_apply(
             output_multiplicity_base=self.output_multiplicity,
@@ -360,7 +364,7 @@ class PipeLLM(PipeOperator):
                             domain=self.domain,
                             user_pipe_jinja2=user_pipe_jinja2,
                             system_prompt=system_prompt,
-                            output_concept_code=output_concept_code,
+                            output=output_concept,
                         )
                         llm_prompt_2_factory = PipedLLMPromptFactory(
                             pipe_llm_prompt=pipe_llm_prompt_2,
@@ -383,7 +387,7 @@ class PipeLLM(PipeOperator):
                     domain=self.domain,
                     user_pipe_jinja2=user_pipe_jinja2,
                     system_prompt=system_prompt,
-                    output_concept_code=output_concept_code,
+                    output=output_concept,
                 )
                 llm_prompt_2_factory = PipedLLMPromptFactory(
                     pipe_llm_prompt=pipe_llm_prompt_2,
@@ -403,7 +407,7 @@ class PipeLLM(PipeOperator):
                 content_generator=content_generator,
             )
 
-        output_stuff = StuffFactory.make_stuff_using_concept(
+        output_stuff = StuffFactory.make_stuff(
             name=output_name,
             concept=output_concept,
             content=the_content,

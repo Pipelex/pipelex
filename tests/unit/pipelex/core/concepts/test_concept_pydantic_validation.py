@@ -47,8 +47,8 @@ class TestConceptPydanticFieldValidation:
         # NativeConcept strings should be converted to full codes
         assert concept.refines == [
             NativeConcept.TEXT.value,
-            NativeConcept.IMAGE.code,
-            NativeConcept.PDF.code,
+            NativeConcept.IMAGE.value,
+            NativeConcept.PDF.value,
         ]
 
     def test_concept_creation_with_mixed_refines(self):
@@ -69,7 +69,7 @@ class TestConceptPydanticFieldValidation:
             "valid_domain.ValidConcept",
             NativeConcept.TEXT.value,
             "another_domain.AnotherConcept",
-            NativeConcept.IMAGE.code,
+            NativeConcept.IMAGE.value,
         ]
         assert concept.refines == expected_refines
 
@@ -87,9 +87,9 @@ class TestConceptPydanticFieldValidation:
             ],
         )
         assert concept.refines == [
-            NativeConcept.DYNAMIC.code,
+            NativeConcept.DYNAMIC.value,
             NativeConcept.TEXT.value,
-            NativeConcept.NUMBER.code,
+            NativeConcept.NUMBER.value,
         ]
 
     def test_concept_creation_with_refines_missing_dot(self):

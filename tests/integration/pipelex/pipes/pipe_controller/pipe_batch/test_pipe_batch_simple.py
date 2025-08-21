@@ -6,6 +6,8 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeRunMode
@@ -36,7 +38,7 @@ class TestPipeBatchSimple:
                     "text_item": InputRequirementBlueprint(concept_code="Text"),
                 },
             ),
-            output_concept_code="test_integration.UppercaseText",
+            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
             batch_params=BatchParams(input_list_stuff_name="text_list", input_item_stuff_name="text_item"),
         )
 
@@ -48,7 +50,7 @@ class TestPipeBatchSimple:
         ]
 
         text_list_stuff = StuffFactory.make_stuff(
-            concept_str="Text",
+            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
             content=ListContent[StuffContent](items=cast(List[StuffContent], text_items)),
             name="text_list",
         )
@@ -128,7 +130,7 @@ class TestPipeBatchSimple:
         # New result should be added
         batch_result = final_working_memory.get_stuff("batch_result")
         assert batch_result is not None
-        assert batch_result.concept_code == "test_integration.UppercaseText"
+        assert batch_result.concept.code == "test_integration.UppercaseText"
 
         # Verify the batch result content matches exactly
         assert isinstance(batch_result.content, ListContent)

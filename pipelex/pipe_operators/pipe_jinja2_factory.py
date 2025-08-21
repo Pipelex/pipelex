@@ -3,6 +3,7 @@ from typing import Literal, Optional
 from typing_extensions import override
 
 from pipelex.config import get_config
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
@@ -45,7 +46,9 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
             code=pipe_code,
             definition=pipe_blueprint.definition,
             inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
-            output_concept_code=pipe_blueprint.output,
+            output=Concept(
+                code=pipe_blueprint.output, domain="generic", definition=pipe_blueprint.output, structure_class_name=pipe_blueprint.output
+            ),
             jinja2_name=pipe_blueprint.jinja2_name,
             jinja2=preprocessed_template,
             prompting_style=pipe_blueprint.prompting_style,

@@ -20,7 +20,7 @@ class TestWorkingMemoryFactory:
         assert "text_item" in working_memory.root
 
         stuff = working_memory.root["text_item"]
-        assert stuff.concept_code == NativeConcept.TEXT.value
+        assert stuff.concept.code == NativeConcept.TEXT.value
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == "Hello, world!"
 
@@ -39,7 +39,7 @@ class TestWorkingMemoryFactory:
         assert "structured_item" in working_memory.root
 
         stuff = working_memory.root["structured_item"]
-        assert stuff.concept_code == "some.CustomConcept"
+        assert stuff.concept.code == "some.CustomConcept"
         assert stuff.content is not None
         assert isinstance(stuff.content, TextContent)  # Falls back to TextContent
 
@@ -47,7 +47,7 @@ class TestWorkingMemoryFactory:
         """Test deserialization of compact memory with complex nested structured content."""
         compact_memory: CompactMemory = {
             "complex_page": {
-                "concept_code": NativeConcept.PAGE.code,
+                "concept_code": NativeConcept.PAGE.value,
                 "content": {
                     "text_and_images": {
                         "text": {
@@ -79,7 +79,7 @@ class TestWorkingMemoryFactory:
         assert "complex_page" in working_memory.root
 
         stuff = working_memory.root["complex_page"]
-        assert stuff.concept_code == NativeConcept.PAGE.code
+        assert stuff.concept.code == NativeConcept.PAGE.value
         assert isinstance(stuff.content, PageContent)
 
         # Verify text_and_images structure
@@ -169,6 +169,6 @@ class TestWorkingMemoryFactory:
 
         # Verify structured content (falls back to TextContent)
         structured_stuff = working_memory.root["structured"]
-        assert structured_stuff.concept_code == "custom.Concept"
+        assert structured_stuff.concept.code == "custom.Concept"
         assert isinstance(structured_stuff.content, TextContent)
         assert structured_stuff.content.text == "Fallback text for custom concept"

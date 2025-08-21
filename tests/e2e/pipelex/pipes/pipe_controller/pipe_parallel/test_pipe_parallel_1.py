@@ -4,6 +4,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -36,7 +37,12 @@ class TestPipeParallelDocumentAnalysis:
         # Create input data
         document_input = DocumentInput(text=document_text)
         stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_parallel.DocumentInput",
+            concept=Concept(
+                code="test_pipe_parallel.DocumentInput",
+                domain="generic",
+                definition="test_pipe_parallel.DocumentInput",
+                structure_class_name="test_pipe_parallel.DocumentInput",
+            ),
             content=document_input,
             name="document",
         )

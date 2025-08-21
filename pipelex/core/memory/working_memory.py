@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
 from pipelex import log, pretty_print
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
@@ -60,7 +61,7 @@ class WorkingMemory(BaseModel):
             content = stuff.content.rendered_plain()
             if len(content) > PRETTY_PRINT_MAX_LENGTH:
                 content = content[:PRETTY_PRINT_MAX_LENGTH] + "..."
-            pretty_print(content, title=f"{stuff.stuff_name} ({stuff.concept_code})")
+            pretty_print(content, title=f"{stuff.stuff_name} ({stuff.concept.code})")
 
     def make_deep_copy(self) -> Self:
         return self.model_copy(deep=True)
@@ -155,7 +156,7 @@ class WorkingMemory(BaseModel):
 
     def is_stuff_code_used(self, stuff_code: str) -> bool:
         for stuff in self.root.values():
-            if stuff.concept_code == stuff_code:
+            if stuff.concept.code == stuff_code:
                 return True
         return False
 
@@ -196,12 +197,12 @@ class WorkingMemory(BaseModel):
         if name:
             self.remove_main_stuff()
             self.add_new_stuff(name=name, stuff=stuff, aliases=[MAIN_STUFF_NAME])
-            log.verbose(f"Setting new main stuff {name}: {stuff.concept_code} = '{stuff.short_desc}'")
+            log.verbose(f"Setting new main stuff {name}: {stuff.concept.code} = '{stuff.short_desc}'")
             log.verbose(stuff.content.rendered_plain())
         else:
             self.remove_alias_to_main_stuff()
             self.set_stuff(name=MAIN_STUFF_NAME, stuff=stuff)
-            log.verbose(f"Setting new main stuff (unnamed): {stuff.concept_code} = '{stuff.short_desc}'")
+            log.verbose(f"Setting new main stuff (unnamed): {stuff.concept.code} = '{stuff.short_desc}'")
 
     def set_alias(self, alias: str, target: str) -> None:
         """Add an alias pointing to a target name."""
@@ -247,7 +248,7 @@ class WorkingMemory(BaseModel):
 
     def pretty_print(self):
         for name, stuff in self.root.items():
-            pretty_print(stuff.content.rendered_plain(), title=f"{name}: {stuff.concept_code}")
+            pretty_print(stuff.content.rendered_plain(), title=f"{name}: {stuff.concept.code}")
 
     def update_from_strings_from_dict(self, context_dict: Dict[str, Any]) -> "WorkingMemory":
         update_stuff_dict: StuffDict = {}
@@ -266,7 +267,12 @@ class WorkingMemory(BaseModel):
             update_stuff_dict[name] = Stuff(
                 stuff_name=name,
                 stuff_code="",
-                concept_code=NativeConcept.TEXT.value,
+                concept=Concept(
+                    code=NativeConcept.TEXT.value,
+                    domain="generic",
+                    definition=NativeConcept.TEXT.value,
+                    structure_class_name=NativeConcept.TEXT.value,
+                ),
                 content=stuff_content,
             )
         self.root.update(update_stuff_dict)

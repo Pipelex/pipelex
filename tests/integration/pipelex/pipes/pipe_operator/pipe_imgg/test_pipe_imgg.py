@@ -2,6 +2,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -30,7 +31,12 @@ class TestPipeImgg:
                 domain="generic",
                 imgg_handle=imgg_handle,
                 imgg_prompt=image_desc,
-                output_concept_code=NativeConcept.IMAGE.code,
+                output=Concept(
+                    code=NativeConcept.IMAGE.value,
+                    domain="native",
+                    definition=NativeConcept.IMAGE.value,
+                    structure_class_name=NativeConcept.IMAGE.value,
+                ),
                 output_multiplicity=False,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

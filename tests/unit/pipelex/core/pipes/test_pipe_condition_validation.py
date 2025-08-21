@@ -1,3 +1,4 @@
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.pipe_controllers.pipe_condition import PipeCondition, PipeConditionPipeMap
 
@@ -13,7 +14,7 @@ class TestPipeConditionValidation:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_domain", blueprint={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output_concept_code="test_domain.ProcessedText",
+            output=Concept(code="test_domain.ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"),
             expression="input_var",
             pipe_map=[
                 PipeConditionPipeMap(expression_result="value1", pipe_code="pipe_a"),
@@ -37,7 +38,7 @@ class TestPipeConditionValidation:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_domain", blueprint={"var": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output_concept_code="test_domain.Result",
+            output=Concept(code="test_domain.Result", domain="test_domain", definition="Result", structure_class_name="Result"),
             expression_template="{{ var }}",
             pipe_map=[PipeConditionPipeMap(expression_result="value", pipe_code="target_pipe")],
         )
@@ -49,7 +50,7 @@ class TestPipeConditionValidation:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_domain", blueprint={"var": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output_concept_code="test_domain.Result",
+            output=Concept(code="test_domain.Result", domain="test_domain", definition="Result", structure_class_name="Result"),
             expression="var",
             pipe_map=[PipeConditionPipeMap(expression_result="value", pipe_code="target_pipe")],
         )

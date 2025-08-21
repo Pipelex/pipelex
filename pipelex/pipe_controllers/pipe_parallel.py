@@ -6,6 +6,7 @@ from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -53,12 +54,12 @@ class PipeParallel(PipeController):
                 filtered_needed_inputs = PipeInputSpec.make_empty()
                 for var_name, requirement in pipe_needed_inputs.root.items():
                     if var_name != batch_as_input:
-                        filtered_needed_inputs.add_requirement(variable_name=var_name, concept_code=requirement.concept_code)
+                        filtered_needed_inputs.add_requirement(variable_name=var_name, concept=requirement.concept)
                 pipe_needed_inputs = filtered_needed_inputs
 
             # Add all inputs from this parallel pipe
             for var_name, requirement in pipe_needed_inputs.root.items():
-                needed_inputs.add_requirement(variable_name=var_name, concept_code=requirement.concept_code)
+                needed_inputs.add_requirement(variable_name=var_name, concept=requirement.concept)
 
         return needed_inputs
 
@@ -184,7 +185,7 @@ class PipeParallel(PipeController):
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
         if combined_output := self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
-                concept_code=combined_output,
+                concept=Concept(code=combined_output, domain=self.domain, definition=combined_output, structure_class_name=combined_output),
                 stuff_contents=output_stuff_contents,
                 name=output_name,
             )
@@ -296,7 +297,7 @@ class PipeParallel(PipeController):
         # 5. Handle combined output if specified
         if combined_output := self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
-                concept_code=combined_output,
+                concept=Concept(code=combined_output, domain=self.domain, definition=combined_output, structure_class_name=combined_output),
                 stuff_contents=output_stuff_contents,
                 name=output_name,
             )

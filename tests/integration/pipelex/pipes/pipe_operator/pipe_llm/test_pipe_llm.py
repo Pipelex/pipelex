@@ -3,6 +3,7 @@ from typing import List
 import pytest
 
 from pipelex import log, pretty_print
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
@@ -29,12 +30,13 @@ class TestPipeLLM:
             pipe=PipeLLM(
                 code="adhoc_for_test_pipe_llm",
                 domain="generic",
-                output_concept_code=NativeConcept.TEXT.value,
+                output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm",
                     domain="generic",
                     system_prompt=PipeTestCases.SYSTEM_PROMPT,
                     user_text=PipeTestCases.USER_PROMPT,
+                    output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
                 ),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -68,14 +70,15 @@ class TestPipeLLM:
                 code="adhoc_for_test_pipe_llm_image",
                 domain="generic",
                 inputs=PipeInputSpec.make_from_blueprint(
-                    domain="generic", blueprint={stuff_name: InputRequirementBlueprint(concept_code=stuff.concept_code)}
+                    domain="generic", blueprint={stuff_name: InputRequirementBlueprint(concept_code=stuff.concept.code)}
                 ),
-                output_concept_code=NativeConcept.TEXT.value,
+                output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
                 pipe_llm_prompt=PipeLLMPrompt(
                     code="adhoc_for_test_pipe_llm_image",
                     domain="generic",
                     system_prompt=PipeTestCases.SYSTEM_PROMPT,
                     user_text=PipeTestCases.MULTI_IMG_DESC_PROMPT,
+                    output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
                 ),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

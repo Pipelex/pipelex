@@ -120,7 +120,6 @@ class Pipelex(metaclass=MetaSingleton):
         # pipelex libraries
         domain_library = DomainLibrary.make_empty()
         concept_library = ConceptLibrary.make_empty()
-        concept_library.load_native_concepts()
         pipe_library = PipeLibrary.make_empty()
         self.pipelex_hub.set_domain_provider(domain_provider=domain_library)
         self.pipelex_hub.set_concept_provider(concept_provider=concept_library)

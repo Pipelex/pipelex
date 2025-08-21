@@ -5,6 +5,7 @@ from typing import cast
 import pytest
 
 from pipelex import log
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -27,7 +28,12 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
             needed_inputs=[
                 TypedNamedInputRequirement(
                     variable_name="document",
-                    concept_code="customer_feedback.Document",
+                    concept=Concept(
+                        code="customer_feedback.Document",
+                        domain="generic",
+                        definition="customer_feedback.Document",
+                        structure_class_name="customer_feedback.Document",
+                    ),
                     structure_class=Document,
                 ),
             ]
@@ -41,7 +47,12 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     else:
         document_stuff = StuffFactory.make_stuff(
             name="document",
-            concept_str="customer_feedback.Document",
+            concept=Concept(
+                code="customer_feedback.Document",
+                domain="generic",
+                definition="customer_feedback.Document",
+                structure_class_name="customer_feedback.Document",
+            ),
             content=Document(
                 text="Review 1: Great product! Love the quality and fast shipping. 5 stars!\n\n\
                 Review 2: Could be better. The product arrived damaged and customer service\
@@ -61,7 +72,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     assert pipe_output is not None
     assert pipe_output.working_memory is not None
     assert pipe_output.main_stuff is not None
-    assert pipe_output.main_stuff.concept_code == "customer_feedback.ProductRating"
+    assert pipe_output.main_stuff.concept.code == "customer_feedback.ProductRating"
 
     # Log the working memory for debugging
     log.debug("Final working memory after pipeline execution:")

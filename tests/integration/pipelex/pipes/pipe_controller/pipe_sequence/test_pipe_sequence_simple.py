@@ -6,6 +6,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -32,7 +33,7 @@ class TestPipeSequenceSimple:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
             ),
-            output_concept_code="Text",
+            output=Concept(code="Text", domain="test_integration", definition="Text", structure_class_name="Text"),
             sequential_sub_pipes=[
                 SubPipe(pipe_code="capitalize_text", output_name="capitalized_text"),
                 SubPipe(pipe_code="add_prefix", output_name="final_text"),
@@ -41,7 +42,7 @@ class TestPipeSequenceSimple:
 
         # Create test data - single text input
         input_text_stuff = StuffFactory.make_stuff(
-            concept_str="Text",
+            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
             content=TextContent(text="hello world"),
             name="input_text",
         )

@@ -41,17 +41,15 @@ class SubPipe(BaseModel):
                     f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
                     f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
                 ) from exc
-            input_concept_code = input_list_stuff.concept_code
-            output_concept_code = pipe.output_concept_code
 
             sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
             pipe_batch_inputs = sub_pipe.inputs
-            pipe_batch_inputs.add_requirement(variable_name=batch_params.input_list_stuff_name, concept_code=input_concept_code)
+            pipe_batch_inputs.add_requirement(variable_name=batch_params.input_list_stuff_name, concept=input_list_stuff.concept)
             pipe_batch = PipeBatch(
                 domain=pipe.domain,
                 code=self.pipe_code,
                 inputs=pipe_batch_inputs,
-                output_concept_code=output_concept_code,
+                output=pipe.output,
                 branch_pipe_code=self.pipe_code,
             )
             # This is the only line that changes between run and dry_run

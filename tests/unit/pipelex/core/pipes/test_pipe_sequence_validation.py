@@ -1,3 +1,4 @@
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.pipe_controllers.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -14,7 +15,7 @@ class TestPipeSequenceValidation:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_domain", blueprint={"text": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output_concept_code="test_domain.ProcessedText",
+            output=Concept(code="test_domain.ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"),
             sequential_sub_pipes=[SubPipe(pipe_code="test_pipe_1", output_name="intermediate_result")],
         )
 
@@ -32,10 +33,10 @@ class TestPipeSequenceValidation:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_domain", blueprint={"initial_input": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output_concept_code="test_domain.FinalOutput",
+            output=Concept(code="test_domain.FinalOutput", domain="test_domain", definition="Final output", structure_class_name="FinalOutput"),
             sequential_sub_pipes=[SubPipe(pipe_code="step_1", output_name="intermediate"), SubPipe(pipe_code="step_2", output_name="final_output")],
         )
 
         assert pipe_sequence.code == "test_sequence"
         assert len(pipe_sequence.sequential_sub_pipes) == 2
-        assert pipe_sequence.inputs.root["initial_input"].concept_code == "test_domain.Text"
+        assert pipe_sequence.inputs.root["initial_input"].concept.code == "test_domain.Text"

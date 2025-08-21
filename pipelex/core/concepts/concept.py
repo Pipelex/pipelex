@@ -1,4 +1,3 @@
-import re
 from typing import Dict, List
 
 from kajson.kajson_manager import KajsonManager
@@ -43,8 +42,8 @@ class Concept(BaseModel):
                 )
 
     @classmethod
-    def sentence_from_concept_code(cls, concept_code: str) -> str:
-        return pascal_case_to_sentence(name=concept_code)
+    def sentence_from_concept(cls, concept: "Concept") -> str:
+        return pascal_case_to_sentence(name=concept.code)
 
     @property
     def node_name(self) -> str:

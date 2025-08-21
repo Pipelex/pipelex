@@ -3,6 +3,8 @@
 import pytest
 
 from pipelex import pretty_print
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -26,7 +28,7 @@ class TestPipeConditionSimple:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_domain", blueprint={"user_category": InputRequirementBlueprint(concept_code="test_pipe_condition.CategoryInput")}
             ),
-            output_concept_code="native.Text",
+            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
             expression_template="{{ user_category.category }}",
             pipe_map=[
                 PipeConditionPipeMap(expression_result="small", pipe_code="process_small"),
@@ -61,7 +63,7 @@ class TestPipeConditionSimple:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_domain", blueprint={"user_status": InputRequirementBlueprint(concept_code="test_pipe_condition.CategoryInput")}
             ),
-            output_concept_code="native.Text",
+            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
             expression_template="{{ user_status.category }}",
             pipe_map=[
                 PipeConditionPipeMap(expression_result="active", pipe_code="process_small"),
@@ -76,7 +78,12 @@ class TestPipeConditionSimple:
             needed_inputs=[
                 TypedNamedInputRequirement(
                     variable_name="user_status",
-                    concept_code="test_pipe_condition.CategoryInput",
+                    concept=Concept(
+                        code="test_pipe_condition.CategoryInput",
+                        domain="test_domain",
+                        definition="CategoryInput",
+                        structure_class_name="CategoryInput",
+                    ),
                     structure_class=CategoryInput,
                 )
             ]

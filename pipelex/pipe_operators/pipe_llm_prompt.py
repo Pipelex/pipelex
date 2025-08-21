@@ -41,7 +41,7 @@ class PipeLLMPromptOutput(PipeOutput):
 class PipeLLMPrompt(PipeOperator):
     adhoc_pipe_code: ClassVar[str] = "adhoc_pipe_code_for_prompt_llm"
 
-    output_concept_code: str = NativeConcept.LLM_PROMPT.code
+    output: Concept = Concept(code=NativeConcept.LLM_PROMPT.value, domain="native", definition="LLMPrompt", structure_class_name="LLMPrompt")
 
     prompting_style: Optional[PromptingStyle] = None
 
@@ -106,7 +106,15 @@ class PipeLLMPrompt(PipeOperator):
             if conceptless_required_variable.startswith("_"):
                 # variables starting with _ are run parameters, not inputs
                 continue
-            pipe_input_spec.add_requirement(variable_name=conceptless_required_variable, concept_code=NativeConcept.ANYTHING.code)
+            pipe_input_spec.add_requirement(
+                variable_name=conceptless_required_variable,
+                concept=Concept(
+                    code=NativeConcept.ANYTHING.value,
+                    domain="native",
+                    definition=NativeConcept.ANYTHING.value,
+                    structure_class_name=NativeConcept.ANYTHING.value,
+                ),
+            )
 
         return pipe_input_spec
 
@@ -172,16 +180,21 @@ class PipeLLMPrompt(PipeOperator):
         # Append output structure prompt if needed
         if pipe_run_params.dynamic_output_concept_code:
             user_text += PipeLLMPrompt.get_output_structure_prompt(
-                output_concept=pipe_run_params.dynamic_output_concept_code,
+                output_concept=Concept(
+                    code=pipe_run_params.dynamic_output_concept_code,
+                    domain="generic",
+                    definition=pipe_run_params.dynamic_output_concept_code,
+                    structure_class_name=pipe_run_params.dynamic_output_concept_code,
+                ),
                 is_with_preliminary_text=pipe_run_params.is_with_preliminary_text or False,
             )
         else:
             user_text += PipeLLMPrompt.get_output_structure_prompt(
-                output_concept=self.output_concept_code,
+                output_concept=self.output,
                 is_with_preliminary_text=pipe_run_params.is_with_preliminary_text or False,
             )
 
-        log.verbose(f"User text with {self.output_concept_code=}:\n {user_text}")
+        log.verbose(f"User text with {self.output.code=}:\n {user_text}")
 
         ############################################################
         # System text
@@ -206,7 +219,7 @@ class PipeLLMPrompt(PipeOperator):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept_str=self.output_concept_code,
+            concept=self.output,
             content=llm_prompt,
         )
 
@@ -237,8 +250,8 @@ class PipeLLMPrompt(PipeOperator):
         )
 
     @staticmethod
-    def get_output_structure_prompt(output_concept: str, is_with_preliminary_text: bool) -> str:
-        class_name = Concept.extract_concept_name_from_str(concept_str=output_concept)
+    def get_output_structure_prompt(output_concept: Concept, is_with_preliminary_text: bool) -> str:
+        class_name = output_concept.structure_class_name
         output_class = get_class_registry().get_class(class_name)
         if not output_class:
             return ""

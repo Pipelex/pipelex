@@ -31,16 +31,14 @@ class PipelexBundleFactory(BaseModel):
         )
         concepts: Dict[str, Concept] = {}
         if blueprint.concept is not None:
-            for concept_name, concept_blueprint_or_str in blueprint.concept.items():
-                if isinstance(concept_blueprint_or_str, ConceptBlueprint):
-                    concepts[concept_name] = ConceptFactory.make_concept_from_blueprint(
-                        domain=blueprint.domain, concept_code=concept_name, concept_blueprint=concept_blueprint_or_str
-                    )
-                else:
-                    # One line concepts
-                    concepts[concept_name] = ConceptFactory.make_concept_from_definition_str(
-                        domain_code=blueprint.domain, concept_str=concept_name, definition=concept_blueprint_or_str
-                    )
+            for concept_code, concept_blueprint_or_str in blueprint.concept.items():
+                concepts[concept_code] = ConceptFactory.make_concept_from_blueprint(
+                    domain=blueprint.domain,
+                    concept_code=concept_code,
+                    concept_blueprint=ConceptBlueprint(definition=concept_blueprint_or_str)
+                    if isinstance(concept_blueprint_or_str, str)
+                    else concept_blueprint_or_str,
+                )
 
         pipes: Dict[str, PipeAbstract] = {}
         if blueprint.pipe is not None:

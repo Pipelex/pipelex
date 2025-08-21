@@ -171,7 +171,7 @@ def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List
     for named_input_requirement in needed_inputs_spec.named_input_requirements:
         try:
             # Get the concept and its structure class
-            concept = concept_provider.get_required_concept(concept_code=named_input_requirement.concept_code)
+            concept = concept_provider.get_required_concept(concept_code=named_input_requirement.concept.code)
             structure_class_name = concept.structure_class_name
 
             # Get the actual class from the registry
@@ -187,7 +187,7 @@ def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List
                 # Fallback to TextContent if we can't get the proper class
                 log.warning(
                     f"Could not get structure class '{structure_class_name}' for "
-                    f"concept '{named_input_requirement.concept_code}', falling back to TextContent"
+                    f"concept '{named_input_requirement.concept.code}', falling back to TextContent"
                 )
                 text_typed_named_input_requirement = TypedNamedInputRequirement.make_from_named(
                     named=named_input_requirement,
@@ -197,7 +197,7 @@ def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List
 
         except Exception as exc:
             # Fallback to TextContent for any errors
-            log.warning(f"Error getting structure class for concept '{named_input_requirement.concept_code}': {exc}, falling back to TextContent")
+            log.warning(f"Error getting structure class for concept '{named_input_requirement.concept.code}': {exc}, falling back to TextContent")
             text_typed_named_input_requirement = TypedNamedInputRequirement.make_from_named(
                 named=named_input_requirement,
                 structure_class=TextContent,

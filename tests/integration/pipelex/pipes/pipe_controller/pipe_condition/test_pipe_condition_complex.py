@@ -6,6 +6,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -36,12 +37,22 @@ class TestPipeConditionComplex:
 
         # Create stuffs for working memory
         doc_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.DocumentRequest",
+            concept=Concept(
+                code="test_pipe_condition_complex.DocumentRequest",
+                domain="generic",
+                definition="test_pipe_condition_complex.DocumentRequest",
+                structure_class_name="test_pipe_condition_complex.DocumentRequest",
+            ),
             content=doc_request,
             name="doc_request",
         )
         user_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.UserProfile",
+            concept=Concept(
+                code="test_pipe_condition_complex.UserProfile",
+                domain="generic",
+                definition="test_pipe_condition_complex.UserProfile",
+                structure_class_name="test_pipe_condition_complex.UserProfile",
+            ),
             content=user_profile,
             name="user_profile",
         )
@@ -74,12 +85,22 @@ class TestPipeConditionComplex:
         user_profile = UserProfile(user_level="intermediate", department="finance")
 
         doc_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.DocumentRequest",
+            concept=Concept(
+                code="test_pipe_condition_complex.DocumentRequest",
+                domain="generic",
+                definition="test_pipe_condition_complex.DocumentRequest",
+                structure_class_name="test_pipe_condition_complex.DocumentRequest",
+            ),
             content=doc_request,
             name="doc_request",
         )
         user_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.UserProfile",
+            concept=Concept(
+                code="test_pipe_condition_complex.UserProfile",
+                domain="generic",
+                definition="test_pipe_condition_complex.UserProfile",
+                structure_class_name="test_pipe_condition_complex.UserProfile",
+            ),
             content=user_profile,
             name="user_profile",
         )
@@ -107,12 +128,22 @@ class TestPipeConditionComplex:
         user_profile = UserProfile(user_level="expert", department="legal")
 
         doc_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.DocumentRequest",
+            concept=Concept(
+                code="test_pipe_condition_complex.DocumentRequest",
+                domain="generic",
+                definition="test_pipe_condition_complex.DocumentRequest",
+                structure_class_name="test_pipe_condition_complex.DocumentRequest",
+            ),
             content=doc_request,
             name="doc_request",
         )
         user_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.UserProfile",
+            concept=Concept(
+                code="test_pipe_condition_complex.UserProfile",
+                domain="generic",
+                definition="test_pipe_condition_complex.UserProfile",
+                structure_class_name="test_pipe_condition_complex.UserProfile",
+            ),
             content=user_profile,
             name="user_profile",
         )
@@ -148,12 +179,22 @@ class TestPipeConditionComplex:
         )
 
         doc_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.DocumentRequest",
+            concept=Concept(
+                code="test_pipe_condition_complex.DocumentRequest",
+                domain="generic",
+                definition="test_pipe_condition_complex.DocumentRequest",
+                structure_class_name="test_pipe_condition_complex.DocumentRequest",
+            ),
             content=doc_request,
             name="doc_request",
         )
         user_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.UserProfile",
+            concept=Concept(
+                code="test_pipe_condition_complex.UserProfile",
+                domain="generic",
+                definition="test_pipe_condition_complex.UserProfile",
+                structure_class_name="test_pipe_condition_complex.UserProfile",
+            ),
             content=user_profile,
             name="user_profile",
         )
@@ -182,12 +223,22 @@ class TestPipeConditionComplex:
         user_profile = UserProfile(user_level="beginner", department="marketing")
 
         doc_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.DocumentRequest",
+            concept=Concept(
+                code="test_pipe_condition_complex.DocumentRequest",
+                domain="generic",
+                definition="test_pipe_condition_complex.DocumentRequest",
+                structure_class_name="test_pipe_condition_complex.DocumentRequest",
+            ),
             content=doc_request,
             name="doc_request",
         )
         user_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.UserProfile",
+            concept=Concept(
+                code="test_pipe_condition_complex.UserProfile",
+                domain="generic",
+                definition="test_pipe_condition_complex.UserProfile",
+                structure_class_name="test_pipe_condition_complex.UserProfile",
+            ),
             content=user_profile,
             name="user_profile",
         )
@@ -211,7 +262,12 @@ class TestPipeConditionComplex:
         doc_request = DocumentRequest(document_type="technical", priority="urgent", language="english", complexity="high")
 
         doc_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.DocumentRequest",
+            concept=Concept(
+                code="test_pipe_condition_complex.DocumentRequest",
+                domain="generic",
+                definition="test_pipe_condition_complex.DocumentRequest",
+                structure_class_name="test_pipe_condition_complex.DocumentRequest",
+            ),
             content=doc_request,
             name="doc_request",
         )
@@ -270,12 +326,22 @@ class TestPipeConditionComplex:
         )
 
         doc_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.DocumentRequest",
+            concept=Concept(
+                code="test_pipe_condition_complex.DocumentRequest",
+                domain="generic",
+                definition="test_pipe_condition_complex.DocumentRequest",
+                structure_class_name="test_pipe_condition_complex.DocumentRequest",
+            ),
             content=doc_request,
             name="doc_request",
         )
         user_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_complex.UserProfile",
+            concept=Concept(
+                code="test_pipe_condition_complex.UserProfile",
+                domain="generic",
+                definition="test_pipe_condition_complex.UserProfile",
+                structure_class_name="test_pipe_condition_complex.UserProfile",
+            ),
             content=user_profile,
             name="user_profile",
         )

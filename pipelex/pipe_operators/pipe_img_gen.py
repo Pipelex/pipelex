@@ -10,6 +10,7 @@ from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, ImggJobParams, Quality
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
@@ -51,7 +52,7 @@ DEFAULT_PROMPT_VAR_NAME = "prompt"
 
 
 class PipeImgGen(PipeOperator):
-    output_concept_code: str = NativeConcept.IMAGE.code
+    output_concept_code: str = NativeConcept.IMAGE.value
     imgg_prompt: Optional[str] = None
     # TODO: wrap this up in imgg llm_presets like for llm
     imgg_handle: Optional[ImggHandle] = None
@@ -84,10 +85,15 @@ class PipeImgGen(PipeOperator):
     def needed_inputs(self) -> PipeInputSpec:
         needed_inputs = PipeInputSpec.make_empty()
         if self.imgg_prompt:
-            needed_inputs.add_requirement(variable_name="imgg_prompt", concept_code=NativeConcept.TEXT.value)
+            needed_inputs.add_requirement(
+                variable_name="imgg_prompt",
+                concept=Concept(
+                    code=NativeConcept.TEXT.value, domain="native", definition=NativeConcept.TEXT.value, structure_class_name=NativeConcept.TEXT.value
+                ),
+            )
         else:
             for input_name, requirement in self.inputs.items:
-                needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
+                needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
         return needed_inputs
 
     @override
@@ -112,9 +118,9 @@ class PipeImgGen(PipeOperator):
 
         candidate_prompt_var_names: List[str] = []
         for input_name, requirement in self.inputs.items:
-            log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept_code}'")
+            log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
             if concept_provider.is_compatible_by_concept_code(
-                tested_concept_code=requirement.concept_code,
+                tested_concept_code=requirement.concept.code,
                 wanted_concept_code=NativeConcept.TEXT.value,
             ):
                 self.img_gen_prompt_var_name = input_name
@@ -125,7 +131,7 @@ class PipeImgGen(PipeOperator):
                     domain_code=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
-                    provided_concept_code=requirement.concept_code,
+                    provided_concept_code=requirement.concept.code,
                     explanation="Only a text input can be provided for image gen prompt",
                 )
                 match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
@@ -283,7 +289,9 @@ class PipeImgGen(PipeOperator):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept_str=self.output_concept_code,
+            concept=Concept(
+                code=self.output_concept_code, domain="generic", definition=self.output_concept_code, structure_class_name=self.output_concept_code
+            ),
             content=the_content,
         )
 

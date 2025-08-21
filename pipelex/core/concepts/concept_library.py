@@ -8,7 +8,6 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConcept
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
-from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
@@ -38,13 +37,13 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return cls(root={})
 
     @classmethod
-    def get_native_concept(cls, native_concept_code: str) -> Concept:
-        return ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConcept(native_concept_code)])
+    def get_native_concept(cls, native_concept: NativeConcept) -> Concept:
+        return ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[native_concept])
 
     @classmethod
     def get_native_concepts(cls) -> List[Concept]:
         """Create all native concepts from the hardcoded data"""
-        return [cls.get_native_concept(native_concept_code=native_concept_data.code) for native_concept_data in NATIVE_CONCEPTS_DATA.values()]
+        return [cls.get_native_concept(native_concept=native_concept) for native_concept in NativeConcept]
 
     @override
     def is_concept_implicit(self, concept_code: str) -> bool:

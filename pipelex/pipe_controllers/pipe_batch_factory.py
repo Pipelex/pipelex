@@ -2,6 +2,7 @@ from typing import Literal, Optional
 
 from typing_extensions import override
 
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
@@ -35,7 +36,9 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
             code=pipe_code,
             definition=pipe_blueprint.definition,
             inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
-            output_concept_code=pipe_blueprint.output,
+            output=Concept(
+                code=pipe_blueprint.output, domain=domain_code, definition=pipe_blueprint.output, structure_class_name=pipe_blueprint.output
+            ),
             branch_pipe_code=pipe_blueprint.branch_pipe_code,
             batch_params=batch_params,
         )

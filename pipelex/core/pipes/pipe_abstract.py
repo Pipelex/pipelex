@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Set, Type
+from typing import Optional, Set, Type
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -19,7 +19,7 @@ class PipeAbstract(ABC, BaseModel):
     domain: str
     definition: Optional[str] = None
     inputs: PipeInputSpec = Field(default_factory=PipeInputSpec)
-    output_concept_code: str
+    output: Concept
 
     # @model_validator(mode="before")
     # @classmethod
@@ -87,7 +87,7 @@ class PipeAbstract(ABC, BaseModel):
         return set()
 
     def concept_dependencies(self) -> Set[str]:
-        required_concepts = set([self.output_concept_code])
+        required_concepts = set([self.output.code])
         required_concepts.update(self.inputs.concepts)
         return required_concepts
 

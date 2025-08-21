@@ -6,6 +6,7 @@ from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -113,13 +114,21 @@ class PipeCondition(PipeController):
             if not var_name.startswith("_"):  # exclude internal variables starting with `_`
                 # We don't know the concept code from just the variable name,
                 # so we'll use a generic placeholder that will be validated later
-                needed_inputs.add_requirement(variable_name=var_name, concept_code=f"{self.domain}.Unknown")
+                needed_inputs.add_requirement(
+                    variable_name=var_name,
+                    concept=Concept(
+                        code=f"{self.domain}.Unknown",
+                        domain="generic",
+                        definition=f"{self.domain}.Unknown",
+                        structure_class_name=f"{self.domain}.Unknown",
+                    ),
+                )
 
         # 2. Add the inputs needed by all possible target pipes
         for pipe_condition_pipe_map in self.pipe_map:
             pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
             for input_name, requirement in pipe.needed_inputs().items:
-                needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
+                needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
 
         return needed_inputs
 
@@ -199,7 +208,7 @@ class PipeCondition(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
     ) -> PipeOutput:
-        log.dev(f"{self.class_name} generating a '{self.output_concept_code}'")
+        log.dev(f"{self.class_name} generating a '{self.output.code}'")
 
         # TODO: restore pipe_layer feature
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
@@ -209,6 +218,7 @@ class PipeCondition(PipeController):
             domain=self.domain,
             jinja2=self.applied_expression_template,
             inputs=self.inputs,
+            output=self.output,
         )
         jinja2_job_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(

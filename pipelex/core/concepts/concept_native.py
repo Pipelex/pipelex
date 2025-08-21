@@ -3,6 +3,10 @@ from typing import Dict, NamedTuple
 from pipelex.types import StrEnum
 
 
+class NativeConceptError(Exception):
+    pass
+
+
 class NativeConceptData(NamedTuple):
     code: str
     content_class_name: str
@@ -18,6 +22,7 @@ class NativeConcept(StrEnum):
     NUMBER = "Number"
     LLM_PROMPT = "LlmPrompt"
     PAGE = "Page"
+    ANYTHING = "Anything"
 
 
 NATIVE_CONCEPTS_DATA: Dict[NativeConcept, NativeConceptData] = {
@@ -38,5 +43,8 @@ NATIVE_CONCEPTS_DATA: Dict[NativeConcept, NativeConceptData] = {
         code=NativeConcept.PAGE,
         content_class_name=f"{NativeConcept.PAGE}Content",
         definition="The content of a page of a document, comprising text and linked images and an optional page view image",
+    ),
+    NativeConcept.ANYTHING: NativeConceptData(
+        code=NativeConcept.ANYTHING, content_class_name=f"{NativeConcept.ANYTHING}Content", definition="Anything"
     ),
 }

@@ -1,6 +1,7 @@
 import pytest
 
 from pipelex import pretty_print
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
@@ -33,7 +34,9 @@ class TestPipeOCR:
                 should_caption_images=False,
                 should_include_page_views=True,
                 page_views_dpi=72,
-                output_concept_code=NativeConcept.TEXT_AND_IMAGES.code,
+                output=Concept(
+                    code=NativeConcept.TEXT_AND_IMAGES.value, domain="generic", definition="TextAndImages", structure_class_name="TextAndImages"
+                ),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_image(
@@ -59,18 +62,20 @@ class TestPipeOCR:
                 code="adhoc_for_test_pipe_ocr_pdf",
                 domain="generic",
                 inputs=PipeInputSpec.make_from_blueprint(
-                    domain="generic", blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=NativeConcept.PDF.code)}
+                    domain="generic", blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=NativeConcept.PDF.value)}
                 ),
                 should_include_images=True,
                 should_caption_images=False,
                 should_include_page_views=True,
                 page_views_dpi=72,
-                output_concept_code=NativeConcept.TEXT_AND_IMAGES.code,
+                output=Concept(
+                    code=NativeConcept.TEXT_AND_IMAGES.value, domain="generic", definition="TextAndImages", structure_class_name="TextAndImages"
+                ),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_pdf(
                 pdf_url=pdf_url,
-                concept_str=NativeConcept.PDF.code,
+                concept_str=NativeConcept.PDF.value,
                 name=PIPE_OCR_INPUT_NAME,
             ),
         )

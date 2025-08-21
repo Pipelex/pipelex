@@ -2,6 +2,7 @@ from typing import ClassVar, List, Tuple
 
 import pytest
 
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -75,15 +76,21 @@ class TestWorkingMemory:
     def multiple_stuff_memory(self) -> WorkingMemory:
         """Create WorkingMemory with multiple stuff items."""
         text_stuff = StuffFactory.make_stuff(
-            concept_str="native.Text", name="question", content=TextContent(text="What are the aerodynamic features?")
+            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            name="question",
+            content=TextContent(text="What are the aerodynamic features?"),
         )
 
         document_stuff = StuffFactory.make_stuff(
-            concept_str="native.Text", name="document", content=TextContent(text=TestWorkingMemoryData.SAMPLE_TEXT)
+            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            name="document",
+            content=TextContent(text=TestWorkingMemoryData.SAMPLE_TEXT),
         )
 
         image_stuff = StuffFactory.make_stuff(
-            concept_str="native.Image", name="diagram", content=ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL)
+            concept=Concept(code="native.Image", domain="generic", definition="native.Image", structure_class_name="native.Image"),
+            name="diagram",
+            content=ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
         )
 
         return WorkingMemoryFactory.make_from_multiple_stuffs(stuff_list=[text_stuff, document_stuff, image_stuff], main_name="document")
@@ -91,9 +98,17 @@ class TestWorkingMemory:
     @pytest.fixture
     def memory_with_aliases(self) -> WorkingMemory:
         """Create WorkingMemory with aliases."""
-        text_stuff = StuffFactory.make_stuff(concept_str="native.Text", name="primary_text", content=TextContent(text="Primary content"))
+        text_stuff = StuffFactory.make_stuff(
+            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            name="primary_text",
+            content=TextContent(text="Primary content"),
+        )
 
-        secondary_stuff = StuffFactory.make_stuff(concept_str="native.Text", name="secondary_text", content=TextContent(text="Secondary content"))
+        secondary_stuff = StuffFactory.make_stuff(
+            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
+            name="secondary_text",
+            content=TextContent(text="Secondary content"),
+        )
 
         memory = WorkingMemory()
         memory.add_new_stuff(name="primary_text", stuff=text_stuff)
@@ -114,7 +129,11 @@ class TestWorkingMemory:
             ]
         )
 
-        complex_stuff = StuffFactory.make_stuff(concept_str="native.List", name="mixed_list", content=complex_content)
+        complex_stuff = StuffFactory.make_stuff(
+            concept=Concept(code="native.List", domain="generic", definition="native.List", structure_class_name="native.List"),
+            name="mixed_list",
+            content=complex_content,
+        )
 
         return WorkingMemoryFactory.make_from_single_stuff(stuff=complex_stuff)
 
@@ -126,7 +145,13 @@ class TestWorkingMemory:
             images=[ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL), ImageContent(url="assets/diagrams/architecture.png")],
         )
 
-        stuff = StuffFactory.make_stuff(concept_str="native.TextAndImages", name="project_overview", content=text_and_images_content)
+        stuff = StuffFactory.make_stuff(
+            concept=Concept(
+                code="native.TextAndImages", domain="generic", definition="native.TextAndImages", structure_class_name="native.TextAndImages"
+            ),
+            name="project_overview",
+            content=text_and_images_content,
+        )
 
         return WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
@@ -138,7 +163,11 @@ class TestWorkingMemory:
             css_class="report-content",
         )
 
-        stuff = StuffFactory.make_stuff(concept_str="native.Html", name="test_report", content=html_content)
+        stuff = StuffFactory.make_stuff(
+            concept=Concept(code="native.Html", domain="generic", definition="native.Html", structure_class_name="native.Html"),
+            name="test_report",
+            content=html_content,
+        )
 
         return WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
@@ -147,7 +176,11 @@ class TestWorkingMemory:
         """Create WorkingMemory with number content."""
         number_content = NumberContent(number=3.14159)
 
-        stuff = StuffFactory.make_stuff(concept_str="native.Number", name="pi_value", content=number_content)
+        stuff = StuffFactory.make_stuff(
+            concept=Concept(code="native.Number", domain="generic", definition="native.Number", structure_class_name="native.Number"),
+            name="pi_value",
+            content=number_content,
+        )
 
         return WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
@@ -159,7 +192,7 @@ class TestWorkingMemory:
 
         # Check stuff retrieval
         stuff = single_text_memory.get_stuff("sample_text")
-        assert stuff.concept_code == NativeConcept.TEXT.value
+        assert stuff.concept.code == NativeConcept.TEXT.value
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == TestWorkingMemoryData.SAMPLE_TEXT
 

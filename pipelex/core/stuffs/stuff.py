@@ -28,7 +28,7 @@ class Stuff(CustomBaseModel):
 
     stuff_code: str
     stuff_name: Optional[str] = None
-    concept_code: str
+    concept: Concept
     content: StuffContent
 
     def make_artefact(self) -> StuffArtefact:
@@ -38,9 +38,9 @@ class Stuff(CustomBaseModel):
             if value is None:
                 return
             if key in artefact_dict:
-                stuff_name = self.stuff_name or f"unnamed using concept code {self.concept_code}"
+                stuff_name = self.stuff_name or f"unnamed using concept code {self.concept.code}"
                 raise StuffError(
-                    f"""Cannot create stuff artefact for stuff '{stuff_name}' of concept '{self.concept_code}' because reserved field '{key}' 
+                    f"""Cannot create stuff artefact for stuff '{stuff_name}' of concept '{self.concept.code}' because reserved field '{key}' 
 in the structured output '{self.content.__class__.__name__}' already exists in the stuff content.
 Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code', 'content'."""
                 )
@@ -48,23 +48,19 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
 
         set_artefact_field("stuff_name", self.stuff_name)
         set_artefact_field("content_class", self.content.__class__.__name__)
-        set_artefact_field("concept_code", self.concept_code)
+        set_artefact_field("concept_code", self.concept.code)
         set_artefact_field("stuff_code", self.stuff_code)
         set_artefact_field("content", self.content)
         return StuffArtefact(artefact_dict)
 
     @classmethod
-    def make_stuff_name(cls, concept_str: str) -> str:
-        if Concept.concept_str_contains_domain(concept_str):
-            return pascal_case_to_snake_case(Concept.extract_concept_name_from_str(concept_str=concept_str))
-        else:
-            log.error(f"Generating stuff name for Concept str '{concept_str}' which does not contain a domain")
-            return pascal_case_to_snake_case(name=concept_str)
+    def make_stuff_name(cls, concept: Concept) -> str:
+        return pascal_case_to_snake_case(name=concept.code)
 
     @property
     def title(self) -> str:
-        name_from_concept = Stuff.make_stuff_name(concept_str=self.concept_code)
-        concept_display = Concept.sentence_from_concept_code(concept_code=self.concept_code)
+        name_from_concept = Stuff.make_stuff_name(concept=self.concept)
+        concept_display = Concept.sentence_from_concept(concept=self.concept)
         if self.is_list:
             return f"List of [{concept_display}]"
         elif self.stuff_name:
@@ -78,7 +74,7 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
     @property
     def short_desc(self) -> str:
         return f"""{self.stuff_code}:
-{self.concept_code} — {type(self.content).__name__}:
+{self.concept.code} — {type(self.content).__name__}:
 {self.content.short_desc}"""
 
     @override

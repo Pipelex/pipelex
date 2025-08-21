@@ -2,6 +2,7 @@ from typing import Literal
 
 from typing_extensions import override
 
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
@@ -27,6 +28,8 @@ class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
             code=pipe_code,
             definition=pipe_blueprint.definition,
             inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
-            output_concept_code=pipe_blueprint.output,
+            output=Concept(
+                code=pipe_blueprint.output, domain="generic", definition=pipe_blueprint.output, structure_class_name=pipe_blueprint.output
+            ),
             function_name=pipe_blueprint.function_name,
         )

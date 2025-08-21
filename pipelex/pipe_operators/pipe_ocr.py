@@ -69,16 +69,16 @@ class PipeOcr(PipeOperator):
         for input_name, requirement in self.inputs.items:
             log.debug(f"{input_name=}")
             log.debug(f"{requirement=}")
-            log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept_code}'")
+            log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
             if concept_provider.is_compatible_by_concept_code(
-                tested_concept_code=requirement.concept_code,
-                wanted_concept_code=NativeConcept.IMAGE.code,
+                tested_concept_code=requirement.concept.code,
+                wanted_concept_code=NativeConcept.IMAGE.value,
             ):
                 self.image_stuff_name = input_name
                 candidate_prompt_var_names.append(input_name)
             elif concept_provider.is_compatible_by_concept_code(
-                tested_concept_code=requirement.concept_code,
-                wanted_concept_code=NativeConcept.PDF.code,
+                tested_concept_code=requirement.concept.code,
+                wanted_concept_code=NativeConcept.PDF.value,
             ):
                 self.pdf_stuff_name = input_name
                 candidate_prompt_var_names.append(input_name)
@@ -88,7 +88,7 @@ class PipeOcr(PipeOperator):
                     domain_code=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
-                    provided_concept_code=requirement.concept_code,
+                    provided_concept_code=requirement.concept.code,
                     explanation="For OCR you must provide either a pdf or an image or a concept that refines one of them",
                 )
                 match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
@@ -133,7 +133,7 @@ class PipeOcr(PipeOperator):
     def needed_inputs(self) -> PipeInputSpec:
         return PipeInputSpec.make_from_blueprint(
             domain=self.domain,
-            blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=self.inputs.root[PIPE_OCR_INPUT_NAME].concept_code)},
+            blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=self.inputs.root[PIPE_OCR_INPUT_NAME].concept.code)},
         )
 
     @override
@@ -222,7 +222,7 @@ class PipeOcr(PipeOperator):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept_str=self.output_concept_code,
+            concept=self.output,
             content=content,
         )
 

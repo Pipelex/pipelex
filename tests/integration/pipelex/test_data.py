@@ -1,5 +1,6 @@
 from typing import ClassVar, List, Optional, Tuple, Type
 
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import (
@@ -49,22 +50,22 @@ class PipeTestCases:
     # Create simple Stuff objects
     SIMPLE_STUFF_TEXT = StuffFactory.make_stuff(
         name="text",
-        concept_str="Text",
+        concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
         content=TextContent(text="Describe a t-shirt in 2 sentences"),
     )
     SIMPLE_STUFF_IMAGE = StuffFactory.make_stuff(
         name="image",
-        concept_str="Image",
+        concept=Concept(code="native.Image", domain="generic", definition="native.Image", structure_class_name="native.Image"),
         content=ImageContent(url=URL_IMG_FASHION_PHOTO_1),
     )
     SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
         name=PIPE_OCR_INPUT_NAME,
-        concept_str="PDF",
+        concept=Concept(code="native.PDF", domain="generic", definition="native.PDF", structure_class_name="native.PDF"),
         content=PDFContent(url=PDFTestCases.DOCUMENT_URLS[0]),
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
         name="complex",
-        concept_str="tests.Complex",
+        concept=Concept(code="tests.Complex", domain="generic", definition="tests.Complex", structure_class_name="tests.Complex"),
         content=ListContent(
             items=[
                 TextContent(text="The quick brown fox jumps over the lazy dog"),
@@ -75,7 +76,7 @@ class PipeTestCases:
 
     STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1 = SomeContentWithImageAttribute(image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_1))
     STUFF_WITH_IMAGE_ATTRIBUTE = StuffFactory.make_stuff(
-        concept_str="Image",
+        concept=Concept(code="native.Image", domain="generic", definition="native.Image", structure_class_name="native.Image"),
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
         name="stuff_with_image",
     )
@@ -84,7 +85,7 @@ class PipeTestCases:
         sub_object=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
     )
     STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = StuffFactory.make_stuff(
-        concept_str="Image",
+        concept=Concept(code="native.Image", domain="generic", definition="native.Image", structure_class_name="native.Image"),
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
         name="stuff_with_image_in_sub_object",
     )

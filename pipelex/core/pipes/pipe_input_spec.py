@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, RootModel, field_validator, model_validat
 from typing_extensions import Self
 
 from pipelex import log
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.exceptions import PipeInputNotFoundError
@@ -23,7 +24,7 @@ class InputRequirementBlueprint(BaseModel):
 
 
 class InputRequirement(BaseModel):
-    concept_code: str
+    concept: Concept
     multiplicity: Optional[PipeOutputMultiplicity] = None
 
 
@@ -73,32 +74,29 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
             if transformed_key != required_input:
                 log.verbose(f"Sub-attribute {required_input} detected, using {transformed_key} as variable name")
 
-            # Validate concept_code
-            concept_code = requirement.concept_code
-
             if transformed_key in transformed_dict and transformed_dict[transformed_key] != requirement:
                 log.verbose(
                     f"Variable {transformed_key} already exists with a different concept code: {transformed_dict[transformed_key]} -> {requirement}"
                 )
-            transformed_dict[transformed_key] = InputRequirement(concept_code=concept_code, multiplicity=requirement.multiplicity)
+            transformed_dict[transformed_key] = InputRequirement(concept=requirement.concept, multiplicity=requirement.multiplicity)
 
         return transformed_dict
 
     def set_default_domain(self, domain: str):
         for input_name, requirement in self.root.items():
-            input_concept_code = requirement.concept_code
+            input_concept_code = requirement.concept.code
             if "." not in input_concept_code:
-                requirement.concept_code = f"{domain}.{input_concept_code}"
+                requirement.concept.code = f"{domain}.{input_concept_code}"
                 self.root[input_name] = requirement
 
     def get_required_concept_code(self, variable_name: str) -> str:
         requirement = self.root.get(variable_name)
         if not requirement:
             raise PipeInputNotFoundError(f"Variable '{variable_name}' not found in input spec")
-        return requirement.concept_code
+        return requirement.concept.code
 
-    def add_requirement(self, variable_name: str, concept_code: str, multiplicity: Optional[PipeOutputMultiplicity] = None):
-        self.root[variable_name] = InputRequirement(concept_code=concept_code, multiplicity=multiplicity)
+    def add_requirement(self, variable_name: str, concept: Concept, multiplicity: Optional[PipeOutputMultiplicity] = None):
+        self.root[variable_name] = InputRequirement(concept=concept, multiplicity=multiplicity)
 
     @classmethod
     def make_empty(cls) -> Self:
@@ -112,7 +110,13 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
         return cls(
             root={
                 var_name: InputRequirement(
-                    concept_code=input_requirement_blueprint.concept_code, multiplicity=input_requirement_blueprint.multiplicity
+                    concept=Concept(
+                        code=input_requirement_blueprint.concept_code,
+                        domain=domain,
+                        definition=input_requirement_blueprint.concept_code,
+                        structure_class_name=input_requirement_blueprint.concept_code,
+                    ),
+                    multiplicity=input_requirement_blueprint.multiplicity,
                 )
                 for var_name, input_requirement_blueprint in blueprint.items()
             }
@@ -126,7 +130,7 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
     def concepts(self) -> Set[str]:
         all_concepts: Set[str] = set()
         for requirement in self.root.values():
-            all_concepts.add(requirement.concept_code)
+            all_concepts.add(requirement.concept.code)
         return all_concepts
 
     @property
@@ -151,7 +155,7 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
                 NamedInputRequirement(
                     variable_name=required_variable_name,
                     requirement_expression=requirement_expression,
-                    concept_code=requirement.concept_code,
+                    concept=requirement.concept,
                     multiplicity=requirement.multiplicity,
                 )
             )

@@ -5,6 +5,8 @@ from typing import cast
 import pytest
 from pytest import FixtureRequest
 
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -31,7 +33,7 @@ class TestPipeParallelSimple:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
             ),
-            output_concept_code="Text",
+            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
             parallel_sub_pipes=[
                 SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
                 SubPipe(pipe_code="count_words", output_name="word_count_result"),
@@ -43,7 +45,7 @@ class TestPipeParallelSimple:
 
         # Create test data
         input_text_stuff = StuffFactory.make_stuff(
-            concept_str="Text",
+            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
             content=TextContent(text="The weather is beautiful today. I love sunny days and outdoor activities."),
             name="input_text",
         )
@@ -103,7 +105,7 @@ class TestPipeParallelSimple:
             assert "DRY RUN" in sentiment_result.content.text
         else:
             assert sentiment_result.content.text.lower() in ["positive", "negative", "neutral"]
-        assert sentiment_result.concept_code == "native.Text"
+        assert sentiment_result.concept.code == "native.Text"
 
         # Verify word count result
         word_count_result = final_working_memory.get_stuff("word_count_result")
@@ -115,7 +117,7 @@ class TestPipeParallelSimple:
             assert "DRY RUN" in word_count_text
         else:
             assert word_count_text.isdigit() or word_count_text in ["12", "thirteen", "twelve"]  # Allow for some variation
-        assert word_count_result.concept_code == "native.Text"
+        assert word_count_result.concept.code == "native.Text"
 
         # Verify keywords extraction result
         keywords_result = final_working_memory.get_stuff("keywords_result")
@@ -124,7 +126,7 @@ class TestPipeParallelSimple:
         # Should contain comma-separated keywords
         keywords_text = keywords_result.content.text.strip()
         assert "," in keywords_text or len(keywords_text.split()) >= 2  # Should have multiple keywords
-        assert keywords_result.concept_code == "native.Text"
+        assert keywords_result.concept.code == "native.Text"
 
         # Verify that all results are different (pipes ran independently)
         assert sentiment_result.content.text != word_count_result.content.text
@@ -145,7 +147,7 @@ class TestPipeParallelSimple:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
             ),
-            output_concept_code="Text",
+            output=Concept(code=NativeConcept.TEXT.value, domain="generic", definition="Text", structure_class_name="Text"),
             parallel_sub_pipes=[
                 SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
                 SubPipe(pipe_code="count_words", output_name="word_count_result"),
@@ -157,7 +159,7 @@ class TestPipeParallelSimple:
 
         # Create test data - shorter text
         input_text_stuff = StuffFactory.make_stuff(
-            concept_str="Text",
+            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
             content=TextContent(text="Hello world"),
             name="input_text",
         )

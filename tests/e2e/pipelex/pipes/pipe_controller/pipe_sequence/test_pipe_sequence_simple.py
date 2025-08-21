@@ -3,6 +3,7 @@
 import pytest
 
 from pipelex import pretty_print
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -20,7 +21,12 @@ async def test_simple_text_sequence(pipe_run_mode: PipeRunMode):
     # Create test input
     raw_text_stuff = StuffFactory.make_stuff(
         name="raw_text",
-        concept_str="simple_text_processing.RawText",
+        concept=Concept(
+            code="simple_text_processing.RawText",
+            domain="generic",
+            definition="simple_text_processing.RawText",
+            structure_class_name="simple_text_processing.RawText",
+        ),
         content=TextContent(text="This is  some  messy    text with bad spacing."),
     )
 
@@ -39,4 +45,4 @@ async def test_simple_text_sequence(pipe_run_mode: PipeRunMode):
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
-        assert pipe_output.main_stuff.concept_code == "simple_text_processing.SummaryText"
+        assert pipe_output.main_stuff.concept.code == "simple_text_processing.SummaryText"

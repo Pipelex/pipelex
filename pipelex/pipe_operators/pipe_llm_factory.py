@@ -4,6 +4,8 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
@@ -73,6 +75,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     domain=domain_code,
                     jinja2=pipe_blueprint.system_prompt_template,
                     jinja2_name=pipe_blueprint.system_prompt_template_name,
+                    output=Concept(code=NativeConcept.LLM_PROMPT.value, domain="native", definition="LLMPrompt", structure_class_name="LLMPrompt"),
                 )
             except Jinja2TemplateError as exc:
                 error_msg = f"Jinja2 template error in system prompt for pipe '{pipe_code}' in domain '{domain_code}': {exc}."
@@ -109,6 +112,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     code="adhoc_for_user_prompt",
                     domain=domain_code,
                     jinja2_name=pipe_code,
+                    output=Concept(code=NativeConcept.LLM_PROMPT.value, domain="native", definition="LLMPrompt", structure_class_name="LLMPrompt"),
                 )
             except TemplateNotFoundError as exc:
                 error_msg = f"Jinja2 template not found for pipe '{pipe_code}' in domain '{domain_code}': {exc}."
@@ -152,7 +156,9 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             code=pipe_code,
             definition=pipe_blueprint.definition,
             inputs=PipeInputSpec.make_from_blueprint(domain=domain_code, blueprint=pipe_blueprint.inputs or {}),
-            output_concept_code=pipe_blueprint.output,
+            output=Concept(
+                code=pipe_blueprint.output, domain="generic", definition=pipe_blueprint.output, structure_class_name=pipe_blueprint.output
+            ),
             pipe_llm_prompt=pipe_llm_prompt,
             llm_choices=llm_choices,
             structuring_method=pipe_blueprint.structuring_method,

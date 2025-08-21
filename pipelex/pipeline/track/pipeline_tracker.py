@@ -76,9 +76,8 @@ class PipelineTracker(PipelineTrackerProtocol):
         stuff: Stuff,
         as_item_index: Optional[int] = None,
     ) -> str:
-        concept_code = stuff.concept_code
-        concept_display = Concept.sentence_from_concept_code(concept_code=concept_code)
-        log.debug(f"Concept display: {concept_code} -> {concept_display}")
+        concept_display = Concept.sentence_from_concept(concept=stuff.concept)
+        log.debug(f"Concept display: {stuff.concept.code} -> {concept_display}")
         if stuff.is_list:
             concept_display = f"List of [{concept_display}]"
         if as_item_index is not None:

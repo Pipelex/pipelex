@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from pipelex import pretty_print
 from pipelex.client.client import PipelexClient
 from pipelex.client.protocol import COMPACT_MEMORY_KEY, PipelineState
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import TextContent
@@ -30,7 +31,7 @@ class TestPipelexApiClient:
                 pipe_code="retrieve_excerpts",
                 memory=[
                     StuffFactory.make_stuff(
-                        concept_str="Text",
+                        concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
                         name="text",
                         content=TextContent(
                             text="""
@@ -75,7 +76,9 @@ class TestPipelexApiClient:
                         ),
                     ),
                     StuffFactory.make_stuff(
-                        concept_str="answer.Question",
+                        concept=Concept(
+                            code="answer.Question", domain="generic", definition="answer.Question", structure_class_name="answer.Question"
+                        ),
                         name="question",
                         content=TextContent(text="Aerodynamic features?"),
                     ),
@@ -98,8 +101,8 @@ class TestPipelexApiClient:
             memory = WorkingMemory()
             question = example.memory[1]
             text = example.memory[0]
-            memory.add_new_stuff(name=question.stuff_name or question.concept_code, stuff=question)
-            memory.add_new_stuff(name=text.stuff_name or text.concept_code, stuff=text)
+            memory.add_new_stuff(name=question.stuff_name or question.concept.code, stuff=question)
+            memory.add_new_stuff(name=text.stuff_name or text.concept.code, stuff=text)
 
             # Execute pipe
             client = PipelexClient()

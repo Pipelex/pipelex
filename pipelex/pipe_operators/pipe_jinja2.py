@@ -9,6 +9,7 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.config import get_config
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConcept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
@@ -39,7 +40,9 @@ class PipeJinja2(PipeOperator):
     model_config = ConfigDict(extra="forbid", strict=False)
 
     adhoc_pipe_code: ClassVar[str] = "jinja2_render"
-    output_concept_code: str = NativeConcept.TEXT.value
+    output: Concept = Concept(
+        code=NativeConcept.TEXT.value, domain="generic", definition=NativeConcept.TEXT.value, structure_class_name=NativeConcept.TEXT.value
+    )
 
     jinja2_name: Optional[str] = None
     jinja2: Optional[str] = None
@@ -81,7 +84,7 @@ class PipeJinja2(PipeOperator):
     def needed_inputs(self) -> PipeInputSpec:
         needed_inputs = PipeInputSpec.make_empty()
         for input_name, requirement in self.inputs.root.items():
-            needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
+            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
         return needed_inputs
 
     @property
@@ -140,7 +143,7 @@ class PipeJinja2(PipeOperator):
         the_content = TextContent(text=jinja2_text)
 
         output_stuff = Stuff(
-            concept_code=self.output_concept_code,
+            concept=self.output,
             content=the_content,
             stuff_name=output_name,
             stuff_code=shortuuid.uuid()[:5],

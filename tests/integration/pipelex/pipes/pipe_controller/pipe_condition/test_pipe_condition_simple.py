@@ -6,6 +6,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -29,12 +30,12 @@ class TestPipeConditionSimple:
     async def test_condition_long_text_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeCondition with long text that should trigger capitalize_long_text pipe."""
         pipe_condition = PipeCondition(
-            domain="test_integration",
             code="text_length_condition",
+            domain="test_integration",
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
             ),
-            output_concept_code="Text",
+            output=Concept(code="Text", domain="generic", definition="Text", structure_class_name="Text"),
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map=[
                 PipeConditionPipeMap(expression_result="long", pipe_code="capitalize_long_text"),
@@ -42,7 +43,7 @@ class TestPipeConditionSimple:
             ],
         )
         input_text_stuff = StuffFactory.make_stuff(
-            concept_str="Text",
+            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
             content=TextContent(text="hello world"),  # 11 characters
             name="input_text",
         )
@@ -99,7 +100,7 @@ class TestPipeConditionSimple:
             assert "DRY RUN" in final_result_in_memory.content.text
         else:
             assert final_result_in_memory.content.text == "LONG: HELLO WORLD"
-        assert final_result_in_memory.concept_code == "native.Text"
+        assert final_result_in_memory.concept.code == "native.Text"
 
     async def test_condition_short_text_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeCondition with short text that should trigger add_prefix_short_text pipe."""
@@ -110,7 +111,7 @@ class TestPipeConditionSimple:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
             ),
-            output_concept_code="Text",
+            output=Concept(code="Text", domain="generic", definition="Text", structure_class_name="Text"),
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map=[
                 PipeConditionPipeMap(expression_result="long", pipe_code="capitalize_long_text"),
@@ -120,7 +121,7 @@ class TestPipeConditionSimple:
 
         # Create test data - short text input (<= 5 characters)
         input_text_stuff = StuffFactory.make_stuff(
-            concept_str="Text",
+            concept=Concept(code="native.Text", domain="generic", definition="native.Text", structure_class_name="native.Text"),
             content=TextContent(text="hi"),  # 2 characters
             name="input_text",
         )
@@ -172,14 +173,19 @@ class TestPipeConditionSimple:
             assert "DRY RUN" in final_result_in_memory.content.text
         else:
             assert final_result_in_memory.content.text == "SHORT: hi"
-        assert final_result_in_memory.concept_code == "native.Text"
+        assert final_result_in_memory.concept.code == "native.Text"
 
     async def test_condition_dry_run_success(self, request: FixtureRequest):
         """Test PipeCondition dry run with valid inputs using real pipe - should succeed."""
         # Create test data using CategoryInput for the real pipe basic_condition_by_category_2
         category_input = CategoryInput(category="small")
         input_data_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_2.CategoryInput",
+            concept=Concept(
+                code="test_pipe_condition_2.CategoryInput",
+                domain="generic",
+                definition="test_pipe_condition_2.CategoryInput",
+                structure_class_name="test_pipe_condition_2.CategoryInput",
+            ),
             content=category_input,
             name="input_data",
         )
@@ -241,7 +247,12 @@ class TestPipeConditionSimple:
         # Create test data using CategoryInput for the medium category
         category_input = CategoryInput(category="medium")
         input_data_stuff = StuffFactory.make_stuff(
-            concept_str="test_pipe_condition_2.CategoryInput",
+            concept=Concept(
+                code="test_pipe_condition_2.CategoryInput",
+                domain="generic",
+                definition="test_pipe_condition_2.CategoryInput",
+                structure_class_name="test_pipe_condition_2.CategoryInput",
+            ),
             content=category_input,
             name="input_data",
         )

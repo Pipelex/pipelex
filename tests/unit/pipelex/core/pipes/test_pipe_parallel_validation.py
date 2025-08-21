@@ -1,3 +1,4 @@
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -15,10 +16,11 @@ class TestPipeParallelValidation:
             domain="test_domain",
             code="analyze_document",
             # Let PipeLLM infer inputs from prompt template - no explicit inputs
-            output_concept_code="test_domain.Analysis",
+            output=Concept(code="test_domain.Analysis", domain="test_domain", definition="Analysis", structure_class_name="Analysis"),
             pipe_llm_prompt=PipeLLMPrompt(
                 code="analyze_document_prompt",
                 domain="test_domain",
+                output=Concept(code="test_domain.Analysis", domain="test_domain", definition="Analysis", structure_class_name="Analysis"),
                 user_text="Analyze this document:  \n@context\n@document",
             ),
         )
@@ -26,7 +28,7 @@ class TestPipeParallelValidation:
         # Verify the real pipe was created successfully
         assert real_pipe.code == "analyze_document"
         assert real_pipe.domain == "test_domain"
-        assert real_pipe.output_concept_code == "test_domain.Analysis"
+        assert real_pipe.output.code == "test_domain.Analysis"
 
         # Create PipeParallel that would reference this pipe
         pipe_parallel = PipeParallel(
@@ -39,7 +41,9 @@ class TestPipeParallelValidation:
                     "context": InputRequirementBlueprint(concept_code="test_domain.context"),
                 },
             ),
-            output_concept_code="test_domain.ProcessedAnalysis",
+            output=Concept(
+                code="test_domain.ProcessedAnalysis", domain="test_domain", definition="Processed analysis", structure_class_name="ProcessedAnalysis"
+            ),
             parallel_sub_pipes=[SubPipe(pipe_code="analyze_document", output_name="analysis_result")],
             add_each_output=True,
             combined_output=None,
@@ -64,7 +68,7 @@ class TestPipeParallelValidation:
             inputs=PipeInputSpec.make_from_blueprint(
                 domain="test_domain", blueprint={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")}
             ),
-            output_concept_code="test_domain.ProcessedText",
+            output=Concept(code="test_domain.ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"),
             parallel_sub_pipes=[SubPipe(pipe_code="test_pipe_1", output_name="result_1")],
             add_each_output=True,
             combined_output=None,
@@ -74,8 +78,8 @@ class TestPipeParallelValidation:
         assert pipe_parallel.code == "test_parallel"
         assert pipe_parallel.domain == "test_domain"
         assert len(pipe_parallel.parallel_sub_pipes) == 1
-        assert pipe_parallel.inputs.root["input_var"].concept_code == "test_domain.Text"
-        assert pipe_parallel.output_concept_code == "test_domain.ProcessedText"
+        assert pipe_parallel.inputs.root["input_var"].concept.code == "test_domain.Text"
+        assert pipe_parallel.output.code == "test_domain.ProcessedText"
         assert pipe_parallel.add_each_output is True
         assert pipe_parallel.combined_output is None
 
@@ -93,7 +97,9 @@ class TestPipeParallelValidation:
                     "context": InputRequirementBlueprint(concept_code="test_domain.Context"),
                 },
             ),
-            output_concept_code="test_domain.ProcessedAnalysis",
+            output=Concept(
+                code="test_domain.ProcessedAnalysis", domain="test_domain", definition="Processed analysis", structure_class_name="ProcessedAnalysis"
+            ),
             parallel_sub_pipes=[],  # No sub-pipes to avoid dependency issues
             add_each_output=True,
             combined_output=None,

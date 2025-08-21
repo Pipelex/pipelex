@@ -4,6 +4,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -40,7 +41,14 @@ class TestPipeSequenceDryRun:
 
         # Create Stuff object for the discord channel updates list
         discord_updates_stuff = StuffFactory.make_stuff(
-            concept_str="discord_newsletter.DiscordChannelUpdate", content=discord_channel_updates, name="discord_channel_updates"
+            concept=Concept(
+                code="discord_newsletter.DiscordChannelUpdate",
+                domain="generic",
+                definition="discord_newsletter.DiscordChannelUpdate",
+                structure_class_name="discord_newsletter.DiscordChannelUpdate",
+            ),
+            content=discord_channel_updates,
+            name="discord_channel_updates",
         )
 
         # Create working memory with the discord channel updates
@@ -65,7 +73,7 @@ class TestPipeSequenceDryRun:
 
         # The pipeline only has one step (summarization), so the final output is ChannelSummary
         # This test is focused on verifying that batching works correctly in dry run mode
-        assert pipe_output.main_stuff.concept_code == "discord_newsletter.ChannelSummary"
+        assert pipe_output.main_stuff.concept.code == "discord_newsletter.ChannelSummary"
         if pipe_run_mode == PipeRunMode.DRY:
             assert isinstance(pipe_output.main_stuff.content, ListContent)
 
@@ -74,7 +82,7 @@ class TestPipeSequenceDryRun:
 
         # Check that discord_channel_updates was created as ListContent
         discord_updates_stuff_final = final_working_memory.get_stuff("discord_channel_updates")
-        assert discord_updates_stuff_final.concept_code == "discord_newsletter.DiscordChannelUpdate"
+        assert discord_updates_stuff_final.concept.code == "discord_newsletter.DiscordChannelUpdate"
 
         if pipe_run_mode == PipeRunMode.DRY:
             # The key assertion: verify it's a ListContent with multiple items
@@ -90,7 +98,7 @@ class TestPipeSequenceDryRun:
             # Check that channel_summaries was created as ListContent (result of batched operation)
             channel_summaries_stuff: Stuff | None = final_working_memory.get_optional_stuff("channel_summaries")
             assert channel_summaries_stuff is not None, "channel_summaries should be in working memory"
-            assert channel_summaries_stuff.concept_code == "discord_newsletter.ChannelSummary"
+            assert channel_summaries_stuff.concept.code == "discord_newsletter.ChannelSummary"
 
             # Verify channel_summaries is also a ListContent with multiple ChannelSummary items
             channel_summaries_list: ListContent[ChannelSummary] = channel_summaries_stuff.as_list_of_fixed_content_type(item_type=ChannelSummary)
@@ -111,4 +119,4 @@ class TestPipeSequenceDryRun:
             print("✅ Successfully verified dry run working memory:")
             print(f"   - discord_channel_updates: ListContent with {len(discord_updates_list.items)} items")
             print(f"   - channel_summaries: ListContent with {len(channel_summaries_list.items)} items")
-            print(f"   - Final output: ChannelSummary list with concept code {pipe_output.main_stuff.concept_code}")
+            print(f"   - Final output: ChannelSummary list with concept code {pipe_output.main_stuff.concept.code}")
