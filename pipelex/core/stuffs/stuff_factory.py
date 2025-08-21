@@ -7,7 +7,7 @@ from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_code_factory import ConceptCodeFactory
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConcept, NativeConceptClass
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, find_native_concept_by_class_name, get_native_concept_code
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import (
     ListContent,
@@ -95,10 +95,10 @@ class StuffFactory:
     @classmethod
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
         if isinstance(blueprint.content, str) and get_concept_provider().is_compatible_by_concept_code(
-            tested_concept_code=blueprint.concept_code, wanted_concept_code=NativeConcept.TEXT.code
+            tested_concept_code=blueprint.concept_code, wanted_concept_code=get_native_concept_code("Text")
         ):
             the_stuff = cls.make_from_str(
-                concept_str=NativeConcept.TEXT.code,
+                concept_str=get_native_concept_code("Text"),
                 str_value=blueprint.content,
                 name=blueprint.stuff_name,
             )
@@ -122,7 +122,7 @@ class StuffFactory:
         cls,
         str_value: str,
         name: Optional[str] = None,
-        concept_str: str = NativeConcept.TEXT.code,
+        concept_str: str = get_native_concept_code("Text"),
     ) -> Stuff:
         try:
             concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
@@ -152,7 +152,10 @@ class StuffFactory:
         Make multiple stuffs from a dictionary of strings.
         It is implied that each string value should be associated with a native.Text concept.
         """
-        return [cls.make_from_str(concept_str=NativeConcept.TEXT.code, str_value=str_value, name=name) for name, str_value in str_text_dict.items()]
+        return [
+            cls.make_from_str(concept_str=get_native_concept_code("Text"), str_value=str_value, name=name)
+            for name, str_value in str_text_dict.items()
+        ]
 
     @classmethod
     def make_multiple_stuff_from_str(cls, str_stuff_and_concepts_dict: Dict[str, Tuple[str, str]]) -> List[Stuff]:
@@ -217,9 +220,14 @@ class StuffFactory:
         elif isinstance(stuff_content_or_data, StuffContent):
             content = stuff_content_or_data
             concept_name = type(content).__name__
-            if concept_name in NativeConceptClass.class_names():
-                native_concept_class = NativeConceptClass(concept_name)
-                concept = ConceptFactory.make_native_concept_from_native_concept_class(native_concept_class=native_concept_class)
+            native_concept_class_names = [data.content_class_name for data in NATIVE_CONCEPTS_DATA.values()]
+            if concept_name in native_concept_class_names:
+                # Find the native concept by its content class name
+                native_concept_data = find_native_concept_by_class_name(concept_name)
+                if native_concept_data is None:
+                    raise StuffFactoryError(f"Could not find native concept for class name: {concept_name}")
+                concept_code = get_native_concept_code(native_concept_data.name)
+                concept = get_required_concept(concept_code=concept_code)
                 return cls.make_stuff(
                     concept_str=concept.code,
                     content=content,

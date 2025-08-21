@@ -1,25 +1,37 @@
-from typing import Dict, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
+from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.pipe_controllers.pipe_condition import PipeCondition
+from pipelex.pipe_controllers.pipe_condition_details import PipeConditionPipeMap
+
+PipeConditionPipeMapRoot = Dict[str, str]
+
+
+class PipeConditionPipeMapBlueprint(RootModel[PipeConditionPipeMapRoot]):
+    root: PipeConditionPipeMapRoot = Field(default_factory=dict)
 
 
 class PipeConditionBlueprint(PipeBlueprint):
     type: Literal["PipeCondition"] = "PipeCondition"
     expression_template: Optional[str] = None
     expression: Optional[str] = None
-    # TODO: make the values of pipe_map a Union[str, PipeAdapter] or something to set a specific alias
-    # TODO: Add a Blueprint for the pipe_map
-    pipe_map: Dict[str, str]
+    pipe_map: PipeConditionPipeMapBlueprint = Field(default_factory=PipeConditionPipeMapBlueprint)
     default_pipe_code: Optional[str] = None
     add_alias_from_expression_to: Optional[str] = None
 
 
 class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondition]):
+    @classmethod
+    def make_pipe_condition_pipe_map(cls, pipe_map: PipeConditionPipeMapBlueprint) -> List[PipeConditionPipeMap]:
+        return [
+            PipeConditionPipeMap(expression_result=expression_result, pipe_code=pipe_code) for expression_result, pipe_code in pipe_map.root.items()
+        ]
+
     @classmethod
     @override
     def make_pipe_from_blueprint(
@@ -36,7 +48,7 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
             output_concept_code=pipe_blueprint.output,
             expression_template=pipe_blueprint.expression_template,
             expression=pipe_blueprint.expression,
-            pipe_map=pipe_blueprint.pipe_map,
+            pipe_map=cls.make_pipe_condition_pipe_map(pipe_map=pipe_blueprint.pipe_map),
             default_pipe_code=pipe_blueprint.default_pipe_code,
             add_alias_from_expression_to=pipe_blueprint.add_alias_from_expression_to,
         )

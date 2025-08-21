@@ -40,6 +40,29 @@ class PipelexInterpreter(BaseModel):
             validate_toml_content(content=self.file_content, file_path=str(self.file_path))
         return self
 
+    def get_file_content(self) -> str:
+        """Load TOML content from file_path or use file_content directly."""
+        if self.file_path:
+            try:
+                with open(self.file_path, "r", encoding="utf-8") as file:
+                    file_content = file.read()
+
+                # Clean trailing whitespace and write back if needed
+                cleaned_content = clean_trailing_whitespace(file_content)
+                if file_content != cleaned_content:
+                    with open(self.file_path, "w", encoding="utf-8") as file:
+                        file.write(cleaned_content)
+                    return cleaned_content
+
+                return file_content
+
+            except Exception as exc:
+                raise ValueError(f"Failed to read TOML file '{self.file_path}': {exc}") from exc
+        else:
+            if self.file_content is None:
+                raise ValueError("file_content must be provided if file_path is not provided")
+            return self.file_content
+
     @staticmethod
     def is_pipelex_file(file_path: Path) -> bool:
         """Check if a file is a valid Pipelex TOML file.
@@ -74,29 +97,6 @@ class PipelexInterpreter(BaseModel):
             # If we can't read the file, it's not a valid Pipelex file
             return False
 
-    def _load_toml_content(self) -> str:
-        """Load TOML content from file_path or use file_content directly."""
-        if self.file_path:
-            try:
-                with open(self.file_path, "r", encoding="utf-8") as file:
-                    file_content = file.read()
-
-                # Clean trailing whitespace and write back if needed
-                cleaned_content = clean_trailing_whitespace(file_content)
-                if file_content != cleaned_content:
-                    with open(self.file_path, "w", encoding="utf-8") as file:
-                        file.write(cleaned_content)
-                    return cleaned_content
-
-                return file_content
-
-            except Exception as exc:
-                raise ValueError(f"Failed to read TOML file '{self.file_path}': {exc}") from exc
-        else:
-            if self.file_content is None:
-                raise ValueError("file_content must be provided if file_path is not provided")
-            return self.file_content
-
     def _parse_toml_content(self, content: str) -> Dict[str, Any]:
         """Parse TOML content and return the dictionary."""
         try:
@@ -107,7 +107,7 @@ class PipelexInterpreter(BaseModel):
 
     def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
         """Make a PipelexBundleBlueprint from the file_path or file_content"""
-        file_content = self._load_toml_content()
+        file_content = self.get_file_content()
         toml_data = self._parse_toml_content(file_content)
         return PipelexBundleBlueprint.model_validate(toml_data)
 

@@ -1,13 +1,14 @@
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 from typing_extensions import Self
 
-from pipelex.exceptions import ConceptFactoryError
 from pipelex.types import StrEnum
 
+class ConceptBlueprintError(Exception):
+    pass
 
-class ConceptStructureBlueprintError(ConceptFactoryError):
+class ConceptStructureBlueprintError(Exception):
     pass
 
 
@@ -29,6 +30,11 @@ class ConceptStructureBlueprint(BaseModel):
     value_type: Optional[str] = None
     choices: Optional[List[str]] = Field(default_factory=list)
     required: Optional[bool] = Field(default=True)
+    default_value: Optional[Any] = None
+
+    # TODO: date translator for default_value
+    # TODO: check default_value type is the same as type
+    # TODO: check when default_value is not None, type is not None
 
     @model_validator(mode="after")
     def validate_structure_blueprint(self) -> Self:
@@ -57,11 +63,18 @@ class ConceptBlueprint(BaseModel):
     structure: Optional[Union[str, Dict[str, ConceptStructureBlueprintType]]] = None
     refines: Optional[Union[str, List[str]]] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    def forbiden_having_refines_and_structure(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if values.get("refines") and values.get("structure"):
+            raise ConceptBlueprintError("Forbidden to have refines and structure at the same time. Please use only one of them.")
+        return values
+
     @model_validator(mode="after")
     def model_validate_blueprint(self) -> Self:
         return self
 
     def structure_to_field_def(self) -> Dict[str, Any]:
+        # TODO: Refactor this method
         if isinstance(self.structure, str):
             raise ValueError("structure_to_field_def can only be called when structure is a dict in the blueprint")
 

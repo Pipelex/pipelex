@@ -7,7 +7,7 @@ from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_code_factory import ConceptCodeFactory
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConcept
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConcept
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import ImageContent
@@ -48,12 +48,25 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
                 self.get_required_concept(concept_code=domain_concept_code)
 
+    def setup(self):
+        native_concepts = self.get_native_concepts()
+        self.add_concepts(native_concepts)
+
     def reset(self):
         self.root = {}
 
     @classmethod
     def make_empty(cls):
         return cls(root={})
+    
+    @classmethod
+    def get_native_concept(cls, native_concept_code: str) -> Concept:
+        return ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConcept(native_concept_code)])
+
+    @classmethod
+    def get_native_concepts(cls) -> List[Concept]:
+        """Create all native concepts from the hardcoded data"""
+        return [cls.get_native_concept(native_concept_code=native_concept_data.code) for native_concept_data in NATIVE_CONCEPTS_DATA.values()]
 
     @override
     def is_concept_implicit(self, concept_code: str) -> bool:
@@ -106,10 +119,10 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def is_compatible_by_concept_code(self, tested_concept_code: str, wanted_concept_code: str) -> bool:
-        if wanted_concept_code == NativeConcept.ANYTHING.code:
+        if wanted_concept_code == ANYTHING_CONCEPT_CODE:
             log.verbose(
                 f"Concept '{tested_concept_code}' is compatible with '{wanted_concept_code}' "
-                f"because '{wanted_concept_code}' is '{NativeConcept.ANYTHING.code}'"
+                f"because '{wanted_concept_code}' is '{ANYTHING_CONCEPT_CODE}'"
             )
             return True
         tested_concept = self.get_required_concept(concept_code=tested_concept_code)
@@ -176,7 +189,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
             return False
         pydantic_model = self.get_class(concept_code=concept.structure_class_name)
         is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
-        refines_image = self.is_compatible_by_concept_code(tested_concept_code=concept.code, wanted_concept_code=NativeConcept.IMAGE.code)
+        refines_image = self.is_compatible_by_concept_code(tested_concept_code=concept.code, wanted_concept_code=get_native_concept_code("Image"))
         return is_image_class or refines_image
 
     @override

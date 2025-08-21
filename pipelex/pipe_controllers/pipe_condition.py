@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set, cast
+from typing import List, Optional, Set, cast
 
 import shortuuid
 from pydantic import model_validator
@@ -21,7 +21,7 @@ from pipelex.exceptions import (
     WorkingMemoryStuffNotFoundError,
 )
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
-from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
+from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
@@ -32,7 +32,7 @@ from pipelex.tools.typing.validation_utils import has_exactly_one_among_attribut
 class PipeCondition(PipeController):
     expression_template: Optional[str] = None
     expression: Optional[str] = None
-    pipe_map: Dict[str, str]
+    pipe_map: List[PipeConditionPipeMap]
     default_pipe_code: Optional[str] = None
     add_alias_from_expression_to: Optional[str] = None
 
@@ -116,8 +116,8 @@ class PipeCondition(PipeController):
                 needed_inputs.add_requirement(variable_name=var_name, concept_code=f"{self.domain}.Unknown")
 
         # 2. Add the inputs needed by all possible target pipes
-        for pipe_code in self.pipe_map.values():
-            pipe = get_required_pipe(pipe_code=pipe_code)
+        for pipe_condition_pipe_map in self.pipe_map:
+            pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
             for input_name, requirement in pipe.needed_inputs().items:
                 needed_inputs.add_requirement(variable_name=input_name, concept_code=requirement.concept_code)
 
@@ -186,7 +186,7 @@ class PipeCondition(PipeController):
 
     @override
     def pipe_dependencies(self) -> Set[str]:
-        pipe_codes = list(self.pipe_map.values())
+        pipe_codes = [pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in self.pipe_map]
         if self.default_pipe_code:
             pipe_codes.append(self.default_pipe_code)
         return set(pipe_codes)
@@ -245,7 +245,14 @@ class PipeCondition(PipeController):
                 target=self.add_alias_from_expression_to,
             )
 
-        chosen_pipe_code = self.pipe_map.get(evaluated_expression, self.default_pipe_code)
+        chosen_pipe_code = next(
+            (
+                pipe_condition_pipe_map.pipe_code
+                for pipe_condition_pipe_map in self.pipe_map
+                if pipe_condition_pipe_map.expression_result == evaluated_expression
+            ),
+            self.default_pipe_code,
+        )
         if not chosen_pipe_code:
             error_msg = f"No pipe code found for evaluated expression '{evaluated_expression}' in pipe {self.code}:"
             error_msg += f"\n\nExpression: {self.applied_expression_template}"
@@ -344,7 +351,7 @@ class PipeCondition(PipeController):
             )
 
         # 3. Validate that all pipes in the pipe_map exist
-        all_pipe_codes = set(self.pipe_map.values())
+        all_pipe_codes = set([pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in self.pipe_map])
         if self.default_pipe_code:
             all_pipe_codes.add(self.default_pipe_code)
 
@@ -369,7 +376,8 @@ class PipeCondition(PipeController):
             )
 
         # Here, it should launch the dry run of all the pipes in the pipe_map
-        for pipe_code in self.pipe_map.values():
+        for pipe_condition_pipe_map in self.pipe_map:
+            pipe_code = pipe_condition_pipe_map.pipe_code
             pipe = get_required_pipe(pipe_code=pipe_code)
             await pipe.run_pipe(
                 job_metadata=job_metadata,

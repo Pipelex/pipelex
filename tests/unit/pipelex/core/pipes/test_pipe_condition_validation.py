@@ -1,5 +1,5 @@
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
-from pipelex.pipe_controllers.pipe_condition import PipeCondition
+from pipelex.pipe_controllers.pipe_condition import PipeCondition, PipeConditionPipeMap
 
 
 class TestPipeConditionValidation:
@@ -15,7 +15,10 @@ class TestPipeConditionValidation:
             ),
             output_concept_code="test_domain.ProcessedText",
             expression="input_var",
-            pipe_map={"value1": "pipe_a", "value2": "pipe_b"},
+            pipe_map=[
+                PipeConditionPipeMap(expression_result="value1", pipe_code="pipe_a"),
+                PipeConditionPipeMap(expression_result="value2", pipe_code="pipe_b"),
+            ],
             default_pipe_code="default_pipe",
         )
 
@@ -36,7 +39,7 @@ class TestPipeConditionValidation:
             ),
             output_concept_code="test_domain.Result",
             expression_template="{{ var }}",
-            pipe_map={"value": "target_pipe"},
+            pipe_map=[PipeConditionPipeMap(expression_result="value", pipe_code="target_pipe")],
         )
 
         # Test with expression
@@ -48,7 +51,7 @@ class TestPipeConditionValidation:
             ),
             output_concept_code="test_domain.Result",
             expression="var",
-            pipe_map={"value": "target_pipe"},
+            pipe_map=[PipeConditionPipeMap(expression_result="value", pipe_code="target_pipe")],
         )
 
         # Both should have the same applied expression template format

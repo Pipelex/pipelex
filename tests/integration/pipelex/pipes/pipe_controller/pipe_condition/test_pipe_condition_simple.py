@@ -15,7 +15,7 @@ from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import DryRunError
 from pipelex.hub import get_pipe_router
-from pipelex.pipe_controllers.pipe_condition import PipeCondition
+from pipelex.pipe_controllers.pipe_condition import PipeCondition, PipeConditionPipeMap
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition import CategoryInput
 
@@ -36,7 +36,10 @@ class TestPipeConditionSimple:
             ),
             output_concept_code="Text",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
-            pipe_map={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
+            pipe_map=[
+                PipeConditionPipeMap(expression_result="long", pipe_code="capitalize_long_text"),
+                PipeConditionPipeMap(expression_result="short", pipe_code="add_prefix_short_text"),
+            ],
         )
         input_text_stuff = StuffFactory.make_stuff(
             concept_str="Text",
@@ -48,8 +51,10 @@ class TestPipeConditionSimple:
 
         assert pipe_condition.domain == "test_integration"
         assert pipe_condition.code == "text_length_condition"
-        assert pipe_condition.pipe_map["long"] == "capitalize_long_text"
-        assert pipe_condition.pipe_map["short"] == "add_prefix_short_text"
+        assert pipe_condition.pipe_map[0].expression_result == "long"
+        assert pipe_condition.pipe_map[0].pipe_code == "capitalize_long_text"
+        assert pipe_condition.pipe_map[1].expression_result == "short"
+        assert pipe_condition.pipe_map[1].pipe_code == "add_prefix_short_text"
 
         input_text = working_memory.get_stuff("input_text")
         assert input_text is not None
@@ -107,7 +112,10 @@ class TestPipeConditionSimple:
             ),
             output_concept_code="Text",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
-            pipe_map={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
+            pipe_map=[
+                PipeConditionPipeMap(expression_result="long", pipe_code="capitalize_long_text"),
+                PipeConditionPipeMap(expression_result="short", pipe_code="add_prefix_short_text"),
+            ],
         )
 
         # Create test data - short text input (<= 5 characters)

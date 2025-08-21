@@ -8,7 +8,7 @@ from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeIn
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.exceptions import DryRunError
-from pipelex.pipe_controllers.pipe_condition import PipeCondition
+from pipelex.pipe_controllers.pipe_condition import PipeCondition, PipeConditionPipeMap
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition import CategoryInput
 
@@ -28,7 +28,11 @@ class TestPipeConditionSimple:
             ),
             output_concept_code="native.Text",
             expression_template="{{ user_category.category }}",
-            pipe_map={"small": "process_small", "medium": "process_medium", "large": "process_large"},
+            pipe_map=[
+                PipeConditionPipeMap(expression_result="small", pipe_code="process_small"),
+                PipeConditionPipeMap(expression_result="medium", pipe_code="process_medium"),
+                PipeConditionPipeMap(expression_result="large", pipe_code="process_large"),
+            ],
             default_pipe_code="process_small",
         )
 
@@ -59,11 +63,11 @@ class TestPipeConditionSimple:
             ),
             output_concept_code="native.Text",
             expression_template="{{ user_status.category }}",
-            pipe_map={
-                "active": "process_small",  # Map to existing pipes
-                "inactive": "process_medium",
-                "pending": "process_large",
-            },
+            pipe_map=[
+                PipeConditionPipeMap(expression_result="active", pipe_code="process_small"),
+                PipeConditionPipeMap(expression_result="inactive", pipe_code="process_medium"),
+                PipeConditionPipeMap(expression_result="pending", pipe_code="process_large"),
+            ],
             default_pipe_code="process_small",
         )
 

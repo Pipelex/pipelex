@@ -1,49 +1,16 @@
-from enum import Enum
-from typing import List
+from typing import Dict, List, NamedTuple
 
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.types import StrEnum
 
 
-class NativeConceptClass(StrEnum):
-    DYNAMIC = "DynamicContent"
-    TEXT = "TextContent"
-    IMAGE = "ImageContent"
-    PDF = "PDFContent"
-    TEXT_AND_IMAGES = "TextAndImagesContent"
-    NUMBER = "NumberContent"
-    LLM_PROMPT = "LLMPromptContent"
-    PAGE = "PageContent"
-
-    @classmethod
-    def class_names(cls) -> List[str]:
-        return [code.value for code in cls]
-
-    @property
-    def native_concept(self) -> "NativeConcept":
-        match self:
-            case NativeConceptClass.DYNAMIC:
-                return NativeConcept.DYNAMIC
-            case NativeConceptClass.TEXT:
-                return NativeConcept.TEXT
-            case NativeConceptClass.IMAGE:
-                return NativeConcept.IMAGE
-            case NativeConceptClass.PDF:
-                return NativeConcept.PDF
-            case NativeConceptClass.TEXT_AND_IMAGES:
-                return NativeConcept.TEXT_AND_IMAGES
-            case NativeConceptClass.NUMBER:
-                return NativeConcept.NUMBER
-            case NativeConceptClass.LLM_PROMPT:
-                return NativeConcept.LLM_PROMPT
-            case NativeConceptClass.PAGE:
-                return NativeConcept.PAGE
+class NativeConceptData(NamedTuple):
+    code: str
+    content_class_name: str
+    definition: str
 
 
-# Exceptionally, we use an Enum here (and not our usual StrEnum) to avoid confusion with
-# the concept_code which must have the form "native.ConceptName"
-class NativeConcept(Enum):
-    ANYTHING = "Anything"
+class NativeConcept(StrEnum):
     DYNAMIC = "Dynamic"
     TEXT = "Text"
     IMAGE = "Image"
@@ -53,34 +20,24 @@ class NativeConcept(Enum):
     LLM_PROMPT = "LlmPrompt"
     PAGE = "Page"
 
-    @classmethod
-    def names(cls) -> List[str]:
-        return [code.value for code in cls]
 
-    @property
-    def code(self) -> str:
-        if "." in self.value:
-            return self.value
-        return f"{SpecialDomain.NATIVE}.{self.value}"
-
-    @property
-    def content_class_name(self) -> NativeConceptClass:
-        match self:
-            case NativeConcept.TEXT:
-                return NativeConceptClass.TEXT
-            case NativeConcept.IMAGE:
-                return NativeConceptClass.IMAGE
-            case NativeConcept.PDF:
-                return NativeConceptClass.PDF
-            case NativeConcept.TEXT_AND_IMAGES:
-                return NativeConceptClass.TEXT_AND_IMAGES
-            case NativeConcept.NUMBER:
-                return NativeConceptClass.NUMBER
-            case NativeConcept.LLM_PROMPT:
-                return NativeConceptClass.LLM_PROMPT
-            case NativeConcept.DYNAMIC:
-                return NativeConceptClass.DYNAMIC
-            case NativeConcept.PAGE:
-                return NativeConceptClass.PAGE
-            case NativeConcept.ANYTHING:
-                raise RuntimeError("NativeConcept.ANYTHING cannot be used as a content class name")
+NATIVE_CONCEPTS_DATA: Dict[NativeConcept, NativeConceptData] = {
+    NativeConcept.DYNAMIC: NativeConceptData(
+        code=NativeConcept.DYNAMIC, content_class_name=f"{NativeConcept.DYNAMIC}Content", definition="A dynamic concept"
+    ),
+    NativeConcept.TEXT: NativeConceptData(code=NativeConcept.TEXT, content_class_name=f"{NativeConcept.TEXT}Content", definition="A text"),
+    NativeConcept.IMAGE: NativeConceptData(code=NativeConcept.IMAGE, content_class_name=f"{NativeConcept.IMAGE}Content", definition="An image"),
+    NativeConcept.PDF: NativeConceptData(code=NativeConcept.PDF, content_class_name=f"{NativeConcept.PDF}Content", definition="A PDF"),
+    NativeConcept.TEXT_AND_IMAGES: NativeConceptData(
+        code=NativeConcept.TEXT_AND_IMAGES, content_class_name=f"{NativeConcept.TEXT_AND_IMAGES}Content", definition="A text and an image"
+    ),
+    NativeConcept.NUMBER: NativeConceptData(code=NativeConcept.NUMBER, content_class_name=f"{NativeConcept.NUMBER}Content", definition="A number"),
+    NativeConcept.LLM_PROMPT: NativeConceptData(
+        code=NativeConcept.LLM_PROMPT, content_class_name=f"{NativeConcept.LLM_PROMPT}Content", definition="A prompt for an LLM"
+    ),
+    NativeConcept.PAGE: NativeConceptData(
+        code=NativeConcept.PAGE,
+        content_class_name=f"{NativeConcept.PAGE}Content",
+        definition="The content of a page of a document, comprising text and linked images and an optional page view image",
+    ),
+}

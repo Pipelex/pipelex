@@ -1,4 +1,5 @@
-from typing import Dict
+from pathlib import Path
+from typing import Dict, Optional
 
 from pydantic import BaseModel
 
@@ -14,7 +15,12 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 
 class PipelexBundleFactory(BaseModel):
     @classmethod
-    def make_from_blueprint(cls, blueprint: PipelexBundleBlueprint) -> PipelexBundle:
+    def make_from_blueprint(
+        cls,
+        blueprint: PipelexBundleBlueprint,
+        file_content: str,
+        file_path: Optional[Path],
+    ) -> PipelexBundle:
         """Make a PipelexBundle from a PipelexBundleBlueprint."""
         domain = Domain(
             code=blueprint.domain,
@@ -44,4 +50,4 @@ class PipelexBundleFactory(BaseModel):
                     pipe_code=pipe_name,
                     pipe_blueprint=pipe_blueprint,
                 )
-        return PipelexBundle(domain=domain, concepts=concepts, pipes=pipes)
+        return PipelexBundle(domain=domain, concepts=concepts, pipes=pipes, file_content=file_content, file_path=file_path)

@@ -12,6 +12,7 @@ class LibraryManagerFactory:
     def make_empty(cls, config_dir_path: str) -> "LibraryManager":
         domain_library = DomainLibrary.make_empty()
         concept_library = ConceptLibrary.make_empty()
+        concept_library.load_native_concepts()
         pipe_library = PipeLibrary.make_empty()
         library_config = LibraryConfig(config_dir_path=config_dir_path)
 

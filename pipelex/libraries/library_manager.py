@@ -161,7 +161,9 @@ class LibraryManager(LibraryManagerAbstract):
 
         converter = PipelexInterpreter(file_path=toml_path)
         blueprint = converter.make_pipelex_bundle_blueprint()
-        pipelex_bundle = PipelexBundleFactory.make_from_blueprint(blueprint=blueprint)
+        pipelex_bundle = PipelexBundleFactory.make_from_blueprint(
+            blueprint=blueprint, file_content=converter.get_file_content(), file_path=converter.file_path
+        )
         self.load_from_pipelex_bundle(pipelex_bundle=pipelex_bundle)
 
     @override
