@@ -5,6 +5,7 @@ from typing_extensions import Self, override
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Quality
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
@@ -56,7 +57,9 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             code=pipe_code,
             definition=pipe_blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
-            output=get_concept_provider().get_required_concept(concept_code=pipe_blueprint.output),
+            output=get_concept_provider().get_required_concept(
+                concept_code=Concept.construct_concept_string_with_domain(domain=domain, concept_code=pipe_blueprint.output)
+            ),
             output_multiplicity=output_multiplicity,
             imgg_prompt=pipe_blueprint.img_gen_prompt,
             imgg_handle=pipe_blueprint.imgg_handle,

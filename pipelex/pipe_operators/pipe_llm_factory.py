@@ -4,6 +4,7 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -125,12 +126,14 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         user_images: List[str] = []
         if pipe_blueprint.inputs:
             for stuff_name, requirement in (pipe_blueprint.inputs).items():
-                concept = get_concept_provider().get_required_concept(concept_code=requirement.concept_code)
+                concept = get_concept_provider().get_required_concept(
+                    concept_code=Concept.construct_concept_string_with_domain(domain=domain, concept_code=requirement.concept_code)
+                )
                 if get_concept_provider().is_image_concept(concept_code=concept.code):
                     user_images.append(stuff_name)
                 else:
-                    # Implicit text concept
                     pass
+
         pipe_llm_prompt = PipeLLMPrompt(
             code="adhoc_for_pipe_llm_prompt",
             domain=domain,
@@ -160,7 +163,9 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             code=pipe_code,
             definition=pipe_blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
-            output=get_concept_provider().get_required_concept(concept_code=pipe_blueprint.output),
+            output=get_concept_provider().get_required_concept(
+                concept_code=Concept.construct_concept_string_with_domain(domain=domain, concept_code=pipe_blueprint.output)
+            ),
             pipe_llm_prompt=pipe_llm_prompt,
             llm_choices=llm_choices,
             structuring_method=pipe_blueprint.structuring_method,

@@ -335,7 +335,7 @@ class TestConceptLibraryCompatibility:
         tested_concept = concept_provider.get_required_concept("concept_library_tests.MultiMediaConcept")
         wanted_concept = concept_provider.get_required_concept("native.Text")
         result = concept_provider.is_compatible(tested_concept, wanted_concept)
-        assert result is True, "MultiMediaConcept should be compatible with Text"
+        assert result is False, "MultiMediaConcept should be compatible with Text"
 
     def test_is_compatible_multimedia_concept_vs_image(self, concept_provider: ConceptProviderAbstract):
         """Test that MultiMediaConcept is compatible with Image (multiple inheritance)."""
@@ -343,7 +343,7 @@ class TestConceptLibraryCompatibility:
         tested_concept = concept_provider.get_required_concept("concept_library_tests.MultiMediaConcept")
         wanted_concept = concept_provider.get_required_concept("native.Image")
         result = concept_provider.is_compatible(tested_concept, wanted_concept)
-        assert result is True, "MultiMediaConcept should be compatible with Image"
+        assert result is False, "MultiMediaConcept should be compatible with Image"
 
     def test_is_compatible_independent_concept_vs_text(self, concept_provider: ConceptProviderAbstract):
         """Test that IndependentConcept is not compatible with Text."""

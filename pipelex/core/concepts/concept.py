@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -23,6 +23,10 @@ class Concept(BaseModel):
     structure_class_name: str
     refines: List[str] = Field(default_factory=list)
 
+    @property
+    def library_key(self) -> str:
+        return f"{self.domain}.{self.code}"
+
     @model_validator(mode="after")
     def validate_concept(self) -> Self:
         if not is_snake_case(self.domain):
@@ -37,10 +41,11 @@ class Concept(BaseModel):
 
     def validate_refines(self) -> None:
         for refine in self.refines:
-            if not is_pascal_case(refine):
-                raise ConceptCodeError(
-                    f"Refine must be PascalCase (letters and numbers only, starting with uppercase) for concept with code '{refine}'"
-                )
+            try:
+                ConceptBlueprint.validate_single_refine(refine)
+            except Exception as e:
+                # Convert any exception from ConceptBlueprint validation to ConceptCodeError
+                raise ConceptCodeError(str(e)) from e
 
     @classmethod
     def sentence_from_concept(cls, concept: "Concept") -> str:
@@ -57,6 +62,32 @@ class Concept(BaseModel):
     @classmethod
     def is_native_concept(cls, concept: "Concept") -> bool:
         return concept.domain == SpecialDomain.NATIVE.value
+
+    @classmethod
+    def construct_concept_string_with_domain(cls, domain: str, concept_code: str) -> str:
+        if "." not in concept_code:
+            if cls.is_native_concept_code(concept_code=concept_code):
+                return f"{SpecialDomain.NATIVE.value}.{concept_code}"
+            else:
+                return f"{domain}.{concept_code}"
+        return concept_code
+
+    @classmethod
+    def validate_concept_string(cls, concept_string: str):
+        if "." in concept_string:
+            # There should be only one dot
+            if concept_string.count(".") != 1:
+                raise ConceptCodeError(f"Concept string '{concept_string}' is not valid. It should have only one dot.")
+
+            domain, concept_code = concept_string.split(".")
+            if not is_snake_case(domain):
+                raise ConceptCodeError(f"Domain '{domain}' in concept string '{concept_string}' is not valid. It should be snake_case.")
+            if not is_pascal_case(concept_code):
+                raise ConceptCodeError(f"Concept code '{concept_code}' in concept string '{concept_string}' is not valid. It should be PascalCase.")
+
+            if domain == SpecialDomain.NATIVE.value:
+                if concept_code not in [native_concept.value for native_concept in NativeConceptEnum]:
+                    raise ConceptCodeError(f"Concept string '{concept_string}' is not valid. It should be a native concept.")
 
     @classmethod
     def is_valid_structure_class(cls, structure_class_name: str) -> bool:

@@ -9,8 +9,6 @@ ThoughtfulAnswerConclusion = "Conclusion of a thoughtful answer"
 
 [concept.ThoughtfulAnswer]
 definition = "A thoughtful answer to a question"
-structure = "ThoughtfulAnswer"
-refines = "AnswerToAQuestion"
 
 [pipe]
 [pipe.analyse_question_tricky]

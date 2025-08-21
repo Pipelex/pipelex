@@ -8,6 +8,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
@@ -47,7 +48,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
-        return self.get_required_concept(concept_code=native_concept.value)
+        return self.root[f"{SpecialDomain.NATIVE.value}.{native_concept.value}"]
 
     def get_native_concepts(self) -> List[Concept]:
         """Create all native concepts from the hardcoded data"""
@@ -70,10 +71,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return [concept for key, concept in self.root.items() if key.startswith(f"{domain}.")]
 
     def add_new_concept(self, concept: Concept):
-        name = concept.code
-        if name in self.root:
-            raise ConceptLibraryError(f"Concept '{name}' already exists in the library")
-        self.root[name] = concept
+        if concept.library_key in self.root:
+            raise ConceptLibraryError(f"Concept '{concept.library_key}' already exists in the library")
+        self.root[concept.library_key] = concept
 
     def add_concepts(self, concepts: List[Concept]):
         for concept in concepts:
@@ -81,6 +81,10 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def is_compatible(self, tested_concept: Concept, wanted_concept: Concept) -> bool:
+        from pipelex import pretty_print
+
+        pretty_print(tested_concept, "tested_concept")
+        pretty_print(wanted_concept, "wanted_concept")
         if tested_concept.code == wanted_concept.code:
             return True
         for inherited_concept_code in tested_concept.refines:
@@ -98,6 +102,8 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         if "." not in concept_code:
             if not Concept.is_native_concept_code(concept_code=concept_code):
                 raise ConceptLibraryError(f"Concept code '{concept_code}' is not a native concept")
+            else:
+                return self.get_native_concept(native_concept=NativeConceptEnum(concept_code))
         try:
             return self.root[concept_code]
         except KeyError:

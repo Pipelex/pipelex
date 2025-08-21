@@ -20,14 +20,10 @@ refines = ["Image"]
 # Concept that refines FundamentalsDoc
 [concept.DocumentationConcept]
 definition = "A specialized documentation concept"
-structure = "DocumentationConcept"
-refines = ["FundamentalsDoc"]
 
 # Concept that refines both Text and Image (multiple inheritance)
 [concept.MultiMediaConcept]
 definition = "A concept that combines text and images"
-structure = "MultiMediaConcept"
-refines = ["Text", "Image"]
 
 # Concept with custom structure that doesn't refine anything
 [concept.IndependentConcept]

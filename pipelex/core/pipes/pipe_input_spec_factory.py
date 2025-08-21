@@ -1,5 +1,6 @@
 from typing import Dict
 
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.pipe_input_spec import InputRequirement, InputRequirementBlueprint, PipeInputSpec
 from pipelex.hub import get_concept_provider
 
@@ -13,15 +14,13 @@ class PipeInputSpecFactory:
 
     @classmethod
     def make_from_blueprint(cls, domain: str, blueprint: Dict[str, InputRequirementBlueprint]) -> PipeInputSpec:
+        inputs: Dict[str, InputRequirement] = {}
         for var_name, input_requirement_blueprint in blueprint.items():
-            concept_code = f"{domain}.{input_requirement_blueprint.concept_code}"
-            blueprint[var_name].concept_code = concept_code
-        return PipeInputSpec(
-            root={
-                var_name: InputRequirement(
-                    concept=get_concept_provider().get_required_concept(concept_code=input_requirement_blueprint.concept_code),
-                    multiplicity=input_requirement_blueprint.multiplicity,
-                )
-                for var_name, input_requirement_blueprint in blueprint.items()
-            }
-        )
+            Concept.validate_concept_string(input_requirement_blueprint.concept_code)
+            inputs[var_name] = InputRequirement(
+                concept=get_concept_provider().get_required_concept(
+                    concept_code=Concept.construct_concept_string_with_domain(domain=domain, concept_code=input_requirement_blueprint.concept_code)
+                ),
+                multiplicity=input_requirement_blueprint.multiplicity,
+            )
+        return PipeInputSpec(root=inputs)
