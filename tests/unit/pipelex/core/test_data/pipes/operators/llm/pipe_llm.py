@@ -1,6 +1,7 @@
 """PipeLLM test cases."""
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint
 
 PIPE_LLM = (
@@ -21,7 +22,7 @@ prompt_template = "Generate a story about a programmer"
             "generate_text": PipeLLMBlueprint(
                 type="PipeLLM",
                 definition="Generate text using LLM",
-                output="Text",
+                output=NativeConceptEnum.TEXT.value,
                 prompt_template="Generate a story about a programmer",
             ),
         },

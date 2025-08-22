@@ -9,10 +9,6 @@ ConceptLibraryRoot = Dict[str, Concept]
 
 class ConceptProviderAbstract(ABC):
     @abstractmethod
-    def get_concept(self, concept_code: str) -> Optional[Concept]:
-        pass
-
-    @abstractmethod
     def add_new_concept(self, concept: Concept) -> None:
         pass
 
@@ -29,7 +25,7 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_required_concept(self, concept_string: str) -> Concept:
+    def get_required_concept(self, concept_string: str, domain: Optional[str] = None) -> Concept:
         pass
 
     @abstractmethod

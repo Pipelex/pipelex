@@ -43,7 +43,7 @@ class TestPipeOCR:
         concept_1 = get_concept_provider().get_required_concept(concept_string="ocr.PageScan")
         pipe_ocr_blueprint = PipeOcrBlueprint(
             definition="OCR test for image processing",
-            inputs={"page_scan": InputRequirementBlueprint(concept_code="Image")},
+            inputs={"page_scan": InputRequirementBlueprint(concept_code=NativeConceptEnum.IMAGE.value)},
             output=NativeConceptEnum.TEXT_AND_IMAGES.value,
             page_images=True,
             page_image_captions=False,

@@ -4,6 +4,7 @@ import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_content import HtmlContent, ImageContent, ListContent, NumberContent, TextAndImagesContent, TextContent
@@ -72,7 +73,9 @@ class TestWorkingMemory:
     @pytest.fixture
     def single_pdf_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single PDF content."""
-        return WorkingMemoryFactory.make_from_pdf(pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL, concept_code="PDF", name="pdf_document")
+        return WorkingMemoryFactory.make_from_pdf(
+            pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL, concept_code=NativeConceptEnum.PDF.value, name="pdf_document"
+        )
 
     @pytest.fixture
     def multiple_stuff_memory(self) -> WorkingMemory:
@@ -130,7 +133,9 @@ class TestWorkingMemory:
         )
 
         complex_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make(concept_code="List", domain="native", definition="native.List", structure_class_name="ListContent"),
+            concept=ConceptFactory.make(
+                concept_code="List", domain=SpecialDomain.NATIVE.value, definition="Lorem Ipsum", structure_class_name="ListContent"
+            ),
             name="mixed_list",
             content=complex_content,
         )
@@ -162,7 +167,9 @@ class TestWorkingMemory:
         )
 
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make(concept_code="Html", domain="native", definition="native.Html", structure_class_name="HtmlContent"),
+            concept=ConceptFactory.make(
+                concept_code="Html", domain=SpecialDomain.NATIVE.value, definition="Lorem Ipsum", structure_class_name="HtmlContent"
+            ),
             name="test_report",
             content=html_content,
         )

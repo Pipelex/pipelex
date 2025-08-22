@@ -31,7 +31,7 @@ class TestDryWorkingMemory:
             TypedNamedInputRequirement(
                 variable_name="page",
                 concept=ConceptFactory.make(
-                    concept_code=NativeConceptEnum.PAGE.value, domain="test_tricky_questions", definition="Page", structure_class_name="Page"
+                    concept_code=NativeConceptEnum.PAGE.value, domain="test_tricky_questions", definition="Lorem Ipsum", structure_class_name="Page"
                 ),
                 structure_class=PageContent,
             ),

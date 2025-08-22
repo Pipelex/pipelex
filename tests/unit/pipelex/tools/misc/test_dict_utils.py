@@ -1,5 +1,6 @@
 """Unit tests for dict_utils module."""
 
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.tools.misc.dict_utils import insert_before
 
 
@@ -38,7 +39,7 @@ class TestDictUtils:
 
     def test_complex_nested_structure(self) -> None:
         """Test with complex nested dictionary structure."""
-        original = {"type": "PipeLLM", "definition": "Test pipe", "output": "Text", "system_prompt": "Test prompt"}
+        original = {"type": "PipeLLM", "definition": "Test pipe", "output": NativeConceptEnum.TEXT.value, "system_prompt": "Test prompt"}
 
         # Insert inputs before output
         result = insert_before(original, "output", "inputs", "InputText")

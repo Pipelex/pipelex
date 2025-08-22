@@ -5,6 +5,7 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptDomainError, ConceptStringError
+from pipelex.core.domains.domain import SpecialDomain
 
 
 class TestConcept:
@@ -12,28 +13,28 @@ class TestConcept:
 
     def test_is_native_concept_code(self):
         """Test is_native_concept_code method."""
-        assert Concept.is_native_concept_code("Text") is True
-        assert Concept.is_native_concept_code("Image") is True
-        assert Concept.is_native_concept_code("PDF") is True
-        assert Concept.is_native_concept_code("TextAndImages") is True
-        assert Concept.is_native_concept_code("Number") is True
-        assert Concept.is_native_concept_code("LlmPrompt") is True
-        assert Concept.is_native_concept_code("Anything") is True
-        assert Concept.is_native_concept_code("Dynamic") is True
-        assert Concept.is_native_concept_code("native.Text") is False
-        assert Concept.is_native_concept_code("native.Image") is False
-        assert Concept.is_native_concept_code("native.PDF") is False
-        assert Concept.is_native_concept_code("native.TextAndImages") is False
-        assert Concept.is_native_concept_code("native.Number") is False
-        assert Concept.is_native_concept_code("native.LlmPrompt") is False
-        assert Concept.is_native_concept_code("not_native.Text") is False
-        assert Concept.is_native_concept_code("not_native.Image") is False
-        assert Concept.is_native_concept_code("not_native.PDF") is False
-        assert Concept.is_native_concept_code("not_native.TextAndImages") is False
-        assert Concept.is_native_concept_code("not_native.Number") is False
-        assert Concept.is_native_concept_code("not_native.LlmPrompt") is False
-        assert Concept.is_native_concept_code("not_native.Anything") is False
-        assert Concept.is_native_concept_code("not_native.Dynamic") is False
+        assert Concept.is_native_concept_code(NativeConceptEnum.TEXT.value) is True
+        assert Concept.is_native_concept_code(NativeConceptEnum.IMAGE.value) is True
+        assert Concept.is_native_concept_code(NativeConceptEnum.PDF.value) is True
+        assert Concept.is_native_concept_code(NativeConceptEnum.TEXT_AND_IMAGES.value) is True
+        assert Concept.is_native_concept_code(NativeConceptEnum.NUMBER.value) is True
+        assert Concept.is_native_concept_code(NativeConceptEnum.LLM_PROMPT.value) is True
+        assert Concept.is_native_concept_code(NativeConceptEnum.ANYTHING.value) is True
+        assert Concept.is_native_concept_code(NativeConceptEnum.DYNAMIC.value) is True
+        assert Concept.is_native_concept_code(f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}") is False
+        assert Concept.is_native_concept_code(f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.IMAGE.value}") is False
+        assert Concept.is_native_concept_code(f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.PDF.value}") is False
+        assert Concept.is_native_concept_code(f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT_AND_IMAGES.value}") is False
+        assert Concept.is_native_concept_code(f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.NUMBER.value}") is False
+        assert Concept.is_native_concept_code(f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.LLM_PROMPT.value}") is False
+        assert Concept.is_native_concept_code(f"not_native.{NativeConceptEnum.TEXT.value}") is False
+        assert Concept.is_native_concept_code(f"not_native.{NativeConceptEnum.IMAGE.value}") is False
+        assert Concept.is_native_concept_code(f"not_native.{NativeConceptEnum.PDF.value}") is False
+        assert Concept.is_native_concept_code(f"not_native.{NativeConceptEnum.TEXT_AND_IMAGES.value}") is False
+        assert Concept.is_native_concept_code(f"not_native.{NativeConceptEnum.NUMBER.value}") is False
+        assert Concept.is_native_concept_code(f"not_native.{NativeConceptEnum.LLM_PROMPT.value}") is False
+        assert Concept.is_native_concept_code(f"not_native.{NativeConceptEnum.ANYTHING.value}") is False
+        assert Concept.is_native_concept_code(f"not_native.{NativeConceptEnum.DYNAMIC.value}") is False
         assert Concept.is_native_concept_code("RandomConcept") is False
         assert Concept.is_native_concept_code("text") is False
 
@@ -47,32 +48,26 @@ class TestConcept:
 
         assert (
             Concept.is_native_concept(
-                ConceptFactory.make_from_blueprint(concept_code="Text", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition))
+                ConceptFactory.make_from_blueprint(
+                    concept_code=NativeConceptEnum.TEXT.value, domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
+                )
             )
             is False
         )
         assert (
             Concept.is_native_concept(
-                ConceptFactory.make_from_blueprint(concept_code="Text", domain="native", blueprint=ConceptBlueprint(definition=valid_definition))
+                ConceptFactory.make_from_blueprint(
+                    concept_code=NativeConceptEnum.TEXT.value,
+                    domain=SpecialDomain.NATIVE.value,
+                    blueprint=ConceptBlueprint(definition=valid_definition),
+                )
             )
             is True
         )
         assert (
             Concept.is_native_concept(
-                ConceptFactory.make_from_blueprint(concept_code="Image", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition))
-            )
-            is False
-        )
-        assert (
-            Concept.is_native_concept(
-                ConceptFactory.make_from_blueprint(concept_code="PDF", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition))
-            )
-            is False
-        )
-        assert (
-            Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code="TextAndImages", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
+                    concept_code=NativeConceptEnum.IMAGE.value, domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
                 )
             )
             is False
@@ -80,7 +75,7 @@ class TestConcept:
         assert (
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code="Number", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
+                    concept_code=NativeConceptEnum.PDF.value, domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
                 )
             )
             is False
@@ -88,7 +83,7 @@ class TestConcept:
         assert (
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code="LlmPrompt", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
+                    concept_code=NativeConceptEnum.TEXT_AND_IMAGES.value, domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
                 )
             )
             is False
@@ -96,7 +91,23 @@ class TestConcept:
         assert (
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code="Anything", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
+                    concept_code=NativeConceptEnum.NUMBER.value, domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
+                )
+            )
+            is False
+        )
+        assert (
+            Concept.is_native_concept(
+                ConceptFactory.make_from_blueprint(
+                    concept_code=NativeConceptEnum.LLM_PROMPT.value, domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
+                )
+            )
+            is False
+        )
+        assert (
+            Concept.is_native_concept(
+                ConceptFactory.make_from_blueprint(
+                    concept_code=NativeConceptEnum.ANYTHING.value, domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
                 )
             )
             is False
@@ -113,19 +124,22 @@ class TestConcept:
     def test_construct_concept_string_with_domain(self):
         """Test construct_concept_string_with_domain method."""
         valid_domain = "valid_domain"
-        assert Concept.construct_concept_string_with_domain(domain=valid_domain, concept_code="Text") == f"{valid_domain}.Text"
+        assert (
+            Concept.construct_concept_string_with_domain(domain=valid_domain, concept_code=NativeConceptEnum.TEXT.value)
+            == f"{valid_domain}.{NativeConceptEnum.TEXT.value}"
+        )
 
     def test_validate_concept_string(self):
         """Test validate_concept_string method."""
         valid_domain = "valid_domain"
-        valid_concept_code = "Text"
+        valid_concept_code = NativeConceptEnum.TEXT.value
         valid_concept_string = f"{valid_domain}.{valid_concept_code}"
         # Valid cases - should not raise exceptions
         assert Concept.validate_concept_string(valid_concept_string) is None
         assert Concept.validate_concept_string(f"snake_case_domain.{valid_concept_code}") is None
         assert Concept.validate_concept_string(f"domain_123.{valid_concept_code}") is None
         assert Concept.validate_concept_string(f"{valid_domain}.TEXT") is None
-        assert Concept.validate_concept_string("native.Anything") is None
+        assert Concept.validate_concept_string(f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.ANYTHING.value}") is None
 
         # Invalid cases - should raise ConceptCodeError
 
@@ -164,4 +178,4 @@ class TestConcept:
 
         # Invalid native concept
         with pytest.raises(ConceptCodeError):
-            Concept.validate_concept_string("native.InvalidNativeConcept")
+            Concept.validate_concept_string(f"{SpecialDomain.NATIVE.value}.InvalidNativeConcept")

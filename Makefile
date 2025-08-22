@@ -422,7 +422,7 @@ docs-deploy: env
 c: format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: cleanderived c
+cc: cleanderived fix-unused-imports c
 	@echo "> done: cc = cleanderived format lint pyright mypy"
 
 check: cc check-unused-imports
