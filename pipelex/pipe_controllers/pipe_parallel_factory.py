@@ -49,15 +49,18 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         else:
             output = get_concept_provider().get_required_concept(concept_string=output_concept_code)
 
-        if pipe_blueprint.combined_output and "." not in pipe_blueprint.combined_output:
-            if Concept.is_native_concept_code(concept_code=pipe_blueprint.combined_output):
-                combined_output = get_concept_provider().get_native_concept(native_concept=NativeConceptEnum(pipe_blueprint.combined_output))
+        if pipe_blueprint.combined_output:
+            if pipe_blueprint.combined_output and "." not in pipe_blueprint.combined_output:
+                if Concept.is_native_concept_code(concept_code=pipe_blueprint.combined_output):
+                    combined_output = get_concept_provider().get_native_concept(native_concept=NativeConceptEnum(pipe_blueprint.combined_output))
+                else:
+                    combined_output = get_concept_provider().get_required_concept(
+                        concept_string=Concept.construct_concept_string_with_domain(domain=domain, concept_code=output_concept_code)
+                    )
             else:
-                combined_output = get_concept_provider().get_required_concept(
-                    concept_string=Concept.construct_concept_string_with_domain(domain=domain, concept_code=output_concept_code)
-                )
+                combined_output = get_concept_provider().get_required_concept(concept_string=output_concept_code)
         else:
-            combined_output = get_concept_provider().get_required_concept(concept_string=output_concept_code)
+            combined_output = None
 
         return PipeParallel(
             domain=domain,
