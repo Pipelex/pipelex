@@ -46,6 +46,20 @@ class LLMAssignment(BaseModel):
     llm_setting: LLMSetting
     llm_prompt: LLMPrompt
 
+    @classmethod
+    def make_from_prompt(
+        cls,
+        job_metadata: JobMetadata,
+        llm_setting: LLMSetting,
+        llm_prompt: LLMPrompt,
+    ) -> "LLMAssignment":
+        """Factory method for creating LLMAssignment from existing prompt."""
+        return cls(
+            job_metadata=job_metadata,
+            llm_setting=llm_setting,
+            llm_prompt=llm_prompt,
+        )
+
     def clone_with_new_prompt(self, new_prompt: LLMPrompt) -> "LLMAssignment":
         return LLMAssignment(
             job_metadata=self.job_metadata,

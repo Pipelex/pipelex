@@ -12,7 +12,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_native import NativeConceptEnum
-from pipelex.core.domains.domain import Domain
+from pipelex.core.domains.domain import Domain, SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
@@ -230,13 +230,13 @@ class PipeLLM(PipeOperator):
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {self.code}")
-        if self.output.code == "native.Dynamic":
+        if self.output.code == SpecialDomain.NATIVE.value + "." + NativeConceptEnum.DYNAMIC.value:
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
             output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
 
             if not output_concept_code:
-                output_concept_code = "native.Text"
+                output_concept_code = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value
         else:
             output_concept_code = self.output.code
 
