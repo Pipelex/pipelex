@@ -6,6 +6,7 @@ from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
@@ -15,7 +16,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import DryRunError, PipeDefinitionError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
-from pipelex.hub import get_concept_provider, get_pipeline_tracker, get_required_pipe
+from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -26,7 +27,7 @@ class PipeParallel(PipeController):
 
     parallel_sub_pipes: List[SubPipe]
     add_each_output: bool
-    combined_output: Optional[str]
+    combined_output: Optional[Concept]
 
     @override
     def required_variables(self) -> Set[str]:
@@ -138,6 +139,7 @@ class PipeParallel(PipeController):
         """
         Run a list of pipes in parallel.
         """
+
         if not self.add_each_output and not self.combined_output:
             raise PipeDefinitionError("PipeParallel requires either add_each_output or combined_output to be set")
         if pipe_run_params.final_stuff_code:
@@ -183,9 +185,10 @@ class PipeParallel(PipeController):
                     f"PipeParallel requires unique output names for each parallel sub pipe, but {sub_pipe_output_name} is already used"
                 )
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
-        if combined_output := self.combined_output:
+
+        if self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
-                concept=get_concept_provider().get_required_concept(concept_string=combined_output),
+                concept=self.combined_output,
                 stuff_contents=output_stuff_contents,
                 name=output_name,
             )
@@ -295,9 +298,9 @@ class PipeParallel(PipeController):
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
 
         # 5. Handle combined output if specified
-        if combined_output := self.combined_output:
+        if self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
-                concept=get_concept_provider().get_required_concept(concept_string=combined_output),
+                concept=self.combined_output,
                 stuff_contents=output_stuff_contents,
                 name=output_name,
             )
