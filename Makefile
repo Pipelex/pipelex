@@ -265,7 +265,7 @@ test-with-prints: env
 tp: test-with-prints
 	@echo "> done: tp = test-with-prints"
 
-test-inference: env
+test-inference-with-prints: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
 		$(VENV_PYTEST) --pipe-run-mode live -m "inference and not imgg" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -273,8 +273,19 @@ test-inference: env
 		$(VENV_PYTEST) --pipe-run-mode live -m "inference and not imgg" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
 
-ti: test-inference
-	@echo "> done: ti = test-inference"
+test-inference-fast: env
+	$(call PRINT_TITLE,"Unit testing")
+	@if [ -n "$(TEST)" ]; then \
+		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference and not imgg" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+	else \
+		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference and not imgg" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+	fi
+
+tip: test-inference-with-prints
+	@echo "> done: tip = test-inference-with-prints"
+
+ti: test-inference-fast
+	@echo "> done: ti-fast = test-inference-fast"
 
 ti-dry: env
 	$(call PRINT_TITLE,"Unit testing")
