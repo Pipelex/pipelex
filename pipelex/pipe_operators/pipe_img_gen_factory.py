@@ -5,7 +5,6 @@ from typing_extensions import Self, override
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Quality
-from pipelex.core.concepts.concept import Concept, NativeConceptEnum
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
@@ -51,24 +50,13 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         pipe_code: str,
         pipe_blueprint: PipeImgGenBlueprint,
     ) -> PipeImgGen:
-        output_multiplicity = pipe_blueprint.nb_output or 1
-        output_concept_code = pipe_blueprint.output
-        if "." not in output_concept_code:
-            if Concept.is_native_concept_code(concept_code=output_concept_code):
-                output = get_concept_provider().get_native_concept(native_concept=NativeConceptEnum(output_concept_code))
-            else:
-                output = get_concept_provider().get_required_concept(
-                    concept_string=Concept.construct_concept_string_with_domain(domain=domain, concept_code=output_concept_code)
-                )
-        else:
-            output = get_concept_provider().get_required_concept(concept_string=output_concept_code)
         return PipeImgGen(
             domain=domain,
             code=pipe_code,
             definition=pipe_blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
-            output=output,
-            output_multiplicity=output_multiplicity,
+            output=get_concept_provider().get_required_concept(concept_string=pipe_blueprint.output, domain=domain),
+            output_multiplicity=pipe_blueprint.nb_output or 1,
             imgg_prompt=pipe_blueprint.img_gen_prompt,
             imgg_handle=pipe_blueprint.imgg_handle,
             aspect_ratio=pipe_blueprint.aspect_ratio,

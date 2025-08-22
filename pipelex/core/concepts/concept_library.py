@@ -83,24 +83,22 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return False
 
     @override
-    def get_concept(self, concept_code: str) -> Optional[Concept]:
-        return self.root.get(concept_code, None)
-
-    @override
-    def get_required_concept(self, concept_string: str) -> Concept:
+    def get_required_concept(self, concept_string: str, domain: Optional[str] = None) -> Concept:
         """
         `concept_string` can have the domain or not. If it doesn't have the domain, it is assumed to be native.
         If it is not native and doesnt have a domain, it should raise an error
         """
+        concept: Concept
         if "." not in concept_string:
-            if not Concept.is_native_concept_code(concept_code=concept_string):
-                raise ConceptLibraryError(f"Concept code '{concept_string}' cannot be found in the library without a domain or being native")
+            if Concept.is_native_concept_code(concept_code=concept_string):
+                concept = self.get_native_concept(native_concept=NativeConceptEnum(concept_string))
+            elif domain:
+                concept = self.root[Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_string)]
             else:
-                return self.get_native_concept(native_concept=NativeConceptEnum(concept_string))
-        try:
-            return self.root[concept_string]
-        except KeyError:
-            raise ConceptLibraryConceptNotFoundError(f"Concept with key '{concept_string}' not found in the library")
+                raise ConceptLibraryError(f"Concept code '{concept_string}' cannot be found in the library without a domain or being native")
+        else:
+            concept = self.root[concept_string]
+        return concept
 
     @override
     def get_class(self, concept_code: str) -> Optional[Type[Any]]:
@@ -122,8 +120,8 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     @override
     def search_for_concept_in_domains(self, concept_name: str, search_domains: List[str]) -> Optional[Concept]:
         for domain in search_domains:
-            concept_code = f"{domain}.{concept_name}"
-            if found_concept := self.get_concept(concept_code=concept_code):
+            concept_code = Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_name)
+            if found_concept := self.get_required_concept(concept_string=concept_code):
                 return found_concept
 
         return None
