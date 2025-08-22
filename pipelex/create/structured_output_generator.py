@@ -133,6 +133,9 @@ class StructureGenerator:
                 return "int"
             case ConceptStructureBlueprintFieldType.BOOLEAN:
                 return "bool"
+            case ConceptStructureBlueprintFieldType.DATE:
+                self.imports.add("from datetime import datetime")
+                return "datetime"
             case ConceptStructureBlueprintFieldType.LIST:
                 item_type = field_blueprint.item_type or "Any"
                 # Recursively handle item types if they're FieldType enums
@@ -162,9 +165,6 @@ class StructureGenerator:
                 except ValueError:
                     pass
                 return f"Dict[{key_type}, {value_type}]"
-            case _:
-                # Unknown FieldType, assume it's a custom type
-                return str(field_blueprint.type)
 
     def _generate_field(self, field_name: str, field_def: Union[Dict[str, Any], str]) -> str:
         """Generate a single field definition.
@@ -249,6 +249,9 @@ class StructureGenerator:
                 return "int"
             case ConceptStructureBlueprintFieldType.BOOLEAN:
                 return "bool"
+            case ConceptStructureBlueprintFieldType.DATE:
+                self.imports.add("from datetime import datetime")
+                return "datetime"
             case ConceptStructureBlueprintFieldType.LIST:
                 item_type = field_def.get("item_type", "Any")
                 # Check if item_type is an enum reference

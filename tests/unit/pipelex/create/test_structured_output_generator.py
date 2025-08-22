@@ -426,6 +426,7 @@ class TestStructureGenerator:
 
         # Check the complete generated structure with mixed field types
         expected_result = (
+            "from datetime import datetime\n"
             "from enum import Enum\n"
             "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
             "from pydantic import Field\n"
@@ -436,7 +437,7 @@ class TestStructureGenerator:
             "\n"
             '    name: str = Field(..., description="The name of the person")\n'
             '    age: float = Field(..., description="The age of the person")\n'
-            '    birthdate: str = Field(..., description="The birthdate of the person")\n'  # DATE type maps to str
+            '    birthdate: datetime = Field(..., description="The birthdate of the person")\n'
         )
         assert result == expected_result
 
