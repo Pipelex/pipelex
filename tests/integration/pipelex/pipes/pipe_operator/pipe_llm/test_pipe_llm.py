@@ -3,17 +3,15 @@ from typing import List
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.hub import get_pipe_router, get_report_delegate
-from pipelex.pipe_operators.pipe_llm import PipeLLM, PipeLLMOutput
-from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
+from pipelex.pipe_operators.pipe_llm import PipeLLMOutput
+from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint, PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from tests.integration.pipelex.test_data import PipeTestCases
 
@@ -27,18 +25,18 @@ class TestPipeLLM:
         self,
         pipe_run_mode: PipeRunMode,
     ):
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            definition="LLM test for basic text generation",
+            output=NativeConceptEnum.TEXT.value,
+            system_prompt=PipeTestCases.SYSTEM_PROMPT,
+            prompt=PipeTestCases.USER_PROMPT,
+        )
+
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeLLM(
-                code="adhoc_for_test_pipe_llm",
+            pipe=PipeLLMFactory.make_from_blueprint(
                 domain="generic",
-                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-                pipe_llm_prompt=PipeLLMPrompt(
-                    code="adhoc_for_test_pipe_llm",
-                    domain="generic",
-                    system_prompt=PipeTestCases.SYSTEM_PROMPT,
-                    user_text=PipeTestCases.USER_PROMPT,
-                    output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-                ),
+                pipe_code="adhoc_for_test_pipe_llm",
+                pipe_blueprint=pipe_llm_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -65,22 +63,21 @@ class TestPipeLLM:
         if not stuff_name:
             pytest.fail(f"Cannot use nameless stuff in this test: {stuff}")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            definition="LLM test for image processing with attributes",
+            inputs={stuff_name: InputRequirementBlueprint(concept_code=stuff.concept.code)},
+            output=NativeConceptEnum.TEXT.value,
+            system_prompt=PipeTestCases.SYSTEM_PROMPT,
+            prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,
+        )
+
         pipe_job = PipeJobFactory.make_pipe_job(
             working_memory=working_memory,
-            pipe=PipeLLM(
-                code="adhoc_for_test_pipe_llm_image",
+            pipe=PipeLLMFactory.make_from_blueprint(
                 domain="generic",
-                inputs=PipeInputSpecFactory.make_from_blueprint(
-                    domain="generic", blueprint={stuff_name: InputRequirementBlueprint(concept_code=stuff.concept.code)}
-                ),
-                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-                pipe_llm_prompt=PipeLLMPrompt(
-                    code="adhoc_for_test_pipe_llm_image",
-                    domain="generic",
-                    system_prompt=PipeTestCases.SYSTEM_PROMPT,
-                    user_text=PipeTestCases.MULTI_IMG_DESC_PROMPT,
-                    output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-                ),
+                pipe_code="adhoc_for_test_pipe_llm_image",
+                pipe_blueprint=pipe_llm_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )

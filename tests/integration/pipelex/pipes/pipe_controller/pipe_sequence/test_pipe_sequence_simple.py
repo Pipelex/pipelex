@@ -10,13 +10,12 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.pipe_controllers.pipe_sequence import PipeSequence
-from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint, PipeSequenceFactory
+from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -29,17 +28,20 @@ class TestPipeSequenceSimple:
     async def test_simple_sequence_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeSequence with a simple 2-step text transformation scenario."""
         # Create PipeSequence instance - pipes are loaded from TOML files
-        pipe_sequence = PipeSequence(
-            domain="test_integration",
-            code="simple_sequence",
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
-            ),
-            output=ConceptFactory.make(concept_code="Text", domain="test_integration", definition="Text", structure_class_name="Text"),
-            sequential_sub_pipes=[
-                SubPipe(pipe_code="capitalize_text", output_name="capitalized_text"),
-                SubPipe(pipe_code="add_prefix", output_name="final_text"),
+        pipe_sequence_blueprint = PipeSequenceBlueprint(
+            definition="Simple sequence for text processing",
+            inputs={"input_text": InputRequirementBlueprint(concept_code="Text")},
+            output="test_integration.Text",
+            steps=[
+                SubPipeBlueprint(pipe="capitalize_text", result="capitalized_text"),
+                SubPipeBlueprint(pipe="add_prefix", result="final_text"),
             ],
+        )
+
+        pipe_sequence = PipeSequenceFactory.make_from_blueprint(
+            domain="test_integration",
+            pipe_code="simple_sequence",
+            pipe_blueprint=pipe_sequence_blueprint,
         )
 
         # Create test data - single text input

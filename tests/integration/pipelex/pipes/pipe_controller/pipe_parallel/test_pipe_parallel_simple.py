@@ -9,13 +9,12 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.pipe_controllers.pipe_parallel import PipeParallel
-from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint, PipeParallelFactory
+from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -28,20 +27,23 @@ class TestPipeParallelSimple:
     async def test_parallel_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeParallel running three text analysis pipes in parallel."""
         # Create PipeParallel instance - pipes are loaded from TOML files
-        pipe_parallel = PipeParallel(
-            domain="test_integration",
-            code="parallel_text_analyzer",
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
-            ),
-            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-            parallel_sub_pipes=[
-                SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
-                SubPipe(pipe_code="count_words", output_name="word_count_result"),
-                SubPipe(pipe_code="extract_keywords", output_name="keywords_result"),
+        pipe_parallel_blueprint = PipeParallelBlueprint(
+            definition="Parallel text analysis pipeline",
+            inputs={"input_text": InputRequirementBlueprint(concept_code="Text")},
+            output=NativeConceptEnum.TEXT.value,
+            parallels=[
+                SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
+                SubPipeBlueprint(pipe="count_words", result="word_count_result"),
+                SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),
             ],
             add_each_output=True,
             combined_output=None,
+        )
+
+        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+            domain="test_integration",
+            pipe_code="parallel_text_analyzer",
+            pipe_blueprint=pipe_parallel_blueprint,
         )
 
         # Create test data
@@ -142,20 +144,23 @@ class TestPipeParallelSimple:
     async def test_parallel_short_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeParallel with shorter text to verify consistent behavior."""
         # Create PipeParallel instance
-        pipe_parallel = PipeParallel(
-            domain="test_integration",
-            code="parallel_text_analyzer",
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
-            ),
-            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-            parallel_sub_pipes=[
-                SubPipe(pipe_code="analyze_sentiment", output_name="sentiment_result"),
-                SubPipe(pipe_code="count_words", output_name="word_count_result"),
-                SubPipe(pipe_code="extract_keywords", output_name="keywords_result"),
+        pipe_parallel_blueprint = PipeParallelBlueprint(
+            definition="Parallel text analysis pipeline for short text",
+            inputs={"input_text": InputRequirementBlueprint(concept_code="Text")},
+            output=NativeConceptEnum.TEXT.value,
+            parallels=[
+                SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
+                SubPipeBlueprint(pipe="count_words", result="word_count_result"),
+                SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),
             ],
             add_each_output=True,
             combined_output=None,
+        )
+
+        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+            domain="test_integration",
+            pipe_code="parallel_text_analyzer",
+            pipe_blueprint=pipe_parallel_blueprint,
         )
 
         # Create test data - shorter text

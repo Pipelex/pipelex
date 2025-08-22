@@ -100,11 +100,11 @@ class WorkingMemoryFactory(BaseModel):
             if not isinstance(content, str):
                 continue
             text_content = TextContent(text=content)
-            stuff_dict[name] = Stuff(
-                stuff_name=name,
-                stuff_code="",
+            stuff_dict[name] = StuffFactory.make_stuff(
                 concept=get_required_concept(concept_string=NativeConceptEnum.TEXT.value),
                 content=text_content,
+                name=name,
+                code="",
             )
         return WorkingMemory(root=stuff_dict)
 
@@ -193,11 +193,11 @@ class WorkingMemoryFactory(BaseModel):
                     mock_content = cls.create_mock_content(requirement)
 
                     # Create stuff with mock content
-                    mock_stuff = Stuff(
-                        stuff_name=requirement.variable_name,
-                        stuff_code=shortuuid.uuid()[:5],
+                    mock_stuff = StuffFactory.make_stuff(
                         concept=requirement.concept,
                         content=mock_content,
+                        name=requirement.variable_name,
+                        code=shortuuid.uuid()[:5],
                     )
 
                     working_memory.add_new_stuff(name=requirement.variable_name, stuff=mock_stuff)
@@ -218,11 +218,11 @@ class WorkingMemoryFactory(BaseModel):
                     mock_list_content = ListContent[StuffContent](items=items)
 
                     # Create stuff with mock content
-                    mock_stuff = Stuff(
-                        stuff_name=requirement.variable_name,
-                        stuff_code=shortuuid.uuid()[:5],
+                    mock_stuff = StuffFactory.make_stuff(
                         concept=requirement.concept,
                         content=mock_list_content,
+                        name=requirement.variable_name,
+                        code=shortuuid.uuid()[:5],
                     )
 
                     working_memory.add_new_stuff(name=requirement.variable_name, stuff=mock_stuff)
@@ -233,11 +233,11 @@ class WorkingMemoryFactory(BaseModel):
                 )
                 # Create fallback text content
                 fallback_content = TextContent(text=f"DRY RUN: Fallback mock for '{requirement.variable_name}' ({requirement.concept.code})")
-                fallback_stuff = Stuff(
-                    stuff_name=requirement.variable_name,
-                    stuff_code=shortuuid.uuid()[:5],
+                fallback_stuff = StuffFactory.make_stuff(
                     concept=requirement.concept,
                     content=fallback_content,
+                    name=requirement.variable_name,
+                    code=shortuuid.uuid()[:5],
                 )
                 working_memory.add_new_stuff(name=requirement.variable_name, stuff=fallback_stuff)
 

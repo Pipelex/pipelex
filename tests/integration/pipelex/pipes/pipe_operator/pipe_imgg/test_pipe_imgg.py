@@ -2,12 +2,12 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.hub import get_pipe_router
-from pipelex.pipe_operators.pipe_img_gen import PipeImgGen, PipeImgGenOutput
+from pipelex.pipe_operators.pipe_img_gen import PipeImgGenOutput
+from pipelex.pipe_operators.pipe_img_gen_factory import PipeImgGenBlueprint, PipeImgGenFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from tests.integration.pipelex.test_data import IMGGTestCases
 
@@ -25,14 +25,19 @@ class TestPipeImgg:
         topic: str,
         image_desc: str,
     ):
+        pipe_imgg_blueprint = PipeImgGenBlueprint(
+            definition="Image generation test",
+            img_gen_prompt=image_desc,
+            imgg_handle=imgg_handle,
+            output=NativeConceptEnum.IMAGE.value,
+            nb_output=1,
+        )
+
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeImgGen(
-                code="adhoc_for_test_pipe_img_gen",
+            pipe=PipeImgGenFactory.make_from_blueprint(
                 domain="generic",
-                imgg_handle=imgg_handle,
-                imgg_prompt=image_desc,
-                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE]),
-                output_multiplicity=False,
+                pipe_code="adhoc_for_test_pipe_img_gen",
+                pipe_blueprint=pipe_imgg_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )

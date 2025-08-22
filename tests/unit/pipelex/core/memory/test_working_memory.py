@@ -112,9 +112,7 @@ class TestWorkingMemory:
             content=TextContent(text="Secondary content"),
         )
 
-        memory = WorkingMemory()  # TODO: use WorkingMemoryFactory
-        memory.add_new_stuff(name="primary_text", stuff=text_stuff)
-        memory.add_new_stuff(name="secondary_text", stuff=secondary_stuff)
+        memory = WorkingMemoryFactory.make_from_multiple_stuffs(stuff_list=[text_stuff, secondary_stuff], main_name="primary_text")
         memory.set_alias(alias="main_text", target="primary_text")
         memory.set_alias(alias="backup_text", target="secondary_text")
 

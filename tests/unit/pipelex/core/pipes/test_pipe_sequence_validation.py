@@ -1,8 +1,6 @@
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
-from pipelex.pipe_controllers.pipe_sequence import PipeSequence
-from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint, PipeSequenceFactory
+from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 
 
 class TestPipeSequenceValidation:
@@ -10,16 +8,17 @@ class TestPipeSequenceValidation:
 
     def test_pipe_sequence_creation(self):
         """Test basic PipeSequence creation"""
-        pipe_sequence = PipeSequence(
+        pipe_sequence_blueprint = PipeSequenceBlueprint(
+            definition="Test sequence for validation",
+            inputs={"text": InputRequirementBlueprint(concept_code="test_domain.Text")},
+            output="test_domain.ProcessedText",
+            steps=[SubPipeBlueprint(pipe="test_pipe_1", result="intermediate_result")],
+        )
+
+        pipe_sequence = PipeSequenceFactory.make_from_blueprint(
             domain="test_domain",
-            code="test_sequence",
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_domain", blueprint={"text": InputRequirementBlueprint(concept_code="test_domain.Text")}
-            ),
-            output=ConceptFactory.make(
-                concept_code="ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"
-            ),
-            sequential_sub_pipes=[SubPipe(pipe_code="test_pipe_1", output_name="intermediate_result")],
+            pipe_code="test_sequence",
+            pipe_blueprint=pipe_sequence_blueprint,
         )
 
         assert pipe_sequence.code == "test_sequence"
@@ -30,16 +29,17 @@ class TestPipeSequenceValidation:
 
     def test_pipe_sequence_multiple_sub_pipes(self):
         """Test PipeSequence with multiple sequential sub-pipes"""
-        pipe_sequence = PipeSequence(
+        pipe_sequence_blueprint = PipeSequenceBlueprint(
+            definition="Test sequence with multiple steps",
+            inputs={"initial_input": InputRequirementBlueprint(concept_code="test_domain.Text")},
+            output="test_domain.FinalOutput",
+            steps=[SubPipeBlueprint(pipe="step_1", result="intermediate"), SubPipeBlueprint(pipe="step_2", result="final_output")],
+        )
+
+        pipe_sequence = PipeSequenceFactory.make_from_blueprint(
             domain="test_domain",
-            code="test_sequence",
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_domain", blueprint={"initial_input": InputRequirementBlueprint(concept_code="test_domain.Text")}
-            ),
-            output=ConceptFactory.make(
-                concept_code="FinalOutput", domain="test_domain", definition="Final output", structure_class_name="FinalOutput"
-            ),
-            sequential_sub_pipes=[SubPipe(pipe_code="step_1", output_name="intermediate"), SubPipe(pipe_code="step_2", output_name="final_output")],
+            pipe_code="test_sequence",
+            pipe_blueprint=pipe_sequence_blueprint,
         )
 
         assert pipe_sequence.code == "test_sequence"

@@ -8,7 +8,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
 from pipelex.exceptions import PipeInputError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
-from pipelex.pipe_controllers.pipe_batch import PipeBatch
+from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchBlueprint, PipeBatchFactory
 from pipelex.pipe_controllers.pipe_condition import PipeCondition
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -45,13 +45,20 @@ class SubPipe(BaseModel):
             sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
             pipe_batch_inputs = sub_pipe.inputs
             pipe_batch_inputs.add_requirement(variable_name=batch_params.input_list_stuff_name, concept=input_list_stuff.concept)
-            # TODO: use PipeBatchFactory
-            pipe_batch = PipeBatch(
-                domain=pipe.domain,
-                code=self.pipe_code,
-                inputs=pipe_batch_inputs,
-                output=pipe.output,
+
+            # Create blueprint for PipeBatch
+            pipe_batch_blueprint = PipeBatchBlueprint(
+                definition=f"Batch processing for {self.pipe_code}",
                 branch_pipe_code=self.pipe_code,
+                output=pipe.output.code,
+                input_list_name=batch_params.input_list_stuff_name,
+                input_item_name=batch_params.input_item_stuff_name,
+            )
+
+            pipe_batch = PipeBatchFactory.make_from_blueprint(
+                domain=pipe.domain,
+                pipe_code=self.pipe_code,
+                pipe_blueprint=pipe_batch_blueprint,
             )
             # This is the only line that changes between run and dry_run
             if sub_pipe_run_params.run_mode == PipeRunMode.DRY:

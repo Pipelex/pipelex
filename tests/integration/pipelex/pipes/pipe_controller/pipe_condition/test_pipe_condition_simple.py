@@ -10,7 +10,6 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -18,7 +17,7 @@ from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import DryRunError
 from pipelex.hub import get_pipe_router
-from pipelex.pipe_controllers.pipe_condition import PipeCondition, PipeConditionPipeMap
+from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionBlueprint, PipeConditionFactory, PipeConditionPipeMapBlueprint
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition import CategoryInput
 
@@ -31,18 +30,18 @@ class TestPipeConditionSimple:
 
     async def test_condition_long_text_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeCondition with long text that should trigger capitalize_long_text pipe."""
-        pipe_condition = PipeCondition(
-            code="text_length_condition",
-            domain="test_integration",
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
-            ),
-            output=ConceptFactory.make(concept_code="Text", domain="generic", definition="Text", structure_class_name="Text"),
+        pipe_condition_blueprint = PipeConditionBlueprint(
+            definition="Text length condition for testing",
+            inputs={"input_text": InputRequirementBlueprint(concept_code="Text")},
+            output="generic.Text",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
-            pipe_map=[
-                PipeConditionPipeMap(expression_result="long", pipe_code="capitalize_long_text"),
-                PipeConditionPipeMap(expression_result="short", pipe_code="add_prefix_short_text"),
-            ],
+            pipe_map=PipeConditionPipeMapBlueprint(root={"long": "capitalize_long_text", "short": "add_prefix_short_text"}),
+        )
+
+        pipe_condition = PipeConditionFactory.make_from_blueprint(
+            domain="test_integration",
+            pipe_code="text_length_condition",
+            pipe_blueprint=pipe_condition_blueprint,
         )
         input_text_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
@@ -107,18 +106,18 @@ class TestPipeConditionSimple:
     async def test_condition_short_text_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeCondition with short text that should trigger add_prefix_short_text pipe."""
         # Create PipeCondition instance - pipes are loaded from TOML files
-        pipe_condition = PipeCondition(
-            domain="test_integration",
-            code="text_length_condition",
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_integration", blueprint={"input_text": InputRequirementBlueprint(concept_code="Text")}
-            ),
-            output=ConceptFactory.make(concept_code="Text", domain="generic", definition="Text", structure_class_name="Text"),
+        pipe_condition_blueprint = PipeConditionBlueprint(
+            definition="Text length condition for short text testing",
+            inputs={"input_text": InputRequirementBlueprint(concept_code="Text")},
+            output="generic.Text",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
-            pipe_map=[
-                PipeConditionPipeMap(expression_result="long", pipe_code="capitalize_long_text"),
-                PipeConditionPipeMap(expression_result="short", pipe_code="add_prefix_short_text"),
-            ],
+            pipe_map=PipeConditionPipeMapBlueprint(root={"long": "capitalize_long_text", "short": "add_prefix_short_text"}),
+        )
+
+        pipe_condition = PipeConditionFactory.make_from_blueprint(
+            domain="test_integration",
+            pipe_code="text_length_condition",
+            pipe_blueprint=pipe_condition_blueprint,
         )
 
         # Create test data - short text input (<= 5 characters)

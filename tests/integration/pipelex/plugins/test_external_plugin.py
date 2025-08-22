@@ -8,14 +8,13 @@ from pipelex import log, pretty_print
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices
+from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.hub import get_inference_manager, get_pipe_router, get_report_delegate
-from pipelex.pipe_operators.pipe_llm import PipeLLM, PipeLLMOutput
-from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
+from pipelex.pipe_operators.pipe_llm import PipeLLMOutput
+from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint, PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
@@ -87,25 +86,24 @@ class TestExternalPlugin:
             llm_handle=llm_handle,
             llm_worker_class=MockExternalLLMWorker,
         )
+
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            definition="LLM test with external plugin",
+            output=NativeConceptEnum.TEXT.value,
+            system_prompt=PipeTestCases.SYSTEM_PROMPT,
+            prompt=PipeTestCases.USER_PROMPT,
+            llm=LLMSetting(
+                llm_handle=llm_handle,
+                temperature=0.5,
+                max_tokens=None,
+            ),
+        )
+
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeLLM(
-                code="adhoc_for_test_pipe_llm_with_external_llm_handle",
+            pipe=PipeLLMFactory.make_from_blueprint(
                 domain="generic",
-                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-                pipe_llm_prompt=PipeLLMPrompt(
-                    code="adhoc_for_test_pipe_llm_with_external_llm_handle",
-                    domain="generic",
-                    system_prompt=PipeTestCases.SYSTEM_PROMPT,
-                    user_text=PipeTestCases.USER_PROMPT,
-                    output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-                ),
-                llm_choices=LLMSettingChoices.make_completed_with_defaults(
-                    for_text=LLMSetting(
-                        llm_handle=llm_handle,
-                        temperature=0.5,
-                        max_tokens=None,
-                    ),
-                ),
+                pipe_code="adhoc_for_test_pipe_llm_with_external_llm_handle",
+                pipe_blueprint=pipe_llm_blueprint,
             ),
         )
         pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(

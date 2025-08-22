@@ -94,35 +94,6 @@ class StuffFactory:
     def make_from_blueprint_dict(cls, blueprint: StuffBlueprint) -> "Stuff":
         return cls.make_from_blueprint(blueprint=blueprint)
 
-    # @classmethod
-    # def make_from_str(
-    #     cls,
-    #     str_value: str,
-    #     name: Optional[str] = None,
-    #     concept_str: str = get_native_concept_code("Text"),
-    # ) -> Stuff:
-    #     try:
-    #         concept_code = ConceptCodeFactory.make_concept_code_from_str(concept_str=concept_str)
-    #     except ConceptError:
-    #         stuff_ref = name or "unnamed"
-    #         raise StuffFactoryError(f"Concept '{concept_str}' does not contain a domain, could not make stuff '{stuff_ref}'")
-    #     the_concept = get_required_concept(concept_string=concept_code)
-    #     the_subclass_name = the_concept.structure_class_name
-    #     the_subclass = get_class_registry().get_class(name=the_subclass_name) or eval(the_subclass_name)
-    #     if not issubclass(the_subclass, StuffContentInitableFromStr):
-    #         raise StuffFactoryError(f"Concept '{concept_code}', subclass '{the_subclass}' is not InitableFromStr")
-    #     stuff_content: StuffContent = the_subclass.make_from_str(str_value)
-
-    #     if not name:
-    #         name = cls.make_stuff_name(concept_str)
-
-    #     return Stuff(
-    #         concept_code=concept_str,
-    #         content=stuff_content,
-    #         stuff_name=name,
-    #         stuff_code=shortuuid.uuid()[:5],
-    #     )
-
     @classmethod
     def combine_stuffs(
         cls,

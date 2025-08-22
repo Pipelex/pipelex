@@ -9,7 +9,8 @@ from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
-from pipelex.pipe_operators.pipe_func import PipeFunc, PipeFuncOutput
+from pipelex.pipe_operators.pipe_func import PipeFuncOutput
+from pipelex.pipe_operators.pipe_func_factory import PipeFuncBlueprint, PipeFuncFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.tools.func_registry import func_registry
 from tests.cases.source_code import wrap_lines
@@ -52,12 +53,17 @@ if __name__ == "__main__":
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=source_text_stuff)
 
         # Create the PipeFunc job
+        pipe_func_blueprint = PipeFuncBlueprint(
+            definition="Function pipe for wrapping lines",
+            function_name="wrap_lines",
+            output=NativeConceptEnum.TEXT.value,
+        )
+
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeFunc(
-                code="wrap_lines",
+            pipe=PipeFuncFactory.make_from_blueprint(
                 domain="source_code",
-                output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-                function_name="wrap_lines",
+                pipe_code="wrap_lines",
+                pipe_blueprint=pipe_func_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,

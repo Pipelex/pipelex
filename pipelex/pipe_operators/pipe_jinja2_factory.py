@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Any, Dict, Literal, Optional
 
 from typing_extensions import override
 
@@ -23,6 +23,7 @@ class PipeJinja2Blueprint(PipeBlueprint):
     jinja2: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
+    extra_context: Optional[Dict[str, Any]] = None
 
 
 class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
@@ -64,6 +65,7 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
             jinja2=preprocessed_template,
             prompting_style=pipe_blueprint.prompting_style,
             template_category=pipe_blueprint.template_category,
+            extra_context=pipe_blueprint.extra_context,
         )
 
     @classmethod

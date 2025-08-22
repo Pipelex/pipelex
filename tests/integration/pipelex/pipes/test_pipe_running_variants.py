@@ -6,7 +6,6 @@ from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.config import get_config
-from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
@@ -63,7 +62,7 @@ class TestPipeRunningVariants:
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            working_memory=WorkingMemory(),  # TODO: use WorkingMemoryFactory
+            working_memory=WorkingMemoryFactory.make_empty(),
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
         get_report_delegate().generate_report()
@@ -95,7 +94,7 @@ class TestPipeRunningVariants:
                 pipe_run_mode=pipe_run_mode,
                 output_multiplicity=output_multiplicity,
             ),
-            working_memory=WorkingMemory(),  # TODO: use WorkingMemoryFactory
+            working_memory=WorkingMemoryFactory.make_empty(),
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
         get_report_delegate().generate_report()

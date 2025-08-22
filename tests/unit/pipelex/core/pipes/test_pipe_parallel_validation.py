@@ -1,10 +1,7 @@
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
-from pipelex.pipe_controllers.pipe_parallel import PipeParallel
-from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_operators.pipe_llm import PipeLLM
-from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
+from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint, PipeParallelFactory
+from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
+from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint, PipeLLMFactory
 
 
 class TestPipeParallelValidation:
@@ -13,17 +10,16 @@ class TestPipeParallelValidation:
     def test_pipe_parallel_with_real_pipe_structure(self):
         """Test PipeParallel structure with a real pipe"""
         # Create a real PipeLLM that will infer inputs from the prompt template
-        real_pipe = PipeLLM(
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            definition="Analysis pipe for document processing",
+            output="test_domain.Analysis",
+            prompt_template="Analyze this document:  \n@context\n@document",
+        )
+
+        real_pipe = PipeLLMFactory.make_from_blueprint(
             domain="test_domain",
-            code="analyze_document",
-            # Let PipeLLM infer inputs from prompt template - no explicit inputs
-            output=ConceptFactory.make(concept_code="Analysis", domain="test_domain", definition="Analysis", structure_class_name="Analysis"),
-            pipe_llm_prompt=PipeLLMPrompt(
-                code="analyze_document_prompt",
-                domain="test_domain",
-                output=ConceptFactory.make(concept_code="Analysis", domain="test_domain", definition="Analysis", structure_class_name="Analysis"),
-                user_text="Analyze this document:  \n@context\n@document",
-            ),
+            pipe_code="analyze_document",
+            pipe_blueprint=pipe_llm_blueprint,
         )
 
         # Verify the real pipe was created successfully
@@ -32,22 +28,22 @@ class TestPipeParallelValidation:
         assert real_pipe.output.code == "test_domain.Analysis"
 
         # Create PipeParallel that would reference this pipe
-        pipe_parallel = PipeParallel(
-            domain="test_domain",
-            code="parallel_document_processor",
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_domain",
-                blueprint={
-                    "document": InputRequirementBlueprint(concept_code="test_domain.document"),
-                    "context": InputRequirementBlueprint(concept_code="test_domain.context"),
-                },
-            ),
-            output=ConceptFactory.make(
-                concept_code="ProcessedAnalysis", domain="test_domain", definition="Processed analysis", structure_class_name="ProcessedAnalysis"
-            ),
-            parallel_sub_pipes=[SubPipe(pipe_code="analyze_document", output_name="analysis_result")],
+        pipe_parallel_blueprint = PipeParallelBlueprint(
+            definition="Parallel document processor for testing",
+            inputs={
+                "document": InputRequirementBlueprint(concept_code="test_domain.document"),
+                "context": InputRequirementBlueprint(concept_code="test_domain.context"),
+            },
+            output="test_domain.ProcessedAnalysis",
+            parallels=[SubPipeBlueprint(pipe="analyze_document", result="analysis_result")],
             add_each_output=True,
             combined_output=None,
+        )
+
+        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+            domain="test_domain",
+            pipe_code="parallel_document_processor",
+            pipe_blueprint=pipe_parallel_blueprint,
         )
 
         # Verify the PipeParallel structure is correct
@@ -63,18 +59,19 @@ class TestPipeParallelValidation:
     def test_pipe_parallel_creation(self):
         """Test basic PipeParallel creation and structure"""
         # Create a simple PipeParallel with proper inputs
-        pipe_parallel = PipeParallel(
-            domain="test_domain",
-            code="test_parallel",
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_domain", blueprint={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")}
-            ),
-            output=ConceptFactory.make(
-                concept_code="ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"
-            ),
-            parallel_sub_pipes=[SubPipe(pipe_code="test_pipe_1", output_name="result_1")],
+        pipe_parallel_blueprint = PipeParallelBlueprint(
+            definition="Basic parallel pipe for testing",
+            inputs={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")},
+            output="test_domain.ProcessedText",
+            parallels=[SubPipeBlueprint(pipe="test_pipe_1", result="result_1")],
             add_each_output=True,
             combined_output=None,
+        )
+
+        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+            domain="test_domain",
+            pipe_code="test_parallel",
+            pipe_blueprint=pipe_parallel_blueprint,
         )
 
         # Verify the PipeParallel was created correctly
@@ -90,22 +87,22 @@ class TestPipeParallelValidation:
         """Test that PipeParallel needed_inputs method can be called and returns expected structure"""
 
         # Create PipeParallel with no sub-pipes to avoid dependency resolution
-        pipe_parallel = PipeParallel(
-            domain="test_domain",
-            code="parallel_document_processor",
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_domain",
-                blueprint={
-                    "document": InputRequirementBlueprint(concept_code="test_domain.Document"),
-                    "context": InputRequirementBlueprint(concept_code="test_domain.Context"),
-                },
-            ),
-            output=ConceptFactory.make(
-                concept_code="ProcessedAnalysis", domain="test_domain", definition="Processed analysis", structure_class_name="ProcessedAnalysis"
-            ),
-            parallel_sub_pipes=[],  # No sub-pipes to avoid dependency issues
+        pipe_parallel_blueprint = PipeParallelBlueprint(
+            definition="Parallel processor for testing inputs structure",
+            inputs={
+                "document": InputRequirementBlueprint(concept_code="test_domain.Document"),
+                "context": InputRequirementBlueprint(concept_code="test_domain.Context"),
+            },
+            output="test_domain.ProcessedAnalysis",
+            parallels=[],  # No sub-pipes to avoid dependency issues
             add_each_output=True,
             combined_output=None,
+        )
+
+        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+            domain="test_domain",
+            pipe_code="parallel_document_processor",
+            pipe_blueprint=pipe_parallel_blueprint,
         )
 
         # Test that needed_inputs method can be called

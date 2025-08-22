@@ -21,31 +21,7 @@ class PipeAbstract(ABC, BaseModel):
     inputs: PipeInputSpec = Field(default_factory=PipeInputSpec)
     output: Concept
 
-    # @model_validator(mode="before")
-    # @classmethod
-    # # TODO: This is a hack to add the domain prefix to the concept code.
-    # # Fix this with a more simple Concept Factory approach.
-    # def add_domain_prefix(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-    #     # Process output_concept_code - always present
-    #     if "output_concept_code" in data:
-    #         data["output_concept_code"] = ConceptCodeFactory.make_concept_code_from_str(
-    #             domain=data["domain"],
-    #             concept_str=data["output_concept_code"],
-    #             fallback_domain=SpecialDomain.IMPLICIT,
-    #         )
-
-    #     # Process inputs - always present
-    #     if "inputs" in data:
-    #         inputs = data["inputs"]
-    #         if isinstance(inputs, PipeInputSpec):
-    #             for _, input_requirement in inputs.root.items():
-    #                 input_requirement.concept_code = ConceptCodeFactory.make_concept_code_from_str(
-    #                     concept_str=input_requirement.concept_code,
-    #                     domain=data["domain"],
-    #                     fallback_domain=SpecialDomain.IMPLICIT,
-    #                 )
-
-    #     return data
+    # TODO: Add validaiton of pipe code. (snake_case ? )
 
     @property
     def class_name(self) -> str:

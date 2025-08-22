@@ -1,6 +1,5 @@
 from typing import Any, ClassVar, Dict, Optional, Set
 
-import shortuuid
 from jinja2 import TemplateSyntaxError
 from pydantic import ConfigDict, model_validator
 from typing_extensions import Self, override
@@ -18,8 +17,8 @@ from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
 from pipelex.hub import get_content_generator, get_template, get_template_provider
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -144,12 +143,7 @@ class PipeJinja2(PipeOperator):
         assert isinstance(jinja2_text, str)
         the_content = TextContent(text=jinja2_text)
 
-        output_stuff = Stuff(
-            concept=self.output,
-            content=the_content,
-            stuff_name=output_name,
-            stuff_code=shortuuid.uuid()[:5],
-        )
+        output_stuff = StuffFactory.make_stuff(concept=self.output, content=the_content, name=output_name)
 
         working_memory.set_new_main_stuff(
             stuff=output_stuff,

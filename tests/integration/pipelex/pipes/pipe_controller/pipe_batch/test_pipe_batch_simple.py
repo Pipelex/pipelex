@@ -10,12 +10,11 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
-from pipelex.core.pipes.pipe_run_params import BatchParams, PipeRunMode
+from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.pipe_controllers.pipe_batch import PipeBatch
+from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchBlueprint, PipeBatchFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -28,20 +27,22 @@ class TestPipeBatchSimple:
     async def test_simple_batch_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeBatch with a simple batch processing scenario."""
         # Create PipeBatch instance - it will call the uppercase_transformer pipe from the TOML
-        # TODO: use PipeBatchFactory
-        pipe_batch = PipeBatch(
-            domain="test_integration",
-            code="simple_batch",
+        pipe_batch_blueprint = PipeBatchBlueprint(
+            definition="Simple batch processing test",
             branch_pipe_code="uppercase_transformer",  # This exists in the TOML file
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_integration",
-                blueprint={
-                    "text_list": InputRequirementBlueprint(concept_code="Text"),
-                    "text_item": InputRequirementBlueprint(concept_code="Text"),
-                },
-            ),
-            output=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-            batch_params=BatchParams(input_list_stuff_name="text_list", input_item_stuff_name="text_item"),
+            inputs={
+                "text_list": InputRequirementBlueprint(concept_code="Text"),
+                "text_item": InputRequirementBlueprint(concept_code="Text"),
+            },
+            output=NativeConceptEnum.TEXT.value,
+            input_list_name="text_list",
+            input_item_name="text_item",
+        )
+
+        pipe_batch = PipeBatchFactory.make_from_blueprint(
+            domain="test_integration",
+            pipe_code="simple_batch",
+            pipe_blueprint=pipe_batch_blueprint,
         )
 
         # Create test data - list of text items

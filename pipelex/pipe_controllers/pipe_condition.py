@@ -1,4 +1,4 @@
-from typing import List, Optional, Set, cast
+from typing import Dict, List, Optional, Set, cast
 
 import shortuuid
 from pydantic import model_validator
@@ -9,7 +9,7 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
@@ -26,8 +26,8 @@ from pipelex.exceptions import (
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
+from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2Output
+from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint, PipeJinja2Factory
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
@@ -212,12 +212,25 @@ class PipeCondition(PipeController):
         # TODO: restore pipe_layer feature
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
 
-        pipe_jinja2 = PipeJinja2(
-            code="adhoc_for_pipe_condition",
-            domain=self.domain,
+        # Convert PipeInputSpec to blueprint format
+        inputs_blueprint: Dict[str, InputRequirementBlueprint] = {}
+        for var_name, requirement in self.inputs.root.items():
+            inputs_blueprint[var_name] = InputRequirementBlueprint(
+                concept_code=requirement.concept.code,
+                multiplicity=requirement.multiplicity,
+            )
+
+        pipe_jinja2_blueprint = PipeJinja2Blueprint(
+            definition="Jinja2 template for pipe condition evaluation",
             jinja2=self.applied_expression_template,
-            inputs=self.inputs,
-            output=self.output,
+            inputs=inputs_blueprint,
+            output=self.output.code,
+        )
+
+        pipe_jinja2 = PipeJinja2Factory.make_from_blueprint(
+            domain=self.domain,
+            pipe_code="adhoc_for_pipe_condition",
+            pipe_blueprint=pipe_jinja2_blueprint,
         )
         jinja2_job_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(
