@@ -7,6 +7,7 @@ from pytest import FixtureRequest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -29,7 +30,7 @@ class TestPipeParallelSimple:
         # Create PipeParallel instance - pipes are loaded from TOML files
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel text analysis pipeline",
-            inputs={"input_text": InputRequirementBlueprint(concept_code="Text")},
+            inputs={"input_text": InputRequirementBlueprint(concept_code=NativeConceptEnum.TEXT.value)},
             output=NativeConceptEnum.TEXT.value,
             parallels=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
@@ -106,7 +107,7 @@ class TestPipeParallelSimple:
         # Should return one of: positive, negative, neutral
         if pipe_run_mode != PipeRunMode.DRY:
             assert sentiment_result.content.text.lower() in ["positive", "negative", "neutral"]
-        assert f"{sentiment_result.concept.domain}.{sentiment_result.concept.code}" == "native.Text"
+        assert f"{sentiment_result.concept.domain}.{sentiment_result.concept.code}" == f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}"
 
         # Verify word count result
         word_count_result = final_working_memory.get_stuff("word_count_result")
@@ -145,7 +146,7 @@ class TestPipeParallelSimple:
         # Create PipeParallel instance
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel text analysis pipeline for short text",
-            inputs={"input_text": InputRequirementBlueprint(concept_code="Text")},
+            inputs={"input_text": InputRequirementBlueprint(concept_code=NativeConceptEnum.TEXT.value)},
             output=NativeConceptEnum.TEXT.value,
             parallels=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),

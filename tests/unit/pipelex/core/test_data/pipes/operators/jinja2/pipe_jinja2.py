@@ -1,6 +1,7 @@
 """PipeJinja2 test cases."""
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint
 
 PIPE_JINJA2 = (
@@ -21,7 +22,7 @@ jinja2 = "Hello {{ name }}!"
             "process_template": PipeJinja2Blueprint(
                 type="PipeJinja2",
                 definition="Process a Jinja2 template",
-                output="Text",
+                output=NativeConceptEnum.TEXT.value,
                 jinja2="Hello {{ name }}!",
             ),
         },

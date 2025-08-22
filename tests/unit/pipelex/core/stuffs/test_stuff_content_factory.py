@@ -4,6 +4,7 @@ import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import StructuredContent, TextContent
 from pipelex.core.stuffs.stuff_factory import StuffContentFactory
 
@@ -11,15 +12,21 @@ from pipelex.core.stuffs.stuff_factory import StuffContentFactory
 class TestCases:
     # Test cases for TextContent with string content
     TEXT_STRING_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_code": "native.Text",
+        "concept_code": f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
         "content": "The Dawn of Ultra-Rapid Transit: NextGen High-Speed Trains Redefine Travel",
     }
 
     # Test cases for TextContent with dict content
-    TEXT_DICT_BLUEPRINT: ClassVar[Dict[str, Any]] = {"concept_code": "native.Text", "content": {"text": "Sample text content"}}
+    TEXT_DICT_BLUEPRINT: ClassVar[Dict[str, Any]] = {
+        "concept_code": f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+        "content": {"text": "Sample text content"},
+    }
 
     # Test cases for native concept without prefix (should work)
-    TEXT_NO_PREFIX_BLUEPRINT: ClassVar[Dict[str, Any]] = {"concept_code": "Text", "content": {"text": "Text content without native prefix"}}
+    TEXT_NO_PREFIX_BLUEPRINT: ClassVar[Dict[str, Any]] = {
+        "concept_code": f"{NativeConceptEnum.TEXT.value}",
+        "content": {"text": "Text content without native prefix"},
+    }
 
     # Test cases for registered class (using actual registered class)
     REGISTERED_CLASS_BLUEPRINT: ClassVar[Dict[str, Any]] = {
