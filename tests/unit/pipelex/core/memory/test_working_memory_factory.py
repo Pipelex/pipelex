@@ -39,7 +39,8 @@ class TestWorkingMemoryFactory:
         assert "structured_item" in working_memory.root
 
         stuff = working_memory.root["structured_item"]
-        assert stuff.concept.code == "some.CustomConcept"
+        assert stuff.concept.code == "CustomConcept"
+        assert stuff.concept.domain == "some"
         assert stuff.content is not None
         assert isinstance(stuff.content, TextContent)  # Falls back to TextContent
 

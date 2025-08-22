@@ -162,7 +162,8 @@ class TestDryWorkingMemory:
 
         conclusion_stuff = dry_memory.get_stuff("conclusion")
         assert isinstance(conclusion_stuff.content, TextContent)
-        assert conclusion_stuff.concept.code == "test_tricky_questions.ThoughtfulAnswerConclusion"
+        assert conclusion_stuff.concept.code == "ThoughtfulAnswerConclusion"
+        assert conclusion_stuff.concept.domain == "test_tricky_questions"
 
         log.info("Created mock working memory with TextContent fallback:")
         dry_memory.pretty_print_summary()
@@ -220,6 +221,7 @@ class TestDryWorkingMemory:
         analysis_result_stuff = dry_memory.get_stuff("analysis_result")
         assert isinstance(analysis_result_stuff.content, TextContent)
         assert analysis_result_stuff.concept.code == "QuestionAnalysis"
+        assert analysis_result_stuff.concept.domain == "test_tricky_questions"
 
         log.info("Created mock working memory with mixed content types:")
         dry_memory.pretty_print_summary()

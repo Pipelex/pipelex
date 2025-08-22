@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Mapping, Optional, cast
 
 import toml
 import tomlkit
+from pydantic import BaseModel
 from tomlkit import array, document, inline_table, table
 from tomlkit import string as tk_string
 
@@ -155,8 +156,18 @@ def make_toml_string(
     return tk_string(normalized, multiline=needs_multiline, literal=use_literal)
 
 
-def _convert_to_inline(value: Any):
+def _convert_to_inline(value: Any) -> Any:
     """Recursively convert Python values; dicts -> inline tables; lists kept as arrays."""
+    # Handle Pydantic models by converting them to dict first
+    if isinstance(value, BaseModel):
+        # For RootModel, use the root attribute; for regular models, use model_dump()
+        if hasattr(value, "root"):
+            # This is a RootModel, use its root value
+            value = getattr(value, "root")
+        else:
+            # This is a regular BaseModel, convert to dict
+            value = value.model_dump()
+
     if isinstance(value, Mapping):
         value = cast(Mapping[str, Any], value)
         inline_table_obj = inline_table()
