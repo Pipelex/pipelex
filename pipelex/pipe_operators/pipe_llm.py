@@ -76,8 +76,13 @@ class PipeLLM(PipeOperator):
 
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
-        # if self.structuring_method is not None:
-        #     output_concept = get_required_concept(concept_string=self.output_concept_code)
+        if self.structuring_method is not None:
+            output_concept = get_concept_provider().get_required_concept(concept_string=self.output.code)
+            if output_concept.structure_class_name == NativeConceptEnum.TEXT.value:
+                raise PipeDefinitionError(
+                    f"Output concept '{self.output.code}' is considered a Text concept, "
+                    f"so it cannot be structured. Maybe you forgot to add '{NativeConceptEnum.TEXT.value}' to the class registry?"
+                )
         return self
 
     @override
@@ -230,7 +235,6 @@ class PipeLLM(PipeOperator):
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {self.code}")
-        print("dsjiqodjosqjo", self.output)
         output_concept = self.output
         if self.output.code == SpecialDomain.NATIVE.value + "." + NativeConceptEnum.DYNAMIC.value:
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.

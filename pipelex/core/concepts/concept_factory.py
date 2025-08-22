@@ -1,16 +1,46 @@
 from typing import Any, Dict, List, Optional
 
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_blueprint import (
+    ConceptBlueprint,
+    ConceptStructureBlueprint,
+    ConceptStructureBlueprintFieldType,
+    ConceptStructureBlueprintType,
+)
 from pipelex.core.concepts.concept_native import NativeConceptEnum, NativeConceptEnumData
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import TextContent
-from pipelex.create.structured_output_generator import generate_structured_output_from_blueprint_dict
+from pipelex.create.structured_output_generator import StructureGenerator
 from pipelex.exceptions import ConceptFactoryError, StructureClassError
 from pipelex.hub import get_class_registry
 
 
 class ConceptFactory:
+    @classmethod
+    def normalize_structure_blueprint(cls, structure_dict: Dict[str, ConceptStructureBlueprintType]) -> Dict[str, ConceptStructureBlueprint]:
+        """Convert a mixed structure dictionary to a proper ConceptStructureBlueprint dictionary.
+
+        Args:
+            structure_dict: Dictionary that may contain strings or ConceptStructureBlueprint objects
+
+        Returns:
+            Dictionary with all values as ConceptStructureBlueprint objects
+        """
+        normalized: Dict[str, ConceptStructureBlueprint] = {}
+
+        for field_name, field_value in structure_dict.items():
+            if isinstance(field_value, str):
+                # Convert string definition to ConceptStructureBlueprint for text field
+                normalized[field_name] = ConceptStructureBlueprint(
+                    definition=field_value,
+                    type=ConceptStructureBlueprintFieldType.TEXT,  # Explicitly set as text field
+                    required=True,  # Default for simple string definitions
+                )
+            else:
+                normalized[field_name] = field_value
+
+        return normalized
+
     @classmethod
     def make(cls, concept_code: str, domain: str, definition: str, structure_class_name: str, refines: Optional[List[str]] = None) -> Concept:
         return Concept(
@@ -72,10 +102,12 @@ class ConceptFactory:
             else:
                 # Structure is defined as a ConceptStructureBlueprint - run the structure generator and put it in the class registry
                 try:
-                    # Generate Python class from blueprint definition
-                    python_code = generate_structured_output_from_blueprint_dict(
+                    # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
+                    normalized_structure = cls.normalize_structure_blueprint(concept_blueprint.structure)
+
+                    python_code = StructureGenerator().generate_from_structure_blueprint(
                         class_name=concept_code,
-                        structure_blueprint=concept_blueprint.structure,  # type: ignore
+                        structure_blueprint=normalized_structure,
                     )
 
                     # Execute the generated Python code to register the class

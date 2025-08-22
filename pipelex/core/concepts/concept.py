@@ -129,5 +129,4 @@ class Concept(BaseModel):
             Generated Python module content
         """
 
-        generator = StructureGenerator()
-        return generator.generate_from_structure_blueprint(class_name, structure_blueprint)
+        return StructureGenerator().generate_from_structure_blueprint(class_name, structure_blueprint)

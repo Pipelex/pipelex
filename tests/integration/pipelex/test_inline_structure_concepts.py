@@ -45,10 +45,10 @@ class TestInlineStructureConcepts:
         concept = ConceptFactory.make_from_blueprint(domain="test_domain", concept_code="TestFeatureAnalysis", concept_blueprint=blueprint)
 
         # Verify concept properties
-        assert concept.code == "test_domain.TestFeatureAnalysis"
+        assert concept.domain == "test_domain"
+        assert concept.code == "TestFeatureAnalysis"
         assert concept.definition == "Analysis of a photo's visual content"
         assert concept.structure_class_name == "TestFeatureAnalysis"
-        assert concept.domain == "test_domain"
 
         # Verify the generated class is registered and accessible
         assert get_class_registry().has_class("TestFeatureAnalysis")
@@ -64,13 +64,13 @@ class TestInlineStructureConcepts:
             visual_elements="Car, road, trees, sky",  # pyright: ignore[reportCallIssue]
             composition="Central composition with car in focus",  # pyright: ignore[reportCallIssue]
             color_palette="Red, green, blue, white",  # pyright: ignore[reportCallIssue]
+            mood_atmosphere="The overall mood or atmosphere",  # pyright: ignore[reportCallIssue]
         )
 
         assert instance.dominant_feature == "A bright red car"  # type: ignore
         assert instance.visual_elements == "Car, road, trees, sky"  # type: ignore
         assert instance.composition == "Central composition with car in focus"  # type: ignore
         assert instance.color_palette == "Red, green, blue, white"  # type: ignore
-        assert instance.mood_atmosphere is None  # type: ignore
 
     def test_string_reference_structure_definition(self):
         """Test that string reference structure definitions still work."""
@@ -81,7 +81,8 @@ class TestInlineStructureConcepts:
         concept = ConceptFactory.make_from_blueprint(domain="test_domain", concept_code="TestStringRef", concept_blueprint=blueprint)
 
         # Verify concept properties
-        assert concept.code == "test_domain.TestStringRef"
+        assert concept.code == "TestStringRef"
+        assert concept.domain == "test_domain"
         assert concept.definition == "Test with string reference"
         assert concept.structure_class_name == "TextContent"
 
@@ -125,7 +126,8 @@ class TestInlineStructureConcepts:
         concept = ConceptFactory.make_from_blueprint(domain="test_domain", concept_code="ComplexDocument", concept_blueprint=blueprint)
 
         # Verify concept creation
-        assert concept.code == "test_domain.ComplexDocument"
+        assert concept.code == "ComplexDocument"
+        assert concept.domain == "test_domain"
         assert concept.structure_class_name == "ComplexDocument"
 
         # Verify the generated class works

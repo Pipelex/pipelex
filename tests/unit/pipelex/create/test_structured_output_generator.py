@@ -3,12 +3,9 @@
 from typing import Dict
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.create.structured_output_generator import (
-    StructureGenerator,
-    generate_structured_output_from_blueprint_dict,
-)
+from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType, ConceptStructureBlueprintType
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.create.structured_output_generator import StructureGenerator
 
 
 class TestStructureGenerator:
@@ -22,21 +19,26 @@ class TestStructureGenerator:
             ),
         }
 
-        generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("TestModel", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("TestModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        # Check that basic structure is correct
-        assert "from typing import Optional" in result
-        assert "from pipelex.core.stuffs.stuff_content import StructuredContent" in result
-        assert "from pydantic import Field" in result
-        assert "class TestModel(StructuredContent):" in result
-        assert '"""Generated TestModel class"""' in result
-        assert 'name: str = Field(..., description="Name field")' in result
-        assert 'age: Optional[int] = Field(default=None, description="Age field")' in result
-        assert 'active: Optional[bool] = Field(default=True, description="Active status")' in result
+        # Check the complete generated structure
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class TestModel(StructuredContent):\n"
+            '    """Generated TestModel class"""\n'
+            "\n"
+            '    name: str = Field(..., description="Name field")\n'
+            '    age: Optional[int] = Field(default=None, description="Age field")\n'
+            '    active: Optional[bool] = Field(default=True, description="Active status")\n'
+        )
+        assert result == expected_result
 
     def test_complex_types_generation(self):
         """Test generation with complex types like lists and dicts."""
@@ -52,15 +54,26 @@ class TestStructureGenerator:
             ),
         }
 
-        generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("ComplexModel", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("ComplexModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        assert 'tags: Optional[List[str]] = Field(default=None, description="List of tags")' in result
-        assert 'metadata: Optional[Dict[str, str]] = Field(default=None, description="Metadata dictionary")' in result
-        assert 'scores: List[float] = Field(..., description="List of scores")' in result
+        # Check the complete generated structure
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class ComplexModel(StructuredContent):\n"
+            '    """Generated ComplexModel class"""\n'
+            "\n"
+            '    tags: Optional[List[str]] = Field(default=None, description="List of tags")\n'
+            '    metadata: Optional[Dict[str, str]] = Field(default=None, description="Metadata dictionary")\n'
+            '    scores: List[float] = Field(..., description="List of scores")\n'
+        )
+        assert result == expected_result
 
     def test_choices_generation(self):
         """Test generation with inline choices (Literal type)."""
@@ -70,30 +83,49 @@ class TestStructureGenerator:
             "size": ConceptStructureBlueprint(definition="Size of the product", choices=["XS", "S", "M", "L", "XL"], required=False),
         }
 
-        generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("Product", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("Product", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        # Check Literal type usage
-        assert "from typing import Optional, List, Dict, Any, Literal" in result
-        assert "category: Literal['electronics', 'clothing', 'food', 'books'] = Field(..., description=\"Product category\")" in result
-        assert "size: Optional[Literal['XS', 'S', 'M', 'L', 'XL']] = Field(default=None, description=\"Size of the product\")" in result
+        # Check the complete generated structure with Literal types
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class Product(StructuredContent):\n"
+            '    """Generated Product class"""\n'
+            "\n"
+            '    name: Optional[str] = Field(default=None, description="Product name")\n'
+            "    category: Literal['electronics', 'clothing', 'food', 'books'] = Field(..., description=\"Product category\")\n"
+            "    size: Optional[Literal['XS', 'S', 'M', 'L', 'XL']] = Field(default=None, description=\"Size of the product\")\n"
+        )
+        assert result == expected_result
 
     def test_empty_structure(self):
         """Test generation of structure with no fields."""
         structure_blueprint: Dict[str, ConceptStructureBlueprint] = {}
 
-        generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("EmptyModel", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("EmptyModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        assert "class EmptyModel(StructuredContent):" in result
-        assert '"""Generated EmptyModel class"""' in result
-        assert "pass" in result
+        # Check the complete generated structure for empty model
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class EmptyModel(StructuredContent):\n"
+            '    """Generated EmptyModel class"""\n'
+            "\n"
+            "    pass\n"
+        )
+        assert result == expected_result
 
     def test_concept_get_structure_method(self):
         """Test the get_structure method on Concept class."""
@@ -102,14 +134,25 @@ class TestStructureGenerator:
             "page_count": ConceptStructureBlueprint(definition="Number of pages", type=ConceptStructureBlueprintFieldType.INTEGER, required=False),
         }
 
-        result = Concept.get_structure("DocumentInfo", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("DocumentInfo", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        assert "class DocumentInfo(StructuredContent):" in result
-        assert 'title: str = Field(..., description="Document title")' in result
-        assert 'page_count: Optional[int] = Field(default=None, description="Number of pages")' in result
+        # Check the complete generated structure
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class DocumentInfo(StructuredContent):\n"
+            '    """Generated DocumentInfo class"""\n'
+            "\n"
+            '    title: str = Field(..., description="Document title")\n'
+            '    page_count: Optional[int] = Field(default=None, description="Number of pages")\n'
+        )
+        assert result == expected_result
 
     def test_generate_from_blueprint_dict_function(self):
         """Test the convenience function for generating from blueprint dict."""
@@ -117,13 +160,24 @@ class TestStructureGenerator:
             "value": ConceptStructureBlueprint(definition="Test value", type=ConceptStructureBlueprintFieldType.TEXT, required=True)
         }
 
-        result = generate_structured_output_from_blueprint_dict("ConvenienceTest", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("ConvenienceTest", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        assert "class ConvenienceTest(StructuredContent):" in result
-        assert 'value: str = Field(..., description="Test value")' in result
+        # Check the complete generated structure
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class ConvenienceTest(StructuredContent):\n"
+            '    """Generated ConvenienceTest class"""\n'
+            "\n"
+            '    value: str = Field(..., description="Test value")\n'
+        )
+        assert result == expected_result
 
     def test_all_field_types(self):
         """Test that all field types are properly handled."""
@@ -140,18 +194,29 @@ class TestStructureGenerator:
             ),
         }
 
-        generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("TypeMappingTest", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("TypeMappingTest", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        assert "text_field: Optional[str]" in result
-        assert "number_field: Optional[float]" in result
-        assert "integer_field: Optional[int]" in result
-        assert "boolean_field: Optional[bool]" in result
-        assert "list_field: Optional[List[str]]" in result
-        assert "dict_field: Optional[Dict[str, int]]" in result
+        # Check the complete generated structure with all field types
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class TypeMappingTest(StructuredContent):\n"
+            '    """Generated TypeMappingTest class"""\n'
+            "\n"
+            '    text_field: Optional[str] = Field(default=None, description="Text field")\n'
+            '    number_field: Optional[float] = Field(default=None, description="Number field")\n'
+            '    integer_field: Optional[int] = Field(default=None, description="Integer field")\n'
+            '    boolean_field: Optional[bool] = Field(default=None, description="Boolean field")\n'
+            '    list_field: Optional[List[str]] = Field(default=None, description="List field")\n'
+            '    dict_field: Optional[Dict[str, int]] = Field(default=None, description="Dict field")\n'
+        )
+        assert result == expected_result
 
     def test_required_vs_optional_fields(self):
         """Test that fields can be marked as required vs optional."""
@@ -160,14 +225,25 @@ class TestStructureGenerator:
             "optional_field": ConceptStructureBlueprint(definition="Optional field", type=ConceptStructureBlueprintFieldType.TEXT, required=False),
         }
 
-        generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("RequiredFieldsModel", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("RequiredFieldsModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        assert 'title: str = Field(..., description="Required title")' in result
-        assert 'optional_field: Optional[str] = Field(default=None, description="Optional field")' in result
+        # Check the complete generated structure with required vs optional fields
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class RequiredFieldsModel(StructuredContent):\n"
+            '    """Generated RequiredFieldsModel class"""\n'
+            "\n"
+            '    title: str = Field(..., description="Required title")\n'
+            '    optional_field: Optional[str] = Field(default=None, description="Optional field")\n'
+        )
+        assert result == expected_result
 
     def test_default_values(self):
         """Test fields with default values."""
@@ -183,15 +259,26 @@ class TestStructureGenerator:
             ),
         }
 
-        generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("PersonWithDefaults", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("PersonWithDefaults", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        assert 'name: Optional[str] = Field(default="Anonymous", description="Person name")' in result
-        assert 'age: Optional[int] = Field(default=0, description="Person age")' in result
-        assert 'active: Optional[bool] = Field(default=True, description="Is active")' in result
+        # Check the complete generated structure with default values
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class PersonWithDefaults(StructuredContent):\n"
+            '    """Generated PersonWithDefaults class"""\n'
+            "\n"
+            '    name: Optional[str] = Field(default="Anonymous", description="Person name")\n'
+            '    age: Optional[int] = Field(default=0, description="Person age")\n'
+            '    active: Optional[bool] = Field(default=True, description="Is active")\n'
+        )
+        assert result == expected_result
 
     def test_nested_list_types(self):
         """Test nested list types with different item types."""
@@ -207,15 +294,26 @@ class TestStructureGenerator:
             ),
         }
 
-        generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("ListTypesModel", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("ListTypesModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        assert 'text_list: Optional[List[str]] = Field(default=None, description="List of text items")' in result
-        assert 'number_list: List[float] = Field(..., description="List of numbers")' in result
-        assert 'integer_list: Optional[List[int]] = Field(default=None, description="List of integers")' in result
+        # Check the complete generated structure with nested list types
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class ListTypesModel(StructuredContent):\n"
+            '    """Generated ListTypesModel class"""\n'
+            "\n"
+            '    text_list: Optional[List[str]] = Field(default=None, description="List of text items")\n'
+            '    number_list: List[float] = Field(..., description="List of numbers")\n'
+            '    integer_list: Optional[List[int]] = Field(default=None, description="List of integers")\n'
+        )
+        assert result == expected_result
 
     def test_nested_dict_types(self):
         """Test nested dict types with different key/value combinations."""
@@ -243,15 +341,26 @@ class TestStructureGenerator:
             ),
         }
 
-        generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("DictTypesModel", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("DictTypesModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        assert 'string_to_string: Optional[Dict[str, str]] = Field(default=None, description="String to string mapping")' in result
-        assert 'string_to_number: Dict[str, float] = Field(..., description="String to number mapping")' in result
-        assert 'string_to_integer: Optional[Dict[str, int]] = Field(default=None, description="String to integer mapping")' in result
+        # Check the complete generated structure with nested dict types
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class DictTypesModel(StructuredContent):\n"
+            '    """Generated DictTypesModel class"""\n'
+            "\n"
+            '    string_to_string: Optional[Dict[str, str]] = Field(default=None, description="String to string mapping")\n'
+            '    string_to_number: Dict[str, float] = Field(..., description="String to number mapping")\n'
+            '    string_to_integer: Optional[Dict[str, int]] = Field(default=None, description="String to integer mapping")\n'
+        )
+        assert result == expected_result
 
     def test_mixed_complexity_structure(self):
         """Test a structure with mixed complexity - simple and complex types together."""
@@ -272,16 +381,67 @@ class TestStructureGenerator:
             ),
         }
 
-        generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("ComplexItem", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("ComplexItem", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
 
-        # Check all field types are correctly generated
-        assert 'id: int = Field(..., description="Unique identifier")' in result
-        assert 'name: str = Field(..., description="Display name")' in result
-        assert 'tags: Optional[List[str]] = Field(default=None, description="Associated tags")' in result
-        assert 'metadata: Optional[Dict[str, str]] = Field(default=None, description="Additional metadata")' in result
-        assert 'active: Optional[bool] = Field(default=True, description="Whether item is active")' in result
-        assert "priority: Optional[Literal['low', 'medium', 'high', 'urgent']] = Field(default='medium', description=\"Priority level\")" in result
+        # Check the complete generated structure with mixed complexity
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class ComplexItem(StructuredContent):\n"
+            '    """Generated ComplexItem class"""\n'
+            "\n"
+            '    id: int = Field(..., description="Unique identifier")\n'
+            '    name: str = Field(..., description="Display name")\n'
+            '    tags: Optional[List[str]] = Field(default=None, description="Associated tags")\n'
+            '    metadata: Optional[Dict[str, str]] = Field(default=None, description="Additional metadata")\n'
+            '    active: Optional[bool] = Field(default=True, description="Whether item is active")\n'
+            "    priority: Optional[Literal['low', 'medium', 'high', 'urgent']] = Field(default=\"medium\", description=\"Priority level\")\n"
+        )
+        assert result == expected_result
+
+    def test_mixed_structure_blueprint_normalization(self):
+        """Test that mixed structure blueprints (strings and ConceptStructureBlueprint objects) are properly normalized."""
+        # Create a mixed structure blueprint similar to what would come from TOML parsing
+        mixed_structure_blueprint: Dict[str, ConceptStructureBlueprintType] = {
+            "name": "The name of the person",  # Simple string definition
+            "age": ConceptStructureBlueprint(definition="The age of the person", type=ConceptStructureBlueprintFieldType.NUMBER, required=True),
+            "birthdate": ConceptStructureBlueprint(
+                definition="The birthdate of the person", type=ConceptStructureBlueprintFieldType.DATE, required=True
+            ),
+        }
+
+        normalized_structure = ConceptFactory.normalize_structure_blueprint(mixed_structure_blueprint)
+
+        result = StructureGenerator().generate_from_structure_blueprint("PersonInfo", normalized_structure)
+
+        pretty_print(mixed_structure_blueprint, title="Source Mixed Blueprint")
+        pretty_print(normalized_structure, title="Normalized Blueprint")
+        pretty_print(result, title="Generated Result")
+
+        # Check the complete generated structure with mixed field types
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class PersonInfo(StructuredContent):\n"
+            '    """Generated PersonInfo class"""\n'
+            "\n"
+            '    name: str = Field(..., description="The name of the person")\n'
+            '    age: float = Field(..., description="The age of the person")\n'
+            '    birthdate: str = Field(..., description="The birthdate of the person")\n'  # DATE type maps to str
+        )
+        assert result == expected_result
+
+        # Verify that the string was properly converted to ConceptStructureBlueprint
+        assert isinstance(normalized_structure["name"], ConceptStructureBlueprint)
+        assert normalized_structure["name"].definition == "The name of the person"
+        assert normalized_structure["name"].type == ConceptStructureBlueprintFieldType.TEXT
+        assert normalized_structure["name"].required
