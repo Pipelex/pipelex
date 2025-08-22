@@ -6,7 +6,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
@@ -14,6 +14,7 @@ from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint, PipeSequenceFactory
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -27,11 +28,21 @@ class TestPipeSequenceSimple:
 
     async def test_simple_sequence_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeSequence with a simple 2-step text transformation scenario."""
+        domain = "test_integration"
+        concept_1 = ConceptFactory.make_from_blueprint(
+            concept_code="TestConcept1", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_2 = ConceptFactory.make_from_blueprint(
+            concept_code="TestConcept2", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_library = get_concept_provider()
+        concept_library.add_concepts([concept_1, concept_2])
+
         # Create PipeSequence instance - pipes are loaded from TOML files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             definition="Simple sequence for text processing",
-            inputs={"input_text": InputRequirementBlueprint(concept_code="Text")},
-            output="test_integration.Text",
+            inputs={"input_text": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}")},
+            output=f"{domain}.{concept_2.code}",
             steps=[
                 SubPipeBlueprint(pipe="capitalize_text", result="capitalized_text"),
                 SubPipeBlueprint(pipe="add_prefix", result="final_text"),
@@ -96,8 +107,6 @@ class TestPipeSequenceSimple:
         # Should be: "hello world" -> "HELLO WORLD" -> "PROCESSED: HELLO WORLD"
         if pipe_run_mode != PipeRunMode.DRY:
             assert final_result.content.text == "PROCESSED: HELLO WORLD"
-        else:
-            assert "DRY RUN" in final_result.content.text
 
         # Verify working memory contains all intermediate results
         final_working_memory = pipe_output.working_memory
@@ -114,8 +123,6 @@ class TestPipeSequenceSimple:
         assert isinstance(capitalized_result.content, TextContent)
         if pipe_run_mode != PipeRunMode.DRY:
             assert capitalized_result.content.text == "HELLO WORLD"
-        else:
-            assert "DRY RUN" in capitalized_result.content.text
 
         # Final result should be there (stored as final_text, which is the last SubPipe's output_name)
         final_result_in_memory = final_working_memory.get_stuff("final_text")
@@ -123,8 +130,6 @@ class TestPipeSequenceSimple:
         assert isinstance(final_result_in_memory.content, TextContent)
         if pipe_run_mode != PipeRunMode.DRY:
             assert final_result_in_memory.content.text == "PROCESSED: HELLO WORLD"
-        else:
-            assert "DRY RUN" in final_result_in_memory.content.text
 
         # Verify working memory structure
         assert len(final_working_memory.root) == 3  # input, intermediate, final

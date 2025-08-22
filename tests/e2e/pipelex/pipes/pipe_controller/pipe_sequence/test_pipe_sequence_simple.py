@@ -45,4 +45,5 @@ async def test_simple_text_sequence(pipe_run_mode: PipeRunMode):
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
-        assert pipe_output.main_stuff.concept.code == "simple_text_processing.SummaryText"
+        assert pipe_output.main_stuff.concept.code == "SummaryText"
+        assert pipe_output.main_stuff.concept.domain == "simple_text_processing"

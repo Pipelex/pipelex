@@ -64,11 +64,13 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     def list_concepts_by_domain(self, domain: str) -> List[Concept]:
         return [concept for key, concept in self.root.items() if key.startswith(f"{domain}.")]
 
+    @override
     def add_new_concept(self, concept: Concept):
         if concept.concept_string in self.root:
             raise ConceptLibraryError(f"Concept '{concept.concept_string}' already exists in the library")
         self.root[concept.concept_string] = concept
 
+    @override
     def add_concepts(self, concepts: List[Concept]):
         for concept in concepts:
             self.add_new_concept(concept=concept)

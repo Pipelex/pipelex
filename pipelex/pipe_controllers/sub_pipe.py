@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_input_spec_factory import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
 from pipelex.exceptions import PipeInputError, WorkingMemoryStuffNotFoundError
@@ -30,9 +31,12 @@ class SubPipe(BaseModel):
         log.debug(f"SubPipe {self.pipe_code} to generate {self.output_name}")
         if self.output_multiplicity:
             sub_pipe_run_params.output_multiplicity = self.output_multiplicity
-        pipe = get_required_pipe(pipe_code=self.pipe_code)
-        pipe_output: PipeOutput
         sub_pipe_run_params.batch_params = self.batch_params
+
+        sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
+        pipe_output: PipeOutput
+
+        # Case 1: Batch processing
         if batch_params := self.batch_params:
             try:
                 input_list_stuff = working_memory.get_stuff(name=batch_params.input_list_stuff_name)
@@ -42,21 +46,25 @@ class SubPipe(BaseModel):
                     f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
                 ) from exc
 
-            sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
-            pipe_batch_inputs = sub_pipe.inputs
-            pipe_batch_inputs.add_requirement(variable_name=batch_params.input_list_stuff_name, concept=input_list_stuff.concept)
+            sub_pipe.inputs.add_requirement(variable_name=batch_params.input_list_stuff_name, concept=input_list_stuff.concept)
 
             # Create blueprint for PipeBatch
             pipe_batch_blueprint = PipeBatchBlueprint(
                 definition=f"Batch processing for {self.pipe_code}",
                 branch_pipe_code=self.pipe_code,
-                output=pipe.output.code,
+                output=sub_pipe.output.code,
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
+                # inputs should be of type: Dict[str, InputRequirementBlueprint]
+                inputs={
+                    batch_params.input_item_stuff_name: InputRequirementBlueprint(
+                        concept_code=sub_pipe.inputs.root[batch_params.input_item_stuff_name].concept.code
+                    ),
+                },
             )
 
             pipe_batch = PipeBatchFactory.make_from_blueprint(
-                domain=pipe.domain,
+                domain=sub_pipe.domain,
                 pipe_code=self.pipe_code,
                 pipe_blueprint=pipe_batch_blueprint,
             )
@@ -77,11 +85,12 @@ class SubPipe(BaseModel):
                     pipe_run_params=sub_pipe_run_params,
                     output_name=self.output_name,
                 )
-        elif isinstance(pipe, PipeCondition):
+        # Case 2: Condition processing
+        elif isinstance(sub_pipe, PipeCondition):
             # This is the only line that changes between run and dry_run
             if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
                 sub_pipe_run_params.run_mode = PipeRunMode.DRY
-                pipe_output = await pipe.run_pipe(
+                pipe_output = await sub_pipe.run_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
                     pipe_run_params=sub_pipe_run_params,
@@ -97,7 +106,8 @@ class SubPipe(BaseModel):
                     pipe_run_params=sub_pipe_run_params,
                 )
         else:
-            required_variables = pipe.required_variables()
+            # Case 3: Normal processing
+            required_variables = sub_pipe.required_variables()
             log.debug(required_variables, title=f"Required variables for {self.pipe_code}")
             required_stuff_names = set([required_variable for required_variable in required_variables if not required_variable.startswith("_")])
             try:
@@ -111,7 +121,7 @@ class SubPipe(BaseModel):
             # This is the only line that changes between run and dry_run
             if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
                 sub_pipe_run_params.run_mode = PipeRunMode.DRY
-                pipe_output = await pipe.run_pipe(
+                pipe_output = await sub_pipe.run_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
                     pipe_run_params=sub_pipe_run_params,

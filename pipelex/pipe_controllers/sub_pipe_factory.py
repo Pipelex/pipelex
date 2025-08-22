@@ -38,18 +38,25 @@ class SubPipeBlueprint(BaseModel):
 
         return self
 
-    def make_sub_pipe(self) -> SubPipe:
+
+class SubPipeFactory:
+    @classmethod
+    def make_from_blueprint(
+        cls,
+        blueprint: SubPipeBlueprint,
+    ) -> SubPipe:
+        """Create a SubPipe from a SubPipeBlueprint."""
         output_multiplicity = make_output_multiplicity(
-            nb_output=self.nb_output,
-            multiple_output=self.multiple_output,
+            nb_output=blueprint.nb_output,
+            multiple_output=blueprint.multiple_output,
         )
         batch_params = BatchParams.make_optional_batch_params(
-            input_list_name=self.batch_over,
-            input_item_name=self.batch_as,
+            input_list_name=blueprint.batch_over,
+            input_item_name=blueprint.batch_as,
         )
         return SubPipe(
-            pipe_code=self.pipe,
-            output_name=self.result,
+            pipe_code=blueprint.pipe,
+            output_name=blueprint.result,
             output_multiplicity=output_multiplicity,
             batch_params=batch_params,
         )

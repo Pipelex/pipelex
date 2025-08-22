@@ -71,6 +71,7 @@ class PipeOcr(PipeOperator):
             log.debug(f"{input_name=}")
             log.debug(f"{requirement=}")
             log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
+            print("ijdqoisjqioj", requirement.concept)
             if concept_provider.is_compatible(
                 tested_concept=requirement.concept,
                 wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.IMAGE),
@@ -151,6 +152,7 @@ class PipeOcr(PipeOperator):
         image_uri: Optional[str] = None
         pdf_uri: Optional[str] = None
         if self.image_stuff_name:
+            print("jdoisjqqodjo", self.image_stuff_name)
             image_stuff = working_memory.get_stuff_as_image(name=self.image_stuff_name)
             image_uri = image_stuff.url
         elif self.pdf_stuff_name:

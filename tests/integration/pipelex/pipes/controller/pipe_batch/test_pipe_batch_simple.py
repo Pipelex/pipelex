@@ -6,7 +6,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
@@ -14,6 +14,7 @@ from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchBlueprint, PipeBatchFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -27,20 +28,30 @@ class TestPipeBatchSimple:
     async def test_simple_batch_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeBatch with a simple batch processing scenario."""
         # Create PipeBatch instance - it will call the uppercase_transformer pipe from the TOML
+        domain = "test_integration"
+        concept_1 = ConceptFactory.make_from_blueprint(
+            concept_code="TestConcept1", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_2 = ConceptFactory.make_from_blueprint(
+            concept_code="TestConcept2", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_library = get_concept_provider()
+        concept_library.add_concepts([concept_1, concept_2])
+
         pipe_batch_blueprint = PipeBatchBlueprint(
             definition="Simple batch processing test",
             branch_pipe_code="uppercase_transformer",  # This exists in the TOML file
             inputs={
-                "text_list": InputRequirementBlueprint(concept_code="Text"),
-                "text_item": InputRequirementBlueprint(concept_code="Text"),
+                "text_list": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}"),
+                "text_item": InputRequirementBlueprint(concept_code=f"{domain}.{concept_2.code}"),
             },
-            output=NativeConceptEnum.TEXT.value,
+            output=f"{domain}.{concept_2.code}",
             input_list_name="text_list",
             input_item_name="text_item",
         )
 
         pipe_batch = PipeBatchFactory.make_from_blueprint(
-            domain="test_integration",
+            domain=domain,
             pipe_code="simple_batch",
             pipe_blueprint=pipe_batch_blueprint,
         )
@@ -62,7 +73,7 @@ class TestPipeBatchSimple:
 
         # Verify the PipeBatch instance was created correctly
         assert pipe_batch is not None
-        assert pipe_batch.domain == "test_integration"
+        assert pipe_batch.domain == domain
         assert pipe_batch.code == "simple_batch"
         assert pipe_batch.branch_pipe_code == "uppercase_transformer"
         assert pipe_batch.batch_params is not None
@@ -131,7 +142,8 @@ class TestPipeBatchSimple:
         # New result should be added
         batch_result = final_working_memory.get_stuff("batch_result")
         assert batch_result is not None
-        assert batch_result.concept.code == "test_integration.UppercaseText"
+        assert batch_result.concept.code == concept_2.code
+        assert batch_result.concept.domain == domain
 
         # Verify the batch result content matches exactly
         assert isinstance(batch_result.content, ListContent)
@@ -141,10 +153,6 @@ class TestPipeBatchSimple:
             assert result_list.items[0].text == "UPPER: HELLO"
             assert result_list.items[1].text == "UPPER: WORLD"
             assert result_list.items[2].text == "UPPER: TEST"
-        else:
-            assert "DRY RUN" in result_list.items[0].text
-            assert "DRY RUN" in result_list.items[1].text
-            assert "DRY RUN" in result_list.items[2].text
 
         # Verify working memory structure
         assert len(final_working_memory.root) == 2

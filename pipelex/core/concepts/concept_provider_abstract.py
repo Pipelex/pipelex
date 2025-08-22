@@ -13,6 +13,14 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
+    def add_new_concept(self, concept: Concept) -> None:
+        pass
+
+    @abstractmethod
+    def add_concepts(self, concepts: List[Concept]) -> None:
+        pass
+
+    @abstractmethod
     def list_concepts_by_domain(self, domain: str) -> List[Concept]:
         pass
 

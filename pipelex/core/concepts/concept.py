@@ -102,7 +102,7 @@ class Concept(BaseModel):
             return True
         if concept_1.structure_class_name == concept_2.structure_class_name:
             return True
-        if set(concept_1.refines) == set(concept_2.refines):
+        if set(concept_1.refines) == set(concept_2.refines) and len(concept_1.refines) >= 1:
             return True
         return False
 

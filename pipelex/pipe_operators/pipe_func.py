@@ -109,9 +109,9 @@ class PipeFunc(PipeOperator):
                 requirement = TypedNamedInputRequirement(
                     variable_name="mock_output",
                     concept=ConceptFactory.make(
-                        concept_code=f"mock.{return_type.__name__}",
+                        concept_code=f"{return_type.__name__}",
                         domain="generic",
-                        definition=f"mock.{return_type.__name__}",
+                        definition="Lorem Ipsum",
                         structure_class_name=return_type.__name__,
                     ),
                     structure_class=return_type,

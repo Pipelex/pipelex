@@ -42,4 +42,5 @@ class TestPipeSequenceMultiplicity:
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
-        assert pipe_output.main_stuff.concept.code == "creative_ideation.BestIdea"
+        assert pipe_output.main_stuff.concept.code == "BestIdea"
+        assert pipe_output.main_stuff.concept.domain == "creative_ideation"

@@ -8,7 +8,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_sequence import PipeSequence
-from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
+from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint, SubPipeFactory
 
 
 class PipeSequenceBlueprint(PipeBlueprint):
@@ -25,7 +25,7 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
         pipe_code: str,
         pipe_blueprint: PipeSequenceBlueprint,
     ) -> PipeSequence:
-        pipe_steps = [step.make_sub_pipe() for step in pipe_blueprint.steps]
+        pipe_steps = [SubPipeFactory.make_from_blueprint(step) for step in pipe_blueprint.steps]
 
         output_concept_code = pipe_blueprint.output
         if "." not in output_concept_code:

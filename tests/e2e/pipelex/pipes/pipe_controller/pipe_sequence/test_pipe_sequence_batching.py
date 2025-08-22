@@ -72,7 +72,8 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     assert pipe_output is not None
     assert pipe_output.working_memory is not None
     assert pipe_output.main_stuff is not None
-    assert pipe_output.main_stuff.concept.code == "customer_feedback.ProductRating"
+    assert pipe_output.main_stuff.concept.code == "ProductRating"
+    assert pipe_output.main_stuff.concept.domain == "customer_feedback"
 
     # Log the working memory for debugging
     log.debug("Final working memory after pipeline execution:")

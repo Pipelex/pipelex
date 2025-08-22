@@ -1,4 +1,6 @@
+from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint, PipeSequenceFactory
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 
@@ -8,40 +10,64 @@ class TestPipeSequenceValidation:
 
     def test_pipe_sequence_creation(self):
         """Test basic PipeSequence creation"""
+        domain = "test_domain"
+        concept_1 = ConceptFactory.make_from_blueprint(
+            concept_code="TestConcept", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_2 = ConceptFactory.make_from_blueprint(
+            concept_code="ProcessedText", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_library = get_concept_provider()
+        concept_library.add_concepts([concept_1, concept_2])
+
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             definition="Test sequence for validation",
-            inputs={"text": InputRequirementBlueprint(concept_code="test_domain.Text")},
-            output="test_domain.ProcessedText",
+            inputs={"text": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}")},
+            output=f"{domain}.{concept_2.code}",
             steps=[SubPipeBlueprint(pipe="test_pipe_1", result="intermediate_result")],
         )
 
         pipe_sequence = PipeSequenceFactory.make_from_blueprint(
-            domain="test_domain",
+            domain=domain,
             pipe_code="test_sequence",
             pipe_blueprint=pipe_sequence_blueprint,
         )
 
         assert pipe_sequence.code == "test_sequence"
-        assert pipe_sequence.domain == "test_domain"
+        assert pipe_sequence.domain == domain
         assert len(pipe_sequence.sequential_sub_pipes) == 1
         assert pipe_sequence.sequential_sub_pipes[0].pipe_code == "test_pipe_1"
         assert pipe_sequence.sequential_sub_pipes[0].output_name == "intermediate_result"
 
+        concept_library.teardown()
+
     def test_pipe_sequence_multiple_sub_pipes(self):
         """Test PipeSequence with multiple sequential sub-pipes"""
+        domain = "test_domain"
+        concept_1 = ConceptFactory.make_from_blueprint(
+            concept_code="TestConcept", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_2 = ConceptFactory.make_from_blueprint(
+            concept_code="ProcessedText", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_library = get_concept_provider()
+        concept_library.add_concepts([concept_1, concept_2])
+
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             definition="Test sequence with multiple steps",
-            inputs={"initial_input": InputRequirementBlueprint(concept_code="test_domain.Text")},
-            output="test_domain.FinalOutput",
+            inputs={"initial_input": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}")},
+            output=f"{domain}.{concept_2.code}",
             steps=[SubPipeBlueprint(pipe="step_1", result="intermediate"), SubPipeBlueprint(pipe="step_2", result="final_output")],
         )
 
         pipe_sequence = PipeSequenceFactory.make_from_blueprint(
-            domain="test_domain",
+            domain=domain,
             pipe_code="test_sequence",
             pipe_blueprint=pipe_sequence_blueprint,
         )
 
         assert pipe_sequence.code == "test_sequence"
         assert len(pipe_sequence.sequential_sub_pipes) == 2
-        assert pipe_sequence.inputs.root["initial_input"].concept.code == "test_domain.Text"
+        assert pipe_sequence.inputs.root["initial_input"].concept.code == concept_1.code
+
+        concept_library.teardown()

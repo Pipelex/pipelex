@@ -37,11 +37,13 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     def make_empty(cls):
         return cls(root={})
 
+    @override
     def add_new_pipe(self, pipe: PipeAbstract):
         if pipe.code in self.root:
             raise PipeLibraryError(f"Pipe '{pipe.code}' already exists in the library")
         self.root[pipe.code] = pipe
 
+    @override
     def add_pipes(self, pipes: List[PipeAbstract]):
         for pipe in pipes:
             self.add_new_pipe(pipe=pipe)

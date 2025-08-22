@@ -1,4 +1,8 @@
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.hub import get_concept_provider, get_pipe_provider
 from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint, PipeParallelFactory
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint, PipeLLMFactory
@@ -10,42 +14,53 @@ class TestPipeParallelValidation:
     def test_pipe_parallel_with_real_pipe_structure(self):
         """Test PipeParallel structure with a real pipe"""
         # Create a real PipeLLM that will infer inputs from the prompt template
+        domain = "test_domain"
+        concept_library = get_concept_provider()
+        concept_blueprint = ConceptBlueprint(definition="A test document")
+        concept_1 = ConceptFactory.make_from_blueprint(domain=domain, concept_code="Document", concept_blueprint=concept_blueprint)
+        concept_2 = ConceptFactory.make_from_blueprint(domain=domain, concept_code="Context", concept_blueprint=concept_blueprint)
+        concept_3 = ConceptFactory.make_from_blueprint(domain=domain, concept_code="Analysis", concept_blueprint=concept_blueprint)
+        concept_library.add_concepts(concepts=[concept_1, concept_2, concept_3])
+
         pipe_llm_blueprint = PipeLLMBlueprint(
             inputs={
-                "document": InputRequirementBlueprint(concept_code="document"),
-                "context": InputRequirementBlueprint(concept_code="context"),
+                "document": InputRequirementBlueprint(concept_code=concept_1.code),
+                "context": InputRequirementBlueprint(concept_code=concept_2.code),
             },
             definition="Analysis pipe for document processing",
-            output="test_domain.Analysis",
+            output=Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
             prompt_template="Analyze this document:  \n@context\n@document",
         )
 
         real_pipe = PipeLLMFactory.make_from_blueprint(
-            domain="test_domain",
+            domain=domain,
             pipe_code="analyze_document",
             pipe_blueprint=pipe_llm_blueprint,
         )
 
+        pipe_provider = get_pipe_provider()
+        pipe_provider.add_new_pipe(pipe=real_pipe)
+
         # Verify the real pipe was created successfully
-        assert real_pipe.code == "analyze_document"
-        assert real_pipe.domain == "test_domain"
-        assert real_pipe.output.code == "test_domain.Analysis"
+        assert real_pipe.domain == domain
+        assert real_pipe.output.code == concept_3.code
+        assert real_pipe.output.domain == domain
 
         # Create PipeParallel that would reference this pipe
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel document processor for testing",
             inputs={
-                "document": InputRequirementBlueprint(concept_code="document"),
-                "context": InputRequirementBlueprint(concept_code="context"),
+                "document": InputRequirementBlueprint(concept_code=concept_1.code),
+                "context": InputRequirementBlueprint(concept_code=concept_2.code),
             },
-            output="test_domain.ProcessedAnalysis",
-            parallels=[SubPipeBlueprint(pipe="analyze_document", result="analysis_result")],
+            output=Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
+            parallels=[SubPipeBlueprint(pipe=real_pipe.code, result="analysis_result")],
             add_each_output=True,
             combined_output=None,
         )
 
         pipe_parallel = PipeParallelFactory.make_from_blueprint(
-            domain="test_domain",
+            domain=domain,
             pipe_code="parallel_document_processor",
             pipe_blueprint=pipe_parallel_blueprint,
         )
@@ -56,55 +71,75 @@ class TestPipeParallelValidation:
         assert pipe_parallel.parallel_sub_pipes[0].output_name == "analysis_result"
 
         # Verify PipeParallel has the expected structure
-        assert pipe_parallel.domain == "test_domain"
+        assert pipe_parallel.domain == domain
         assert pipe_parallel.code == "parallel_document_processor"
         assert pipe_parallel.add_each_output is True
+
+        concept_library.teardown()
 
     def test_pipe_parallel_creation(self):
         """Test basic PipeParallel creation and structure"""
         # Create a simple PipeParallel with proper inputs
+        domain = "test_domain"
+        concept_library = get_concept_provider()
+        concept_blueprint = ConceptBlueprint(definition="Lorem Ipsum")
+        concept_1 = ConceptFactory.make_from_blueprint(domain=domain, concept_code="Document", concept_blueprint=concept_blueprint)
+        concept_2 = ConceptFactory.make_from_blueprint(domain=domain, concept_code="Context", concept_blueprint=concept_blueprint)
+        concept_3 = ConceptFactory.make_from_blueprint(domain=domain, concept_code="ProcessedAnalysis", concept_blueprint=concept_blueprint)
+        concept_library.add_concepts(concepts=[concept_1, concept_2, concept_3])
+
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Basic parallel pipe for testing",
-            inputs={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")},
-            output="test_domain.ProcessedText",
+            inputs={"input_var": InputRequirementBlueprint(concept_code=concept_1.code)},
+            output=Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
             parallels=[SubPipeBlueprint(pipe="test_pipe_1", result="result_1")],
             add_each_output=True,
             combined_output=None,
         )
 
         pipe_parallel = PipeParallelFactory.make_from_blueprint(
-            domain="test_domain",
+            domain=domain,
             pipe_code="test_parallel",
             pipe_blueprint=pipe_parallel_blueprint,
         )
 
         # Verify the PipeParallel was created correctly
         assert pipe_parallel.code == "test_parallel"
-        assert pipe_parallel.domain == "test_domain"
+        assert pipe_parallel.domain == domain
         assert len(pipe_parallel.parallel_sub_pipes) == 1
-        assert pipe_parallel.inputs.root["input_var"].concept.code == "test_domain.Text"
-        assert pipe_parallel.output.code == "test_domain.ProcessedText"
+        assert pipe_parallel.inputs.root["input_var"].concept.code == concept_1.code
+        assert pipe_parallel.output.code == concept_3.code
+        assert pipe_parallel.output.domain == domain
         assert pipe_parallel.add_each_output is True
         assert pipe_parallel.combined_output is None
 
+        concept_library.teardown()
+
     def test_pipe_parallel_needed_inputs_structure(self):
         """Test that PipeParallel needed_inputs method can be called and returns expected structure"""
+        domain = "test_domain"
+        concept_library = get_concept_provider()
+        concept_blueprint = ConceptBlueprint(definition="A test document")
+        concept_1 = ConceptFactory.make_from_blueprint(domain=domain, concept_code="Document", concept_blueprint=concept_blueprint)
+        concept_2 = ConceptFactory.make_from_blueprint(domain=domain, concept_code="Context", concept_blueprint=concept_blueprint)
+        concept_3 = ConceptFactory.make_from_blueprint(domain=domain, concept_code="ProcessedAnalysis", concept_blueprint=concept_blueprint)
+        concept_library.add_concepts(concepts=[concept_1, concept_2, concept_3])
 
         # Create PipeParallel with no sub-pipes to avoid dependency resolution
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel processor for testing inputs structure",
             inputs={
-                "document": InputRequirementBlueprint(concept_code="test_domain.Document"),
-                "context": InputRequirementBlueprint(concept_code="test_domain.Context"),
+                "document": InputRequirementBlueprint(concept_code=concept_1.code),
+                "context": InputRequirementBlueprint(concept_code=concept_2.code),
             },
-            output="test_domain.ProcessedAnalysis",
+            output=Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
             parallels=[],  # No sub-pipes to avoid dependency issues
             add_each_output=True,
             combined_output=None,
         )
 
         pipe_parallel = PipeParallelFactory.make_from_blueprint(
-            domain="test_domain",
+            domain=domain,
             pipe_code="parallel_document_processor",
             pipe_blueprint=pipe_parallel_blueprint,
         )
@@ -118,3 +153,5 @@ class TestPipeParallelValidation:
         assert isinstance(needed_inputs.root, dict)
         # With no sub-pipes, should return empty inputs
         assert len(needed_inputs.root) == 0
+
+        concept_library.teardown()

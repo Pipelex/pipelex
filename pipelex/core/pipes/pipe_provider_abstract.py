@@ -30,3 +30,11 @@ class PipeProviderAbstract(ABC):
     @abstractmethod
     def pretty_list_pipes(self) -> None:
         pass
+
+    @abstractmethod
+    def add_new_pipe(self, pipe: PipeAbstract) -> None:
+        pass
+
+    @abstractmethod
+    def add_pipes(self, pipes: List[PipeAbstract]) -> None:
+        pass

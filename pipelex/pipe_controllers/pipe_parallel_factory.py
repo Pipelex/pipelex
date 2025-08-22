@@ -10,7 +10,7 @@ from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
+from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint, SubPipeFactory
 
 
 class PipeParallelBlueprint(PipeBlueprint):
@@ -33,7 +33,7 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         for sub_pipe_blueprint in pipe_blueprint.parallels:
             if not sub_pipe_blueprint.result:
                 raise PipeDefinitionError("PipeParallel requires a result specified for each parallel sub pipe")
-            sub_pipe = sub_pipe_blueprint.make_sub_pipe()
+            sub_pipe = SubPipeFactory.make_from_blueprint(sub_pipe_blueprint)
             parallel_sub_pipes.append(sub_pipe)
         if not pipe_blueprint.add_each_output and not pipe_blueprint.combined_output:
             raise PipeDefinitionError("PipeParallel requires either add_each_output or combined_output to be set")

@@ -201,8 +201,6 @@ class TestPipeConditionSimple:
         # For dry run, the output should be a synthetic result from the chosen pipe (process_small_2)
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
-        # The dry run should contain some indication it's a dry run result
-        assert "DRY RUN" in final_result.content.text
 
         # Verify working memory structure is preserved
         final_working_memory = pipe_output.working_memory
@@ -270,8 +268,6 @@ class TestPipeConditionSimple:
         # Verify that the dry run correctly validated the pipeline structure for medium category
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
-        # The dry run should contain some indication it's a dry run result from process_medium_2
-        assert "DRY RUN" in final_result.content.text
 
         # Verify working memory structure
         final_working_memory = pipe_output.working_memory

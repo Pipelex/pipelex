@@ -1,4 +1,6 @@
+from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionBlueprint, PipeConditionFactory, PipeConditionPipeMapBlueprint
 
 
@@ -7,40 +9,62 @@ class TestPipeConditionValidation:
 
     def test_pipe_condition_creation(self):
         """Test basic PipeCondition creation"""
+        domain = "test_domain"
+        concept_1 = ConceptFactory.make_from_blueprint(
+            concept_code="TestConcept", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_2 = ConceptFactory.make_from_blueprint(
+            concept_code="Result", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_library = get_concept_provider()
+        concept_library.add_concepts([concept_1, concept_2])
+
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Test condition for validation",
-            inputs={"input_var": InputRequirementBlueprint(concept_code="Text")},
-            output="test_domain.ProcessedText",
+            inputs={"input_var": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}")},
+            output=f"{domain}.{concept_2.code}",
             expression="input_var",
             pipe_map=PipeConditionPipeMapBlueprint(root={"value1": "pipe_a", "value2": "pipe_b"}),
             default_pipe_code="default_pipe",
         )
 
         pipe_condition = PipeConditionFactory.make_from_blueprint(
-            domain="test_domain",
+            domain=domain,
             pipe_code="test_condition",
             pipe_blueprint=pipe_condition_blueprint,
         )
 
         assert pipe_condition.code == "test_condition"
-        assert pipe_condition.domain == "test_domain"
+        assert pipe_condition.domain == domain
         assert len(pipe_condition.pipe_map) == 2
         assert pipe_condition.expression == "input_var"
         assert pipe_condition.default_pipe_code == "default_pipe"
 
+        concept_library.teardown()
+
     def test_pipe_condition_expression_template_vs_expression(self):
         """Test that both expression_template and expression formats work"""
         # Test with expression_template
+        domain = "test_domain"
+        concept_library = get_concept_provider()
+        concept_1 = ConceptFactory.make_from_blueprint(
+            concept_code="TestConcept", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_2 = ConceptFactory.make_from_blueprint(
+            concept_code="Result", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+        )
+        concept_library.add_concepts([concept_1, concept_2])
+
         pipe_condition_template_blueprint = PipeConditionBlueprint(
             definition="Test condition with expression template",
-            inputs={"var": InputRequirementBlueprint(concept_code="test_domain.Text")},
-            output="test_domain.Result",
+            inputs={"var": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}")},
+            output=f"{domain}.{concept_2.code}",
             expression_template="{{ var }}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"value": "target_pipe"}),
         )
 
         pipe_condition_template = PipeConditionFactory.make_from_blueprint(
-            domain="test_domain",
+            domain=domain,
             pipe_code="test_condition_template",
             pipe_blueprint=pipe_condition_template_blueprint,
         )
@@ -48,14 +72,14 @@ class TestPipeConditionValidation:
         # Test with expression
         pipe_condition_expr_blueprint = PipeConditionBlueprint(
             definition="Test condition with expression",
-            inputs={"var": InputRequirementBlueprint(concept_code="test_domain.Text")},
-            output="test_domain.Result",
+            inputs={"var": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}")},
+            output=f"{domain}.{concept_2.code}",
             expression="var",
             pipe_map=PipeConditionPipeMapBlueprint(root={"value": "target_pipe"}),
         )
 
         pipe_condition_expr = PipeConditionFactory.make_from_blueprint(
-            domain="test_domain",
+            domain=domain,
             pipe_code="test_condition_expr",
             pipe_blueprint=pipe_condition_expr_blueprint,
         )
@@ -63,3 +87,4 @@ class TestPipeConditionValidation:
         # Both should have the same applied expression template format
         assert pipe_condition_template.applied_expression_template == "{{ var }}"
         assert pipe_condition_expr.applied_expression_template == "{{ var }}"
+        concept_library.teardown()
