@@ -11,6 +11,10 @@ class TestPipeParallelValidation:
         """Test PipeParallel structure with a real pipe"""
         # Create a real PipeLLM that will infer inputs from the prompt template
         pipe_llm_blueprint = PipeLLMBlueprint(
+            inputs={
+                "document": InputRequirementBlueprint(concept_code="document"),
+                "context": InputRequirementBlueprint(concept_code="context"),
+            },
             definition="Analysis pipe for document processing",
             output="test_domain.Analysis",
             prompt_template="Analyze this document:  \n@context\n@document",
@@ -31,8 +35,8 @@ class TestPipeParallelValidation:
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel document processor for testing",
             inputs={
-                "document": InputRequirementBlueprint(concept_code="test_domain.document"),
-                "context": InputRequirementBlueprint(concept_code="test_domain.context"),
+                "document": InputRequirementBlueprint(concept_code="document"),
+                "context": InputRequirementBlueprint(concept_code="context"),
             },
             output="test_domain.ProcessedAnalysis",
             parallels=[SubPipeBlueprint(pipe="analyze_document", result="analysis_result")],

@@ -96,10 +96,12 @@ class TestDryWorkingMemory:
 
         # Verify concept codes are preserved
         thoughtful_answer_stuff = dry_memory.get_stuff("thoughtful_answer")
-        assert thoughtful_answer_stuff.concept.code == "test_tricky_questions.ThoughtfulAnswer"
+        assert thoughtful_answer_stuff.concept.code == "ThoughtfulAnswer"
+        assert thoughtful_answer_stuff.concept.domain == "test_tricky_questions"
 
         question_stuff = dry_memory.get_stuff("question")
-        assert question_stuff.concept.code == "answer.Question"
+        assert question_stuff.concept.code == "Question"
+        assert question_stuff.concept.domain == "answer"
 
         # Verify structured content was created properly
         thoughtful_answer_content = thoughtful_answer_stuff.content
@@ -211,12 +213,14 @@ class TestDryWorkingMemory:
         # Verify structured content
         thoughtful_answer_stuff = dry_memory.get_stuff("thoughtful_answer")
         assert isinstance(thoughtful_answer_stuff.content, ThoughtfulAnswer)
-        assert thoughtful_answer_stuff.concept.code == "test_tricky_questions.ThoughtfulAnswer"
+        assert thoughtful_answer_stuff.concept.code == "ThoughtfulAnswer"
+        assert thoughtful_answer_stuff.concept.domain == "test_tricky_questions"
 
         # Verify text content
         raw_question_stuff = dry_memory.get_stuff("raw_question")
         assert isinstance(raw_question_stuff.content, TextContent)
-        assert raw_question_stuff.concept.code == "answer.Question"
+        assert raw_question_stuff.concept.code == "Question"
+        assert raw_question_stuff.concept.domain == "answer"
 
         analysis_result_stuff = dry_memory.get_stuff("analysis_result")
         assert isinstance(analysis_result_stuff.content, TextContent)

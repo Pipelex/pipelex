@@ -80,8 +80,9 @@ class StuffFactory:
                 name=blueprint.stuff_name,
             )
         else:
-            the_stuff_content = StuffContentFactory.make_stuffcontent_from_concept_code_required(
-                concept_code=blueprint.concept_code, value=blueprint.content
+            the_stuff_content = StuffContentFactory.make_stuff_content_from_concept_required(
+                concept=get_concept_provider().get_required_concept(concept_string=blueprint.concept_code),
+                value=blueprint.content,
             )
             the_stuff = cls.make_stuff(
                 concept=get_concept_provider().get_required_concept(concept_string=blueprint.concept_code),
@@ -121,7 +122,7 @@ class StuffFactory:
         name: str,
         stuff_content_or_data: StuffContentOrData,
         search_domains: List[str],
-        code: Optional[str] = None,
+        stuff_code: Optional[str] = None,
     ) -> Stuff:
         content: StuffContent
         concept_name: str
@@ -136,7 +137,7 @@ class StuffFactory:
                     search_domains=search_domains,
                     content=content,
                     name=name,
-                    code=code,
+                    code=stuff_code,
                 )
             except StuffFactoryError as exc:
                 raise StuffFactoryError(f"Could not make stuff for ListContent '{name}': {exc}") from exc
@@ -151,7 +152,7 @@ class StuffFactory:
                     concept=concept,
                     content=content,
                     name=name,
-                    code=code,
+                    code=stuff_code,
                 )
             try:
                 return cls.make_stuff_using_concept_name_and_search_domains(
@@ -159,7 +160,7 @@ class StuffFactory:
                     search_domains=search_domains,
                     content=content,
                     name=name,
-                    code=code,
+                    code=stuff_code,
                 )
             except StuffFactoryError as exc:
                 raise StuffFactoryError(f"Could not make stuff for StuffContent '{name}': {exc}") from exc
@@ -176,7 +177,7 @@ class StuffFactory:
                     search_domains=search_domains,
                     content=content,
                     name=name,
-                    code=code,
+                    code=stuff_code,
                 )
             except StuffFactoryError as exc:
                 raise StuffFactoryError(f"Could not make stuff for list of StuffContent '{name}': {exc}") from exc
@@ -201,18 +202,18 @@ class StuffFactory:
                     concept=get_concept_provider().get_required_concept(concept_string=concept_code),
                     name=name,
                     content=content_value,
-                    code=code,
+                    code=stuff_code,
                 )
             else:
-                content = StuffContentFactory.make_stuffcontent_from_concept_code_with_fallback(
-                    concept_code=concept_code,
+                content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
+                    concept=get_concept_provider().get_required_concept(concept_string=concept_code),
                     value=content_value,
                 )
                 return StuffFactory.make_stuff(
                     concept=get_concept_provider().get_required_concept(concept_string=concept_code),
                     name=name,
                     content=content,
-                    code=code,
+                    code=stuff_code,
                 )
 
 
@@ -228,28 +229,26 @@ class StuffContentFactory:
         return stuff_content_subclass.model_validate(obj=value)
 
     @classmethod
-    def make_stuffcontent_from_concept_code_required(cls, concept_code: str, value: Dict[str, Any] | str) -> StuffContent:
+    def make_stuff_content_from_concept_required(cls, concept: Concept, value: Dict[str, Any] | str) -> StuffContent:
         """
         Create StuffContent from concept code, requiring the concept to be linked to a class in the registry.
         Raises StuffContentFactoryError if no registry class is found.
         """
-        concept = get_required_concept(concept_string=concept_code)
         the_subclass_name = concept.structure_class_name
         the_subclass = get_class_registry().get_required_subclass(name=the_subclass_name, base_class=StuffContent)
         return cls.make_content_from_value(stuff_content_subclass=the_subclass, value=value)
 
     @classmethod
-    def make_stuffcontent_from_concept_code_with_fallback(cls, concept_code: str, value: Dict[str, Any] | str) -> StuffContent:
+    def make_stuff_content_from_concept_with_fallback(cls, concept: Concept, value: Dict[str, Any] | str) -> StuffContent:
         """
         Create StuffContent from concept code, falling back to TextContent if no registry class is found.
         """
-        concept = get_required_concept(concept_string=concept_code)
         the_structure_class = get_class_registry().get_class(name=concept.structure_class_name)
 
         if the_structure_class is None:
             return cls.make_content_from_value(stuff_content_subclass=TextContent, value=value)
 
         if not issubclass(the_structure_class, StuffContent):
-            raise StuffContentFactoryError(f"Concept '{concept_code}', subclass '{the_structure_class}' is not a subclass of StuffContent")
+            raise StuffContentFactoryError(f"Concept '{concept.code}', subclass '{the_structure_class}' is not a subclass of StuffContent")
 
         return cls.make_content_from_value(stuff_content_subclass=the_structure_class, value=value)

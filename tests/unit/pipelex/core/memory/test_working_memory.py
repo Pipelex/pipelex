@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_content import HtmlContent, ImageContent, ListContent, NumberContent, TextAndImagesContent, TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -196,9 +196,13 @@ class TestWorkingMemory:
 
     def test_working_memory_aliases(self, memory_with_aliases: WorkingMemory):
         """Test WorkingMemory alias functionality."""
-        # Should have two root items and two aliases
+        # Should have two root items and two aliases other then the main stuff
+        assert MAIN_STUFF_NAME in memory_with_aliases.aliases.keys()
+        # Remove it from the aliases
+        aliases = memory_with_aliases.aliases.copy()
+        del aliases[MAIN_STUFF_NAME]
         assert len(memory_with_aliases.root) == 2
-        assert len(memory_with_aliases.aliases) == 2
+        assert len(aliases) == 2
 
         # Check aliases work
         primary_stuff = memory_with_aliases.get_stuff("primary_text")

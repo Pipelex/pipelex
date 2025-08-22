@@ -101,7 +101,7 @@ class TestApiSerialization:
         # Check the dict structure
         datetime_blueprint = compact_memory["project_meeting"]
         assert isinstance(datetime_blueprint, dict)
-        assert datetime_blueprint["concept_code"] == "event.DateTimeEvent"
+        assert datetime_blueprint["concept_code"] == "DateTimeEvent"
 
         # Check content is properly serialized
         content = datetime_blueprint["content"]
@@ -160,6 +160,6 @@ class TestApiSerialization:
         assert "pi_value" in compact_memory
 
         number_blueprint = compact_memory["pi_value"]
-        assert number_blueprint["concept_code"] == "native.Number"
+        assert number_blueprint["concept_code"] == NativeConceptEnum.NUMBER.value
         assert isinstance(number_blueprint["content"], dict)
         assert number_blueprint["content"]["number"] == 3.14159
