@@ -105,7 +105,7 @@ class PipeLLM(PipeOperator):
         concept_provider = get_concept_provider()
 
         for input_name, requirement in self.inputs.items:
-            if concept_provider.is_image_concept(concept_code=requirement.concept.code):
+            if concept_provider.is_image_concept(concept=requirement.concept):
                 needed_inputs.add_requirement(
                     variable_name=input_name, concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE)
                 )
@@ -154,30 +154,31 @@ class PipeLLM(PipeOperator):
                     case StaticValidationReaction.RAISE:
                         raise missing_input_var_error
 
-            # there is one case where the needed input is of specific concept: the user_images
+            # There is one case where the needed input is of specific concept: the user_images
             if named_input_requirement.concept == get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE):
                 try:
-                    concept_code_of_declared_input = self.inputs.get_required_input_requirement(variable_name=named_input_requirement.variable_name)
+                    input_requirement_of_declared_input = self.inputs.get_required_input_requirement(
+                        variable_name=named_input_requirement.variable_name
+                    )
                 except PipeInputNotFoundError as exc:
                     raise PipeInputError(
                         f"Input variable '{named_input_requirement.variable_name}' is not in this PipeLLM '{self.code}' input spec: {self.inputs}"
                     ) from exc
-
                 if not concept_provider.is_compatible(
-                    tested_concept=concept_code_of_declared_input.concept,
+                    tested_concept=input_requirement_of_declared_input.concept,
                     wanted_concept=named_input_requirement.concept,
                 ):
                     if named_input_requirement.variable_name != named_input_requirement.requirement_expression:
                         # the required_input is a sub-attribute of the required variable
                         # TODO: check that the sub-attribute is compatible with the concept code
                         # let's check at least that the input is a structured concept
-                        input_concept = concept_code_of_declared_input.concept
+                        input_concept = input_requirement_of_declared_input.concept
                         input_concept_class_name = input_concept.structure_class_name
                         input_concept_class = get_class_registry().get_required_subclass(name=input_concept_class_name, base_class=StuffContent)
                         if issubclass(input_concept_class, StructuredContent):
                             continue
                     explanation = "The input provided for LLM Vision must be an image or a concept that refines image"
-                    if inadequate_concept := get_concept_provider().get_concept(concept_code=concept_code_of_declared_input.concept.code):
+                    if inadequate_concept := input_requirement_of_declared_input.concept:
                         explanation += f",\nconcept = {inadequate_concept}"
                     else:
                         explanation += ",\nconcept not found"
@@ -187,7 +188,7 @@ class PipeLLM(PipeOperator):
                         domain=self.domain,
                         pipe_code=self.code,
                         variable_names=[named_input_requirement.variable_name],
-                        provided_concept_code=concept_code_of_declared_input.concept.code,
+                        provided_concept_code=input_requirement_of_declared_input.concept.code,
                         explanation=explanation,
                     )
                     match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
@@ -197,7 +198,8 @@ class PipeLLM(PipeOperator):
                             log.error(inadequate_input_concept_error.desc())
                         case StaticValidationReaction.RAISE:
                             raise inadequate_input_concept_error
-        # check that all inputs are in the required variables
+
+        # Check that all inputs are in the required variables
         for input_name in self.inputs.variables:
             if input_name not in the_needed_inputs.required_names:
                 extraneous_input_var_error = StaticValidationError(
@@ -213,14 +215,6 @@ class PipeLLM(PipeOperator):
                         log.error(extraneous_input_var_error.desc())
                     case StaticValidationReaction.RAISE:
                         raise extraneous_input_var_error
-            else:
-                # Check if this input is an image concept but is being used as a variable in the prompt
-                if concept_provider.is_image_concept(concept_code=input_name):
-                    raise PipeDefinitionError(
-                        f"Image-based input '{input_name}' of concept '{input_name}' "
-                        f"cannot be used as a variable in a prompt for Pipe '{self.code}'. "
-                        f"Image variables are automatically passed to vision-enabled LLMs."
-                    )
 
     @override
     async def _run_operator_pipe(

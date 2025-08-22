@@ -9,7 +9,7 @@ definition = "This pipe is a dummy pipe"
 output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 1, max_tokens = 50 }
 prompt_template = """
-This is a dummy prompt, do whatever you want. Something funny but not a joke, ok?
+Output only "Hello".
 """
 
 [pipe.infinite_loop_1]

@@ -59,34 +59,34 @@ class TestPipeLLM:
         attribute_paths: List[str],
         pipe_run_mode: PipeRunMode,
     ):
-        stuff_name = stuff.stuff_name
-        if not stuff_name:
-            pytest.fail(f"Cannot use nameless stuff in this test: {stuff}")
-        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+        for attribute_path in attribute_paths:
+            stuff_name = attribute_path
+            if not stuff_name:
+                pytest.fail(f"Cannot use nameless stuff in this test: {stuff}")
+            working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+            pipe_llm_blueprint = PipeLLMBlueprint(
+                definition="LLM test for image processing with attributes",
+                inputs={stuff_name: InputRequirementBlueprint(concept_code=stuff.concept.code)},
+                output=NativeConceptEnum.TEXT.value,
+                system_prompt=PipeTestCases.SYSTEM_PROMPT,
+                prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,
+            )
 
-        pipe_llm_blueprint = PipeLLMBlueprint(
-            definition="LLM test for image processing with attributes",
-            inputs={stuff_name: InputRequirementBlueprint(concept_code=stuff.concept.code)},
-            output=NativeConceptEnum.TEXT.value,
-            system_prompt=PipeTestCases.SYSTEM_PROMPT,
-            prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,
-        )
+            pipe_job = PipeJobFactory.make_pipe_job(
+                working_memory=working_memory,
+                pipe=PipeLLMFactory.make_from_blueprint(
+                    domain="generic",
+                    pipe_code="adhoc_for_test_pipe_llm_image",
+                    pipe_blueprint=pipe_llm_blueprint,
+                ),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            )
 
-        pipe_job = PipeJobFactory.make_pipe_job(
-            working_memory=working_memory,
-            pipe=PipeLLMFactory.make_from_blueprint(
-                domain="generic",
-                pipe_code="adhoc_for_test_pipe_llm_image",
-                pipe_blueprint=pipe_llm_blueprint,
-            ),
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-        )
+            pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
+                pipe_job=pipe_job,
+            )
 
-        pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
-            pipe_job=pipe_job,
-        )
-
-        log.verbose(pipe_llm_output, title="stuff")
-        llm_generated_text = pipe_llm_output.main_stuff_as_text
-        pretty_print(llm_generated_text, title="llm_generated_text")
-        get_report_delegate().generate_report()
+            log.verbose(pipe_llm_output, title="stuff")
+            llm_generated_text = pipe_llm_output.main_stuff_as_text
+            pretty_print(llm_generated_text, title="llm_generated_text")
+            get_report_delegate().generate_report()

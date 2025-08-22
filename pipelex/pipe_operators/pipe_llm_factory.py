@@ -129,7 +129,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
 
         user_images: List[str] = []
         if pipe_blueprint.inputs:
-            for stuff_name, requirement in (pipe_blueprint.inputs).items():
+            for stuff_name, requirement in pipe_blueprint.inputs.items():
                 concept_code = requirement.concept_code
                 if "." not in concept_code:
                     if Concept.is_native_concept_code(concept_code=concept_code):
@@ -140,10 +140,9 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                         )
                 else:
                     concept = get_concept_provider().get_required_concept(concept_string=concept_code)
-                if get_concept_provider().is_image_concept(concept_code=concept.code):
+
+                if get_concept_provider().is_image_concept(concept=concept):
                     user_images.append(stuff_name)
-                else:
-                    pass
 
         pipe_llm_prompt = PipeLLMPrompt(
             code="adhoc_for_pipe_llm_prompt",

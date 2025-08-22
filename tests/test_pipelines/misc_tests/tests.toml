@@ -30,7 +30,7 @@ Explain that this is a test prompt which took no input from the user.
 type = "PipeLLM"
 definition = "No Input but generates a text that could be long"
 output = "Text"
-llm = { llm_handle = "gpt-4o-mini", temperature = 0.5, max_tokens = 100 }
+llm = { llm_handle = "gpt-4o-mini", temperature = 0.5, max_tokens = 1000 }
 prompt_template = """
 Tell me a short story about a red baloon.
 """

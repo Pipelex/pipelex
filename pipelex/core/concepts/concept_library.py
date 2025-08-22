@@ -107,15 +107,13 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return get_class_registry().get_class(concept_code)
 
     @override
-    def is_image_concept(self, concept_code: str) -> bool:
+    def is_image_concept(self, concept: Concept) -> bool:
+        # TODO: to test
         """
         Check if the concept is an image concept.
         It is an image concept if its structure class is a subclass of ImageContent
         or if it refines the native Image concept.
         """
-        concept = self.get_concept(concept_code=concept_code)
-        if not concept:
-            return False
         pydantic_model = self.get_class(concept_code=concept.structure_class_name)
         is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
         refines_image = self.is_compatible(tested_concept=concept, wanted_concept=self.get_native_concept(native_concept=NativeConceptEnum.IMAGE))

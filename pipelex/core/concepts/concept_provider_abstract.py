@@ -49,7 +49,7 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def is_image_concept(self, concept_code: str) -> bool:
+    def is_image_concept(self, concept: Concept) -> bool:
         pass
 
     @abstractmethod
