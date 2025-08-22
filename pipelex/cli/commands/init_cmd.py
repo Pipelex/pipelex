@@ -45,7 +45,7 @@ def do_init_config(reset: bool = False) -> None:
 
 
 # Typer group for init commands
-init_app = typer.Typer(help="Initialization commands")
+init_app = typer.Typer(help="Initialization commands", no_args_is_help=True)
 
 
 @init_app.command("libraries")

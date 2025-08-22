@@ -41,7 +41,7 @@ def do_show_pipe(pipe_code: str, relative_config_folder_path: str = "./pipelex_l
 
 
 # Typer group for show commands
-show_app = typer.Typer(help="Show and list commands")
+show_app = typer.Typer(help="Show and list commands", no_args_is_help=True)
 
 
 @show_app.command("config")

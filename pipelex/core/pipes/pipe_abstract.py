@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Set, Type
+from typing import List, Optional, Set, Type
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -62,9 +62,11 @@ class PipeAbstract(ABC, BaseModel):
         """
         return set()
 
-    def concept_dependencies(self) -> Set[str]:
-        required_concepts = set([self.output.code])
-        required_concepts.update(self.inputs.concepts)
+    def concept_dependencies(self) -> List[Concept]:
+        required_concepts: List[Concept] = [self.output]
+        for concept in self.inputs.concepts:
+            required_concepts.append(concept)
+        required_concepts.append(self.output)
         return required_concepts
 
     @abstractmethod

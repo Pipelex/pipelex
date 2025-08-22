@@ -71,7 +71,6 @@ class PipeOcr(PipeOperator):
             log.debug(f"{input_name=}")
             log.debug(f"{requirement=}")
             log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
-            print("ijdqoisjqioj", requirement.concept)
             if concept_provider.is_compatible(
                 tested_concept=requirement.concept,
                 wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.IMAGE),

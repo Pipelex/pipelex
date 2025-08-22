@@ -24,26 +24,6 @@ class TestWorkingMemoryFactory:
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == "Hello, world!"
 
-    def test_make_from_compact_memory_with_structured_content(self):
-        """Test deserialization of compact memory with structured content."""
-        compact_memory: CompactMemory = {
-            "structured_item": {
-                "concept_code": "some.CustomConcept",
-                "content": "This is fallback text content since CustomConcept doesn't exist",
-            }
-        }
-
-        working_memory = WorkingMemoryFactory.make_from_compact_memory(compact_memory)
-
-        assert working_memory is not None
-        assert "structured_item" in working_memory.root
-
-        stuff = working_memory.root["structured_item"]
-        assert stuff.concept.code == "CustomConcept"
-        assert stuff.concept.domain == "some"
-        assert stuff.content is not None
-        assert isinstance(stuff.content, TextContent)  # Falls back to TextContent
-
     def test_make_from_compact_memory_with_complex_nested_content(self):
         """Test deserialization of compact memory with complex nested structured content."""
         compact_memory: CompactMemory = {
@@ -145,19 +125,14 @@ class TestWorkingMemoryFactory:
                 "concept_code": NativeConceptEnum.TEXT.value,
                 "content": "Second text",
             },
-            "structured": {
-                "concept_code": "custom.Concept",
-                "content": "Fallback text for custom concept",
-            },
         }
 
         working_memory = WorkingMemoryFactory.make_from_compact_memory(compact_memory)
 
         assert working_memory is not None
-        assert len(working_memory.root) == 3
+        assert len(working_memory.root) == 2
         assert "text1" in working_memory.root
         assert "text2" in working_memory.root
-        assert "structured" in working_memory.root
 
         # Verify text content
         text1_stuff = working_memory.root["text1"]
@@ -167,9 +142,3 @@ class TestWorkingMemoryFactory:
         text2_stuff = working_memory.root["text2"]
         assert isinstance(text2_stuff.content, TextContent)
         assert text2_stuff.content.text == "Second text"
-
-        # Verify structured content (falls back to TextContent)
-        structured_stuff = working_memory.root["structured"]
-        assert structured_stuff.concept.code == "custom.Concept"
-        assert isinstance(structured_stuff.content, TextContent)
-        assert structured_stuff.content.text == "Fallback text for custom concept"

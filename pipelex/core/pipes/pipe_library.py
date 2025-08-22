@@ -20,12 +20,12 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         concept_provider = get_concept_provider()
         for pipe in self.root.values():
             try:
-                for concept_code in pipe.concept_dependencies():
+                for concept in pipe.concept_dependencies():
                     try:
-                        concept_provider.get_required_concept(concept_string=concept_code)
+                        concept_provider.get_required_concept(concept_string=concept.concept_string)
                     except ConceptError as concept_error:
                         raise PipeLibraryError(
-                            f"Error validating pipe '{pipe.code}' dependency concept '{concept_code}' because of: {concept_error}"
+                            f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
                         ) from concept_error
                 for pipe_code in pipe.pipe_dependencies():
                     self.get_required_pipe(pipe_code=pipe_code)

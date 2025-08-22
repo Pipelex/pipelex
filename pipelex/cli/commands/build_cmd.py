@@ -12,7 +12,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.tools.misc.file_utils import load_text_from_path
 
 # Typer group for build commands
-build_app = typer.Typer(help="Build artifacts like pipeline blueprints")
+build_app = typer.Typer(help="Build artifacts like pipeline blueprints", no_args_is_help=True)
 
 
 @build_app.command("draft")

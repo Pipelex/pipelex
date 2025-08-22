@@ -65,7 +65,13 @@ class WorkingMemory(BaseModel):
     def generate_stuff_artefact_dict(self) -> StuffArtefactDict:
         artefact_dict: StuffArtefactDict = {}
         for name, stuff in self.root.items():
-            artefact_dict[name] = stuff.make_artefact()
+            a = stuff.make_artefact()
+            artefact_dict[name] = a
+            if name == "thoughtful_answer":
+                from pipelex import pretty_print
+
+                pretty_print(self.root, "rooaaaat")
+                print("djsqjdjoqj", a)
         for alias, target in self.aliases.items():
             artefact_dict[alias] = artefact_dict[target]
         return artefact_dict

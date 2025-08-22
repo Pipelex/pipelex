@@ -47,24 +47,32 @@ class TestConcept:
 
         assert (
             Concept.is_native_concept(
-                ConceptFactory.make_from_blueprint(
-                    concept_code="Text", domain=valid_domain, concept_blueprint=ConceptBlueprint(definition=valid_definition)
-                )
+                ConceptFactory.make_from_blueprint(concept_code="Text", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition))
             )
             is False
         )
         assert (
             Concept.is_native_concept(
-                ConceptFactory.make_from_blueprint(
-                    concept_code="Text", domain="native", concept_blueprint=ConceptBlueprint(definition=valid_definition)
-                )
+                ConceptFactory.make_from_blueprint(concept_code="Text", domain="native", blueprint=ConceptBlueprint(definition=valid_definition))
             )
             is True
         )
         assert (
             Concept.is_native_concept(
+                ConceptFactory.make_from_blueprint(concept_code="Image", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition))
+            )
+            is False
+        )
+        assert (
+            Concept.is_native_concept(
+                ConceptFactory.make_from_blueprint(concept_code="PDF", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition))
+            )
+            is False
+        )
+        assert (
+            Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code="Image", domain=valid_domain, concept_blueprint=ConceptBlueprint(definition=valid_definition)
+                    concept_code="TextAndImages", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
                 )
             )
             is False
@@ -72,7 +80,7 @@ class TestConcept:
         assert (
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code="PDF", domain=valid_domain, concept_blueprint=ConceptBlueprint(definition=valid_definition)
+                    concept_code="Number", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
                 )
             )
             is False
@@ -80,7 +88,7 @@ class TestConcept:
         assert (
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code="TextAndImages", domain=valid_domain, concept_blueprint=ConceptBlueprint(definition=valid_definition)
+                    concept_code="LlmPrompt", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
                 )
             )
             is False
@@ -88,7 +96,7 @@ class TestConcept:
         assert (
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code="Number", domain=valid_domain, concept_blueprint=ConceptBlueprint(definition=valid_definition)
+                    concept_code="Anything", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
                 )
             )
             is False
@@ -96,23 +104,7 @@ class TestConcept:
         assert (
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code="LlmPrompt", domain=valid_domain, concept_blueprint=ConceptBlueprint(definition=valid_definition)
-                )
-            )
-            is False
-        )
-        assert (
-            Concept.is_native_concept(
-                ConceptFactory.make_from_blueprint(
-                    concept_code="Anything", domain=valid_domain, concept_blueprint=ConceptBlueprint(definition=valid_definition)
-                )
-            )
-            is False
-        )
-        assert (
-            Concept.is_native_concept(
-                ConceptFactory.make_from_blueprint(
-                    concept_code="RandomConcept", domain=valid_domain, concept_blueprint=ConceptBlueprint(definition=valid_definition)
+                    concept_code="RandomConcept", domain=valid_domain, blueprint=ConceptBlueprint(definition=valid_definition)
                 )
             )
             is False

@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from pydantic import BaseModel, Field, RootModel, field_validator, model_validator
 
@@ -102,10 +102,11 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
         return list(self.root.items())
 
     @property
-    def concepts(self) -> Set[str]:
-        all_concepts: Set[str] = set()
+    def concepts(self) -> List[Concept]:
+        all_concepts: List[Concept] = []
         for requirement in self.root.values():
-            all_concepts.add(requirement.concept.code)
+            if requirement.concept.concept_string not in [c.concept_string for c in all_concepts]:
+                all_concepts.append(requirement.concept)
         return all_concepts
 
     @property

@@ -32,18 +32,21 @@ def do_dry_run_pipe(pipe_code: str, relative_config_folder_path: str = "./pipele
         typer.echo("To create a pipelex libraries folder, run: pipelex init-libraries")
         raise typer.Exit(1)
 
-    try:
-        pipelex_instance = Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
-        pipelex_instance.validate_libraries()
-        asyncio.run(dry_run_single_pipe(pipe_code))
-        get_pipeline_tracker().output_flowchart()
-    except Exception as exc:
-        typer.echo(f"❌ Error running dry run for pipe '{pipe_code}': {exc}")
+    pipelex_instance = Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+    pipelex_instance.validate_libraries()
+    result = asyncio.run(dry_run_single_pipe(pipe_code))
+
+    # Check if the dry run failed
+    if result.startswith("FAILED:"):
+        typer.echo(f"❌ {result}")
         raise typer.Exit(1)
+
+    typer.echo(f"✅ Pipe '{pipe_code}' validation successful")
+    get_pipeline_tracker().output_flowchart()
 
 
 # Typer group for validation commands
-validate_app = typer.Typer(help="Validation and dry-run commands")
+validate_app = typer.Typer(help="Validation and dry-run commands", no_args_is_help=True)
 
 
 @validate_app.command("all")

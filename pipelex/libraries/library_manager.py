@@ -199,7 +199,7 @@ class LibraryManager(LibraryManagerAbstract):
                 concept = ConceptFactory.make_from_blueprint(
                     domain=blueprint.domain,
                     concept_code=concept_code,
-                    concept_blueprint=ConceptBlueprint(definition=concept_blueprint_or_str)
+                    blueprint=ConceptBlueprint(definition=concept_blueprint_or_str)
                     if isinstance(concept_blueprint_or_str, str)
                     else concept_blueprint_or_str,
                 )

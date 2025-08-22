@@ -11,11 +11,9 @@ class TestPipeConditionValidation:
         """Test basic PipeCondition creation"""
         domain = "test_domain"
         concept_1 = ConceptFactory.make_from_blueprint(
-            concept_code="TestConcept", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+            concept_code="TestConcept", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum")
         )
-        concept_2 = ConceptFactory.make_from_blueprint(
-            concept_code="Result", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
-        )
+        concept_2 = ConceptFactory.make_from_blueprint(concept_code="Result", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum"))
         concept_library = get_concept_provider()
         concept_library.add_concepts([concept_1, concept_2])
 
@@ -48,11 +46,9 @@ class TestPipeConditionValidation:
         domain = "test_domain"
         concept_library = get_concept_provider()
         concept_1 = ConceptFactory.make_from_blueprint(
-            concept_code="TestConcept", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+            concept_code="TestConcept", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum")
         )
-        concept_2 = ConceptFactory.make_from_blueprint(
-            concept_code="Result", domain=domain, concept_blueprint=ConceptBlueprint(definition="Lorem Ipsum")
-        )
+        concept_2 = ConceptFactory.make_from_blueprint(concept_code="Result", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum"))
         concept_library.add_concepts([concept_1, concept_2])
 
         pipe_condition_template_blueprint = PipeConditionBlueprint(

@@ -32,6 +32,8 @@ class Stuff(CustomBaseModel):
     content: StuffContent
 
     def make_artefact(self) -> StuffArtefact:
+        if self.stuff_name == "thoughtful_answer":
+            print("djsqjdjoqj2", self.content)
         artefact_dict: Dict[str, Any] = self.content.model_dump(serialize_as_any=True)
 
         def set_artefact_field(key: str, value: Optional[Union[str, StuffContent]]):

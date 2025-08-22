@@ -12,7 +12,7 @@ from pipelex.core.pipes.pipe_input_spec import PipeInputSpec, TypedNamedInputReq
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import StuffContent, TextContent
-from pipelex.hub import get_class_registry, get_concept_provider, get_pipe_provider
+from pipelex.hub import get_class_registry, get_pipe_provider
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -31,17 +31,12 @@ async def dry_run_single_pipe(pipe_code: str) -> str:
     Returns:
         Status string: "SUCCESS" or error message
     """
-    try:
-        # Get the pipe using the hub function
-        pipe = get_pipe_provider().get_optional_pipe(pipe_code=pipe_code)
-        if not pipe:
-            return f"FAILED: Pipe '{pipe_code}' not found"
 
-        # Run the single pipe
-        result = await dry_run_pipes(pipes=[pipe])
-        return result.get(pipe_code, f"FAILED: No result for pipe '{pipe_code}'")
-    except Exception as exc:
-        return f"FAILED: {str(exc)}"
+    # Get the pipe using the hub function
+    pipe = get_pipe_provider().get_required_pipe(pipe_code=pipe_code)
+    # Run the single pipe
+    result = await dry_run_pipes(pipes=[pipe])
+    return result.get(pipe_code, f"FAILED: No result for pipe '{pipe_code}'")
 
 
 async def dry_run_pipe_codes(pipe_codes: List[str]) -> Dict[str, str]:
@@ -87,8 +82,16 @@ async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
         try:
             # This function runs in a separate thread
             needed_inputs = pipe.needed_inputs()
+            if pipe.code == "conclude_thoughtful_answer":
+                from pipelex import pretty_print
+
+                pretty_print(needed_inputs, "needed_inputsss")
             log.debug(f"Needed inputs for {pipe.code}: {needed_inputs}")
             needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=needed_inputs)
+            if pipe.code == "conclude_thoughtful_answer":
+                from pipelex import pretty_print
+
+                pretty_print(needed_inputs_for_factory, "needed_inputsss_for_factory")
             log.debug(f"Needed inputs for {pipe.code} converted to working memory format: {needed_inputs_for_factory}")
             working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
 
@@ -117,9 +120,9 @@ async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
 
             # Check if this pipe is allowed to fail
             if pipe.code in allowed_to_fail_pipes:
-                log.debug(f"✗ Pipe {pipe.code} dry run failed: {exc} (this is normal, allowed by config)")
+                log.debug(f"✗ Pipe '{pipe.code}' dry run failed: {exc} (this is normal, allowed by config)")
             else:
-                log.error(f"✗ Pipe {pipe.code} dry run failed: {exc}")
+                log.error(f"✗ Pipe '{pipe.code}' dry run failed: {exc}")
 
             return (pipe.code, error_msg)
 
@@ -165,13 +168,12 @@ def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List
         List of tuples (variable_name, concept_code, structure_class)
     """
     needed_inputs_for_factory: List[TypedNamedInputRequirement] = []
-    concept_provider = get_concept_provider()
     class_registry = get_class_registry()
 
     for named_input_requirement in needed_inputs_spec.named_input_requirements:
         try:
             # Get the concept and its structure class
-            concept = concept_provider.get_required_concept(concept_string=named_input_requirement.concept.code)
+            concept = named_input_requirement.concept
             structure_class_name = concept.structure_class_name
 
             # Get the actual class from the registry

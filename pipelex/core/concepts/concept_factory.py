@@ -84,26 +84,26 @@ class ConceptFactory:
         cls,
         domain: str,
         concept_code: str,
-        concept_blueprint: ConceptBlueprint,
+        blueprint: ConceptBlueprint,
     ) -> Concept:
         structure_class_name: str
         current_refines: List[str] = []
 
         # Handle structure definition
-        if concept_blueprint.structure:
-            if isinstance(concept_blueprint.structure, str):
+        if blueprint.structure:
+            if isinstance(blueprint.structure, str):
                 # Structure is defined as a string - check if the class is in the registry and is valid
-                if not Concept.is_valid_structure_class(structure_class_name=concept_blueprint.structure):
+                if not Concept.is_valid_structure_class(structure_class_name=blueprint.structure):
                     raise StructureClassError(
-                        f"Structure class '{concept_blueprint.structure}' set for concept '{concept_code}' in domain '{domain}' "
+                        f"Structure class '{blueprint.structure}' set for concept '{concept_code}' in domain '{domain}' "
                         "is not a registered subclass of StuffContent"
                     )
-                structure_class_name = concept_blueprint.structure
+                structure_class_name = blueprint.structure
             else:
                 # Structure is defined as a ConceptStructureBlueprint - run the structure generator and put it in the class registry
                 try:
                     # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
-                    normalized_structure = cls.normalize_structure_blueprint(concept_blueprint.structure)
+                    normalized_structure = cls.normalize_structure_blueprint(blueprint.structure)
 
                     python_code = StructureGenerator().generate_from_structure_blueprint(
                         class_name=concept_code,
@@ -125,7 +125,7 @@ class ConceptFactory:
                     raise ConceptFactoryError(f"Error generating structure class for concept '{concept_code}' in domain '{domain}': {exc}") from exc
 
         # Handle refines definition
-        elif concept_blueprint.refines:
+        elif blueprint.refines:
             # If we have refines, validate that there is no structure related to the concept code in the class registry
             if Concept.is_valid_structure_class(structure_class_name=concept_code):
                 raise ConceptFactoryError(
@@ -133,7 +133,7 @@ class ConceptFactory:
                     "A concept cannot have both structure and refines."
                 )
             # pass for now
-            current_refines = cls.make_refines(domain=domain, blueprint=concept_blueprint)
+            current_refines = cls.make_refines(domain=domain, blueprint=blueprint)
             structure_class_name = TextContent.__name__  # Default structure for refined concepts
 
         # Handle neither structure nor refines - check the class registry
@@ -150,7 +150,7 @@ class ConceptFactory:
         return Concept(
             code=concept_code,
             domain=domain,
-            definition=concept_blueprint.definition,
+            definition=blueprint.definition,
             structure_class_name=structure_class_name,
             refines=current_refines,
         )

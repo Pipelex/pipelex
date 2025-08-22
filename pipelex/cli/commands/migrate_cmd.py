@@ -101,7 +101,7 @@ def do_migrate(
 
 
 # Typer group for migration commands
-migrate_app = typer.Typer(help="Migration commands")
+migrate_app = typer.Typer(help="Migration commands", no_args_is_help=True)
 
 
 @migrate_app.command("run")

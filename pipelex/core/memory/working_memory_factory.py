@@ -179,7 +179,11 @@ class WorkingMemoryFactory(BaseModel):
         Returns:
             WorkingMemory with mock objects for each needed input
         """
+        if "thoughtful_answer" in [r.variable_name for r in needed_inputs]:
+            print("djsqjdjoqj3")
+            from pipelex import pretty_print
 
+            pretty_print(needed_inputs, "needed_inputs")
         working_memory = cls.make_empty()
 
         for requirement in needed_inputs:
