@@ -12,37 +12,37 @@ from pipelex.core.stuffs.stuff_factory import StuffContentFactory
 class TestCases:
     # Test cases for TextContent with string content
     TEXT_STRING_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_code": f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+        "concept_string": f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
         "content": "The Dawn of Ultra-Rapid Transit: NextGen High-Speed Trains Redefine Travel",
     }
 
     # Test cases for TextContent with dict content
     TEXT_DICT_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_code": f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+        "concept_string": f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
         "content": {"text": "Sample text content"},
     }
 
     # Test cases for native concept without prefix (should work)
     TEXT_NO_PREFIX_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_code": f"{NativeConceptEnum.TEXT.value}",
+        "concept_string": f"{NativeConceptEnum.TEXT.value}",
         "content": {"text": "Text content without native prefix"},
     }
 
     # Test cases for registered class (using actual registered class)
     REGISTERED_CLASS_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_code": "test.MockRegisteredContent",
+        "concept_string": "test.MockRegisteredContent",
         "content": {"title": "Test Question", "description": "What are aerodynamic features?"},
     }
 
     # Test cases for unregistered class (creates implicit concept, returns TextContent)
     UNREGISTERED_STRING_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_code": "unknown.NonExistentConcept",
+        "concept_string": "unknown.NonExistentConcept",
         "content": "This should create implicit concept and return TextContent",
     }
 
     # Test cases for unregistered class with dict content
     UNREGISTERED_DICT_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_code": "unknown.NonExistentConcept",
+        "concept_string": "unknown.NonExistentConcept",
         "content": {"text": "Dict content for implicit concept"},
     }
 
