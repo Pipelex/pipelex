@@ -31,7 +31,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
                     concept=ConceptFactory.make(
                         concept_code="Document",
                         domain="customer_feedback",
-                        definition="customer_feedback.Document",
+                        definition="Lorem ipsum",
                         structure_class_name="Document",
                     ),
                     structure_class=Document,

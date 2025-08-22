@@ -125,6 +125,9 @@ class PipeRunParams(BaseModel):
     @classmethod
     def validate_param_keys(cls, value: Dict[str, Any]) -> Dict[str, Any]:
         for key in value:
+            if key == PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT:
+                # TODO: validate the concept code
+                pass
             if not key.startswith("_"):
                 raise ValueError(f"Parameter key '{key}' must start with an underscore '_'")
         return value

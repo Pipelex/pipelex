@@ -29,9 +29,7 @@ class PipeInputSpecFactory:
                         concept_string=Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_string)
                     )
             else:
-                concept = get_concept_provider().get_required_concept(
-                    concept_string=Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_string)
-                )
+                concept = get_concept_provider().get_required_concept(concept_string=concept_string)
 
             inputs[var_name] = InputRequirement(
                 concept=concept,

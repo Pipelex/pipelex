@@ -11,6 +11,7 @@ from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoice
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import Domain, SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -38,7 +39,6 @@ from pipelex.hub import (
     get_content_generator,
     get_llm_deck,
     get_optional_pipe,
-    get_required_concept,
     get_required_domain,
     get_required_pipe,
     get_template,
@@ -230,6 +230,8 @@ class PipeLLM(PipeOperator):
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {self.code}")
+        print("dsjiqodjosqjo", self.output)
+        output_concept = self.output
         if self.output.code == SpecialDomain.NATIVE.value + "." + NativeConceptEnum.DYNAMIC.value:
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
@@ -237,10 +239,18 @@ class PipeLLM(PipeOperator):
 
             if not output_concept_code:
                 output_concept_code = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value
-        else:
-            output_concept_code = self.output.code
+            else:
+                if "." not in output_concept_code:
+                    if Concept.is_native_concept_code(concept_code=output_concept_code):
+                        output_concept = get_concept_provider().get_native_concept(native_concept=NativeConceptEnum(output_concept_code))
+                    else:
+                        output_concept = get_concept_provider().get_required_concept(
+                            concept_string=Concept.construct_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code)
+                        )
+                else:
+                    output_concept = get_concept_provider().get_required_concept(concept_string=output_concept_code)
 
-        self.pipe_llm_prompt.output = get_concept_provider().get_required_concept(concept_string=output_concept_code)
+        self.pipe_llm_prompt.output = output_concept
 
         applied_output_multiplicity, is_multiple_output, fixed_nb_output = output_multiplicity_to_apply(
             output_multiplicity_base=self.output_multiplicity,
@@ -251,14 +261,13 @@ class PipeLLM(PipeOperator):
             f"is_multiple_output = {is_multiple_output}, fixed_nb_output = {fixed_nb_output}"
         )
 
-        output_concept = get_required_concept(concept_string=output_concept_code)
         if is_multiple_output:
             if fixed_nb_output:
-                log.verbose(f"{self.class_name} generate {fixed_nb_output} x '{output_concept_code}' (class '{output_concept.structure_class_name}')")
+                log.verbose(f"{self.class_name} generate {fixed_nb_output} x '{output_concept.code}' (class '{output_concept.structure_class_name}')")
             else:
-                log.verbose(f"{self.class_name} generate a list of '{output_concept_code}' (class '{output_concept.structure_class_name}')")
+                log.verbose(f"{self.class_name} generate a list of '{output_concept.code}' (class '{output_concept.structure_class_name}')")
         else:
-            log.verbose(f"{self.class_name} generate a single '{output_concept_code}' (class '{output_concept.structure_class_name}')")
+            log.verbose(f"{self.class_name} generate a single '{output_concept.code}' (class '{output_concept.structure_class_name}')")
 
         # Collect what LLM settings we have for this particular PipeLLM
         llm_for_text_choice: Optional[LLMSettingOrPresetId] = None

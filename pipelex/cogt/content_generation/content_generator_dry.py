@@ -81,6 +81,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> BaseModelTypeVar:
         func_name = "make_text_then_object"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+
         return await self.make_object_direct(
             job_metadata=job_metadata,
             object_class=object_class,

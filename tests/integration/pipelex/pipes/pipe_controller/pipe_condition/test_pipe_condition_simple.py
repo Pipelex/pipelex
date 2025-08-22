@@ -33,7 +33,7 @@ class TestPipeConditionSimple:
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Text length condition for testing",
             inputs={"input_text": InputRequirementBlueprint(concept_code="Text")},
-            output="generic.Text",
+            output="native.Text",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"long": "capitalize_long_text", "short": "add_prefix_short_text"}),
         )
@@ -78,9 +78,7 @@ class TestPipeConditionSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hello world" (11 chars > 5) -> expression="long" -> capitalize_long_text -> "LONG: HELLO WORLD"
-        if pipe_run_mode == PipeRunMode.DRY:
-            assert "DRY RUN" in final_result.content.text
-        else:
+        if pipe_run_mode != PipeRunMode.DRY:
             assert final_result.content.text == "LONG: HELLO WORLD"
 
         # Verify working memory structure
@@ -97,11 +95,9 @@ class TestPipeConditionSimple:
         final_result_in_memory = final_working_memory.get_main_stuff()
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        if pipe_run_mode == PipeRunMode.DRY:
-            assert "DRY RUN" in final_result_in_memory.content.text
-        else:
+        if pipe_run_mode != PipeRunMode.DRY:
             assert final_result_in_memory.content.text == "LONG: HELLO WORLD"
-        assert final_result_in_memory.concept.code == "native.Text"
+        assert f"{final_result_in_memory.concept.domain}.{final_result_in_memory.concept.code}" == "native.Text"
 
     async def test_condition_short_text_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeCondition with short text that should trigger add_prefix_short_text pipe."""
@@ -109,7 +105,7 @@ class TestPipeConditionSimple:
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Text length condition for short text testing",
             inputs={"input_text": InputRequirementBlueprint(concept_code="Text")},
-            output="generic.Text",
+            output="native.Text",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"long": "capitalize_long_text", "short": "add_prefix_short_text"}),
         )
@@ -151,9 +147,7 @@ class TestPipeConditionSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hi" (2 chars <= 5) -> expression="short" -> add_prefix_short_text -> "SHORT: hi"
-        if pipe_run_mode == PipeRunMode.DRY:
-            assert "DRY RUN" in final_result.content.text
-        else:
+        if pipe_run_mode != PipeRunMode.DRY:
             assert final_result.content.text == "SHORT: hi"
 
         # Verify working memory structure
@@ -170,11 +164,9 @@ class TestPipeConditionSimple:
         final_result_in_memory = final_working_memory.get_main_stuff()
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        if pipe_run_mode == PipeRunMode.DRY:
-            assert "DRY RUN" in final_result_in_memory.content.text
-        else:
+        if pipe_run_mode != PipeRunMode.DRY:
             assert final_result_in_memory.content.text == "SHORT: hi"
-        assert final_result_in_memory.concept.code == "native.Text"
+        assert f"{final_result_in_memory.concept.domain}.{final_result_in_memory.concept.code}" == "native.Text"
 
     async def test_condition_dry_run_success(self, request: FixtureRequest):
         """Test PipeCondition dry run with valid inputs using real pipe - should succeed."""

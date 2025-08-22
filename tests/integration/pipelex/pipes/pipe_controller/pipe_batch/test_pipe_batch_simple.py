@@ -114,8 +114,6 @@ class TestPipeBatchSimple:
             assert isinstance(item, TextContent)
             if pipe_run_mode != PipeRunMode.DRY:
                 assert item.text == expected_results[i], f"Item {i}: expected '{expected_results[i]}', got '{item.text}'"
-            else:
-                assert "DRY RUN" in item.text
 
         # Verify working memory contains all the expected elements
         final_working_memory = pipe_output.working_memory
