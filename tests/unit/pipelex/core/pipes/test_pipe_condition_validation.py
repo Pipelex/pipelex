@@ -13,7 +13,7 @@ class TestPipeConditionValidation:
             domain="test_domain",
             code="test_condition",
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain="test_domain", blueprint={"input_var": InputRequirementBlueprint(concept_code="test_domain.Text")}
+                domain="test_domain", blueprint={"input_var": InputRequirementBlueprint(concept_code="Text")}
             ),
             output=ConceptFactory.make(
                 concept_code="ProcessedText", domain="test_domain", definition="Processed text", structure_class_name="ProcessedText"

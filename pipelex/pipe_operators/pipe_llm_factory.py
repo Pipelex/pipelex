@@ -126,9 +126,16 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         user_images: List[str] = []
         if pipe_blueprint.inputs:
             for stuff_name, requirement in (pipe_blueprint.inputs).items():
-                concept = get_concept_provider().get_required_concept(
-                    concept_code=Concept.construct_concept_string_with_domain(domain=domain, concept_code=requirement.concept_code)
-                )
+                concept_code = requirement.concept_code
+                if "." not in concept_code:
+                    if Concept.is_native_concept_code(concept_code=concept_code):
+                        concept = get_concept_provider().get_native_concept(native_concept=NativeConceptEnum(concept_code))
+                    else:
+                        concept = get_concept_provider().get_required_concept(
+                            concept_string=Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_code)
+                        )
+                else:
+                    concept = get_concept_provider().get_required_concept(concept_string=concept_code)
                 if get_concept_provider().is_image_concept(concept_code=concept.code):
                     user_images.append(stuff_name)
                 else:
@@ -158,14 +165,25 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             nb_output=pipe_blueprint.nb_output,
             multiple_output=pipe_blueprint.multiple_output,
         )
+
+        output_concept_code = pipe_blueprint.output
+
+        if "." not in output_concept_code:
+            if Concept.is_native_concept_code(concept_code=output_concept_code):
+                output = get_concept_provider().get_native_concept(native_concept=NativeConceptEnum(output_concept_code))
+            else:
+                output = get_concept_provider().get_required_concept(
+                    concept_string=Concept.construct_concept_string_with_domain(domain=domain, concept_code=output_concept_code)
+                )
+        else:
+            output = get_concept_provider().get_required_concept(concept_string=output_concept_code)
+
         return PipeLLM(
             domain=domain,
             code=pipe_code,
             definition=pipe_blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
-            output=get_concept_provider().get_required_concept(
-                concept_code=Concept.construct_concept_string_with_domain(domain=domain, concept_code=pipe_blueprint.output)
-            ),
+            output=output,
             pipe_llm_prompt=pipe_llm_prompt,
             llm_choices=llm_choices,
             structuring_method=pipe_blueprint.structuring_method,

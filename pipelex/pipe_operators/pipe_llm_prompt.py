@@ -181,9 +181,7 @@ class PipeLLMPrompt(PipeOperator):
         # Append output structure prompt if needed
         if pipe_run_params.dynamic_output_concept_code:
             user_text += PipeLLMPrompt.get_output_structure_prompt(
-                output_concept=get_concept_provider().get_required_concept(
-                    concept_code=pipe_run_params.dynamic_output_concept_code,
-                ),
+                output_concept=get_concept_provider().get_required_concept(concept_string=pipe_run_params.dynamic_output_concept_code),
                 is_with_preliminary_text=pipe_run_params.is_with_preliminary_text or False,
             )
         else:

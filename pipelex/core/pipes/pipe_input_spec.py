@@ -88,11 +88,11 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
                 requirement.concept.code = f"{domain}.{input_concept_code}"
                 self.root[input_name] = requirement
 
-    def get_required_concept_code(self, variable_name: str) -> str:
+    def get_required_input_requirement(self, variable_name: str) -> InputRequirement:
         requirement = self.root.get(variable_name)
         if not requirement:
             raise PipeInputNotFoundError(f"Variable '{variable_name}' not found in input spec")
-        return requirement.concept.code
+        return requirement
 
     def add_requirement(self, variable_name: str, concept: Concept, multiplicity: Optional[PipeOutputMultiplicity] = None):
         self.root[variable_name] = InputRequirement(concept=concept, multiplicity=multiplicity)

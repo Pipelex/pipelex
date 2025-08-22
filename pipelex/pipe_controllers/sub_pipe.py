@@ -45,6 +45,7 @@ class SubPipe(BaseModel):
             sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
             pipe_batch_inputs = sub_pipe.inputs
             pipe_batch_inputs.add_requirement(variable_name=batch_params.input_list_stuff_name, concept=input_list_stuff.concept)
+            # TODO: use PipeBatchFactory
             pipe_batch = PipeBatch(
                 domain=pipe.domain,
                 code=self.pipe_code,

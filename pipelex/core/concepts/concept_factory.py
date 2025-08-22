@@ -31,7 +31,7 @@ class ConceptFactory:
         )
 
     @classmethod
-    def _make_refine(cls, domain: str, refine: str) -> str:
+    def make_refine(cls, domain: str, refine: str) -> str:
         if "." not in refine:
             if refine in [native_concept.value for native_concept in NativeConceptEnum]:
                 for native_concept in NativeConceptEnum:
@@ -42,11 +42,11 @@ class ConceptFactory:
         return refine
 
     @classmethod
-    def _make_refines(cls, domain: str, blueprint: ConceptBlueprint) -> List[str]:
+    def make_refines(cls, domain: str, blueprint: ConceptBlueprint) -> List[str]:
         if isinstance(blueprint.refines, str):
-            return [cls._make_refine(domain=domain, refine=blueprint.refines)]
+            return [cls.make_refine(domain=domain, refine=blueprint.refines)]
         elif isinstance(blueprint.refines, list):
-            return [cls._make_refine(domain=domain, refine=refine) for refine in blueprint.refines]
+            return [cls.make_refine(domain=domain, refine=refine) for refine in blueprint.refines]
         return []
 
     @classmethod
@@ -101,7 +101,7 @@ class ConceptFactory:
                     "A concept cannot have both structure and refines."
                 )
             # pass for now
-            current_refines = cls._make_refines(domain=domain, blueprint=concept_blueprint)
+            current_refines = cls.make_refines(domain=domain, blueprint=concept_blueprint)
             structure_class_name = TextContent.__name__  # Default structure for refined concepts
 
         # Handle neither structure nor refines - check the class registry

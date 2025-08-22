@@ -428,8 +428,8 @@ def get_optional_concept_provider() -> Optional[ConceptProviderAbstract]:
     return get_pipelex_hub().get_optional_concept_provider()
 
 
-def get_required_concept(concept_code: str) -> Concept:
-    return get_pipelex_hub().get_required_concept_provider().get_required_concept(concept_code=concept_code)
+def get_required_concept(concept_string: str) -> Concept:
+    return get_pipelex_hub().get_required_concept_provider().get_required_concept(concept_string=concept_string)
 
 
 def get_pipe_router() -> PipeRouterProtocol:

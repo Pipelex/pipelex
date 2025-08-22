@@ -21,11 +21,7 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def is_concept_implicit(self, concept_code: str) -> bool:
-        pass
-
-    @abstractmethod
-    def get_required_concept(self, concept_code: str) -> Concept:
+    def get_required_concept(self, concept_string: str) -> Concept:
         pass
 
     @abstractmethod

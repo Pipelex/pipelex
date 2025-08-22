@@ -47,6 +47,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     ) -> str:
         log.verbose(f"{self.__class__.__name__} make_llm_text: {llm_prompt_for_text}")
         log.verbose(f"llm_setting_main: {llm_setting_main}")
+        # TODO: use LLMAssignmentFactory
         llm_assignment = LLMAssignment(
             job_metadata=job_metadata,
             llm_setting=llm_setting_main,
@@ -67,6 +68,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar:
         log.verbose(f"{self.__class__.__name__} make_object_direct: {llm_prompt_for_object}")
+        # TODO: use LLMAssignmentFactory
         llm_assignment_for_object = LLMAssignment(
             job_metadata=job_metadata,
             llm_setting=llm_setting_for_object,
@@ -91,6 +93,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object: Optional[LLMPromptFactoryAbstract] = None,
     ) -> BaseModelTypeVar:
+        # TODO: use LLMAssignmentFactory
         llm_assignment_for_text = LLMAssignment(
             job_metadata=job_metadata,
             llm_setting=llm_setting_main,
@@ -135,6 +138,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: Optional[int] = None,
     ) -> List[BaseModelTypeVar]:
+        # TODO: use LLMAssignmentFactory
         llm_assignment_for_object = LLMAssignment(
             job_metadata=job_metadata,
             llm_setting=llm_setting_for_object_list,
@@ -160,6 +164,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_prompt_factory_for_object_list: Optional[LLMPromptFactoryAbstract] = None,
         nb_items: Optional[int] = None,
     ) -> List[BaseModelTypeVar]:
+        # TODO: use LLMAssignmentFactory
         llm_assignment_for_text = LLMAssignment(
             job_metadata=job_metadata,
             llm_setting=llm_setting_main,

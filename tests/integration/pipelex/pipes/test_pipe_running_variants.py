@@ -63,7 +63,7 @@ class TestPipeRunningVariants:
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code=pipe_code,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            working_memory=WorkingMemory(),
+            working_memory=WorkingMemory(),  # TODO: use WorkingMemoryFactory
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
         get_report_delegate().generate_report()
@@ -95,7 +95,7 @@ class TestPipeRunningVariants:
                 pipe_run_mode=pipe_run_mode,
                 output_multiplicity=output_multiplicity,
             ),
-            working_memory=WorkingMemory(),
+            working_memory=WorkingMemory(),  # TODO: use WorkingMemoryFactory
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
         get_report_delegate().generate_report()

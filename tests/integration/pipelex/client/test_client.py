@@ -99,6 +99,7 @@ class TestPipelexApiClient:
         """
         for example in examples:
             # Create working memory from example data
+            # TODO: use WorkingMemoryFactory
             memory = WorkingMemory()
             question = example.memory[1]
             text = example.memory[0]

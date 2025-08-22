@@ -28,6 +28,7 @@ class TestPipeBatchSimple:
     async def test_simple_batch_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeBatch with a simple batch processing scenario."""
         # Create PipeBatch instance - it will call the uppercase_transformer pipe from the TOML
+        # TODO: use PipeBatchFactory
         pipe_batch = PipeBatch(
             domain="test_integration",
             code="simple_batch",

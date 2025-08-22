@@ -185,7 +185,7 @@ class PipeParallel(PipeController):
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
         if combined_output := self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
-                concept=get_concept_provider().get_required_concept(concept_code=combined_output),
+                concept=get_concept_provider().get_required_concept(concept_string=combined_output),
                 stuff_contents=output_stuff_contents,
                 name=output_name,
             )
@@ -297,7 +297,7 @@ class PipeParallel(PipeController):
         # 5. Handle combined output if specified
         if combined_output := self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
-                concept=get_concept_provider().get_required_concept(concept_code=combined_output),
+                concept=get_concept_provider().get_required_concept(concept_string=combined_output),
                 stuff_contents=output_stuff_contents,
                 name=output_name,
             )

@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Optional, Type
 from pydantic import Field, RootModel
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
@@ -48,19 +47,14 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
-        return self.root[f"{SpecialDomain.NATIVE.value}.{native_concept.value}"]
+        try:
+            return self.root[f"{SpecialDomain.NATIVE.value}.{native_concept.value}"]
+        except KeyError:
+            raise ConceptLibraryConceptNotFoundError(f"Native concept '{native_concept.value}' not found in the library")
 
     def get_native_concepts(self) -> List[Concept]:
         """Create all native concepts from the hardcoded data"""
         return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptEnum]
-
-    @override
-    def is_concept_implicit(self, concept_code: str) -> bool:
-        concept_names = [concept.code for concept in self.list_concepts()]
-        is_implicit = concept_code not in concept_names
-        if is_implicit:
-            log.debug(f"Concept '{concept_code}' is implicit")
-        return is_implicit
 
     @override
     def list_concepts(self) -> List[Concept]:
@@ -71,9 +65,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return [concept for key, concept in self.root.items() if key.startswith(f"{domain}.")]
 
     def add_new_concept(self, concept: Concept):
-        if concept.library_key in self.root:
-            raise ConceptLibraryError(f"Concept '{concept.library_key}' already exists in the library")
-        self.root[concept.library_key] = concept
+        if concept.concept_string in self.root:
+            raise ConceptLibraryError(f"Concept '{concept.concept_string}' already exists in the library")
+        self.root[concept.concept_string] = concept
 
     def add_concepts(self, concepts: List[Concept]):
         for concept in concepts:
@@ -81,16 +75,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def is_compatible(self, tested_concept: Concept, wanted_concept: Concept) -> bool:
-        from pipelex import pretty_print
-
-        pretty_print(tested_concept, "tested_concept")
-        pretty_print(wanted_concept, "wanted_concept")
-        if tested_concept.code == wanted_concept.code:
+        if Concept.are_concept_compatible(concept_1=tested_concept, concept_2=wanted_concept):
             return True
-        for inherited_concept_code in tested_concept.refines:
-            inherited_concept = self.get_required_concept(concept_code=inherited_concept_code)
-            if self.is_compatible(inherited_concept, wanted_concept):
-                return True
+        # Loop
         return False
 
     @override
@@ -98,16 +85,20 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return self.root.get(concept_code, None)
 
     @override
-    def get_required_concept(self, concept_code: str) -> Concept:
-        if "." not in concept_code:
-            if not Concept.is_native_concept_code(concept_code=concept_code):
-                raise ConceptLibraryError(f"Concept code '{concept_code}' is not a native concept")
+    def get_required_concept(self, concept_string: str) -> Concept:
+        """
+        `concept_string` can have the domain or not. If it doesn't have the domain, it is assumed to be native.
+        If it is not native and doesnt have a domain, it should raise an error
+        """
+        if "." not in concept_string:
+            if not Concept.is_native_concept_code(concept_code=concept_string):
+                raise ConceptLibraryError(f"Concept code '{concept_string}' cannot be found in the library without a domain or being native")
             else:
-                return self.get_native_concept(native_concept=NativeConceptEnum(concept_code))
+                return self.get_native_concept(native_concept=NativeConceptEnum(concept_string))
         try:
-            return self.root[concept_code]
+            return self.root[concept_string]
         except KeyError:
-            raise ConceptLibraryConceptNotFoundError(f"Concept code was not found and is not implicit: '{concept_code}'")
+            raise ConceptLibraryConceptNotFoundError(f"Concept with key '{concept_string}' not found in the library")
 
     @override
     def get_class(self, concept_code: str) -> Optional[Type[Any]]:

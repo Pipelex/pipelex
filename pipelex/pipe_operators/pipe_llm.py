@@ -77,7 +77,7 @@ class PipeLLM(PipeOperator):
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
         # if self.structuring_method is not None:
-        #     output_concept = get_required_concept(concept_code=self.output_concept_code)
+        #     output_concept = get_required_concept(concept_string=self.output_concept_code)
         return self
 
     @override
@@ -153,26 +153,27 @@ class PipeLLM(PipeOperator):
             # there is one case where the needed input is of specific concept: the user_images
             if named_input_requirement.concept == get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE):
                 try:
-                    concept_code_of_declared_input = self.inputs.get_required_concept_code(variable_name=named_input_requirement.variable_name)
+                    concept_code_of_declared_input = self.inputs.get_required_input_requirement(variable_name=named_input_requirement.variable_name)
                 except PipeInputNotFoundError as exc:
                     raise PipeInputError(
                         f"Input variable '{named_input_requirement.variable_name}' is not in this PipeLLM '{self.code}' input spec: {self.inputs}"
                     ) from exc
+
                 if not concept_provider.is_compatible(
-                    tested_concept=concept_provider.get_required_concept(concept_code=concept_code_of_declared_input),
+                    tested_concept=concept_code_of_declared_input.concept,
                     wanted_concept=named_input_requirement.concept,
                 ):
                     if named_input_requirement.variable_name != named_input_requirement.requirement_expression:
                         # the required_input is a sub-attribute of the required variable
                         # TODO: check that the sub-attribute is compatible with the concept code
                         # let's check at least that the input is a structured concept
-                        input_concept = concept_provider.get_required_concept(concept_code=concept_code_of_declared_input)
+                        input_concept = concept_code_of_declared_input.concept
                         input_concept_class_name = input_concept.structure_class_name
                         input_concept_class = get_class_registry().get_required_subclass(name=input_concept_class_name, base_class=StuffContent)
                         if issubclass(input_concept_class, StructuredContent):
                             continue
                     explanation = "The input provided for LLM Vision must be an image or a concept that refines image"
-                    if inadequate_concept := get_concept_provider().get_concept(concept_code=concept_code_of_declared_input):
+                    if inadequate_concept := get_concept_provider().get_concept(concept_code=concept_code_of_declared_input.concept.code):
                         explanation += f",\nconcept = {inadequate_concept}"
                     else:
                         explanation += ",\nconcept not found"
@@ -182,7 +183,7 @@ class PipeLLM(PipeOperator):
                         domain=self.domain,
                         pipe_code=self.code,
                         variable_names=[named_input_requirement.variable_name],
-                        provided_concept_code=concept_code_of_declared_input,
+                        provided_concept_code=concept_code_of_declared_input.concept.code,
                         explanation=explanation,
                     )
                     match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
@@ -239,7 +240,7 @@ class PipeLLM(PipeOperator):
         else:
             output_concept_code = self.output.code
 
-        self.pipe_llm_prompt.output = get_concept_provider().get_required_concept(concept_code=output_concept_code)
+        self.pipe_llm_prompt.output = get_concept_provider().get_required_concept(concept_string=output_concept_code)
 
         applied_output_multiplicity, is_multiple_output, fixed_nb_output = output_multiplicity_to_apply(
             output_multiplicity_base=self.output_multiplicity,
@@ -250,7 +251,7 @@ class PipeLLM(PipeOperator):
             f"is_multiple_output = {is_multiple_output}, fixed_nb_output = {fixed_nb_output}"
         )
 
-        output_concept = get_required_concept(concept_code=output_concept_code)
+        output_concept = get_required_concept(concept_string=output_concept_code)
         if is_multiple_output:
             if fixed_nb_output:
                 log.verbose(f"{self.class_name} generate {fixed_nb_output} x '{output_concept_code}' (class '{output_concept.structure_class_name}')")

@@ -71,7 +71,7 @@ class StuffFactory:
     @classmethod
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
         if isinstance(blueprint.content, str) and get_concept_provider().is_compatible(
-            tested_concept=get_concept_provider().get_required_concept(concept_code=blueprint.concept_code),
+            tested_concept=get_concept_provider().get_required_concept(concept_string=blueprint.concept_code),
             wanted_concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.TEXT),
         ):
             the_stuff = cls.make_stuff(
@@ -84,7 +84,7 @@ class StuffFactory:
                 concept_code=blueprint.concept_code, value=blueprint.content
             )
             the_stuff = cls.make_stuff(
-                concept=get_concept_provider().get_required_concept(concept_code=blueprint.concept_code),
+                concept=get_concept_provider().get_required_concept(concept_string=blueprint.concept_code),
                 content=the_stuff_content,
                 name=blueprint.stuff_name,
             )
@@ -106,7 +106,7 @@ class StuffFactory:
     #     except ConceptError:
     #         stuff_ref = name or "unnamed"
     #         raise StuffFactoryError(f"Concept '{concept_str}' does not contain a domain, could not make stuff '{stuff_ref}'")
-    #     the_concept = get_required_concept(concept_code=concept_code)
+    #     the_concept = get_required_concept(concept_string=concept_code)
     #     the_subclass_name = the_concept.structure_class_name
     #     the_subclass = get_class_registry().get_class(name=the_subclass_name) or eval(the_subclass_name)
     #     if not issubclass(the_subclass, StuffContentInitableFromStr):
@@ -227,7 +227,7 @@ class StuffFactory:
                 raise StuffFactoryError(f"Stuff content data dict is badly formed: {exc}") from exc
             if isinstance(content_value, StuffContent):
                 return StuffFactory.make_stuff(
-                    concept=get_concept_provider().get_required_concept(concept_code=concept_code),
+                    concept=get_concept_provider().get_required_concept(concept_string=concept_code),
                     name=name,
                     content=content_value,
                     code=code,
@@ -238,7 +238,7 @@ class StuffFactory:
                     value=content_value,
                 )
                 return StuffFactory.make_stuff(
-                    concept=get_concept_provider().get_required_concept(concept_code=concept_code),
+                    concept=get_concept_provider().get_required_concept(concept_string=concept_code),
                     name=name,
                     content=content,
                     code=code,
@@ -262,7 +262,7 @@ class StuffContentFactory:
         Create StuffContent from concept code, requiring the concept to be linked to a class in the registry.
         Raises StuffContentFactoryError if no registry class is found.
         """
-        concept = get_required_concept(concept_code=concept_code)
+        concept = get_required_concept(concept_string=concept_code)
         the_subclass_name = concept.structure_class_name
         the_subclass = get_class_registry().get_required_subclass(name=the_subclass_name, base_class=StuffContent)
         return cls.make_content_from_value(stuff_content_subclass=the_subclass, value=value)
@@ -272,7 +272,7 @@ class StuffContentFactory:
         """
         Create StuffContent from concept code, falling back to TextContent if no registry class is found.
         """
-        concept = get_required_concept(concept_code=concept_code)
+        concept = get_required_concept(concept_string=concept_code)
         the_structure_class = get_class_registry().get_class(name=concept.structure_class_name)
 
         if the_structure_class is None:

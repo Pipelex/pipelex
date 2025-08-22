@@ -19,7 +19,7 @@ from pipelex.exceptions import (
     PipeInputNotFoundError,
     WorkingMemoryStuffNotFoundError,
 )
-from pipelex.hub import get_concept_provider, get_pipeline_tracker, get_required_pipe
+from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -78,7 +78,7 @@ class PipeBatch(PipeController):
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_item_stuff_name = batch_params.input_item_stuff_name
         try:
-            input_item_concept_code = self.inputs.get_required_concept_code(input_item_stuff_name)
+            input_item_concept_code = self.inputs.get_required_input_requirement(input_item_stuff_name)
         except PipeInputNotFoundError as exc:
             raise PipeInputError(
                 f"Batch input item stuff named '{input_item_stuff_name}' is not in this PipeBatch '{self.code}' input spec: {self.inputs}"
@@ -122,7 +122,7 @@ class PipeBatch(PipeController):
             branch_input_item_code = f"{input_stuff_code}-branch-{branch_index}"
             item_input_stuff = StuffFactory.make_stuff(
                 code=branch_input_item_code,
-                concept=get_concept_provider().get_required_concept(concept_code=input_item_concept_code),
+                concept=input_item_concept_code.concept,
                 content=item,
                 name=input_item_stuff_name,
             )

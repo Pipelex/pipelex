@@ -1,16 +1,16 @@
 from typing import Dict, List
 
 from kajson.kajson_manager import KajsonManager
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptDomainError, ConceptStringError
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.create.structured_output_generator import StructureGenerator
-from pipelex.exceptions import ConceptCodeError, ConceptDomainError
 from pipelex.tools.misc.string_utils import is_pascal_case, is_snake_case, pascal_case_to_sentence
 
 
@@ -24,18 +24,21 @@ class Concept(BaseModel):
     refines: List[str] = Field(default_factory=list)
 
     @property
-    def library_key(self) -> str:
-        return f"{self.domain}.{self.code}"
+    def concept_string(self) -> str:
+        return Concept.construct_concept_string_with_domain(domain=self.domain, concept_code=self.code)
+
+    @field_validator("code")
+    def validate_code(cls, code: str) -> str:
+        cls.validate_concept_code(concept_code=code)
+        return code
+
+    @field_validator("domain")
+    def validate_domain(cls, domain: str) -> str:
+        cls.validate_domain_syntax(domain=domain)
+        return domain
 
     @model_validator(mode="after")
     def validate_concept(self) -> Self:
-        if not is_snake_case(self.domain):
-            raise ConceptDomainError(
-                f"Domain must be snake_case (lowercase letters, numbers, and underscores only) for concept with domain '{self.domain}'"
-            )
-        if not is_pascal_case(self.code):
-            raise ConceptCodeError(f"Code must be PascalCase (letters and numbers only, starting with uppercase) for concept with code '{self.code}'")
-
         self.validate_refines()
         return self
 
@@ -65,29 +68,43 @@ class Concept(BaseModel):
 
     @classmethod
     def construct_concept_string_with_domain(cls, domain: str, concept_code: str) -> str:
-        if "." not in concept_code:
-            if cls.is_native_concept_code(concept_code=concept_code):
-                return f"{SpecialDomain.NATIVE.value}.{concept_code}"
-            else:
-                return f"{domain}.{concept_code}"
-        return concept_code
+        return f"{domain}.{concept_code}"
+
+    @classmethod
+    def validate_domain_syntax(cls, domain: str) -> None:
+        if not is_snake_case(domain):
+            raise ConceptDomainError(domain=domain)
+
+    @classmethod
+    def validate_concept_code(cls, concept_code: str) -> None:
+        if "." in concept_code:
+            raise ConceptCodeError(code=concept_code)
+        if not is_pascal_case(concept_code):
+            raise ConceptCodeError(code=concept_code)
 
     @classmethod
     def validate_concept_string(cls, concept_string: str):
         if "." in concept_string:
-            # There should be only one dot
             if concept_string.count(".") != 1:
-                raise ConceptCodeError(f"Concept string '{concept_string}' is not valid. It should have only one dot.")
+                raise ConceptStringError(concept_string=concept_string)
 
             domain, concept_code = concept_string.split(".")
-            if not is_snake_case(domain):
-                raise ConceptCodeError(f"Domain '{domain}' in concept string '{concept_string}' is not valid. It should be snake_case.")
-            if not is_pascal_case(concept_code):
-                raise ConceptCodeError(f"Concept code '{concept_code}' in concept string '{concept_string}' is not valid. It should be PascalCase.")
+            cls.validate_domain_syntax(domain=domain)
+            cls.validate_concept_code(concept_code=concept_code)
 
             if domain == SpecialDomain.NATIVE.value:
                 if concept_code not in [native_concept.value for native_concept in NativeConceptEnum]:
-                    raise ConceptCodeError(f"Concept string '{concept_string}' is not valid. It should be a native concept.")
+                    raise ConceptCodeError(code=concept_code)
+
+    @classmethod
+    def are_concept_compatible(cls, concept_1: "Concept", concept_2: "Concept") -> bool:
+        if concept_1.code == concept_2.code and concept_1.domain == concept_2.domain:
+            return True
+        if concept_1.structure_class_name == concept_2.structure_class_name:
+            return True
+        if set(concept_1.refines) == set(concept_2.refines):
+            return True
+        return False
 
     @classmethod
     def is_valid_structure_class(cls, structure_class_name: str) -> bool:

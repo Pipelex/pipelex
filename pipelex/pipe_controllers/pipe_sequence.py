@@ -15,7 +15,7 @@ from pipelex.exceptions import (
     StaticValidationError,
     StaticValidationErrorType,
 )
-from pipelex.hub import get_concept_provider, get_required_pipe
+from pipelex.hub import get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -42,7 +42,7 @@ class PipeSequence(PipeController):
             # Instead we must add the batch_over variable nale.
             if sequential_sub_pipe.batch_params:
                 batch_as_input = sequential_sub_pipe.batch_params.input_item_stuff_name
-                batch_item_concept_code = sub_pipe_needed_inputs.get_required_concept_code(variable_name=batch_as_input)
+                batch_item_concept_code = sub_pipe_needed_inputs.get_required_input_requirement(variable_name=batch_as_input)
                 # Create a new PipeInputSpec without the batch_as input
                 # TODO: this should be done with a simple remove_requirement() method on the PipeInputSpec
                 filtered_needed_inputs = PipeInputSpecFactory.make_empty()
@@ -53,9 +53,7 @@ class PipeSequence(PipeController):
                 batch_over = sequential_sub_pipe.batch_params.input_list_stuff_name
                 sub_pipe_needed_inputs.add_requirement(
                     variable_name=batch_over,
-                    concept=get_concept_provider().get_required_concept(
-                        concept_code=batch_item_concept_code,
-                    ),
+                    concept=batch_item_concept_code.concept,
                     multiplicity=True,
                 )
 

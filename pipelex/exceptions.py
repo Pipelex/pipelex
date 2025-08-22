@@ -254,10 +254,6 @@ class ConceptCodeError(ConceptError):
     pass
 
 
-class ConceptDomainError(ConceptError):
-    pass
-
-
 class PipelineManagerNotFoundError(PipelexError):
     pass
 

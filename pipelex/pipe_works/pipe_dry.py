@@ -171,7 +171,7 @@ def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List
     for named_input_requirement in needed_inputs_spec.named_input_requirements:
         try:
             # Get the concept and its structure class
-            concept = concept_provider.get_required_concept(concept_code=named_input_requirement.concept.code)
+            concept = concept_provider.get_required_concept(concept_string=named_input_requirement.concept.code)
             structure_class_name = concept.structure_class_name
 
             # Get the actual class from the registry

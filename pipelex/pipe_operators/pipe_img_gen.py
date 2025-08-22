@@ -290,7 +290,7 @@ class PipeImgGen(PipeOperator):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept=get_concept_provider().get_required_concept(concept_code=self.output_concept_code),
+            concept=get_concept_provider().get_required_concept(concept_string=self.output_concept_code),
             content=the_content,
         )
 

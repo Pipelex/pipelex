@@ -26,7 +26,7 @@ class WorkingMemoryFactory(BaseModel):
     ) -> WorkingMemory:
         return cls.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
-                concept=get_required_concept(concept_code=concept_code),
+                concept=get_required_concept(concept_string=concept_code),
                 content=TextContent(text=text),
                 name=name,
             )
@@ -41,7 +41,7 @@ class WorkingMemoryFactory(BaseModel):
     ) -> WorkingMemory:
         # TODO: validate that the concept is an image concept
         stuff = StuffFactory.make_stuff(
-            concept=get_required_concept(concept_code=concept_code),
+            concept=get_required_concept(concept_string=concept_code),
             content=ImageContent(url=image_url),
             name=name,
         )
@@ -56,7 +56,7 @@ class WorkingMemoryFactory(BaseModel):
     ) -> WorkingMemory:
         return cls.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
-                concept=get_required_concept(concept_code=concept_code),
+                concept=get_required_concept(concept_string=concept_code),
                 content=PDFContent(url=pdf_url),
                 name=name,
             )
@@ -103,7 +103,7 @@ class WorkingMemoryFactory(BaseModel):
             stuff_dict[name] = Stuff(
                 stuff_name=name,
                 stuff_code="",
-                concept=get_required_concept(concept_code=NativeConceptEnum.TEXT.value),
+                concept=get_required_concept(concept_string=NativeConceptEnum.TEXT.value),
                 content=text_content,
             )
         return WorkingMemory(root=stuff_dict)
