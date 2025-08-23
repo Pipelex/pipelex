@@ -78,13 +78,6 @@ class ConceptFactory:
     def make_domain_and_concept_code_from_concept_string_or_concept_code(
         cls, domain: str, concept_string_or_concept_code: str, concept_codes_from_the_same_domain: Optional[List[str]] = None
     ) -> List[str]:
-        from pipelex import pretty_print
-
-        if concept_string_or_concept_code == "ChannelSummary":
-            pretty_print(concept_string_or_concept_code, title="oidjsioqjdisoj")
-            pretty_print(concept_codes_from_the_same_domain, title="concept_codes_from_the_same_domain")
-            pretty_print(domain, title="domain")
-
         # At this point, the concept_string_or_concept_code is already validated
         if "." in concept_string_or_concept_code:
             # Is a concept string.

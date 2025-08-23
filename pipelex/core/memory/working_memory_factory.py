@@ -22,12 +22,13 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_text(
         cls,
         text: str,
-        concept_code: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value,
+        concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value,
         name: Optional[str] = "text",
     ) -> WorkingMemory:
+        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
         return cls.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
-                concept=get_required_concept(concept_string=concept_code),
+                concept=get_required_concept(concept_string=concept_string),
                 content=TextContent(text=text),
                 name=name,
             )

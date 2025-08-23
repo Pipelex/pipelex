@@ -287,8 +287,6 @@ class PipeImgGen(PipeOperator):
             )
             log.verbose(the_content, title="Single image content")
 
-        print("oiqdjiosjqodjoq", self.output)
-
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
             concept=self.output,

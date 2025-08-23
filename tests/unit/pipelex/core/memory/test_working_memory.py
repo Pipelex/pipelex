@@ -60,7 +60,7 @@ class TestWorkingMemory:
     def single_text_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single text content."""
         return WorkingMemoryFactory.make_from_text(
-            text=TestWorkingMemoryData.SAMPLE_TEXT, concept_code=NativeConceptEnum.TEXT.value, name="sample_text"
+            text=TestWorkingMemoryData.SAMPLE_TEXT, concept_string=SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value, name="sample_text"
         )
 
     @pytest.fixture

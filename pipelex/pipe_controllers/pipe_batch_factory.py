@@ -29,12 +29,6 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
         pipe_blueprint: PipeBatchBlueprint,
         concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeBatch:
-        if pipe_blueprint.output == "ChannelSummary":
-            from pipelex import pretty_print
-
-            pretty_print(domain, title="domain")
-            pretty_print(concept_codes_from_the_same_domain, title="concept_codes_fromdzdzq_the_same_domain")
-            pretty_print(domain, title="domain")
         output_concept_domain, output_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
             concept_string_or_concept_code=pipe_blueprint.output,
