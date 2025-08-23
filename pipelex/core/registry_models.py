@@ -8,7 +8,6 @@ from pipelex.core.stuffs.stuff_content import (
     HtmlContent,
     ImageContent,
     ListContent,
-    LLMPromptContent,
     NumberContent,
     PageContent,
     PDFContent,
@@ -26,6 +25,7 @@ from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelFactory
 from pipelex.pipe_controllers.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceFactory
+from pipelex.pipe_operators.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_func import PipeFunc
 from pipelex.pipe_operators.pipe_func_factory import PipeFuncFactory
 from pipelex.pipe_operators.pipe_img_gen import PipeImgGen
@@ -34,7 +34,6 @@ from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm import PipeLLM
 from pipelex.pipe_operators.pipe_llm_factory import PipeLLMFactory
-from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 from pipelex.pipe_operators.pipe_ocr import PipeOcr
 from pipelex.pipe_operators.pipe_ocr_factory import PipeOcrFactory
 from pipelex.tools.registry_models import ModelType, RegistryModels
@@ -48,7 +47,6 @@ class PipelexRegistryModels(RegistryModels):
         PipeImgGen,
         PipeJinja2,
         PipeLLM,
-        PipeLLMPrompt,
         PipeOcr,
     ]
 
@@ -78,7 +76,6 @@ class PipelexRegistryModels(RegistryModels):
         TextContent,
         NumberContent,
         ImageContent,
-        LLMPromptContent,
         Stuff,
         StuffContent,
         HtmlContent,

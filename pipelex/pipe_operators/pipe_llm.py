@@ -10,6 +10,7 @@ from pipelex.cogt.llm.llm_models.llm_deck_check import check_llm_setting_with_de
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
+from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
@@ -43,10 +44,9 @@ from pipelex.hub import (
     get_required_pipe,
     get_template,
 )
+from pipelex.pipe_operators.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
-from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt, PipeLLMPromptOutput
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_operators.piped_llm_prompt_factory import PipedLLMPromptFactory
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.types import StrEnum
 
@@ -61,7 +61,7 @@ class PipeLLMOutput(PipeOutput):
 
 
 class PipeLLM(PipeOperator):
-    pipe_llm_prompt: PipeLLMPrompt
+    llm_prompt_blueprint: LLMPromptBlueprint
     llm_choices: Optional[LLMSettingChoices] = None
     structuring_method: Optional[StructuringMethod] = None
     prompt_template_to_structure: Optional[str] = None
@@ -87,7 +87,7 @@ class PipeLLM(PipeOperator):
     @override
     def validate_with_libraries(self):
         self._validate_inputs()
-        self.pipe_llm_prompt.validate_with_libraries()
+        self.llm_prompt_blueprint.validate_with_libraries()
         if self.prompt_template_to_structure:
             get_template(template_name=self.prompt_template_to_structure)
         if self.system_prompt_to_structure:
@@ -118,7 +118,7 @@ class PipeLLM(PipeOperator):
     def required_variables(self) -> Set[str]:
         """Required variables are the variables that are used in the current prompt template or system prompt"""
         required_variables: Set[str] = set()
-        required_variables.update(self.pipe_llm_prompt.required_variables())
+        required_variables.update(self.llm_prompt_blueprint.required_variables())
         required_variables = {variable_name for variable_name in required_variables if not variable_name.startswith("_")}
         return required_variables
 
@@ -241,7 +241,7 @@ class PipeLLM(PipeOperator):
                     concept_string=ConceptFactory.construct_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code)
                 )
 
-        self.pipe_llm_prompt.output = output_concept
+        # self.llm_prompt_blueprint.output = output_concept
 
         applied_output_multiplicity, is_multiple_output, fixed_nb_output = output_multiplicity_to_apply(
             output_multiplicity_base=self.output_multiplicity,
@@ -285,14 +285,16 @@ class PipeLLM(PipeOperator):
         )
         llm_setting_for_object: LLMSetting = get_llm_deck().get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_object)
 
-        if not self.pipe_llm_prompt.prompting_style and (llm_model := get_llm_deck().find_optional_llm_model(llm_handle=llm_setting_main.llm_handle)):
+        if not self.llm_prompt_blueprint.prompting_style and (
+            llm_model := get_llm_deck().find_optional_llm_model(llm_handle=llm_setting_main.llm_handle)
+        ):
             llm_family = llm_model.llm_family
             if llm_setting_main.prompting_target:
                 log.dev(f"prompting_target for '{llm_setting_main.llm_handle}' from setting: {llm_setting_main}")
             else:
                 log.dev(f"prompting_target for '{llm_setting_main.llm_handle}' from llm_family: {llm_family}")
             prompting_target = llm_setting_main.prompting_target or llm_family.prompting_target
-            self.pipe_llm_prompt.prompting_style = get_config().pipelex.prompting_config.get_prompting_style(
+            self.llm_prompt_blueprint.prompting_style = get_config().pipelex.prompting_config.get_prompting_style(
                 prompting_target=prompting_target,
             )
 
@@ -319,12 +321,12 @@ class PipeLLM(PipeOperator):
         #     )
         # ).llm_prompt
         # TODO: restore the possibility above, without need to explicitly cast the output
-        pipe_output: PipeOutput = await self.pipe_llm_prompt.run_pipe(
+        llm_prompt_1 = await self.llm_prompt_blueprint.make_llm_prompt(
+            output_concept_string=output_concept.concept_string,
             job_metadata=prompt_job_metadata,
             working_memory=working_memory,
             pipe_run_params=llm_prompt_run_params,
         )
-        llm_prompt_1 = cast(PipeLLMPromptOutput, pipe_output).llm_prompt
 
         the_content: StuffContent
         if output_concept.structure_class_name == NativeConceptEnum.TEXT.value and not is_multiple_output:
@@ -358,15 +360,18 @@ class PipeLLM(PipeOperator):
                             prompt_template_to_structure=prompt_template_to_structure,
                         )
                         system_prompt = self.system_prompt_to_structure or domain.system_prompt
-                        pipe_llm_prompt_2 = PipeLLMPrompt(
-                            code="adhoc_for_pipe_llm_prompt_2",
-                            domain=self.domain,
+                        llm_prompt_2_blueprint = LLMPromptBlueprint(
                             user_pipe_jinja2=user_pipe_jinja2,
                             system_prompt=system_prompt,
-                            output=output_concept,
                         )
-                        llm_prompt_2_factory = PipedLLMPromptFactory(
-                            pipe_llm_prompt=pipe_llm_prompt_2,
+                        llm_prompt_2_proto = await llm_prompt_2_blueprint.make_llm_prompt(
+                            output_concept_string=output_concept.concept_string,
+                            job_metadata=prompt_job_metadata,
+                            working_memory=working_memory,
+                            pipe_run_params=llm_prompt_run_params,
+                        )
+                        llm_prompt_2_factory = LLMPromptTemplate(
+                            proto_prompt=llm_prompt_2_proto,
                         )
             elif get_config().pipelex.structure_config.is_default_text_then_structure:
                 log.debug(f"PipeLLM pipe_code is '{self.code}' and is_default_text_then_structure")
@@ -381,15 +386,18 @@ class PipeLLM(PipeOperator):
                     prompt_template_to_structure=prompt_template_to_structure,
                 )
                 system_prompt = self.system_prompt_to_structure or domain.system_prompt
-                pipe_llm_prompt_2 = PipeLLMPrompt(
-                    code="adhoc_for_pipe_llm_prompt_2",
-                    domain=self.domain,
+                llm_prompt_2_blueprint = LLMPromptBlueprint(
                     user_pipe_jinja2=user_pipe_jinja2,
                     system_prompt=system_prompt,
-                    output=output_concept,
                 )
-                llm_prompt_2_factory = PipedLLMPromptFactory(
-                    pipe_llm_prompt=pipe_llm_prompt_2,
+                llm_prompt_2_proto = await llm_prompt_2_blueprint.make_llm_prompt(
+                    output_concept_string=output_concept.concept_string,
+                    job_metadata=prompt_job_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=llm_prompt_run_params,
+                )
+                llm_prompt_2_factory = LLMPromptTemplate(
+                    proto_prompt=llm_prompt_2_proto,
                 )
             else:
                 llm_prompt_2_factory = None

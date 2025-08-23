@@ -1,6 +1,6 @@
 from typing import ClassVar, List, Optional, Set, cast
 
-from pydantic import model_validator
+from pydantic import BaseModel, model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
@@ -8,15 +8,12 @@ from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuffs.stuff_content import ImageContent, LLMPromptContent, StuffContent
+from pipelex.core.stuffs.stuff_content import ImageContent, StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeDefinitionError,
@@ -24,7 +21,7 @@ from pipelex.exceptions import (
     PipeRunParamsError,
     WorkingMemoryVariableError,
 )
-from pipelex.hub import get_class_registry, get_concept_provider, get_template
+from pipelex.hub import get_class_registry, get_required_concept, get_template
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
@@ -33,20 +30,7 @@ from pipelex.tools.typing.type_inspector import get_type_structure
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
 
 
-class PipeLLMPromptOutput(PipeOutput):
-    @property
-    def llm_prompt(self) -> LLMPrompt:
-        return self.main_stuff_as(content_type=LLMPromptContent)
-
-
-# TODO: consider adding a PipeLLMPromptFactory for consistency
-class PipeLLMPrompt(PipeOperator):
-    adhoc_pipe_code: ClassVar[str] = "adhoc_pipe_code_for_prompt_llm"
-
-    output: Concept = ConceptFactory.make_native_concept(
-        native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.LLM_PROMPT],
-    )
-
+class LLMPromptBlueprint(BaseModel):
     prompting_style: Optional[PromptingStyle] = None
 
     system_prompt_pipe_jinja2: Optional[PipeJinja2] = None
@@ -85,7 +69,6 @@ class PipeLLMPrompt(PipeOperator):
             )
         return self
 
-    @override
     def validate_with_libraries(self):
         if self.user_prompt_verbatim_name:
             get_template(template_name=self.user_prompt_verbatim_name)
@@ -97,29 +80,6 @@ class PipeLLMPrompt(PipeOperator):
         if self.system_prompt_pipe_jinja2:
             self.system_prompt_pipe_jinja2.validate_with_libraries()
 
-    @override
-    def needed_inputs(self) -> PipeInputSpec:
-        conceptless_required_variables: Set[str] = set()
-        if self.user_pipe_jinja2:
-            conceptless_required_variables.update(self.user_pipe_jinja2.required_variables())
-        if self.system_prompt_pipe_jinja2:
-            conceptless_required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
-
-        pipe_input_spec = PipeInputSpecFactory.make_empty()
-        for conceptless_required_variable in conceptless_required_variables:
-            if conceptless_required_variable.startswith("_"):
-                # variables starting with _ are run parameters, not inputs
-                continue
-            pipe_input_spec.add_requirement(
-                variable_name=conceptless_required_variable,
-                concept=ConceptFactory.make_native_concept(
-                    native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.ANYTHING],
-                ),
-            )
-
-        return pipe_input_spec
-
-    @override
     def required_variables(self) -> Set[str]:
         required_variables: Set[str] = set()
         if self.user_pipe_jinja2:
@@ -131,14 +91,14 @@ class PipeLLMPrompt(PipeOperator):
             required_variables.update(user_images_top_object_name)
         return required_variables
 
-    @override
-    async def _run_operator_pipe(
+    async def make_llm_prompt(
         self,
+        output_concept_string: str,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
-    ) -> PipeLLMPromptOutput:
+    ) -> LLMPrompt:
         if pipe_run_params.is_multiple_output_required:
             raise PipeRunParamsError(
                 f"PipeLLMPrompt does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
@@ -180,17 +140,17 @@ class PipeLLMPrompt(PipeOperator):
 
         # Append output structure prompt if needed
         if pipe_run_params.dynamic_output_concept_code:
-            user_text += PipeLLMPrompt.get_output_structure_prompt(
-                output_concept=get_concept_provider().get_required_concept(concept_string=pipe_run_params.dynamic_output_concept_code),
+            user_text += LLMPromptBlueprint.get_output_structure_prompt(
+                concept_string=pipe_run_params.dynamic_output_concept_code,
                 is_with_preliminary_text=pipe_run_params.is_with_preliminary_text or False,
             )
         else:
-            user_text += PipeLLMPrompt.get_output_structure_prompt(
-                output_concept=self.output,
+            user_text += LLMPromptBlueprint.get_output_structure_prompt(
+                concept_string=output_concept_string,
                 is_with_preliminary_text=pipe_run_params.is_with_preliminary_text or False,
             )
 
-        log.verbose(f"User text with {self.output.code=}:\n {user_text}")
+        log.verbose(f"User text with {output_concept_string=}:\n {user_text}")
 
         ############################################################
         # System text
@@ -207,47 +167,18 @@ class PipeLLMPrompt(PipeOperator):
         ############################################################
         # Full LLMPrompt
         ############################################################
-        llm_prompt = LLMPromptContent(
+        llm_prompt = LLMPrompt(
             system_text=system_text,
             user_text=user_text,
             user_images=prompt_user_images,
         )
 
-        output_stuff = StuffFactory.make_stuff(
-            name=output_name,
-            concept=self.output,
-            content=llm_prompt,
-        )
-
-        working_memory.set_new_main_stuff(
-            stuff=output_stuff,
-            name=output_name,
-        )
-
-        pipe_output = PipeLLMPromptOutput(
-            working_memory=working_memory,
-            pipeline_run_id=job_metadata.pipeline_run_id,
-        )
-        return pipe_output
-
-    @override
-    async def _dry_run_operator_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: Optional[PipeRunParams] = None,
-        output_name: Optional[str] = None,
-    ) -> PipeOutput:
-        return await self._run_operator_pipe(
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
-            output_name=output_name,
-        )
+        return llm_prompt
 
     @staticmethod
-    def get_output_structure_prompt(output_concept: Concept, is_with_preliminary_text: bool) -> str:
-        class_name = output_concept.structure_class_name
+    def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str:
+        concept = get_required_concept(concept_string=concept_string)
+        class_name = concept.structure_class_name
         output_class = get_class_registry().get_class(class_name)
         if not output_class:
             return ""

@@ -13,9 +13,9 @@ from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider, get_optional_domain
+from pipelex.pipe_operators.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint, PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm import PipeLLM, StructuringMethod
-from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
 from pipelex.tools.templating.template_provider_abstract import TemplateNotFoundError
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
@@ -150,12 +150,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 if get_concept_provider().is_image_concept(concept=concept):
                     user_images.append(stuff_name)
 
-        pipe_llm_prompt = PipeLLMPrompt(
-            code="adhoc_for_pipe_llm_prompt",
-            domain=domain,
-            inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
-            ),
+        llm_prompt_blueprint = LLMPromptBlueprint(
             system_prompt_pipe_jinja2=system_prompt_pipe_jinja2,
             system_prompt_verbatim_name=pipe_blueprint.system_prompt_name,
             system_prompt=pipe_blueprint.system_prompt or system_prompt,
@@ -192,7 +187,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
             ),
-            pipe_llm_prompt=pipe_llm_prompt,
+            llm_prompt_blueprint=llm_prompt_blueprint,
             llm_choices=llm_choices,
             structuring_method=pipe_blueprint.structuring_method,
             prompt_template_to_structure=pipe_blueprint.prompt_template_to_structure,

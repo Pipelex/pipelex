@@ -399,10 +399,6 @@ class StructuredContent(StuffContent):
         return convert_to_markdown(data=dict_dump, level=level, is_pretty=is_pretty)
 
 
-class LLMPromptContent(StructuredContent, LLMPrompt):
-    pass
-
-
 class ListContent(StuffContent, Generic[StuffContentType]):
     items: List[StuffContentType]
 
