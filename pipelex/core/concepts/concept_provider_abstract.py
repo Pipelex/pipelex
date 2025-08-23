@@ -25,11 +25,11 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_required_concept(self, concept_string: str, domain: Optional[str] = None) -> Concept:
+    def get_required_concept(self, concept_string: str) -> Concept:
         pass
 
     @abstractmethod
-    def is_compatible(self, tested_concept: Concept, wanted_concept: Concept) -> bool:
+    def is_compatible(self, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
         pass
 
     @abstractmethod

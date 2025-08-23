@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set, cast
+from typing import Dict, List, Optional, Set, Union, cast
 
 import shortuuid
 from pydantic import model_validator
@@ -213,10 +213,10 @@ class PipeCondition(PipeController):
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
 
         # Convert PipeInputSpec to blueprint format
-        inputs_blueprint: Dict[str, InputRequirementBlueprint] = {}
+        inputs_blueprint: Dict[str, Union[str, InputRequirementBlueprint]] = {}
         for var_name, requirement in self.inputs.root.items():
             inputs_blueprint[var_name] = InputRequirementBlueprint(
-                concept_code=requirement.concept.code,
+                concept_string_or_concept_code=requirement.concept.concept_string,
                 multiplicity=requirement.multiplicity,
             )
 

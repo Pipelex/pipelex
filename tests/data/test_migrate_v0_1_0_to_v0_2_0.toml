@@ -13,7 +13,7 @@ refines = "Text"
 [concept.AnotherConcept]
 Concept = "Another concept to test migration"
 structure = "CustomStructure"
-refines = ["Text", "Document"]
+refines = "Text"
 
 [concept.AlreadyMigrated]
 definition = "This one is already migrated"

@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import Self
@@ -44,6 +44,7 @@ class SubPipeFactory:
     def make_from_blueprint(
         cls,
         blueprint: SubPipeBlueprint,
+        concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> SubPipe:
         """Create a SubPipe from a SubPipeBlueprint."""
         output_multiplicity = make_output_multiplicity(
@@ -59,4 +60,5 @@ class SubPipeFactory:
             output_name=blueprint.result,
             output_multiplicity=output_multiplicity,
             batch_params=batch_params,
+            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )

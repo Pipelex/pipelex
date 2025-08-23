@@ -5,6 +5,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -24,8 +25,8 @@ class TestPipeConditionSimple:
         # Create a PipeCondition directly in Python that requires an input
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Test condition that should fail",
-            inputs={"user_category": InputRequirementBlueprint(concept_code="test_pipe_condition.CategoryInput")},
-            output=NativeConceptEnum.TEXT.value,
+            inputs={"user_category": InputRequirementBlueprint(concept_string_or_concept_code="test_pipe_condition.CategoryInput")},
+            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
             expression_template="{{ user_category.category }}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"small": "process_small", "medium": "process_medium", "large": "process_large"}),
             default_pipe_code="process_small",
@@ -58,8 +59,8 @@ class TestPipeConditionSimple:
         # Create a PipeCondition directly in Python
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Test condition that should succeed",
-            inputs={"user_status": InputRequirementBlueprint(concept_code="test_pipe_condition.CategoryInput")},
-            output=NativeConceptEnum.TEXT.value,
+            inputs={"user_status": InputRequirementBlueprint(concept_string_or_concept_code="test_pipe_condition.CategoryInput")},
+            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
             expression_template="{{ user_status.category }}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"active": "process_small", "inactive": "process_medium", "pending": "process_large"}),
             default_pipe_code="process_small",

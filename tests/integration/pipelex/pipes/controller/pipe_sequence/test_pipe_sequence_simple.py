@@ -30,19 +30,20 @@ class TestPipeSequenceSimple:
         """Test PipeSequence with a simple 2-step text transformation scenario."""
         domain = "test_integration"
         concept_1 = ConceptFactory.make_from_blueprint(
-            concept_code="TestConcept1", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum")
-        )
-        concept_2 = ConceptFactory.make_from_blueprint(
-            concept_code="TestConcept2", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+            concept_code="TestConcept1",
+            domain=domain,
+            blueprint=ConceptBlueprint(definition="Lorem Ipsum"),
+            concept_codes_from_the_same_domain=["TestConcept1"],
         )
         concept_library = get_concept_provider()
-        concept_library.add_concepts([concept_1, concept_2])
+        concept_library.add_concepts([concept_1])
+        concept_2 = concept_library.get_native_concept(native_concept=NativeConceptEnum.TEXT)
 
         # Create PipeSequence instance - pipes are loaded from TOML files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             definition="Simple sequence for text processing",
-            inputs={"input_text": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}")},
-            output=f"{domain}.{concept_2.code}",
+            inputs={"input_text": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string)},
+            output=concept_2.concept_string,
             steps=[
                 SubPipeBlueprint(pipe="capitalize_text", result="capitalized_text"),
                 SubPipeBlueprint(pipe="add_prefix", result="final_text"),

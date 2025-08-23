@@ -1,16 +1,12 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
-from pydantic import BaseModel, model_validator
-from typing_extensions import Self
+from pydantic import BaseModel, field_validator
 
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import StrEnum
-
-
-class PipeBlueprintError(Exception):
-    """Exception raised for errors in the PipeBlueprint class."""
-
-    pass
 
 
 class AllowedPipeTypes(StrEnum):
@@ -36,13 +32,24 @@ class PipeBlueprint(BaseModel):
 
     type: Any  # TODO: Find a better way to handle this.
     definition: Optional[str] = None
-    inputs: Optional[Dict[str, InputRequirementBlueprint]] = None
-    output: str
+    inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
+    output: str  # concept_string_or_concept_code
 
-    @model_validator(mode="after")
-    def validate_pipe_type(self) -> Self:
+    @field_validator("type", mode="after")
+    def validate_pipe_type(cls, value: Any) -> Any:
         """Validate that the pipe type is one of the allowed values."""
         allowed_types = [_type.value for _type in AllowedPipeTypes]
-        if self.type not in allowed_types:
-            raise PipeBlueprintError(f"Invalid pipe type '{self.type}'. Must be one of: {sorted(allowed_types)}")
-        return self
+        if value not in allowed_types:
+            raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {sorted(allowed_types)}")
+        return value
+
+    @field_validator("output", mode="before")
+    def validate_concept_string_or_concept_code(cls, output: str) -> str:
+        ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=output)
+        return output
+
+    @classmethod
+    def validate_pipe_code_syntax(cls, pipe_code: str) -> str:
+        if not is_snake_case(pipe_code):
+            raise PipeBlueprintError(f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case.")
+        return pipe_code

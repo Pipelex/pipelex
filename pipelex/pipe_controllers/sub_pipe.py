@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -19,6 +19,7 @@ class SubPipe(BaseModel):
     output_name: Optional[str] = None
     output_multiplicity: Optional[PipeOutputMultiplicity] = None
     batch_params: Optional[BatchParams] = None
+    concept_codes_from_the_same_domain: Optional[List[str]] = None
 
     async def run_pipe(
         self,
@@ -58,7 +59,7 @@ class SubPipe(BaseModel):
                 # inputs should be of type: Dict[str, InputRequirementBlueprint]
                 inputs={
                     batch_params.input_item_stuff_name: InputRequirementBlueprint(
-                        concept_code=sub_pipe.inputs.root[batch_params.input_item_stuff_name].concept.code
+                        concept_string_or_concept_code=sub_pipe.inputs.root[batch_params.input_item_stuff_name].concept.concept_string
                     ),
                 },
             )
@@ -67,6 +68,7 @@ class SubPipe(BaseModel):
                 domain=sub_pipe.domain,
                 pipe_code=self.pipe_code,
                 pipe_blueprint=pipe_batch_blueprint,
+                concept_codes_from_the_same_domain=self.concept_codes_from_the_same_domain,
             )
             # This is the only line that changes between run and dry_run
             if sub_pipe_run_params.run_mode == PipeRunMode.DRY:

@@ -26,7 +26,12 @@ class TestPipeOCR:
     @pytest.fixture(scope="class", autouse=True)
     def setup(self):
         concept_provider = get_concept_provider()
-        concept_1 = ConceptFactory.make_from_blueprint(concept_code="PageScan", domain="ocr", blueprint=ConceptBlueprint(definition="Lorem Ipsum"))
+        concept_1 = ConceptFactory.make_from_blueprint(
+            concept_code="PageScan",
+            domain="ocr",
+            blueprint=ConceptBlueprint(definition="Lorem Ipsum"),
+            concept_codes_from_the_same_domain=["PageScan"],
+        )
         concept_provider.add_new_concept(concept=concept_1)
 
         yield
@@ -40,10 +45,9 @@ class TestPipeOCR:
         image_url: str,
         setup: Any,
     ):
-        concept_1 = get_concept_provider().get_required_concept(concept_string="ocr.PageScan")
         pipe_ocr_blueprint = PipeOcrBlueprint(
             definition="OCR test for image processing",
-            inputs={"page_scan": InputRequirementBlueprint(concept_code=NativeConceptEnum.IMAGE.value)},
+            inputs={"page_scan": InputRequirementBlueprint(concept_string_or_concept_code=NativeConceptEnum.IMAGE.value)},
             output=NativeConceptEnum.TEXT_AND_IMAGES.value,
             page_images=True,
             page_image_captions=False,
@@ -60,7 +64,6 @@ class TestPipeOCR:
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_image(
                 image_url=image_url,
-                concept_code=concept_1.concept_string,
                 name="page_scan",
             ),
         )
@@ -78,7 +81,7 @@ class TestPipeOCR:
     ):
         pipe_ocr_blueprint = PipeOcrBlueprint(
             definition="OCR test for PDF processing",
-            inputs={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=NativeConceptEnum.PDF.value)},
+            inputs={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_string_or_concept_code=NativeConceptEnum.PDF.value)},
             output=NativeConceptEnum.TEXT_AND_IMAGES.value,
             page_images=True,
             page_image_captions=False,
@@ -95,7 +98,6 @@ class TestPipeOCR:
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_pdf(
                 pdf_url=pdf_url,
-                concept_code=NativeConceptEnum.PDF.value,
                 name=PIPE_OCR_INPUT_NAME,
             ),
         )

@@ -44,7 +44,7 @@ class TestPipeSequenceDryRun:
             concept=ConceptFactory.make(
                 concept_code="DiscordChannelUpdate",
                 domain="discord_newsletter",
-                definition="discord_newsletter.DiscordChannelUpdate",
+                definition="Lorem Ipsum",
                 structure_class_name="DiscordChannelUpdate",
             ),
             content=discord_channel_updates,
@@ -53,7 +53,6 @@ class TestPipeSequenceDryRun:
 
         # Create working memory with the discord channel updates
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=discord_updates_stuff)
-
         # Run the Discord newsletter pipeline in dry run mode
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="write_discord_newsletter",
@@ -73,10 +72,8 @@ class TestPipeSequenceDryRun:
 
         # The pipeline only has one step (summarization), so the final output is ChannelSummary
         # This test is focused on verifying that batching works correctly in dry run mode
-        assert pipe_output.main_stuff.concept.code == "ChannelSummary"
+        assert pipe_output.main_stuff.concept.code == "HtmlNewsletter"
         assert pipe_output.main_stuff.concept.domain == "discord_newsletter"
-        if pipe_run_mode == PipeRunMode.DRY:
-            assert isinstance(pipe_output.main_stuff.content, ListContent)
 
         # Verify working memory structure
         final_working_memory: WorkingMemory = pipe_output.working_memory

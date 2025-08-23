@@ -1,10 +1,11 @@
 from typing import Any, Dict, List, Optional, Type, cast
 
 import shortuuid
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 
 from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.stuffs.stuff import Stuff
@@ -24,8 +25,13 @@ class StuffFactoryError(PipelexError):
 
 class StuffBlueprint(BaseModel):
     stuff_name: str
-    concept_code: str
+    concept_string: str
     content: Dict[str, Any] | str
+
+    @field_validator("concept_string")
+    def validate_concept_string(cls, concept_string: str) -> str:
+        ConceptBlueprint.validate_concept_string(concept_string)
+        return concept_string
 
 
 class StuffFactory:
@@ -70,30 +76,27 @@ class StuffFactory:
 
     @classmethod
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
-        if isinstance(blueprint.content, str) and get_concept_provider().is_compatible(
-            tested_concept=get_concept_provider().get_required_concept(concept_string=blueprint.concept_code),
-            wanted_concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.TEXT),
+        concept_library = get_concept_provider()
+        if isinstance(blueprint.content, str) and concept_library.is_compatible(
+            tested_concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
+            wanted_concept=concept_library.get_native_concept(native_concept=NativeConceptEnum.TEXT),
         ):
             the_stuff = cls.make_stuff(
-                concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+                concept=concept_library.get_native_concept(native_concept=NativeConceptEnum.TEXT),
                 content=TextContent(text=blueprint.content),
                 name=blueprint.stuff_name,
             )
         else:
             the_stuff_content = StuffContentFactory.make_stuff_content_from_concept_required(
-                concept=get_concept_provider().get_required_concept(concept_string=blueprint.concept_code),
+                concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
                 value=blueprint.content,
             )
             the_stuff = cls.make_stuff(
-                concept=get_concept_provider().get_required_concept(concept_string=blueprint.concept_code),
+                concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
                 content=the_stuff_content,
                 name=blueprint.stuff_name,
             )
         return the_stuff
-
-    @classmethod
-    def make_from_blueprint_dict(cls, blueprint: StuffBlueprint) -> "Stuff":
-        return cls.make_from_blueprint(blueprint=blueprint)
 
     @classmethod
     def combine_stuffs(
@@ -195,8 +198,21 @@ class StuffFactory:
                 if not concept_code:
                     raise StuffFactoryError("Stuff content data dict is badly formed: no concept code")
                 content_value = stuff_content_dict["content"]
+                if ConceptBlueprint.is_native_concept_string_or_concept_code(concept_string_or_concept_code=concept_code):
+                    concept = ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum(concept_code)])
+                    content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
+                        concept=concept,
+                        value=content_value,
+                    )
+                    return StuffFactory.make_stuff(
+                        concept=concept,
+                        name=name,
+                        content=content,
+                        code=stuff_code,
+                    )
             except KeyError as exc:
                 raise StuffFactoryError(f"Stuff content data dict is badly formed: {exc}") from exc
+
             if isinstance(content_value, StuffContent):
                 return StuffFactory.make_stuff(
                     concept=get_concept_provider().get_required_concept(concept_string=concept_code),

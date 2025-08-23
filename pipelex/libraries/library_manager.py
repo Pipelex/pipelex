@@ -194,11 +194,13 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[Concept]:
         """Create Concepts from blueprint."""
         concepts: List[Concept] = []
+
         if blueprint.concept is not None:
             for concept_code, concept_blueprint_or_str in blueprint.concept.items():
                 concept = ConceptFactory.make_from_blueprint(
                     domain=blueprint.domain,
                     concept_code=concept_code,
+                    concept_codes_from_the_same_domain=list(blueprint.concept.keys()),
                     blueprint=ConceptBlueprint(definition=concept_blueprint_or_str)
                     if isinstance(concept_blueprint_or_str, str)
                     else concept_blueprint_or_str,
@@ -215,6 +217,7 @@ class LibraryManager(LibraryManagerAbstract):
                     domain=blueprint.domain,
                     pipe_code=pipe_name,
                     pipe_blueprint=pipe_blueprint,
+                    concept_codes_from_the_same_domain=list(blueprint.concept.keys()) if blueprint.concept else None,
                 )
                 pipes.append(pipe)
         return pipes

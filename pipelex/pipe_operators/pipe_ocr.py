@@ -74,12 +74,14 @@ class PipeOcr(PipeOperator):
             if concept_provider.is_compatible(
                 tested_concept=requirement.concept,
                 wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+                strict=True,
             ):
                 self.image_stuff_name = input_name
                 candidate_prompt_var_names.append(input_name)
             elif concept_provider.is_compatible(
                 tested_concept=requirement.concept,
                 wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.PDF),
+                strict=True,
             ):
                 self.pdf_stuff_name = input_name
                 candidate_prompt_var_names.append(input_name)
@@ -134,7 +136,11 @@ class PipeOcr(PipeOperator):
     def needed_inputs(self) -> PipeInputSpec:
         return PipeInputSpecFactory.make_from_blueprint(
             domain=self.domain,
-            blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_code=self.inputs.root[PIPE_OCR_INPUT_NAME].concept.code)},
+            blueprint={
+                PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(
+                    concept_string_or_concept_code=self.inputs.root[PIPE_OCR_INPUT_NAME].concept.concept_string
+                )
+            },
         )
 
     @override
@@ -151,7 +157,6 @@ class PipeOcr(PipeOperator):
         image_uri: Optional[str] = None
         pdf_uri: Optional[str] = None
         if self.image_stuff_name:
-            print("jdoisjqqodjo", self.image_stuff_name)
             image_stuff = working_memory.get_stuff_as_image(name=self.image_stuff_name)
             image_uri = image_stuff.url
         elif self.pdf_stuff_name:

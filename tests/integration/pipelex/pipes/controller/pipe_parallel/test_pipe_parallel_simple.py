@@ -30,8 +30,10 @@ class TestPipeParallelSimple:
         # Create PipeParallel instance - pipes are loaded from TOML files
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel text analysis pipeline",
-            inputs={"input_text": InputRequirementBlueprint(concept_code=NativeConceptEnum.TEXT.value)},
-            output=NativeConceptEnum.TEXT.value,
+            inputs={
+                "input_text": InputRequirementBlueprint(concept_string_or_concept_code=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")
+            },
+            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
             parallels=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),
@@ -146,8 +148,10 @@ class TestPipeParallelSimple:
         # Create PipeParallel instance
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel text analysis pipeline for short text",
-            inputs={"input_text": InputRequirementBlueprint(concept_code=NativeConceptEnum.TEXT.value)},
-            output=NativeConceptEnum.TEXT.value,
+            inputs={
+                "input_text": InputRequirementBlueprint(concept_string_or_concept_code=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")
+            },
+            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
             parallels=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),

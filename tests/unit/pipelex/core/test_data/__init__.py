@@ -39,7 +39,7 @@ class InterpreterTestCases:
         *PIPE_FUNC_TEST_CASES,
         *PIPE_IMG_GEN_TEST_CASES,
         *PIPE_JINJA2_TEST_CASES,
-        # Pipe controller tests
+        # # Pipe controller tests
         *PIPE_SEQUENCE_TEST_CASES,
         *PIPE_CONDITION_TEST_CASES,
         *PIPE_PARALLEL_TEST_CASES,

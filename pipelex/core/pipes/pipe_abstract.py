@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Set, Type
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
@@ -21,7 +22,10 @@ class PipeAbstract(ABC, BaseModel):
     inputs: PipeInputSpec = Field(default_factory=PipeInputSpec)
     output: Concept
 
-    # TODO: Add validaiton of pipe code. (snake_case ? )
+    @field_validator("code", mode="before")
+    def validate_pipe_code_syntax(cls, code: str) -> str:
+        PipeBlueprint.validate_pipe_code_syntax(pipe_code=code)
+        return code
 
     @property
     def class_name(self) -> str:

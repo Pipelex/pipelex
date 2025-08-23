@@ -1,0 +1,2 @@
+class PipelexBundleBlueprintError(Exception):
+    pass

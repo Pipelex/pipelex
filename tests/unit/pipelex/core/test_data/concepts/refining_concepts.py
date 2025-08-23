@@ -14,7 +14,7 @@ Concept2 = "A concept2"
 
 [concept.Concept3]
 definition = "A concept3"
-refines = "Concept2"
+refines = "Image"
 """,
     PipelexBundleBlueprint(
         domain="refining_concepts",
@@ -22,7 +22,7 @@ refines = "Concept2"
         concept={
             "Concept1": "A concept1",
             "Concept2": "A concept2",
-            "Concept3": ConceptBlueprint(definition="A concept3", refines="Concept2"),
+            "Concept3": ConceptBlueprint(definition="A concept3", refines="Image"),
         },
     ),
 )

@@ -4,9 +4,11 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
@@ -63,6 +65,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         domain: str,
         pipe_code: str,
         pipe_blueprint: PipeLLMBlueprint,
+        concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeLLM:
         system_prompt_pipe_jinja2 = None
         system_prompt: Optional[str] = None
@@ -79,6 +82,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     domain=domain,
                     pipe_code="adhoc_for_system_prompt",
                     pipe_blueprint=system_prompt_jinja2_blueprint,
+                    concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
                 )
             except Jinja2TemplateError as exc:
                 error_msg = f"Jinja2 template error in system prompt for pipe '{pipe_code}' in domain '{domain}': {exc}."
@@ -99,7 +103,9 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     domain=domain,
                     template_str=pipe_blueprint.prompt_template,
                     template_name=pipe_blueprint.template_name,
-                    inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
+                    inputs=PipeInputSpecFactory.make_from_blueprint(
+                        domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+                    ),
                 )
             except Jinja2TemplateError as exc:
                 error_msg = f"Jinja2 syntax error in user prompt for pipe '{pipe_code}' in domain '{domain}': {exc}."
@@ -129,8 +135,17 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         user_images: List[str] = []
         if pipe_blueprint.inputs:
             for stuff_name, requirement in pipe_blueprint.inputs.items():
-                concept_code = requirement.concept_code
-                concept = get_concept_provider().get_required_concept(concept_string=concept_code, domain=domain)
+                if isinstance(requirement, str):
+                    requirement = InputRequirementBlueprint(concept_string_or_concept_code=requirement)
+                concept_string_or_concept_code = requirement.concept_string_or_concept_code
+                concept_domain, concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+                    domain=domain,
+                    concept_string_or_concept_code=concept_string_or_concept_code,
+                    concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+                )
+                concept = get_concept_provider().get_required_concept(
+                    concept_string=ConceptFactory.construct_concept_string_with_domain(domain=concept_domain, concept_code=concept_code)
+                )
 
                 if get_concept_provider().is_image_concept(concept=concept):
                     user_images.append(stuff_name)
@@ -138,7 +153,9 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         pipe_llm_prompt = PipeLLMPrompt(
             code="adhoc_for_pipe_llm_prompt",
             domain=domain,
-            inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
+            inputs=PipeInputSpecFactory.make_from_blueprint(
+                domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+            ),
             system_prompt_pipe_jinja2=system_prompt_pipe_jinja2,
             system_prompt_verbatim_name=pipe_blueprint.system_prompt_name,
             system_prompt=pipe_blueprint.system_prompt or system_prompt,
@@ -160,12 +177,21 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             multiple_output=pipe_blueprint.multiple_output,
         )
 
+        output_concept_domain, output_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+            domain=domain,
+            concept_string_or_concept_code=pipe_blueprint.output,
+            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+        )
         return PipeLLM(
             domain=domain,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
-            output=get_concept_provider().get_required_concept(concept_string=pipe_blueprint.output, domain=domain),
+            inputs=PipeInputSpecFactory.make_from_blueprint(
+                domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+            ),
+            output=get_concept_provider().get_required_concept(
+                concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
+            ),
             pipe_llm_prompt=pipe_llm_prompt,
             llm_choices=llm_choices,
             structuring_method=pipe_blueprint.structuring_method,

@@ -12,18 +12,24 @@ class TestPipeSequenceValidation:
         """Test basic PipeSequence creation"""
         domain = "test_domain"
         concept_1 = ConceptFactory.make_from_blueprint(
-            concept_code="TestConcept", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+            concept_code="TestConcept",
+            domain=domain,
+            blueprint=ConceptBlueprint(definition="Lorem Ipsum"),
+            concept_codes_from_the_same_domain=["TestConcept"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
-            concept_code="ProcessedText", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+            concept_code="ProcessedText",
+            domain=domain,
+            blueprint=ConceptBlueprint(definition="Lorem Ipsum"),
+            concept_codes_from_the_same_domain=["ProcessedText"],
         )
         concept_library = get_concept_provider()
         concept_library.add_concepts([concept_1, concept_2])
 
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             definition="Test sequence for validation",
-            inputs={"text": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}")},
-            output=f"{domain}.{concept_2.code}",
+            inputs={"text": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string)},
+            output=concept_2.concept_string,
             steps=[SubPipeBlueprint(pipe="test_pipe_1", result="intermediate_result")],
         )
 
@@ -45,18 +51,24 @@ class TestPipeSequenceValidation:
         """Test PipeSequence with multiple sequential sub-pipes"""
         domain = "test_domain"
         concept_1 = ConceptFactory.make_from_blueprint(
-            concept_code="TestConcept", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+            concept_code="TestConcept",
+            domain=domain,
+            blueprint=ConceptBlueprint(definition="Lorem Ipsum"),
+            concept_codes_from_the_same_domain=["TestConcept"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
-            concept_code="ProcessedText", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+            concept_code="ProcessedText",
+            domain=domain,
+            blueprint=ConceptBlueprint(definition="Lorem Ipsum"),
+            concept_codes_from_the_same_domain=["ProcessedText"],
         )
         concept_library = get_concept_provider()
         concept_library.add_concepts([concept_1, concept_2])
 
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             definition="Test sequence with multiple steps",
-            inputs={"initial_input": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}")},
-            output=f"{domain}.{concept_2.code}",
+            inputs={"initial_input": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string)},
+            output=concept_2.concept_string,
             steps=[SubPipeBlueprint(pipe="step_1", result="intermediate"), SubPipeBlueprint(pipe="step_2", result="final_output")],
         )
 

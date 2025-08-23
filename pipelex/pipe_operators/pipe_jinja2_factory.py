@@ -1,8 +1,9 @@
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from typing_extensions import override
 
 from pipelex.config import get_config
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
@@ -33,6 +34,7 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
         domain: str,
         pipe_code: str,
         pipe_blueprint: PipeJinja2Blueprint,
+        concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeJinja2:
         preprocessed_template: Optional[str] = None
         if pipe_blueprint.jinja2:
@@ -44,12 +46,21 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
         else:
             preprocessed_template = None
 
+        output_concept_domain, output_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+            domain=domain,
+            concept_string_or_concept_code=pipe_blueprint.output,
+            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+        )
         return PipeJinja2(
             domain=domain,
             code=pipe_code,
             definition=pipe_blueprint.definition,
-            inputs=PipeInputSpecFactory.make_from_blueprint(domain=domain, blueprint=pipe_blueprint.inputs or {}),
-            output=get_concept_provider().get_required_concept(concept_string=pipe_blueprint.output, domain=domain),
+            inputs=PipeInputSpecFactory.make_from_blueprint(
+                domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+            ),
+            output=get_concept_provider().get_required_concept(
+                concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
+            ),
             jinja2_name=pipe_blueprint.jinja2_name,
             jinja2=preprocessed_template,
             prompting_style=pipe_blueprint.prompting_style,

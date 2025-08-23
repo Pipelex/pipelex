@@ -24,7 +24,7 @@ class TestConceptFactory:
         expected_result: List[str],
     ):
         """Test _make_refines method with different blueprint configurations."""
-        result = ConceptFactory.make_refines(domain="test_domain", blueprint=blueprint)
+        result = ConceptFactory.make_refines(blueprint=blueprint)
         assert result == expected_result, f"Failed for test case: {test_name}"
 
     def test_normalize_structure_blueprint(self):

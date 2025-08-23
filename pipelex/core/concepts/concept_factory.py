@@ -42,13 +42,27 @@ class ConceptFactory:
         return normalized
 
     @classmethod
-    def make(cls, concept_code: str, domain: str, definition: str, structure_class_name: str, refines: Optional[List[str]] = None) -> Concept:
+    def make_implicit_concept(cls, concept_string: str) -> Concept:
+        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
+        return Concept(
+            code=concept_string.split(".")[1],
+            domain=SpecialDomain.IMPLICIT.value,
+            definition="",
+            structure_class_name=TextContent.__name__,
+        )
+
+    @classmethod
+    def construct_concept_string_with_domain(cls, domain: str, concept_code: str) -> str:
+        return f"{domain}.{concept_code}"
+
+    @classmethod
+    def make(cls, concept_code: str, domain: str, definition: str, structure_class_name: str, refines: Optional[str] = None) -> Concept:
         return Concept(
             code=concept_code,
             domain=domain,
             definition=definition,
             structure_class_name=structure_class_name,
-            refines=refines or [],
+            refines=refines,
         )
 
     @classmethod
@@ -61,23 +75,46 @@ class ConceptFactory:
         )
 
     @classmethod
-    def make_refine(cls, domain: str, refine: str) -> str:
-        if "." not in refine:
-            if refine in [native_concept.value for native_concept in NativeConceptEnum]:
-                for native_concept in NativeConceptEnum:
-                    if native_concept.value == refine:
-                        return f"{SpecialDomain.NATIVE.value}.{refine}"
+    def make_domain_and_concept_code_from_concept_string_or_concept_code(
+        cls, domain: str, concept_string_or_concept_code: str, concept_codes_from_the_same_domain: Optional[List[str]] = None
+    ) -> List[str]:
+        from pipelex import pretty_print
+
+        if concept_string_or_concept_code == "ChannelSummary":
+            pretty_print(concept_string_or_concept_code, title="oidjsioqjdisoj")
+            pretty_print(concept_codes_from_the_same_domain, title="concept_codes_from_the_same_domain")
+            pretty_print(domain, title="domain")
+
+        # At this point, the concept_string_or_concept_code is already validated
+        if "." in concept_string_or_concept_code:
+            # Is a concept string.
+            return concept_string_or_concept_code.split(".")
+        else:
+            if concept_string_or_concept_code in [native_concept.value for native_concept in NativeConceptEnum]:  # Is a native concept code
+                return [SpecialDomain.NATIVE.value, concept_string_or_concept_code]
+
+            elif (
+                concept_codes_from_the_same_domain and concept_string_or_concept_code in concept_codes_from_the_same_domain
+            ):  # Is a concept code from the same domain
+                return [domain, concept_string_or_concept_code]
             else:
-                return f"{domain}.{refine}"
+                return [SpecialDomain.IMPLICIT.value, concept_string_or_concept_code]
+
+    @classmethod
+    def make_refine(cls, refine: str) -> str:
+        if ConceptBlueprint.is_native_concept_string_or_concept_code(concept_string_or_concept_code=refine):
+            for native_concept in NativeConceptEnum:
+                if native_concept.value == refine:
+                    return f"{SpecialDomain.NATIVE.value}.{refine}"
+        else:
+            raise ConceptFactoryError(f"Refine '{refine}' is not a native concept")
         return refine
 
     @classmethod
-    def make_refines(cls, domain: str, blueprint: ConceptBlueprint) -> List[str]:
-        if isinstance(blueprint.refines, str):
-            return [cls.make_refine(domain=domain, refine=blueprint.refines)]
-        elif isinstance(blueprint.refines, list):
-            return [cls.make_refine(domain=domain, refine=refine) for refine in blueprint.refines]
-        return []
+    def make_refines(cls, blueprint: ConceptBlueprint) -> Optional[str]:
+        if blueprint.refines:
+            return cls.make_refine(refine=blueprint.refines)
+        return None
 
     @classmethod
     def make_from_blueprint(
@@ -85,9 +122,11 @@ class ConceptFactory:
         domain: str,
         concept_code: str,
         blueprint: ConceptBlueprint,
+        concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> Concept:
+        ConceptBlueprint.validate_concept_code(concept_code=concept_code)
         structure_class_name: str
-        current_refines: List[str] = []
+        current_refine: Optional[str] = None
 
         # Handle structure definition
         if blueprint.structure:
@@ -114,9 +153,8 @@ class ConceptFactory:
                     exec_globals: Dict[str, Any] = {}
                     exec(python_code, exec_globals)
 
-                    # Get the generated class and register it
-                    generated_class = exec_globals[concept_code]
-                    get_class_registry().register_class(generated_class)
+                    # Register the generated class
+                    get_class_registry().register_class(exec_globals[concept_code])
 
                     # The structure_class_name of the concept is the concept_code
                     structure_class_name = concept_code
@@ -132,10 +170,8 @@ class ConceptFactory:
                     f"Concept '{concept_code}' in domain '{domain}' has refines but also has a structure class registered. "
                     "A concept cannot have both structure and refines."
                 )
-            # pass for now
-            current_refines = cls.make_refines(domain=domain, blueprint=blueprint)
-            structure_class_name = TextContent.__name__  # Default structure for refined concepts
-
+            current_refine = cls.make_refines(blueprint=blueprint)
+            structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
         # Handle neither structure nor refines - check the class registry
         else:
             # If there is a class, use it. structure_class_name is then the concept_code
@@ -144,13 +180,19 @@ class ConceptFactory:
             else:
                 # If there is NO class, the fallback class is TextContent.__name__
                 structure_class_name = TextContent.__name__
-                # Also add Text as a refines since we're using TextContent
-                current_refines = []
 
         return Concept(
-            code=concept_code,
-            domain=domain,
+            domain=cls.make_domain_and_concept_code_from_concept_string_or_concept_code(
+                domain=domain,
+                concept_string_or_concept_code=concept_code,
+                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+            )[0],
+            code=cls.make_domain_and_concept_code_from_concept_string_or_concept_code(
+                domain=domain,
+                concept_string_or_concept_code=concept_code,
+                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+            )[1],
             definition=blueprint.definition,
             structure_class_name=structure_class_name,
-            refines=current_refines,
+            refines=current_refine,
         )

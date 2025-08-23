@@ -4,6 +4,7 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
@@ -66,8 +67,8 @@ class TestPipeLLM:
             working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
             pipe_llm_blueprint = PipeLLMBlueprint(
                 definition="LLM test for image processing with attributes",
-                inputs={stuff_name: InputRequirementBlueprint(concept_code=stuff.concept.code)},
-                output=NativeConceptEnum.TEXT.value,
+                inputs={stuff_name: InputRequirementBlueprint(concept_string_or_concept_code=stuff.concept.concept_string)},
+                output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,
             )

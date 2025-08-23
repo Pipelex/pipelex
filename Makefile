@@ -74,6 +74,7 @@ make test-with-prints         - Run tests with prints (no inference)
 make tp                       - Shorthand -> test-with-prints
 make test-inference           - Run unit tests only for inference (with prints)
 make ti                       - Shorthand -> test-inference
+make tip                      - Shorthand -> test-inference-with-prints (parallelized inference tests)
 make test-ocr                 - Run unit tests only for ocr (with prints)
 make to                       - Shorthand -> test-ocr
 make test-imgg                - Run unit tests only for imgg (with prints)

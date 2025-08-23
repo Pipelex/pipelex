@@ -4,6 +4,7 @@ from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
@@ -21,9 +22,10 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     def validate_with_libraries(self):
         """Validates that the each refine concept code in the refines array of each concept in the library exists in the library"""
         for concept in self.root.values():
-            for refine in concept.refines:
-                if refine not in self.root.keys():
-                    raise ConceptLibraryError(f"Concept '{concept.code}' refines '{refine}' but no concept with the code '{refine}' exists")
+            if concept.refines and concept.refines not in self.root.keys():
+                raise ConceptLibraryError(
+                    f"Concept '{concept.code}' refines '{concept.refines}' but no concept with the code '{concept.refines}' exists"
+                )
 
     @override
     def setup(self):
@@ -76,28 +78,21 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
             self.add_new_concept(concept=concept)
 
     @override
-    def is_compatible(self, tested_concept: Concept, wanted_concept: Concept) -> bool:
-        if Concept.are_concept_compatible(concept_1=tested_concept, concept_2=wanted_concept):
+    def is_compatible(self, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
+        if Concept.are_concept_compatible(concept_1=tested_concept, concept_2=wanted_concept, strict=strict):
             return True
-        # Loop
         return False
 
     @override
-    def get_required_concept(self, concept_string: str, domain: Optional[str] = None) -> Concept:
+    def get_required_concept(self, concept_string: str) -> Concept:
         """
         `concept_string` can have the domain or not. If it doesn't have the domain, it is assumed to be native.
         If it is not native and doesnt have a domain, it should raise an error
         """
-        concept: Concept
-        if "." not in concept_string:
-            if Concept.is_native_concept_code(concept_code=concept_string):
-                concept = self.get_native_concept(native_concept=NativeConceptEnum(concept_string))
-            elif domain:
-                concept = self.root[Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_string)]
-            else:
-                raise ConceptLibraryError(f"Concept code '{concept_string}' cannot be found in the library without a domain or being native")
-        else:
-            concept = self.root[concept_string]
+        if Concept.is_implicit_concept(concept_string=concept_string):
+            return ConceptFactory.make_implicit_concept(concept_string=concept_string)
+        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
+        concept = self.root[concept_string]
         return concept
 
     @override
@@ -114,13 +109,15 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         """
         pydantic_model = self.get_class(concept_code=concept.structure_class_name)
         is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
-        refines_image = self.is_compatible(tested_concept=concept, wanted_concept=self.get_native_concept(native_concept=NativeConceptEnum.IMAGE))
+        refines_image = self.is_compatible(
+            tested_concept=concept, wanted_concept=self.get_native_concept(native_concept=NativeConceptEnum.IMAGE), strict=True
+        )
         return is_image_class or refines_image
 
     @override
     def search_for_concept_in_domains(self, concept_name: str, search_domains: List[str]) -> Optional[Concept]:
         for domain in search_domains:
-            concept_code = Concept.construct_concept_string_with_domain(domain=domain, concept_code=concept_name)
+            concept_code = ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_name)
             if found_concept := self.get_required_concept(concept_string=concept_code):
                 return found_concept
 

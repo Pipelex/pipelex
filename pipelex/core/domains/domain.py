@@ -27,7 +27,7 @@ class DomainBlueprint(BaseModel):
     def validate_domain_code(code: str) -> None:
         """Validate that a domain code follows snake_case convention."""
         if not is_snake_case(code):
-            raise DomainError(f"Domain code must be snake_case (lowercase letters, numbers, and underscores only) for domain '{code}'")
+            raise DomainError(f"Domain code '{code}' must be snake_case (lowercase letters, numbers, and underscores only)")
 
 
 class Domain(BaseModel):

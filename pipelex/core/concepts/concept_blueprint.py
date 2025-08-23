@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from typing_extensions import Self
 
 from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptStringOrConceptCodeError
 from pipelex.core.domains.domain import DomainBlueprint, SpecialDomain
 from pipelex.tools.misc.string_utils import is_pascal_case
 from pipelex.types import StrEnum
@@ -66,57 +67,101 @@ class ConceptBlueprint(BaseModel):
 
     definition: str
     structure: Optional[Union[str, Dict[str, ConceptStructureBlueprintType]]] = None
-    refines: Optional[Union[str, List[str]]] = Field(default_factory=list)
+    refines: Optional[str] = None
 
-    @staticmethod
-    def validate_concept_code(concept_code: str) -> None:
-        """Validate that a concept code follows PascalCase convention."""
-        if not is_pascal_case(concept_code):
-            raise ConceptBlueprintError(
-                f"Concept code must be PascalCase (letters and numbers only, starting with uppercase) for concept code '{concept_code}'"
-            )
-
-    @staticmethod
-    def validate_single_refine(refine: str) -> None:
-        """Validate a single refine string, handling domain-qualified concept codes."""
-        if "." in refine:
-            # Count dots - there should be exactly one
-            dot_count = refine.count(".")
-            if dot_count != 1:
-                raise ConceptBlueprintError(f"Refine with domain qualification must have exactly one dot, got {dot_count} dots in '{refine}'")
-
-            # Split into domain and concept parts
-            domain_part, concept_part = refine.split(".", 1)
-
-            # Special case for native concepts
-            if domain_part.lower() == SpecialDomain.NATIVE.value:
-                # Check if the concept is a valid native concept
-                valid_native_concepts = [native_concept.value for native_concept in NativeConceptEnum]
-                if concept_part not in valid_native_concepts:
-                    raise ConceptBlueprintError(
-                        f"Invalid native concept '{concept_part}' in refine '{refine}'. Valid native concepts are: {valid_native_concepts}"
-                    )
-            else:
-                # Validate domain part (should be snake_case)
-                DomainBlueprint.validate_domain_code(domain_part)
-
-                # Validate concept part (should be PascalCase)
-                ConceptBlueprint.validate_concept_code(concept_part)
-        else:
-            # No dot, just validate as PascalCase concept code
-            ConceptBlueprint.validate_concept_code(refine)
-
-    @field_validator("refines", mode="after")
     @classmethod
-    def validate_refines(cls, refines: Union[str, List[str]]) -> Union[str, List[str]]:
-        if isinstance(refines, str):
-            cls.validate_single_refine(refines)
+    def is_native_concept_code(cls, concept_code: str) -> bool:
+        ConceptBlueprint.validate_concept_code(concept_code=concept_code)
+        return concept_code in [native_concept.value for native_concept in NativeConceptEnum]
+
+    @classmethod
+    def is_native_concept_string_or_concept_code(cls, concept_string_or_concept_code: str) -> bool:
+        if "." in concept_string_or_concept_code:
+            domain, concept_code = concept_string_or_concept_code.split(".", 1)
+            if domain == SpecialDomain.NATIVE.value and concept_code in [native_concept.value for native_concept in NativeConceptEnum]:
+                return True
         else:
-            for refine in refines:
-                cls.validate_single_refine(refine)
+            if concept_string_or_concept_code in [native_concept.value for native_concept in NativeConceptEnum]:
+                return True
+        return False
+
+    @classmethod
+    def validate_concept_code(cls, concept_code: str) -> None:
+        if not is_pascal_case(concept_code):
+            raise ConceptCodeError(code=concept_code)
+
+    @classmethod
+    def validate_concept_string_or_concept_code(cls, concept_string_or_concept_code: str) -> None:
+        if concept_string_or_concept_code.count(".") > 1:
+            raise ConceptStringOrConceptCodeError(concept_string_or_concept_code=concept_string_or_concept_code)
+
+        elif concept_string_or_concept_code.count(".") == 1:
+            domain, concept_code = concept_string_or_concept_code.split(".")
+            DomainBlueprint.validate_domain_code(code=domain)
+            cls.validate_concept_code(concept_code=concept_code)
+        else:
+            cls.validate_concept_code(concept_code=concept_string_or_concept_code)
+
+    @staticmethod
+    def validate_concept_string(concept_string: str) -> None:
+        """Validate that a concept code follows PascalCase convention."""
+        if "." not in concept_string:
+            raise ConceptStringError(concept_string)
+        elif concept_string.count(".") > 1:
+            raise ConceptStringError(concept_string)
+        else:
+            domain, concept_code = concept_string.split(".", 1)
+
+        # Validate domain
+        DomainBlueprint.validate_domain_code(domain)
+
+        # Validate concept code
+        if not is_pascal_case(concept_code):
+            raise ConceptCodeError(code=concept_code)
+
+        # Validate that if the concept code is among the native concepts, the domain MUST be native.
+        if concept_code in [native_concept.value for native_concept in NativeConceptEnum]:
+            if domain != SpecialDomain.NATIVE.value:
+                raise ConceptStringError(
+                    concept_string,
+                    f"Concept code '{concept_code}' is a native concept, so the domain must be '{SpecialDomain.NATIVE.value}', "
+                    "or nothing, but not '{domain}'",
+                )
+
+        # Validate that if the domain is native, the concept code is a native concept
+        if domain == SpecialDomain.NATIVE.value:
+            if concept_code not in [native_concept.value for native_concept in NativeConceptEnum]:
+                raise ConceptStringError(
+                    concept_string,
+                    f"Concept code '{concept_code}' is not a native concept, so the domain must be '{SpecialDomain.NATIVE.value}', or nothing.",
+                )
+
+    @field_validator("refines", mode="before")
+    @classmethod
+    def validate_refines(cls, refines: Optional[str] = None) -> Optional[str]:
+        def is_native_concept(concept_ref: str) -> bool:
+            """Check if a concept reference is a native concept (short or fully qualified form)."""
+            native_concept_values = [native_concept.value for native_concept in NativeConceptEnum]
+
+            # Check short form (e.g., "Text")
+            if concept_ref in native_concept_values:
+                return True
+
+            # Check fully qualified form (e.g., "native.Text")
+            if "." in concept_ref:
+                domain, concept_code = concept_ref.split(".", 1)
+                if domain == SpecialDomain.NATIVE.value and concept_code in native_concept_values:
+                    return True
+
+            return False
+
+        if refines is not None:
+            if not is_native_concept(refines):
+                raise ConceptBlueprintError(f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon.")
+            cls.validate_concept_string_or_concept_code(concept_string_or_concept_code=refines)
         return refines
 
-    @model_validator(mode="before")
+    @classmethod
     def forbiden_having_refines_and_structure(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         if values.get("refines") and values.get("structure"):
             raise ConceptBlueprintError(
@@ -125,9 +170,11 @@ class ConceptBlueprint(BaseModel):
             )
         return values
 
-    @model_validator(mode="after")
-    def model_validate_blueprint(self) -> Self:
-        return self
+    @model_validator(mode="before")
+    def model_validate_blueprint(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if isinstance(values, ConceptBlueprint):
+            cls.forbiden_having_refines_and_structure(values=values)
+        return values
 
     def structure_to_field_def(self) -> Dict[str, Any]:
         # TODO: Refactor this method

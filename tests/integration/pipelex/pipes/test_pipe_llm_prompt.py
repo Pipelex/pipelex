@@ -96,7 +96,7 @@ class TestPipeLLMPrompt:
 
         for content_class, description, concept_code in test_cases:
             pipe_llm_prompt = PipeLLMPrompt(
-                code=f"test_output_structure_{content_class.__name__}",
+                code=f"test_output_structure_{content_class.__name__.lower()}",
                 domain="generic",
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 user_text=f"Generate content for {description}",

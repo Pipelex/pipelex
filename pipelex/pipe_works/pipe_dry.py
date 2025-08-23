@@ -21,7 +21,7 @@ async def dry_run_all_pipes():
     await dry_run_pipes(pipes=all_pipes)
 
 
-async def dry_run_single_pipe(pipe_code: str) -> str:
+async def dry_run_single_pipe(pipe_code: str):
     """
     Dry run a single pipe by its code.
 
@@ -35,8 +35,7 @@ async def dry_run_single_pipe(pipe_code: str) -> str:
     # Get the pipe using the hub function
     pipe = get_pipe_provider().get_required_pipe(pipe_code=pipe_code)
     # Run the single pipe
-    result = await dry_run_pipes(pipes=[pipe])
-    return result.get(pipe_code, f"FAILED: No result for pipe '{pipe_code}'")
+    await dry_run_pipes(pipes=[pipe])
 
 
 async def dry_run_pipe_codes(pipe_codes: List[str]) -> Dict[str, str]:
@@ -79,52 +78,48 @@ async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
     # Define a function that will run in a thread
     def run_pipe_in_thread(pipe: PipeAbstract) -> Tuple[str, str]:
         """Execute pipe.run_pipe in a thread and return its status."""
+        # try:
+        # This function runs in a separate thread
+        needed_inputs = pipe.needed_inputs()
+        log.debug(f"Needed inputs for {pipe.code}: {needed_inputs}")
+        needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=needed_inputs)
+
+        log.debug(f"Needed inputs for {pipe.code} converted to working memory format: {needed_inputs_for_factory}")
+        working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
+
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
         try:
-            # This function runs in a separate thread
-            needed_inputs = pipe.needed_inputs()
-            if pipe.code == "conclude_thoughtful_answer":
-                from pipelex import pretty_print
-
-                pretty_print(needed_inputs, "needed_inputsss")
-            log.debug(f"Needed inputs for {pipe.code}: {needed_inputs}")
-            needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=needed_inputs)
-            if pipe.code == "conclude_thoughtful_answer":
-                from pipelex import pretty_print
-
-                pretty_print(needed_inputs_for_factory, "needed_inputsss_for_factory")
-            log.debug(f"Needed inputs for {pipe.code} converted to working memory format: {needed_inputs_for_factory}")
-            working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
-
-            # Create a new event loop for this thread
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-            try:
-                # Run the pipe in this thread's event loop
-                loop.run_until_complete(
-                    pipe.run_pipe(
-                        job_metadata=JobMetadata(job_name=f"dry_run_{pipe.code}"),
-                        working_memory=working_memory,
-                        pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
-                    )
+            # Run the pipe in this thread's event loop
+            loop.run_until_complete(
+                pipe.run_pipe(
+                    job_metadata=JobMetadata(job_name=f"dry_run_{pipe.code}"),
+                    working_memory=working_memory,
+                    pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
                 )
-                result = (pipe.code, "SUCCESS")
-                log.debug(f"✓ Pipe {pipe.code} dry run completed successfully")
-            finally:
-                loop.close()
-
-            return result
-
+            )
+            result = (pipe.code, "SUCCESS")
+            log.debug(f"✓ Pipe {pipe.code} dry run completed successfully")
         except Exception as exc:
-            error_msg = f"FAILED: {str(exc)}"
+            from pipelex import pretty_print
 
-            # Check if this pipe is allowed to fail
-            if pipe.code in allowed_to_fail_pipes:
-                log.debug(f"✗ Pipe '{pipe.code}' dry run failed: {exc} (this is normal, allowed by config)")
-            else:
-                log.error(f"✗ Pipe '{pipe.code}' dry run failed: {exc}")
+            pretty_print(exc, "exc")
+            raise exc
 
-            return (pipe.code, error_msg)
+        return result
+
+        # except Exception as exc:
+        #     error_msg = f"FAILED: {str(exc)}"
+
+        #     # Check if this pipe is allowed to fail
+        #     if pipe.code in allowed_to_fail_pipes:
+        #         log.debug(f"✗ Pipe '{pipe.code}' dry run failed: {exc} (this is normal, allowed by config)")
+        #     else:
+        #         log.error(f"✗ Pipe '{pipe.code}' dry run failed: {exc}")
+
+        #     return (pipe.code, error_msg)
 
     # Get the event loop for the main thread
     loop = asyncio.get_running_loop()

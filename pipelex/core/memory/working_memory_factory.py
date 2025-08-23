@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.client.protocol import CompactMemory, ImplicitMemory
+from pipelex.core.concepts.concept import ConceptBlueprint, SpecialDomain
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
@@ -21,7 +22,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_text(
         cls,
         text: str,
-        concept_code: str = NativeConceptEnum.TEXT.value,
+        concept_code: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value,
         name: Optional[str] = "text",
     ) -> WorkingMemory:
         return cls.make_from_single_stuff(
@@ -36,12 +37,13 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_image(
         cls,
         image_url: str,
-        concept_code: str = NativeConceptEnum.IMAGE.value,
+        concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.IMAGE.value,
         name: Optional[str] = "image",
     ) -> WorkingMemory:
-        # TODO: validate that the concept is an image concept
+        # TODO: validate that the concept is compatible with an image concept
+        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
         stuff = StuffFactory.make_stuff(
-            concept=get_required_concept(concept_string=concept_code),
+            concept=get_required_concept(concept_string=concept_string),
             content=ImageContent(url=image_url),
             name=name,
         )
@@ -51,12 +53,13 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_pdf(
         cls,
         pdf_url: str,
-        concept_code: str = NativeConceptEnum.PDF.value,
+        concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.PDF.value,
         name: Optional[str] = "pdf",
     ) -> WorkingMemory:
+        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
         return cls.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
-                concept=get_required_concept(concept_string=concept_code),
+                concept=get_required_concept(concept_string=concept_string),
                 content=PDFContent(url=pdf_url),
                 name=name,
             )
@@ -101,7 +104,7 @@ class WorkingMemoryFactory(BaseModel):
                 continue
             text_content = TextContent(text=content)
             stuff_dict[name] = StuffFactory.make_stuff(
-                concept=get_required_concept(concept_string=NativeConceptEnum.TEXT.value),
+                concept=get_required_concept(concept_string=SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value),
                 content=text_content,
                 name=name,
                 code="",
@@ -179,11 +182,6 @@ class WorkingMemoryFactory(BaseModel):
         Returns:
             WorkingMemory with mock objects for each needed input
         """
-        if "thoughtful_answer" in [r.variable_name for r in needed_inputs]:
-            print("djsqjdjoqj3")
-            from pipelex import pretty_print
-
-            pretty_print(needed_inputs, "needed_inputs")
         working_memory = cls.make_empty()
 
         for requirement in needed_inputs:

@@ -34,12 +34,7 @@ def do_dry_run_pipe(pipe_code: str, relative_config_folder_path: str = "./pipele
 
     pipelex_instance = Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
     pipelex_instance.validate_libraries()
-    result = asyncio.run(dry_run_single_pipe(pipe_code))
-
-    # Check if the dry run failed
-    if result.startswith("FAILED:"):
-        typer.echo(f"❌ {result}")
-        raise typer.Exit(1)
+    asyncio.run(dry_run_single_pipe(pipe_code))
 
     typer.echo(f"✅ Pipe '{pipe_code}' validation successful")
     get_pipeline_tracker().output_flowchart()

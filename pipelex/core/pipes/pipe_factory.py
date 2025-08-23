@@ -1,4 +1,4 @@
-from typing import Any, Protocol, Type, TypeVar
+from typing import Any, List, Optional, Protocol, Type, TypeVar
 
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
 from kajson.kajson_manager import KajsonManager
@@ -20,6 +20,7 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeType]):
         domain: str,
         pipe_code: str,
         pipe_blueprint: PipeBlueprintType,
+        concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeType: ...
 
 
@@ -31,6 +32,7 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
         domain: str,
         pipe_code: str,
         pipe_blueprint: PipeBlueprint,
+        concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeAbstract:
         # The factory class name for that specific type of Pipe is the pipe class name with "Factory" suffix
         factory_class_name = f"{pipe_blueprint.type}Factory"
@@ -52,5 +54,6 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
             domain=domain,
             pipe_code=pipe_code,
             pipe_blueprint=pipe_blueprint,
+            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return pipe_from_blueprint

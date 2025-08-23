@@ -53,7 +53,6 @@ DEFAULT_PROMPT_VAR_NAME = "prompt"
 
 
 class PipeImgGen(PipeOperator):
-    output_concept_code: str = NativeConceptEnum.IMAGE.value
     imgg_prompt: Optional[str] = None
     # TODO: wrap this up in imgg llm_presets like for llm
     imgg_handle: Optional[ImggHandle] = None
@@ -122,7 +121,7 @@ class PipeImgGen(PipeOperator):
             log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
             if concept_provider.is_compatible(
                 tested_concept=requirement.concept,
-                wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.TEXT),
+                wanted_concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             ):
                 self.img_gen_prompt_var_name = input_name
                 candidate_prompt_var_names.append(input_name)
@@ -288,9 +287,11 @@ class PipeImgGen(PipeOperator):
             )
             log.verbose(the_content, title="Single image content")
 
+        print("oiqdjiosjqodjoq", self.output)
+
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept=get_concept_provider().get_required_concept(concept_string=self.output_concept_code),
+            concept=self.output,
             content=the_content,
         )
 

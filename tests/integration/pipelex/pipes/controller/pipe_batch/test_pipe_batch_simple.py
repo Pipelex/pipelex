@@ -30,10 +30,16 @@ class TestPipeBatchSimple:
         # Create PipeBatch instance - it will call the uppercase_transformer pipe from the TOML
         domain = "test_integration"
         concept_1 = ConceptFactory.make_from_blueprint(
-            concept_code="TestConcept1", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+            concept_code="TestConcept1",
+            domain=domain,
+            blueprint=ConceptBlueprint(definition="Lorem Ipsum"),
+            concept_codes_from_the_same_domain=["TestConcept1"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
-            concept_code="TestConcept2", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum")
+            concept_code="TestConcept2",
+            domain=domain,
+            blueprint=ConceptBlueprint(definition="Lorem Ipsum"),
+            concept_codes_from_the_same_domain=["TestConcept2"],
         )
         concept_library = get_concept_provider()
         concept_library.add_concepts([concept_1, concept_2])
@@ -42,10 +48,10 @@ class TestPipeBatchSimple:
             definition="Simple batch processing test",
             branch_pipe_code="uppercase_transformer",  # This exists in the TOML file
             inputs={
-                "text_list": InputRequirementBlueprint(concept_code=f"{domain}.{concept_1.code}"),
-                "text_item": InputRequirementBlueprint(concept_code=f"{domain}.{concept_2.code}"),
+                "text_list": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string),
+                "text_item": InputRequirementBlueprint(concept_string_or_concept_code=concept_2.concept_string),
             },
-            output=f"{domain}.{concept_2.code}",
+            output=concept_2.concept_string,
             input_list_name="text_list",
             input_item_name="text_item",
         )
@@ -54,6 +60,7 @@ class TestPipeBatchSimple:
             domain=domain,
             pipe_code="simple_batch",
             pipe_blueprint=pipe_batch_blueprint,
+            concept_codes_from_the_same_domain=["TestConcept1", "TestConcept2"],
         )
 
         # Create test data - list of text items

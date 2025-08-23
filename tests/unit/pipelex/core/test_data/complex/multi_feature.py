@@ -1,7 +1,6 @@
 """Complex test cases combining multiple features."""
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
 from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint
@@ -43,14 +42,14 @@ steps = [
             "llm_pipe": PipeLLMBlueprint(
                 type="PipeLLM",
                 definition="Generate content",
-                inputs={"data": InputRequirementBlueprint(concept_code="InputData")},
+                inputs={"data": "InputData"},
                 output="ProcessedData",
                 prompt_template="Process this data: @data",
             ),
             "sequence_pipe": PipeSequenceBlueprint(
                 type="PipeSequence",
                 definition="Sequential processing",
-                inputs={"input_data": InputRequirementBlueprint(concept_code="InputData")},
+                inputs={"input_data": "InputData"},
                 output="ProcessedData",
                 steps=[
                     SubPipeBlueprint(pipe="llm_pipe", result="llm_result"),

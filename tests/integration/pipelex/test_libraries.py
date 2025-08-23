@@ -77,7 +77,7 @@ def pretty_print_all_concepts(
             concept.code,
             concept.definition,
             concept.structure_class_name,
-            ", ".join(concept.refines),
+            concept.refines,
         )
 
     console.print("\n")

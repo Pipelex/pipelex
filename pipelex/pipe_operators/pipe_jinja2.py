@@ -132,15 +132,6 @@ class PipeJinja2(PipeOperator):
         if self.extra_context:
             context.update(**self.extra_context)
 
-        from pipelex import pretty_print
-
-        if "thoughtful_answer" in context:
-            print("jqdjsiqjojo", self.code)
-            pretty_print(context, "context")
-            pretty_print(self.extra_context, "extra_context")
-            pretty_print(self.inputs, "inputs")
-            pretty_print(self.required_variables(), "required_variables")
-
         jinja2_text = await content_generator.make_jinja2_text(
             context=context,
             jinja2_name=self.jinja2_name,

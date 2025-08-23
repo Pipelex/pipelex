@@ -67,14 +67,14 @@ class TestWorkingMemory:
     def single_image_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single image content."""
         return WorkingMemoryFactory.make_from_image(
-            image_url=TestWorkingMemoryData.SAMPLE_IMAGE_URL, concept_code="gantt.GanttImage", name="gantt_chart_image"
+            image_url=TestWorkingMemoryData.SAMPLE_IMAGE_URL, concept_string="gantt.GanttImage", name="gantt_chart_image"
         )
 
     @pytest.fixture
     def single_pdf_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single PDF content."""
         return WorkingMemoryFactory.make_from_pdf(
-            pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL, concept_code=NativeConceptEnum.PDF.value, name="pdf_document"
+            pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL, concept_string=NativeConceptEnum.PDF.value, name="pdf_document"
         )
 
     @pytest.fixture

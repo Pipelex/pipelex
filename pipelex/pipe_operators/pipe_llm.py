@@ -11,6 +11,7 @@ from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoice
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import Domain, SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -236,7 +237,9 @@ class PipeLLM(PipeOperator):
             if not output_concept_code:
                 output_concept_code = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value
             else:
-                output_concept = get_concept_provider().get_required_concept(concept_string=output_concept_code, domain=self.domain)
+                output_concept = get_concept_provider().get_required_concept(
+                    concept_string=ConceptFactory.construct_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code)
+                )
 
         self.pipe_llm_prompt.output = output_concept
 
