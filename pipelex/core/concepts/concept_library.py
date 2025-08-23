@@ -115,10 +115,12 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return is_image_class or refines_image
 
     @override
-    def search_for_concept_in_domains(self, concept_name: str, search_domains: List[str]) -> Optional[Concept]:
+    def search_for_concept_in_domains(self, concept_code: str, search_domains: List[str]) -> Optional[Concept]:
+        ConceptBlueprint.validate_concept_code(concept_code=concept_code)
         for domain in search_domains:
-            concept_code = ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_name)
-            if found_concept := self.get_required_concept(concept_string=concept_code):
+            if found_concept := self.get_required_concept(
+                concept_string=ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_code)
+            ):
                 return found_concept
 
         return None

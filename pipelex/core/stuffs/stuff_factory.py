@@ -67,7 +67,7 @@ class StuffFactory:
     ) -> Stuff:
         concept_provider = get_concept_provider()
         concept = concept_provider.search_for_concept_in_domains(
-            concept_name=concept_name,
+            concept_code=concept_name,
             search_domains=search_domains,
         )
         if not concept:

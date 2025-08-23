@@ -49,7 +49,7 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def search_for_concept_in_domains(self, concept_name: str, search_domains: List[str]) -> Optional[Concept]:
+    def search_for_concept_in_domains(self, concept_code: str, search_domains: List[str]) -> Optional[Concept]:
         pass
 
     @abstractmethod
