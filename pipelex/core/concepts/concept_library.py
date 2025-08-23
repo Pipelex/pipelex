@@ -101,7 +101,6 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def is_image_concept(self, concept: Concept) -> bool:
-        # TODO: to test
         """
         Check if the concept is an image concept.
         It is an image concept if its structure class is a subclass of ImageContent
