@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 
 import pytest
 
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptStructureBlueprint,
@@ -16,19 +17,19 @@ from .data import TestCases
 
 
 class TestConceptFactory:
-    """Test ConceptFactory._make_refines method with various refines configurations."""
+    """Test ConceptFactory methods with various configurations."""
 
     @pytest.mark.parametrize(
         "test_name,blueprint,expected_result",
-        TestCases.TEST_CASES,
+        TestCases.MAKE_REFINES_TEST_CASES,
     )
     def test_make_refines(
         self,
         test_name: str,
         blueprint: ConceptBlueprint,
-        expected_result: List[str],
+        expected_result: str,
     ):
-        """Test _make_refines method with different blueprint configurations."""
+        """Test make_refines method with different blueprint configurations."""
         result = ConceptFactory.make_refines(blueprint=blueprint)
         assert result == expected_result, f"Failed for test case: {test_name}"
 
@@ -72,39 +73,7 @@ class TestConceptFactory:
 
     @pytest.mark.parametrize(
         "domain,concept_string_or_concept_code,concept_codes_from_the_same_domain,expected_result",
-        [
-            # Test case 1: Concept string with dot notation
-            ("my_domain", "other_domain.ConceptName", None, ["other_domain", "ConceptName"]),
-            # Test case 2: Concept string with dot notation (ignores same domain codes)
-            ("my_domain", "other_domain.ConceptName", ["ConceptName"], ["other_domain", "ConceptName"]),
-            # Test case 3: Native concept code (Text)
-            ("my_domain", "Text", None, ["native", "Text"]),
-            # Test case 4: Native concept code (Image)
-            ("my_domain", "Image", None, ["native", "Image"]),
-            # Test case 5: Native concept code (PDF)
-            ("my_domain", "PDF", None, ["native", "PDF"]),
-            # Test case 6: Native concept code with same domain codes provided (native takes precedence)
-            ("my_domain", "Text", ["Text", "OtherConcept"], ["native", "Text"]),
-            # Test case 7: Concept code from same domain
-            ("my_domain", "MyConcept", ["MyConcept", "OtherConcept"], ["my_domain", "MyConcept"]),
-            # Test case 8: Concept code from same domain (case sensitive)
-            ("my_domain", "MyConcept", ["MyCon", "OtherConcept"], ["implicit", "MyConcept"]),
-            # Test case 9: Unknown concept code (no same domain codes)
-            ("my_domain", "UnknownConcept", None, ["implicit", "UnknownConcept"]),
-            # Test case 10: Unknown concept code (not in same domain codes)
-            ("my_domain", "UnknownConcept", ["KnownConcept", "OtherConcept"], ["implicit", "UnknownConcept"]),
-            # Test case 11: Empty same domain codes list
-            ("my_domain", "SomeConcept", [], ["implicit", "SomeConcept"]),
-            # Test case 12: Different domain in concept string
-            ("my_domain", "another_domain.SomeConcept", ["SomeConcept"], ["another_domain", "SomeConcept"]),
-            # Test case 13: All native concept codes
-            ("my_domain", "Dynamic", None, ["native", "Dynamic"]),
-            ("my_domain", "TextAndImages", None, ["native", "TextAndImages"]),
-            ("my_domain", "Number", None, ["native", "Number"]),
-            ("my_domain", "LlmPrompt", None, ["native", "LlmPrompt"]),
-            ("my_domain", "Page", None, ["native", "Page"]),
-            ("my_domain", "Anything", None, ["native", "Anything"]),
-        ],
+        TestCases.MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES,
     )
     def test_make_domain_and_concept_code_from_concept_string_or_concept_code(
         self,
@@ -120,3 +89,39 @@ class TestConceptFactory:
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         assert result == expected_result
+
+    @pytest.mark.parametrize(
+        "test_name,domain,concept_code,blueprint,concept_codes_from_the_same_domain,expected_concept",
+        TestCases.MAKE_FROM_BLUEPRINT_TEST_CASES,
+    )
+    def test_make_from_blueprint(
+        self,
+        test_name: str,
+        domain: str,
+        concept_code: str,
+        blueprint: ConceptBlueprint,
+        concept_codes_from_the_same_domain: Optional[List[str]],
+        expected_concept: Concept,
+    ):
+        """Test make_from_blueprint method with various blueprint configurations."""
+        result = ConceptFactory.make_from_blueprint(
+            domain=domain,
+            concept_code=concept_code,
+            blueprint=blueprint,
+            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+        )
+
+        assert result == expected_concept, f"Concept mismatch for {test_name}"
+
+    def test_make_from_blueprint_with_invalid_structure_class(self):
+        """Test that make_from_blueprint raises StructureClassError for invalid structure class."""
+        blueprint = ConceptBlueprint(definition="A concept with invalid structure", structure="NonExistentStructureClass")
+
+        from pipelex.exceptions import StructureClassError
+
+        with pytest.raises(StructureClassError, match="is not a registered subclass of StuffContent"):
+            ConceptFactory.make_from_blueprint(
+                domain="my_domain",
+                concept_code="TestConcept",
+                blueprint=blueprint,
+            )
