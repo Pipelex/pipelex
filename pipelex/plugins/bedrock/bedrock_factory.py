@@ -1,11 +1,9 @@
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCapabilityError, PromptImageFormatError
-from pipelex.cogt.image.prompt_image import PromptImageBytes
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
 from pipelex.plugins.bedrock.bedrock_config import BedrockClientMethod
-from pipelex.plugins.bedrock.bedrock_message import BedrockContentItem, BedrockImage, BedrockMessage, BedrockSource, ImageFormat
+from pipelex.plugins.bedrock.bedrock_message import BedrockContentItem, BedrockMessage
 
 
 class BedrockFactory:
@@ -44,17 +42,4 @@ class BedrockFactory:
         message = BedrockMessage(role="user", content=[])
         if user_text := llm_job.llm_prompt.user_text:
             message.content.append(BedrockContentItem(text=user_text))
-        if user_images := llm_job.llm_prompt.user_images:
-            raise LLMCapabilityError("BedrockFactory does not support images. Skipping images.")
-            for user_image in user_images:
-                if isinstance(user_image, PromptImageBytes):
-                    image_bytes = user_image.image_bytes
-                    image = BedrockImage(
-                        format=ImageFormat.JPEG,
-                        source=BedrockSource(bytes=image_bytes),
-                    )
-                    message.content.append(BedrockContentItem(image=image))
-                else:
-                    raise PromptImageFormatError("Only PromptImageBytes is supported for BedrockFactory.")
-
         return message

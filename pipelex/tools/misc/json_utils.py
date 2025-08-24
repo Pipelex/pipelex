@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
@@ -240,34 +242,13 @@ def purify_json(
     indent: Optional[int] = None,
     is_truncate_bytes_enabled: bool = False,
     is_warning_enabled: bool = True,
-) -> Tuple[Union[Dict[Any, Any], List[Any]], str]:
+) -> Tuple[Union[Dict[str, Any], List[Any]], str]:
     """
     Converts any Python object into a JSON-serializable format and its string representation.
-
-    This function handles various types of input data:
-    - Pydantic BaseModel instances are converted using their model_dump method
-    - Lists of BaseModel instances are converted element by element
-    - Other types are attempted to be JSON serialized directly
-    - If standard JSON serialization fails, it attempts using kajson or falls back to str conversion
-
-    Args:
-        data (Any): The data to convert. Can be a Pydantic model, list, dict, or any other type.
-        indent (Optional[int], optional): Number of spaces for JSON formatting indentation. Defaults to None.
-        is_warning_enabled (bool, optional): If True, wraps non-serializable data in a warning object.
-            Defaults to True.
-
-    Returns:
-        Tuple[Union[Dict[Any, Any], List[Any]], str]: A tuple containing:
-            - The purified data structure (either a dict or list)
-            - The JSON string representation of the data
-
-    Example:
-        >>> model = SomeModel(name="test")
-        >>> data, json_str = purify_json(model)
-        >>> print(json_str)
-        '{"name": "test"}'
+    Always returns either a dict[str, Any] or a list[Any] as the purified structure.
     """
-    dict_string: str
+
+    # Pydantic models first
     if isinstance(data, CustomBaseModel) and is_truncate_bytes_enabled:
         return purify_json(
             data.model_dump_truncated(serialize_as_any=True),
@@ -275,7 +256,8 @@ def purify_json(
             is_truncate_bytes_enabled=is_truncate_bytes_enabled,
             is_warning_enabled=is_warning_enabled,
         )
-    elif isinstance(data, BaseModel):
+
+    if isinstance(data, BaseModel):
         return purify_json(
             data.model_dump(serialize_as_any=True),
             indent=indent,
@@ -283,33 +265,57 @@ def purify_json(
             is_warning_enabled=is_warning_enabled,
         )
 
+    # Homogeneous lists of models
     if isinstance(data, list):
-        the_list = data  # type: ignore
-        if not the_list:
+        lst = cast(List[Any], data)
+        if not lst:
             return [], "[]"
-        if isinstance(the_list[0], CustomBaseModel) and is_truncate_bytes_enabled:
-            the_list_of_custom_base_models: List[CustomBaseModel] = the_list
-            pure_list = [item.model_dump_truncated(serialize_as_any=True) for item in the_list_of_custom_base_models]
-            dict_string = json.dumps(pure_list, indent=indent, default=str)
-            return pure_list, dict_string
-        elif isinstance(the_list[0], BaseModel):
-            the_list_of_base_models: List[BaseModel] = the_list
-            pure_list = [item.model_dump(serialize_as_any=True) for item in the_list_of_base_models]
-            dict_string = json.dumps(pure_list, indent=indent, default=str)
-            return pure_list, dict_string
 
+        if is_truncate_bytes_enabled and all(isinstance(x, CustomBaseModel) for x in lst):
+            cbm_list = cast(List[CustomBaseModel], lst)
+            out_cbm: List[Any] = [x.model_dump_truncated(serialize_as_any=True) for x in cbm_list]
+            return out_cbm, json.dumps(out_cbm, indent=indent, default=str)
+
+        elif all(isinstance(x, BaseModel) for x in lst):
+            bm_list = cast(List[BaseModel], lst)
+            out_bm: List[Any] = [x.model_dump(serialize_as_any=True) for x in bm_list]
+            return out_bm, json.dumps(out_bm, indent=indent, default=str)
+
+        # fall through to generic handling below
+
+    # Generic JSON encoding
     try:
-        dict_string = json.dumps(data, indent=indent)
-        pure_dict: Union[Dict[Any, Any], List[Any]] = data
+        json_str = json.dumps(data, indent=indent)
+
+        if isinstance(data, dict):
+            return cast(Dict[str, Any], data), json_str
+
+        if isinstance(data, list):
+            return cast(List[Any], data), json_str
+
+        # Scalar or other JSON-serializable types: wrap to honor return type
+        wrapped_value: Dict[str, Any] = {"value": data}
+        return wrapped_value, json.dumps(wrapped_value, indent=indent)
+
     except TypeError:
+        # Try kajson (handles more types)
         try:
-            dict_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
+            json_str = kajson.dumps(data, indent=indent)  # type: ignore[name-defined]
+            parsed = json.loads(json_str)
+
+            if isinstance(parsed, dict):
+                return cast(Dict[str, Any], parsed), json_str
+            if isinstance(parsed, list):
+                return cast(List[Any], parsed), json_str
+
+            wrapped_parsed: Dict[str, Any] = {"value": parsed}
+            return wrapped_parsed, json.dumps(wrapped_parsed, indent=indent)
+
         except Exception:
-            if is_warning_enabled:
-                data = {"!": data}
-            dict_string = json.dumps(data, indent=indent, default=str)
-        pure_dict = json.loads(dict_string)
-    return pure_dict, dict_string
+            # Final fallback: wrap with a marker (or neutral wrapper)
+            wrapper: Dict[str, Any] = {"!": data} if is_warning_enabled else {"value": data}
+            json_str2 = json.dumps(wrapper, indent=indent, default=str)
+            return wrapper, json_str2
 
 
 def purify_json_list(

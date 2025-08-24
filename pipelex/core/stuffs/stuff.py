@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any, Dict, Optional, TypeVar, Union
 
 from pydantic import ConfigDict, ValidationError
 from typing_extensions import override
@@ -21,6 +21,8 @@ from pipelex.core.stuffs.stuff_content import (
 from pipelex.exceptions import StuffContentValidationError, StuffError
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
+
+CT = TypeVar("CT", bound="StuffContent")
 
 
 class Stuff(CustomBaseModel):
@@ -101,12 +103,11 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
     def is_number(self) -> bool:
         return isinstance(self.content, NumberContent)
 
-    def content_as(self, content_type: Type[StuffContentType]) -> StuffContentType:
-        """Get content with proper typing if it's of the expected type."""
+    def content_as(self, content_type: type[CT]) -> CT:
         return self.verify_content_type(self.content, content_type)
 
     @classmethod
-    def verify_content_type(cls, content: StuffContent, content_type: Type[StuffContentType]) -> StuffContentType:
+    def verify_content_type(cls, content: StuffContent, content_type: type[CT]) -> CT:
         """Verify and convert content to the expected type."""
         # First try the direct isinstance check for performance
         if isinstance(content, content_type):
@@ -132,26 +133,16 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         """Get content as ListContent with items of any type."""
         return self.content_as(content_type=ListContent)  # pyright: ignore[reportUnknownVariableType]
 
-    def as_list_of_fixed_content_type(self, item_type: Type[StuffContentType]) -> ListContent[StuffContentType]:
-        """
-        Get content as ListContent with items of type T.
-
-        Args:
-            item_type: The expected type of items in the list.
-
-        Returns:
-            A typed ListContent[StuffContentType] with proper type information
-
-        Raises:
-            TypeError: If content is not ListContent or items don't match expected type
-        """
-        list_content: ListContent[StuffContentType] = self.content_as(content_type=ListContent)
-
-        # Validate all items are of the expected type
-        for item in list_content.items:
+    def as_list_of_fixed_content_type(self, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
+        # Get a list content with a known (but broad) item type
+        list_content_any: ListContent[StuffContentType] = self.content_as(ListContent[StuffContentType])
+        
+        # Validate all items match the requested type
+        for item in list_content_any.items:
             self.verify_content_type(item, item_type)
 
-        return list_content
+        # Now we can safely narrow the list’s generic parameter
+        return list_content_any
 
     @property
     def as_text(self) -> TextContent:

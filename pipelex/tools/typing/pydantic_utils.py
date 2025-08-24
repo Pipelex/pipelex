@@ -1,6 +1,6 @@
 import json
 from collections.abc import Mapping
-from typing import Any, Dict, List, Optional, Protocol, Sequence, Set, Tuple, TypeGuard, TypeVar, Union, cast, overload, runtime_checkable
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, TypeGuard, TypeVar, Union, cast, overload
 
 from pydantic import BaseModel, ValidationError
 from rich.repr import Result as RichReprResult
@@ -64,11 +64,6 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
     return error_msg
 
 
-@runtime_checkable
-class _HasDisplayName(Protocol):
-    def display_name(self) -> str: ...
-
-
 @overload
 def convert_strenum_to_str(obj: dict[str, Any]) -> dict[str, Any]: ...
 @overload
@@ -84,7 +79,7 @@ def convert_strenum_to_str(obj: object) -> object:
         obj_dict = cast(dict[str, Any], obj)
         out: dict[str, Any] = {}
         for k, v in obj_dict.items():
-            out[str(k)] = cast(Any, convert_strenum_to_str(v))
+            out[str(k)] = cast(Any, convert_strenum_to_str(v))  # keep values as Any
         return out
 
     if isinstance(obj, list):
@@ -92,8 +87,9 @@ def convert_strenum_to_str(obj: object) -> object:
         return [cast(Any, convert_strenum_to_str(item)) for item in obj_list]
 
     if isinstance(obj, StrEnum):
-        if isinstance(obj, _HasDisplayName):
-            return obj.display_name()
+        dn = getattr(obj, "display_name", None)
+        if callable(dn):
+            return cast(str, dn())
         return str(obj)
 
     return obj
@@ -260,28 +256,31 @@ def _is_name_value_hint(t: tuple[object, ...]) -> TypeGuard[tuple[str, Any, Any]
 class CustomBaseModel(BaseModel):
     @override
     def __rich_repr__(self) -> RichReprResult:
-        for item in super().__rich_repr__():
-            if isinstance(item, tuple):
-                # normalize to a fully-known tuple type before checks
-                t: tuple[object, ...] = cast(tuple[object, ...], item)
+        parent = getattr(super(CustomBaseModel, self), "__rich_repr__", None)
 
-                if _is_name_value(t):
-                    name, value = t  # name: str, value: Any
+        items: RichReprResult
+        if callable(parent):
+            items = cast(RichReprResult, parent())
+        else:
+            items = cast(RichReprResult, ())
+
+        for item in items:
+            if isinstance(item, tuple):
+                typed_item: tuple[object, ...] = cast(tuple[object, ...], item)
+
+                if _is_name_value(typed_item):
+                    name, value = typed_item
                     if AttributePolisher.should_truncate(name=name, value=value):
                         yield name, AttributePolisher.get_truncated_value(name, value)
-                    else:
-                        yield item
-                elif _is_name_value_hint(t):
-                    name, value, hint = t  # name: str, value: Any, hint: Any
+                        continue
+
+                elif _is_name_value_hint(typed_item):
+                    name, value, hint = typed_item
                     if AttributePolisher.should_truncate(name=name, value=value):
                         yield name, AttributePolisher.get_truncated_value(name, value), hint
-                    else:
-                        yield item
-                else:
-                    # other tuple shapes — pass through
-                    yield item
-            else:
-                yield item
+                        continue
+
+            yield item
 
     @override
     def __repr_args__(self) -> Sequence[tuple[Optional[str], Any]]:

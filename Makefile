@@ -15,7 +15,7 @@ VENV_MYPY := $(VIRTUAL_ENV)/bin/mypy
 VENV_PIPELEX := $(VIRTUAL_ENV)/bin/pipelex
 VENV_MKDOCS := $(VIRTUAL_ENV)/bin/mkdocs
 VENV_AUTOFLAKE := $(VIRTUAL_ENV)/bin/autoflake
-VENV_VULTURE := $(VIRTUAL_ENV)/bin/vulture
+VENV_PYLINT := $(VIRTUAL_ENV)/bin/pylint
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -372,6 +372,9 @@ mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
 	$(VENV_MYPY)
 
+pylint: env
+	$(call PRINT_TITLE,"Linting with pylint")
+	$(VENV_PYLINT) -sn --rcfile=pyproject.toml .
 
 ##########################################################################################
 ### MERGE CHECKS
@@ -393,13 +396,14 @@ merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
 	$(VENV_MYPY) --config-file pyproject.toml
 
-merge-check-vulture: env
-	$(call PRINT_TITLE,"Checking for unused code with vulture")
-	$(VENV_VULTURE) --config pyproject.toml
+merge-check-pylint: env
+	$(call PRINT_TITLE,"Checking for unused code with pylint")
+	$(VENV_PYLINT) -sn --rcfile=pyproject.toml .
 
 merge-check-autoflake: env
 	$(call PRINT_TITLE,"Removing unused imports with autoflake")
 	$(VENV_AUTOFLAKE) . --check --config pyproject.toml
+
 
 ##########################################################################################
 ### MISCELLANEOUS
@@ -419,10 +423,6 @@ fui: fix-unused-imports
 check-TODOs: env
 	$(call PRINT_TITLE,"Checking for TODOs")
 	@$(VENV_RUFF) check --select=TD -v .
-
-vulture: env
-	$(call PRINT_TITLE,"Checking for unused code with vulture")
-	$(VENV_VULTURE) --config pyproject.toml
 
 autoflake: env
 	$(call PRINT_TITLE,"Removing unused imports with autoflake")
@@ -448,7 +448,7 @@ docs-deploy: env
 ### SHORTHANDS
 ##########################################################################################
 
-c: format lint pyright vulture autoflake mypy
+c: format lint pyright autoflake mypy pylint
 	@echo "> done: c = check"
 
 cc: cleanderived fix-unused-imports c

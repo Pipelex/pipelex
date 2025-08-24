@@ -69,8 +69,9 @@ dev = [
     "boto3-stubs>=1.35.24",
     "cocode>=0.0.10",
     "mypy>=1.11.2",
-    "pyright>=1.1.404",
     "pandas-stubs>=2.2.3.241126",
+    "pylint>=3.3.8",
+    "pyright>=1.1.404",
     "pytest>=8.3.3",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.1.1",
@@ -87,7 +88,6 @@ dev = [
     "types-requests>=2.32.0.2024091",
     "types-PyYAML>=6.0.12.20250326",
     "types-toml>=0.10.8.20240310",
-    "vulture>=2.14",
 ]
 
 [project.scripts]
@@ -192,19 +192,20 @@ reportUntypedClassDecorator = "error"
 reportUntypedFunctionDecorator = "error"
 reportUntypedNamedTuple = "error"
 reportUnusedCallResult = "none"
+reportUnreachableCode = "error"
+reportUnusedFunction = "error"
 reportUnusedClass = "error"
 reportUnusedCoroutine = "error"
 reportUnusedExcept = "error"
 reportUnusedExpression = "error"
-reportUnusedFunction = "error"
 reportUnusedImport = "none"
 reportUnusedVariable = "error"
-reportUnreachableCode = "error"
 reportWildcardImportFromLibrary = "error"
 strictDictionaryInference = true
 strictListInference = true
 strictParameterNoneValue = true
 strictSetInference = true
+reportUnusedParameter = "none"
 typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
@@ -258,6 +259,7 @@ target-version = "py311"
 ignore = ["F401"]
 external = ["F401"]
 select = [
+    "F841",
     "E4",
     "E7",
     "E9",
@@ -297,25 +299,7 @@ packages = ["pipelex"]
 [tool.hatch.metadata]
 allow-direct-references = true
 
-[tool.vulture]
-paths = ["pipelex"]
-exclude = [
-  "**/.venv/**",
-  "**/.git/**",
-  "**/__pycache__/**",
-  "**/site-packages/**",
-  "build/**",
-  "dist/**",
-  "node_modules/**",
-  "tests/**",
-  "**/__init__.py",
-]
-ignore_names = ["test_*", "Test*"]
-ignore_decorators = ["@pytest.fixture"]
-min_confidence = 100
-
 [tool.autoflake]
-
 in-place = true
 recursive = true
 remove-all-unused-imports = true
@@ -323,3 +307,27 @@ remove-unused-variables = true
 expand-star-imports = true
 ignore-init-module-imports = true
 exclude = ".venv,.git,__pycache__,build,dist,node_modules"
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = ["all"]
+enable = ["unreachable"]
+
+[tool.pylint.MASTER]
+ignore = [
+  ".venv",
+  ".git",
+  "build",
+  "dist",
+  "node_modules",
+  "tests",
+  "__pycache__",
+]
+
+ignore-paths = [
+  "^\\.venv/.*",
+  "^\\.git/.*",
+  "^build/.*",
+  "^dist/.*",
+  "^node_modules/.*",
+  "^tests/.*",
+]
