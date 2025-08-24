@@ -245,22 +245,13 @@ class PipeLLM(PipeOperator):
 
         # self.llm_prompt_blueprint.output = output_concept
 
-        applied_output_multiplicity, is_multiple_output, fixed_nb_output = output_multiplicity_to_apply(
-            output_multiplicity_base=self.output_multiplicity,
-            output_multiplicity_override=pipe_run_params.output_multiplicity,
+        multiplicity_resolution = output_multiplicity_to_apply(
+            base_multiplicity=self.output_multiplicity,
+            override_multiplicity=pipe_run_params.output_multiplicity,
         )
-        log.debug(
-            f"PipeLLM pipe_code = {self.code}: applied_output_multiplicity = {applied_output_multiplicity}, "
-            f"is_multiple_output = {is_multiple_output}, fixed_nb_output = {fixed_nb_output}"
-        )
-
-        if is_multiple_output:
-            if fixed_nb_output:
-                log.verbose(f"{self.class_name} generate {fixed_nb_output} x '{output_concept.code}' (class '{output_concept.structure_class_name}')")
-            else:
-                log.verbose(f"{self.class_name} generate a list of '{output_concept.code}' (class '{output_concept.structure_class_name}')")
-        else:
-            log.verbose(f"{self.class_name} generate a single '{output_concept.code}' (class '{output_concept.structure_class_name}')")
+        applied_output_multiplicity = multiplicity_resolution.resolved_multiplicity
+        is_multiple_output = multiplicity_resolution.enable_multiple_outputs
+        fixed_nb_output = multiplicity_resolution.specific_output_count
 
         # Collect what LLM settings we have for this particular PipeLLM
         llm_for_text_choice: Optional[LLMSettingOrPresetId] = None
@@ -291,10 +282,6 @@ class PipeLLM(PipeOperator):
             llm_model := get_llm_deck().find_optional_llm_model(llm_handle=llm_setting_main.llm_handle)
         ):
             llm_family = llm_model.llm_family
-            if llm_setting_main.prompting_target:
-                log.dev(f"prompting_target for '{llm_setting_main.llm_handle}' from setting: {llm_setting_main}")
-            else:
-                log.dev(f"prompting_target for '{llm_setting_main.llm_handle}' from llm_family: {llm_family}")
             prompting_target = llm_setting_main.prompting_target or llm_family.prompting_target
             self.llm_prompt_blueprint.prompting_style = get_config().pipelex.prompting_config.get_prompting_style(
                 prompting_target=prompting_target,

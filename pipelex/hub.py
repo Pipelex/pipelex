@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Optional, Type
+from typing import ClassVar, Optional, Type
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 
@@ -388,13 +388,6 @@ def get_content_generator() -> ContentGeneratorProtocol:
 
 def get_secret(secret_id: str) -> str:
     return get_secrets_provider().get_secret(secret_id=secret_id)
-
-
-def get_domains(excluded_domains: Optional[List[str]] = None) -> List[Domain]:
-    domains = get_pipelex_hub().get_required_domain_provider().get_domains()
-    if excluded_domains:
-        domains = [domain for domain in domains if domain.code not in excluded_domains]
-    return domains
 
 
 def get_required_domain(domain: str) -> Domain:
