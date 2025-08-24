@@ -1,20 +1,15 @@
-from typing import Any, ClassVar, Dict, List, Optional, Set, cast
+from typing import Any, Dict, List, Optional, Set
 
 from pydantic import BaseModel, model_validator
-from typing_extensions import Self, override
+from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
-from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.core.pipes.pipe_run_params import PipeRunParams
 from pipelex.core.stuffs.stuff_content import ImageContent, StuffContent
-from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeDefinitionError,
     PipeInputError,
@@ -22,10 +17,7 @@ from pipelex.exceptions import (
     WorkingMemoryVariableError,
 )
 from pipelex.hub import get_class_registry, get_content_generator, get_required_concept, get_template
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
-from pipelex.pipe_operators.pipe_jinja2_factory import Jinja2Blueprint
-from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
+from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.type_inspector import get_type_structure
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list

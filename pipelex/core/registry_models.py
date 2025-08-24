@@ -25,7 +25,6 @@ from pipelex.pipe_controllers.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelFactory
 from pipelex.pipe_controllers.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceFactory
-from pipelex.pipe_operators.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_func import PipeFunc
 from pipelex.pipe_operators.pipe_func_factory import PipeFuncFactory
 from pipelex.pipe_operators.pipe_img_gen import PipeImgGen

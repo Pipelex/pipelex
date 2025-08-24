@@ -45,9 +45,9 @@ from pipelex.hub import (
     get_template,
 )
 from pipelex.pipe_operators.llm_prompt_blueprint import LLMPromptBlueprint
-from pipelex.pipe_operators.pipe_jinja2_factory import Jinja2Blueprint, PipeJinja2Factory
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
+from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.types import StrEnum
 
 

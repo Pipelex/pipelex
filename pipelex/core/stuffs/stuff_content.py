@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from typing_extensions import Self, override
 from yattag import Doc
 
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.ocr.ocr_output import ExtractedImage
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_directory_exists, get_incremental_file_path, save_text_to_path
