@@ -2,7 +2,7 @@ from operator import attrgetter
 from typing import Any, Dict, List, Optional, Set, Type
 
 from pydantic import BaseModel, Field, model_validator
-from typing_extensions import Self
+from typing_extensions import Self, override
 
 from pipelex import log, pretty_print
 from pipelex.core.stuffs.stuff import Stuff
@@ -24,6 +24,7 @@ from pipelex.exceptions import (
     WorkingMemoryStuffNotFoundError,
     WorkingMemoryTypeError,
 )
+from pipelex.tools.misc.typed_getter_abstract import TypedGetterAbstract
 
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
@@ -33,7 +34,7 @@ StuffDict = Dict[str, Stuff]
 StuffArtefactDict = Dict[str, StuffArtefact]
 
 
-class WorkingMemory(BaseModel):
+class WorkingMemory(BaseModel, TypedGetterAbstract):
     root: StuffDict = Field(default_factory=dict)
     aliases: Dict[str, str] = Field(default_factory=dict)
 
@@ -62,7 +63,8 @@ class WorkingMemory(BaseModel):
     def make_deep_copy(self) -> Self:
         return self.model_copy(deep=True)
 
-    def generate_stuff_artefact_dict(self) -> StuffArtefactDict:
+    @override
+    def generate_context(self) -> Dict[str, Any]:
         artefact_dict: StuffArtefactDict = {}
         for name, stuff in self.root.items():
             a = stuff.make_artefact()
@@ -98,7 +100,8 @@ class WorkingMemory(BaseModel):
             message=f"Stuff '{name}' not found in working memory, valid keys are: {self.list_keys()}",
         )
 
-    def get_stuff_or_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
+    @override
+    def get_typed_object_or_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
         if "." in name:
             parts = name.split(".", 1)  # Split only at the first dot
             base_name = parts[0]

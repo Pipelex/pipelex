@@ -126,7 +126,7 @@ class PipeJinja2(PipeOperator):
                 f"PipeJinja2 does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
             )
 
-        context: Dict[str, Any] = working_memory.generate_stuff_artefact_dict()
+        context: Dict[str, Any] = working_memory.generate_context()
         if pipe_run_params:
             context.update(**pipe_run_params.params)
         if self.extra_context:
