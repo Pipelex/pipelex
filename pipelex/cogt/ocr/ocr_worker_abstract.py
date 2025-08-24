@@ -51,7 +51,7 @@ class OcrWorkerAbstract(InferenceWorkerAbstract):
         ocr_job.job_metadata.unit_job_id = UnitJobId.OCR_EXTRACT_PAGES
 
         # Prepare job
-        ocr_job.ocr_job_before_start(ocr_engine=self.ocr_engine)
+        ocr_job.ocr_job_before_start()
 
         # Execute job
         result = await self._ocr_extract_pages(ocr_job=ocr_job)

@@ -15,8 +15,7 @@ async def do_build_blueprint(
     domain: str,
     pipeline_name: str,
     requirements: str,
-    output_path: Optional[str],
-    validate: bool,
+    output_path: Optional[str] = None,
 ) -> None:
     pipe_output = await execute_pipeline(
         pipe_code="build_blueprint",

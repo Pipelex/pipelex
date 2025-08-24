@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TypeAlias
 
 from pydantic import Field
 
@@ -29,9 +29,16 @@ class ExtractedImageFromPage(ExtractedImage):
     bottom_right_y: Optional[int] = None
 
 
+ExtractedImageList: TypeAlias = list[ExtractedImageFromPage]
+
+
+def _empty_extracted_images() -> ExtractedImageList:
+    return []
+
+
 class Page(CustomBaseModel):
-    text: Optional[str] = None
-    extracted_images: List[ExtractedImageFromPage] = Field(default_factory=list)
+    text: str | None = None
+    extracted_images: List[ExtractedImageFromPage] = Field(default_factory=_empty_extracted_images)
     page_view: Optional[ExtractedImageFromPage] = None
 
     def save_to_directory(self, directory: str, page_text_file_name: str):

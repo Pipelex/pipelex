@@ -106,10 +106,6 @@ def build_blueprint_cmd(
         Optional[str],
         typer.Option("--output", "-o", help="Path to save the generated TOML blueprint (optional)"),
     ] = None,
-    validate: Annotated[
-        bool,
-        typer.Option("--validate", help="Dry-run the first generated pipe from the blueprint"),
-    ] = False,
     relative_config_folder_path: Annotated[
         str,
         typer.Option(
@@ -140,6 +136,5 @@ def build_blueprint_cmd(
             pipeline_name=pipeline_name,
             requirements=requirements_text,
             output_path=output_path,
-            validate=validate,
         )
     )

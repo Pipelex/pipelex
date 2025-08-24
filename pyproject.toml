@@ -113,8 +113,8 @@ module = ["filetype", "json2html", "pypdfium2", "pypdfium2.raw"]
 
 [tool.pyright]
 pythonVersion = "3.11"
-include = ["pipelex", "tests"]
-exclude = ["**/node_modules", "**/__pycache__", ".venv", ".git", "build", "dist", "node_modules", "**/__init__.py"]
+include = ["pipelex"]
+exclude = ["**/node_modules", "**/__pycache__", ".venv", ".git", "build", "dist", "node_modules", "**/__init__.py", "tests"]
 analyzeUnannotatedFunctions = true
 deprecateTypingAliases = false
 disableBytesTypePromotions = true

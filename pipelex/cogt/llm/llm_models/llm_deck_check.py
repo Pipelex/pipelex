@@ -3,7 +3,7 @@ from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingOrPres
 from pipelex.hub import get_llm_deck
 
 
-def check_llm_setting_with_deck(llm_setting_or_preset_id: LLMSettingOrPresetId, is_disabled_allowed: bool = False):
+def check_llm_setting_with_deck(llm_setting_or_preset_id: LLMSettingOrPresetId):
     if isinstance(llm_setting_or_preset_id, LLMSetting):
         return
     preset_id: str = llm_setting_or_preset_id

@@ -30,8 +30,12 @@ class LLMModelLibraryError(ToolException):
 LLMModelLibraryRoot = List[LLMModel]
 
 
+def _empty_llm_model_library_root() -> LLMModelLibraryRoot:
+    return []
+
+
 class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
-    root: LLMModelLibraryRoot = Field(default_factory=list)
+    root: LLMModelLibraryRoot = Field(default_factory=_empty_llm_model_library_root)
     library_config: ClassVar[LibraryConfig]
 
     @classmethod

@@ -50,7 +50,7 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
         imgg_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
 
         # Prepare job
-        imgg_job.imgg_job_before_start(imgg_engine=self.imgg_engine)
+        imgg_job.imgg_job_before_start()
 
         # Execute job
         result = await self._gen_image(imgg_job=imgg_job)
@@ -86,7 +86,7 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
         imgg_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
 
         # Prepare job
-        imgg_job.imgg_job_before_start(imgg_engine=self.imgg_engine)
+        imgg_job.imgg_job_before_start()
 
         # Execute job
         result = await self._gen_image_list(imgg_job=imgg_job, nb_images=nb_images)

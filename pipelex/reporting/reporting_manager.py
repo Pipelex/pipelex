@@ -17,8 +17,12 @@ from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 LLMUsageRegistryRoot = List[LLMTokensUsage]
 
 
+def _empty_llm_usage_registry_root() -> LLMUsageRegistryRoot:
+    return []
+
+
 class UsageRegistry(RootModel[LLMUsageRegistryRoot]):
-    root: LLMUsageRegistryRoot = Field(default_factory=list)
+    root: LLMUsageRegistryRoot = Field(default_factory=_empty_llm_usage_registry_root)
 
     def get_current_tokens_usage(self) -> LLMUsageRegistryRoot:
         return self.root

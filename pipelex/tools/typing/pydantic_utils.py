@@ -124,7 +124,7 @@ def serialize_model(
 
     for field_name, field_info in obj.__class__.model_fields.items():
         json_schema_extra = field_info.json_schema_extra
-        is_hidden = json_schema_extra and isinstance(json_schema_extra, dict) and json_schema_extra.get(ExtraFieldAttribute.IS_HIDDEN) is True
+        is_hidden = json_schema_extra and isinstance(json_schema_extra, dict) and json_schema_extra.get(ExtraFieldAttribute.IS_HIDDEN.value) is True
         match field_visibility:
             case FieldVisibility.ALL_FIELDS:
                 pass

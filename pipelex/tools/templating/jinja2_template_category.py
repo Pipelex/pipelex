@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 from jinja2.runtime import Context
 
@@ -6,6 +6,8 @@ from pipelex.tools.templating.jinja2_filters import tag, text_format
 from pipelex.tools.templating.jinja2_models import Jinja2FilterName
 from pipelex.tools.templating.templating_models import TextFormat
 from pipelex.types import StrEnum
+
+FilterFunc = Callable[[Context, Any, Optional[TextFormat]], Any]
 
 
 class Jinja2TemplateCategory(StrEnum):
@@ -15,17 +17,17 @@ class Jinja2TemplateCategory(StrEnum):
     LLM_PROMPT = "llm_prompt"
 
     @property
-    def filters(self) -> Dict[Jinja2FilterName, Callable[[Context, Any, Optional[TextFormat]], Any]]:
+    def filters(self) -> dict[str, FilterFunc]:
         match self:
             case Jinja2TemplateCategory.MERMAID:
                 return {}
             case Jinja2TemplateCategory.HTML | Jinja2TemplateCategory.MARKDOWN:
                 return {
-                    Jinja2FilterName.FORMAT: text_format,
-                    Jinja2FilterName.TAG: tag,
+                    Jinja2FilterName.FORMAT.value: text_format,
+                    Jinja2FilterName.TAG.value: tag,
                 }
             case Jinja2TemplateCategory.LLM_PROMPT:
                 return {
-                    Jinja2FilterName.FORMAT: text_format,
-                    Jinja2FilterName.TAG: tag,
+                    Jinja2FilterName.FORMAT.value: text_format,
+                    Jinja2FilterName.TAG.value: tag,
                 }

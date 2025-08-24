@@ -102,7 +102,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
             raise FuncRegistryError(f"Function '{name}' not found in registry")
         return self.root[name]
 
-    def get_required_function_with_signature(self, name: str, expected_signature: Callable[..., T]) -> Callable[..., T]:
+    def get_required_function_with_signature(self, name: str) -> Callable[..., object]:
         """
         Retrieves a function from the registry by its name and verifies it matches the expected signature.
         Raises an error if not found or if signature doesn't match.
