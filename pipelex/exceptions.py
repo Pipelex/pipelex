@@ -75,9 +75,6 @@ class WorkingMemoryConsistencyError(WorkingMemoryError):
 
 
 class WorkingMemoryVariableError(WorkingMemoryError, ContextProviderException):
-    # def __init__(self, variable_name: str, message: str, *args: object, **kwargs: object) -> None:
-    #     self.variable_name = variable_name
-    #     super().__init__(message, *args, **kwargs)
     pass
 
 
