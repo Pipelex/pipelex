@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
@@ -42,6 +42,12 @@ class PipeLLMBlueprint(PipeBlueprint):
 
     nb_output: Optional[int] = None
     multiple_output: Optional[bool] = None
+
+    @field_validator("nb_output", mode="after")
+    def validate_nb_output(cls, value: Optional[int] = None) -> Optional[int]:
+        if value and value < 1:
+            raise PipeDefinitionError("PipeLLMBlueprint nb_output must be greater than 0")
+        return value
 
     @model_validator(mode="after")
     def validate_multiple_output(self) -> Self:

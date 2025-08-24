@@ -184,10 +184,11 @@ class PipeImgGen(PipeOperator):
     ) -> PipeImgGenOutput:
         content_generator = content_generator or get_content_generator()
 
-        applied_output_multiplicity, _, _ = output_multiplicity_to_apply(
-            output_multiplicity_base=self.output_multiplicity or False,
-            output_multiplicity_override=pipe_run_params.output_multiplicity,
+        multiplicity_resolution = output_multiplicity_to_apply(
+            base_multiplicity=self.output_multiplicity or False,
+            override_multiplicity=pipe_run_params.output_multiplicity,
         )
+        applied_output_multiplicity = multiplicity_resolution.resolved_multiplicity
 
         log.debug("Getting image generation prompt from context")
         if self.imgg_prompt:
