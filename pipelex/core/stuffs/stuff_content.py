@@ -2,7 +2,7 @@ import base64
 import json
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union, cast
 
 import markdown
 from json2html import json2html
@@ -20,7 +20,7 @@ from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.misc.markdown_utils import convert_to_markdown
 from pipelex.tools.misc.path_utils import InterpretedPathOrUrl, interpret_path_or_url
 from pipelex.tools.templating.templating_models import TextFormat
-from pipelex.tools.typing.pydantic_utils import CustomBaseModel, clean_model_to_dict
+from pipelex.tools.typing.pydantic_utils import CustomBaseModel, clean_model_to_dict, clean_model_to_string
 
 ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
@@ -384,13 +384,9 @@ class StructuredContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        dict_dump = clean_model_to_dict(obj=self)
+        dict_dump = clean_model_to_string(obj=self)
 
-        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType]
-            json=dict_dump,  # pyright: ignore[reportArgumentType]
-            clubbing=True,
-            table_attributes="",
-        )
+        html: str = cast(str, json2html.convert(json=dict_dump, clubbing=True, table_attributes=""))
         return html
 
     @override
@@ -454,13 +450,8 @@ class ListContent(StuffContent, Generic[StuffContentType]):
 
     @override
     def rendered_html(self) -> str:
-        list_dump = [item.smart_dump() for item in self.items]
-
-        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType]
-            json=list_dump,  # pyright: ignore[reportArgumentType]
-            clubbing=True,
-            table_attributes="",
-        )
+        list_dump_str = clean_model_to_string(obj=self)
+        html = cast(str, json2html.convert(json=list_dump_str, clubbing=True, table_attributes=""))
         return html
 
     @override

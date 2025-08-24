@@ -1,4 +1,6 @@
-from typing import Any, Dict, List, Optional, Sequence, Set, TypeVar, Union
+import json
+from collections.abc import Mapping
+from typing import Any, Dict, List, Optional, Protocol, Sequence, Set, Tuple, TypeGuard, TypeVar, Union, cast, overload, runtime_checkable
 
 from pydantic import BaseModel, ValidationError
 from rich.repr import Result as RichReprResult
@@ -62,21 +64,39 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
     return error_msg
 
 
-def convert_strenum_to_str(
-    obj: Dict[str, Any] | List[Any] | StrEnum | Any,
-) -> Dict[str, Any] | List[Any] | str | Any:
+@runtime_checkable
+class _HasDisplayName(Protocol):
+    def display_name(self) -> str: ...
+
+
+@overload
+def convert_strenum_to_str(obj: dict[str, Any]) -> dict[str, Any]: ...
+@overload
+def convert_strenum_to_str(obj: list[Any]) -> list[Any]: ...
+@overload
+def convert_strenum_to_str(obj: StrEnum) -> str: ...
+@overload
+def convert_strenum_to_str(obj: object) -> object: ...
+
+
+def convert_strenum_to_str(obj: object) -> object:
     if isinstance(obj, dict):
-        obj_dict: Dict[str, Any] = obj
-        return {str(key): convert_strenum_to_str(value) for key, value in obj_dict.items()}
-    elif isinstance(obj, list):
-        obj_list: List[Any] = obj
-        return [convert_strenum_to_str(item) for item in obj_list]
-    elif isinstance(obj, StrEnum):
-        if hasattr(obj, "display_name"):
-            return obj.display_name()  # type: ignore
+        obj_dict = cast(dict[str, Any], obj)
+        out: dict[str, Any] = {}
+        for k, v in obj_dict.items():
+            out[str(k)] = cast(Any, convert_strenum_to_str(v))
+        return out
+
+    if isinstance(obj, list):
+        obj_list = cast(list[Any], obj)
+        return [cast(Any, convert_strenum_to_str(item)) for item in obj_list]
+
+    if isinstance(obj, StrEnum):
+        if isinstance(obj, _HasDisplayName):
+            return obj.display_name()
         return str(obj)
-    else:
-        return obj
+
+    return obj
 
 
 class ExtraFieldAttribute(StrEnum):
@@ -89,16 +109,53 @@ class FieldVisibility(StrEnum):
     ONLY_HIDDEN_FIELDS = "only_hidden_fields"
 
 
-def clean_model_to_dict(obj: BaseModel) -> Dict[str, Any]:
+def clean_model_to_dict(obj: BaseModel) -> dict[str, Any]:
     dict_dump = serialize_model(
         obj=obj,
         field_visibility=FieldVisibility.NO_HIDDEN_FIELDS,
         is_stringify_enums=True,
     )
-    if not isinstance(dict_dump, dict):
-        raise TypeError(f"Expected dict, got {type(dict_dump)}")
-    result_dict: Dict[str, Any] = dict_dump
-    return result_dict
+    return dict_dump
+
+
+def clean_model_to_string(obj: BaseModel) -> str:
+    """Convert a BaseModel to a clean JSON string representation.
+
+    Args:
+        obj: The Pydantic BaseModel to convert
+
+    Returns:
+        A JSON string representation of the model with hidden fields omitted
+        and enums stringified
+    """
+    dict_dump = clean_model_to_dict(obj)
+    return json.dumps(dict_dump, indent=2, ensure_ascii=False)
+
+
+@overload
+def serialize_model(
+    obj: BaseModel,
+    field_visibility: FieldVisibility = FieldVisibility.NO_HIDDEN_FIELDS,
+    is_stringify_enums: bool = True,
+) -> dict[str, Any]: ...
+@overload
+def serialize_model(
+    obj: list[Any],
+    field_visibility: FieldVisibility = FieldVisibility.NO_HIDDEN_FIELDS,
+    is_stringify_enums: bool = True,
+) -> list[Any]: ...
+@overload
+def serialize_model(
+    obj: dict[str, Any],
+    field_visibility: FieldVisibility = FieldVisibility.NO_HIDDEN_FIELDS,
+    is_stringify_enums: bool = True,
+) -> dict[str, Any]: ...
+@overload
+def serialize_model(
+    obj: object,
+    field_visibility: FieldVisibility = FieldVisibility.NO_HIDDEN_FIELDS,
+    is_stringify_enums: bool = True,
+) -> Any: ...
 
 
 def serialize_model(
@@ -123,8 +180,12 @@ def serialize_model(
     fields_to_exclude: Set[str] = set()
 
     for field_name, field_info in obj.__class__.model_fields.items():
-        json_schema_extra = field_info.json_schema_extra
-        is_hidden = json_schema_extra and isinstance(json_schema_extra, dict) and json_schema_extra.get(ExtraFieldAttribute.IS_HIDDEN.value) is True
+        extra = field_info.json_schema_extra
+
+        is_hidden = False
+        if isinstance(extra, Mapping):  # narrow first
+            extra_map = cast(Mapping[str, Any], extra)  # give key/value types
+            is_hidden = bool(extra_map.get(ExtraFieldAttribute.IS_HIDDEN.value, False))
         match field_visibility:
             case FieldVisibility.ALL_FIELDS:
                 pass
@@ -153,7 +214,7 @@ def serialize_model(
 
         # If it's a list, we recurse for each item
         elif isinstance(value, list):
-            value_list: List[Any] = value
+            value_list = cast(List[Any], value)
             data[field_name] = [
                 serialize_model(
                     obj=item,
@@ -165,7 +226,7 @@ def serialize_model(
 
         # If it's a dict, we can similarly recurse for any nested BaseModels inside the dict
         elif isinstance(value, dict):
-            value_dict: Dict[str, Any] = value
+            value_dict = cast(Dict[str, Any], value)
             data[field_name] = {
                 key: serialize_model(
                     obj=value,
@@ -188,23 +249,37 @@ def serialize_model(
     return data
 
 
+def _is_name_value(t: tuple[object, ...]) -> TypeGuard[tuple[str, Any]]:
+    return len(t) == 2 and isinstance(t[0], str)
+
+
+def _is_name_value_hint(t: tuple[object, ...]) -> TypeGuard[tuple[str, Any, Any]]:
+    return len(t) == 3 and isinstance(t[0], str)
+
+
 class CustomBaseModel(BaseModel):
     @override
-    def __rich_repr__(self) -> RichReprResult:  # type: ignore
-        for item in super().__rich_repr__():  # type: ignore
+    def __rich_repr__(self) -> RichReprResult:
+        for item in super().__rich_repr__():
             if isinstance(item, tuple):
-                tuple_item: tuple[Any, ...] = item
-                if len(tuple_item) >= 2:
-                    name = tuple_item[0]
-                    value = tuple_item[1]
+                # normalize to a fully-known tuple type before checks
+                t: tuple[object, ...] = cast(tuple[object, ...], item)
+
+                if _is_name_value(t):
+                    name, value = t  # name: str, value: Any
                     if AttributePolisher.should_truncate(name=name, value=value):
-                        truncated_value = AttributePolisher.get_truncated_value(name, value)
-                        if len(tuple_item) == 3:
-                            yield name, truncated_value, tuple_item[2]
-                        else:
-                            yield name, truncated_value
+                        yield name, AttributePolisher.get_truncated_value(name, value)
                     else:
                         yield item
+                elif _is_name_value_hint(t):
+                    name, value, hint = t  # name: str, value: Any, hint: Any
+                    if AttributePolisher.should_truncate(name=name, value=value):
+                        yield name, AttributePolisher.get_truncated_value(name, value), hint
+                    else:
+                        yield item
+                else:
+                    # other tuple shapes — pass through
+                    yield item
             else:
                 yield item
 
@@ -252,23 +327,20 @@ class CustomBaseModel(BaseModel):
         if name and AttributePolisher.should_truncate(name=name, value=obj):
             return AttributePolisher.get_truncated_value(name, obj)
 
-        # If it's a dictionary, recurse into its values
         if isinstance(obj, dict):
-            obj_dict: Dict[str, Any] = obj
+            obj_dict = cast(Dict[str, Any], obj)
             truncated_dict: Dict[str, Any] = {}
             for key, value in obj_dict.items():
                 truncated_dict[key] = self._apply_truncation_recursive(value, name=key)
             return truncated_dict
 
-        # If it's a list, recurse into its items
         elif isinstance(obj, list):
-            obj_list: List[Any] = obj
+            obj_list = cast(List[Any], obj)
             return [self._apply_truncation_recursive(item, name=name) for item in obj_list]
 
-        # If it's a tuple, recurse into its items and return as tuple
         elif isinstance(obj, tuple):
-            return tuple(self._apply_truncation_recursive(item, name=name) for item in obj)  # type: ignore
+            cast_obj = cast(Tuple[Any, ...], obj)
+            return tuple(self._apply_truncation_recursive(item, name=name) for item in cast_obj)
 
-        # For all other types, return as-is
         else:
             return obj

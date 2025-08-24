@@ -102,17 +102,17 @@ class TestFuncRegistry:
 
     def test_get_required_function_with_signature(self, registry: FuncRegistry):
         registry.register_function(another_function)
-        func = registry.get_required_function_with_signature("another_function", another_function)
+        func = registry.get_required_function_with_signature("another_function")
         assert func is another_function
 
     def test_get_required_function_with_signature_not_found(self, registry: FuncRegistry):
         with pytest.raises(FuncRegistryError, match="not found in registry"):
-            registry.get_required_function_with_signature("non_existent", sample_function)
+            registry.get_required_function_with_signature("non_existent")
 
     def test_get_required_function_with_signature_not_callable(self, registry: FuncRegistry):
         registry.root["not_a_function"] = "a string"  # type: ignore
         with pytest.raises(FuncRegistryError, match="is not a callable function"):
-            registry.get_required_function_with_signature("not_a_function", sample_function)
+            registry.get_required_function_with_signature("not_a_function")
 
     def test_register_function_without_warning_when_already_exists(self, registry: FuncRegistry, caplog: LogCaptureFixture):
         """Test that no 'already exists' log is generated when should_warn_if_already_registered=False and function doesn't exist yet"""
