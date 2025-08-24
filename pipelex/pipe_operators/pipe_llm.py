@@ -45,7 +45,7 @@ from pipelex.hub import (
     get_template,
 )
 from pipelex.pipe_operators.llm_prompt_blueprint import LLMPromptBlueprint
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
+from pipelex.pipe_operators.pipe_jinja2_factory import Jinja2Blueprint, PipeJinja2Factory
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.types import StrEnum
@@ -298,13 +298,6 @@ class PipeLLM(PipeOperator):
                 prompting_target=prompting_target,
             )
 
-        # prepare the job
-        prompt_job_metadata = job_metadata.copy_with_update(
-            updated_metadata=JobMetadata(
-                job_category=JobCategory.PROMPTING_JOB,
-            )
-        )
-
         is_with_preliminary_text = (
             self.structuring_method == StructuringMethod.PRELIMINARY_TEXT
         ) or get_config().pipelex.structure_config.is_default_text_then_structure
@@ -313,17 +306,8 @@ class PipeLLM(PipeOperator):
             applied_output_multiplicity=applied_output_multiplicity,
             is_with_preliminary_text=is_with_preliminary_text,
         )
-        # llm_prompt_1: LLMPrompt = (
-        #     await self.pipe_llm_prompt.run_pipe(
-        #         job_metadata=prompt_job_metadata,
-        #         working_memory=working_memory,
-        #         pipe_run_params=llm_prompt_run_params,
-        #     )
-        # ).llm_prompt
-        # TODO: restore the possibility above, without need to explicitly cast the output
         llm_prompt_1 = await self.llm_prompt_blueprint.make_llm_prompt(
             output_concept_string=output_concept.concept_string,
-            job_metadata=prompt_job_metadata,
             working_memory=working_memory,
             pipe_run_params=llm_prompt_run_params,
         )
@@ -355,18 +339,16 @@ class PipeLLM(PipeOperator):
                         # TODO: run_pipe() could get the domain at the same time as the pip_code
                         domain = get_required_domain(domain=pipe.domain)
                         prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
-                        user_pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_to_structure(
-                            domain=self.domain,
-                            prompt_template_to_structure=prompt_template_to_structure,
+                        user_text_jinja2_blueprint = Jinja2Blueprint(
+                            jinja2_name=prompt_template_to_structure,
                         )
                         system_prompt = self.system_prompt_to_structure or domain.system_prompt
                         llm_prompt_2_blueprint = LLMPromptBlueprint(
-                            user_pipe_jinja2=user_pipe_jinja2,
+                            user_text_jinja2_blueprint=user_text_jinja2_blueprint,
                             system_prompt=system_prompt,
                         )
                         llm_prompt_2_proto = await llm_prompt_2_blueprint.make_llm_prompt(
                             output_concept_string=output_concept.concept_string,
-                            job_metadata=prompt_job_metadata,
                             working_memory=working_memory,
                             pipe_run_params=llm_prompt_run_params,
                         )
@@ -381,18 +363,16 @@ class PipeLLM(PipeOperator):
                 else:
                     domain = Domain.make_default()
                 prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
-                user_pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_to_structure(
-                    domain=self.domain,
-                    prompt_template_to_structure=prompt_template_to_structure,
+                user_text_jinja2_blueprint = Jinja2Blueprint(
+                    jinja2_name=prompt_template_to_structure,
                 )
                 system_prompt = self.system_prompt_to_structure or domain.system_prompt
                 llm_prompt_2_blueprint = LLMPromptBlueprint(
-                    user_pipe_jinja2=user_pipe_jinja2,
+                    user_text_jinja2_blueprint=user_text_jinja2_blueprint,
                     system_prompt=system_prompt,
                 )
                 llm_prompt_2_proto = await llm_prompt_2_blueprint.make_llm_prompt(
                     output_concept_string=output_concept.concept_string,
-                    job_metadata=prompt_job_metadata,
                     working_memory=working_memory,
                     pipe_run_params=llm_prompt_run_params,
                 )

@@ -1,7 +1,9 @@
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Set
 
+from pydantic import BaseModel
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -9,21 +11,43 @@ from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.hub import get_concept_provider
+from pipelex.hub import get_concept_provider, get_template, get_template_provider
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.templating_models import PromptingStyle
 
 
-class PipeJinja2Blueprint(PipeBlueprint):
-    type: Literal["PipeJinja2"] = "PipeJinja2"
+class Jinja2Blueprint(BaseModel):
     jinja2_name: Optional[str] = None
     jinja2: Optional[str] = None
     prompting_style: Optional[PromptingStyle] = None
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
     extra_context: Optional[Dict[str, Any]] = None
+
+    def required_variables(self) -> Set[str]:
+        required_variables = detect_jinja2_required_variables(
+            template_category=self.template_category,
+            template_provider=get_template_provider(),
+            jinja2_name=self.jinja2_name,
+            jinja2=self.jinja2,
+        )
+        return {
+            variable_name
+            for variable_name in required_variables
+            if not variable_name.startswith("_") and variable_name != "preliminary_text" and variable_name != "place_holder"
+        }
+
+    def validate_with_libraries(self):
+        if self.jinja2_name:
+            the_template = get_template(template_name=self.jinja2_name)
+            log.debug(f"Validated jinja2 template '{self.jinja2_name}':\n{the_template}")
+
+
+class PipeJinja2Blueprint(PipeBlueprint, Jinja2Blueprint):
+    type: Literal["PipeJinja2"] = "PipeJinja2"
 
 
 class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):

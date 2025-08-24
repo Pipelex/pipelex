@@ -14,7 +14,7 @@ from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider, get_optional_domain
 from pipelex.pipe_operators.llm_prompt_blueprint import LLMPromptBlueprint
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint, PipeJinja2Factory
+from pipelex.pipe_operators.pipe_jinja2_factory import Jinja2Blueprint, PipeJinja2Blueprint, PipeJinja2Factory
 from pipelex.pipe_operators.pipe_llm import PipeLLM, StructuringMethod
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
 from pipelex.tools.templating.template_provider_abstract import TemplateNotFoundError
@@ -67,22 +67,13 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         pipe_blueprint: PipeLLMBlueprint,
         concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeLLM:
-        system_prompt_pipe_jinja2 = None
+        system_prompt_jinja2_blueprint: Optional[Jinja2Blueprint] = None
         system_prompt: Optional[str] = None
         if pipe_blueprint.system_prompt_template or pipe_blueprint.system_prompt_template_name:
             try:
-                system_prompt_jinja2_blueprint = PipeJinja2Blueprint(
-                    definition="System prompt template for LLM",
+                system_prompt_jinja2_blueprint = Jinja2Blueprint(
                     jinja2=pipe_blueprint.system_prompt_template,
                     jinja2_name=pipe_blueprint.system_prompt_template_name,
-                    output=NativeConceptEnum.LLM_PROMPT.value,
-                )
-
-                system_prompt_pipe_jinja2 = PipeJinja2Factory.make_from_blueprint(
-                    domain=domain,
-                    pipe_code="adhoc_for_system_prompt",
-                    pipe_blueprint=system_prompt_jinja2_blueprint,
-                    concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
                 )
             except Jinja2TemplateError as exc:
                 error_msg = f"Jinja2 template error in system prompt for pipe '{pipe_code}' in domain '{domain}': {exc}."
@@ -96,16 +87,12 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             if domain_obj := get_optional_domain(domain=domain):
                 system_prompt = domain_obj.system_prompt
 
-        user_pipe_jinja2 = None
+        user_text_jinja2_blueprint: Optional[Jinja2Blueprint] = None
         if pipe_blueprint.prompt_template or pipe_blueprint.template_name:
             try:
-                user_pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
-                    domain=domain,
-                    template_str=pipe_blueprint.prompt_template,
-                    template_name=pipe_blueprint.template_name,
-                    inputs=PipeInputSpecFactory.make_from_blueprint(
-                        domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
-                    ),
+                user_text_jinja2_blueprint = Jinja2Blueprint(
+                    jinja2=pipe_blueprint.prompt_template,
+                    jinja2_name=pipe_blueprint.template_name,
                 )
             except Jinja2TemplateError as exc:
                 error_msg = f"Jinja2 syntax error in user prompt for pipe '{pipe_code}' in domain '{domain}': {exc}."
@@ -117,16 +104,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         elif pipe_blueprint.prompt is None and pipe_blueprint.prompt_name is None:
             # no jinja2 provided, no verbatim name, no fixed text, let's try and use the pipe code as jinja2 name
             try:
-                user_prompt_jinja2_blueprint = PipeJinja2Blueprint(
-                    definition="User prompt template for LLM",
+                user_text_jinja2_blueprint = Jinja2Blueprint(
                     jinja2_name=pipe_code,
-                    output=NativeConceptEnum.LLM_PROMPT.value,
-                )
-
-                user_pipe_jinja2 = PipeJinja2Factory.make_from_blueprint(
-                    domain=domain,
-                    pipe_code="adhoc_for_user_prompt",
-                    pipe_blueprint=user_prompt_jinja2_blueprint,
                 )
             except TemplateNotFoundError as exc:
                 error_msg = f"Jinja2 template not found for pipe '{pipe_code}' in domain '{domain}': {exc}."
@@ -151,10 +130,10 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     user_images.append(stuff_name)
 
         llm_prompt_blueprint = LLMPromptBlueprint(
-            system_prompt_pipe_jinja2=system_prompt_pipe_jinja2,
+            system_prompt_jinja2_blueprint=system_prompt_jinja2_blueprint,
             system_prompt_verbatim_name=pipe_blueprint.system_prompt_name,
             system_prompt=pipe_blueprint.system_prompt or system_prompt,
-            user_pipe_jinja2=user_pipe_jinja2,
+            user_text_jinja2_blueprint=user_text_jinja2_blueprint,
             user_prompt_verbatim_name=pipe_blueprint.prompt_name,
             user_text=pipe_blueprint.prompt,
             user_images=user_images or None,

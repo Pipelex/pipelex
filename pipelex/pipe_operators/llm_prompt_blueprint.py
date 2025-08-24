@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Optional, Set, cast
+from typing import Any, ClassVar, Dict, List, Optional, Set, cast
 
 from pydantic import BaseModel, model_validator
 from typing_extensions import Self, override
@@ -21,8 +21,9 @@ from pipelex.exceptions import (
     PipeRunParamsError,
     WorkingMemoryVariableError,
 )
-from pipelex.hub import get_class_registry, get_required_concept, get_template
+from pipelex.hub import get_class_registry, get_content_generator, get_required_concept, get_template
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2, PipeJinja2Output
+from pipelex.pipe_operators.pipe_jinja2_factory import Jinja2Blueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.templating.templating_models import PromptingStyle
@@ -33,11 +34,11 @@ from pipelex.tools.typing.validation_utils import has_exactly_one_among_attribut
 class LLMPromptBlueprint(BaseModel):
     prompting_style: Optional[PromptingStyle] = None
 
-    system_prompt_pipe_jinja2: Optional[PipeJinja2] = None
+    system_prompt_jinja2_blueprint: Optional[Jinja2Blueprint] = None
     system_prompt_verbatim_name: Optional[str] = None
     system_prompt: Optional[str] = None
 
-    user_pipe_jinja2: Optional[PipeJinja2] = None
+    user_text_jinja2_blueprint: Optional[Jinja2Blueprint] = None
     user_prompt_verbatim_name: Optional[str] = None
     user_text: Optional[str] = None
 
@@ -48,24 +49,24 @@ class LLMPromptBlueprint(BaseModel):
         if not has_exactly_one_among_attributes_from_list(
             obj=self,
             attributes_list=[
-                "user_text",
-                "user_pipe_jinja2",
+                "user_text_jinja2_blueprint",
                 "user_prompt_verbatim_name",
+                "user_text",
             ],
         ):
             raise PipeDefinitionError(
-                f"PipeLLMPrompt user text must have exactly one of user_text, user_pipe_jinja2 or user_prompt_verbatim_name: {self}"
+                f"PipeLLMPrompt user text must have exactly one of user_text, user_text_jinja2_blueprint or user_prompt_verbatim_name: {self}"
             )
         if has_more_than_one_among_attributes_from_list(
             obj=self,
             attributes_list=[
-                "system_prompt",
-                "system_prompt_pipe_jinja2",
+                "system_prompt_jinja2_blueprint",
                 "system_prompt_verbatim_name",
+                "system_prompt",
             ],
         ):
             raise PipeDefinitionError(
-                f"PipeLLMPrompt system got more than one of system_prompt, system_prompt_pipe_jinja2, system_prompt_verbatim_name: {self}"
+                f"PipeLLMPrompt system got more than one of system_prompt, system_prompt_jinja2_blueprint, system_prompt_verbatim_name: {self}"
             )
         return self
 
@@ -75,17 +76,17 @@ class LLMPromptBlueprint(BaseModel):
         if self.system_prompt_verbatim_name:
             get_template(template_name=self.system_prompt_verbatim_name)
 
-        if self.user_pipe_jinja2:
-            self.user_pipe_jinja2.validate_with_libraries()
-        if self.system_prompt_pipe_jinja2:
-            self.system_prompt_pipe_jinja2.validate_with_libraries()
+        if self.user_text_jinja2_blueprint:
+            self.user_text_jinja2_blueprint.validate_with_libraries()
+        if self.system_prompt_jinja2_blueprint:
+            self.system_prompt_jinja2_blueprint.validate_with_libraries()
 
     def required_variables(self) -> Set[str]:
         required_variables: Set[str] = set()
-        if self.user_pipe_jinja2:
-            required_variables.update(self.user_pipe_jinja2.required_variables())
-        if self.system_prompt_pipe_jinja2:
-            required_variables.update(self.system_prompt_pipe_jinja2.required_variables())
+        if self.user_text_jinja2_blueprint:
+            required_variables.update(self.user_text_jinja2_blueprint.required_variables())
+        if self.system_prompt_jinja2_blueprint:
+            required_variables.update(self.system_prompt_jinja2_blueprint.required_variables())
         if self.user_images:
             user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
             required_variables.update(user_images_top_object_name)
@@ -94,10 +95,8 @@ class LLMPromptBlueprint(BaseModel):
     async def make_llm_prompt(
         self,
         output_concept_string: str,
-        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
     ) -> LLMPrompt:
         if pipe_run_params.is_multiple_output_required:
             raise PipeRunParamsError(
@@ -128,9 +127,8 @@ class LLMPromptBlueprint(BaseModel):
         # User text
         ############################################################
         user_text = await self._unravel_text(
-            job_metadata=job_metadata,
             working_memory=working_memory,
-            pipe_jinja2=self.user_pipe_jinja2,
+            jinja2_blueprint=self.user_text_jinja2_blueprint,
             text_verbatim_name=self.user_prompt_verbatim_name,
             fixed_text=self.user_text,
             pipe_run_params=pipe_run_params,
@@ -156,9 +154,8 @@ class LLMPromptBlueprint(BaseModel):
         # System text
         ############################################################
         system_text = await self._unravel_text(
-            job_metadata=job_metadata,
             working_memory=working_memory,
-            pipe_jinja2=self.system_prompt_pipe_jinja2,
+            jinja2_blueprint=self.system_prompt_jinja2_blueprint,
             text_verbatim_name=self.system_prompt_verbatim_name,
             fixed_text=self.system_prompt,
             pipe_run_params=pipe_run_params,
@@ -212,41 +209,35 @@ class LLMPromptBlueprint(BaseModel):
 
     async def _unravel_text(
         self,
-        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        pipe_jinja2: Optional[PipeJinja2],
+        jinja2_blueprint: Optional[Jinja2Blueprint],
         text_verbatim_name: Optional[str],
         fixed_text: Optional[str],
     ) -> Optional[str]:
         the_text: Optional[str]
-        if pipe_jinja2:
-            log.verbose(f"Working with Jinja2 pipe '{pipe_jinja2.jinja2_name}'")
-            if (prompting_style := self.prompting_style) and not pipe_jinja2.prompting_style:
-                pipe_jinja2.prompting_style = prompting_style
+        if jinja2_blueprint:
+            log.verbose(f"Working with Jinja2 pipe '{jinja2_blueprint.jinja2_name}'")
+            if pipe_run_params.is_multiple_output_required:
+                raise PipeRunParamsError(
+                    f"PipeJinja2 does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
+                )
+            if (prompting_style := self.prompting_style) and not jinja2_blueprint.prompting_style:
+                jinja2_blueprint.prompting_style = prompting_style
                 log.verbose(f"Setting prompting style to {prompting_style}")
 
-            jinja2_job_metadata = job_metadata.copy_with_update(
-                updated_metadata=JobMetadata(
-                    job_category=JobCategory.JINJA2_JOB,
-                )
+            context: Dict[str, Any] = working_memory.generate_stuff_artefact_dict()
+            if pipe_run_params:
+                context.update(**pipe_run_params.params)
+            if jinja2_blueprint.extra_context:
+                context.update(**jinja2_blueprint.extra_context)
+            the_text = await get_content_generator().make_jinja2_text(
+                context=context,
+                jinja2_name=jinja2_blueprint.jinja2_name,
+                jinja2=jinja2_blueprint.jinja2,
+                prompting_style=self.prompting_style,
+                template_category=jinja2_blueprint.template_category,
             )
-            # the_text = (
-            #     await pipe_jinja2.run_pipe(
-            #         job_metadata=jinja2_job_metadata,
-            #         working_memory=working_memory,
-            #         pipe_run_params=pipe_run_params,
-            #     )
-            # ).rendered_text
-            # TODO: restore the possibility above, without need to explicitly cast the output
-            pipe_output: PipeOutput = await pipe_jinja2.run_pipe(
-                job_metadata=jinja2_job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
-            )
-            pipe_jinja2_output = cast(PipeJinja2Output, pipe_output)
-            the_text = pipe_jinja2_output.rendered_text
-
         elif text_verbatim_name:
             user_text_verbatim = get_template(
                 template_name=text_verbatim_name,
