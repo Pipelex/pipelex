@@ -4,16 +4,14 @@ from pydantic import BaseModel, model_validator
 from typing_extensions import Self
 
 from pipelex import log
+from pipelex.cogt.exceptions import LLMPromptBlueprintError
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_run_params import PipeRunParams
 from pipelex.core.stuffs.stuff_content import ImageContent, StuffContent
 from pipelex.exceptions import (
-    PipeDefinitionError,
     PipeInputError,
-    PipeRunParamsError,
     WorkingMemoryVariableError,
 )
 from pipelex.hub import get_class_registry, get_content_generator, get_required_concept, get_template
@@ -46,8 +44,8 @@ class LLMPromptBlueprint(BaseModel):
                 "user_text",
             ],
         ):
-            raise PipeDefinitionError(
-                f"PipeLLMPrompt user text must have exactly one of user_text, user_text_jinja2_blueprint or user_prompt_verbatim_name: {self}"
+            raise LLMPromptBlueprintError(
+                f"LLMPromptBlueprint user text must have exactly one of user_text, user_text_jinja2_blueprint or user_prompt_verbatim_name: {self}"
             )
         if has_more_than_one_among_attributes_from_list(
             obj=self,
@@ -57,8 +55,8 @@ class LLMPromptBlueprint(BaseModel):
                 "system_prompt",
             ],
         ):
-            raise PipeDefinitionError(
-                f"PipeLLMPrompt system got more than one of system_prompt, system_prompt_jinja2_blueprint, system_prompt_verbatim_name: {self}"
+            raise LLMPromptBlueprintError(
+                f"LLMPromptBlueprint system got more than one of system_prompt, system_prompt_jinja2_blueprint, system_prompt_verbatim_name: {self}"
             )
         return self
 
@@ -88,13 +86,9 @@ class LLMPromptBlueprint(BaseModel):
         self,
         output_concept_string: str,
         working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
+        output_structure_prompt: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> LLMPrompt:
-        if pipe_run_params.is_multiple_output_required:
-            raise PipeRunParamsError(
-                f"PipeLLMPrompt does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
-            )
-
         ############################################################
         # User images
         ############################################################
@@ -123,22 +117,13 @@ class LLMPromptBlueprint(BaseModel):
             jinja2_blueprint=self.user_text_jinja2_blueprint,
             text_verbatim_name=self.user_prompt_verbatim_name,
             fixed_text=self.user_text,
-            pipe_run_params=pipe_run_params,
+            extra_params=extra_params,
         )
         if not user_text:
             raise ValueError("For user_text we need either a pipe_jinja2, a text_verbatim_name or a fixed user_text")
 
-        # Append output structure prompt if needed
-        if pipe_run_params.dynamic_output_concept_code:
-            user_text += LLMPromptBlueprint.get_output_structure_prompt(
-                concept_string=pipe_run_params.dynamic_output_concept_code,
-                is_with_preliminary_text=pipe_run_params.is_with_preliminary_text or False,
-            )
-        else:
-            user_text += LLMPromptBlueprint.get_output_structure_prompt(
-                concept_string=output_concept_string,
-                is_with_preliminary_text=pipe_run_params.is_with_preliminary_text or False,
-            )
+        if output_structure_prompt:
+            user_text += output_structure_prompt
 
         log.verbose(f"User text with {output_concept_string=}:\n {user_text}")
 
@@ -150,7 +135,7 @@ class LLMPromptBlueprint(BaseModel):
             jinja2_blueprint=self.system_prompt_jinja2_blueprint,
             text_verbatim_name=self.system_prompt_verbatim_name,
             fixed_text=self.system_prompt,
-            pipe_run_params=pipe_run_params,
+            extra_params=extra_params,
         )
 
         ############################################################
@@ -164,63 +149,24 @@ class LLMPromptBlueprint(BaseModel):
 
         return llm_prompt
 
-    @staticmethod
-    def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str:
-        concept = get_required_concept(concept_string=concept_string)
-        class_name = concept.structure_class_name
-        output_class = get_class_registry().get_class(class_name)
-        if not output_class:
-            return ""
-
-        class_structure = get_type_structure(output_class, base_class=StuffContent)
-
-        if not class_structure:
-            return ""
-
-        class_structure_str = "\n".join(class_structure)
-
-        # TODO: use proper prompt templating for this
-        if is_with_preliminary_text:
-            output_structure_prompt = (
-                f"\n\n---\nRequested output format: The requested output will be used to define the following class: {class_name}\n"
-                f"{class_structure_str}\n"
-                "You do NOT need to output a formatted JSON object, another LLM will take care of that. "
-                "If you cannot find a value that is Optional, output None for that field. "
-                "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
-                "DO NOT create information. If the information is not present, output None."
-            )
-        else:
-            output_structure_prompt = (
-                f"\n\n---\nRequested output format: The output must conform to the following BaseModel: {class_name}\n"
-                f"{class_structure_str}\n"
-                "If you cannot find a value that is Optional, output None for that field. "
-                "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
-                "DO NOT create information. If the information is not present, output None."
-            )
-        return output_structure_prompt
-
     async def _unravel_text(
         self,
         working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
         jinja2_blueprint: Optional[Jinja2Blueprint],
         text_verbatim_name: Optional[str],
         fixed_text: Optional[str],
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         the_text: Optional[str]
         if jinja2_blueprint:
             log.verbose(f"Working with Jinja2 pipe '{jinja2_blueprint.jinja2_name}'")
-            if pipe_run_params.is_multiple_output_required:
-                raise PipeRunParamsError(
-                    f"PipeJinja2 does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
-                )
             if (prompting_style := self.prompting_style) and not jinja2_blueprint.prompting_style:
                 jinja2_blueprint.prompting_style = prompting_style
                 log.verbose(f"Setting prompting style to {prompting_style}")
 
             context: Dict[str, Any] = working_memory.generate_stuff_artefact_dict()
-            if pipe_run_params:
-                context.update(**pipe_run_params.params)
+            if extra_params:
+                context.update(**extra_params)
             if jinja2_blueprint.extra_context:
                 context.update(**jinja2_blueprint.extra_context)
             the_text = await get_content_generator().make_jinja2_text(

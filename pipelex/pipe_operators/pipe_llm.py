@@ -40,6 +40,7 @@ from pipelex.hub import (
     get_content_generator,
     get_llm_deck,
     get_optional_pipe,
+    get_required_concept,
     get_required_domain,
     get_required_pipe,
     get_template,
@@ -48,6 +49,7 @@ from pipelex.pipe_operators.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
+from pipelex.tools.typing.type_inspector import get_type_structure
 from pipelex.types import StrEnum
 
 
@@ -107,7 +109,7 @@ class PipeLLM(PipeOperator):
         for input_name, requirement in self.inputs.items:
             if concept_provider.is_image_concept(concept=requirement.concept):
                 needed_inputs.add_requirement(
-                    variable_name=input_name, concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE)
+                    variable_name=input_name, concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.IMAGE)
                 )
             else:
                 needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
@@ -155,7 +157,7 @@ class PipeLLM(PipeOperator):
                         raise missing_input_var_error
 
             # There is one case where the needed input is of specific concept: the user_images
-            if named_input_requirement.concept == get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE):
+            if named_input_requirement.concept == concept_provider.get_native_concept(native_concept=NativeConceptEnum.IMAGE):
                 try:
                     input_requirement_of_declared_input = self.inputs.get_required_input_requirement(
                         variable_name=named_input_requirement.variable_name
@@ -301,6 +303,13 @@ class PipeLLM(PipeOperator):
         is_with_preliminary_text = (
             self.structuring_method == StructuringMethod.PRELIMINARY_TEXT
         ) or get_config().pipelex.structure_config.is_default_text_then_structure
+
+        # Append output structure prompt if needed
+        output_structure_prompt: Optional[str] = PipeLLM.get_output_structure_prompt(
+            concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
+            is_with_preliminary_text=is_with_preliminary_text or False,
+        )
+
         llm_prompt_run_params = PipeRunParams.copy_by_injecting_multiplicity(
             pipe_run_params=pipe_run_params,
             applied_output_multiplicity=applied_output_multiplicity,
@@ -309,7 +318,8 @@ class PipeLLM(PipeOperator):
         llm_prompt_1 = await self.llm_prompt_blueprint.make_llm_prompt(
             output_concept_string=output_concept.concept_string,
             working_memory=working_memory,
-            pipe_run_params=llm_prompt_run_params,
+            output_structure_prompt=output_structure_prompt,
+            extra_params=llm_prompt_run_params.params,
         )
 
         the_content: StuffContent
@@ -350,7 +360,8 @@ class PipeLLM(PipeOperator):
                         llm_prompt_2_proto = await llm_prompt_2_blueprint.make_llm_prompt(
                             output_concept_string=output_concept.concept_string,
                             working_memory=working_memory,
-                            pipe_run_params=llm_prompt_run_params,
+                            output_structure_prompt=output_structure_prompt,
+                            extra_params=llm_prompt_run_params.params,
                         )
                         llm_prompt_2_factory = LLMPromptTemplate(
                             proto_prompt=llm_prompt_2_proto,
@@ -374,7 +385,8 @@ class PipeLLM(PipeOperator):
                 llm_prompt_2_proto = await llm_prompt_2_blueprint.make_llm_prompt(
                     output_concept_string=output_concept.concept_string,
                     working_memory=working_memory,
-                    pipe_run_params=llm_prompt_run_params,
+                    output_structure_prompt=output_structure_prompt,
+                    extra_params=llm_prompt_run_params.params,
                 )
                 llm_prompt_2_factory = LLMPromptTemplate(
                     proto_prompt=llm_prompt_2_proto,
@@ -509,3 +521,38 @@ class PipeLLM(PipeOperator):
             content_generator=content_generator_dry,
         )
         return pipe_output
+
+    @staticmethod
+    def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str:
+        concept = get_required_concept(concept_string=concept_string)
+        class_name = concept.structure_class_name
+        output_class = get_class_registry().get_class(class_name)
+        if not output_class:
+            return ""
+
+        class_structure = get_type_structure(output_class, base_class=StuffContent)
+
+        if not class_structure:
+            return ""
+
+        class_structure_str = "\n".join(class_structure)
+
+        # TODO: use proper prompt templating for this
+        if is_with_preliminary_text:
+            output_structure_prompt = (
+                f"\n\n---\nRequested output format: The requested output will be used to define the following class: {class_name}\n"
+                f"{class_structure_str}\n"
+                "You do NOT need to output a formatted JSON object, another LLM will take care of that. "
+                "If you cannot find a value that is Optional, output None for that field. "
+                "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
+                "DO NOT create information. If the information is not present, output None."
+            )
+        else:
+            output_structure_prompt = (
+                f"\n\n---\nRequested output format: The output must conform to the following BaseModel: {class_name}\n"
+                f"{class_structure_str}\n"
+                "If you cannot find a value that is Optional, output None for that field. "
+                "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
+                "DO NOT create information. If the information is not present, output None."
+            )
+        return output_structure_prompt

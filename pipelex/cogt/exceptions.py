@@ -83,6 +83,10 @@ class LLMAssignmentError(CogtError):
     pass
 
 
+class LLMPromptBlueprintError(CogtError):
+    pass
+
+
 class LLMPromptFactoryError(CogtError):
     pass
 
