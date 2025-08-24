@@ -4,6 +4,7 @@ from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
+from pipelex.cogt.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
@@ -12,7 +13,6 @@ from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider, get_optional_domain
-from pipelex.pipe_operators.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_llm import PipeLLM, StructuringMethod
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError

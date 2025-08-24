@@ -9,6 +9,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.cogt.llm.llm_models.llm_deck_check import check_llm_setting_with_deck
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.config import StaticValidationReaction, get_config
@@ -45,7 +46,6 @@ from pipelex.hub import (
     get_required_pipe,
     get_template,
 )
-from pipelex.pipe_operators.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
@@ -317,7 +317,7 @@ class PipeLLM(PipeOperator):
         )
         llm_prompt_1 = await self.llm_prompt_blueprint.make_llm_prompt(
             output_concept_string=output_concept.concept_string,
-            working_memory=working_memory,
+            context_provider=working_memory,
             output_structure_prompt=output_structure_prompt,
             extra_params=llm_prompt_run_params.params,
         )
@@ -359,7 +359,7 @@ class PipeLLM(PipeOperator):
                         )
                         llm_prompt_2_proto = await llm_prompt_2_blueprint.make_llm_prompt(
                             output_concept_string=output_concept.concept_string,
-                            working_memory=working_memory,
+                            context_provider=working_memory,
                             output_structure_prompt=output_structure_prompt,
                             extra_params=llm_prompt_run_params.params,
                         )
@@ -384,7 +384,7 @@ class PipeLLM(PipeOperator):
                 )
                 llm_prompt_2_proto = await llm_prompt_2_blueprint.make_llm_prompt(
                     output_concept_string=output_concept.concept_string,
-                    working_memory=working_memory,
+                    context_provider=working_memory,
                     output_structure_prompt=output_structure_prompt,
                     extra_params=llm_prompt_run_params.params,
                 )

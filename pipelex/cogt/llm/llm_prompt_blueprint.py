@@ -8,14 +8,9 @@ from pipelex.cogt.exceptions import LLMPromptBlueprintError
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import ImageContent
-from pipelex.exceptions import (
-    PipeInputError,
-    WorkingMemoryVariableError,
-)
 from pipelex.hub import get_content_generator, get_template
-from pipelex.tools.misc.typed_getter_abstract import TypedGetterAbstract
+from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
@@ -85,7 +80,7 @@ class LLMPromptBlueprint(BaseModel):
     async def make_llm_prompt(
         self,
         output_concept_string: str,
-        working_memory: TypedGetterAbstract,
+        context_provider: ContextProviderAbstract,
         output_structure_prompt: Optional[str] = None,
         extra_params: Optional[Dict[str, Any]] = None,
     ) -> LLMPrompt:
@@ -97,9 +92,11 @@ class LLMPromptBlueprint(BaseModel):
             for user_image_name in self.user_images:
                 log.debug(f"Getting user image '{user_image_name}' from context")
                 try:
-                    prompt_image_content = working_memory.get_typed_object_or_attribute(name=user_image_name, wanted_type=ImageContent)
-                except WorkingMemoryVariableError as exc:
-                    raise PipeInputError(f"Could not find a valid user image named '{user_image_name}' in the working_memory: {exc}") from exc
+                    prompt_image_content = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=ImageContent)
+                except ContextProviderException as exc:
+                    raise LLMPromptBlueprintError(
+                        f"Could not find a valid user image named '{user_image_name}' from the provided context_provider: {exc}"
+                    ) from exc
 
                 if prompt_image_content is not None:  # An ImageContent can be optional..
                     if base_64 := prompt_image_content.base_64:
@@ -113,7 +110,7 @@ class LLMPromptBlueprint(BaseModel):
         # User text
         ############################################################
         user_text = await self._unravel_text(
-            working_memory=working_memory,
+            context_provider=context_provider,
             jinja2_blueprint=self.user_text_jinja2_blueprint,
             text_verbatim_name=self.user_prompt_verbatim_name,
             fixed_text=self.user_text,
@@ -131,7 +128,7 @@ class LLMPromptBlueprint(BaseModel):
         # System text
         ############################################################
         system_text = await self._unravel_text(
-            working_memory=working_memory,
+            context_provider=context_provider,
             jinja2_blueprint=self.system_prompt_jinja2_blueprint,
             text_verbatim_name=self.system_prompt_verbatim_name,
             fixed_text=self.system_prompt,
@@ -151,7 +148,7 @@ class LLMPromptBlueprint(BaseModel):
 
     async def _unravel_text(
         self,
-        working_memory: TypedGetterAbstract,
+        context_provider: ContextProviderAbstract,
         jinja2_blueprint: Optional[Jinja2Blueprint],
         text_verbatim_name: Optional[str],
         fixed_text: Optional[str],
@@ -164,7 +161,7 @@ class LLMPromptBlueprint(BaseModel):
                 jinja2_blueprint.prompting_style = prompting_style
                 log.verbose(f"Setting prompting style to {prompting_style}")
 
-            context: Dict[str, Any] = working_memory.generate_context()
+            context: Dict[str, Any] = context_provider.generate_context()
             if extra_params:
                 context.update(**extra_params)
             if jinja2_blueprint.extra_context:
