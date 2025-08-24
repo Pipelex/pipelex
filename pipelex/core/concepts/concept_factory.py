@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
 
+from kajson.kajson_manager import KajsonManager
+
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
@@ -12,7 +14,6 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.create.structured_output_generator import StructureGenerator
 from pipelex.exceptions import ConceptFactoryError, StructureClassError
-from pipelex.hub import get_class_registry
 
 
 class ConceptFactory:
@@ -147,7 +148,7 @@ class ConceptFactory:
                     exec(python_code, exec_globals)
 
                     # Register the generated class
-                    get_class_registry().register_class(exec_globals[concept_code])
+                    KajsonManager.get_class_registry().register_class(exec_globals[concept_code])
 
                     # The structure_class_name of the concept is the concept_code
                     structure_class_name = concept_code
