@@ -30,5 +30,3 @@ class PipelineDraft(StructuredContent):
 
 class PipelexBundleBlueprintStuff(PipelexBundleBlueprint, StructuredContent):
     """Complete blueprint of a pipelex bundle TOML file."""
-
-    pass

@@ -4,7 +4,7 @@ from pydantic import field_validator, model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.exceptions import LLMDeckValidatonError, LLMHandleNotFoundError, LLMPresetNotFoundError, LLMSettingsValidationError
-from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
+from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract, TDeck
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.cogt.llm.llm_models.llm_model import LLMModel
@@ -76,7 +76,7 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
 
     @override
     @classmethod
-    def final_validate(cls, deck: Self):
+    def final_validate(cls: type[TDeck], deck: TDeck) -> None:
         for llm_preset_id, llm_setting in deck.llm_presets.items():
             llm_model = deck.find_llm_model(llm_handle=llm_setting.llm_handle)
             try:
@@ -89,7 +89,8 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
     ############################################################
 
     @classmethod
-    def _validate_llm_setting(cls, llm_setting: LLMSetting, llm_model: LLMModel):
+    @override
+    def _validate_llm_setting(cls, llm_setting: LLMSetting, llm_model: LLMModel) -> None:
         if llm_model.max_tokens is not None and (llm_setting_max_tokens := llm_setting.max_tokens):
             if llm_setting_max_tokens > llm_model.max_tokens:
                 raise LLMSettingsValidationError(

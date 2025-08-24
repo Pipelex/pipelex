@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict
+from typing import ClassVar, Dict, TypeAlias, Union
 
 from jinja2 import TemplateSyntaxError
 from pydantic import Field, RootModel, ValidationError
@@ -14,6 +14,8 @@ from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.template_provider_abstract import TemplateNotFoundError, TemplateProviderAbstract
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
+TemplateNode: TypeAlias = Union[str, "TemplateTree"]
+TemplateTree: TypeAlias = Dict[str, TemplateNode]
 TemplateLibraryRoot = Dict[str, str]
 
 
@@ -65,20 +67,18 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
         toml_name = toml_path.split("/")[-1]
         log.debug(f"Loaded {len(self.root) - nb_concepts_before} templates from '{toml_name}'")
 
-    def _load_from_recursive_dict(self, domain: str, recursive_dict: Dict[str, Any]):
+    def _load_from_recursive_dict(self, domain: str, recursive_dict: TemplateTree):
         for name, obj in recursive_dict.items():
             try:
                 if isinstance(obj, str):
                     # it's a template
-                    template = obj
-                    self._add_new_template(template=template, name=name)
-                elif isinstance(obj, dict):
-                    # this is not a templae but a subdomain
-                    sub_recursive_dict: Dict[str, str] = obj
-                    domain = f"{domain}/{name}"
-                    self._load_from_recursive_dict(domain=domain, recursive_dict=sub_recursive_dict)
+                    self._add_new_template(template=obj, name=name)
                 else:
-                    raise TemplateLibraryError(f"Unexpected type for key '{name}' in recursive_dict: {type(obj)}")
+                    # this is not a templae but a subdomain
+                    self._load_from_recursive_dict(
+                        domain=f"{domain}/{name}",
+                        recursive_dict=obj,
+                    )
             except ValidationError as exc:
                 error_msg = format_pydantic_validation_error(exc)
                 raise TemplateLibraryError(f"Error loading concept '{name}' of domain '{domain}' because of: {error_msg}") from exc

@@ -14,6 +14,8 @@ VENV_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
 VENV_MYPY := $(VIRTUAL_ENV)/bin/mypy
 VENV_PIPELEX := $(VIRTUAL_ENV)/bin/pipelex
 VENV_MKDOCS := $(VIRTUAL_ENV)/bin/mkdocs
+VENV_AUTOFLAKE := $(VIRTUAL_ENV)/bin/autoflake
+VENV_VULTURE := $(VIRTUAL_ENV)/bin/vulture
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -364,8 +366,7 @@ lint: env
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	@$(VENV_PYRIGHT) --pythonpath $(VIRTUAL_ENV)/bin/python3  && \
-	echo "Done typechecking with pyright — disregard warning about latest version, it's giving us false positives"
+	@$(VENV_PYRIGHT) . --project pyproject.toml
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
@@ -392,6 +393,14 @@ merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
 	$(VENV_MYPY) --config-file pyproject.toml
 
+merge-check-vulture: env
+	$(call PRINT_TITLE,"Checking for unused code with vulture")
+	$(VENV_VULTURE) --config pyproject.toml
+
+merge-check-autoflake: env
+	$(call PRINT_TITLE,"Removing unused imports with autoflake")
+	$(VENV_AUTOFLAKE) . --check --config pyproject.toml
+
 ##########################################################################################
 ### MISCELLANEOUS
 ##########################################################################################
@@ -410,6 +419,14 @@ fui: fix-unused-imports
 check-TODOs: env
 	$(call PRINT_TITLE,"Checking for TODOs")
 	@$(VENV_RUFF) check --select=TD -v .
+
+vulture: env
+	$(call PRINT_TITLE,"Checking for unused code with vulture")
+	$(VENV_VULTURE) --config pyproject.toml
+
+autoflake: env
+	$(call PRINT_TITLE,"Removing unused imports with autoflake")
+	$(VENV_AUTOFLAKE) . --config pyproject.toml
 
 ##########################################################################################
 ### DOCUMENTATION
@@ -431,7 +448,7 @@ docs-deploy: env
 ### SHORTHANDS
 ##########################################################################################
 
-c: format lint pyright mypy
+c: format lint pyright vulture autoflake mypy
 	@echo "> done: c = check"
 
 cc: cleanderived fix-unused-imports c

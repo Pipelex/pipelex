@@ -94,8 +94,6 @@ class WorkingMemoryStuffNotFoundError(WorkingMemoryVariableError):
 class PipelexCLIError(PipelexError, ClickException):
     """Raised when there's an error in CLI usage or operation."""
 
-    pass
-
 
 class PipelexConfigError(PipelexError):
     pass
@@ -207,31 +205,21 @@ class PipeRunParamsError(PipelexError):
 class PipeBatchError(PipelexError):
     """Base class for all PipeBatch-related errors."""
 
-    pass
-
 
 class PipeBatchRecursionError(PipeBatchError):
     """Raised when a PipeBatch attempts to run itself recursively."""
-
-    pass
 
 
 class PipeBatchInputError(PipeBatchError):
     """Raised when the input to a PipeBatch is not a ListContent or is invalid."""
 
-    pass
-
 
 class PipeBatchOutputError(PipeBatchError):
     """Raised when there's an error with the output structure of a PipeBatch operation."""
 
-    pass
-
 
 class PipeBatchBranchError(PipeBatchError):
     """Raised when there's an error with a branch pipe execution in PipeBatch."""
-
-    pass
 
 
 class JobHistoryError(PipelexError):
@@ -272,8 +260,6 @@ class PipeInputDetailsError(PipelexError):
 
 class ApiSerializationError(Exception):
     """Exception raised when API serialization fails."""
-
-    pass
 
 
 class StartPipelineException(Exception):

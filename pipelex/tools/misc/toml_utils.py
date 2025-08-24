@@ -16,8 +16,6 @@ from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 class TOMLValidationError(Exception):
     """Raised when TOML file has formatting issues that could cause problems."""
 
-    pass
-
 
 def validate_toml_content(content: str, file_path: Optional[str] = None) -> None:
     """Validate TOML content for common formatting issues."""

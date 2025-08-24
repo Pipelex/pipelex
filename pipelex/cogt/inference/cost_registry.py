@@ -14,8 +14,12 @@ from pipelex.cogt.llm.token_category import TokenCategory
 CostRegistryRoot = List[LLMTokenCostReport]
 
 
+def _empty_cost_registry() -> CostRegistryRoot:
+    return []
+
+
 class CostRegistry(RootModel[CostRegistryRoot]):
-    root: CostRegistryRoot = Field(default_factory=list)
+    root: CostRegistryRoot = Field(default_factory=_empty_cost_registry)
 
     def to_dataframe(self) -> pd.DataFrame:
         records: List[Dict[str, Any]] = []

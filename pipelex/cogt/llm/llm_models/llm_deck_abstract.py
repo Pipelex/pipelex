@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Type, TypeVar
 
 from pydantic import Field
-from typing_extensions import Self
 
 from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
 from pipelex.cogt.llm.llm_models.llm_model import LLMModel
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults, LLMSettingOrPresetId
+
+TDeck = TypeVar("TDeck", bound="LLMDeckAbstract")
 
 
 class LLMDeckAbstract(ABC):
@@ -41,5 +42,9 @@ class LLMDeckAbstract(ABC):
 
     @classmethod
     @abstractmethod
-    def final_validate(cls, deck: Self):
+    def final_validate(cls: Type[TDeck], deck: TDeck):
         pass
+
+    @classmethod
+    @abstractmethod
+    def _validate_llm_setting(cls, llm_setting: "LLMSetting", llm_model: "LLMModel") -> None: ...

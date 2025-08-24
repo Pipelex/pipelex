@@ -34,8 +34,6 @@ class MusicGenre(StrEnum):
 class SimpleTextContent(TextContent):
     """A simple text content class"""
 
-    pass
-
 
 class MusicCategoryContent(StructuredContent):
     """A content class with a Literal field for music genres."""

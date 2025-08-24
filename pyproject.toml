@@ -65,10 +65,11 @@ docs = [
     "mkdocs-meta-manager==1.1.0",
 ]
 dev = [
+    "autoflake>=2.3.1",   
     "boto3-stubs>=1.35.24",
     "cocode>=0.0.10",
     "mypy>=1.11.2",
-    "pyright==1.1.398",
+    "pyright>=1.1.404",
     "pandas-stubs>=2.2.3.241126",
     "pytest>=8.3.3",
     "pytest-asyncio>=0.24.0",
@@ -86,6 +87,7 @@ dev = [
     "types-requests>=2.32.0.2024091",
     "types-PyYAML>=6.0.12.20250326",
     "types-toml>=0.10.8.20240310",
+    "vulture>=2.14",
 ]
 
 [project.scripts]
@@ -110,15 +112,14 @@ ignore_missing_imports = true
 module = ["filetype", "json2html", "pypdfium2", "pypdfium2.raw"]
 
 [tool.pyright]
+pythonVersion = "3.11"
+include = ["pipelex", "tests"]
+exclude = ["**/node_modules", "**/__pycache__", ".venv", ".git", "build", "dist", "node_modules", "**/__init__.py"]
 analyzeUnannotatedFunctions = true
 deprecateTypingAliases = false
 disableBytesTypePromotions = true
 enableExperimentalFeatures = false
 enableTypeIgnoreComments = true
-exclude = ["**/node_modules", "**/__pycache__"]
-extraPaths = ["./tests"]
-include = ["pipelex", "tests"]
-pythonVersion = "3.11"
 reportAbstractUsage = "error"
 reportArgumentType = "error"
 reportAssertAlwaysTrue = "error"
@@ -198,6 +199,7 @@ reportUnusedExpression = "error"
 reportUnusedFunction = "error"
 reportUnusedImport = "none"
 reportUnusedVariable = "error"
+reportUnreachableCode = "error"
 reportWildcardImportFromLibrary = "error"
 strictDictionaryInference = true
 strictListInference = true
@@ -260,6 +262,7 @@ select = [
     "E7",
     "E9",
     "F",
+    "ARG",
     "A001",
     "A002",
     "A003",
@@ -271,6 +274,10 @@ select = [
     "E501",
     "I",
 ]
+
+per-file-ignores = { "tests/**" = ["F841", "ARG001", "ARG002", "ARG003", "ARG004"] }
+
+
 
 [tool.uv]
 required-version = ">=0.7.2"
@@ -289,3 +296,30 @@ packages = ["pipelex"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.vulture]
+paths = ["pipelex"]
+exclude = [
+  "**/.venv/**",
+  "**/.git/**",
+  "**/__pycache__/**",
+  "**/site-packages/**",
+  "build/**",
+  "dist/**",
+  "node_modules/**",
+  "tests/**",
+  "**/__init__.py",
+]
+ignore_names = ["test_*", "Test*"]
+ignore_decorators = ["@pytest.fixture"]
+min_confidence = 100
+
+[tool.autoflake]
+
+in-place = true
+recursive = true
+remove-all-unused-imports = true
+remove-unused-variables = true
+expand-star-imports = true
+ignore-init-module-imports = true
+exclude = ".venv,.git,__pycache__,build,dist,node_modules"

@@ -57,5 +57,5 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment) -> List[BaseM
         llm_job=llm_job,
         schema=ListSchema,
     )
-    generated_list: List[BaseModel] = wrapped_list.items  # pyright: ignore[reportUnknownMemberType]
+    generated_list: List[BaseModel] = wrapped_list.items  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
     return generated_list

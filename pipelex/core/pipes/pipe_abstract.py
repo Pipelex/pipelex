@@ -35,7 +35,6 @@ class PipeAbstract(ABC, BaseModel):
         """
         Validate the pipe with the libraries, after the static validation
         """
-        pass
 
     @abstractmethod
     def required_variables(self) -> Set[str]:
@@ -48,14 +47,12 @@ class PipeAbstract(ABC, BaseModel):
             - PipeBatch : Variables in the batch_params
             - PipeLLM : Variables in the prompt
         """
-        pass
 
     @abstractmethod
     def needed_inputs(self) -> PipeInputSpec:
         """
         Return the inputs that are needed for the pipe to run. (Mostly the inputs of the pipe themselves)
         """
-        pass
 
     def pipe_dependencies(self) -> Set[str]:
         """
