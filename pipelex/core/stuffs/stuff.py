@@ -136,7 +136,7 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
     def as_list_of_fixed_content_type(self, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
         # Get a list content with a known (but broad) item type
         list_content_any: ListContent[StuffContentType] = self.content_as(ListContent[StuffContentType])
-        
+
         # Validate all items match the requested type
         for item in list_content_any.items:
             self.verify_content_type(item, item_type)

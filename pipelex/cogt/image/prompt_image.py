@@ -45,10 +45,6 @@ class PromptImageUrl(PromptImage):
         return self.__str__()
 
 
-def ok():
-    print("ok")
-
-
 class PromptImageBytes(PromptImage):
     base_64: bytes
 
