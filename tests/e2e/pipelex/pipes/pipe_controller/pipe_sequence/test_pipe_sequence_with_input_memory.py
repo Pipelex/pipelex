@@ -126,3 +126,4 @@ class TestPipeSequenceWithInputMemory:
         assert optimized_tweet.text != SAMPLE_DRAFT_TWEET
         # Verify it's not empty
         assert len(optimized_tweet.text.strip()) > 0
+        assert "Maria Rodriguez" in optimized_tweet.text

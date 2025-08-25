@@ -12,6 +12,8 @@ from pipelex.core.stuffs.stuff_content import ImageContent
 from pipelex.hub import get_content_generator, get_template
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
+from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
 
@@ -168,10 +170,18 @@ class LLMPromptSpec(BaseModel):
                 context.update(**extra_params)
             if jinja2_blueprint.extra_context:
                 context.update(**jinja2_blueprint.extra_context)
+
+            template: str = jinja2_blueprint.jinja2 or ""
+            if jinja2_blueprint.jinja2:
+                template = preprocess_template(jinja2_blueprint.jinja2)
+                check_jinja2_parsing(
+                    jinja2_template_source=template,
+                    template_category=jinja2_blueprint.template_category,
+                )
             the_text = await get_content_generator().make_jinja2_text(
                 context=context,
                 jinja2_name=jinja2_blueprint.jinja2_name,
-                jinja2=jinja2_blueprint.jinja2,
+                jinja2=template,
                 prompting_style=self.prompting_style,
                 template_category=jinja2_blueprint.template_category,
             )
