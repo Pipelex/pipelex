@@ -120,11 +120,11 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         if pipe_blueprint.inputs:
             for stuff_name, requirement in pipe_blueprint.inputs.items():
                 if isinstance(requirement, str):
-                    requirement = InputRequirementBlueprint(concept_string_or_concept_code=requirement)
-                concept_string_or_concept_code = requirement.concept_string_or_concept_code
+                    requirement = InputRequirementBlueprint(concept=requirement)
+                concept_string = requirement.concept
                 concept_domain, concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
                     domain=domain,
-                    concept_string_or_concept_code=concept_string_or_concept_code,
+                    concept_string_or_concept_code=concept_string,
                     concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
                 )
                 concept = get_concept_provider().get_required_concept(

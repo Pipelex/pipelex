@@ -24,7 +24,7 @@ class TestPipeConditionValidation:
 
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Test condition for validation",
-            inputs={"input_var": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string)},
+            inputs={"input_var": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             expression="input_var",
             pipe_map=PipeConditionPipeMapBlueprint(root={"value1": "pipe_a", "value2": "pipe_b"}),
@@ -63,7 +63,7 @@ class TestPipeConditionValidation:
 
         pipe_condition_template_blueprint = PipeConditionBlueprint(
             definition="Test condition with expression template",
-            inputs={"var": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string)},
+            inputs={"var": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             expression_template="{{ var }}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"value": "target_pipe"}),
@@ -78,7 +78,7 @@ class TestPipeConditionValidation:
         # Test with expression
         pipe_condition_expr_blueprint = PipeConditionBlueprint(
             definition="Test condition with expression",
-            inputs={"var": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string)},
+            inputs={"var": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             expression="var",
             pipe_map=PipeConditionPipeMapBlueprint(root={"value": "target_pipe"}),

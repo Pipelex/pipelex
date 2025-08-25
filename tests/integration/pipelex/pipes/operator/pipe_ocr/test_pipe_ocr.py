@@ -47,7 +47,7 @@ class TestPipeOCR:
     ):
         pipe_ocr_blueprint = PipeOcrBlueprint(
             definition="OCR test for image processing",
-            inputs={"page_scan": InputRequirementBlueprint(concept_string_or_concept_code=NativeConceptEnum.IMAGE.value)},
+            inputs={"page_scan": InputRequirementBlueprint(concept=NativeConceptEnum.IMAGE.value)},
             output=NativeConceptEnum.TEXT_AND_IMAGES.value,
             page_images=True,
             page_image_captions=False,
@@ -81,7 +81,7 @@ class TestPipeOCR:
     ):
         pipe_ocr_blueprint = PipeOcrBlueprint(
             definition="OCR test for PDF processing",
-            inputs={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept_string_or_concept_code=NativeConceptEnum.PDF.value)},
+            inputs={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept=NativeConceptEnum.PDF.value)},
             output=NativeConceptEnum.TEXT_AND_IMAGES.value,
             page_images=True,
             page_image_captions=False,

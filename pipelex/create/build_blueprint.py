@@ -5,7 +5,7 @@ from typing import Optional
 from pipelex import log, pretty_print
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.create.helpers import get_support_file
-from pipelex.libraries.pipelines.meta.pipeline_draft import PipelexBundleBlueprintStuff
+from pipelex.libraries.pipelines.meta.pipeline_draft import PipelexBundleBlueprint
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import save_text_to_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
@@ -31,7 +31,7 @@ async def do_build_blueprint(
     )
     pretty_print(pipe_output, title="Pipe Output")
 
-    blueprint = pipe_output.main_stuff_as(content_type=PipelexBundleBlueprintStuff)
+    blueprint = pipe_output.main_stuff_as(content_type=PipelexBundleBlueprint)
     pipeline_draft = pipe_output.working_memory.get_stuff_as_str(name="pipeline_draft")
 
     # Save or display result

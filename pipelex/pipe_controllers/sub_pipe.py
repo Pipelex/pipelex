@@ -59,7 +59,7 @@ class SubPipe(BaseModel):
                 # inputs should be of type: Dict[str, InputRequirementBlueprint]
                 inputs={
                     batch_params.input_item_stuff_name: InputRequirementBlueprint(
-                        concept_string_or_concept_code=sub_pipe.inputs.root[batch_params.input_item_stuff_name].concept.concept_string
+                        concept=sub_pipe.inputs.root[batch_params.input_item_stuff_name].concept.concept_string
                     ),
                 },
             )

@@ -17,15 +17,15 @@ ProcessedData = "Processed data concept"
 [pipe.llm_pipe]
 type = "PipeLLM"
 definition = "Generate content"
-output = "ProcessedData"
 inputs = { data = "InputData" }
+output = "ProcessedData"
 prompt_template = "Process this data: @data"
 
 [pipe.sequence_pipe]
 type = "PipeSequence"
 definition = "Sequential processing"
-output = "ProcessedData"
 inputs = { input_data = "InputData" }
+output = "ProcessedData"
 steps = [
     { pipe = "llm_pipe", result = "llm_result" },
     { pipe = "final_step", result = "final_output" },

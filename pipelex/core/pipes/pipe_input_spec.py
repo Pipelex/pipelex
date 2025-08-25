@@ -11,10 +11,10 @@ from pipelex.exceptions import PipeInputNotFoundError
 
 
 class InputRequirementBlueprint(BaseModel):
-    concept_string_or_concept_code: str
+    concept: str
     multiplicity: Optional[PipeOutputMultiplicity] = None
 
-    @field_validator("concept_string_or_concept_code", mode="before")
+    @field_validator("concept", mode="before")
     @classmethod
     def validate_concept_string(cls, concept_string: str) -> str:
         ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=concept_string)

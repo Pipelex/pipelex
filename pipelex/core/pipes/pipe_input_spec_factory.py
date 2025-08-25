@@ -20,13 +20,13 @@ class PipeInputSpecFactory:
         inputs: Dict[str, InputRequirement] = {}
         for var_name, input_requirement_blueprint in blueprint.items():
             if isinstance(input_requirement_blueprint, str):
-                input_requirement_blueprint = InputRequirementBlueprint(concept_string_or_concept_code=input_requirement_blueprint)
+                input_requirement_blueprint = InputRequirementBlueprint(concept=input_requirement_blueprint)
 
-            concept_string_or_concept_code = input_requirement_blueprint.concept_string_or_concept_code
-            ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=concept_string_or_concept_code)
+            concept_string = input_requirement_blueprint.concept
+            ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=concept_string)
             input_concept_domain, input_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
                 domain=domain,
-                concept_string_or_concept_code=concept_string_or_concept_code,
+                concept_string_or_concept_code=concept_string,
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             )
 
