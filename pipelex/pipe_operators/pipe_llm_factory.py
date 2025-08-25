@@ -4,7 +4,7 @@ from pydantic import field_validator, model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
-from pipelex.cogt.llm.llm_prompt_blueprint import LLMPromptBlueprint
+from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
@@ -134,7 +134,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 if get_concept_provider().is_image_concept(concept=concept):
                     user_images.append(stuff_name)
 
-        llm_prompt_blueprint = LLMPromptBlueprint(
+        llm_prompt_spec = LLMPromptSpec(
             system_prompt_jinja2_blueprint=system_prompt_jinja2_blueprint,
             system_prompt_verbatim_name=pipe_blueprint.system_prompt_name,
             system_prompt=pipe_blueprint.system_prompt or system_prompt,
@@ -171,7 +171,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
             ),
-            llm_prompt_blueprint=llm_prompt_blueprint,
+            llm_prompt_spec=llm_prompt_spec,
             llm_choices=llm_choices,
             structuring_method=pipe_blueprint.structuring_method,
             prompt_template_to_structure=pipe_blueprint.prompt_template_to_structure,

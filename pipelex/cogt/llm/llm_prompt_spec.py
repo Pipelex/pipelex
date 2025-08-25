@@ -4,7 +4,7 @@ from pydantic import BaseModel, model_validator
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMPromptBlueprintError
+from pipelex.cogt.exceptions import LLMPromptSpecError
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -16,7 +16,7 @@ from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
 
 
-class LLMPromptBlueprint(BaseModel):
+class LLMPromptSpec(BaseModel):
     prompting_style: Optional[PromptingStyle] = None
 
     system_prompt_jinja2_blueprint: Optional[Jinja2Blueprint] = None
@@ -39,8 +39,8 @@ class LLMPromptBlueprint(BaseModel):
                 "user_text",
             ],
         ):
-            raise LLMPromptBlueprintError(
-                f"LLMPromptBlueprint user text must have exactly one of user_text, user_text_jinja2_blueprint or user_prompt_verbatim_name: {self}"
+            raise LLMPromptSpecError(
+                f"LLMPromptSpec user text must have exactly one of user_text, user_text_jinja2_blueprint or user_prompt_verbatim_name: {self}"
             )
         if has_more_than_one_among_attributes_from_list(
             obj=self,
@@ -50,8 +50,8 @@ class LLMPromptBlueprint(BaseModel):
                 "system_prompt",
             ],
         ):
-            raise LLMPromptBlueprintError(
-                f"LLMPromptBlueprint system got more than one of system_prompt, system_prompt_jinja2_blueprint, system_prompt_verbatim_name: {self}"
+            raise LLMPromptSpecError(
+                f"LLMPromptSpec system got more than one of system_prompt, system_prompt_jinja2_blueprint, system_prompt_verbatim_name: {self}"
             )
         return self
 
@@ -94,7 +94,7 @@ class LLMPromptBlueprint(BaseModel):
                 try:
                     prompt_image_content = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=ImageContent)
                 except ContextProviderException as exc:
-                    raise LLMPromptBlueprintError(
+                    raise LLMPromptSpecError(
                         f"Could not find a valid user image named '{user_image_name}' from the provided context_provider: {exc}"
                     ) from exc
 

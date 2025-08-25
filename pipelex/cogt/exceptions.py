@@ -83,7 +83,7 @@ class LLMAssignmentError(CogtError):
     pass
 
 
-class LLMPromptBlueprintError(CogtError):
+class LLMPromptSpecError(CogtError):
     pass
 
 

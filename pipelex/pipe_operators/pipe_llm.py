@@ -9,8 +9,8 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.cogt.llm.llm_models.llm_deck_check import check_llm_setting_with_deck
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
+from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -63,7 +63,7 @@ class PipeLLMOutput(PipeOutput):
 
 
 class PipeLLM(PipeOperator):
-    llm_prompt_blueprint: LLMPromptBlueprint
+    llm_prompt_spec: LLMPromptSpec
     llm_choices: Optional[LLMSettingChoices] = None
     structuring_method: Optional[StructuringMethod] = None
     prompt_template_to_structure: Optional[str] = None
@@ -89,7 +89,7 @@ class PipeLLM(PipeOperator):
     @override
     def validate_with_libraries(self):
         self._validate_inputs()
-        self.llm_prompt_blueprint.validate_with_libraries()
+        self.llm_prompt_spec.validate_with_libraries()
         if self.prompt_template_to_structure:
             get_template(template_name=self.prompt_template_to_structure)
         if self.system_prompt_to_structure:
@@ -120,7 +120,7 @@ class PipeLLM(PipeOperator):
     def required_variables(self) -> Set[str]:
         """Required variables are the variables that are used in the current prompt template or system prompt"""
         required_variables: Set[str] = set()
-        required_variables.update(self.llm_prompt_blueprint.required_variables())
+        required_variables.update(self.llm_prompt_spec.required_variables())
         required_variables = {variable_name for variable_name in required_variables if not variable_name.startswith("_")}
         return required_variables
 
@@ -243,7 +243,7 @@ class PipeLLM(PipeOperator):
                     concept_string=ConceptFactory.construct_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code)
                 )
 
-        # self.llm_prompt_blueprint.output = output_concept
+        # self.llm_prompt_spec.output = output_concept
 
         multiplicity_resolution = output_multiplicity_to_apply(
             base_multiplicity=self.output_multiplicity,
@@ -278,12 +278,10 @@ class PipeLLM(PipeOperator):
         )
         llm_setting_for_object: LLMSetting = get_llm_deck().get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_object)
 
-        if not self.llm_prompt_blueprint.prompting_style and (
-            llm_model := get_llm_deck().find_optional_llm_model(llm_handle=llm_setting_main.llm_handle)
-        ):
+        if not self.llm_prompt_spec.prompting_style and (llm_model := get_llm_deck().find_optional_llm_model(llm_handle=llm_setting_main.llm_handle)):
             llm_family = llm_model.llm_family
             prompting_target = llm_setting_main.prompting_target or llm_family.prompting_target
-            self.llm_prompt_blueprint.prompting_style = get_config().pipelex.prompting_config.get_prompting_style(
+            self.llm_prompt_spec.prompting_style = get_config().pipelex.prompting_config.get_prompting_style(
                 prompting_target=prompting_target,
             )
 
@@ -302,7 +300,7 @@ class PipeLLM(PipeOperator):
             applied_output_multiplicity=applied_output_multiplicity,
             is_with_preliminary_text=is_with_preliminary_text,
         )
-        llm_prompt_1 = await self.llm_prompt_blueprint.make_llm_prompt(
+        llm_prompt_1 = await self.llm_prompt_spec.make_llm_prompt(
             output_concept_string=output_concept.concept_string,
             context_provider=working_memory,
             output_structure_prompt=output_structure_prompt,
@@ -340,7 +338,7 @@ class PipeLLM(PipeOperator):
                             jinja2_name=prompt_template_to_structure,
                         )
                         system_prompt = self.system_prompt_to_structure or domain.system_prompt
-                        llm_prompt_2_blueprint = LLMPromptBlueprint(
+                        llm_prompt_2_blueprint = LLMPromptSpec(
                             user_text_jinja2_blueprint=user_text_jinja2_blueprint,
                             system_prompt=system_prompt,
                         )
@@ -365,7 +363,7 @@ class PipeLLM(PipeOperator):
                     jinja2_name=prompt_template_to_structure,
                 )
                 system_prompt = self.system_prompt_to_structure or domain.system_prompt
-                llm_prompt_2_blueprint = LLMPromptBlueprint(
+                llm_prompt_2_blueprint = LLMPromptSpec(
                     user_text_jinja2_blueprint=user_text_jinja2_blueprint,
                     system_prompt=system_prompt,
                 )
