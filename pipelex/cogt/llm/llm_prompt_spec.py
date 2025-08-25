@@ -77,6 +77,8 @@ class LLMPromptSpec(BaseModel):
             required_variables.update(user_images_top_object_name)
         return required_variables
 
+    # TODO: make this consistent with `LLMPromptFactoryAbstract` or `LLMPromptTemplate`,
+    # let's get back to it when we have a better solution for structuring_method
     async def make_llm_prompt(
         self,
         output_concept_string: str,

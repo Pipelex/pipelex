@@ -300,6 +300,8 @@ class PipeLLM(PipeOperator):
             applied_output_multiplicity=applied_output_multiplicity,
             is_with_preliminary_text=is_with_preliminary_text,
         )
+        # TODO: we need a better solution for structuring_method (text then object), meanwhile,
+        # we acknowledge the code here with llm_prompt_1 and llm_prompt_2 is overly complex and should be refactored.
         llm_prompt_1 = await self.llm_prompt_spec.make_llm_prompt(
             output_concept_string=output_concept.concept_string,
             context_provider=working_memory,
@@ -322,6 +324,8 @@ class PipeLLM(PipeOperator):
         else:
             log.debug(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
 
+            # TODO: we need a better solution for structuring_method (text then object), meanwhile,
+            # we acknowledge the code here with llm_prompt_1 and llm_prompt_2 is overly complex and should be refactored.
             llm_prompt_2_factory: Optional[LLMPromptFactoryAbstract]
             if self.structuring_method:
                 structuring_method = cast(StructuringMethod, self.structuring_method)
