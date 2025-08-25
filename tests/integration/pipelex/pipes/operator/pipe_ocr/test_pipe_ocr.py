@@ -59,7 +59,7 @@ class TestPipeOCR:
             pipe=PipeOcrFactory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_ocr_image",
-                pipe_blueprint=pipe_ocr_blueprint,
+                blueprint=pipe_ocr_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_image(
@@ -93,7 +93,7 @@ class TestPipeOCR:
             pipe=PipeOcrFactory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_ocr_pdf",
-                pipe_blueprint=pipe_ocr_blueprint,
+                blueprint=pipe_ocr_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_pdf(

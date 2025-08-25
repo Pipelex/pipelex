@@ -10,7 +10,7 @@ class TestPipelexInterpreterBatchToml:
     """Test Batch pipe to TOML string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,pipe_blueprint,expected_toml",
+        "pipe_name,blueprint,expected_toml",
         [
             # Basic Batch pipe
             (
@@ -50,7 +50,7 @@ branch_pipe_code = "transform_item\"""",
             ),
         ],
     )
-    def test_batch_pipe_to_toml_string(self, pipe_name: str, pipe_blueprint: PipeBatchBlueprint, expected_toml: str):
+    def test_batch_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeBatchBlueprint, expected_toml: str):
         """Test converting Batch pipe blueprint to TOML string."""
-        result = PipelexInterpreter.batch_pipe_to_toml_string(pipe_name, pipe_blueprint, "test_domain")
+        result = PipelexInterpreter.batch_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
         assert result == expected_toml

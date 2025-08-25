@@ -40,27 +40,27 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
         cls,
         domain: str,
         pipe_code: str,
-        pipe_blueprint: PipeConditionBlueprint,
+        blueprint: PipeConditionBlueprint,
         concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeCondition:
         output_concept_domain, output_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
-            concept_string_or_concept_code=pipe_blueprint.output,
+            concept_string_or_concept_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return PipeCondition(
             domain=domain,
             code=pipe_code,
-            definition=pipe_blueprint.definition,
+            definition=blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
             ),
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
             ),
-            expression_template=pipe_blueprint.expression_template,
-            expression=pipe_blueprint.expression,
-            pipe_map=cls.make_pipe_condition_pipe_map(pipe_map=pipe_blueprint.pipe_map),
-            default_pipe_code=pipe_blueprint.default_pipe_code,
-            add_alias_from_expression_to=pipe_blueprint.add_alias_from_expression_to,
+            expression_template=blueprint.expression_template,
+            expression=blueprint.expression,
+            pipe_map=cls.make_pipe_condition_pipe_map(pipe_map=blueprint.pipe_map),
+            default_pipe_code=blueprint.default_pipe_code,
+            add_alias_from_expression_to=blueprint.add_alias_from_expression_to,
         )

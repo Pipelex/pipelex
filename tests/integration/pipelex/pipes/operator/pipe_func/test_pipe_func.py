@@ -63,7 +63,7 @@ if __name__ == "__main__":
             pipe=PipeFuncFactory.make_from_blueprint(
                 domain="source_code",
                 pipe_code="wrap_lines",
-                pipe_blueprint=pipe_func_blueprint,
+                blueprint=pipe_func_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,

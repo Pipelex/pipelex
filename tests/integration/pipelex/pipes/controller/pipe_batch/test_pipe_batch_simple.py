@@ -59,7 +59,7 @@ class TestPipeBatchSimple:
         pipe_batch = PipeBatchFactory.make_from_blueprint(
             domain=domain,
             pipe_code="simple_batch",
-            pipe_blueprint=pipe_batch_blueprint,
+            blueprint=pipe_batch_blueprint,
             concept_codes_from_the_same_domain=["TestConcept1", "TestConcept2"],
         )
 

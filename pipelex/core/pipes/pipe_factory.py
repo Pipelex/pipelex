@@ -19,7 +19,7 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeType]):
         cls,
         domain: str,
         pipe_code: str,
-        pipe_blueprint: PipeBlueprintType,
+        blueprint: PipeBlueprintType,
         concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeType: ...
 
@@ -31,11 +31,11 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
         cls,
         domain: str,
         pipe_code: str,
-        pipe_blueprint: PipeBlueprint,
+        blueprint: PipeBlueprint,
         concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeAbstract:
         # The factory class name for that specific type of Pipe is the pipe class name with "Factory" suffix
-        factory_class_name = f"{pipe_blueprint.type}Factory"
+        factory_class_name = f"{blueprint.type}Factory"
         try:
             pipe_factory: Type[PipeFactoryProtocol[Any, Any]] = KajsonManager.get_class_registry().get_required_subclass(
                 name=factory_class_name,
@@ -53,7 +53,7 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
         pipe_from_blueprint: PipeAbstract = pipe_factory.make_from_blueprint(
             domain=domain,
             pipe_code=pipe_code,
-            pipe_blueprint=pipe_blueprint,
+            blueprint=blueprint,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return pipe_from_blueprint

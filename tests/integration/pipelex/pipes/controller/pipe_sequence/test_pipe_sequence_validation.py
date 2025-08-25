@@ -36,7 +36,7 @@ class TestPipeSequenceValidation:
         pipe_sequence = PipeSequenceFactory.make_from_blueprint(
             domain=domain,
             pipe_code="test_sequence",
-            pipe_blueprint=pipe_sequence_blueprint,
+            blueprint=pipe_sequence_blueprint,
         )
 
         assert pipe_sequence.code == "test_sequence"
@@ -75,7 +75,7 @@ class TestPipeSequenceValidation:
         pipe_sequence = PipeSequenceFactory.make_from_blueprint(
             domain=domain,
             pipe_code="test_sequence",
-            pipe_blueprint=pipe_sequence_blueprint,
+            blueprint=pipe_sequence_blueprint,
         )
 
         assert pipe_sequence.code == "test_sequence"

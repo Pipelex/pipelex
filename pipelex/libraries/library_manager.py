@@ -216,7 +216,7 @@ class LibraryManager(LibraryManagerAbstract):
                 pipe = PipeFactory.make_from_blueprint(
                     domain=blueprint.domain,
                     pipe_code=pipe_name,
-                    pipe_blueprint=pipe_blueprint,
+                    blueprint=pipe_blueprint,
                     concept_codes_from_the_same_domain=list(blueprint.concept.keys()) if blueprint.concept else None,
                 )
                 pipes.append(pipe)

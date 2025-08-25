@@ -230,7 +230,7 @@ class PipeCondition(PipeController):
         pipe_jinja2 = PipeJinja2Factory.make_from_blueprint(
             domain=self.domain,
             pipe_code="adhoc_for_pipe_condition",
-            pipe_blueprint=pipe_jinja2_blueprint,
+            blueprint=pipe_jinja2_blueprint,
         )
         jinja2_job_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(

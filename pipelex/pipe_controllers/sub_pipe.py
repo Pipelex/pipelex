@@ -67,7 +67,7 @@ class SubPipe(BaseModel):
             pipe_batch = PipeBatchFactory.make_from_blueprint(
                 domain=sub_pipe.domain,
                 pipe_code=self.pipe_code,
-                pipe_blueprint=pipe_batch_blueprint,
+                blueprint=pipe_batch_blueprint,
                 concept_codes_from_the_same_domain=self.concept_codes_from_the_same_domain,
             )
             # This is the only line that changes between run and dry_run

@@ -11,7 +11,7 @@ class TestPipelexInterpreterLlmToml:
     """Test LLM pipe to TOML string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,pipe_blueprint,expected_toml",
+        "pipe_name,blueprint,expected_toml",
         [
             # Simple LLM pipe with string inputs
             (
@@ -90,7 +90,7 @@ prompt_template = "Generate ideas about: $topic\"""",
             ),
         ],
     )
-    def test_llm_pipe_to_toml_string(self, pipe_name: str, pipe_blueprint: PipeLLMBlueprint, expected_toml: str):
+    def test_llm_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeLLMBlueprint, expected_toml: str):
         """Test converting LLM pipe blueprint to TOML string."""
-        result = PipelexInterpreter.llm_pipe_to_toml_string(pipe_name, pipe_blueprint, "test_domain")
+        result = PipelexInterpreter.llm_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
         assert result == expected_toml

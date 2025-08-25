@@ -10,7 +10,7 @@ class TestPipelexInterpreterConditionToml:
     """Test Condition pipe to TOML string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,pipe_blueprint,expected_toml",
+        "pipe_name,blueprint,expected_toml",
         [
             # Basic Condition pipe with expression
             (
@@ -50,7 +50,7 @@ expression_template = "{{ data.size if data.size > threshold else 'low' }}\"""",
             ),
         ],
     )
-    def test_condition_pipe_to_toml_string(self, pipe_name: str, pipe_blueprint: PipeConditionBlueprint, expected_toml: str):
+    def test_condition_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeConditionBlueprint, expected_toml: str):
         """Test converting Condition pipe blueprint to TOML string."""
-        result = PipelexInterpreter.condition_pipe_to_toml_string(pipe_name, pipe_blueprint, "test_domain")
+        result = PipelexInterpreter.condition_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
         assert result == expected_toml

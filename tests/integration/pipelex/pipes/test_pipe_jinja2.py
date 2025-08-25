@@ -33,7 +33,7 @@ class TestPipeJinja2:
             pipe=PipeJinja2Factory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_jinja2_for_any",
-                pipe_blueprint=pipe_jinja2_blueprint,
+                blueprint=pipe_jinja2_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -60,7 +60,7 @@ class TestPipeJinja2:
             pipe=PipeJinja2Factory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_jinja2",
-                pipe_blueprint=pipe_jinja2_blueprint,
+                blueprint=pipe_jinja2_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,

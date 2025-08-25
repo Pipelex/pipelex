@@ -34,7 +34,7 @@ class TestPipeConditionValidation:
         pipe_condition = PipeConditionFactory.make_from_blueprint(
             domain=domain,
             pipe_code="test_condition",
-            pipe_blueprint=pipe_condition_blueprint,
+            blueprint=pipe_condition_blueprint,
         )
 
         assert pipe_condition.code == "test_condition"
@@ -72,7 +72,7 @@ class TestPipeConditionValidation:
         pipe_condition_template = PipeConditionFactory.make_from_blueprint(
             domain=domain,
             pipe_code="test_condition_template",
-            pipe_blueprint=pipe_condition_template_blueprint,
+            blueprint=pipe_condition_template_blueprint,
         )
 
         # Test with expression
@@ -87,7 +87,7 @@ class TestPipeConditionValidation:
         pipe_condition_expr = PipeConditionFactory.make_from_blueprint(
             domain=domain,
             pipe_code="test_condition_expr",
-            pipe_blueprint=pipe_condition_expr_blueprint,
+            blueprint=pipe_condition_expr_blueprint,
         )
 
         # Both should have the same applied expression template format

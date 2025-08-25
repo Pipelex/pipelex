@@ -253,35 +253,35 @@ class PipelexInterpreter(BaseModel):
     def pipes_to_toml_string(pipes: Dict[str, Any], domain: str) -> str:
         """Convert pipes dict to TOML string."""
         toml_parts: list[str] = []
-        for pipe_name, pipe_blueprint in pipes.items():
-            pipe_toml = PipelexInterpreter.pipe_to_toml_string(pipe_name, pipe_blueprint, domain)
+        for pipe_name, blueprint in pipes.items():
+            pipe_toml = PipelexInterpreter.pipe_to_toml_string(pipe_name, blueprint, domain)
             toml_parts.append(pipe_toml)
         return "\n\n".join(toml_parts)
 
     @staticmethod
-    def pipe_to_toml_string(pipe_name: str, pipe_blueprint: Any, domain: str) -> str:
+    def pipe_to_toml_string(pipe_name: str, blueprint: Any, domain: str) -> str:
         """Convert a single pipe blueprint to TOML string."""
-        if isinstance(pipe_blueprint, PipeLLMBlueprint):
-            return PipelexInterpreter.llm_pipe_to_toml_string(pipe_name, pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeSequenceBlueprint):
-            return PipelexInterpreter.sequence_pipe_to_toml_string(pipe_name, pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeOcrBlueprint):
-            return PipelexInterpreter.ocr_pipe_to_toml_string(pipe_name, pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeFuncBlueprint):
-            return PipelexInterpreter.func_pipe_to_toml_string(pipe_name, pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeImgGenBlueprint):
-            return PipelexInterpreter.img_gen_pipe_to_toml_string(pipe_name, pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeJinja2Blueprint):
-            return PipelexInterpreter.jinja2_pipe_to_toml_string(pipe_name, pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeConditionBlueprint):
-            return PipelexInterpreter.condition_pipe_to_toml_string(pipe_name, pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeParallelBlueprint):
-            return PipelexInterpreter.parallel_pipe_to_toml_string(pipe_name, pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeBatchBlueprint):
-            return PipelexInterpreter.batch_pipe_to_toml_string(pipe_name, pipe_blueprint, domain)
+        if isinstance(blueprint, PipeLLMBlueprint):
+            return PipelexInterpreter.llm_pipe_to_toml_string(pipe_name, blueprint, domain)
+        elif isinstance(blueprint, PipeSequenceBlueprint):
+            return PipelexInterpreter.sequence_pipe_to_toml_string(pipe_name, blueprint, domain)
+        elif isinstance(blueprint, PipeOcrBlueprint):
+            return PipelexInterpreter.ocr_pipe_to_toml_string(pipe_name, blueprint, domain)
+        elif isinstance(blueprint, PipeFuncBlueprint):
+            return PipelexInterpreter.func_pipe_to_toml_string(pipe_name, blueprint, domain)
+        elif isinstance(blueprint, PipeImgGenBlueprint):
+            return PipelexInterpreter.img_gen_pipe_to_toml_string(pipe_name, blueprint, domain)
+        elif isinstance(blueprint, PipeJinja2Blueprint):
+            return PipelexInterpreter.jinja2_pipe_to_toml_string(pipe_name, blueprint, domain)
+        elif isinstance(blueprint, PipeConditionBlueprint):
+            return PipelexInterpreter.condition_pipe_to_toml_string(pipe_name, blueprint, domain)
+        elif isinstance(blueprint, PipeParallelBlueprint):
+            return PipelexInterpreter.parallel_pipe_to_toml_string(pipe_name, blueprint, domain)
+        elif isinstance(blueprint, PipeBatchBlueprint):
+            return PipelexInterpreter.batch_pipe_to_toml_string(pipe_name, blueprint, domain)
         else:
             # Fallback to old dict approach for unknown pipe types
-            pipe_dict = PipelexInterpreter.serialize_pipe(pipe_blueprint, domain)
+            pipe_dict = PipelexInterpreter.serialize_pipe(blueprint, domain)
             return f"[pipe.{pipe_name}]\n" + "\n".join([f'{k} = "{v}"' if isinstance(v, str) else f"{k} = {v}" for k, v in pipe_dict.items()])
 
     @staticmethod
@@ -575,34 +575,34 @@ class PipelexInterpreter(BaseModel):
     def serialize_pipes(pipes: Dict[str, Any], domain: str) -> Dict[str, Any]:
         """Serialize pipes section with domain context."""
         result: Dict[str, Any] = {}
-        for pipe_name, pipe_blueprint in pipes.items():
-            result[pipe_name] = PipelexInterpreter.serialize_pipe(pipe_blueprint, domain)
+        for pipe_name, blueprint in pipes.items():
+            result[pipe_name] = PipelexInterpreter.serialize_pipe(blueprint, domain)
         return result
 
     @staticmethod
-    def serialize_pipe(pipe_blueprint: Any, domain: str) -> Dict[str, Any]:
+    def serialize_pipe(blueprint: Any, domain: str) -> Dict[str, Any]:
         """Serialize a single pipe blueprint with domain context."""
 
-        if isinstance(pipe_blueprint, PipeLLMBlueprint):
-            return PipelexInterpreter.serialize_llm_pipe(pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeOcrBlueprint):
-            return PipelexInterpreter.serialize_ocr_pipe(pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeFuncBlueprint):
-            return PipelexInterpreter._serialize_func_pipe(pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeImgGenBlueprint):
-            return PipelexInterpreter._serialize_img_gen_pipe(pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeJinja2Blueprint):
-            return PipelexInterpreter.serialize_jinja2_pipe(pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeSequenceBlueprint):
-            return PipelexInterpreter.serialize_sequence_pipe(pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeConditionBlueprint):
-            return PipelexInterpreter._serialize_condition_pipe(pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeParallelBlueprint):
-            return PipelexInterpreter._serialize_parallel_pipe(pipe_blueprint, domain)
-        elif isinstance(pipe_blueprint, PipeBatchBlueprint):
-            return PipelexInterpreter._serialize_batch_pipe(pipe_blueprint, domain)
+        if isinstance(blueprint, PipeLLMBlueprint):
+            return PipelexInterpreter.serialize_llm_pipe(blueprint, domain)
+        elif isinstance(blueprint, PipeOcrBlueprint):
+            return PipelexInterpreter.serialize_ocr_pipe(blueprint, domain)
+        elif isinstance(blueprint, PipeFuncBlueprint):
+            return PipelexInterpreter._serialize_func_pipe(blueprint, domain)
+        elif isinstance(blueprint, PipeImgGenBlueprint):
+            return PipelexInterpreter._serialize_img_gen_pipe(blueprint, domain)
+        elif isinstance(blueprint, PipeJinja2Blueprint):
+            return PipelexInterpreter.serialize_jinja2_pipe(blueprint, domain)
+        elif isinstance(blueprint, PipeSequenceBlueprint):
+            return PipelexInterpreter.serialize_sequence_pipe(blueprint, domain)
+        elif isinstance(blueprint, PipeConditionBlueprint):
+            return PipelexInterpreter._serialize_condition_pipe(blueprint, domain)
+        elif isinstance(blueprint, PipeParallelBlueprint):
+            return PipelexInterpreter._serialize_parallel_pipe(blueprint, domain)
+        elif isinstance(blueprint, PipeBatchBlueprint):
+            return PipelexInterpreter._serialize_batch_pipe(blueprint, domain)
         else:
-            raise ValueError(f"Unknown pipe blueprint type: {type(pipe_blueprint)}")
+            raise ValueError(f"Unknown pipe blueprint type: {type(blueprint)}")
 
     @staticmethod
     def serialize_llm_pipe(pipe: PipeLLMBlueprint, domain: str) -> Dict[str, Any]:

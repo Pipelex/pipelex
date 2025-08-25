@@ -11,7 +11,7 @@ class TestPipelexInterpreterParallelToml:
     """Test Parallel pipe to TOML string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,pipe_blueprint,expected_toml",
+        "pipe_name,blueprint,expected_toml",
         [
             # Basic Parallel pipe
             (
@@ -65,7 +65,7 @@ combined_output = "MergedResults\"""",
             ),
         ],
     )
-    def test_parallel_pipe_to_toml_string(self, pipe_name: str, pipe_blueprint: PipeParallelBlueprint, expected_toml: str):
+    def test_parallel_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeParallelBlueprint, expected_toml: str):
         """Test converting Parallel pipe blueprint to TOML string."""
-        result = PipelexInterpreter.parallel_pipe_to_toml_string(pipe_name, pipe_blueprint, "test_domain")
+        result = PipelexInterpreter.parallel_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
         assert result == expected_toml
