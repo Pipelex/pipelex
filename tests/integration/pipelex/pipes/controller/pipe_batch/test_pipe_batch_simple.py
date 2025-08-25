@@ -48,8 +48,8 @@ class TestPipeBatchSimple:
             definition="Simple batch processing test",
             branch_pipe_code="uppercase_transformer",  # This exists in the TOML file
             inputs={
-                "text_list": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string),
-                "text_item": InputRequirementBlueprint(concept_string_or_concept_code=concept_2.concept_string),
+                "text_list": InputRequirementBlueprint(concept=concept_1.concept_string),
+                "text_item": InputRequirementBlueprint(concept=concept_2.concept_string),
             },
             output=concept_2.concept_string,
             input_list_name="text_list",

@@ -33,9 +33,7 @@ class TestPipeConditionSimple:
         """Test PipeCondition with long text that should trigger capitalize_long_text pipe."""
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Text length condition for testing",
-            inputs={
-                "input_text": InputRequirementBlueprint(concept_string_or_concept_code=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")
-            },
+            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")},
             output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"long": "capitalize_long_text", "short": "add_prefix_short_text"}),
@@ -110,9 +108,7 @@ class TestPipeConditionSimple:
         # Create PipeCondition instance - pipes are loaded from TOML files
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Text length condition for short text testing",
-            inputs={
-                "input_text": InputRequirementBlueprint(concept_string_or_concept_code=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")
-            },
+            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")},
             output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"long": "capitalize_long_text", "short": "add_prefix_short_text"}),

@@ -42,7 +42,7 @@ class TestPipeSequenceSimple:
         # Create PipeSequence instance - pipes are loaded from TOML files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             definition="Simple sequence for text processing",
-            inputs={"input_text": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string)},
+            inputs={"input_text": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             steps=[
                 SubPipeBlueprint(pipe="capitalize_text", result="capitalized_text"),

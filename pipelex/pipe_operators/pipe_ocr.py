@@ -136,11 +136,7 @@ class PipeOcr(PipeOperator):
     def needed_inputs(self) -> PipeInputSpec:
         return PipeInputSpecFactory.make_from_blueprint(
             domain=self.domain,
-            blueprint={
-                PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(
-                    concept_string_or_concept_code=self.inputs.root[PIPE_OCR_INPUT_NAME].concept.concept_string
-                )
-            },
+            blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept=self.inputs.root[PIPE_OCR_INPUT_NAME].concept.concept_string)},
         )
 
     @override

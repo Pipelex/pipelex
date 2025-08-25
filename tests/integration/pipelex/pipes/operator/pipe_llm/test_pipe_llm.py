@@ -67,7 +67,7 @@ class TestPipeLLM:
             working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
             pipe_llm_blueprint = PipeLLMBlueprint(
                 definition="LLM test for image processing with attributes",
-                inputs={stuff_name: InputRequirementBlueprint(concept_string_or_concept_code=stuff.concept.concept_string)},
+                inputs={stuff_name: InputRequirementBlueprint(concept=stuff.concept.concept_string)},
                 output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,

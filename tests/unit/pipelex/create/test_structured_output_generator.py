@@ -446,3 +446,44 @@ class TestStructureGenerator:
         assert normalized_structure["name"].definition == "The name of the person"
         assert normalized_structure["name"].type == ConceptStructureBlueprintFieldType.TEXT
         assert normalized_structure["name"].required
+
+    def test_code_validation_success(self):
+        """Test that valid generated code passes validation."""
+        structure_blueprint = {
+            "name": ConceptStructureBlueprint(definition="Name field", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
+        }
+
+        generator = StructureGenerator()
+        result = generator.generate_from_structure_blueprint("ValidTestModel", structure_blueprint)
+
+        # The generation should succeed (validation happens internally)
+        assert "class ValidTestModel(StructuredContent):" in result
+
+        # Test validation directly
+        assert generator.validate_generated_code(result, "ValidTestModel") is True
+
+    def test_code_validation_syntax_error(self):
+        """Test that invalid syntax fails validation."""
+        generator = StructureGenerator()
+        invalid_code = """
+from pydantic import Field
+from pipelex.core.stuffs.stuff_content import StructuredContent
+
+class InvalidModel(StructuredContent):
+    name: str = Field(..., description="Name field"  # Missing closing parenthesis
+"""
+
+        assert generator.validate_generated_code(invalid_code, "InvalidModel") is False
+
+    def test_code_validation_missing_class(self):
+        """Test that code without the expected class fails validation."""
+        generator = StructureGenerator()
+        code_without_expected_class = """
+from pydantic import Field
+from pipelex.core.stuffs.stuff_content import StructuredContent
+
+class WrongClassName(StructuredContent):
+    name: str = Field(..., description="Name field")
+"""
+
+        assert generator.validate_generated_code(code_without_expected_class, "ExpectedClassName") is False

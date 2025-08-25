@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Type
 
 import pytest
 
@@ -40,3 +41,11 @@ class TestPipelexInterpreter:
         pretty_print(get_toml_content, title=f"TOML content {test_name}")
         pretty_print(toml_content, title=f"Expected TOML content {test_name}")
         assert get_toml_content == toml_content
+
+    @pytest.mark.parametrize("test_name,invalid_toml_content,expected_exception", InterpreterTestCases.ERROR_TEST_CASES)
+    def test_invalid_toml_should_raise_exception(self, test_name: str, invalid_toml_content: str, expected_exception: Type[Exception]):
+        """Test that invalid TOML content raises appropriate exceptions."""
+        converter = PipelexInterpreter(file_content=invalid_toml_content)
+
+        with pytest.raises(expected_exception):
+            converter.make_pipelex_bundle_blueprint()

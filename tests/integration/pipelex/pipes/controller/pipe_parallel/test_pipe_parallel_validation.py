@@ -29,8 +29,8 @@ class TestPipeParallelValidation:
 
         pipe_llm_blueprint = PipeLLMBlueprint(
             inputs={
-                "document": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string),
-                "context": InputRequirementBlueprint(concept_string_or_concept_code=concept_2.concept_string),
+                "document": InputRequirementBlueprint(concept=concept_1.concept_string),
+                "context": InputRequirementBlueprint(concept=concept_2.concept_string),
             },
             definition="Analysis pipe for document processing",
             output=ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
@@ -55,8 +55,8 @@ class TestPipeParallelValidation:
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel document processor for testing",
             inputs={
-                "document": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.code),
-                "context": InputRequirementBlueprint(concept_string_or_concept_code=concept_2.code),
+                "document": InputRequirementBlueprint(concept=concept_1.code),
+                "context": InputRequirementBlueprint(concept=concept_2.code),
             },
             output=ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
             parallels=[SubPipeBlueprint(pipe=real_pipe.code, result="analysis_result")],
@@ -101,7 +101,7 @@ class TestPipeParallelValidation:
 
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Basic parallel pipe for testing",
-            inputs={"input_var": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string)},
+            inputs={"input_var": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
             parallels=[SubPipeBlueprint(pipe="test_pipe_1", result="result_1")],
             add_each_output=True,
@@ -146,8 +146,8 @@ class TestPipeParallelValidation:
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel processor for testing inputs structure",
             inputs={
-                "document": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string),
-                "context": InputRequirementBlueprint(concept_string_or_concept_code=concept_2.concept_string),
+                "document": InputRequirementBlueprint(concept=concept_1.concept_string),
+                "context": InputRequirementBlueprint(concept=concept_2.concept_string),
             },
             output=ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
             parallels=[],  # No sub-pipes to avoid dependency issues

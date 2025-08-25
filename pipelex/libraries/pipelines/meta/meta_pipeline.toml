@@ -10,7 +10,7 @@ PipeBlueprint = "Details enabling to create a pipe"
 
 [concept.PipelexBundleBlueprint]
 definition = "Details enabling to create a pipeline"
-structure = "PipelexBundleBlueprintStuff"
+structure = "PipelexBundleBlueprint"
 
 [pipe]
 [pipe.build_blueprint]

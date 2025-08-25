@@ -28,7 +28,7 @@ class TestPipeSequenceValidation:
 
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             definition="Test sequence for validation",
-            inputs={"text": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string)},
+            inputs={"text": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             steps=[SubPipeBlueprint(pipe="test_pipe_1", result="intermediate_result")],
         )
@@ -67,7 +67,7 @@ class TestPipeSequenceValidation:
 
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             definition="Test sequence with multiple steps",
-            inputs={"initial_input": InputRequirementBlueprint(concept_string_or_concept_code=concept_1.concept_string)},
+            inputs={"initial_input": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             steps=[SubPipeBlueprint(pipe="step_1", result="intermediate"), SubPipeBlueprint(pipe="step_2", result="final_output")],
         )

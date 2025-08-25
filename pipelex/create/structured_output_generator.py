@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Union
+import ast
+from typing import Any, Dict, List, Type, Union, cast
 
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 
@@ -42,7 +43,13 @@ class StructureGenerator:
         # Generate the complete module
         imports_section = "\n".join(sorted(self.imports))
 
-        return f"{imports_section}\n\n\n{class_code}\n"
+        generated_code = f"{imports_section}\n\n\n{class_code}\n"
+
+        # Validate the generated code
+        if not self.validate_generated_code(generated_code, class_name):
+            raise ValueError(f"Generated code for class '{class_name}' failed validation")
+
+        return generated_code
 
     def _generate_class_from_blueprint(self, class_name: str, structure_blueprint: Dict[str, ConceptStructureBlueprint]) -> str:
         """Generate a class definition from ConceptStructureBlueprint.
@@ -286,3 +293,156 @@ class StructureGenerator:
             case _:
                 # Unknown FieldType, assume it's a custom type
                 return str(field_type)
+
+    def validate_generated_code(self, python_code: str, expected_class_name: str) -> bool:
+        """Validate that the generated Python code is syntactically correct and executable.
+
+        Args:
+            python_code: The generated Python code to validate
+            expected_class_name: The name of the class that should be created
+
+        Returns:
+            True if the code is valid, False otherwise
+        """
+        # Step 1: Syntax validation
+        if not self._validate_syntax(python_code):
+            return False
+
+        # Step 2: Compilation validation
+        if not self._validate_compilation(python_code):
+            return False
+
+        # Step 3: Execution and class creation validation
+        if not self._validate_execution(python_code, expected_class_name):
+            return False
+
+        # Step 4: Class instantiation validation
+        if not self._validate_instantiation(python_code, expected_class_name):
+            return False
+
+        return True
+
+    def _validate_syntax(self, python_code: str) -> bool:
+        """Validate that the code has valid Python syntax."""
+        try:
+            ast.parse(python_code)
+            return True
+        except SyntaxError as e:
+            print(f"Syntax error in generated code: {e}")
+            return False
+
+    def _validate_compilation(self, python_code: str) -> bool:
+        """Validate that the code can be compiled."""
+        try:
+            compile(python_code, "<generated>", "exec")
+            return True
+        except Exception as e:
+            print(f"Compilation error in generated code: {e}")
+            return False
+
+    def _validate_execution(self, python_code: str, expected_class_name: str) -> bool:
+        """Validate that the code executes and creates the expected class."""
+        try:
+            # Import necessary modules for the execution context
+            from datetime import datetime
+            from enum import Enum
+            from typing import Any, Dict, List, Literal, Optional
+
+            from pydantic import Field
+
+            from pipelex.core.stuffs.stuff_content import StructuredContent
+
+            # Provide necessary imports in the execution context
+            exec_globals = {
+                "__builtins__": __builtins__,
+                "datetime": datetime,
+                "Enum": Enum,
+                "Optional": Optional,
+                "List": List,
+                "Dict": Dict,
+                "Any": Any,
+                "Literal": Literal,
+                "Field": Field,
+                "StructuredContent": StructuredContent,
+            }
+            exec_locals: Dict[str, Any] = {}
+            exec(python_code, exec_globals, exec_locals)
+
+            # Verify the expected class was created
+            if expected_class_name not in exec_locals:
+                print(f"Expected class '{expected_class_name}' not found in generated code")
+                return False
+
+            # Verify it's actually a class
+            if not isinstance(exec_locals[expected_class_name], type):
+                print(f"'{expected_class_name}' is not a class")
+                return False
+
+            return True
+
+        except ImportError as e:
+            print(f"Import error in generated code: {e}")
+            return False
+        except Exception as e:
+            print(f"Execution error in generated code: {e}")
+            return False
+
+    def _validate_instantiation(self, python_code: str, expected_class_name: str) -> bool:
+        """Validate that the generated class can be instantiated."""
+        try:
+            # Import necessary modules for the execution context
+            from datetime import datetime
+            from enum import Enum
+            from typing import Any, Dict, List, Literal, Optional
+
+            from pydantic import Field
+
+            from pipelex.core.stuffs.stuff_content import StructuredContent
+
+            # Provide necessary imports in the execution context
+            exec_globals = {
+                "__builtins__": __builtins__,
+                "datetime": datetime,
+                "Enum": Enum,
+                "Optional": Optional,
+                "List": List,
+                "Dict": Dict,
+                "Any": Any,
+                "Literal": Literal,
+                "Field": Field,
+                "StructuredContent": StructuredContent,
+            }
+            exec_locals: Dict[str, Any] = {}
+            exec(python_code, exec_globals, exec_locals)
+
+            generated_class = cast(Type[Any], exec_locals[expected_class_name])
+
+            # Try to create an instance (this will catch Pydantic validation issues)
+            # For validation purposes, we'll try to create an instance with minimal valid data
+            instance: Any = None
+            try:
+                # First try with no arguments (works for classes with all optional fields)
+                instance = generated_class()
+            except Exception:
+                # If that fails, try with empty dict (some models accept this)
+                try:
+                    instance = generated_class(**{})
+                except Exception:
+                    # If that fails too, the class structure is probably fine but requires specific data
+                    # For validation purposes, we'll just check that it's a valid Pydantic model class
+                    if not hasattr(generated_class, "model_fields"):
+                        print("Generated class doesn't appear to be a Pydantic model")
+                        return False
+                    # Class structure is valid, just requires specific data to instantiate
+                    return True
+
+            # Verify it's a Pydantic model with the expected structure
+            if instance is not None and not hasattr(instance, "model_fields"):
+                print("Generated class doesn't appear to be a Pydantic model")
+                return False
+
+            return True
+
+        except Exception as e:
+            print(f"Instantiation error in generated code: {e}")
+            return False

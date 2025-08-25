@@ -192,14 +192,20 @@ def _convert_to_inline(value: Any) -> Any:
         return array_obj
 
     if isinstance(value, str):
-        # Triple quotes if needed (or forced); closing quotes on their own line.
-        return make_toml_string(
-            value,
-            prefer_literal=False,  # flip to True for '''...'''
-            force_multiline=False,  # flip to True to force """...""" even without \n
-            ensure_trailing_newline=True,  # keep closing """ on its own line
-            ensure_leading_blank_line_in_value=False,  # flip to True to keep a blank first line
-        )
+        # For prompt templates and similar fields, escape newlines instead of using multiline format
+        if any(keyword in str(value) for keyword in ["@", "$"]) and "\n" in value:
+            # This looks like a prompt template - escape newlines for single-line format
+            # Return the string directly and let tomlkit handle the escaping properly
+            return value
+        else:
+            # Triple quotes if needed (or forced); closing quotes on their own line.
+            return make_toml_string(
+                value,
+                prefer_literal=False,  # flip to True for '''...'''
+                force_multiline=False,  # flip to True to force """...""" even without \n
+                ensure_trailing_newline=True,  # keep closing """ on its own line
+                ensure_leading_blank_line_in_value=False,  # flip to True to keep a blank first line
+            )
     return value
 
 
@@ -304,9 +310,71 @@ def dict_to_toml(data: Mapping[str, Any]) -> str:
 
     # Post-process to fix inline table spacing: {key = "value"} -> { key = "value" }
 
-    # Add space after opening brace and before closing brace for TOML inline tables only
+    # Fix spacing around inline table contents - ensure single space after { and before }
     # This regex matches TOML inline tables (containing = signs) but not Jinja2 templates
-    dumped_content = re.sub(r"\{([^}]*=[^}]*)\}", r"{ \1 }", dumped_content)
+    # We need to handle nested braces properly by working from innermost to outermost
+
+    def fix_inline_table_spacing(content: str) -> str:
+        """Fix spacing in inline tables, handling nested structures, but avoid modifying braces inside strings."""
+        # Split content into lines and process each line
+        lines = content.split("\n")
+        processed_lines: list[str] = []
+
+        for line in lines:
+            # Only process lines that contain TOML inline tables (have '=' and braces outside quotes)
+            # Skip lines that are just string values with braces (like Jinja2 templates)
+            if "=" in line and "{" in line and "}" in line:
+                # Check if this line has a TOML key-value assignment with inline table
+                # Pattern: key = { ... } or key = { nested = { ... } }
+                if re.match(r"^\s*\w+\s*=\s*\{", line):
+                    # This is a TOML inline table assignment, apply spacing fixes
+                    processed_line = line
+
+                    # Apply multiple passes to handle nested structures properly
+                    for _ in range(10):  # Prevent infinite loops
+                        old_line = processed_line
+
+                        # First: fix simple inline tables (no nested braces)
+                        processed_line = re.sub(r"\{\s*([^{}]*=[^{}]*?)\s*\}", r"{ \1 }", processed_line)
+
+                        # Second: fix nested inline tables - outer tables containing inner ones
+                        # Match pattern like { key = { inner = "value" } }
+                        processed_line = re.sub(r"\{\s*([^={}]*=\s*\{[^}]*\}[^{}]*?)\s*\}", r"{ \1 }", processed_line)
+
+                        # Third: fix complex nested cases with multiple inner tables
+                        # Handle cases like {key1 = {inner = "value"}, key2 = {inner2 = "value2"}}
+                        processed_line = re.sub(r"\{\s*([^{}]*=\s*\{[^}]*\}.*?)\s*\}", r"{ \1 }", processed_line)
+
+                        # Fourth: clean up any excessive whitespace that might remain
+                        # Remove multiple consecutive spaces inside tables
+                        processed_line = re.sub(r"\{\s*([^{}]*?)\s{2,}\}", r"{ \1 }", processed_line)
+
+                        # Fifth: ensure consistent single space formatting
+                        processed_line = re.sub(r"\{\s{2,}([^{}]*?)\s*\}", r"{ \1 }", processed_line)
+
+                        if old_line == processed_line:
+                            break
+
+                    # Final cleanup: fix any remaining spacing issues in inline tables
+                    # First: ensure there's a space between adjacent closing braces "}}"
+                    processed_line = re.sub(r"\}\}", "} }", processed_line)
+
+                    # Then: remove extra spaces (2 or more) before closing braces, but keep single spaces
+                    # This pattern matches cases like "}  }" (2+ spaces) and replaces with "} }"
+                    processed_line = re.sub(r"\}\s{2,}\}", "} }", processed_line)
+
+                    processed_lines.append(processed_line)
+                else:
+                    # This line has braces but is not a TOML inline table (e.g., string with Jinja2)
+                    # Leave it unchanged
+                    processed_lines.append(line)
+            else:
+                # No braces or no assignment, leave unchanged
+                processed_lines.append(line)
+
+        return "\n".join(processed_lines)
+
+    dumped_content = fix_inline_table_spacing(dumped_content)
 
     return dumped_content
 

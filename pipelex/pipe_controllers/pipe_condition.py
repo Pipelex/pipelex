@@ -216,7 +216,7 @@ class PipeCondition(PipeController):
         inputs_blueprint: Dict[str, Union[str, InputRequirementBlueprint]] = {}
         for var_name, requirement in self.inputs.root.items():
             inputs_blueprint[var_name] = InputRequirementBlueprint(
-                concept_string_or_concept_code=requirement.concept.concept_string,
+                concept=requirement.concept.concept_string,
                 multiplicity=requirement.multiplicity,
             )
 
