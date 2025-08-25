@@ -16,7 +16,9 @@ from pipelex.tools.templating.jinja2_errors import (
     make_jinja2_error_explanation,
 )
 from pipelex.tools.templating.jinja2_models import Jinja2ContextKey
+from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.template_provider_abstract import TemplateProviderAbstract
 from pipelex.tools.templating.templating_models import PromptingStyle
 
@@ -58,6 +60,12 @@ async def render_jinja2(
     except TemplateAssertionError as exc:
         explanation = make_jinja2_error_explanation(jinja2_name=jinja2_name, template_text=jinja2)
         raise Jinja2RenderError(f"Jinja2 render error: '{exc}' {explanation}") from exc
+
+    template_source = preprocess_template(template_source)
+    check_jinja2_parsing(
+        jinja2_template_source=template_source,
+        template_category=template_category,
+    )
 
     parsed_ast = jinja2_env.parse(template_source)
     if undeclared_variables := meta.find_undeclared_variables(parsed_ast):

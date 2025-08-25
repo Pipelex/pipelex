@@ -171,17 +171,10 @@ class LLMPromptSpec(BaseModel):
             if jinja2_blueprint.extra_context:
                 context.update(**jinja2_blueprint.extra_context)
 
-            template: str = jinja2_blueprint.jinja2 or ""
-            if jinja2_blueprint.jinja2:
-                template = preprocess_template(jinja2_blueprint.jinja2)
-                check_jinja2_parsing(
-                    jinja2_template_source=template,
-                    template_category=jinja2_blueprint.template_category,
-                )
             the_text = await get_content_generator().make_jinja2_text(
                 context=context,
                 jinja2_name=jinja2_blueprint.jinja2_name,
-                jinja2=template,
+                jinja2=jinja2_blueprint.jinja2,
                 prompting_style=self.prompting_style,
                 template_category=jinja2_blueprint.template_category,
             )

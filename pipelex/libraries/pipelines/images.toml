@@ -25,6 +25,7 @@ inputs = { image = "Image" }
 output = "VisualDescription"
 system_prompt = "You are a very good observer."
 llm = "llm_to_describe_img"
+structuring_method = "preliminary_text"
 prompt_template = """
 Describe the provided image in great detail.
 """
