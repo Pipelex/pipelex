@@ -40,7 +40,7 @@ class TestPipeParallelValidation:
         real_pipe = PipeLLMFactory.make_from_blueprint(
             domain=domain,
             pipe_code="analyze_document",
-            pipe_blueprint=pipe_llm_blueprint,
+            blueprint=pipe_llm_blueprint,
         )
 
         pipe_provider = get_pipe_provider()
@@ -67,7 +67,7 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallelFactory.make_from_blueprint(
             domain=domain,
             pipe_code="parallel_document_processor",
-            pipe_blueprint=pipe_parallel_blueprint,
+            blueprint=pipe_parallel_blueprint,
         )
 
         # Verify the PipeParallel structure is correct
@@ -111,7 +111,7 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallelFactory.make_from_blueprint(
             domain=domain,
             pipe_code="test_parallel",
-            pipe_blueprint=pipe_parallel_blueprint,
+            blueprint=pipe_parallel_blueprint,
         )
 
         # Verify the PipeParallel was created correctly
@@ -158,7 +158,7 @@ class TestPipeParallelValidation:
         pipe_parallel = PipeParallelFactory.make_from_blueprint(
             domain=domain,
             pipe_code="parallel_document_processor",
-            pipe_blueprint=pipe_parallel_blueprint,
+            blueprint=pipe_parallel_blueprint,
         )
 
         # Test that needed_inputs method can be called

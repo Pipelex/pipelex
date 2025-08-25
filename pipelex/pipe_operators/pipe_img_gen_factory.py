@@ -49,33 +49,33 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         cls,
         domain: str,
         pipe_code: str,
-        pipe_blueprint: PipeImgGenBlueprint,
+        blueprint: PipeImgGenBlueprint,
         concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeImgGen:
         output_concept_domain, output_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
-            concept_string_or_concept_code=pipe_blueprint.output,
+            concept_string_or_concept_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return PipeImgGen(
             domain=domain,
             code=pipe_code,
-            definition=pipe_blueprint.definition,
+            definition=blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
             ),
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
             ),
-            output_multiplicity=pipe_blueprint.nb_output or 1,
-            imgg_prompt=pipe_blueprint.img_gen_prompt,
-            imgg_handle=pipe_blueprint.imgg_handle,
-            aspect_ratio=pipe_blueprint.aspect_ratio,
-            nb_steps=pipe_blueprint.nb_steps,
-            guidance_scale=pipe_blueprint.guidance_scale,
-            is_moderated=pipe_blueprint.is_moderated,
-            safety_tolerance=pipe_blueprint.safety_tolerance,
-            is_raw=pipe_blueprint.is_raw,
-            seed=pipe_blueprint.seed,
-            img_gen_prompt_var_name=pipe_blueprint.img_gen_prompt_var_name,
+            output_multiplicity=blueprint.nb_output or 1,
+            imgg_prompt=blueprint.img_gen_prompt,
+            imgg_handle=blueprint.imgg_handle,
+            aspect_ratio=blueprint.aspect_ratio,
+            nb_steps=blueprint.nb_steps,
+            guidance_scale=blueprint.guidance_scale,
+            is_moderated=blueprint.is_moderated,
+            safety_tolerance=blueprint.safety_tolerance,
+            is_raw=blueprint.is_raw,
+            seed=blueprint.seed,
+            img_gen_prompt_var_name=blueprint.img_gen_prompt_var_name,
         )

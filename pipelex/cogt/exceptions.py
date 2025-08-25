@@ -83,6 +83,10 @@ class LLMAssignmentError(CogtError):
     pass
 
 
+class LLMPromptSpecError(CogtError):
+    pass
+
+
 class LLMPromptFactoryError(CogtError):
     pass
 

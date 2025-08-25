@@ -4,6 +4,7 @@ from click import ClickException
 from typing_extensions import override
 
 from pipelex.tools.exceptions import RootException
+from pipelex.tools.misc.context_provider_abstract import ContextProviderException
 from pipelex.types import StrEnum
 
 
@@ -73,10 +74,8 @@ class WorkingMemoryConsistencyError(WorkingMemoryError):
     pass
 
 
-class WorkingMemoryVariableError(WorkingMemoryError):
-    def __init__(self, variable_name: str, message: str, *args: object, **kwargs: object) -> None:
-        self.variable_name = variable_name
-        super().__init__(message, *args, **kwargs)
+class WorkingMemoryVariableError(WorkingMemoryError, ContextProviderException):
+    pass
 
 
 class WorkingMemoryTypeError(WorkingMemoryVariableError):

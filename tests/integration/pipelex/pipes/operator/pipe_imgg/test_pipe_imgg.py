@@ -37,7 +37,7 @@ class TestPipeImgg:
             pipe=PipeImgGenFactory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_img_gen",
-                pipe_blueprint=pipe_imgg_blueprint,
+                blueprint=pipe_imgg_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )

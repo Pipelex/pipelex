@@ -42,7 +42,7 @@ class TestPipeConditionSimple:
         pipe_condition = PipeConditionFactory.make_from_blueprint(
             domain="test_integration",
             pipe_code="text_length_condition",
-            pipe_blueprint=pipe_condition_blueprint,
+            blueprint=pipe_condition_blueprint,
         )
         input_text_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
@@ -117,7 +117,7 @@ class TestPipeConditionSimple:
         pipe_condition = PipeConditionFactory.make_from_blueprint(
             domain="test_integration",
             pipe_code="text_length_condition",
-            pipe_blueprint=pipe_condition_blueprint,
+            blueprint=pipe_condition_blueprint,
         )
 
         # Create test data - short text input (<= 5 characters)

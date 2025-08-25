@@ -26,27 +26,27 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
         cls,
         domain: str,
         pipe_code: str,
-        pipe_blueprint: PipeBatchBlueprint,
+        blueprint: PipeBatchBlueprint,
         concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeBatch:
         output_concept_domain, output_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
-            concept_string_or_concept_code=pipe_blueprint.output,
+            concept_string_or_concept_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return PipeBatch(
             domain=domain,
             code=pipe_code,
-            definition=pipe_blueprint.definition,
+            definition=blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
             ),
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
             ),
-            branch_pipe_code=pipe_blueprint.branch_pipe_code,
+            branch_pipe_code=blueprint.branch_pipe_code,
             batch_params=BatchParams.make_optional_batch_params(
-                input_list_name=pipe_blueprint.input_list_name or False,
-                input_item_name=pipe_blueprint.input_item_name,
+                input_list_name=blueprint.input_list_name or False,
+                input_item_name=blueprint.input_item_name,
             ),
         )

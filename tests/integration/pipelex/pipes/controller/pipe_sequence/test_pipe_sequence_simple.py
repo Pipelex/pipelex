@@ -53,7 +53,7 @@ class TestPipeSequenceSimple:
         pipe_sequence = PipeSequenceFactory.make_from_blueprint(
             domain="test_integration",
             pipe_code="simple_sequence",
-            pipe_blueprint=pipe_sequence_blueprint,
+            blueprint=pipe_sequence_blueprint,
         )
 
         # Create test data - single text input

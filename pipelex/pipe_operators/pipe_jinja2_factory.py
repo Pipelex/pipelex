@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional
+from typing import List, Literal, Optional
 
 from typing_extensions import override
 
@@ -11,19 +11,15 @@ from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
+from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.templating_models import PromptingStyle
 
 
-class PipeJinja2Blueprint(PipeBlueprint):
+class PipeJinja2Blueprint(PipeBlueprint, Jinja2Blueprint):
     type: Literal["PipeJinja2"] = "PipeJinja2"
-    jinja2_name: Optional[str] = None
-    jinja2: Optional[str] = None
-    prompting_style: Optional[PromptingStyle] = None
-    template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
-    extra_context: Optional[Dict[str, Any]] = None
 
 
 class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
@@ -33,39 +29,39 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
         cls,
         domain: str,
         pipe_code: str,
-        pipe_blueprint: PipeJinja2Blueprint,
+        blueprint: PipeJinja2Blueprint,
         concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeJinja2:
         preprocessed_template: Optional[str] = None
-        if pipe_blueprint.jinja2:
-            preprocessed_template = preprocess_template(pipe_blueprint.jinja2)
+        if blueprint.jinja2:
+            preprocessed_template = preprocess_template(blueprint.jinja2)
             check_jinja2_parsing(
                 jinja2_template_source=preprocessed_template,
-                template_category=pipe_blueprint.template_category,
+                template_category=blueprint.template_category,
             )
         else:
             preprocessed_template = None
 
         output_concept_domain, output_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
-            concept_string_or_concept_code=pipe_blueprint.output,
+            concept_string_or_concept_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return PipeJinja2(
             domain=domain,
             code=pipe_code,
-            definition=pipe_blueprint.definition,
+            definition=blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
             ),
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
             ),
-            jinja2_name=pipe_blueprint.jinja2_name,
+            jinja2_name=blueprint.jinja2_name,
             jinja2=preprocessed_template,
-            prompting_style=pipe_blueprint.prompting_style,
-            template_category=pipe_blueprint.template_category,
-            extra_context=pipe_blueprint.extra_context,
+            prompting_style=blueprint.prompting_style,
+            template_category=blueprint.template_category,
+            extra_context=blueprint.extra_context,
         )
 
     @classmethod

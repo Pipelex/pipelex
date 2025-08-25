@@ -2,7 +2,7 @@ from operator import attrgetter
 from typing import Any, Dict, List, Optional, Set, Type
 
 from pydantic import BaseModel, Field, model_validator
-from typing_extensions import Self
+from typing_extensions import Self, override
 
 from pipelex import log, pretty_print
 from pipelex.core.stuffs.stuff import Stuff
@@ -24,6 +24,7 @@ from pipelex.exceptions import (
     WorkingMemoryStuffNotFoundError,
     WorkingMemoryTypeError,
 )
+from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
@@ -33,7 +34,7 @@ StuffDict = Dict[str, Stuff]
 StuffArtefactDict = Dict[str, StuffArtefact]
 
 
-class WorkingMemory(BaseModel):
+class WorkingMemory(BaseModel, ContextProviderAbstract):
     root: StuffDict = Field(default_factory=dict)
     aliases: Dict[str, str] = Field(default_factory=dict)
 
@@ -62,15 +63,6 @@ class WorkingMemory(BaseModel):
     def make_deep_copy(self) -> Self:
         return self.model_copy(deep=True)
 
-    def generate_stuff_artefact_dict(self) -> StuffArtefactDict:
-        artefact_dict: StuffArtefactDict = {}
-        for name, stuff in self.root.items():
-            a = stuff.make_artefact()
-            artefact_dict[name] = a
-        for alias, target in self.aliases.items():
-            artefact_dict[alias] = artefact_dict[target]
-        return artefact_dict
-
     def get_optional_stuff(self, name: str) -> Optional[Stuff]:
         if named_stuff := self.root.get(name):
             return named_stuff
@@ -97,41 +89,6 @@ class WorkingMemory(BaseModel):
             variable_name=name,
             message=f"Stuff '{name}' not found in working memory, valid keys are: {self.list_keys()}",
         )
-
-    def get_stuff_or_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
-        if "." in name:
-            parts = name.split(".", 1)  # Split only at the first dot
-            base_name = parts[0]
-            attr_path_str = parts[1]  # Keep the rest as a dot-separated string
-
-            base_stuff = self.get_stuff(base_name)
-
-            try:
-                stuff_content = attrgetter(attr_path_str)(base_stuff.content)
-            except AttributeError as exc:
-                raise WorkingMemoryStuffAttributeNotFoundError(
-                    variable_name=name,
-                    message=f"Stuff attribute not found in attribute path '{name}': {exc}",
-                ) from exc
-
-            # Sometimes, some stuff content are Optional, therefore can be None. So Do not impose a wanted type
-            if stuff_content is not None and wanted_type is not None and not isinstance(stuff_content, wanted_type):
-                raise WorkingMemoryTypeError(
-                    variable_name=name,
-                    message=f"Content at '{name}' is of type {type(stuff_content).__name__}, it should be {wanted_type.__name__}",
-                )
-
-            return stuff_content
-        else:
-            content = self.get_stuff(name).content
-
-            if wanted_type is not None and not isinstance(content, wanted_type):
-                raise WorkingMemoryTypeError(
-                    variable_name=name,
-                    message=f"Content of '{name}' is of type {type(content).__name__}, it should be {wanted_type.__name__}",
-                )
-
-            return content
 
     def get_stuffs(self, names: Set[str]) -> List[Stuff]:
         the_stuffs: List[Stuff] = []
@@ -231,6 +188,56 @@ class WorkingMemory(BaseModel):
     def pretty_print(self):
         for name, stuff in self.root.items():
             pretty_print(stuff.content.rendered_plain(), title=f"{name}: {stuff.concept.code}")
+
+    ################################################################################################
+    # ContextProviderAbstract
+    ################################################################################################
+
+    @override
+    def generate_context(self) -> Dict[str, Any]:
+        artefact_dict: StuffArtefactDict = {}
+        for name, stuff in self.root.items():
+            a = stuff.make_artefact()
+            artefact_dict[name] = a
+        for alias, target in self.aliases.items():
+            artefact_dict[alias] = artefact_dict[target]
+        return artefact_dict
+
+    @override
+    def get_typed_object_or_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
+        if "." in name:
+            parts = name.split(".", 1)  # Split only at the first dot
+            base_name = parts[0]
+            attr_path_str = parts[1]  # Keep the rest as a dot-separated string
+
+            base_stuff = self.get_stuff(base_name)
+
+            try:
+                stuff_content = attrgetter(attr_path_str)(base_stuff.content)
+            except AttributeError as exc:
+                raise WorkingMemoryStuffAttributeNotFoundError(
+                    variable_name=name,
+                    message=f"Stuff attribute not found in attribute path '{name}': {exc}",
+                ) from exc
+
+            # Sometimes, some stuff content are Optional, therefore can be None. So Do not impose a wanted type
+            if stuff_content is not None and wanted_type is not None and not isinstance(stuff_content, wanted_type):
+                raise WorkingMemoryTypeError(
+                    variable_name=name,
+                    message=f"Content at '{name}' is of type {type(stuff_content).__name__}, it should be {wanted_type.__name__}",
+                )
+
+            return stuff_content
+        else:
+            content = self.get_stuff(name).content
+
+            if wanted_type is not None and not isinstance(content, wanted_type):
+                raise WorkingMemoryTypeError(
+                    variable_name=name,
+                    message=f"Content of '{name}' is of type {type(content).__name__}, it should be {wanted_type.__name__}",
+                )
+
+            return content
 
     ################################################################################################
     # Stuff accessors

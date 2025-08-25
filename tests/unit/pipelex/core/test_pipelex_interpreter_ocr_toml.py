@@ -10,7 +10,7 @@ class TestPipelexInterpreterOcrToml:
     """Test OCR pipe to TOML string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,pipe_blueprint,expected_toml",
+        "pipe_name,blueprint,expected_toml",
         [
             # Basic OCR pipe
             (
@@ -42,7 +42,7 @@ output = "Page\"""",
             ),
         ],
     )
-    def test_ocr_pipe_to_toml_string(self, pipe_name: str, pipe_blueprint: PipeOcrBlueprint, expected_toml: str):
+    def test_ocr_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeOcrBlueprint, expected_toml: str):
         """Test converting OCR pipe blueprint to TOML string."""
-        result = PipelexInterpreter.ocr_pipe_to_toml_string(pipe_name, pipe_blueprint, "test_domain")
+        result = PipelexInterpreter.ocr_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
         assert result == expected_toml

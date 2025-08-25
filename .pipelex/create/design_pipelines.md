@@ -90,7 +90,7 @@ This section explains how to design pipelines for Pipelex.
 
 ### Pipes: overall rules
 
-Each entry under `pipe` is a dict that will be converted into a typed `PipeBlueprint` (see `pipelex/core/pipe_blueprint.py` for the base and factories in `pipe_controllers/` and `pipe_operators/`). Use the new format:
+Each entry under `pipe` is a dict that will be converted into a typed `PipeBlueprint` (see `pipelex/core/blueprint.py` for the base and factories in `pipe_controllers/` and `pipe_operators/`). Use the new format:
 
 - `type: str` — the pipe class name, e.g., `PipeLLM`, `PipeOcr`, `PipeSequence`, `PipeParallel`, `PipeCondition`, `PipeFunc`, `PipeImgGen`.
 

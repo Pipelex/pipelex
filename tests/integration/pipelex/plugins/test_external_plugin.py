@@ -103,7 +103,7 @@ class TestExternalPlugin:
             pipe=PipeLLMFactory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_llm_with_external_llm_handle",
-                pipe_blueprint=pipe_llm_blueprint,
+                blueprint=pipe_llm_blueprint,
             ),
         )
         pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(

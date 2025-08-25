@@ -37,7 +37,7 @@ class TestPipeLLM:
             pipe=PipeLLMFactory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_llm",
-                pipe_blueprint=pipe_llm_blueprint,
+                blueprint=pipe_llm_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -78,7 +78,7 @@ class TestPipeLLM:
                 pipe=PipeLLMFactory.make_from_blueprint(
                     domain="generic",
                     pipe_code="adhoc_for_test_pipe_llm_image",
-                    pipe_blueprint=pipe_llm_blueprint,
+                    blueprint=pipe_llm_blueprint,
                 ),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             )

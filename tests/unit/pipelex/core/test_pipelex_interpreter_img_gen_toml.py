@@ -11,7 +11,7 @@ class TestPipelexInterpreterImgGenToml:
     """Test ImgGen pipe to TOML string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,pipe_blueprint,expected_toml",
+        "pipe_name,blueprint,expected_toml",
         [
             # Basic ImgGen pipe
             (
@@ -49,7 +49,7 @@ seed = 12345""",
             ),
         ],
     )
-    def test_img_gen_pipe_to_toml_string(self, pipe_name: str, pipe_blueprint: PipeImgGenBlueprint, expected_toml: str):
+    def test_img_gen_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeImgGenBlueprint, expected_toml: str):
         """Test converting ImgGen pipe blueprint to TOML string."""
-        result = PipelexInterpreter.img_gen_pipe_to_toml_string(pipe_name, pipe_blueprint, "test_domain")
+        result = PipelexInterpreter.img_gen_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
         assert result == expected_toml

@@ -10,7 +10,7 @@ class TestPipelexInterpreterJinja2PipeTomlString:
     """Test the jinja2_pipe_to_toml_string function directly."""
 
     @pytest.mark.parametrize(
-        "pipe_name,pipe_blueprint,expected_result",
+        "pipe_name,blueprint,expected_result",
         [
             # Basic Jinja2 pipe
             (
@@ -76,7 +76,7 @@ jinja2_name = "greeting_template\"""",
             ),
         ],
     )
-    def test_jinja2_pipe_to_toml_string(self, pipe_name: str, pipe_blueprint: PipeJinja2Blueprint, expected_result: str):
+    def test_jinja2_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeJinja2Blueprint, expected_result: str):
         """Test converting PipeJinja2Blueprint to TOML string with various configurations."""
-        result = PipelexInterpreter.jinja2_pipe_to_toml_string(pipe_name, pipe_blueprint, "test_domain")
+        result = PipelexInterpreter.jinja2_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
         assert result == expected_result

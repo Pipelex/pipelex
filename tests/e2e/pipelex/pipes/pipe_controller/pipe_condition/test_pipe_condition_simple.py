@@ -35,7 +35,7 @@ class TestPipeConditionSimple:
         pipe_condition = PipeConditionFactory.make_from_blueprint(
             domain="test_domain",
             pipe_code="test_condition_fail",
-            pipe_blueprint=pipe_condition_blueprint,
+            blueprint=pipe_condition_blueprint,
         )
 
         # Test with empty working memory - should FAIL
@@ -69,7 +69,7 @@ class TestPipeConditionSimple:
         pipe_condition = PipeConditionFactory.make_from_blueprint(
             domain="test_domain",
             pipe_code="test_condition_succeed",
-            pipe_blueprint=pipe_condition_blueprint,
+            blueprint=pipe_condition_blueprint,
         )
 
         # Test with proper working memory - should SUCCEED or fail at expression evaluation (not missing inputs)

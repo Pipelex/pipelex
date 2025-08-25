@@ -35,22 +35,22 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         cls,
         domain: str,
         pipe_code: str,
-        pipe_blueprint: PipeParallelBlueprint,
+        blueprint: PipeParallelBlueprint,
         concept_codes_from_the_same_domain: Optional[List[str]] = None,
     ) -> PipeParallel:
         parallel_sub_pipes: List[SubPipe] = []
-        for sub_pipe_blueprint in pipe_blueprint.parallels:
+        for sub_pipe_blueprint in blueprint.parallels:
             if not sub_pipe_blueprint.result:
                 raise PipeDefinitionError("PipeParallel requires a result specified for each parallel sub pipe")
             sub_pipe = SubPipeFactory.make_from_blueprint(sub_pipe_blueprint, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain)
             parallel_sub_pipes.append(sub_pipe)
-        if not pipe_blueprint.add_each_output and not pipe_blueprint.combined_output:
+        if not blueprint.add_each_output and not blueprint.combined_output:
             raise PipeDefinitionError("PipeParallel requires either add_each_output or combined_output to be set")
 
-        if pipe_blueprint.combined_output:
+        if blueprint.combined_output:
             combined_output_domain, output_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
                 domain=domain,
-                concept_string_or_concept_code=pipe_blueprint.output,
+                concept_string_or_concept_code=blueprint.output,
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             )
             combined_output = get_concept_provider().get_required_concept(
@@ -61,20 +61,20 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
 
         output_concept_domain, output_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
-            concept_string_or_concept_code=pipe_blueprint.output,
+            concept_string_or_concept_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return PipeParallel(
             domain=domain,
             code=pipe_code,
-            definition=pipe_blueprint.definition,
+            definition=blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=pipe_blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
             ),
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
             ),
             parallel_sub_pipes=parallel_sub_pipes,
-            add_each_output=pipe_blueprint.add_each_output,
+            add_each_output=blueprint.add_each_output,
             combined_output=combined_output,
         )
