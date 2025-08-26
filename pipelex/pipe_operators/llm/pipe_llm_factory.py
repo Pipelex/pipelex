@@ -1,65 +1,21 @@
-from typing import List, Literal, Optional
+from typing import List, Optional
 
-from pydantic import field_validator, model_validator
-from typing_extensions import Self, override
+from typing_extensions import override
 
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices, LLMSettingOrPresetId
+from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider, get_optional_domain
-from pipelex.pipe_operators.pipe_llm import PipeLLM, StructuringMethod
+from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
 from pipelex.tools.templating.template_provider_abstract import TemplateNotFoundError
-from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
-
-
-class PipeLLMBlueprint(PipeBlueprint):
-    type: Literal["PipeLLM"] = "PipeLLM"
-    system_prompt_template: Optional[str] = None
-    system_prompt_template_name: Optional[str] = None
-    system_prompt_name: Optional[str] = None
-    system_prompt: Optional[str] = None
-
-    prompt_template: Optional[str] = None
-    template_name: Optional[str] = None
-    prompt_name: Optional[str] = None
-    prompt: Optional[str] = None
-
-    llm: Optional[LLMSettingOrPresetId] = None
-    llm_to_structure: Optional[LLMSettingOrPresetId] = None
-
-    structuring_method: Optional[StructuringMethod] = None
-    prompt_template_to_structure: Optional[str] = None
-    system_prompt_to_structure: Optional[str] = None
-
-    nb_output: Optional[int] = None
-    multiple_output: Optional[bool] = None
-
-    @field_validator("nb_output", mode="after")
-    def validate_nb_output(cls, value: Optional[int] = None) -> Optional[int]:
-        if value and value < 1:
-            raise PipeDefinitionError("PipeLLMBlueprint nb_output must be greater than 0")
-        return value
-
-    @model_validator(mode="after")
-    def validate_multiple_output(self) -> Self:
-        if excess_attributes_list := has_more_than_one_among_attributes_from_lists(
-            self,
-            attributes_lists=[
-                ["nb_output", "multiple_output"],
-                ["system_prompt", "system_prompt_name", "system_prompt_template", "system_prompt_template_name"],
-                ["prompt", "prompt_name", "prompt_template", "template_name"],
-            ],
-        ):
-            raise PipeDefinitionError(f"PipeLLMBlueprint should have no more than one of {excess_attributes_list} among them")
-        return self
 
 
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):

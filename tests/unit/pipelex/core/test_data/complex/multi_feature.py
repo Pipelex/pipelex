@@ -1,9 +1,9 @@
 """Complex test cases combining multiple features."""
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint
-from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
-from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint
+from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 COMPLEX_PIPES = (
     "complex_pipes",

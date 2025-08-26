@@ -156,19 +156,18 @@ class LibraryManager(LibraryManagerAbstract):
 
         return all_toml_paths
 
-    def _parse_file(self, toml_path: Path) -> PipelexBundleBlueprint:
-        """Parse a TOML file and return its blueprint."""
-        if not PipelexInterpreter.is_pipelex_file(toml_path):
-            raise LibraryError(f"File is not a valid Pipelex TOML file: {toml_path}")
-
-        converter = PipelexInterpreter(file_path=toml_path)
-        return converter.make_pipelex_bundle_blueprint()
-
     @override
     def load_from_file(self, toml_path: Path) -> None:
         """Load a single file - this method is kept for compatibility."""
-        blueprint = self._parse_file(toml_path)
+        if not PipelexInterpreter.is_pipelex_file(toml_path):
+            raise LibraryError(f"File is not a valid Pipelex TOML file: {toml_path}")
 
+        blueprint = PipelexInterpreter(file_path=toml_path).make_pipelex_bundle_blueprint()
+        self.load_from_blueprint(blueprint)
+
+    @override
+    def load_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[PipeAbstract]:
+        """Load a blueprint."""
         # Create and load domain
         domain = self._load_domain_from_blueprint(blueprint)
         self.domain_library.add_domain(domain=domain)
@@ -180,6 +179,8 @@ class LibraryManager(LibraryManagerAbstract):
         # Create and load pipes
         pipes = self._load_pipes_from_blueprint(blueprint)
         self.pipe_library.add_pipes(pipes=pipes)
+
+        return pipes
 
     def _load_domain_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> Domain:
         """Create a Domain from blueprint."""
@@ -245,7 +246,7 @@ class LibraryManager(LibraryManagerAbstract):
         # Parse all blueprints first
         blueprints: List[PipelexBundleBlueprint] = []
         for toml_file_path in all_toml_paths:
-            blueprint = self._parse_file(toml_file_path)
+            blueprint = PipelexInterpreter(file_path=toml_file_path).make_pipelex_bundle_blueprint()
             blueprints.append(blueprint)
 
         # Load all domains first

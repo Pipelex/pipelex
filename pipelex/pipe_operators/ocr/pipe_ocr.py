@@ -13,7 +13,8 @@ from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
@@ -58,6 +59,11 @@ class PipeOcr(PipeOperator):
     @override
     def required_variables(self) -> Set[str]:
         return {PIPE_OCR_INPUT_NAME}
+
+    @override
+    def validate_output(self):
+        if self.output != get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.PAGE):
+            raise PipeDefinitionError(f"PipeOcr output should be a Page concept, but is {self.output.concept_string}")
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()

@@ -76,6 +76,10 @@ class PipeJinja2(PipeOperator):
         return self
 
     @override
+    def validate_output(self):
+        pass
+
+    @override
     def validate_with_libraries(self):
         if self.jinja2_name:
             the_template = get_template(template_name=self.jinja2_name)

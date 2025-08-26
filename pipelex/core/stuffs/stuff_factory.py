@@ -8,6 +8,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import (
     ListContent,
@@ -15,7 +16,7 @@ from pipelex.core.stuffs.stuff_content import (
     TextContent,
 )
 from pipelex.exceptions import PipelexError
-from pipelex.hub import get_class_registry, get_concept_provider, get_required_concept
+from pipelex.hub import get_class_registry, get_concept_provider
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -146,17 +147,21 @@ class StuffFactory:
                 raise StuffFactoryError(f"Could not make stuff for ListContent '{name}': {exc}") from exc
         elif isinstance(stuff_content_or_data, StuffContent):
             content = stuff_content_or_data
-            concept_name = type(content).__name__
+            concept_class_name = type(content).__name__
             native_concept_class_names = [data.content_class_name for data in NATIVE_CONCEPTS_DATA.values()]
-            if concept_name in native_concept_class_names:
-                # Find the native concept by its content class name
-                concept = get_required_concept(concept_name)
+
+            if concept_class_name in native_concept_class_names:
+                concept = get_concept_provider().get_required_concept(
+                    concept_string=SpecialDomain.NATIVE.value + "." + concept_class_name.split("Content")[0]
+                )
                 return cls.make_stuff(
                     concept=concept,
                     content=content,
                     name=name,
                     code=stuff_code,
                 )
+            # For non-native StuffContent, we need to define concept_name
+            concept_name = concept_class_name.split("Content")[0]
             try:
                 return cls.make_stuff_using_concept_name_and_search_domains(
                     concept_name=concept_name,

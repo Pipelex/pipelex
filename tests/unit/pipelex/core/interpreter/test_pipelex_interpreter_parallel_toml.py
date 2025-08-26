@@ -3,8 +3,8 @@
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint
-from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
 class TestPipelexInterpreterParallelToml:

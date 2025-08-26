@@ -9,8 +9,9 @@ from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipe_router, get_report_delegate
-from pipelex.pipe_operators.pipe_func import PipeFuncOutput
-from pipelex.pipe_operators.pipe_func_factory import PipeFuncBlueprint, PipeFuncFactory
+from pipelex.pipe_operators.func.pipe_func import PipeFuncOutput
+from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
+from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.tools.func_registry import func_registry
 from tests.cases.source_code import wrap_lines

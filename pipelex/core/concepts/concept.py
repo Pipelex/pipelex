@@ -6,9 +6,11 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
-from pipelex.core.domains.domain import DomainBlueprint, SpecialDomain
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.create.structured_output_generator import StructureGenerator
+from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 
 
@@ -65,18 +67,30 @@ class Concept(BaseModel):
 
     @classmethod
     def are_concept_compatible(cls, concept_1: "Concept", concept_2: "Concept", strict: bool = False) -> bool:
-        if concept_1.code == concept_2.code and concept_1.domain == concept_2.domain:
+        if concept_1.concept_string == concept_2.concept_string:
             return True
         if concept_1.structure_class_name == concept_2.structure_class_name:
             return True
-        if concept_1.refines == concept_2.refines:
+        if concept_1.refines is None and concept_2.refines is None:
+            concept_1_class = KajsonManager.get_class_registry().get_class(name=concept_1.structure_class_name)
+            concept_2_class = KajsonManager.get_class_registry().get_class(name=concept_2.structure_class_name)
+
+            if concept_1_class is None or concept_2_class is None:
+                return False
+
             if strict:
-                if concept_1.refines is not None:
-                    return True
-                else:
-                    return False
+                # Check if classes are equivalent (same fields, types, descriptions)
+                return ClassRegistryUtils.are_classes_equivalent(concept_1_class, concept_2_class)
             else:
-                return True
+                # Check if concept_1 is a subclass of concept_2
+                try:
+                    if issubclass(concept_1_class, concept_2_class):
+                        return True
+                except TypeError:
+                    pass
+
+                # Check if concept_1 has a field that is of type concept_2_class
+                return ClassRegistryUtils.has_compatible_field(concept_1_class, concept_2_class)
         return False
 
     @classmethod

@@ -46,15 +46,10 @@ from pipelex.hub import (
     get_required_pipe,
     get_template,
 )
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.type_inspector import get_type_structure
-from pipelex.types import StrEnum
-
-
-class StructuringMethod(StrEnum):
-    DIRECT = "direct"
-    PRELIMINARY_TEXT = "preliminary_text"
 
 
 class PipeLLMOutput(PipeOutput):
@@ -96,6 +91,17 @@ class PipeLLM(PipeOperator):
         if self.llm_choices:
             for llm_setting in self.llm_choices.list_used_presets():
                 check_llm_setting_with_deck(llm_setting_or_preset_id=llm_setting)
+
+    @override
+    def validate_output(self):
+        if get_concept_provider().is_compatible(
+            tested_concept=self.output,
+            wanted_concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+        ):
+            raise PipeDefinitionError(
+                f"The output of a LLM pipe cannot be compatible with the Image concept. In the "
+                f"pipe '{self.code}' the output is '{self.output.concept_string}'"
+            )
 
     @override
     def needed_inputs(self) -> PipeInputSpec:

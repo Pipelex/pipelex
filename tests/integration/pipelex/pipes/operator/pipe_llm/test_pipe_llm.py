@@ -6,13 +6,14 @@ from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.hub import get_pipe_router, get_report_delegate
-from pipelex.pipe_operators.pipe_llm import PipeLLMOutput
-from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint, PipeLLMFactory
+from pipelex.pipe_operators.llm.pipe_llm import PipeLLMOutput
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from tests.integration.pipelex.test_data import PipeTestCases
 

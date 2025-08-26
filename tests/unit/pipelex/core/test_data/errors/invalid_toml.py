@@ -6,7 +6,7 @@ import toml
 from pydantic import ValidationError
 
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintError
-from pipelex.core.domains.domain import DomainError
+from pipelex.core.domains.exceptions import DomainError
 
 # TOML Syntax Errors
 INVALID_TOML_SYNTAX = (

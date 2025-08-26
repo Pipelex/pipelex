@@ -1,6 +1,6 @@
 [project]
 name = "pipelex"
-version = "0.8.1"
+version = "0.8.0"
 description = "Pipelex is an open-source dev tool based on a simple declarative language that lets you define replicable, structured, composable LLM pipelines."
 authors = [{ name = "Evotis S.A.S.", email = "evotis@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -19,6 +19,7 @@ classifiers = [
 
 dependencies = [
     "aiofiles>=23.2.1",
+    "backports.strenum>=1.3.0 ; python_version < '3.11'",
     "filetype>=1.2.0",
     "httpx>=0.27.0",
     "instructor>=1.8.3",
@@ -57,7 +58,6 @@ bedrock = ["boto3>=1.34.131", "aioboto3>=13.4.0"]
 fal = ["fal-client>=0.4.1"]
 google = ["google-auth-oauthlib>=1.2.1"]
 mistralai = ["mistralai==1.5.2"]
-compat = ["backports.strenum>=1.3.0 ; python_version < '3.11'"]
 docs = [
     "mkdocs==1.6.1",
     "mkdocs-glightbox==0.4.0",
