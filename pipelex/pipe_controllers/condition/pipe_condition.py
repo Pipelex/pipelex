@@ -44,6 +44,26 @@ class PipeCondition(PipeController):
     #########################################################################################
     # Validation
     #########################################################################################
+    @override
+    def validate_output(self):
+        """
+        Validate the output for the pipe condition.
+        The output of the pipe condition should match the output of all the conditional pipes, and the default pipe.
+        """
+        for pipe_condition_pipe_map in self.pipe_map:
+            pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
+            if self.output.concept_string != pipe.output.concept_string:
+                raise PipeConditionError(
+                    f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
+                    f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'"
+                )
+        if self.default_pipe_code:
+            default_pipe = get_required_pipe(pipe_code=self.default_pipe_code)
+            if self.output.concept_string != default_pipe.output.concept_string:
+                raise PipeConditionError(
+                    f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
+                    f"not matching the output concept code '{default_pipe.output.concept_string}' of the default pipe '{self.default_pipe_code}'"
+                )
 
     @model_validator(mode="after")
     def validate_expression(self) -> Self:

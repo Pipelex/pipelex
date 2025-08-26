@@ -93,6 +93,17 @@ class PipeLLM(PipeOperator):
                 check_llm_setting_with_deck(llm_setting_or_preset_id=llm_setting)
 
     @override
+    def validate_output(self):
+        if get_concept_provider().is_compatible(
+            tested_concept=self.output,
+            wanted_concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+        ):
+            raise PipeDefinitionError(
+                f"The output of a LLM pipe cannot be compatible with the Image concept. In the "
+                f"pipe '{self.code}' the output is '{self.output.concept_string}'"
+            )
+
+    @override
     def needed_inputs(self) -> PipeInputSpec:
         """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
         # The images are not tagged in the prompt_template.

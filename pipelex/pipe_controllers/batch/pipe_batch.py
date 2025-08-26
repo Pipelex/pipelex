@@ -34,6 +34,10 @@ class PipeBatch(PipeController):
     def pipe_dependencies(self) -> Set[str]:
         return set([self.branch_pipe_code])
 
+    @override
+    def validate_output(self):
+        pass
+
     @model_validator(mode="after")
     def validate_required_variables(self) -> Self:
         # Skip for now

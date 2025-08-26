@@ -60,6 +60,11 @@ class PipeOcr(PipeOperator):
     def required_variables(self) -> Set[str]:
         return {PIPE_OCR_INPUT_NAME}
 
+    @override
+    def validate_output(self):
+        if self.output != get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.PAGE):
+            raise PipeDefinitionError(f"PipeOcr output should be a Page concept, but is {self.output.concept_string}")
+
     def _validate_inputs(self):
         concept_provider = get_concept_provider()
         static_validation_config = get_config().pipelex.static_validation_config

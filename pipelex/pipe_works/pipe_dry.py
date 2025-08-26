@@ -69,7 +69,8 @@ async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
 
     start_time = time.time()
     results: Dict[str, str] = {}
-
+    pipe_library = get_pipe_provider()
+    pipe_library.validate_with_libraries()
     # Get the list of pipes that are allowed to fail from config
     allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
 
