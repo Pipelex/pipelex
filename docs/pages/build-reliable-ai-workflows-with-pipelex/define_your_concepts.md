@@ -17,7 +17,7 @@ Employee = "A person employed by an organization"
 ProductReview = "A customer's evaluation of a product or service"
 ```
 
-Those concepts will be Text-based by default. If you want to use sutrctured output, you need to create a Python class for the concept, or declare the structure directly in the concept definition. Look at the [Structured Output](structured-output.md) section for more information.
+Those concepts will be Text-based by default. If you want to use sutrctured output, you need to create a Python class for the concept, or declare the structure directly in the concept definition. 
 
 **Key principles for concept definitions:**
 
