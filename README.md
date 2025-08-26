@@ -72,7 +72,8 @@ Buyer = "The person who made the purchase"
 PurchaseDocumentText = "Transcript of a receipt, invoice, or order confirmation"
 
 [pipe.extract_buyer]
-PipeLLM = "Extract buyer from purchase document"
+type = "PipeLLM"
+description = "Extract buyer from purchase document"
 inputs = { purchase_document_text = "PurchaseDocumentText" }
 output = "Buyer"
 llm = "llm_to_extract_info"
@@ -166,7 +167,8 @@ WritingStyle = "A style of writing"
 
 [pipe]
 [pipe.analyze_tweet]
-PipeLLM = "Analyze the draft tweet and identify areas for improvement"
+type = "PipeLLM"
+description = "Analyze the draft tweet and identify areas for improvement"
 inputs = { draft_tweet = "DraftTweet" }
 output = "TweetAnalysis"
 llm = "llm_for_writing_analysis"
@@ -194,7 +196,8 @@ For each criterion, provide:
 """
 
 [pipe.optimize_tweet]
-PipeLLM = "Optimize the tweet based on the analysis"
+type = "PipeLLM"
+description = "Optimize the tweet based on the analysis"
 inputs = { draft_tweet = "DraftTweet", tweet_analysis = "TweetAnalysis", writing_style = "WritingStyle" }
 output = "OptimizedTweet"
 llm = "llm_for_social_post_writing"
@@ -228,7 +231,8 @@ Keep the core meaning of the original tweet.
 """
 
 [pipe.optimize_tweet_sequence]
-PipeSequence = "Analyze and optimize a tech tweet in sequence"
+type = "PipeSequence"
+description = "Analyze and optimize a tech tweet in sequence"
 inputs = { draft_tweet = "DraftTweet", writing_style = "WritingStyle" }
 output = "OptimizedTweet"
 steps = [

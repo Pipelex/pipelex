@@ -22,7 +22,8 @@ You must use `add_each_output`, `combined_output`, or both.
 
 | Parameter         | Type          | Description                                                                                                                                                                    | Required |
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| `PipeParallel`    | string        | A descriptive name for the parallel operation.                                                                           | Yes      |
+| `type`            | string        | The type of the pipe: `PipeParallel`                                                                          | Yes      |
+| `description`     | string        | A description of the parallel operation.                                                                           | Yes      |
 | `inputs`    | dictionary  | The input concept(s) for the parallel operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
 | `output`   | string          | The output concept produced by the parallel operation.                                                | Yes      |
 | `parallels`       | array of tables| An array defining the pipes to run in parallel. Each table is a sub-pipe definition.                                                                                           | Yes      |
@@ -47,18 +48,21 @@ Imagine you have a product description and you want to extract the product featu
 structure = "ProductAnalysis" # A Pydantic model with 'features' and 'sentiment' fields
 
 [pipe.extract_features]
-PipeLLM = "Extract features from text"
+type = "PipeLLM"
+description = "Extract features from text"
 inputs = { description = "ProductDescription" }
 output = "ProductFeatures"
 
 [pipe.analyze_sentiment]
-PipeLLM = "Analyze sentiment of text"
+type = "PipeLLM"
+description = "Analyze sentiment of text"
 inputs = { description = "ProductDescription" }
 output = "ProductSentiment"
 
 # The PipeParallel definition
 [pipe.analyze_product_in_parallel]
-PipeParallel = "Extract features and sentiment at the same time"
+type = "PipeParallel"
+description = "Extract features and sentiment at the same time"
 inputs = { description = "ProductDescription" }
 output = "ProductAnalysis" # This name is for the combined output
 add_each_output = false

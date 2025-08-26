@@ -64,7 +64,8 @@ The entire workflow is defined in a TOML file. This declarative approach makes t
 ```toml
 # The main pipeline, a sequence of steps
 [pipe.process_invoice]
-PipeSequence = "Process relevant information from an invoice"
+type = "PipeSequence"
+description = "Process relevant information from an invoice"
 inputs = { invoice_pdf = "PDF" }
 output = "Invoice"
 steps = [
@@ -76,7 +77,8 @@ steps = [
 
 # A sub-pipeline that uses an LLM to extract the data
 [pipe.extract_invoice_data]
-PipeLLM = "Extract invoice information from an invoice text transcript"
+type = "PipeLLM"
+description = "Extract invoice information from an invoice text transcript"
 inputs = { "invoice_page.page_view" = "Page", invoice_details = "InvoiceDetails" }
 output = "Invoice"
 # The output is constrained to the "Invoice" model

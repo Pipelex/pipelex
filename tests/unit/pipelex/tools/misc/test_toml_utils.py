@@ -59,7 +59,8 @@ definition = "Test"
         toml_content = '''domain = "test"
 
 [pipe.test_pipe]
-PipeLLM = "Test"
+type = "PipeLLM"
+description = "Test"
 prompt_template = """
 Output this only: "test"
 """   
@@ -72,7 +73,7 @@ Output this only: "test"
 
         error_msg = str(exc_info.value)
         assert "Trailing whitespace after triple quotes" in error_msg
-        assert "Line 7" in error_msg
+        assert "Line 8" in error_msg
 
     @pytest.mark.skip(reason="Mixed line ending detection needs refinement - focusing on trailing whitespace detection")
     def test_validate_toml_file_mixed_line_endings(self, tmp_path: Path) -> None:

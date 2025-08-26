@@ -25,7 +25,8 @@ The `PageContent` object has the following structure:
 
 | Parameter                   | Type    | Description                                                                                                                              | Required |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `PipeOcr`                   | string  | A descriptive name for the OCR operation.                                                                           | Yes      |
+| `type`                      | string  | The type of the pipe: `PipeOcr`                                                                          | Yes      |
+| `description`               | string  | A description of the OCR operation.                                                                   | Yes      |
 | `inputs`                    | Fixed  | The input for the PipeOcr is the key `ocr_input` and the value is either of concept `Image` or `Pdf`.                                                     | Yes       |
 | `output`                    | string  | The output concept produced by the OCR operation.                                                | Yes      |
 | `should_include_images`     | boolean | If `true`, any images found within the document pages will be extracted and included in the output. Defaults to `false`.                 | No       |
@@ -40,14 +41,20 @@ This example defines a pipe that takes a PDF, extracts text and full-page images
 ```toml
 [concept]
 ScannedDocument = "A document that has been scanned as a PDF"
-ExtractedPages = "A list of pages extracted from a document by OCR"
+
+[concept.ExtractedPages]
+definition = "A list of pages extracted from a document by OCR"
+refines = "Page"
 
 [pipe.extract_text_from_document]
-PipeOcr = "Extract text from a scanned document"
+type = "PipeOcr"
+description = "Extract text from a scanned document"
 inputs = { ocr_input = "ScannedDocument" }
 output = "ExtractedText"
 should_include_page_views = true
 page_views_dpi = 200
 ```
+
+The output of the PipeOcr has to be a concept compatible with the native `Page` concept. A concept is compatible with the `Page` concept if it refines the `Page` concept.
 
 To use this pipe, you would first need to load a PDF into the `ScannedDocument` concept. After the pipe runs, the `ExtractedPages` concept will contain a list of `PageContent` objects, where each object has the extracted text and a 200 DPI image of the corresponding page.

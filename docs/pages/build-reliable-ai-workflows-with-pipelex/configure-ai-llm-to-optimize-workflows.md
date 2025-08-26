@@ -64,7 +64,8 @@ Here's how to use these configurations in your pipelines:
 
 ```toml
 [pipe.generate_response]
-PipeLLM = "Generate a creative response"
+type = "PipeLLM"
+description = "Generate a creative response"
 inputs = { question = "Question" }
 output = "Response"
 llm = {
@@ -79,7 +80,8 @@ Generate a creative response to this question:
 """
 
 [pipe.extract_weather_data]
-PipeLLM = "Extract structured weather data from text"
+type = "PipeLLM"
+description = "Extract structured weather data from text"
 inputs = { text = "Text" }
 output = "WeatherData"
 llm = "llm_to_extract"  # Using a preset

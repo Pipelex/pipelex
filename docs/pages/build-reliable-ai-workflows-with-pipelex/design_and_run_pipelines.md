@@ -36,7 +36,8 @@ Tagline = "A catchy marketing tagline"
 
 # 2. Define the pipe that does the work
 [pipe.generate_tagline]
-PipeLLM = "Generate a catchy tagline for a product"
+type = "PipeLLM"
+description = "Generate a catchy tagline for a product"
 inputs = { description = "ProductDescription" }
 output = "Tagline"
 prompt_template = """
@@ -52,6 +53,10 @@ This defines a single-step pipeline. The pipe `generate_tagline` takes a `Produc
 
 To create a multi-step workflow, you use a controller. The `PipeSequence` controller is the most common one. It executes a series of pipes in a specific order.
 
+The inputs specified will be required before the pipe is executed. Those inputs should be stored in the Working Memory.
+
+The output concept is very important. Indeed, the output of your pipe wille be corresponding to the concept you specify. If the concept is structured, the output will be a structured object. If the concept is native, the output will be a string.
+
 ```toml
 # Filename: marketing_pipeline.toml
 
@@ -66,7 +71,8 @@ Tagline = "A catchy marketing tagline"
 
 # 2. Define operator pipes
 [pipe.extract_keywords]
-PipeLLM = "Extract keywords from a product description"
+type = "PipeLLM"
+description = "Extract keywords from a product description"
 inputs = { description = "ProductDescription" }
 output = "Keyword"
 multiple_output = true
@@ -79,7 +85,8 @@ Focus on features, benefits, and unique selling points.
 """
 
 [pipe.generate_tagline_from_keywords]
-PipeLLM = "Generate a tagline from keywords"
+type = "PipeLLM"
+description = "Generate a tagline from keywords"
 inputs = { keywords = "Keyword" }
 output = "Tagline"
 prompt_template = """
@@ -92,7 +99,8 @@ The tagline should be memorable, concise (under 10 words), and highlight the mai
 
 # 3. This controller pipe defines the two-step pipeline
 [pipe.description_to_tagline]
-PipeSequence = "From product description to tagline"
+type = "PipeSequence"
+description = "From product description to tagline"
 inputs = { description = "ProductDescription" }
 output = "Tagline"
 steps = [

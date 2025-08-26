@@ -16,7 +16,8 @@ PipeLLM is used to:
 ### Simple Text Generation
 ```toml
 [pipe.write_story]
-PipeLLM = "Write a short story"
+type = "PipeLLM"
+description = "Write a short story"
 output = "Text"
 prompt_template = """
 Write a short story about a programmer.
@@ -26,7 +27,8 @@ Write a short story about a programmer.
 ### Structured Data Extraction
 ```toml
 [pipe.extract_info]
-PipeLLM = "Extract information"
+type = "PipeLLM"
+description = "Extract information"
 inputs = { text = "Text" }
 output = "PersonInfo"
 prompt_template = """
@@ -56,7 +58,8 @@ You can specify LLM settings in two ways:
 1. **Direct in the pipe**:
 ```toml
 [pipe.analyze]
-PipeLLM = "Analyze text"
+type = "PipeLLM"
+description = "Analyze text"
 output = "Analysis"
 llm = { llm_handle = "gpt-4", temperature = 0.7 }
 prompt_template = "Analyze this text"
@@ -65,7 +68,8 @@ prompt_template = "Analyze this text"
 2. **Using predefined settings** from `pipelex_libraries/llm_deck/base_llm_deck.toml`:
 ```toml
 [pipe.analyze]
-PipeLLM = "Analyze text"
+type = "PipeLLM"
+description = "Analyze text"
 output = "Analysis"
 llm = "llm_for_analysis"  # References a preset from llm_deck
 prompt_template = "Analyze this text"
@@ -75,7 +79,8 @@ prompt_template = "Analyze this text"
 Add system-level instructions:
 ```toml
 [pipe.expert_analysis]
-PipeLLM = "Expert analysis"
+type = "PipeLLM"
+description = "Expert analysis"
 output = "Analysis"
 system_prompt = "You are a data analysis expert"
 prompt_template = "Analyze this data"
@@ -85,7 +90,8 @@ prompt_template = "Analyze this data"
 Generate multiple results:
 ```toml
 [pipe.generate_ideas]
-PipeLLM = "Generate ideas"
+type = "PipeLLM"
+description = "Generate ideas"
 output = "Idea"
 nb_output = 3  # Generate exactly 3 ideas
 # OR
@@ -96,7 +102,8 @@ multiple_output = true  # Let the LLM decide how many to generate
 Process images with VLMs:
 ```toml
 [pipe.analyze_image]
-PipeLLM = "Analyze image"
+type = "PipeLLM"
+description = "Analyze image"
 inputs = { image = "Image" } # `image` is the name of the stuff that contains the Image. If its in a stuff, you can add something like `{ "page.image": "Image" }
 output = "ImageAnalysis"
 prompt_template = "Describe what you see in this image"

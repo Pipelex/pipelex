@@ -13,7 +13,8 @@ The PipeCondition controller allows you to implement conditional logic in your p
 
 ```toml
 [pipe.conditional_operation]
-PipeCondition = "A conditonal pipe to decide wheter..."
+type = "PipeCondition"
+description = "A conditonal pipe to decide wheter..."
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
@@ -26,7 +27,8 @@ large = "process_large"
 or
 ```toml
 [pipe.conditional_operation]
-PipeCondition = "A conditonal pipe to decide wheter..."
+type = "PipeCondition"
+description = "A conditonal pipe to decide wheter..."
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression_template = "{{ input_data.category }}" # Jinja2 code

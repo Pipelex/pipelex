@@ -59,7 +59,8 @@ Once the function is registered, you can use it in your `.toml` file.
 
 | Parameter       | Type   | Description                                                                 | Required |
 | --------------- | ------ | --------------------------------------------------------------------------- | -------- |
-| `PipeFunc`      | string | A descriptive name for the pipe's function.                                 | Yes      |
+| `type`          | string | The type of the pipe: `PipeFunc`                                                                          | Yes      |
+| `description`   | string | A description of the function operation.                                                                   | Yes      |
 | `function_name` | string | The unique name used to register the Python function (e.g., "combine_two_texts"). | Yes      |
 | `output`        | string | The concept to associate with the function's return value.                  | Yes      |
 
@@ -69,7 +70,8 @@ This TOML snippet shows how to use the `combine_two_texts` function defined abov
 
 ```toml
 [pipe.combine_them]
-PipeFunc = "Combine two text inputs using a custom Python function"
+type = "PipeFunc"
+description = "Combine two text inputs using a custom Python function"
 function_name = "combine_two_texts"
 output = "ConcatenatedText"
 ```

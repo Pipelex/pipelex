@@ -48,7 +48,7 @@ class YourModel(StructuredContent): # Always be a subclass of StructuredContent
 
 Structures are meant to indicate what class to use for a particular Concept. In general they use the same name as the concept.
 
-Structure classes defined within `pipelex_libraries/pipelines/` are automatically loaded into the class_registry when setting up Pipelex, no need to do it manually.
+Structure classes defined within `pipelex/libraries/pipelines/` are automatically loaded into the class_registry when setting up Pipelex, no need to do it manually.
 
 
 ## Best Practices for structures

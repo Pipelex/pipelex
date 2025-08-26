@@ -38,7 +38,8 @@ Here is an example of using an llm_handle to specify which LLM to use in a PipeL
 
 ```toml
 [pipe.hello_world]
-PipeLLM = "Write text about Hello World."
+type = "PipeLLM"
+description = "Write text about Hello World."
 output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
 prompt_template = """
@@ -62,7 +63,8 @@ The interest is that these presets can be used to set the LLM choice in a PipeLL
 
 ```toml
 [pipe.extract_invoice]
-PipeLLM = "Extract invoice information from an invoice text transcript"
+type = "PipeLLM"
+description = "Extract invoice information from an invoice text transcript"
 inputs = { invoice_text = "InvoiceText" }
 output = "Invoice"
 llm = "llm_to_extract_invoice"

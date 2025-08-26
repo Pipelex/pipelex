@@ -6,7 +6,7 @@ alwaysApply: false
 # Pipeline Guide
 
 - Always first write your "plan" in natural langage, then transcribe it in pipelex.
-- Always run `pipelex validate` before finishing a task. It will ensure the pipe is runnable
+- Always run `pipelex validate all -c pipelex/libraries` before finishing a task. It will ensure the pipe is runnable
 
 # Pipeline Structure Guide
 
@@ -38,15 +38,16 @@ Important Rules:
 - Use PascalCase for concept names
 - Never use plurals (no "Stories", use "Story")
 - Avoid adjectives (no "LargeText", use "Text")
-- Don't redefine native concepts (Text, Image, PDF, TextAndImages, Number)
-yes 
+- Don't redefine native concepts (Text, Image, PDF, TextAndImages, Number, Page)
+
 ### Pipe Definitions
 
 ## Pipe Base Structure
 
 ```toml
 [pipe.your_pipe_name]
-PipeLLM = "A description of what your pipe does"
+type = "PipeLLM"
+description = "A description of what your pipe does"
 inputs = { input_1 = "ConceptName1", input_2 = "ConceptName2" }
 output = "ConceptName"
 ```
@@ -77,4 +78,4 @@ When building a pipeline:
 
 # Important tip
 
-Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.
+Always run the cli `pipelex validate all -c pipelex/libraries` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

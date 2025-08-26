@@ -22,7 +22,8 @@ The Jinja2 template has access to all the "stuffs" currently in the working memo
 
 | Parameter       | Type            | Description                                                                                               | Required                    |
 | --------------- | --------------- | --------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `PipeJinja2`    | string          | A descriptive name for the pipe's function.                                                               | Yes                         |
+| `type`          | string          | The type of the pipe: `PipeJinja2`                                                                       | Yes                         |
+| `description`   | string          | A description of the Jinja2 operation.                                                                   | Yes                         |
 | `output`        | string          | The concept for the output. Defaults to `native.Text`.                                                    | No                          |
 | `jinja2_name`   | string          | The name of a pre-loaded template file.                                                                   | Yes (or `jinja2`)           |
 | `jinja2`        | string          | An inline Jinja2 template string.                                                                         | Yes (or `jinja2_name`)      |
@@ -52,7 +53,8 @@ Report generated on: {{ report_date }}
 **Pipeline TOML definition:**
 ```toml
 [pipe.generate_weekly_report]
-PipeJinja2 = "Generate a formatted weekly report for a user"
+type = "PipeJinja2"
+description = "Generate a formatted weekly report for a user"
 output = "WeeklyReportText"
 jinja2_name = "weekly_report.md"
 extra_context = { report_date = "2023-10-27" }

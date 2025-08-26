@@ -51,7 +51,8 @@ definition = "Discovering Pipelex"
 
 [pipe]
 [pipe.hello_world]
-PipeLLM = "Write text about Hello World."
+type = "PipeLLM"
+description = "Write text about Hello World."
 output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
 prompt = """

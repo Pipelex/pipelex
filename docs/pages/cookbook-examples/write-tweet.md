@@ -61,7 +61,8 @@ This pipeline uses a two-step "analyze and optimize" sequence. The first pipe an
 
 ```toml
 [pipe.optimize_tweet_sequence]
-PipeSequence = "Analyze and optimize a tech tweet in sequence"
+type = "PipeSequence"
+description = "Analyze and optimize a tech tweet in sequence"
 inputs = { draft_tweet = "DraftTweet", writing_style = "WritingStyle" }
 output = "OptimizedTweet"
 steps = [
@@ -73,7 +74,8 @@ steps = [
 
 # This is the pipe that analyzes the draft tweet.
 [pipe.analyze_tweet]
-PipeLLM = "Analyze the draft tweet and identify areas for improvement"
+type = "PipeLLM"
+description = "Analyze the draft tweet and identify areas for improvement"
 inputs = { draft_tweet = "DraftTweet" }
 output = "TweetAnalysis"
 system_prompt = """

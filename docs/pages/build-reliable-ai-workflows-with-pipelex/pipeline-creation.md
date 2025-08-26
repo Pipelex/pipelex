@@ -127,7 +127,8 @@ PhotoAnalysis = "Analysis of photo content and main features"
 OppositePhotoPrompt = "Prompt for generating opposite version of photo"
 
 [pipe.gen_photopposite]
-PipeSequence = "Generate opposite version of photo's main feature"
+type = "PipeSequence"
+description = "Generate opposite version of photo's main feature"
 output = "Image"
 steps = [
     { pipe = "analyze_photo", result = "analysis" },
@@ -136,7 +137,8 @@ steps = [
 ]
 
 [pipe.analyze_photo]
-PipeLLM = "Analyze photo content and identify main feature"
+type = "PipeLLM"
+description = "Analyze photo content and identify main feature"
 inputs = { photo = "Image" }
 output = "PhotoAnalysis"
 prompt_template = """
@@ -148,7 +150,8 @@ Focus on the dominant element, color, mood, or characteristic that defines this 
 """
 
 [pipe.create_opposite_concept]
-PipeLLM = "Create concept for opposite version"
+type = "PipeLLM"
+description = "Create concept for opposite version"
 inputs = { analysis = "PhotoAnalysis" }
 output = "OppositePhotoPrompt"
 prompt_template = """
@@ -160,7 +163,8 @@ Describe what the opposite would look like, focusing on reversing the main featu
 """
 
 [pipe.render_opposite]
-PipeImgGen = "Generate the opposite photo"
+type = "PipeImgGen"
+description = "Generate the opposite photo"
 inputs = { opposite_concept = "OppositePhotoPrompt" }
 output = "Image"
 ```

@@ -22,7 +22,8 @@ domain = "characters"
 
 [pipe]
 [pipe.create_character]
-PipeLLM = "Creates a character."
+type = "PipeLLM"
+description = "Creates a character."
 output = "Text"
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
@@ -67,7 +68,8 @@ python character.py
 
 ```toml
 [pipe.create_character]
-PipeLLM = "Create a character."
+type = "PipeLLM"
+description = "Create a character."
 output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
 prompt_template = """You are a book writer. Your task is to create a character.
@@ -78,7 +80,8 @@ Think of it and then output the character description."""
 
 ```toml
 [pipe.create_character]
-PipeLLM = "Create a character."
+type = "PipeLLM"
+description = "Create a character."
 output = "Text"
 llm = "llm_for_creative_writing"
 prompt_template = """You are a book writer. Your task is to create a character.
@@ -132,7 +135,8 @@ Character = "A character is a fiction story" # <- Define here your output concep
 
 [pipe]
 [pipe.create_character]
-PipeLLM = "Create a character. Get a structured result."
+type = "PipeLLM"
+description = "Create a character. Get a structured result."
 output = "Character"    # <- This is the output concept for your pipe
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
@@ -188,7 +192,8 @@ CharacterMetadata = "Metadata regarding a character."
 
 [pipe]
 [pipe.extract_character_1]
-PipeLLM = "Get character information from a description."
+type = "PipeLLM"
+description = "Get character information from a description."
 inputs = { character = "Character" }  # <- These are the inputs of your pipe, usable in the prompt_template
 output = "CharacterMetadata"
 prompt_template = """

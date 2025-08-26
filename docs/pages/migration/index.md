@@ -14,14 +14,14 @@ We changed the syntax for defining concepts in TOML library files. The key name 
 ```toml
 [concept.MyConceptName]
 Concept = "Description of the concept"
-refines = "BaseConceptName"
+refines = "Text"
 ```
 
 **New syntax:**
 ```toml
 [concept.MyConceptName]
 definition = "Description of the concept"
-refines = "BaseConceptName"
+refines = "Text"
 ```
 
 ### Why This Change

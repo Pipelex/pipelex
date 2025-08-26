@@ -23,7 +23,8 @@ Images must be declared in the `inputs` section of your pipe definition. The ima
 
 ```toml
 [pipe.describe_image]
-PipeLLM = "Describe an image"
+type = "PipeLLM"
+description = "Describe an image"
 inputs = { image = "Image" }
 output = "VisualDescription"
 prompt_template = """
@@ -39,7 +40,8 @@ You can use any concept that refines `Image` as an input, and choose descriptive
 
 ```toml
 [pipe.analyze_wedding]
-PipeLLM = "Analyze wedding photo"
+type = "PipeLLM"
+description = "Analyze wedding photo"
 inputs = { wedding_photo = "images.Photo" }
 output = "PhotoAnalysis"
 prompt_template = """
@@ -53,7 +55,8 @@ When working with structured content that contains image fields (like `PageConte
 
 ```toml
 [pipe.analyze_page_view]
-PipeLLM = "Analyze the visual layout of a page"
+type = "PipeLLM"
+description = "Analyze the visual layout of a page"
 inputs = { "page_content.page_view" = "Image" }
 output = "LayoutAnalysis"
 prompt_template = """
@@ -73,7 +76,8 @@ You can include multiple images in a single prompt by listing them in the inputs
 
 ```toml
 [pipe.compare_images]
-PipeLLM = "Compare two images"
+type = "PipeLLM"
+description = "Compare two images"
 inputs = { 
     first_image = "Image",
     second_image = "Image"
@@ -90,7 +94,8 @@ You can mix any stuff and image inputs in the same pipe:
 
 ```toml
 [pipe.analyze_document_with_context]
-PipeLLM = "Analyze a document page with additional context"
+type = "PipeLLM"
+description = "Analyze a document page with additional context"
 inputs = { 
     context = "Text",
     document.page_view = "Image"
@@ -111,7 +116,8 @@ Analyze the document page shown in the image and explain how it relates to the p
 
 | Parameter                   | Type                | Description                                                                                                                                                                  | Required |
 | --------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `PipeLLM`                   | string              | A descriptive name for the LLM operation.                                                                           | Yes      |
+| `type`                      | string              | The type of the pipe: `PipeLLM`                                                                          | Yes      |
+| `description`               | string              | A description of the LLM operation.                                                                           | Yes      |
 | `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. For images within structured content, use dot notation (e.g., `"page.image"`).                                                     | Yes       |
 | `output`                    | string              | The output concept produced by the LLM operation.                                                | Yes      |
 | `llm`                       | string or table     | Specifies the LLM preset(s) to use. Can be a single preset or a table mapping different presets for different generation modes (e.g., `main`, `object_direct`).              | No       |
@@ -142,7 +148,8 @@ This pipe takes no input and writes a poem.
 
 ```toml
 [pipe.write_poem]
-PipeLLM = "Write a short poem"
+type = "PipeLLM"
+description = "Write a short poem"
 output = "Text"
 llm = "llm_for_creative_writing"
 prompt = """
@@ -156,7 +163,8 @@ This pipe summarizes an input text, using a `prompt_template` to inject the inpu
 
 ```toml
 [pipe.summarize_text]
-PipeLLM = "Summarize a text"
+type = "PipeLLM"
+description = "Summarize a text"
 inputs = { text = "TextToSummarize" }
 output = "TextSummary"
 prompt_template = """
@@ -174,7 +182,8 @@ This pipe takes an image of a table and uses a VLM to extract the content as an 
 
 ```toml
 [pipe.extract_table_from_image]
-PipeLLM = "Extract table data from an image"
+type = "PipeLLM"
+description = "Extract table data from an image"
 inputs = { image = "TableScreenshot" }
 output = "TableData"
 prompt_template = """
@@ -191,7 +200,8 @@ This pipe extracts a list of `Expense` items from a block of text.
 structure = "Expense" # Assumes a Pydantic model 'Expense' is defined
 
 [pipe.process_expense_report]
-PipeLLM = "Process an expense report"
+type = "PipeLLM"
+description = "Process an expense report"
 inputs = { report = "ExpenseReport" }
 output = "ProcessedExpenseReport"
 prompt_template = """

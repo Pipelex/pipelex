@@ -20,7 +20,8 @@ The pipe can be configured to generate a single image or a list of images.
 
 | Parameter               | Type            | Description                                                                                                                   | Required |
 | ----------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `PipeImgGen`            | string          | A descriptive name for the image generation operation.                                                                           | Yes      |
+| `type`                  | string          | The type of the pipe: `PipeImgGen`                                                                          | Yes      |
+| `description`           | string          | A description of the image generation operation.                                                                           | Yes      |
 | `inputs`                | dictionary      | The input concept(s) for the image generation operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
 | `output`                | string          | The output concept produced by the image generation operation.                                                | Yes      |
 | `imgg_prompt`           | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |
@@ -39,7 +40,8 @@ This pipe generates one image of a futuristic car without requiring any input.
 
 ```toml
 [pipe.generate_car_image]
-PipeImgGen = "Generate a futuristic car image"
+type = "PipeImgGen"
+description = "Generate a futuristic car image"
 output = "Image"
 imgg_prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
 imgg_handle = "dall-e-3"
@@ -56,13 +58,16 @@ This pipe takes a text prompt as input and generates three variations of the ima
 ImagePrompt = "A text prompt for generating an image"
 
 [pipe.generate_logo_variations]
-PipeImgGen = "Generate three logo variations from a prompt"
+type = "PipeImgGen"
+description = "Generate three logo variations from a prompt"
 inputs = { prompt = "images.ImgGenPrompt" }
 output = "Image"
 nb_output = 3
 imgg_handle = "stable-diffusion"
 aspect_ratio = "1:1"
 ```
+
+The output of the PipeImgGen has to be a concept compatible with the native `Image` concept. A concept is compatible with the `Image` concept if it refines the `Image` concept.
 
 To use this pipe, you would first load a text prompt (e.g., "A minimalist logo for a coffee shop, featuring a stylized mountain and a coffee bean") into the "prompt" stuff (`ImgGenPrompt` concept). After running, the output will be a list containing three generated `ImageContent` objects.
 

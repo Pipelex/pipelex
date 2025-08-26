@@ -61,7 +61,8 @@ The pipeline uses a two-step "extract and review" pattern. The first pipe does t
 
 ```toml
 [pipe.extract_html_table_and_review]
-PipeSequence = "Get an HTML table and review it"
+type = "PipeSequence"
+description = "Get an HTML table and review it"
 inputs = { table_screenshot = "TableScreenshot" }
 output = "HtmlTable"
 steps = [
@@ -72,7 +73,8 @@ steps = [
 ]
 
 [pipe.review_html_table]
-PipeLLM = "Review an HTML table"
+type = "PipeLLM"
+description = "Review an HTML table"
 inputs = { table_screenshot = "TableScreenshot", html_table = "HtmlTable" }
 output = "HtmlTable"
 prompt_template = """

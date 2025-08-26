@@ -17,7 +17,8 @@ Answer = "A response to a question"
 
 [pipe]
 [pipe.answer_question]
-PipeLLM = "Answer a question"
+type = "PipeLLM"
+description = "Answer a question"
 inputs = { question = "tutorial.Question" }
 output = "tutorial.Answer"
 prompt_template = """
@@ -62,7 +63,8 @@ A domain consists of:
    
     [pipe]
     [pipe.summarize_invoice]
-    PipeLLM = "Summarize an invoice to extract key information"
+    type = "PipeLLM"
+    description = "Summarize an invoice to extract key information"
     inputs = { invoice = "finance.Invoice" }
     output = "finance.InvoiceSummary"
     ```

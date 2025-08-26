@@ -14,7 +14,8 @@ Extract text and images from an image or a PDF
 ### Simple Text Generation
 ```toml
 [pipe.extract_info]
-PipeOcr = "extract the information"
+type = "PipeOcr"
+description = "extract the information"
 inputs = { ocr_input = "PDF" } # or { ocr_input = "Image" } if its an image. This is the only input
 output = "Page"
 ```

@@ -81,7 +81,8 @@ The `generate_screenplay` pipeline is a master `PipeSequence` that orchestrates 
 
 ```toml
 [pipe.generate_screenplay]
-PipeSequence = "Generate a complete screenplay from a pitch"
+type = "PipeSequence"
+description = "Generate a complete screenplay from a pitch"
 inputs = { pitch = "Pitch" }
 output = "FormattedScreenplay"
 steps = [
@@ -99,7 +100,8 @@ steps = [
 
 # This is the nested sequence that creates all the scenes for a single chapter.
 [pipe.create_scenes_sequence]
-PipeSequence = "Create all scenes for a chapter sequentially"
+type = "PipeSequence"
+description = "Create all scenes for a chapter sequentially"
 inputs = { chapter = "Chapter", characters = "CharacterList", detailed_pitch = "DetailedPitch" }
 output = "Chapter"
 steps = [
