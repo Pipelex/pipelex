@@ -123,6 +123,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         self.root[name] = stuff
 
     def add_new_stuff(self, name: str, stuff: Stuff, aliases: Optional[List[str]] = None):
+        # TODO: Add unit tests for this method
         log.debug(f"Adding new stuff '{name}' to WorkingMemory with aliases: {aliases}")
         if self.is_stuff_code_used(stuff_code=stuff.stuff_code):
             raise WorkingMemoryConsistencyError(f"Stuff code '{stuff.stuff_code}' is already used by another stuff")
@@ -143,6 +144,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
                 self.set_alias(alias, name)
 
     def set_new_main_stuff(self, stuff: Stuff, name: Optional[str] = None):
+        # TODO: Add unit tests for this method
         if name:
             self.remove_main_stuff()
             self.add_new_stuff(name=name, stuff=stuff, aliases=[MAIN_STUFF_NAME])
@@ -195,6 +197,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
     @override
     def generate_context(self) -> Dict[str, Any]:
+        # TODO: Add unit tests for this method
         artefact_dict: StuffArtefactDict = {}
         for name, stuff in self.root.items():
             a = stuff.make_artefact()
@@ -205,6 +208,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
     @override
     def get_typed_object_or_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
+        # TODO: Add unit tests for this method
         if "." in name:
             parts = name.split(".", 1)  # Split only at the first dot
             base_name = parts[0]
