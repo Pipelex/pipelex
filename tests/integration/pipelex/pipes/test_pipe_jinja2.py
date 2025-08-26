@@ -6,8 +6,9 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.hub import get_pipe_router
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2Output
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint, PipeJinja2Factory
+from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2Output
+from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
+from pipelex.pipe_operators.jinja2.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
 from tests.cases import JINJA2TestCases

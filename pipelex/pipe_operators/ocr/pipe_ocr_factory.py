@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 from typing_extensions import override
 
@@ -7,20 +7,11 @@ from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.hub import get_concept_provider
-from pipelex.pipe_operators.pipe_ocr import PipeOcr
-
-
-class PipeOcrBlueprint(PipeBlueprint):
-    type: Literal["PipeOcr"] = "PipeOcr"
-    ocr_platform: Optional[OcrPlatform] = None
-    page_images: Optional[bool] = None
-    page_image_captions: Optional[bool] = None
-    page_views: Optional[bool] = None
-    page_views_dpi: Optional[int] = None
+from pipelex.pipe_operators.ocr.pipe_ocr import PipeOcr
+from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
 
 class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):

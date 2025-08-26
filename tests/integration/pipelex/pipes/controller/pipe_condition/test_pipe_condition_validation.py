@@ -1,7 +1,8 @@
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.hub import get_concept_provider
-from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionBlueprint, PipeConditionFactory, PipeConditionPipeMapBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 
 
 class TestPipeConditionValidation:

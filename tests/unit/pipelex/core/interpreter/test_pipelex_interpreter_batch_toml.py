@@ -3,7 +3,7 @@
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchBlueprint
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 
 
 class TestPipelexInterpreterBatchToml:

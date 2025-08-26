@@ -3,9 +3,9 @@
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
-from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint
-from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
 class TestPipelexInterpreterSequenceToml:

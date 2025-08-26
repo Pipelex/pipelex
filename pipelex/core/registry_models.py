@@ -17,24 +17,24 @@ from pipelex.core.stuffs.stuff_content import (
     TextContent,
 )
 from pipelex.libraries.pipelines.meta.pipeline_draft import PipelexBundleBlueprint, PipelineDraft
-from pipelex.pipe_controllers.pipe_batch import PipeBatch
-from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchFactory
-from pipelex.pipe_controllers.pipe_condition import PipeCondition
-from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionFactory
-from pipelex.pipe_controllers.pipe_parallel import PipeParallel
-from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelFactory
-from pipelex.pipe_controllers.pipe_sequence import PipeSequence
-from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceFactory
-from pipelex.pipe_operators.pipe_func import PipeFunc
-from pipelex.pipe_operators.pipe_func_factory import PipeFuncFactory
-from pipelex.pipe_operators.pipe_img_gen import PipeImgGen
-from pipelex.pipe_operators.pipe_img_gen_factory import PipeImgGenFactory
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Factory
-from pipelex.pipe_operators.pipe_llm import PipeLLM
-from pipelex.pipe_operators.pipe_llm_factory import PipeLLMFactory
-from pipelex.pipe_operators.pipe_ocr import PipeOcr
-from pipelex.pipe_operators.pipe_ocr_factory import PipeOcrFactory
+from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
+from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
+from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
+from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
+from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
+from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
+from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
+from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
+from pipelex.pipe_operators.func.pipe_func import PipeFunc
+from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
+from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
+from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
+from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2
+from pipelex.pipe_operators.jinja2.pipe_jinja2_factory import PipeJinja2Factory
+from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
+from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
+from pipelex.pipe_operators.ocr.pipe_ocr import PipeOcr
+from pipelex.pipe_operators.ocr.pipe_ocr_factory import PipeOcrFactory
 from pipelex.tools.registry_models import ModelType, RegistryModels
 
 

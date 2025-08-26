@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.pipe_operators.pipe_img_gen_factory import PipeImgGenBlueprint
+from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
 
 class TestPipelexInterpreterImgGenToml:

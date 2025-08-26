@@ -1,19 +1,14 @@
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.hub import get_concept_provider
-from pipelex.pipe_controllers.pipe_sequence import PipeSequence
-from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint, SubPipeFactory
-
-
-class PipeSequenceBlueprint(PipeBlueprint):
-    type: Literal["PipeSequence"] = "PipeSequence"
-    steps: List[SubPipeBlueprint]
+from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
+from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipe_controllers.sub_pipe_factory import SubPipeFactory
 
 
 class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequence]):

@@ -3,7 +3,7 @@
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint
+from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
 
 
 class TestPipelexInterpreterJinja2PipeTomlString:

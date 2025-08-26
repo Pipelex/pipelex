@@ -9,7 +9,8 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
@@ -24,10 +25,11 @@ from pipelex.exceptions import (
     WorkingMemoryStuffNotFoundError,
 )
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
-from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
+from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2Output
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint, PipeJinja2Factory
+from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2Output
+from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
+from pipelex.pipe_operators.jinja2.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 

@@ -1,30 +1,14 @@
-from typing import Dict, List, Literal, Optional
+from typing import List, Optional
 
-from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.hub import get_concept_provider
-from pipelex.pipe_controllers.pipe_condition import PipeCondition
-from pipelex.pipe_controllers.pipe_condition_details import PipeConditionPipeMap
-
-PipeConditionPipeMapRoot = Dict[str, str]
-
-
-class PipeConditionPipeMapBlueprint(RootModel[PipeConditionPipeMapRoot]):
-    root: PipeConditionPipeMapRoot = Field(default_factory=dict)
-
-
-class PipeConditionBlueprint(PipeBlueprint):
-    type: Literal["PipeCondition"] = "PipeCondition"
-    expression_template: Optional[str] = None
-    expression: Optional[str] = None
-    pipe_map: PipeConditionPipeMapBlueprint = Field(default_factory=PipeConditionPipeMapBlueprint)
-    default_pipe_code: Optional[str] = None
-    add_alias_from_expression_to: Optional[str] = None
+from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionPipeMap
 
 
 class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondition]):

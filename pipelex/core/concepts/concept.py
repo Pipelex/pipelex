@@ -6,7 +6,8 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
-from pipelex.core.domains.domain import DomainBlueprint, SpecialDomain
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.create.structured_output_generator import StructureGenerator
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence

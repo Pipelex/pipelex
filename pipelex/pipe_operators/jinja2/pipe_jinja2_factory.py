@@ -1,25 +1,20 @@
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 from typing_extensions import override
 
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2
-from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
+from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2
+from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.templating_models import PromptingStyle
-
-
-class PipeJinja2Blueprint(PipeBlueprint, Jinja2Blueprint):
-    type: Literal["PipeJinja2"] = "PipeJinja2"
 
 
 class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):

@@ -4,16 +4,16 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.domains.domain import DomainBlueprint
-from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchBlueprint
-from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionBlueprint
-from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint
-from pipelex.pipe_controllers.pipe_sequence_factory import PipeSequenceBlueprint
-from pipelex.pipe_operators.pipe_func_factory import PipeFuncBlueprint
-from pipelex.pipe_operators.pipe_img_gen_factory import PipeImgGenBlueprint
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint
-from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint
-from pipelex.pipe_operators.pipe_ocr_factory import PipeOcrBlueprint
+from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
+from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
+from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
 PipeBlueprintUnion = Annotated[
     Union[

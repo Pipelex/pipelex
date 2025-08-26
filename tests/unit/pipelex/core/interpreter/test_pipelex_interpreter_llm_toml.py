@@ -3,8 +3,8 @@
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint
-from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 
 class TestPipelexInterpreterLlmToml:

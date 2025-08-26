@@ -46,16 +46,11 @@ from pipelex.hub import (
     get_required_pipe,
     get_template,
 )
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.typing.type_inspector import get_type_structure
-from pipelex.types import StrEnum
-
-
-class StructuringMethod(StrEnum):
-    DIRECT = "direct"
-    PRELIMINARY_TEXT = "preliminary_text"
 
 
 class PipeLLMOutput(PipeOutput):

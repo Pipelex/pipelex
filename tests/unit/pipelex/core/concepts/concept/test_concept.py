@@ -5,7 +5,8 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError
-from pipelex.core.domains.domain import DomainError, SpecialDomain
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.domains.exceptions import DomainError
 
 
 class TestConcept:

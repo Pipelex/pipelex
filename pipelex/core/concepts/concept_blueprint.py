@@ -5,7 +5,8 @@ from typing_extensions import Self
 
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptStringOrConceptCodeError
-from pipelex.core.domains.domain import DomainBlueprint, SpecialDomain
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.tools.misc.string_utils import is_pascal_case
 from pipelex.types import StrEnum
 
