@@ -5,6 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug check",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
+            "args": [
+                "--help",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Debug tests",
             "type": "debugpy",
             "request": "launch",
@@ -18,27 +29,16 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug legacy check",
+            "name": "Debug Validate Pipe",
             "type": "debugpy",
             "request": "launch",
-            "module": "pipelex.cli._cli",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
-                "check",
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": true
-        },
-        {
-            "name": "Debug Expense Report",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "pipelex.cli",
-            "args": [
-                "expense",
-                "--pipe",
-                "process_expense_report",
-                "--expense-report",
-                "expense_report_diner"
+                "validate",
+                "pipe",
+                "describe_image",
+                "-c",
+                "pipelex/libraries",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
