@@ -2,7 +2,6 @@ from typing import List, Optional
 
 from typing_extensions import override
 
-from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
@@ -14,7 +13,6 @@ from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Bluepr
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.template_preprocessor import preprocess_template
-from pipelex.tools.templating.templating_models import PromptingStyle
 
 
 class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
@@ -88,18 +86,3 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
             )
         else:
             raise PipeDefinitionError("Either template_str or template_name must be provided to make_pipe_jinja2_from_template_str")
-
-    @classmethod
-    def make_pipe_jinja2_to_structure(
-        cls,
-        domain: str,
-        prompt_template_to_structure: Optional[str],
-    ) -> PipeJinja2:
-        jinja2_name = prompt_template_to_structure or get_config().pipelex.generic_template_names.structure_from_preliminary_text_user
-        prompting_style = PromptingStyle.make_default_prompting_style()
-        return PipeJinja2(
-            domain=domain,
-            code="adhoc_pipe_jinja2_to_structure",
-            jinja2_name=jinja2_name,
-            prompting_style=prompting_style,
-        )

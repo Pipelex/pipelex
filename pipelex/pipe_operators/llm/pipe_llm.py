@@ -49,7 +49,6 @@ from pipelex.hub import (
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.typing.type_inspector import get_type_structure
 
 
@@ -317,7 +316,10 @@ class PipeLLM(PipeOperator):
                 text=generated_text,
             )
         else:
-            log.debug(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
+            if is_multiple_output:
+                log.debug(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
+            else:
+                log.debug("PipeLLM generating a single output")
 
             # TODO: we need a better solution for structuring_method (text then object), meanwhile,
             # we acknowledge the code here with llm_prompt_1 and llm_prompt_2 is overly complex and should be refactored.
@@ -333,19 +335,10 @@ class PipeLLM(PipeOperator):
                         # TODO: run_pipe() could get the domain at the same time as the pip_code
                         domain = get_required_domain(domain=pipe.domain)
                         prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
-                        user_text_jinja2_blueprint = Jinja2Blueprint(
-                            jinja2_name=prompt_template_to_structure,
-                        )
                         system_prompt = self.system_prompt_to_structure or domain.system_prompt
-                        llm_prompt_2_blueprint = LLMPromptSpec(
-                            user_text_jinja2_blueprint=user_text_jinja2_blueprint,
-                            system_prompt=system_prompt,
-                        )
-                        llm_prompt_2_proto = await llm_prompt_2_blueprint.make_llm_prompt(
-                            output_concept_string=output_concept.concept_string,
-                            context_provider=working_memory,
-                            output_structure_prompt=output_structure_prompt,
-                            extra_params=llm_prompt_run_params.params,
+                        llm_prompt_2_proto = LLMPrompt(
+                            system_text=system_prompt,
+                            user_text=prompt_template_to_structure,
                         )
                         llm_prompt_2_factory = LLMPromptTemplate(
                             proto_prompt=llm_prompt_2_proto,
@@ -358,23 +351,15 @@ class PipeLLM(PipeOperator):
                 else:
                     domain = Domain.make_default()
                 prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
-                user_text_jinja2_blueprint = Jinja2Blueprint(
-                    jinja2_name=prompt_template_to_structure,
-                )
                 system_prompt = self.system_prompt_to_structure or domain.system_prompt
-                llm_prompt_2_blueprint = LLMPromptSpec(
-                    user_text_jinja2_blueprint=user_text_jinja2_blueprint,
-                    system_prompt=system_prompt,
-                )
-                llm_prompt_2_proto = await llm_prompt_2_blueprint.make_llm_prompt(
-                    output_concept_string=output_concept.concept_string,
-                    context_provider=working_memory,
-                    output_structure_prompt=output_structure_prompt,
-                    extra_params=llm_prompt_run_params.params,
+                llm_prompt_2_proto = LLMPrompt(
+                    system_text=system_prompt,
+                    user_text=prompt_template_to_structure,
                 )
                 llm_prompt_2_factory = LLMPromptTemplate(
                     proto_prompt=llm_prompt_2_proto,
                 )
+                log.debug(llm_prompt_2_factory, title="llm_prompt_2_factory")
             else:
                 llm_prompt_2_factory = None
 
