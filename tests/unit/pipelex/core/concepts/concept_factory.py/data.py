@@ -8,6 +8,7 @@ from pipelex.core.concepts.concept_blueprint import (
     ConceptStructureBlueprint,
     ConceptStructureBlueprintFieldType,
 )
+from pipelex.core.concepts.concept_factory import DomainAndConceptCode
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 
@@ -33,38 +34,43 @@ class TestCases:
     ]
 
     # Test cases for make_domain_and_concept_code_from_concept_string_or_concept_code method
-    MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES: ClassVar[List[Tuple[str, str, Optional[List[str]], List[str]]]] = [
+    MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES: ClassVar[List[Tuple[str, str, Optional[List[str]], DomainAndConceptCode]]] = [
         # Test case 1: Concept string with dot notation
-        ("my_domain", "other_domain.ConceptName", None, ["other_domain", "ConceptName"]),
+        ("my_domain", "other_domain.ConceptName", None, DomainAndConceptCode(domain="other_domain", concept_code="ConceptName")),
         # Test case 2: Concept string with dot notation (ignores same domain codes)
-        ("my_domain", "other_domain.ConceptName", ["ConceptName"], ["other_domain", "ConceptName"]),
+        ("my_domain", "other_domain.ConceptName", ["ConceptName"], DomainAndConceptCode(domain="other_domain", concept_code="ConceptName")),
         # Test case 3: Native concept code (Text)
-        ("my_domain", "Text", None, ["native", "Text"]),
+        ("my_domain", "Text", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Text")),
         # Test case 4: Native concept code (Image)
-        ("my_domain", "Image", None, ["native", "Image"]),
+        ("my_domain", "Image", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Image")),
         # Test case 5: Native concept code (PDF)
-        ("my_domain", "PDF", None, ["native", "PDF"]),
+        ("my_domain", "PDF", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="PDF")),
         # Test case 6: Native concept code with same domain codes provided (native takes precedence)
-        ("my_domain", "Text", ["Text", "OtherConcept"], ["native", "Text"]),
+        ("my_domain", "Text", ["Text", "OtherConcept"], DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Text")),
         # Test case 7: Concept code from same domain
-        ("my_domain", "MyConcept", ["MyConcept", "OtherConcept"], ["my_domain", "MyConcept"]),
+        ("my_domain", "MyConcept", ["MyConcept", "OtherConcept"], DomainAndConceptCode(domain="my_domain", concept_code="MyConcept")),
         # Test case 8: Concept code from same domain (case sensitive)
-        ("my_domain", "MyConcept", ["MyCon", "OtherConcept"], ["implicit", "MyConcept"]),
+        ("my_domain", "MyConcept", ["MyCon", "OtherConcept"], DomainAndConceptCode(domain=SpecialDomain.IMPLICIT, concept_code="MyConcept")),
         # Test case 9: Unknown concept code (no same domain codes)
-        ("my_domain", "UnknownConcept", None, ["implicit", "UnknownConcept"]),
+        ("my_domain", "UnknownConcept", None, DomainAndConceptCode(domain=SpecialDomain.IMPLICIT, concept_code="UnknownConcept")),
         # Test case 10: Unknown concept code (not in same domain codes)
-        ("my_domain", "UnknownConcept", ["KnownConcept", "OtherConcept"], ["implicit", "UnknownConcept"]),
+        (
+            "my_domain",
+            "UnknownConcept",
+            ["KnownConcept", "OtherConcept"],
+            DomainAndConceptCode(domain=SpecialDomain.IMPLICIT, concept_code="UnknownConcept"),
+        ),
         # Test case 11: Empty same domain codes list
-        ("my_domain", "SomeConcept", [], ["implicit", "SomeConcept"]),
+        ("my_domain", "SomeConcept", [], DomainAndConceptCode(domain=SpecialDomain.IMPLICIT, concept_code="SomeConcept")),
         # Test case 12: Different domain in concept string
-        ("my_domain", "another_domain.SomeConcept", ["SomeConcept"], ["another_domain", "SomeConcept"]),
+        ("my_domain", "another_domain.SomeConcept", ["SomeConcept"], DomainAndConceptCode(domain="another_domain", concept_code="SomeConcept")),
         # Test case 13: All native concept codes
-        ("my_domain", "Dynamic", None, ["native", "Dynamic"]),
-        ("my_domain", "TextAndImages", None, ["native", "TextAndImages"]),
-        ("my_domain", "Number", None, ["native", "Number"]),
-        ("my_domain", "LlmPrompt", None, ["native", "LlmPrompt"]),
-        ("my_domain", "Page", None, ["native", "Page"]),
-        ("my_domain", "Anything", None, ["native", "Anything"]),
+        ("my_domain", "Dynamic", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Dynamic")),
+        ("my_domain", "TextAndImages", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="TextAndImages")),
+        ("my_domain", "Number", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Number")),
+        ("my_domain", "LlmPrompt", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="LlmPrompt")),
+        ("my_domain", "Page", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Page")),
+        ("my_domain", "Anything", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Anything")),
     ]
 
     # Test cases for make_from_blueprint method

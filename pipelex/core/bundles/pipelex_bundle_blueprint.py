@@ -1,8 +1,7 @@
-from typing import Annotated, Any, Dict, Optional, Union
+from typing import Annotated, Dict, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
@@ -36,6 +35,8 @@ PipeBlueprintUnion = Annotated[
 class PipelexBundleBlueprint(BaseModel):
     """Complete blueprint of a pipelex bundle TOML definition."""
 
+    model_config = ConfigDict(extra="forbid")
+
     domain: str
     definition: Optional[str] = None
     system_prompt: Optional[str] = None
@@ -51,12 +52,3 @@ class PipelexBundleBlueprint(BaseModel):
     def validate_domain_syntax(cls, domain: str) -> str:
         DomainBlueprint.validate_domain_code(code=domain)
         return domain
-
-    @model_validator(mode="before")
-    @classmethod
-    def validate_non_valid_values_in_blueprint(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        # TODO: to test
-        for key in values.keys():
-            if key not in ["domain", "definition", "system_prompt", "system_prompt_to_structure", "prompt_template_to_structure", "concept", "pipe"]:
-                raise PipelexBundleBlueprintError(f"Invalid key '{key}' in bundle blueprint")
-        return values

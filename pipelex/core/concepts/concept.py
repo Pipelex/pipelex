@@ -1,15 +1,13 @@
-from typing import Dict, Optional
+from typing import Optional
 
 from kajson.kajson_manager import KajsonManager
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
-from typing_extensions import Self
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex import log
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.create.structured_output_generator import StructureGenerator
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 
@@ -42,10 +40,6 @@ class Concept(BaseModel):
         DomainBlueprint.validate_domain_code(code=domain)
         return domain
 
-    @model_validator(mode="after")
-    def validate_concept(self) -> Self:
-        return self
-
     @field_validator("refines", mode="before")
     def validate_refines(cls, refines: Optional[str]) -> Optional[str]:
         if refines is None:
@@ -56,10 +50,6 @@ class Concept(BaseModel):
     @classmethod
     def sentence_from_concept(cls, concept: "Concept") -> str:
         return pascal_case_to_sentence(name=concept.code)
-
-    @property
-    def node_name(self) -> str:
-        return self.code
 
     @classmethod
     def is_native_concept(cls, concept: "Concept") -> bool:
@@ -103,17 +93,3 @@ class Concept(BaseModel):
             if KajsonManager.get_class_registry().has_class(name=structure_class_name):
                 log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
             return False
-
-    @classmethod
-    def get_structure(cls, class_name: str, structure_blueprint: Dict[str, ConceptStructureBlueprint]) -> str:
-        """Generate Python code from ConceptStructureBlueprint.
-
-        Args:
-            class_name: Name of the class to generate
-            structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
-
-        Returns:
-            Generated Python module content
-        """
-
-        return StructureGenerator().generate_from_structure_blueprint(class_name, structure_blueprint)

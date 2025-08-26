@@ -1,5 +1,6 @@
 from typing import Dict, NamedTuple
 
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.types import StrEnum
 
 
@@ -56,3 +57,20 @@ NATIVE_CONCEPTS_DATA: Dict[NativeConceptEnum, NativeConceptEnumData] = {
         code=NativeConceptEnum.ANYTHING, content_class_name=f"{NativeConceptEnum.ANYTHING}Content", definition="Anything"
     ),
 }
+
+
+def is_native_concept(concept_string_or_concept_code: str) -> bool:
+    """Check if a concept reference is a native concept (short or fully qualified form)."""
+    native_concept_values = [native_concept.value for native_concept in NativeConceptEnum]
+
+    # Check short form (e.g., "Text")
+    if concept_string_or_concept_code in native_concept_values:
+        return True
+
+    # Check fully qualified form (e.g., "native.Text")
+    if "." in concept_string_or_concept_code:
+        domain, concept_code = concept_string_or_concept_code.split(".", 1)
+        if domain == SpecialDomain.NATIVE.value and concept_code in native_concept_values:
+            return True
+
+    return False

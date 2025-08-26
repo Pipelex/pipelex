@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 from kajson.kajson_manager import KajsonManager
+from pydantic import BaseModel
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import (
@@ -9,11 +10,18 @@ from pipelex.core.concepts.concept_blueprint import (
     ConceptStructureBlueprintFieldType,
     ConceptStructureBlueprintType,
 )
-from pipelex.core.concepts.concept_native import NativeConceptEnum, NativeConceptEnumData
+from pipelex.core.concepts.concept_native import NativeConceptEnumData, is_native_concept
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.create.structured_output_generator import StructureGenerator
 from pipelex.exceptions import ConceptFactoryError, StructureClassError
+
+
+class DomainAndConceptCode(BaseModel):
+    """Small model to represent domain and concept code pair."""
+
+    domain: str
+    concept_code: str
 
 
 class ConceptFactory:
@@ -47,8 +55,8 @@ class ConceptFactory:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
         return Concept(
             code=concept_string.split(".")[1],
-            domain=SpecialDomain.IMPLICIT.value,
-            definition="",
+            domain=SpecialDomain.IMPLICIT,
+            definition=concept_string,
             structure_class_name=TextContent.__name__,
         )
 
@@ -78,31 +86,32 @@ class ConceptFactory:
     @classmethod
     def make_domain_and_concept_code_from_concept_string_or_concept_code(
         cls, domain: str, concept_string_or_concept_code: str, concept_codes_from_the_same_domain: Optional[List[str]] = None
-    ) -> List[str]:
+    ) -> DomainAndConceptCode:
         # At this point, the concept_string_or_concept_code is already validated
         if "." in concept_string_or_concept_code:
             # Is a concept string.
-            return concept_string_or_concept_code.split(".")
+            parts = concept_string_or_concept_code.rsplit(".")
+            return DomainAndConceptCode(domain=parts[0], concept_code=parts[1])
         else:
-            if concept_string_or_concept_code in [native_concept.value for native_concept in NativeConceptEnum]:  # Is a native concept code
-                return [SpecialDomain.NATIVE.value, concept_string_or_concept_code]
+            if is_native_concept(concept_string_or_concept_code=concept_string_or_concept_code):
+                return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=concept_string_or_concept_code)
 
             elif (
                 concept_codes_from_the_same_domain and concept_string_or_concept_code in concept_codes_from_the_same_domain
             ):  # Is a concept code from the same domain
-                return [domain, concept_string_or_concept_code]
+                return DomainAndConceptCode(domain=domain, concept_code=concept_string_or_concept_code)
             else:
-                return [SpecialDomain.IMPLICIT.value, concept_string_or_concept_code]
+                return DomainAndConceptCode(domain=SpecialDomain.IMPLICIT.value, concept_code=concept_string_or_concept_code)
 
     @classmethod
     def make_refine(cls, refine: str) -> str:
         if ConceptBlueprint.is_native_concept_string_or_concept_code(concept_string_or_concept_code=refine):
-            for native_concept in NativeConceptEnum:
-                if native_concept.value == refine:
-                    return f"{SpecialDomain.NATIVE.value}.{refine}"
+            if "." in refine:
+                return refine
+            else:
+                return f"{SpecialDomain.NATIVE}.{refine}"
         else:
             raise ConceptFactoryError(f"Refine '{refine}' is not a native concept")
-        return refine
 
     @classmethod
     def make_refines(cls, blueprint: ConceptBlueprint) -> Optional[str]:
@@ -175,17 +184,15 @@ class ConceptFactory:
                 # If there is NO class, the fallback class is TextContent.__name__
                 structure_class_name = TextContent.__name__
 
+        domain_and_concept_code = cls.make_domain_and_concept_code_from_concept_string_or_concept_code(
+            domain=domain,
+            concept_string_or_concept_code=concept_code,
+            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+        )
+
         return Concept(
-            domain=cls.make_domain_and_concept_code_from_concept_string_or_concept_code(
-                domain=domain,
-                concept_string_or_concept_code=concept_code,
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-            )[0],
-            code=cls.make_domain_and_concept_code_from_concept_string_or_concept_code(
-                domain=domain,
-                concept_string_or_concept_code=concept_code,
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-            )[1],
+            domain=domain_and_concept_code.domain,
+            code=domain_and_concept_code.concept_code,
             definition=blueprint.definition,
             structure_class_name=structure_class_name,
             refines=current_refine,

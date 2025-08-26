@@ -25,7 +25,7 @@ class PipeInputSpecFactory:
 
             concept_string = input_requirement_blueprint.concept
             ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=concept_string)
-            input_concept_domain, input_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+            input_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
                 domain=domain,
                 concept_string_or_concept_code=concept_string,
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
@@ -33,7 +33,9 @@ class PipeInputSpecFactory:
 
             inputs[var_name] = InputRequirement(
                 concept=get_concept_provider().get_required_concept(
-                    concept_string=ConceptFactory.construct_concept_string_with_domain(domain=input_concept_domain, concept_code=input_concept_code)
+                    concept_string=ConceptFactory.construct_concept_string_with_domain(
+                        domain=input_domain_and_code.domain, concept_code=input_domain_and_code.concept_code
+                    )
                 ),
                 multiplicity=input_requirement_blueprint.multiplicity,
             )

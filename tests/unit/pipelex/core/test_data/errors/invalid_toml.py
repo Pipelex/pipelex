@@ -5,7 +5,6 @@ from typing import List, Tuple, Type, Union
 import toml
 from pydantic import ValidationError
 
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintError
 from pipelex.core.domains.exceptions import DomainError
 
 # TOML Syntax Errors
@@ -104,7 +103,7 @@ invalid_root_key = "This key should not be allowed at root level"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexBundleBlueprintError,
+    ValidationError,
 )
 
 MULTIPLE_INVALID_ROOT_KEYS = (
@@ -118,7 +117,7 @@ unknown_field = "Another unknown field"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexBundleBlueprintError,
+    ValidationError,
 )
 
 WRONG_TYPE_FOR_DOMAIN = (
@@ -172,7 +171,7 @@ some_key = "This section is not allowed"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexBundleBlueprintError,
+    ValidationError,
 )
 
 INVALID_TABLE_SYNTAX = (
