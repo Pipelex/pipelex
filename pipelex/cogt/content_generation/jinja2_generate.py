@@ -5,6 +5,13 @@ from pipelex.tools.templating.jinja2_rendering import render_jinja2
 
 # TODO: get rid of this intermediate call which seems useless, or explain why it stays
 async def jinja2_gen_text(jinja2_assignment: Jinja2Assignment) -> str:
+    from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
+    from pipelex.tools.templating.template_preprocessor import preprocess_template
+
+    if jinja2_assignment.jinja2:
+        jinja2_assignment.jinja2 = preprocess_template(template=jinja2_assignment.jinja2)
+        check_jinja2_parsing(jinja2_assignment.jinja2)
+
     jinja2_text: str = await render_jinja2(
         template_category=jinja2_assignment.template_category,
         template_provider=get_template_provider(),
