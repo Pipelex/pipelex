@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, Union, get_args, get_origin
 
 from kajson.kajson_manager import KajsonManager
-from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
 from pipelex.tools.typing.module_inspector import find_classes_in_module, import_module_from_file
