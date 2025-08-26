@@ -3,7 +3,7 @@
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.pipe_operators.pipe_func_factory import PipeFuncBlueprint
+from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 
 
 class TestPipelexInterpreterFuncToml:

@@ -1,36 +1,32 @@
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_run_params import BatchParams
 from pipelex.hub import get_concept_provider
-from pipelex.pipe_operators.pipe_func import PipeFunc
+from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 
 
-class PipeFuncBlueprint(PipeBlueprint):
-    type: Literal["PipeFunc"] = "PipeFunc"
-    function_name: str
-
-
-class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
+class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
     @classmethod
     @override
     def make_from_blueprint(
         cls,
         domain: str,
         pipe_code: str,
-        blueprint: PipeFuncBlueprint,
+        blueprint: PipeBatchBlueprint,
         concept_codes_from_the_same_domain: Optional[List[str]] = None,
-    ) -> PipeFunc:
+    ) -> PipeBatch:
         output_concept_domain, output_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
             concept_string_or_concept_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
-        return PipeFunc(
+        return PipeBatch(
             domain=domain,
             code=pipe_code,
             definition=blueprint.definition,
@@ -40,5 +36,9 @@ class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
             ),
-            function_name=blueprint.function_name,
+            branch_pipe_code=blueprint.branch_pipe_code,
+            batch_params=BatchParams.make_optional_batch_params(
+                input_list_name=blueprint.input_list_name or False,
+                input_item_name=blueprint.input_item_name,
+            ),
         )

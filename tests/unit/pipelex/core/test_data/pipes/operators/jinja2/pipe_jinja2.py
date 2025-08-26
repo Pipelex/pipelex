@@ -2,7 +2,7 @@
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptEnum
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint
+from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
 
 PIPE_JINJA2 = (
     "pipe_jinja2",

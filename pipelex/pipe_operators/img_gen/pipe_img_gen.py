@@ -82,6 +82,18 @@ class PipeImgGen(PipeOperator):
         return self
 
     @override
+    def validate_output(self):
+        if not get_concept_provider().is_compatible(
+            tested_concept=self.output,
+            wanted_concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+            strict=True,
+        ):
+            raise PipeDefinitionError(
+                f"The output of a ImgGen pipe must be compatible with the Image concept. "
+                f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
+            )
+
+    @override
     def needed_inputs(self) -> PipeInputSpec:
         needed_inputs = PipeInputSpecFactory.make_empty()
         if self.imgg_prompt:

@@ -3,7 +3,7 @@
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.pipe_operators.pipe_ocr_factory import PipeOcrBlueprint
+from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
 
 class TestPipelexInterpreterOcrToml:

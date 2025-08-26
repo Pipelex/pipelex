@@ -5,7 +5,7 @@ from typing import Any, Dict
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
 class TestPipelexInterpreterSerializeSubPipe:

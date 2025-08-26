@@ -5,7 +5,8 @@ from typing_extensions import Self
 
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptStringOrConceptCodeError
-from pipelex.core.domains.domain import DomainBlueprint, SpecialDomain
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.tools.misc.string_utils import is_pascal_case
 from pipelex.types import StrEnum
 
@@ -39,24 +40,78 @@ class ConceptStructureBlueprint(BaseModel):
     default_value: Optional[Any] = None
 
     # TODO: date translator for default_value
-    # TODO: check default_value type is the same as type
-    # TODO: check when default_value is not None, type is not None
 
     @model_validator(mode="after")
     def validate_structure_blueprint(self) -> Self:
         """Validate the structure blueprint according to type rules."""
         # If type is None (array), choices must not be None
         if self.type is None and not self.choices:
-            raise ConceptStructureBlueprintError("When type is None (array), choices must not be empty")
+            raise ConceptStructureBlueprintError(
+                f"When type is None (array), choices must not be empty. Actual type: {self.type}, choices: {self.choices}"
+            )
 
         # If type is "dict", key_type and value_type must not be empty
         if self.type == ConceptStructureBlueprintFieldType.DICT:
             if not self.key_type:
-                raise ConceptStructureBlueprintError(f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty")
+                raise ConceptStructureBlueprintError(
+                    f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty. Actual key_type: {self.key_type}"
+                )
             if not self.value_type:
-                raise ConceptStructureBlueprintError(f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty")
+                raise ConceptStructureBlueprintError(
+                    f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty. Actual value_type: {self.value_type}"
+                )
+
+        # Check when default_value is not None, type is not None (except for choice fields)
+        if self.default_value is not None and self.type is None and not self.choices:
+            raise ConceptStructureBlueprintError(
+                f"When default_value is not None, type must be specified (unless choices are provided). "
+                f"Actual type: {self.type}, default_value: {self.default_value}, choices: {self.choices}"
+            )
+
+        # Check default_value type is the same as type
+        if self.default_value is not None and self.type is not None:
+            self._validate_default_value_type()
+
+        # Check default_value is valid for choice fields
+        if self.default_value is not None and self.type is None and self.choices:
+            if self.default_value not in self.choices:
+                raise ConceptStructureBlueprintError(
+                    f"default_value must be one of the valid choices. Got '{self.default_value}', valid choices: {self.choices}"
+                )
 
         return self
+
+    def _validate_default_value_type(self) -> None:
+        """Validate that default_value matches the specified type."""
+        if self.type is None or self.default_value is None:
+            return
+
+        # Validate based on the type
+        if self.type == ConceptStructureBlueprintFieldType.TEXT:
+            if not isinstance(self.default_value, str):
+                self._raise_type_mismatch_error("str", type(self.default_value).__name__)
+        elif self.type == ConceptStructureBlueprintFieldType.INTEGER:
+            if not isinstance(self.default_value, int):
+                self._raise_type_mismatch_error("int", type(self.default_value).__name__)
+        elif self.type == ConceptStructureBlueprintFieldType.BOOLEAN:
+            if not isinstance(self.default_value, bool):
+                self._raise_type_mismatch_error("bool", type(self.default_value).__name__)
+        elif self.type == ConceptStructureBlueprintFieldType.NUMBER:
+            if not isinstance(self.default_value, (int, float)):
+                self._raise_type_mismatch_error("number (int or float)", type(self.default_value).__name__)
+        elif self.type == ConceptStructureBlueprintFieldType.LIST:
+            if not isinstance(self.default_value, list):
+                self._raise_type_mismatch_error("list", type(self.default_value).__name__)
+        elif self.type == ConceptStructureBlueprintFieldType.DICT:
+            if not isinstance(self.default_value, dict):
+                self._raise_type_mismatch_error("dict", type(self.default_value).__name__)
+        # Skip validation for DATE and other unknown types
+
+    def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
+        """Raise a type mismatch error with consistent formatting."""
+        raise ConceptStructureBlueprintError(
+            f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
+        )
 
 
 ConceptStructureBlueprintType = Union[str, ConceptStructureBlueprint]
@@ -175,35 +230,3 @@ class ConceptBlueprint(BaseModel):
         if isinstance(values, ConceptBlueprint):
             cls.forbiden_having_refines_and_structure(values=values)
         return values
-
-    def structure_to_field_def(self) -> Dict[str, Any]:
-        # TODO: Refactor this method
-        if isinstance(self.structure, str):
-            raise ValueError("structure_to_field_def can only be called when structure is a dict in the blueprint")
-
-        if self.structure is None:
-            return {}
-
-        # Process the dict structure
-        result: Dict[str, Any] = {}
-        for key, value in self.structure.items():
-            if isinstance(value, ConceptStructureBlueprint):
-                # Use model_dump for ConceptStructureBlueprint instances
-                result[key] = value.model_dump()
-            else:
-                # This shouldn't happen based on the type hints, but handle it gracefully
-                result[key] = {"type": ConceptStructureBlueprintFieldType.TEXT, "definition": value}
-
-        return result
-
-    @staticmethod
-    def extract_non_native_refines(refines: Union[str, List[str]]) -> List[str]:
-        if isinstance(refines, str) and "." not in refines:
-            if refines not in [native_concept.value for native_concept in NativeConceptEnum]:
-                return [refines]
-        elif isinstance(refines, list):
-            to_return: List[str] = []
-            for refine in refines:
-                to_return += ConceptBlueprint.extract_non_native_refines(refine)
-            return to_return
-        return []

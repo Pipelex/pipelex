@@ -21,7 +21,7 @@ class TestClassRegistryUtilsUnit:
 
         # Mock the global class registry
         mock_registry = mocker.MagicMock()
-        mocker.patch("pipelex.tools.class_registry_utils.get_class_registry", return_value=mock_registry)
+        mocker.patch("pipelex.tools.class_registry_utils.KajsonManager.get_class_registry", return_value=mock_registry)
 
         ClassRegistryUtils.register_classes_in_file(file_path="/fake/path.py", base_class=None, is_include_imported=False)
 

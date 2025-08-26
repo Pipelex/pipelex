@@ -9,9 +9,10 @@ from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.core.stuffs.stuff_content import ImageContent
-from pipelex.hub import get_content_generator, get_template
+from pipelex.hub import get_content_generator, get_template, get_template_provider
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
+from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
 
@@ -61,21 +62,31 @@ class LLMPromptSpec(BaseModel):
         if self.system_prompt_verbatim_name:
             get_template(template_name=self.system_prompt_verbatim_name)
 
-        if self.user_text_jinja2_blueprint:
-            self.user_text_jinja2_blueprint.validate_with_libraries()
-        if self.system_prompt_jinja2_blueprint:
-            self.system_prompt_jinja2_blueprint.validate_with_libraries()
+        if self.user_text_jinja2_blueprint and self.user_text_jinja2_blueprint.jinja2_name:
+            the_template = get_template(template_name=self.user_text_jinja2_blueprint.jinja2_name)
+            log.debug(f"Validated jinja2 template '{self.user_text_jinja2_blueprint.jinja2_name}':\n{the_template}")
+        if self.system_prompt_jinja2_blueprint and self.system_prompt_jinja2_blueprint.jinja2_name:
+            the_template = get_template(template_name=self.system_prompt_jinja2_blueprint.jinja2_name)
+            log.debug(f"Validated jinja2 template '{self.system_prompt_jinja2_blueprint.jinja2_name}':\n{the_template}")
 
     def required_variables(self) -> Set[str]:
         required_variables: Set[str] = set()
-        if self.user_text_jinja2_blueprint:
-            required_variables.update(self.user_text_jinja2_blueprint.required_variables())
-        if self.system_prompt_jinja2_blueprint:
-            required_variables.update(self.system_prompt_jinja2_blueprint.required_variables())
         if self.user_images:
             user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
             required_variables.update(user_images_top_object_name)
-        return required_variables
+
+        if self.user_text_jinja2_blueprint:
+            required_variables = detect_jinja2_required_variables(
+                template_category=self.user_text_jinja2_blueprint.template_category,
+                template_provider=get_template_provider(),
+                jinja2_name=self.user_text_jinja2_blueprint.jinja2_name,
+                jinja2=self.user_text_jinja2_blueprint.jinja2,
+            )
+        return {
+            variable_name
+            for variable_name in required_variables
+            if not variable_name.startswith("_") and variable_name != "preliminary_text" and variable_name != "place_holder"
+        }
 
     # TODO: make this consistent with `LLMPromptFactoryAbstract` or `LLMPromptTemplate`,
     # let's get back to it when we have a better solution for structuring_method

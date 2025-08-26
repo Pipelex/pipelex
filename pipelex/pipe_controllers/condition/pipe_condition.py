@@ -9,7 +9,8 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
@@ -24,10 +25,11 @@ from pipelex.exceptions import (
     WorkingMemoryStuffNotFoundError,
 )
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
-from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
+from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_operators.pipe_jinja2 import PipeJinja2Output
-from pipelex.pipe_operators.pipe_jinja2_factory import PipeJinja2Blueprint, PipeJinja2Factory
+from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2Output
+from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
+from pipelex.pipe_operators.jinja2.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
@@ -42,6 +44,26 @@ class PipeCondition(PipeController):
     #########################################################################################
     # Validation
     #########################################################################################
+    @override
+    def validate_output(self):
+        """
+        Validate the output for the pipe condition.
+        The output of the pipe condition should match the output of all the conditional pipes, and the default pipe.
+        """
+        for pipe_condition_pipe_map in self.pipe_map:
+            pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
+            if self.output.concept_string != pipe.output.concept_string:
+                raise PipeConditionError(
+                    f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
+                    f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'"
+                )
+        if self.default_pipe_code:
+            default_pipe = get_required_pipe(pipe_code=self.default_pipe_code)
+            if self.output.concept_string != default_pipe.output.concept_string:
+                raise PipeConditionError(
+                    f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
+                    f"not matching the output concept code '{default_pipe.output.concept_string}' of the default pipe '{self.default_pipe_code}'"
+                )
 
     @model_validator(mode="after")
     def validate_expression(self) -> Self:

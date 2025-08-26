@@ -1,4 +1,5 @@
-from pipelex.core.domains.domain import Domain, DomainBlueprint
+from pipelex.core.domains.domain import Domain
+from pipelex.core.domains.domain_blueprint import DomainBlueprint
 
 
 class DomainFactory:

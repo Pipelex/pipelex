@@ -5,7 +5,8 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError
-from pipelex.core.domains.domain import DomainError, SpecialDomain
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.domains.exceptions import DomainError
 
 
 class TestConcept:
@@ -296,6 +297,15 @@ class TestConcept:
             native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE],
         )
 
+        concept_7 = ConceptFactory.make_from_blueprint(
+            concept_code="VisualDescription",
+            domain="images",
+            blueprint=ConceptBlueprint(definition="Lorem Ipsum"),
+        )
+
+        assert Concept.are_concept_compatible(concept_7, concept_6, strict=True) is False
+        assert Concept.are_concept_compatible(concept_7, concept_6, strict=False) is False
+
         # Test same code and domain
         assert Concept.are_concept_compatible(concept1, concept2) is True
 
@@ -306,5 +316,5 @@ class TestConcept:
         assert Concept.are_concept_compatible(concept1, concept4) is False
 
         # Test same refines
-        assert Concept.are_concept_compatible(concept_5, concept_6) is True
+        assert Concept.are_concept_compatible(concept_5, concept_6, strict=False) is True
         assert Concept.are_concept_compatible(concept_5, concept_6, strict=True) is False

@@ -99,6 +99,7 @@ class WorkingMemoryFactory(BaseModel):
 
     @classmethod
     def make_from_strings_from_dict(cls, input_dict: Dict[str, Any]) -> WorkingMemory:
+        # TODO: Add unit tests for this method
         stuff_dict: StuffDict = {}
         for name, content in input_dict.items():
             if not isinstance(content, str):

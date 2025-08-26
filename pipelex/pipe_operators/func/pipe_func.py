@@ -33,6 +33,10 @@ class PipeFunc(PipeOperator):
         return self.inputs
 
     @override
+    def validate_output(self):
+        pass
+
+    @override
     async def _run_operator_pipe(
         self,
         job_metadata: JobMetadata,

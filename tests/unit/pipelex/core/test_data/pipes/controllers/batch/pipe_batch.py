@@ -1,7 +1,7 @@
 """PipeBatch test cases."""
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.pipe_controllers.pipe_batch_factory import PipeBatchBlueprint
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 
 PIPE_BATCH = (
     "pipe_batch",

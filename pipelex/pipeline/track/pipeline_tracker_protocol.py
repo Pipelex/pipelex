@@ -7,7 +7,7 @@ from typing import List, Optional, Protocol
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.pipe_controllers.pipe_condition_details import PipeConditionDetails
+from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
 
 
 class PipelineTrackerProtocol(Protocol):

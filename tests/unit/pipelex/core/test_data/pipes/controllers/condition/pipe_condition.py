@@ -1,7 +1,7 @@
 """PipeCondition test cases."""
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.pipe_controllers.pipe_condition_factory import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
 
 PIPE_CONDITION = (
     "pipe_condition",

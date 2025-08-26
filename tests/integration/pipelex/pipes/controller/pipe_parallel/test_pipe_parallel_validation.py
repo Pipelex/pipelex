@@ -1,10 +1,13 @@
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_input_spec import InputRequirementBlueprint, PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.hub import get_concept_provider, get_pipe_provider
-from pipelex.pipe_controllers.pipe_parallel_factory import PipeParallelBlueprint, PipeParallelFactory
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
+from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
-from pipelex.pipe_operators.pipe_llm_factory import PipeLLMBlueprint, PipeLLMFactory
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 
 
 class TestPipeParallelValidation:

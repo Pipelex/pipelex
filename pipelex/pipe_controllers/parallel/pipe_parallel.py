@@ -72,6 +72,10 @@ class PipeParallel(PipeController):
 
         return self
 
+    @override
+    def validate_output(self):
+        pass
+
     def _validate_inputs(self):
         """
         Validate that the inputs declared for this PipeParallel match what is actually needed.

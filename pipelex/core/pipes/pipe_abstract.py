@@ -27,6 +27,13 @@ class PipeAbstract(ABC, BaseModel):
         PipeBlueprint.validate_pipe_code_syntax(pipe_code=code)
         return code
 
+    @abstractmethod
+    def validate_output(self):
+        """
+        Validate the output for the pipe.
+        """
+        pass
+
     @property
     def class_name(self) -> str:
         return self.__class__.__name__

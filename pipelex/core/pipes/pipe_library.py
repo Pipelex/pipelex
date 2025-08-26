@@ -16,9 +16,11 @@ PipeLibraryRoot = Dict[str, PipeAbstract]
 
 
 class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
+    @override
     def validate_with_libraries(self):
         concept_provider = get_concept_provider()
         for pipe in self.root.values():
+            pipe.validate_output()
             try:
                 for concept in pipe.concept_dependencies():
                     try:

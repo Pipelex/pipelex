@@ -17,6 +17,7 @@ from pipelex.exceptions import (
 )
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -71,6 +72,20 @@ class PipeSequence(PipeController):
     @override
     def required_variables(self) -> Set[str]:
         return set()
+
+    @override
+    def validate_output(self):
+        """
+        Validate the output for the pipe sequence.
+        The output of the pipe sequence should match the output of the last step.
+        """
+        last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
+        if self.output.concept_string != last_step_output_pipe.output.concept_string:
+            raise PipeSequenceError(
+                f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
+                f"not matching the output concept code '{last_step_output_pipe.output.concept_string}' "
+                f"of the last step '{self.sequential_sub_pipes[-1].pipe_code}'"
+            )
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:

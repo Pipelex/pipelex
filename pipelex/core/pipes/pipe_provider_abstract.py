@@ -8,6 +8,10 @@ PipeLibraryRoot = Dict[str, PipeAbstract]
 
 class PipeProviderAbstract(ABC):
     @abstractmethod
+    def validate_with_libraries(self) -> None:
+        pass
+
+    @abstractmethod
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
         pass
 
