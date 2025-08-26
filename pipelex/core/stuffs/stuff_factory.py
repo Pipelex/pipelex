@@ -41,6 +41,26 @@ class StuffFactory:
         return Stuff.make_stuff_name(concept=concept)
 
     @classmethod
+    def make_from_str(cls, str_value: str, name: str) -> Stuff:
+        return cls.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+            content=TextContent(text=str_value),
+            name=name,
+        )
+
+    @classmethod
+    def make_from_concept_string(cls, concept_string: str, name: str, content: Optional[StuffContent] = None) -> Stuff:
+        ConceptBlueprint.validate_concept_string(concept_string)
+        if not content:
+            raise StuffFactoryError(f"Content is required for `make_from_concept_string`, with concept_string: {concept_string}")
+        concept = get_concept_provider().get_required_concept(concept_string=concept_string)
+        return cls.make_stuff(
+            concept=concept,
+            content=content or TextContent(text=""),
+            name=name,
+        )
+
+    @classmethod
     def make_stuff(
         cls,
         concept: Concept,
