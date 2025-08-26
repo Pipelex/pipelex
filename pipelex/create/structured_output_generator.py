@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 from typing import Any, Dict, List, Type, Union, cast
 
+from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 
 
@@ -328,7 +329,7 @@ class StructureGenerator:
             ast.parse(python_code)
             return True
         except SyntaxError as e:
-            print(f"Syntax error in generated code: {e}")
+            log.error(f"Syntax error in generated code: {e}")
             return False
 
     def _validate_compilation(self, python_code: str) -> bool:
@@ -337,7 +338,7 @@ class StructureGenerator:
             compile(python_code, "<generated>", "exec")
             return True
         except Exception as e:
-            print(f"Compilation error in generated code: {e}")
+            log.error(f"Compilation error in generated code: {e}")
             return False
 
     def _validate_execution(self, python_code: str, expected_class_name: str) -> bool:
@@ -370,21 +371,21 @@ class StructureGenerator:
 
             # Verify the expected class was created
             if expected_class_name not in exec_locals:
-                print(f"Expected class '{expected_class_name}' not found in generated code")
+                log.error(f"Expected class '{expected_class_name}' not found in generated code")
                 return False
 
             # Verify it's actually a class
             if not isinstance(exec_locals[expected_class_name], type):
-                print(f"'{expected_class_name}' is not a class")
+                log.error(f"'{expected_class_name}' is not a class")
                 return False
 
             return True
 
         except ImportError as e:
-            print(f"Import error in generated code: {e}")
+            log.error(f"Import error in generated code: {e}")
             return False
         except Exception as e:
-            print(f"Execution error in generated code: {e}")
+            log.error(f"Execution error in generated code: {e}")
             return False
 
     def _validate_instantiation(self, python_code: str, expected_class_name: str) -> bool:
@@ -431,18 +432,18 @@ class StructureGenerator:
                     # If that fails too, the class structure is probably fine but requires specific data
                     # For validation purposes, we'll just check that it's a valid Pydantic model class
                     if not hasattr(generated_class, "model_fields"):
-                        print("Generated class doesn't appear to be a Pydantic model")
+                        log.error("Generated class doesn't appear to be a Pydantic model")
                         return False
                     # Class structure is valid, just requires specific data to instantiate
                     return True
 
             # Verify it's a Pydantic model with the expected structure
             if instance is not None and not hasattr(instance, "model_fields"):
-                print("Generated class doesn't appear to be a Pydantic model")
+                log.error("Generated class doesn't appear to be a Pydantic model")
                 return False
 
             return True
 
         except Exception as e:
-            print(f"Instantiation error in generated code: {e}")
+            log.error(f"Instantiation error in generated code: {e}")
             return False
