@@ -42,7 +42,7 @@ Just state what it is in a single sentence.
 type = "PipeLLM"
 definition = "Imagine a fantasy scene including products of nature"
 inputs = { product_of_nature = "ProductOfNature" }
-output = "Image"
+output = "images.ImgGenPrompt"
 prompt_template = """
 Imagine a fantasy scene including the following products of nature:
 

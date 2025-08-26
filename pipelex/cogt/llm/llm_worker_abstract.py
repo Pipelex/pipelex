@@ -92,7 +92,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         llm_job: LLMJob,
         schema: Type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        log.debug("LLM Worker gen_object")
+        log.debug(f"LLM Worker gen_object using {self.desc}")
         log.verbose(llm_job.params_desc)
         log.verbose(llm_job.llm_prompt.desc(), title="llm_prompt")
 
