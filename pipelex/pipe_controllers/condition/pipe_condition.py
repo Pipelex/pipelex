@@ -266,6 +266,7 @@ class PipeCondition(PipeController):
             output=self.output.code,
         )
 
+        # TODO: use jinja2 directly without going though a pipe
         pipe_jinja2 = PipeJinja2Factory.make_from_blueprint(
             domain=self.domain,
             pipe_code="adhoc_for_pipe_condition",

@@ -12,6 +12,8 @@ from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, C
 class StructureGenerator:
     """Generate Pydantic BaseModel classes from concept structure blueprints."""
 
+    # TODO: The methods that return False for a failed validation should just raise (proper errors).
+
     def __init__(self):
         self.imports = {
             "from typing import Optional, List, Dict, Any, Literal",

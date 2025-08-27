@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.8.0] - 2025-08-27
+
+### Refactor
+
+- Refactored the concepts: Blueprints are now more explicit, and hold only concept strings or code. Pipes hold concept instances.
+- Organized code: Created subfolders for controller and operator pipes.
+- Say goodbye to `PipeLLMPrompt`.
+- Remove the `PipeJinja2` and `PipeLLMPrompt` in the `PipeLLM`.
+
+### Added
+
+- Added a lot of unit tests.
+- Loading the library can now be done from toml file or form `PipelexBundleBlueprint`.
+
+### Fixed
+
+- Backported `backports.strenum` to `>=1.3.0` to support Python 3.10 now in dependencies and not in optional dependencies.
+
 ## [v0.7.0] - 2025-08-20
 
 ### Refactor

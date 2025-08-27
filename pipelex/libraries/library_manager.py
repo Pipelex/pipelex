@@ -13,6 +13,8 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain import Domain
+from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -184,12 +186,14 @@ class LibraryManager(LibraryManagerAbstract):
 
     def _load_domain_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> Domain:
         """Create a Domain from blueprint."""
-        return Domain(
-            code=blueprint.domain,
-            definition=blueprint.definition,
-            system_prompt=blueprint.system_prompt,
-            system_prompt_to_structure=blueprint.system_prompt_to_structure,
-            prompt_template_to_structure=blueprint.prompt_template_to_structure,
+        return DomainFactory.make_from_blueprint(
+            blueprint=DomainBlueprint(
+                code=blueprint.domain,
+                definition=blueprint.definition,
+                system_prompt=blueprint.system_prompt,
+                system_prompt_to_structure=blueprint.system_prompt_to_structure,
+                prompt_template_to_structure=blueprint.prompt_template_to_structure,
+            )
         )
 
     def _load_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[Concept]:
