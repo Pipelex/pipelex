@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Fixed a bug in the `needed_inputs` method of the `PipeSequence` pipe.
+
+### Changed
+
+- `dry_run_pipe` now returns a `DryRunOutput` object instead of a `str` with additional information.
+
+### Added
+
+- Added the `FuncRegistryUtils` class to register functions in the library.
+
 ## [v0.8.1] - 2025-08-27
 
 ### Bugfix
