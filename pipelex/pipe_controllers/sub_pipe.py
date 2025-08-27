@@ -41,14 +41,12 @@ class SubPipe(BaseModel):
         # Case 1: Batch processing
         if batch_params := self.batch_params:
             try:
-                input_list_stuff = working_memory.get_stuff(name=batch_params.input_list_stuff_name)
+                working_memory.get_stuff(name=batch_params.input_list_stuff_name)
             except WorkingMemoryStuffNotFoundError as exc:
                 raise PipeInputError(
                     f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
                     f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
                 ) from exc
-
-            sub_pipe.inputs.add_requirement(variable_name=batch_params.input_list_stuff_name, concept=input_list_stuff.concept)
 
             # Create blueprint for PipeBatch
             pipe_batch_blueprint = PipeBatchBlueprint(

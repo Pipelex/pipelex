@@ -36,9 +36,10 @@ class PipeOperator(PipeAbstract):
                     name = self.class_name
                     indent_level = len(pipe_run_params.pipe_stack) - 1
                     indent = "   " * indent_level
-                    label = f"{indent}{name}: {self.code}".ljust(80)
+                    label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} "
+                    f"Running [cyan]{self.class_name}[/cyan] → [green]{self.code}[/green]"
                     output = self.output.code
-                    log.info(f"{label} → {output}")
+                    log.info(f"{label} → [red]{output}[/red]")
                 pipe_output = await self._run_operator_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
@@ -46,12 +47,12 @@ class PipeOperator(PipeAbstract):
                     output_name=output_name,
                 )
             case PipeRunMode.DRY:
-                name = f"Dry {self.class_name}"
+                name = f"Dry run [cyan]{self.class_name}[/cyan]"
                 indent_level = len(pipe_run_params.pipe_stack) - 1
                 indent = "   " * indent_level
-                label = f"{indent}{name}: {self.code}".ljust(80)
+                label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name}: [green]{self.code}[/green]"
                 output = self.output.code
-                log.info(f"{label} → {output}")
+                log.info(f"{label} → [red]{output}[/red]")
                 pipe_output = await self._dry_run_operator_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,

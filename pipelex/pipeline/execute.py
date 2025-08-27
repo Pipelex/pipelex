@@ -97,9 +97,6 @@ async def execute_pipeline(
         pipe_run_mode=pipe_run_mode,
     )
 
-    if working_memory:
-        working_memory.pretty_print_summary()
-
     pipe_job = PipeJobFactory.make_pipe_job(
         pipe=pipe,
         pipe_run_params=pipe_run_params,
