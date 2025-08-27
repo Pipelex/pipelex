@@ -34,7 +34,13 @@ def do_dry_run_pipe(pipe_code: str, relative_config_folder_path: str = "./pipele
 
     pipelex_instance = Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
     pipelex_instance.validate_libraries()
-    asyncio.run(dry_run_pipe(get_pipe_provider().get_required_pipe(pipe_code=pipe_code)))
+
+    asyncio.run(
+        dry_run_pipe(
+            get_pipe_provider().get_required_pipe(pipe_code=pipe_code),
+            error_on_failure=True,
+        )
+    )
     typer.echo(f"✅ Pipe '{pipe_code}' validation successful")
     get_pipeline_tracker().output_flowchart()
 
