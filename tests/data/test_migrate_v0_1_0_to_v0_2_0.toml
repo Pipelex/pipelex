@@ -20,8 +20,7 @@ definition = "This one is already migrated"
 refines = "Text"
 
 [pipe.test_pipe]
-type = "PipeLLM"
-description = "A test pipe that generates simple text"
+PipeLLM = "A test pipe that generates simple text"
 inputs = { input_text = "SimpleText" }
 output = "SimpleDoc"
 prompt_template = """

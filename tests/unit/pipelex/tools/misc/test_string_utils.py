@@ -5,6 +5,8 @@ from pipelex.tools.misc.string_utils import (
     can_inject_text,
     is_none_or_has_text,
     is_not_none_and_has_text,
+    is_pascal_case,
+    is_snake_case,
     pascal_case_to_sentence,
     pascal_case_to_snake_case,
     snake_to_capitalize_first_letter,
@@ -125,3 +127,70 @@ def test_snake_to_pascal_case(snake: str, expected: str) -> None:
 )
 def test_snake_to_capitalize_first_letter(snake: str, expected: str) -> None:
     assert snake_to_capitalize_first_letter(snake) == expected
+
+
+@pytest.mark.parametrize(
+    "word, expected",
+    [
+        # Valid snake_case
+        ("hello", True),
+        ("hello_world", True),
+        ("my_variable_name", True),
+        ("test123", True),
+        ("test_123", True),
+        ("a", True),
+        ("abc123def", True),
+        ("snake_case_with_numbers_123", True),
+        # Invalid snake_case
+        ("Hello", False),  # Starts with uppercase
+        ("HelloWorld", False),  # PascalCase
+        ("helloWorld", False),  # camelCase
+        ("_hello", False),  # Starts with underscore
+        ("123hello", False),  # Starts with number
+        ("", False),  # Empty string
+        ("hello-world", False),  # Contains hyphen
+        ("hello world", False),  # Contains space
+        ("hello.world", False),  # Contains dot
+        ("HELLO_WORLD", False),  # All uppercase
+        ("Hello_World", False),  # Mixed case
+        ("hello_World", False),  # Mixed case
+        ("hello__world", True),  # Double underscore (valid)
+        ("hello_", True),  # Ends with underscore (valid)
+    ],
+)
+def test_is_snake_case(word: str, expected: bool) -> None:
+    assert is_snake_case(word) is expected
+
+
+@pytest.mark.parametrize(
+    "word, expected",
+    [
+        # Valid PascalCase
+        ("Hello", True),
+        ("HelloWorld", True),
+        ("MyVariableName", True),
+        ("Test123", True),
+        ("A", True),
+        ("ABC", True),
+        ("TestWithNumbers123", True),
+        ("HTTPRequest", True),
+        ("ParseJSONData", True),
+        ("XMLParser", True),
+        # Invalid PascalCase
+        ("hello", False),  # Starts with lowercase
+        ("helloWorld", False),  # camelCase
+        ("hello_world", False),  # snake_case
+        ("_Hello", False),  # Starts with underscore
+        ("123Hello", False),  # Starts with number
+        ("", False),  # Empty string
+        ("Hello-World", False),  # Contains hyphen
+        ("Hello World", False),  # Contains space
+        ("Hello.World", False),  # Contains dot
+        ("Hello_World", False),  # Contains underscore
+        ("HELLO_WORLD", False),  # Contains underscore
+        ("Hello$World", False),  # Contains special character
+        ("Hello@World", False),  # Contains special character
+    ],
+)
+def test_is_pascal_case(word: str, expected: bool) -> None:
+    assert is_pascal_case(word) is expected

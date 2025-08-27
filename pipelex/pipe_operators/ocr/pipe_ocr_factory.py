@@ -31,9 +31,10 @@ class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
 
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
-            concept_string_or_concept_code=blueprint.output,
+            concept_string_or_concept_code=blueprint.output_concept_string_or_concept_code,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
+
         return PipeOcr(
             domain=domain,
             code=pipe_code,

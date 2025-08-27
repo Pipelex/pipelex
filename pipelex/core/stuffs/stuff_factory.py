@@ -49,14 +49,12 @@ class StuffFactory:
         )
 
     @classmethod
-    def make_from_concept_string(cls, concept_string: str, name: str, content: Optional[StuffContent] = None) -> Stuff:
+    def make_from_concept_string(cls, concept_string: str, name: str, content: StuffContent) -> Stuff:
         ConceptBlueprint.validate_concept_string(concept_string)
-        if not content:
-            raise StuffFactoryError(f"Content is required for `make_from_concept_string`, with concept_string: {concept_string}")
         concept = get_concept_provider().get_required_concept(concept_string=concept_string)
         return cls.make_stuff(
             concept=concept,
-            content=content or TextContent(text=""),
+            content=content,
             name=name,
         )
 

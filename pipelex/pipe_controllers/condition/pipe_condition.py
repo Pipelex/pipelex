@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Set, Union, cast
 
 import shortuuid
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from typing_extensions import Self, override
 
 from pipelex import log
@@ -37,6 +37,7 @@ from pipelex.tools.typing.validation_utils import has_exactly_one_among_attribut
 class PipeCondition(PipeController):
     expression_template: Optional[str] = None
     expression: Optional[str] = None
+    # TODO: rething this pipe_map.
     pipe_map: List[PipeConditionPipeMap]
     default_pipe_code: Optional[str] = None
     add_alias_from_expression_to: Optional[str] = None
@@ -64,6 +65,22 @@ class PipeCondition(PipeController):
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                     f"not matching the output concept code '{default_pipe.output.concept_string}' of the default pipe '{self.default_pipe_code}'"
                 )
+
+    @field_validator("pipe_map")
+    @classmethod
+    def validate_pipe_map(cls, pipe_map: List[PipeConditionPipeMap]) -> List[PipeConditionPipeMap]:
+        # Validate that the expressions and pipe_code are UNIQUE
+        expression_results = [pipe_condition_pipe_map.expression_result for pipe_condition_pipe_map in pipe_map]
+        pipe_codes = [pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in pipe_map]
+        if len(expression_results) != len(set(expression_results)):
+            raise PipeDefinitionError(
+                f"PipeCondition '{cls.code}' must have a unique expression result for each pipe in pipe_map in pipe_map: {pipe_map}"
+            )
+        if len(pipe_codes) != len(set(pipe_codes)):
+            raise PipeDefinitionError(
+                f"PipeCondition '{cls.code}' must have a unique pipe code for each expression result in pipe_map in pipe_map: {pipe_map}"
+            )
+        return pipe_map
 
     @model_validator(mode="after")
     def validate_expression(self) -> Self:

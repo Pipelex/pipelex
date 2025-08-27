@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, Union
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.exceptions import PipeBlueprintError
@@ -33,17 +33,17 @@ class PipeBlueprint(BaseModel):
     type: Any  # TODO: Find a better way to handle this.
     definition: Optional[str] = None
     inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
-    output: str  # concept_string_or_concept_code
+    output_concept_string_or_concept_code: str = Field(alias="output")
 
     @field_validator("type", mode="after")
     def validate_pipe_type(cls, value: Any) -> Any:
         """Validate that the pipe type is one of the allowed values."""
         allowed_types = [_type.value for _type in AllowedPipeTypes]
         if value not in allowed_types:
-            raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {sorted(allowed_types)}")
+            raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {allowed_types}")
         return value
 
-    @field_validator("output", mode="before")
+    @field_validator("output_concept_string_or_concept_code", mode="before")
     def validate_concept_string_or_concept_code(cls, output: str) -> str:
         ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=output)
         return output
