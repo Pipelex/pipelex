@@ -145,16 +145,80 @@ def get_type_structure(
             seen_types.add(tp.__name__)
             collected_types[tp.__name__] = tp
 
-            # Only collect immediate parent class if it's a custom class
+            # Check for base classes with name conflicts that need special handling
             for base in tp.__bases__:
-                if (
-                    issubclass(base, BaseModel)
-                    and base is not BaseModel
-                    and base.__module__ != "pydantic.main"
-                    and base.__module__ != "abc"
-                    and not base.__module__.startswith("pipelex.core")
-                ):
-                    collect_types(base)
+                if issubclass(base, BaseModel) and base is not BaseModel and base.__module__ != "pydantic.main" and base.__module__ != "abc":
+                    # Special case: collect base classes with same name but different modules
+                    if base.__name__ == tp.__name__ and base.__module__ != tp.__module__:
+                        # Use unique key to avoid conflicts
+                        unique_name = f"{base.__name__}_from_{base.__module__.replace('.', '_')}"
+                        if unique_name not in seen_types:
+                            seen_types.add(unique_name)
+                            collected_types[unique_name] = base
+
+                        # Collect all field types from this base class recursively using BaseModel as base_class
+                        try:
+                            # Create a nested collection function for the base class
+                            def collect_base_types(tp_arg: Any) -> None:
+                                # Handle generic types first (before type check)
+                                origin = get_origin(tp_arg)
+                                if origin is not None:
+                                    for arg in get_args(tp_arg):
+                                        collect_base_types(arg)
+                                    return
+
+                                if not isinstance(tp_arg, type):
+                                    return
+                                if tp_arg in (type, object, type(None)):
+                                    return
+
+                                # Collect enums
+                                if issubclass(tp_arg, Enum) and tp_arg not in collected_enums.values():
+                                    collected_enums[tp_arg.__name__] = tp_arg
+                                    return
+
+                                # Collect model classes (BaseModel subclasses for base class analysis)
+                                if (
+                                    issubclass(tp_arg, BaseModel)
+                                    and tp_arg is not BaseModel
+                                    and tp_arg.__name__ not in seen_types
+                                    and tp_arg.__module__ != "pydantic.main"
+                                    and tp_arg.__module__ != "abc"
+                                ):
+                                    # DEBUG: print what we're collecting
+                                    # print(f"DEBUG: Collecting nested type {tp_arg.__name__} from {tp_arg.__module__}")
+                                    seen_types.add(tp_arg.__name__)
+                                    collected_types[tp_arg.__name__] = tp_arg
+
+                                    # Also process its fields
+                                    try:
+                                        nested_type_hints = get_type_hints(tp_arg)
+                                        nested_model_fields = getattr(tp_arg, "model_fields", {})
+                                        if nested_model_fields:
+                                            for fname, _ in nested_model_fields.items():
+                                                if fname in nested_type_hints:
+                                                    ftype = nested_type_hints[fname]
+                                                    collect_base_types(ftype)
+                                    except (TypeError, AttributeError):
+                                        pass
+
+                            # Process all field types from the base class
+                            base_type_hints = get_type_hints(base)
+                            base_model_fields = getattr(base, "model_fields", {})
+                            if base_model_fields:
+                                for fname, _ in base_model_fields.items():
+                                    if fname in base_type_hints:
+                                        ftype = base_type_hints[fname]
+                                        # DEBUG: print what we're processing
+                                        # if 'ConceptBlueprint' in str(ftype):
+                                        #     print(f"DEBUG: Processing field {fname} with type {ftype}")
+                                        collect_base_types(ftype)
+                        except (TypeError, AttributeError):
+                            pass
+
+                    # Regular base class collection for non-pipelex.core classes
+                    elif not base.__module__.startswith("pipelex.core"):
+                        collect_types(base)
 
             try:
                 type_hints = get_type_hints(tp)
@@ -184,7 +248,32 @@ def get_type_structure(
 
         # Get class docstring
         doc = class_type.__doc__ and class_type.__doc__.strip()
-        base_class_name = class_type.__bases__[0].__name__
+
+        # Handle base class name selection, dealing with circular naming issues
+        base_class_name = None
+        for base in class_type.__bases__:
+            # Skip if same name as current class (avoid circular reference appearance)
+            if base.__name__ == class_name:
+                continue
+            # Prefer StructuredContent, TextContent, ListContent for display
+            if base.__name__ in ["StructuredContent", "TextContent", "ListContent"]:
+                base_class_name = base.__name__
+                break
+            # Skip pipelex.core classes for display unless no better option
+            if not base.__module__.startswith("pipelex.core"):
+                base_class_name = base.__name__
+                break
+
+        # Fallback to first non-circular base class
+        if base_class_name is None:
+            for base in class_type.__bases__:
+                if base.__name__ != class_name:
+                    base_class_name = base.__name__
+                    break
+
+        # Ultimate fallback
+        if base_class_name is None:
+            base_class_name = class_type.__bases__[0].__name__
 
         # Get generic parameters if any
         type_args = get_args(class_type)

@@ -4,6 +4,8 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 from pytest import FixtureRequest
 
+from pipelex import pretty_print
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint as PipelexBundleBlueprintBaseModel
 from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent, TextContent
 from pipelex.tools.typing.type_inspector import get_type_structure
 from pipelex.types import StrEnum
@@ -322,3 +324,26 @@ class TestTypeInspector:
             "    date: Optional[datetime] = None",
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
+
+    def test_multiple_inheritance_with_structured_content_works(self, request: FixtureRequest):
+        """Test that multiple inheritance with StructuredContent correctly captures custom base model fields"""
+
+        class PipelexBundleBlueprint(PipelexBundleBlueprintBaseModel, StructuredContent):
+            """A class that inherits from both custom base model and StructuredContent"""
+
+            pass
+
+        result = get_type_structure(PipelexBundleBlueprint, base_class=StructuredContent)
+        result_text = "\n".join(result)
+        pretty_print(result, title="Multiple Inheritance Result")
+
+        # Check that the main class is shown with StructuredContent as base
+        assert "class PipelexBundleBlueprint(StructuredContent):" in result_text
+
+        # Check that the base class fields are included
+        assert "prompt_template_to_structure: Optional[str] = None" in result_text
+        assert "domain: str" in result_text
+        assert "system_prompt: Optional[str] = None" in result_text
+        assert "ConceptBlueprint(BaseModel)" in result_text
+
+        pretty_print(result, title="Multiple Inheritance Result")

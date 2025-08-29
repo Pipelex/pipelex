@@ -30,10 +30,14 @@ class PipeBlueprint(BaseModel):
     at runtime to ensure only valid pipe type values are allowed.
     """
 
-    type: Any  # TODO: Find a better way to handle this.
-    definition: Optional[str] = None
-    inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
-    output_concept_string_or_concept_code: str = Field(alias="output")
+    type: Any = Field(
+        description=f"The type of the pipe: {', '.join([_type for _type in AllowedPipeTypes])}"
+    )  # TODO: Find a better way to handle this.
+    definition: Optional[str] = Field(default=None, description="A description of what the pipe does.")
+    inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = Field(
+        default=None, description="The input concept(s) for the pipe, needs to be PascalCase."
+    )
+    output_concept_string_or_concept_code: str = Field(alias="output", description="The output concept code for the pipe, needs to be PascalCase.")
 
     @field_validator("type", mode="after")
     def validate_pipe_type(cls, value: Any) -> Any:

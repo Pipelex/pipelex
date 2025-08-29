@@ -1,6 +1,6 @@
 from typing import Optional, Union
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Self
 
 from pipelex.exceptions import PipeDefinitionError
@@ -8,14 +8,24 @@ from pipelex.tools.typing.validation_utils import has_more_than_one_among_attrib
 
 
 class SubPipeBlueprint(BaseModel):
+    """
+    SubPipeBlueprint is used to charaterize a step in a Pipe Controller (PipeSequence, PipeParallel, PipeBatch, PipeCondition).
+    It should have no more than '1' of nb_output or multiple_output.
+    When batch_over is specified, batch_as must also be provided.
+    When batch_as is specified, batch_over must also be provided.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
-    pipe: str
-    result: Optional[str] = None
-    nb_output: Optional[int] = None
-    multiple_output: Optional[bool] = None
-    batch_over: Union[bool, str] = False
-    batch_as: Optional[str] = None
+    pipe: str = Field(description="The pipe code to run.")
+    result: Optional[str] = Field(default=None, description="The name to assign to the output of the pipe.")
+    nb_output: Optional[int] = Field(default=None, description="The number of outputs to generate.")
+    multiple_output: Optional[bool] = Field(
+        default=None,
+        description="Whether to generate multiple outputs. (if yes, it leaves to the LLM the choice of the number of outputs)",
+    )
+    batch_over: Union[bool, str] = Field(default=False, description="The name of the list in the context to iterate over.")
+    batch_as: Optional[str] = Field(default=None, description="The name to assign to the current item in the batch.")
 
     @model_validator(mode="after")
     def validate_multiple_output(self) -> Self:

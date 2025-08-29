@@ -2,15 +2,6 @@
 
 This guide explains how to define schemas and enums for structured data generation in multi-step workflows. This step occurs between drafting pipelines (see `draft_pipelines.md`) and building them (see `build_pipelines.md`).
 
-## When to Define Structures
-
-After drafting your pipeline but before building it, review your draft for:
-
-1. **Complex data that needs validation**: When your pipeline generates structured information that must follow specific formats
-2. **Multi-field outputs**: When a single "result" actually contains multiple related pieces of information
-3. **Constrained values**: When fields can only have specific allowed values
-4. **Reusable data types**: When the same structure appears in multiple places
-
 ## Structure Definition Workflow
 
 ### Step 1: Identify Structure Needs from Draft
@@ -29,9 +20,6 @@ Ask yourself:
 - What format should `contact_info` follow?
 - What are the valid values for `support_category`?
 
-### Step 2: Design Schema Definitions
-
-Create a TOML file defining your structures using the syntax from `structured_output_generator.py`.
 
 ## Structure Definition Syntax
 
@@ -136,7 +124,7 @@ definition = "AI confidence in extraction"
 
 [enum.ConfidenceLevel.values]
 low = "Low confidence - manual review recommended"
-medium = "Medium confidence - spot check suggested"  
+medium = "Medium confidence - spot check suggested"
 high = "High confidence - likely accurate"
 
 # Structures for structured data
@@ -211,7 +199,7 @@ After defining structures, update your pipeline blueprint concepts to reference 
 ```json
 "concept": {
   "PageInfo": "Information extracted from a page",
-  "DocumentMetadata": "Document classification data", 
+  "DocumentMetadata": "Document classification data",
   "DocumentAnalysis": "Complete document analysis"
 }
 ```
@@ -232,7 +220,7 @@ After defining structures, update your pipeline blueprint concepts to reference 
         "required": true
       },
       "priority": {
-        "type": "Priority", 
+        "type": "Priority",
         "definition": "Processing priority",
         "required": true
       },
@@ -277,79 +265,21 @@ After defining structures, update your pipeline blueprint concepts to reference 
 - Concept name exactly matches an existing StructuredContent class
 - Working with simple, standard structures that are already registered
 
-### Generating Python Classes
-
-**From TOML files:**
-```python
-from pipelex.create.structured_output_generator import generate_structured_outputs_from_toml_file
-
-# Generate Python classes from TOML definitions
-generate_structured_outputs_from_toml_file(
-    "document_analysis_structures.toml",
-    "document_analysis.py"
-)
-```
-
-**From inline definitions (for concept integration):**
-```python
-from pipelex.create.structured_output_generator import generate_structured_output_from_inline_definition
-
-# Generate from inline field definitions (as used in concept.structure)
-fields_def = {
-    "document_type": {
-        "type": "DocumentType",
-        "definition": "Classified document type",
-        "required": True
-    },
-    "priority": {
-        "type": "Priority", 
-        "definition": "Processing priority",
-        "required": True
-    },
-    "title": "Inferred document title",
-    "page_count": {
-        "type": "integer",
-        "definition": "Total number of pages"
-    },
-    "language": {
-        "choices": ["en", "fr", "es", "de"],
-        "definition": "Document language"
-    }
-}
-
-enums = {
-    "DocumentType": {
-        "definition": "Types of documents we can process",
-        "values": ["technical", "legal", "financial", "marketing", "general"]
-    },
-    "Priority": {
-        "definition": "Document processing priority", 
-        "values": ["low", "medium", "high", "urgent"]
-    }
-}
-
-python_code = generate_structured_output_from_inline_definition(
-    "DocumentMetadata", 
-    fields_def,
-    enums
-)
-```
-
 ## Validation Checklist
 
 Before finalizing your structure definitions:
 
-- [ ] All structure names use PascalCase and are singular
-- [ ] All field names use snake_case
-- [ ] Every structure and enum has a clear `definition`
-- [ ] Required fields are marked appropriately
-- [ ] Enums are used for constrained values with known options
-- [ ] Field types match the expected data format
-- [ ] Structures group related fields logically
-- [ ] Structure names are semantic (describe what they are, not how they're used)
-- [ ] No native concepts (Text, Image, PDF) are redefined
-- [ ] List item types are specified correctly
-- [ ] Dictionary key and value types are appropriate
+- All structure names use PascalCase and are singular
+- All field names use snake_case
+- Every structure and enum has a clear `definition`
+- Required fields are marked appropriately
+- Enums are used for constrained values with known options
+- Field types match the expected data format
+- Structures group related fields logically
+- Structure names are semantic (describe what they are, not how they're used)
+- No native concepts (Text, Image, PDF) are redefined
+- List item types are specified correctly
+- Dictionary key and value types are appropriate
 
 ## Common Patterns
 

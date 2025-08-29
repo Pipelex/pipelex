@@ -37,15 +37,22 @@ class PipelexBundleBlueprint(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    domain: str
-    definition: Optional[str] = None
-    system_prompt: Optional[str] = None
-    system_prompt_to_structure: Optional[str] = None
-    prompt_template_to_structure: Optional[str] = None
+    domain: str = Field(description="The domain of the current bundle: snake_case format")
+    definition: Optional[str] = Field(default=None, description="The definition depicting the whole pipeline")
+    system_prompt: Optional[str] = Field(default=None, description="The system prompt of the current bundle, used by default for all pipes.")
+    system_prompt_to_structure: Optional[str] = Field(default=None, description="The system prompt to structure the output of the current bundle")
+    prompt_template_to_structure: Optional[str] = Field(default=None, description="The prompt template to structure the output of the current bundle")
 
-    concept: Optional[Dict[str, ConceptBlueprint | str]] = Field(default_factory=dict)
+    concept: Optional[Dict[str, ConceptBlueprint | str]] = Field(
+        default_factory=dict,
+        description="The concepts used in this domain, to characterise inputs and ouputs of pipes. "
+        "The key is the concept code, in PascalCase format.",
+    )
 
-    pipe: Optional[Dict[str, PipeBlueprintUnion]] = Field(default_factory=dict)
+    pipe: Optional[Dict[str, PipeBlueprintUnion]] = Field(
+        default_factory=dict,
+        description="The pipes of this domain, to transform inputs into outputs. The key is the pipe code, in snake_case format.",
+    )
 
     @field_validator("domain", mode="before")
     @classmethod

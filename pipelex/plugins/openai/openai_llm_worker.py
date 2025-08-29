@@ -6,6 +6,7 @@ from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError
 from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
+from instructor.exceptions import InstructorRetryException
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -197,15 +198,19 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.PERPLEXITY_DEEPSEEK
                     | LLMFamily.GROK_3
                 ):
-                    result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-                        model=self.llm_engine.llm_id,
-                        temperature=llm_job.job_params.temperature,
-                        max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-                        seed=llm_job.job_params.seed,
-                        messages=messages,
-                        response_model=schema,
-                        max_retries=llm_job.job_config.max_retries,
-                    )
+                    try: 
+                        result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
+                            model=self.llm_engine.llm_id,
+                            temperature=llm_job.job_params.temperature,
+                            max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
+                            seed=llm_job.job_params.seed,
+                            messages=messages,
+                            response_model=schema,
+                            max_retries=llm_job.job_config.max_retries,
+                        )
+                    except InstructorRetryException as exc:
+                        log.error(f"Error generating object `{schema}` with model {self.llm_engine.llm_id} in retry: {exc}")
+                        raise exc
                 case (
                     LLMFamily.CLAUDE_3
                     | LLMFamily.CLAUDE_3_5

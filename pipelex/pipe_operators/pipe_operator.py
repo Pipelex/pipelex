@@ -33,11 +33,10 @@ class PipeOperator(PipeAbstract):
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
                 if self.class_name not in ["PipeJinja2", "PipeLLMPrompt"]:
-                    name = self.class_name
+                    name = f"Running [cyan]{self.class_name}[/cyan]"
                     indent_level = len(pipe_run_params.pipe_stack) - 1
                     indent = "   " * indent_level
-                    label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} "
-                    f"Running [cyan]{self.class_name}[/cyan] → [green]{self.code}[/green]"
+                    label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name} → [green]{self.code}[/green]"
                     output = self.output.code
                     log.info(f"{label} → [red]{output}[/red]")
                 pipe_output = await self._run_operator_pipe(

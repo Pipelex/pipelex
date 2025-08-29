@@ -31,14 +31,27 @@ class ConceptStructureBlueprintFieldType(StrEnum):
 
 
 class ConceptStructureBlueprint(BaseModel):
-    definition: str
-    type: ConceptStructureBlueprintFieldType | None = None
-    item_type: Optional[str] = None
-    key_type: Optional[str] = None
-    value_type: Optional[str] = None
-    choices: Optional[List[str]] = Field(default_factory=list)
-    required: Optional[bool] = Field(default=True)
-    default_value: Optional[Any] = None
+    """This Blueprint defines a field in the structure of a concept, that will be used as a pydantic v2 model."""
+
+    definition: str = Field(description="The definition of the field, in natural language")
+    type: Optional[ConceptStructureBlueprintFieldType] = Field(
+        default=None, description="The type of the concept structure. When 'dict', both key_type and value_type must be specified"
+    )
+    item_type: Optional[str] = Field(default=None, description="The type of the item of the concept structure")
+    key_type: Optional[str] = Field(default=None, description="The type of the key of the concept structure. Required when type='dict'")
+    value_type: Optional[str] = Field(default=None, description="The type of the value of the concept structure. Required when type='dict'")
+    choices: Optional[List[str]] = Field(
+        default_factory=list,
+        description="The choices of the concept structure. When provided (type=None), cannot be empty and field value must be one of these options",
+    )
+    required: Optional[bool] = Field(
+        default=True, description="Whether the concept structure is required. Defaults to True - field is mandatory unless explicitly set to False"
+    )
+    default_value: Optional[Any] = Field(
+        default=None,
+        description="The default value of the concept structure. Must match the specified type, "
+        " and for choice fields must be one of the valid choices. When provided, type must be specified (unless choices are provided)",
+    )
 
     # TODO: date translator for default_value
 
@@ -116,16 +129,17 @@ class ConceptStructureBlueprint(BaseModel):
         )
 
 
-ConceptStructureBlueprintType = Union[str, ConceptStructureBlueprint]
-
-
 class ConceptBlueprint(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    definition: str
-    structure: Optional[Union[str, Dict[str, ConceptStructureBlueprintType]]] = None
+    definition: str = Field(description="The definition of the concept, in natural language")
+    structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = Field(
+        default=None,
+        description="The structure of the concept: The key is the field name, in snake_case format, "
+        "and the value is the structure blueprint of the field.",
+    )
     # TODO: restore possibility of multiple refiles
-    refines: Optional[str] = None
+    refines: Optional[str] = Field(default=None, description="The native concept that this concept refines, in PascalCase format")
 
     @classmethod
     def is_native_concept_code(cls, concept_code: str) -> bool:

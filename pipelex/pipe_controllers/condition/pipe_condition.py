@@ -53,14 +53,14 @@ class PipeCondition(PipeController):
         """
         for pipe_condition_pipe_map in self.pipe_map:
             pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
-            if self.output.concept_string != pipe.output.concept_string:
+            if self.output.concept_string != pipe.output.concept_string and self.output.concept_string != "native.Dynamic":
                 raise PipeConditionError(
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                     f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'"
                 )
         if self.default_pipe_code:
             default_pipe = get_required_pipe(pipe_code=self.default_pipe_code)
-            if self.output.concept_string != default_pipe.output.concept_string:
+            if self.output.concept_string != default_pipe.output.concept_string and self.output.concept_string != "native.Dynamic":
                 raise PipeConditionError(
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                     f"not matching the output concept code '{default_pipe.output.concept_string}' of the default pipe '{self.default_pipe_code}'"

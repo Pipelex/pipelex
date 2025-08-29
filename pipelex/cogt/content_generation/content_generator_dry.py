@@ -65,7 +65,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             __use_examples__ = True
             __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
-        obj = ObjectFactory.build()
+        obj = ObjectFactory.build(factory_use_construct=True)
         return obj
 
     @override

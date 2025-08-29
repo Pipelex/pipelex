@@ -1,6 +1,6 @@
 """Tests for ConceptFactory methods."""
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import pytest
 
@@ -9,7 +9,6 @@ from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptStructureBlueprint,
     ConceptStructureBlueprintFieldType,
-    ConceptStructureBlueprintType,
 )
 from pipelex.core.concepts.concept_factory import ConceptFactory
 
@@ -35,7 +34,7 @@ class TestConceptFactory:
 
     def test_normalize_structure_blueprint(self):
         """Test that mixed structure blueprints are properly normalized."""
-        mixed_structure_blueprint: Dict[str, ConceptStructureBlueprintType] = {
+        mixed_structure_blueprint: Dict[str, Union[str, ConceptStructureBlueprint]] = {
             "name": "The name of the person",
             "age": ConceptStructureBlueprint(definition="The age of the person", type=ConceptStructureBlueprintFieldType.NUMBER, required=True),
             "active": ConceptStructureBlueprint(
@@ -53,7 +52,7 @@ class TestConceptFactory:
 
         assert ConceptFactory.normalize_structure_blueprint(mixed_structure_blueprint) == expected_structure
 
-        mixed_structure_blueprint2: Dict[str, ConceptStructureBlueprintType] = {
+        mixed_structure_blueprint2: Dict[str, Union[str, ConceptStructureBlueprint]] = {
             "name": ConceptStructureBlueprint(definition="The name of the person", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
             "age": ConceptStructureBlueprint(definition="The age of the person", type=ConceptStructureBlueprintFieldType.NUMBER, required=True),
             "active": ConceptStructureBlueprint(
