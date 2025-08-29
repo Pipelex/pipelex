@@ -9,6 +9,7 @@
 ### Changed
 
 - `dry_run_pipe` now returns a `DryRunOutput` object instead of a `str` with additional information.
+- Updated `cocode` dependency from version `v0.0.10` to `v0.0.15`.
 
 ### Added
 
