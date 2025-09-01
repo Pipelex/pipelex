@@ -149,7 +149,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
             self.remove_main_stuff()
             self.add_new_stuff(name=name, stuff=stuff, aliases=[MAIN_STUFF_NAME])
             log.verbose(f"Setting new main stuff {name}: {stuff.concept.code} = '{stuff.short_desc}'")
-            log.verbose(stuff.content.rendered_plain())
         else:
             self.remove_alias_to_main_stuff()
             self.set_stuff(name=MAIN_STUFF_NAME, stuff=stuff)

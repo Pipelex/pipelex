@@ -32,7 +32,6 @@ class LLMAssignmentFactory(BaseModel):
         llm_setting: Optional[LLMSetting] = None,
         **prompt_arguments: Any,
     ) -> "LLMAssignment":
-        log.verbose(f"Making LLMAssignment with prompt arguments: {prompt_arguments}, using {self.llm_prompt_factory.desc}")
         llm_prompt = await self.llm_prompt_factory.make_llm_prompt_from_args(**prompt_arguments)
         return LLMAssignment(
             job_metadata=job_metadata or self.job_metadata,

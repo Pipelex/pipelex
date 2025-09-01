@@ -3,7 +3,7 @@ from typing import Optional
 
 from typing_extensions import override
 
-from pipelex import log
+from pipelex import log, pretty_print
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -45,6 +45,7 @@ class PipeOperator(PipeAbstract):
                     pipe_run_params=pipe_run_params,
                     output_name=output_name,
                 )
+                pretty_print(pipe_output.main_stuff, title=f"PipeOutput of pipe {self.code} output:")
             case PipeRunMode.DRY:
                 name = f"Dry run [cyan]{self.class_name}[/cyan]"
                 indent_level = len(pipe_run_params.pipe_stack) - 1
@@ -58,6 +59,7 @@ class PipeOperator(PipeAbstract):
                     pipe_run_params=pipe_run_params,
                     output_name=output_name,
                 )
+                pretty_print(pipe_output.main_stuff, title=f"PipeOutput of pipe {self.code} output:")
         get_activity_manager().dispatch_activity(
             activity_report=ActivityReport(
                 job_metadata=job_metadata,

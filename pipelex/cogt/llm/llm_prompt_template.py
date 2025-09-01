@@ -43,6 +43,8 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
         # pop the base fields and then use the templating method
         system_text: Optional[str] = arguments_dict.pop("system_text", None)
         user_text: Optional[str] = arguments_dict.pop("user_text", None)
+        if not user_text:
+            user_text = self.proto_prompt.user_text
 
         # user_images is Optional here: None means the template is not altering the user_images field
         user_images: Optional[List[PromptImage]] = None
@@ -68,7 +70,6 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
         is_user_images_append: Optional[bool] = None,
         template_inputs: Optional[LLMPromptTemplateInputs] = None,
     ) -> LLMPrompt:
-        log.verbose("_make_llm_prompt called for LLMPromptTemplate")
         if not is_none_or_has_text(system_text):
             if system_text == "":
                 log.warning(f"Prompt template system_text should be None or contain text. system_text = '{system_text}'")

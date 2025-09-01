@@ -12,7 +12,7 @@ from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.hub import get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLMOutput
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from tests.integration.pipelex.test_data import PipeTestCases
@@ -23,7 +23,7 @@ from tests.integration.pipelex.test_data import PipeTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeLLM:
-    async def test_pipe_llm(
+    async def test_pipe_llmmmm(
         self,
         pipe_run_mode: PipeRunMode,
     ):
@@ -32,6 +32,7 @@ class TestPipeLLM:
             output=NativeConceptEnum.TEXT.value,
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             prompt=PipeTestCases.USER_PROMPT,
+            structuring_method=StructuringMethod.PRELIMINARY_TEXT,
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(

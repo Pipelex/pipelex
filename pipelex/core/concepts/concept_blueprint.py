@@ -35,14 +35,16 @@ class ConceptStructureBlueprint(BaseModel):
 
     definition: str = Field(description="The definition of the field, in natural language")
     type: Optional[ConceptStructureBlueprintFieldType] = Field(
-        default=None, description="The type of the concept structure. When 'dict', both key_type and value_type must be specified"
+        default=None,
+        description="The type of the concept structure. When 'dict', both key_type and value_type must be specified. When 'None', "
+        "choices must be provided.",
     )
     item_type: Optional[str] = Field(default=None, description="The type of the item of the concept structure")
     key_type: Optional[str] = Field(default=None, description="The type of the key of the concept structure. Required when type='dict'")
     value_type: Optional[str] = Field(default=None, description="The type of the value of the concept structure. Required when type='dict'")
     choices: Optional[List[str]] = Field(
-        default_factory=list,
-        description="The choices of the concept structure. When provided (type=None), cannot be empty and field value must be one of these options",
+        default=None,
+        description="The choices of the concept structure. When provided, type must be None",
     )
     required: Optional[bool] = Field(
         default=True, description="Whether the concept structure is required. Defaults to True - field is mandatory unless explicitly set to False"
@@ -136,10 +138,15 @@ class ConceptBlueprint(BaseModel):
     structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = Field(
         default=None,
         description="The structure of the concept: The key is the field name, in snake_case format, "
-        "and the value is the structure blueprint of the field.",
+        "and the value is the structure blueprint of the field."
+        "You cannot have a structure and refine at the same time.",
     )
     # TODO: restore possibility of multiple refiles
-    refines: Optional[str] = Field(default=None, description="The native concept that this concept refines, in PascalCase format")
+    refines: Optional[str] = Field(
+        default=None,
+        description="The native concept (Text, Image, PDF, TextAndImages, Number, Page) that this concept refines, in PascalCase format."
+        "You cannot have a structure and refine at the same time.",
+    )
 
     @classmethod
     def is_native_concept_code(cls, concept_code: str) -> bool:

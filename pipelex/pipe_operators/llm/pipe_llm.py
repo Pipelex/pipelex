@@ -49,7 +49,7 @@ from pipelex.hub import (
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.typing.type_inspector import get_type_structure
+from pipelex.tools.typing.structure_printer import StructurePrinter
 
 
 class PipeLLMOutput(PipeOutput):
@@ -293,11 +293,13 @@ class PipeLLM(PipeOperator):
         is_with_preliminary_text = (
             self.structuring_method == StructuringMethod.PRELIMINARY_TEXT
         ) or get_config().pipelex.structure_config.is_default_text_then_structure
-
+        log.verbose(
+            f"is_with_preliminary_text: {is_with_preliminary_text} for pipe {self.code} because the structuring_method is {self.structuring_method}"
+        )
         # Append output structure prompt if needed
         output_structure_prompt: Optional[str] = PipeLLM.get_output_structure_prompt(
             concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
-            is_with_preliminary_text=is_with_preliminary_text or False,
+            is_with_preliminary_text=is_with_preliminary_text,
         )
 
         llm_prompt_run_params = PipeRunParams.copy_by_injecting_multiplicity(
@@ -342,10 +344,16 @@ class PipeLLM(PipeOperator):
                     case StructuringMethod.DIRECT:
                         llm_prompt_2_factory = None
                     case StructuringMethod.PRELIMINARY_TEXT:
+                        log.verbose(f"Creating llm_prompt_2_factory for pipe {self.code} with structuring_method {structuring_method}")
                         pipe = get_required_pipe(pipe_code=self.code)
                         # TODO: run_pipe() could get the domain at the same time as the pip_code
                         domain = get_required_domain(domain=pipe.domain)
-                        prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
+                        prompt_template_to_structure = (
+                            self.prompt_template_to_structure
+                            or domain.prompt_template_to_structure
+                            or get_template(template_name="structure_from_preliminary_text_user")
+                        )
+                        log.verbose(f"prompt_template_to_structure for pipe {self.code}: {prompt_template_to_structure}")
                         system_prompt = self.system_prompt_to_structure or domain.system_prompt
                         llm_prompt_2_proto = LLMPrompt(
                             system_text=system_prompt,
@@ -361,7 +369,11 @@ class PipeLLM(PipeOperator):
                     domain = get_required_domain(domain=the_pipe.domain)
                 else:
                     domain = Domain.make_default()
-                prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
+                prompt_template_to_structure = (
+                    self.prompt_template_to_structure
+                    or domain.prompt_template_to_structure
+                    or get_template(template_name="structure_from_preliminary_text_user")
+                )
                 system_prompt = self.system_prompt_to_structure or domain.system_prompt
                 llm_prompt_2_proto = LLMPrompt(
                     system_text=system_prompt,
@@ -431,6 +443,7 @@ class PipeLLM(PipeOperator):
                 # We're generating a list of objects using preliminary text
                 method_desc = "text_then_object"
                 log.dev(f"{task_desc} by {method_desc}")
+                log.verbose(f"llm_prompt_2_factory: {llm_prompt_2_factory}")
 
                 generated_objects = await content_generator.make_text_then_object_list(
                     job_metadata=job_metadata,
@@ -462,6 +475,7 @@ class PipeLLM(PipeOperator):
                 # We're generating a single object using preliminary text
                 method_desc = "text_then_object"
                 log.verbose(f"{task_desc} by {method_desc}")
+                log.verbose(f"llm_prompt_2_factory: {llm_prompt_2_factory}")
                 generated_object = await content_generator.make_text_then_object(
                     job_metadata=job_metadata,
                     object_class=content_class,
@@ -510,29 +524,23 @@ class PipeLLM(PipeOperator):
         if not output_class:
             return ""
 
-        class_structure = get_type_structure(output_class, base_class=StuffContent)
+        class_structure = StructurePrinter.render_model(output_class, stop_at=StructuredContent)
 
         if not class_structure:
             return ""
 
-        class_structure_str = "\n".join(class_structure)
-
         # TODO: use proper prompt templating for this
         if is_with_preliminary_text:
             output_structure_prompt = (
-                f"\n\n---\nRequested output format: The requested output will be used to define the following class: {class_name}\n"
-                f"{class_structure_str}\n"
-                "You do NOT need to output a formatted JSON object, another LLM will take care of that. "
-                "If you cannot find a value that is Optional, output None for that field. "
-                "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
-                "DO NOT create information. If the information is not present, output None."
+                f"\n\n---\nRequested output format: The requested output will be used to define the following class (follow the rules if any): {class_name}\n"
+                f"{class_structure}\n"
+                "You do NOT need to output a formatted JSON object, another LLM will take care of that. Just output the text representation of the class."
+                "DO NOT create information. If the information is not present, output the default value."
             )
         else:
             output_structure_prompt = (
-                f"\n\n---\nRequested output format: The output must conform to the following BaseModel: {class_name}\n"
-                f"{class_structure_str}\n"
-                "If you cannot find a value that is Optional, output None for that field. "
-                "However, you MUST clearly output the values for each of these fields in your response.\n---\n"
-                "DO NOT create information. If the information is not present, output None."
+                f"\n\n---\nRequested output format: The output must conform to the following BaseModel (follow the rules if any): {class_name}\n"
+                f"{class_structure}\n"
+                "DO NOT create information. If the information is not present, output the default value."
             )
         return output_structure_prompt

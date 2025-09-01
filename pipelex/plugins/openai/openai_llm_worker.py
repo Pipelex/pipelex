@@ -2,11 +2,11 @@ from typing import Any, Optional, Type
 
 import instructor
 import openai
+from instructor.exceptions import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError
 from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
-from instructor.exceptions import InstructorRetryException
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -198,7 +198,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.PERPLEXITY_DEEPSEEK
                     | LLMFamily.GROK_3
                 ):
-                    try: 
+                    try:
                         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                             model=self.llm_engine.llm_id,
                             temperature=llm_job.job_params.temperature,

@@ -109,7 +109,7 @@ class LLMWorkerFactory:
                 llm_worker = AnthropicLLMWorker(
                     sdk_instance=llm_sdk_instance,
                     llm_engine=llm_engine,
-                    structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS,
+                    structure_method=StructureMethod.INSTRUCTOR_VERTEX_JSON,
                     reporting_delegate=reporting_delegate,
                 )
             case LLMPlatform.MISTRAL:

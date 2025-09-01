@@ -12,8 +12,10 @@ from pipelex.core.stuffs.stuff_content import StructuredContent
 class ConceptSpec(StructuredContent):
     the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
     description: str = Field(description="Description of the concept, in natural language.")
-    structure: str = Field(description="A description of a dict with fieldnames as keys, and values being a "
-                           "dict with: definition, type, item_type, key_type, value_type, choices, required, default_value")
+    structure: str = Field(
+        description="A description of a dict with fieldnames as keys, and values being a "
+        "dict with: definition, type, item_type, key_type, value_type, choices, required, default_value"
+    )
 
 
 class ConceptStructureBlueprint(ConceptStructureBlueprintBaseModel, StructuredContent):
