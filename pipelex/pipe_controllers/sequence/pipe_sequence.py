@@ -16,6 +16,7 @@ from pipelex.exceptions import (
     StaticValidationErrorType,
 )
 from pipelex.hub import get_required_pipe
+from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -36,7 +37,16 @@ class PipeSequence(PipeController):
         generated_outputs: Set[str] = set()
 
         for sequential_sub_pipe in self.sequential_sub_pipes:
-            sub_pipe_needed_inputs = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code).needed_inputs()
+            sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
+            sub_pipe_needed_inputs = sub_pipe.needed_inputs()
+
+            if isinstance(sub_pipe, PipeParallel):
+                if sub_pipe.add_each_output:
+                    for sub_parallel_pipe in sub_pipe.parallel_sub_pipes:
+                        if sub_pipe.add_each_output and sub_parallel_pipe.output_name:
+                            generated_outputs.add(sub_parallel_pipe.output_name)
+                        elif sub_parallel_pipe.output_name:
+                            generated_outputs.add(sub_parallel_pipe.output_name)
 
             if sequential_sub_pipe.batch_params:
                 if sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:

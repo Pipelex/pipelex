@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Set, Type
+from typing import Any, List, Optional, Set, Type
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -16,6 +16,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class PipeAbstract(ABC, BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
+    type: Any
     code: str
     domain: str
     definition: Optional[str] = None

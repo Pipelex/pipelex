@@ -49,7 +49,6 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
 
         self.anthropic_async_client = sdk_instance
-        print("jdsjqod", structure_method)
         if structure_method:
             instructor_mode = structure_method.as_instructor_mode()
             log.debug(f"Anthropic structure mode: {structure_method} --> {instructor_mode}")

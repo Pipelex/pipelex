@@ -20,7 +20,7 @@ steps = [
 [pipe.to_concept_spec]
 type = "PipeLLM"
 description = "From the brief and one signature, propose a ConceptSpec (with a structure draft in plain text)."
-inputs = { signature = "PipeSignature" }
+inputs = { signature = "PipeSignature", brief = "UserBrief" }
 output = "ConceptSpec"
 llm = "llm_to_engineer"
 structuring_method = "preliminary_text"

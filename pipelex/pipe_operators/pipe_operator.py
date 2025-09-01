@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Optional
+from typing import Literal, Optional
 
 from typing_extensions import override
 
@@ -14,6 +14,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeOperator(PipeAbstract):
+    type: Literal["PipeOperator"] = "PipeOperator"
     @override
     async def run_pipe(
         self,
@@ -59,7 +60,6 @@ class PipeOperator(PipeAbstract):
                     pipe_run_params=pipe_run_params,
                     output_name=output_name,
                 )
-                pretty_print(pipe_output.main_stuff, title=f"PipeOutput of pipe {self.code} output:")
         get_activity_manager().dispatch_activity(
             activity_report=ActivityReport(
                 job_metadata=job_metadata,

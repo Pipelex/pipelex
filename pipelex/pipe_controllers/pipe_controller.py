@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Optional
+from typing import Literal, Optional
 
 from typing_extensions import override
 
@@ -12,6 +12,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeController(PipeAbstract):
+    type: Literal["PipeController"] = "PipeController"
     @override
     async def run_pipe(
         self,

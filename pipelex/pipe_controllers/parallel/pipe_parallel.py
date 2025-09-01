@@ -43,25 +43,21 @@ class PipeParallel(PipeController):
 
         for sub_pipe in self.parallel_sub_pipes:
             pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
-
-            # Get the inputs needed by this parallel pipe
             pipe_needed_inputs = pipe.needed_inputs()
-
-            # Handle batching: if this sub_pipe has batch_params, exclude the batch_as input
-            # since it's provided by the batching mechanism
             if sub_pipe.batch_params:
-                batch_as_input = sub_pipe.batch_params.input_item_stuff_name
-                # Create a new PipeInputSpec without the batch_as input
-                filtered_needed_inputs = PipeInputSpecFactory.make_empty()
-                for var_name, requirement in pipe_needed_inputs.root.items():
-                    if var_name != batch_as_input:
-                        filtered_needed_inputs.add_requirement(variable_name=var_name, concept=requirement.concept)
-                pipe_needed_inputs = filtered_needed_inputs
-
-            # Add all inputs from this parallel pipe
-            for var_name, requirement in pipe_needed_inputs.root.items():
-                needed_inputs.add_requirement(variable_name=var_name, concept=requirement.concept)
-
+                needed_inputs.add_requirement(
+                    variable_name=sub_pipe.batch_params.input_list_stuff_name,
+                    concept=pipe_needed_inputs.get_required_input_requirement(
+                        variable_name=sub_pipe.batch_params.input_item_stuff_name
+                    ).concept,
+                    multiplicity=True,
+                )
+                for input_name, requirement in pipe_needed_inputs.items:
+                        if input_name != sub_pipe.batch_params.input_item_stuff_name:
+                            needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
+            else:
+                for input_name, requirement in pipe_needed_inputs.items:
+                    needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
         return needed_inputs
 
     @model_validator(mode="after")
@@ -312,7 +308,6 @@ class PipeParallel(PipeController):
                 stuff=combined_output_stuff,
                 name=output_name,
             )
-
         return PipeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,

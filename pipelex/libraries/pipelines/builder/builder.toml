@@ -17,11 +17,10 @@ inputs = { brief = "UserBrief" }
 output = "Dynamic"
 multiple_output = true
 steps = [
-    { pipe = "draft_planning_text",          result = "plan_draft" },
-    { pipe = "draft_to_conceptspecs_text",   result = "concept_specs_text" },
-    { pipe = "draft_to_pipesignatures_text", result = "pipe_signatures_text" },
-    { pipe = "materialize_concept_specs",    result = "concept_specs" },
-    { pipe = "materialize_pipe_signatures",  result = "pipe_signatures" },
+    { pipe = "draft_planning_text", result = "plan_draft" },
+    { pipe = "parallel_draft_to_specs" },
+    { pipe = "materialize_concept_specs", result = "concept_specs" },
+    { pipe = "materialize_pipe_signatures", result = "pipe_signatures" },
     { pipe = "build_concept_blueprint", batch_over = "concept_specs", batch_as = "concept_spec", result = "concept_blueprints" },
     { pipe = "create_pipes_from_signatures", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_blueprints" },
     # { pipe = "compile_in_pipelex_bundle_blueprint", result = "pipelex_bundle_blueprint" }
@@ -64,6 +63,15 @@ Brief:
 # ────────────────────────────────────────────────────────────────────────────────
 # STAGE 2 — textual specs (still TEXT, not structured objects yet)
 # ────────────────────────────────────────────────────────────────────────────────
+[pipe.parallel_draft_to_specs]
+type = "PipeParallel"
+description = "Generate ConceptSpecsText and PipeSignaturesText in parallel from plan draft."
+inputs = { plan_draft = "PlanDraftText", brief = "UserBrief" }
+output = "Dynamic"
+parallels = [
+    { pipe = "draft_to_conceptspecs_text",   result = "concept_specs_text" },
+    { pipe = "draft_to_pipesignatures_text", result = "pipe_signatures_text" },
+]
 
 [pipe.draft_to_conceptspecs_text]
 type = "PipeLLM"
