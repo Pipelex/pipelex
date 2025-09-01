@@ -47,14 +47,12 @@ class PipeParallel(PipeController):
             if sub_pipe.batch_params:
                 needed_inputs.add_requirement(
                     variable_name=sub_pipe.batch_params.input_list_stuff_name,
-                    concept=pipe_needed_inputs.get_required_input_requirement(
-                        variable_name=sub_pipe.batch_params.input_item_stuff_name
-                    ).concept,
+                    concept=pipe_needed_inputs.get_required_input_requirement(variable_name=sub_pipe.batch_params.input_item_stuff_name).concept,
                     multiplicity=True,
                 )
                 for input_name, requirement in pipe_needed_inputs.items:
-                        if input_name != sub_pipe.batch_params.input_item_stuff_name:
-                            needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
+                    if input_name != sub_pipe.batch_params.input_item_stuff_name:
+                        needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
             else:
                 for input_name, requirement in pipe_needed_inputs.items:
                     needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)

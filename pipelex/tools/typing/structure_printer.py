@@ -6,7 +6,7 @@ import inspect
 import sys
 import types
 import typing
-from typing import Any, Dict, List, Set, Tuple, Type, get_args, get_origin, get_type_hints
+from typing import Any, Dict, List, Set, Tuple, Type, cast, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 from typing_extensions import Annotated as TE_Annotated
@@ -150,7 +150,7 @@ class StructurePrinter:
             b = base_origin
 
         # Try a clean __name__ first
-        name = getattr(b, "__name__", None)
+        name = cast(str, getattr(b, "__name__", None))
         if name:
             if "[" in name:
                 return name.split("[", 1)[0]
