@@ -16,7 +16,7 @@ from tests.unit.pipelex.tools.typing.data import (
 )
 
 
-class TestStructurePrinterParam:
+class TestStructurePrinter:
     """Parametric tests for StructurePrinter (one test method per public API)."""
 
     # ---------- pretty_type (single test, many cases) ----------

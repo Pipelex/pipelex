@@ -1,43 +1,38 @@
 from typing import Literal, Optional
 
-from pydantic import Field
-
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 
 class PipeBatchBlueprint(PipeBlueprint):
-    """
-    PipeBatch is used to run a pipe on a list of items in parallel.
-    This is a pipe Controller, it orchestrates the execution of a pipe on a list of items.
+    """Blueprint for batch processing pipe operations in the Pipelex framework.
 
-    This pipe is mostly used directly inside a `PipeSequence` pipe like so:
-    ```toml
-    [pipe.sequence_with_batch]
-    type = "Sequence"
-    description = "A Sequence of pipes"
-    inputs = { input_data = "ConceptName" }
-    output = "OutputConceptName"
-    steps = [
-        { pipe = "pipe_to_apply", batch_over = "input_list", batch_as = "current_item", result = "batch_results" }
-    ]
-    ```
-    ## Key Parameters
-    - `pipe`: The pipe operation to apply to each element in the batch
-    - `batch_over`: The name of the list in the context to iterate over
-    - `batch_as`: The name to use for the current element in the pipe's context
-    - `result`: Where to store the results of the batch operation
+    PipeBatch enables parallel execution of a single pipe across multiple items
+    in a list. Each item is processed independently, making it ideal for data
+    transformation, enrichment, or analysis tasks on collections.
+
+    This controller is commonly used within PipeSequence for inline batch processing,
+    where the batch configuration is specified directly in the sequence step using
+    batch_over and batch_as parameters in SubPipeBlueprint.
+
+    Attributes:
+        type: Fixed to "PipeBatch" for this pipe type.
+        branch_pipe_code: The pipe code to execute for each item in the input list.
+                         This pipe is instantiated once per item in parallel.
+        input_list_name: Name of the list in WorkingMemory to iterate over.
+                        Defaults to the PipeBatch's main input name if not specified.
+        input_item_name: Name assigned to individual items within each execution branch.
+                        This is how the branch pipe accesses its specific input item.
+
+    Validation Rules:
+        1. branch_pipe_code must reference an existing pipe in the pipeline.
+        2. When input_list_name is specified, it must reference a list in context.
+        3. The branch pipe should be designed to process single items.
+
+    Raises:
+        PipeDefinitionError: When validation rules are violated.
     """
 
     type: Literal["PipeBatch"] = "PipeBatch"
-    branch_pipe_code: str = Field(description="The name of the single pipe to execute for each item in the input list.")
-
-    input_list_name: Optional[str] = Field(
-        default=None,
-        description="The name of the list in the `WorkingMemory` to iterate over. "
-        "If not provided, it defaults to the name of the `PipeBatch`'s main `input`.",
-    )
-    input_item_name: Optional[str] = Field(
-        default=None,
-        description="The name that an individual item from the list will have inside its execution branch. "
-        "This is how the branch pipe finds its input.",
-    )
+    branch_pipe_code: str
+    input_list_name: Optional[str] = None
+    input_item_name: Optional[str] = None

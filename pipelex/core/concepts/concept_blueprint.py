@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from typing_extensions import Self
 
 from pipelex.core.concepts.concept_native import NativeConceptEnum, is_native_concept
@@ -31,29 +31,47 @@ class ConceptStructureBlueprintFieldType(StrEnum):
 
 
 class ConceptStructureBlueprint(BaseModel):
-    """This Blueprint defines a field in the structure of a concept, that will be used as a pydantic v2 model."""
+    """Blueprint defining a field in the structure of a concept, used as a Pydantic V2 model.
 
-    definition: str = Field(description="The definition of the field, in natural language")
-    type: Optional[ConceptStructureBlueprintFieldType] = Field(
-        default=None,
-        description="The type of the concept structure. When 'dict', both key_type and value_type must be specified. When 'None', "
-        "choices must be provided.",
-    )
-    item_type: Optional[str] = Field(default=None, description="The type of the item of the concept structure")
-    key_type: Optional[str] = Field(default=None, description="The type of the key of the concept structure. Required when type='dict'")
-    value_type: Optional[str] = Field(default=None, description="The type of the value of the concept structure. Required when type='dict'")
-    choices: Optional[List[str]] = Field(
-        default=None,
-        description="The choices of the concept structure. When provided, type must be None",
-    )
-    required: Optional[bool] = Field(
-        default=True, description="Whether the concept structure is required. Defaults to True - field is mandatory unless explicitly set to False"
-    )
-    default_value: Optional[Any] = Field(
-        default=None,
-        description="The default value of the concept structure. Must match the specified type, "
-        " and for choice fields must be one of the valid choices. When provided, type must be specified (unless choices are provided)",
-    )
+    This class represents the schema for a single field in a concept's structure. It supports
+    various field types including text, list, dict, integer, boolean, number, and date, as well
+    as choice-based fields (enums).
+
+    Attributes:
+        definition: Natural language description of the field's purpose and usage.
+        type: The field's data type. When 'dict', both key_type and value_type must be specified.
+              When None, choices must be provided (creating an enum field).
+        item_type: For 'list' type fields, specifies the type of items in the list.
+        key_type: For 'dict' type fields, specifies the type of dictionary keys. Required when type='dict'.
+        value_type: For 'dict' type fields, specifies the type of dictionary values. Required when type='dict'.
+        choices: List of valid string choices for enum fields. When provided, type must be None.
+        required: Whether the field is mandatory. Defaults to True unless explicitly set to False.
+        default_value: Default value for the field. Must match the specified type, and for choice
+                      fields must be one of the valid choices. When provided, type must be specified
+                      (unless choices are provided).
+
+    Validation Rules:
+        1. Choice fields (enums): When type is None, choices must be provided and non-empty.
+        2. Dictionary fields: When type is 'dict', both key_type and value_type are required.
+        3. Default values: When default_value is provided:
+           - For typed fields: type must be specified and default_value must match that type
+           - For choice fields: default_value must be one of the valid choices
+           - Type validation includes: text (str), integer (int), boolean (bool),
+             number (int/float), list (list), dict (dict)
+        4. List fields: When type is 'list', item_type should specify the type of list items.
+
+    Raises:
+        ConceptStructureBlueprintError: When validation rules are violated.
+    """
+
+    definition: str
+    type: Optional[ConceptStructureBlueprintFieldType] = None
+    item_type: Optional[str] = None
+    key_type: Optional[str] = None
+    value_type: Optional[str] = None
+    choices: Optional[List[str]] = None
+    required: Optional[bool] = True
+    default_value: Optional[Any] = None
 
     # TODO: date translator for default_value
 
@@ -132,21 +150,46 @@ class ConceptStructureBlueprint(BaseModel):
 
 
 class ConceptBlueprint(BaseModel):
+    """Blueprint defining a concept that can be used in the Pipelex framework.
+
+    A concept represents a structured data type that can either define its own structure
+    or refine an existing native concept. Concepts are fundamental building blocks in
+    Pipelex workflows for data validation and transformation.
+
+    Attributes:
+        definition: Natural language description of what the concept represents and its purpose.
+        structure: The concept's field structure. Can be either:
+                  - A string referring to another concept
+                  - A dictionary where keys are field names (in snake_case) and values are
+                    either strings (concept references) or ConceptStructureBlueprint instances
+                  Cannot be used together with 'refines'.
+        refines: The native concept this concept extends (Text, Image, PDF, TextAndImages,
+                Number, Page) in PascalCase format. Cannot be used together with 'structure'.
+
+    Validation Rules:
+        1. Mutual exclusivity: A concept must have either 'structure' or 'refines', but not both.
+        2. Field names: When structure is a dict, all keys must be valid snake_case identifiers.
+        3. Concept codes: Must be in PascalCase format (letters and numbers only, starting
+           with uppercase, no dots).
+        4. Concept strings: Format is "domain.ConceptCode" where domain is lowercase and
+           ConceptCode is PascalCase.
+        5. Native concepts: When refining, must be one of the valid native concepts.
+        6. Structure values: In structure dict, values must be either valid concept strings
+           or ConceptStructureBlueprint instances.
+
+
+    Raises:
+        ConceptBlueprintError: When validation rules are violated.
+        ConceptCodeError: When concept code format is invalid.
+        ConceptStringError: When concept string format is invalid.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
-    definition: str = Field(description="The definition of the concept, in natural language")
-    structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = Field(
-        default=None,
-        description="The structure of the concept: The key is the field name, in snake_case format, "
-        "and the value is the structure blueprint of the field."
-        "You cannot have a structure and refine at the same time.",
-    )
+    definition: str
+    structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = None
     # TODO: restore possibility of multiple refiles
-    refines: Optional[str] = Field(
-        default=None,
-        description="The native concept (Text, Image, PDF, TextAndImages, Number, Page) that this concept refines, in PascalCase format."
-        "You cannot have a structure and refine at the same time.",
-    )
+    refines: Optional[str] = None
 
     @classmethod
     def is_native_concept_code(cls, concept_code: str) -> bool:

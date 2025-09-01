@@ -24,20 +24,38 @@ class AllowedPipeTypes(StrEnum):
 
 
 class PipeBlueprint(BaseModel):
-    """Simple data container for pipe blueprint information.
+    """Blueprint defining a pipe component in the Pipelex framework.
 
-    The 'type' field uses Any to avoid type override conflicts but is validated
-    at runtime to ensure only valid pipe type values are allowed.
+    Pipes are the fundamental processing units in Pipelex workflows. They transform
+    input concepts into output concepts through various operations like LLM processing,
+    image generation, OCR, or custom functions.
+
+    Attributes:
+        type: The pipe type (PipeFunc, PipeLLM, PipeImgGen, PipeOcr, PipeBatch,
+              PipeCondition, PipeParallel, PipeSequence). Uses Any type to avoid
+              type override conflicts but validated at runtime.
+        definition: Natural language description of what the pipe does.
+        inputs: Input concept specifications. Can be either:
+               - A string (concept string/code in PascalCase)
+               - An InputRequirementBlueprint with additional constraints
+               Dictionary keys are input names, values are concept specifications.
+        output_concept_string_or_concept_code: Output concept code in PascalCase format.
+                                              Aliased as 'output' in serialization.
+
+    Validation Rules:
+        1. Pipe type: Must be one of the AllowedPipeTypes enum values.
+        2. Output concept: Must be valid concept string or code in PascalCase.
+        3. Input concepts: When provided, must use PascalCase for concept references.
+        4. Pipe codes: When validating pipe codes, must be in snake_case format.
+
+    Raises:
+        PipeBlueprintError: When validation rules are violated.
     """
 
-    type: Any = Field(
-        description=f"The type of the pipe: {', '.join([_type for _type in AllowedPipeTypes])}"
-    )  # TODO: Find a better way to handle this.
-    definition: Optional[str] = Field(default=None, description="A description of what the pipe does.")
-    inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = Field(
-        default=None, description="The input concept(s) for the pipe, needs to be PascalCase."
-    )
-    output_concept_string_or_concept_code: str = Field(alias="output", description="The output concept code for the pipe, needs to be PascalCase.")
+    type: Any  # TODO: Find a better way to handle this.
+    definition: Optional[str] = None
+    inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
+    output_concept_string_or_concept_code: str = Field(alias="output")
 
     @field_validator("type", mode="after")
     def validate_pipe_type(cls, value: Any) -> Any:

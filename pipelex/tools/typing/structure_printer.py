@@ -24,15 +24,15 @@ class StructurePrinter:
     @classmethod
     def pretty_type(cls, tp: Any) -> str:
         # Prefer stdlib origin/args, fallback to typing_extensions
-        origin = get_origin(tp) or (te_get_origin(tp) if te_get_origin else None)
-        args = get_args(tp) or (te_get_args(tp) if te_get_args else ())
+        origin = get_origin(tp) or te_get_origin(tp)
+        args = get_args(tp) or te_get_args(tp) or ()
 
         # Handle cases where Annotated isn't recognized by get_origin
         if origin is None:
             s = str(tp)
             if "Annotated[" in s or s.startswith("Annotated[") or s.startswith("typing.Annotated"):
                 try:
-                    ann_args = te_get_args(tp) if te_get_args else get_args(tp)
+                    ann_args = te_get_args(tp) or get_args(tp) or ()
                     if ann_args:
                         return cls.pretty_type(ann_args[0])
                 except Exception:
@@ -53,7 +53,9 @@ class StructurePrinter:
 
         # Annotated[T, ...] -> T
         if str(origin).endswith("Annotated") or (TE_Annotated and origin is TE_Annotated):
-            return cls.pretty_type(args[0])
+            if args:
+                return cls.pretty_type(args[0])
+            return str(tp)
 
         # Containers
         from typing import Dict as TDict
@@ -61,9 +63,13 @@ class StructurePrinter:
         from typing import Tuple as TTuple
 
         if origin in (list, TList):
-            return f"List[{cls.pretty_type(args[0])}]"
+            if args:
+                return f"List[{cls.pretty_type(args[0])}]"
+            return "List"
         if origin in (dict, TDict):
-            return f"Dict[{cls.pretty_type(args[0])}, {cls.pretty_type(args[1])}]"
+            if len(args) >= 2:
+                return f"Dict[{cls.pretty_type(args[0])}, {cls.pretty_type(args[1])}]"
+            return "Dict"
         if origin in (tuple, TTuple):
             return "Tuple[" + ", ".join(cls.pretty_type(a) for a in args) + "]"
 
@@ -78,13 +84,13 @@ class StructurePrinter:
         Also collects Enum *types* when they appear as Literal values.
         """
         found: Set[Type[Any]] = set()
-        origin = get_origin(tp) or (te_get_origin(tp) if te_get_origin else None)
+        origin = get_origin(tp) or te_get_origin(tp)
         if origin is None:
             if isinstance(tp, type):
                 found.add(tp)
             return found
 
-        args = get_args(tp) or (te_get_args(tp) if te_get_args else ())
+        args = get_args(tp) or te_get_args(tp) or ()
 
         # If Literal of enums, collect the enum's class
         if str(origin).endswith("Literal"):
@@ -99,13 +105,31 @@ class StructurePrinter:
     # ---------- decisions ----------
 
     @classmethod
-    def is_renderable_type(cls, t: Any) -> bool:
-        if not isinstance(t, type):
+    def is_renderable_type(cls, _type: Any) -> bool:
+        if not isinstance(_type, type):
             return False
-        if t in (object, type):
+        if _type in (object, type):
             return False
         # render Pydantic models, dataclasses, enums, and your own domain classes
-        return issubclass(t, BaseModel) or dataclasses.is_dataclass(t) or issubclass(t, enum.Enum) or t.__module__.startswith("pipelex.")
+        try:
+            is_pydantic = issubclass(_type, BaseModel)
+        except TypeError:
+            is_pydantic = False
+
+        try:
+            is_dc = dataclasses.is_dataclass(_type)
+        except Exception:
+            is_dc = False
+
+        try:
+            is_enum = issubclass(_type, enum.Enum)
+        except TypeError:
+            is_enum = False
+
+        module = getattr(_type, "__module__", None)
+        is_pipelex = module.startswith("pipelex.") if isinstance(module, str) else False
+
+        return is_pydantic or is_dc or is_enum or is_pipelex
 
     @classmethod
     def _is_content_base(cls, b: Type[Any], stop_at: Type[Any]) -> bool:
@@ -121,7 +145,7 @@ class StructurePrinter:
     @classmethod
     def _normalize_base_name(cls, b: Any) -> str:
         """Return a non-generic display name for a base (strip T params)."""
-        base_origin = get_origin(b) or (te_get_origin(b) if te_get_origin else None)
+        base_origin = get_origin(b) or te_get_origin(b)
         if base_origin is not None:
             b = base_origin
 
@@ -129,7 +153,7 @@ class StructurePrinter:
         name = getattr(b, "__name__", None)
         if name:
             if "[" in name:
-                name = name.split("[", 1)[0]
+                return name.split("[", 1)[0]
             return name
 
         # Fallback to str() patterns
@@ -317,8 +341,12 @@ class StructurePrinter:
     def render_model(cls, model_cls: Type[Any], stop_at: Type[Any]) -> str:
         """Return a printable string describing `model_cls` and its referenced types."""
         # Capture caller locals to resolve forward refs defined in test/local scopes
-        caller_frame = inspect.currentframe().f_back if inspect.currentframe() else None
-        localns: Dict[str, Any] = dict(caller_frame.f_locals) if caller_frame else {}
+        localns: Dict[str, Any] = {}
+        current_frame = inspect.currentframe()
+        if current_frame is not None:
+            caller_frame = current_frame.f_back
+            if caller_frame is not None:
+                localns = dict(caller_frame.f_locals)
 
         lines: List[str] = []
         seen: Set[Type[Any]] = set()

@@ -22,18 +22,6 @@ async def do_build_blueprint(
             "concept_rules": get_support_file(subpath="create/structures.md"),
         },
     )
-    # pipe_output = await execute_pipeline(
-    #     pipe_code="build_blueprint",
-    #     input_memory={
-    #         "domain": "test",
-    #         "pipeline_name": "test_pipe",
-    #         "requirements": "Take a photo as input, analyze its content and its most important feature, "
-    # "imagine the opposite to that feature, render it as a photo",
-    #         "draft_pipeline_rules": get_support_file(subpath="create/draft_pipelines.md"),
-    #         "build_pipeline_rules": get_support_file(subpath="create/build_pipelines.md"),
-    #         "create_structured_output_rules": get_support_file(subpath="create/structures.md"),
-    #     },
-    # )
     pretty_print(pipe_output, title="Pipe Output")
     concepts = pipe_output.working_memory.get_stuff_as_list(name="concept_blueprints", item_type=ConceptBlueprint)
     pipes = cast(ListContent[PipeBlueprintUnion], pipe_output.main_stuff)
@@ -41,14 +29,3 @@ async def do_build_blueprint(
         domain="test", concept={concept.the_concept_code: concept for concept in concepts.items}, pipe={pipe.pipe_code: pipe for pipe in pipes.items}
     )
     pretty_print(blueprint, title="Pipelex Bundle Blueprint")
-    # pipeline_draft = pipe_output.working_memory.get_stuff_as_str(name="pipeline_draft")
-
-    # # Save or display result
-    # output_path_base = output_path or "pipelex/libraries/pipelines/temp/gen_blueprint"
-    # draft_path = f"{output_path_base}_draft.md"
-    # save_text_to_path(text=pipeline_draft, path=draft_path, create_directory=True)
-    # # rough_toml_path = f"{output_path_base}_rough.toml"
-    # # save_text_to_path(text=PipelexInterpreter.make_toml_content(blueprint=blueprint), path=rough_toml_path)
-    # rough_json_path = f"{output_path_base}_rough.json"
-    # save_as_json_to_path(object_to_save=blueprint, path=rough_json_path)
-    # log.info(f"✅ Rough blueprint saved to '{output_path_base}'")

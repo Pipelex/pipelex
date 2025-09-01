@@ -1,6 +1,6 @@
 from typing import Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import Self
 
 from pipelex.exceptions import PipeDefinitionError
@@ -8,24 +8,44 @@ from pipelex.tools.typing.validation_utils import has_more_than_one_among_attrib
 
 
 class SubPipeBlueprint(BaseModel):
-    """
-    SubPipeBlueprint is used to charaterize a step in a Pipe Controller (PipeSequence, PipeParallel, PipeBatch, PipeCondition).
-    It should have no more than '1' of nb_output or multiple_output.
-    When batch_over is specified, batch_as must also be provided.
-    When batch_as is specified, batch_over must also be provided.
+    """Blueprint for a single step within a pipe controller.
+
+    SubPipeBlueprint defines individual pipe executions within controller pipes
+    (PipeSequence, PipeParallel, PipeBatch, PipeCondition). Supports output
+    cardinality control and batch processing configuration.
+
+    Attributes:
+        pipe: The pipe code to execute. Must reference an existing pipe in the pipeline.
+        result: Optional name to assign to the pipe's output in the context.
+               If not specified, output is added directly to context.
+        nb_output: Fixed number of outputs to generate. Mutually exclusive with
+                  multiple_output.
+        multiple_output: When true, allows LLM to determine the number of outputs.
+                        Mutually exclusive with nb_output.
+        batch_over: Name of the list in context to iterate over for batch processing.
+                   When false (default), no batching occurs. When specified as string,
+                   references a list in context. Requires batch_as when set.
+        batch_as: Name to assign to the current item during batch iteration.
+                 Required when batch_over is specified.
+
+    Validation Rules:
+        1. nb_output and multiple_output are mutually exclusive.
+        2. batch_over and batch_as must be specified together (both or neither).
+        3. pipe must reference a valid pipe code.
+        4. result, when specified, should follow naming conventions.
+
+    Raises:
+        PipeDefinitionError: When validation rules are violated.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    pipe: str = Field(description="The pipe code to run.")
-    result: Optional[str] = Field(default=None, description="The name to assign to the output of the pipe.")
-    nb_output: Optional[int] = Field(default=None, description="The number of outputs to generate.")
-    multiple_output: Optional[bool] = Field(
-        default=None,
-        description="Whether to generate multiple outputs. (if yes, it leaves to the LLM the choice of the number of outputs)",
-    )
-    batch_over: Union[bool, str] = Field(default=False, description="The name of the list in the context to iterate over.")
-    batch_as: Optional[str] = Field(default=None, description="The name to assign to the current item in the batch.")
+    pipe: str
+    result: Optional[str] = None
+    nb_output: Optional[int] = None
+    multiple_output: Optional[bool] = None
+    batch_over: Union[bool, str] = False
+    batch_as: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_multiple_output(self) -> Self:

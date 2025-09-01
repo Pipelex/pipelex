@@ -33,26 +33,52 @@ PipeBlueprintUnion = Annotated[
 
 
 class PipelexBundleBlueprint(BaseModel):
-    """Complete blueprint of a pipelex bundle TOML definition."""
+    """Complete blueprint of a Pipelex bundle TOML definition.
+
+    Represents the top-level structure of a Pipelex bundle, which defines a domain
+    with its concepts, pipes, and configuration. Bundles are the primary unit of
+    organization for Pipelex workflows, loaded from TOML files.
+
+    Attributes:
+        domain: The domain identifier for this bundle in snake_case format.
+               Serves as the namespace for all concepts and pipes within.
+        definition: Natural language description of the pipeline's purpose and functionality.
+        system_prompt: Default system prompt applied to all LLM pipes in the bundle
+                      unless overridden at the pipe level.
+        system_prompt_to_structure: System prompt specifically for output structuring
+                                   operations across the bundle.
+        prompt_template_to_structure: Template for structuring prompts used in output
+                                     formatting operations.
+        concept: Dictionary of concept definitions used in this domain. Keys are concept
+                codes in PascalCase format, values are ConceptBlueprint instances or
+                string references to existing concepts.
+        pipe: Dictionary of pipe definitions for data transformation. Keys are pipe
+             codes in snake_case format, values are specific pipe blueprint types
+             (PipeLLM, PipeImgGen, PipeSequence, etc.).
+
+    Validation Rules:
+        1. Domain must be in valid snake_case format.
+        2. Concept keys must be in PascalCase format.
+        3. Pipe keys must be in snake_case format.
+        4. Extra fields are forbidden (strict mode).
+        5. Pipe types must match their blueprint discriminator.
+
+    Raises:
+        ValidationError: When domain, concept, or pipe naming conventions are violated.
+        PipeDefinitionError: When pipe definitions are invalid.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    domain: str = Field(description="The domain of the current bundle: snake_case format")
-    definition: Optional[str] = Field(default=None, description="The definition depicting the whole pipeline")
-    system_prompt: Optional[str] = Field(default=None, description="The system prompt of the current bundle, used by default for all pipes.")
-    system_prompt_to_structure: Optional[str] = Field(default=None, description="The system prompt to structure the output of the current bundle")
-    prompt_template_to_structure: Optional[str] = Field(default=None, description="The prompt template to structure the output of the current bundle")
+    domain: str
+    definition: Optional[str] = None
+    system_prompt: Optional[str] = None
+    system_prompt_to_structure: Optional[str] = None
+    prompt_template_to_structure: Optional[str] = None
 
-    concept: Optional[Dict[str, ConceptBlueprint | str]] = Field(
-        default_factory=dict,
-        description="The concepts used in this domain, to characterise inputs and ouputs of pipes. "
-        "The key is the concept code, in PascalCase format.",
-    )
+    concept: Optional[Dict[str, ConceptBlueprint | str]] = Field(default_factory=dict)
 
-    pipe: Optional[Dict[str, PipeBlueprintUnion]] = Field(
-        default_factory=dict,
-        description="The pipes of this domain, to transform inputs into outputs. The key is the pipe code, in snake_case format.",
-    )
+    pipe: Optional[Dict[str, PipeBlueprintUnion]] = Field(default_factory=dict)
 
     @field_validator("domain", mode="before")
     @classmethod
