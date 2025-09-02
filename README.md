@@ -100,6 +100,8 @@ Follow these steps to get started:
 - Python ≥3.10
 - [pip](https://pip.pypa.io/en/stable/), [poetry](https://python-poetry.org/), or [uv](https://github.com/astral-sh/uv) package manager
 
+We **highly** recommend installing our own extension for PLX files into your IDE of choice. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to VS Code marketplace too and if you are using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
+
 ### Option #1: Run examples
 
 Visit the 
@@ -118,17 +120,13 @@ poetry add pipelex
 uv pip install pipelex
 ```
 
-## IDE extension
-
-We **highly** recommend installing our own extension for PLX files into your IDE of choice. You can find it in the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Pipelex.pipelex).
-
 ### Optional Features
 
 The package supports the following additional features:
 
-- `anthropic`: Anthropic/Claude support
+- `anthropic`: Anthropic/Claude support+
 - `google`: Google models (Vertex) support
-- `mistralai`: Mistral AI support
+- `mistralai`: Mistral AI support√
 - `bedrock`: AWS Bedrock support
 - `fal`: Image generation with Black Forest Labs "FAL" service
 
@@ -153,6 +151,13 @@ uv pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
 
 ## Example: optimizing a tweet in 2 steps
 
+Example with the extension you can download now on Cursor, Windsurf or another VS Code fork. (Coming soon for VS Code Marketplace)
+
+<div>
+<a href="https://open-vsx.org/extension/Pipelex/pipelex">
+<img src="https://raw.githubusercontent.com/Pipelex/pipelex/fix/preliminiary_text/.github/assets/sample_code.png" alt="Pipelex Code Sample" width="400" style="max-width: 100%; height: auto;">
+</a>
+</div>
 ### 1. Define the pipeline in PLX
 
 ```plx
@@ -189,10 +194,10 @@ Evaluate the tweet for these key issues:
 
 For each criterion, provide:
 1. A score (1-5) where 1 = not present, 5 = severely present
-2. If the problem is not present, no comment. Otherwise, explain of the issue and give concise guidance on fixing it, without providing an actual rewrite
+2. If the problem is not present, no comment. Otherwise, explain of the issue and give concise guidance on fixing it, 
+without providing an actual rewrite
 
 @draft_tweet
-
 """
 
 [pipe.optimize_tweet]
