@@ -1,16 +1,14 @@
-"""Test PipelexInterpreter concept to TOML string conversion."""
-
 import pytest
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.interpreter import PipelexInterpreter
 
 
-class TestPipelexInterpreterConceptToml:
-    """Test concept to TOML string conversion."""
+class TestPipelexInterpreterConceptPLX:
+    """Test concept to PLX string conversion."""
 
     @pytest.mark.parametrize(
-        "concepts,expected_toml",
+        "concepts,expected_plx",
         [
             # Simple string concepts
             (
@@ -93,7 +91,7 @@ structure = "ProductStructure\"""",
             ),
         ],
     )
-    def test_concepts_to_toml_string(self, concepts: dict[str, ConceptBlueprint | str], expected_toml: str):
-        """Test converting concepts dict to TOML string."""
-        result = PipelexInterpreter.concepts_to_toml_string(concepts, "test_domain")
-        assert result == expected_toml
+    def test_concepts_to_plx_string(self, concepts: dict[str, ConceptBlueprint | str], expected_plx: str):
+        """Test converting concepts dict to PLX string."""
+        result = PipelexInterpreter.concepts_to_plx_string(concepts, "test_domain")
+        assert result == expected_plx

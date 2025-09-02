@@ -8,7 +8,7 @@ from typing import Any, ClassVar, Dict, List, Match
 from pipelex.migration.migration_result import MigrationResult
 
 
-class TomlMigrator:
+class TOMLMigrator:
     """Handles migration from Concept = to definition = and PipeClassName = to type/definition syntax in TOML files."""
 
     # Known pipe class names based on the factory classes in the codebase
@@ -257,7 +257,7 @@ def migrate_concept_syntax(directory: Path, create_backups: bool = True, dry_run
     Returns:
         MigrationResult with migration statistics
     """
-    migrator = TomlMigrator()
+    migrator = TOMLMigrator()
 
     # Support passing a single TOML file path in addition to a directory
     input_path = directory

@@ -12,9 +12,9 @@ A `PipeSequence` defines a list of `steps`. Each step calls another pipe and giv
 
 ## Configuration
 
-`PipeSequence` is configured in your pipeline's `.toml` file.
+`PipeSequence` is configured in your pipeline's `.plx` file.
 
-### TOML Parameters
+### PLX Parameters
 
 | Parameter  | Type            | Description                                                                                                    | Required |
 | ---------- | --------------- | -------------------------------------------------------------------------------------------------------------- | -------- |
@@ -39,7 +39,7 @@ Each entry in the `steps` array is a table with the following keys:
 
 Let's imagine a pipeline that first extracts text from an image, then summarizes that text, and finally translates the summary into French.
 
-```toml
+```plx
 [pipe.extract_text_from_image]
 type = "PipeOcr"
 description = "Extract text from an image"

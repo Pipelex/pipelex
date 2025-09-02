@@ -106,7 +106,7 @@ class TestPipeConditionSimple:
 
     async def test_condition_short_text_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeCondition with short text that should trigger add_prefix_short_text pipe."""
-        # Create PipeCondition instance - pipes are loaded from TOML files
+        # Create PipeCondition instance - pipes are loaded from PLX files
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Text length condition for short text testing",
             inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")},

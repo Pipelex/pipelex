@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from pipelex.cli.commands.common import is_pipelex_libraries_folder
-from pipelex.migration.migrate_v0_1_0_to_v0_2_0 import TomlMigrator, migrate_concept_syntax
+from pipelex.migration.migrate_v0_1_0_to_v0_2_0 import TOMLMigrator, migrate_concept_syntax
 from pipelex.migration.migration_result import MigrationResult
 
 
@@ -54,7 +54,7 @@ def do_migrate(
             return
 
         if dry_run:
-            migrator = TomlMigrator()
+            migrator = TOMLMigrator()
             # For display, if a single file path was provided, show relative to its parent
             base_for_print = pipelines_dir_or_file if pipelines_dir_or_file.is_dir() else pipelines_dir_or_file.parent
             for file_path in result.modified_files:
@@ -91,7 +91,7 @@ def do_migrate(
             typer.echo(f"\n✅ Migration completed: {result.total_changes} change(s) applied to {result.files_modified} file(s)")
             if create_backups:
                 typer.echo("   Backup files created with .backup extension")
-            typer.echo("   Run 'pipelex validate all' to verify the migration")
+            typer.echo("   Run 'pipelex validate all -c pipelex/libraries' to verify the migration")
     except FileNotFoundError as exc:
         typer.echo(f"❌ {exc}")
         raise typer.Exit(1)

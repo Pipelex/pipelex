@@ -21,15 +21,21 @@ from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 from pipelex.tools.misc.toml_utils import clean_trailing_whitespace, validate_toml_content, validate_toml_file
 
 
+class PLXDecodeError(toml.TomlDecodeError):
+    """Raised when PLX decoding fails."""
+
+    pass
+
+
 class PipelexInterpreter(BaseModel):
-    """TOML -> PipelexBundleBlueprint"""
+    """plx -> PipelexBundleBlueprint"""
 
     file_path: Optional[Path] = None
     file_content: Optional[str] = None
 
     @staticmethod
-    def escape_toml_string(value: Optional[str]) -> str:
-        """Escape a string for TOML serialization."""
+    def escape_plx_string(value: Optional[str]) -> str:
+        """Escape a string for plx serialization."""
         if value is None:
             return ""
         # Escape backslashes first (must be done first)
@@ -58,7 +64,7 @@ class PipelexInterpreter(BaseModel):
         return self
 
     def get_file_content(self) -> str:
-        """Load TOML content from file_path or use file_content directly."""
+        """Load PLX content from file_path or use file_content directly."""
         if self.file_path:
             try:
                 with open(self.file_path, "r", encoding="utf-8") as file:
@@ -70,18 +76,17 @@ class PipelexInterpreter(BaseModel):
                     with open(self.file_path, "w", encoding="utf-8") as file:
                         file.write(cleaned_content)
                     return cleaned_content
-
                 return file_content
 
             except Exception as exc:
-                raise PipelexFileError(f"Failed to read TOML file '{self.file_path}': {exc}") from exc
+                raise PipelexFileError(f"Failed to read PLX file '{self.file_path}': {exc}") from exc
         elif self.file_content is None:
             raise PipelexConfigurationError("file_content must be provided if file_path is not provided")
         return self.file_content
 
     @staticmethod
     def is_pipelex_file(file_path: Path) -> bool:
-        """Check if a file is a valid Pipelex TOML file.
+        """Check if a file is a valid Pipelex PLX file.
 
         Args:
             file_path: Path to the file to check
@@ -90,11 +95,11 @@ class PipelexInterpreter(BaseModel):
             True if the file is a Pipelex file, False otherwise
 
         Criteria:
-            - Has .toml extension
+            - Has .plx extension
             - Starts with "domain =" (ignoring leading whitespace)
         """
         # Check if it has .toml extension
-        if file_path.suffix != ".toml":
+        if file_path.suffix != ".plx":
             return False
 
         # Check if file exists
@@ -113,136 +118,136 @@ class PipelexInterpreter(BaseModel):
             # If we can't read the file, it's not a valid Pipelex file
             return False
 
-    def _parse_toml_content(self, content: str) -> Dict[str, Any]:
-        """Parse TOML content and return the dictionary."""
+    def _parse_plx_content(self, content: str) -> Dict[str, Any]:
+        """Parse PLX content and return the dictionary."""
         try:
             return toml.loads(content)
         except toml.TomlDecodeError as exc:
             file_path_str = str(self.file_path) if self.file_path else "content"
-            raise toml.TomlDecodeError(f"TOML parsing error in '{file_path_str}': {exc}", exc.doc, exc.pos) from exc
+            raise PLXDecodeError(f"PLX parsing error in '{file_path_str}': {exc}", exc.doc, exc.pos) from exc
 
     def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
         """Make a PipelexBundleBlueprint from the file_path or file_content"""
         file_content = self.get_file_content()
-        toml_data = self._parse_toml_content(file_content)
-        return PipelexBundleBlueprint.model_validate(toml_data)
+        plx_data = self._parse_plx_content(file_content)
+        return PipelexBundleBlueprint.model_validate(plx_data)
 
     @staticmethod
-    def make_toml_content(blueprint: PipelexBundleBlueprint) -> str:
-        """Convert a PipelexBundleBlueprint to properly formatted TOML content."""
-        toml_parts: list[str] = []
+    def make_plx_content(blueprint: PipelexBundleBlueprint) -> str:
+        """Convert a PipelexBundleBlueprint to properly formatted PLX content."""
+        plx_parts: list[str] = []
 
         # Domain-level fields
         domain_fields: list[str] = []
-        domain_fields.append(f'domain = "{PipelexInterpreter.escape_toml_string(blueprint.domain)}"')
+        domain_fields.append(f'domain = "{PipelexInterpreter.escape_plx_string(blueprint.domain)}"')
         if blueprint.definition:
-            domain_fields.append(f'definition = "{PipelexInterpreter.escape_toml_string(blueprint.definition)}"')
+            domain_fields.append(f'definition = "{PipelexInterpreter.escape_plx_string(blueprint.definition)}"')
         if blueprint.system_prompt:
-            domain_fields.append(f'system_prompt = "{PipelexInterpreter.escape_toml_string(blueprint.system_prompt)}"')
+            domain_fields.append(f'system_prompt = "{PipelexInterpreter.escape_plx_string(blueprint.system_prompt)}"')
         if blueprint.system_prompt_to_structure:
-            domain_fields.append(f'system_prompt_to_structure = "{PipelexInterpreter.escape_toml_string(blueprint.system_prompt_to_structure)}"')
+            domain_fields.append(f'system_prompt_to_structure = "{PipelexInterpreter.escape_plx_string(blueprint.system_prompt_to_structure)}"')
         if blueprint.prompt_template_to_structure:
-            domain_fields.append(f'prompt_template_to_structure = "{PipelexInterpreter.escape_toml_string(blueprint.prompt_template_to_structure)}"')
+            domain_fields.append(f'prompt_template_to_structure = "{PipelexInterpreter.escape_plx_string(blueprint.prompt_template_to_structure)}"')
 
-        toml_parts.append("\n".join(domain_fields))
+        plx_parts.append("\n".join(domain_fields))
 
         # Concepts section
         if blueprint.concept:
-            concept_toml = PipelexInterpreter.concepts_to_toml_string(blueprint.concept, blueprint.domain)
-            if concept_toml:  # Only add if not empty
-                toml_parts.append(concept_toml)
+            concept_plx = PipelexInterpreter.concepts_to_plx_string(blueprint.concept, blueprint.domain)
+            if concept_plx:  # Only add if not empty
+                plx_parts.append(concept_plx)
 
         # Pipes section
         if blueprint.pipe:
-            pipes_toml = PipelexInterpreter.pipes_to_toml_string(blueprint.pipe, blueprint.domain)
-            if pipes_toml:  # Only add if not empty
-                toml_parts.append(pipes_toml)
+            pipes_plx = PipelexInterpreter.pipes_to_plx_string(blueprint.pipe, blueprint.domain)
+            if pipes_plx:  # Only add if not empty
+                plx_parts.append(pipes_plx)
 
-        result = "\n\n".join(toml_parts)
+        result = "\n\n".join(plx_parts)
         if result and not result.endswith("\n"):
             result += "\n"
         return result
 
     @staticmethod
-    def concepts_to_toml_string(concepts: Dict[str, ConceptBlueprint | str], domain: str) -> str:
-        """Convert concepts dict to TOML string."""
+    def concepts_to_plx_string(concepts: Dict[str, ConceptBlueprint | str], domain: str) -> str:
+        """Convert concepts dict to PLX string."""
         if not concepts:
             return ""
 
-        toml_parts: list[str] = []
+        plx_parts: list[str] = []
         simple_concepts: list[str] = []
         complex_concepts: list[str] = []
 
         for concept_name, concept_blueprint in concepts.items():
             if isinstance(concept_blueprint, str):
-                simple_concepts.append(f'{concept_name} = "{PipelexInterpreter.escape_toml_string(concept_blueprint)}"')
+                simple_concepts.append(f'{concept_name} = "{PipelexInterpreter.escape_plx_string(concept_blueprint)}"')
             else:
                 # Handle ConceptBlueprint objects
                 if concept_blueprint.structure is None and concept_blueprint.refines is None:
                     # Simple concept with just definition
-                    simple_concepts.append(f'{concept_name} = "{PipelexInterpreter.escape_toml_string(concept_blueprint.definition)}"')
+                    simple_concepts.append(f'{concept_name} = "{PipelexInterpreter.escape_plx_string(concept_blueprint.definition)}"')
                 else:
                     # Complex concept needs its own section
-                    complex_concept_toml = PipelexInterpreter.complex_concept_to_toml_string(concept_name, concept_blueprint)
-                    complex_concepts.append(complex_concept_toml)
+                    complex_concept_plx = PipelexInterpreter.complex_concept_to_plx_string(concept_name, concept_blueprint)
+                    complex_concepts.append(complex_concept_plx)
 
         # Add simple concepts section if we have any
         if simple_concepts:
-            toml_parts.append("[concept]")
-            toml_parts.extend(simple_concepts)
+            plx_parts.append("[concept]")
+            plx_parts.extend(simple_concepts)
 
         # Add complex concepts with proper spacing
         if complex_concepts:
             # If we had simple concepts, add an empty line before complex ones
             if simple_concepts:
-                toml_parts.append("")
+                plx_parts.append("")
             # Add each complex concept with empty lines between them
             for i, complex_concept in enumerate(complex_concepts):
                 if i > 0:  # Add empty line between complex concepts
-                    toml_parts.append("")
-                toml_parts.append(complex_concept)
+                    plx_parts.append("")
+                plx_parts.append(complex_concept)
 
-        return "\n".join(toml_parts)
+        return "\n".join(plx_parts)
 
     @staticmethod
-    def complex_concept_to_toml_string(concept_name: str, concept: ConceptBlueprint) -> str:
-        """Convert a complex ConceptBlueprint to TOML string."""
+    def complex_concept_to_plx_string(concept_name: str, concept: ConceptBlueprint) -> str:
+        """Convert a complex ConceptBlueprint to PLX string."""
         lines: list[str] = [f"[concept.{concept_name}]"]
 
         if concept.definition:
-            lines.append(f'definition = "{PipelexInterpreter.escape_toml_string(concept.definition)}"')
+            lines.append(f'definition = "{PipelexInterpreter.escape_plx_string(concept.definition)}"')
 
         if concept.refines:
-            lines.append(f'refines = "{PipelexInterpreter.escape_toml_string(concept.refines)}"')
+            lines.append(f'refines = "{PipelexInterpreter.escape_plx_string(concept.refines)}"')
 
         if concept.structure:
             if isinstance(concept.structure, str):
-                lines.append(f'structure = "{PipelexInterpreter.escape_toml_string(concept.structure)}"')
+                lines.append(f'structure = "{PipelexInterpreter.escape_plx_string(concept.structure)}"')
             else:
                 # Complex structure with fields
                 lines.append("")
                 lines.append(f"[concept.{concept_name}.structure]")
                 for field_name, field_def in concept.structure.items():
-                    field_toml = PipelexInterpreter.structure_field_to_toml_string(field_name, field_def)
-                    lines.append(field_toml)
+                    field_plx = PipelexInterpreter.structure_field_to_plx_string(field_name, field_def)
+                    lines.append(field_plx)
 
         return "\n".join(lines)
 
     @staticmethod
-    def structure_field_to_toml_string(field_name: str, field_def: Any) -> str:
-        """Convert a structure field to TOML string."""
+    def structure_field_to_plx_string(field_name: str, field_def: Any) -> str:
+        """Convert a structure field to PLX string."""
         if isinstance(field_def, str):
-            return f'{field_name} = "{PipelexInterpreter.escape_toml_string(field_def)}"'
+            return f'{field_name} = "{PipelexInterpreter.escape_plx_string(field_def)}"'
         else:
             # Complex field with type, definition, required, etc.
             field_parts: list[str] = []
 
             if hasattr(field_def, "type") and field_def.type:
                 type_value = field_def.type.value if hasattr(field_def.type, "value") else field_def.type
-                field_parts.append(f'type = "{PipelexInterpreter.escape_toml_string(str(type_value))}"')
+                field_parts.append(f'type = "{PipelexInterpreter.escape_plx_string(str(type_value))}"')
 
             if hasattr(field_def, "definition") and field_def.definition:
-                field_parts.append(f'definition = "{PipelexInterpreter.escape_toml_string(field_def.definition)}"')
+                field_parts.append(f'definition = "{PipelexInterpreter.escape_plx_string(field_def.definition)}"')
 
             if hasattr(field_def, "required") and field_def.required is not None:
                 field_parts.append(f"required = {str(field_def.required).lower()}")
@@ -250,54 +255,54 @@ class PipelexInterpreter(BaseModel):
             return f"{field_name} = {{ {', '.join(field_parts)} }}"
 
     @staticmethod
-    def pipes_to_toml_string(pipes: Dict[str, Any], domain: str) -> str:
-        """Convert pipes dict to TOML string."""
-        toml_parts: list[str] = []
+    def pipes_to_plx_string(pipes: Dict[str, Any], domain: str) -> str:
+        """Convert pipes dict to PLX string."""
+        plx_parts: list[str] = []
         for pipe_name, blueprint in pipes.items():
-            pipe_toml = PipelexInterpreter.pipe_to_toml_string(pipe_name, blueprint, domain)
-            toml_parts.append(pipe_toml)
-        return "\n\n".join(toml_parts)
+            pipe_plx = PipelexInterpreter.pipe_to_plx_string(pipe_name, blueprint, domain)
+            plx_parts.append(pipe_plx)
+        return "\n\n".join(plx_parts)
 
     @staticmethod
-    def pipe_to_toml_string(pipe_name: str, blueprint: Any, domain: str) -> str:
-        """Convert a single pipe blueprint to TOML string."""
+    def pipe_to_plx_string(pipe_name: str, blueprint: Any, domain: str) -> str:
+        """Convert a single pipe blueprint to PLX string."""
         if isinstance(blueprint, PipeLLMBlueprint):
-            return PipelexInterpreter.llm_pipe_to_toml_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.llm_pipe_to_plx_string(pipe_name, blueprint, domain)
         elif isinstance(blueprint, PipeSequenceBlueprint):
-            return PipelexInterpreter.sequence_pipe_to_toml_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.sequence_pipe_to_plx_string(pipe_name, blueprint, domain)
         elif isinstance(blueprint, PipeOcrBlueprint):
-            return PipelexInterpreter.ocr_pipe_to_toml_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.ocr_pipe_to_plx_string(pipe_name, blueprint, domain)
         elif isinstance(blueprint, PipeFuncBlueprint):
-            return PipelexInterpreter.func_pipe_to_toml_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.func_pipe_to_plx_string(pipe_name, blueprint, domain)
         elif isinstance(blueprint, PipeImgGenBlueprint):
-            return PipelexInterpreter.img_gen_pipe_to_toml_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.img_gen_pipe_to_plx_string(pipe_name, blueprint, domain)
         elif isinstance(blueprint, PipeJinja2Blueprint):
-            return PipelexInterpreter.jinja2_pipe_to_toml_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.jinja2_pipe_to_plx_string(pipe_name, blueprint, domain)
         elif isinstance(blueprint, PipeConditionBlueprint):
-            return PipelexInterpreter.condition_pipe_to_toml_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.condition_pipe_to_plx_string(pipe_name, blueprint, domain)
         elif isinstance(blueprint, PipeParallelBlueprint):
-            return PipelexInterpreter.parallel_pipe_to_toml_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.parallel_pipe_to_plx_string(pipe_name, blueprint, domain)
         elif isinstance(blueprint, PipeBatchBlueprint):
-            return PipelexInterpreter.batch_pipe_to_toml_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.batch_pipe_to_plx_string(pipe_name, blueprint, domain)
         else:
             # Fallback to old dict approach for unknown pipe types
             pipe_dict = PipelexInterpreter.serialize_pipe(blueprint, domain)
             return f"[pipe.{pipe_name}]\n" + "\n".join([f'{k} = "{v}"' if isinstance(v, str) else f"{k} = {v}" for k, v in pipe_dict.items()])
 
     @staticmethod
-    def llm_pipe_to_toml_string(pipe_name: str, pipe: PipeLLMBlueprint, domain: str) -> str:
-        """Convert a PipeLLM blueprint directly to TOML section string."""
+    def llm_pipe_to_plx_string(pipe_name: str, pipe: PipeLLMBlueprint, domain: str) -> str:
+        """Convert a PipeLLM blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
-            f'type = "{PipelexInterpreter.escape_toml_string(pipe.type)}"',
-            f'definition = "{PipelexInterpreter.escape_toml_string(pipe.definition)}"',
+            f'type = "{PipelexInterpreter.escape_plx_string(pipe.type)}"',
+            f'definition = "{PipelexInterpreter.escape_plx_string(pipe.definition)}"',
         ]
 
         # Add inputs first if they exist
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
         # Add output after inputs (or immediately if no inputs)
-        lines.append(f'output = "{PipelexInterpreter.escape_toml_string(pipe.output_concept_string_or_concept_code)}"')
+        lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
 
         # Add optional fields
         if pipe.nb_output is not None:
@@ -305,21 +310,21 @@ class PipelexInterpreter(BaseModel):
         if pipe.multiple_output is not None:
             lines.append(f"multiple_output = {str(pipe.multiple_output).lower()}")
         if pipe.system_prompt_template:
-            lines.append(f'system_prompt_template = "{PipelexInterpreter.escape_toml_string(pipe.system_prompt_template)}"')
+            lines.append(f'system_prompt_template = "{PipelexInterpreter.escape_plx_string(pipe.system_prompt_template)}"')
         if pipe.system_prompt:
-            lines.append(f'system_prompt = "{PipelexInterpreter.escape_toml_string(pipe.system_prompt)}"')
+            lines.append(f'system_prompt = "{PipelexInterpreter.escape_plx_string(pipe.system_prompt)}"')
         if pipe.prompt_template:
-            lines.append(f'prompt_template = "{PipelexInterpreter.escape_toml_string(pipe.prompt_template)}"')
+            lines.append(f'prompt_template = "{PipelexInterpreter.escape_plx_string(pipe.prompt_template)}"')
         if pipe.template_name:
-            lines.append(f'template_name = "{PipelexInterpreter.escape_toml_string(pipe.template_name)}"')
+            lines.append(f'template_name = "{PipelexInterpreter.escape_plx_string(pipe.template_name)}"')
         if pipe.prompt:
-            lines.append(f'prompt = "{PipelexInterpreter.escape_toml_string(pipe.prompt)}"')
+            lines.append(f'prompt = "{PipelexInterpreter.escape_plx_string(pipe.prompt)}"')
 
         return "\n".join(lines)
 
     @staticmethod
-    def ocr_pipe_to_toml_string(pipe_name: str, pipe: PipeOcrBlueprint, domain: str) -> str:
-        """Convert a PipeOcr blueprint directly to TOML section string."""
+    def ocr_pipe_to_plx_string(pipe_name: str, pipe: PipeOcrBlueprint, domain: str) -> str:
+        """Convert a PipeOcr blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
             f'type = "{pipe.type}"',
@@ -329,13 +334,13 @@ class PipelexInterpreter(BaseModel):
         # Add inputs if they exist
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
-        lines.append(f'output = "{PipelexInterpreter.escape_toml_string(pipe.output_concept_string_or_concept_code)}"')
+        lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
 
         return "\n".join(lines)
 
     @staticmethod
-    def func_pipe_to_toml_string(pipe_name: str, pipe: PipeFuncBlueprint, domain: str) -> str:
-        """Convert a PipeFunc blueprint directly to TOML section string."""
+    def func_pipe_to_plx_string(pipe_name: str, pipe: PipeFuncBlueprint, domain: str) -> str:
+        """Convert a PipeFunc blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
             f'type = "{pipe.type}"',
@@ -345,14 +350,14 @@ class PipelexInterpreter(BaseModel):
         # Add inputs if they exist
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
-        lines.append(f'output = "{PipelexInterpreter.escape_toml_string(pipe.output_concept_string_or_concept_code)}"')
-        lines.append(f'function_name = "{PipelexInterpreter.escape_toml_string(pipe.function_name)}"')
+        lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
+        lines.append(f'function_name = "{PipelexInterpreter.escape_plx_string(pipe.function_name)}"')
 
         return "\n".join(lines)
 
     @staticmethod
-    def img_gen_pipe_to_toml_string(pipe_name: str, pipe: PipeImgGenBlueprint, domain: str) -> str:
-        """Convert a PipeImgGen blueprint directly to TOML section string."""
+    def img_gen_pipe_to_plx_string(pipe_name: str, pipe: PipeImgGenBlueprint, domain: str) -> str:
+        """Convert a PipeImgGen blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
             f'type = "{pipe.type}"',
@@ -362,13 +367,13 @@ class PipelexInterpreter(BaseModel):
         # Add inputs if they exist
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
-        lines.append(f'output = "{PipelexInterpreter.escape_toml_string(pipe.output_concept_string_or_concept_code)}"')
+        lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
 
         # Add optional fields
         if pipe.img_gen_prompt:
-            lines.append(f'img_gen_prompt = "{PipelexInterpreter.escape_toml_string(pipe.img_gen_prompt)}"')
+            lines.append(f'img_gen_prompt = "{PipelexInterpreter.escape_plx_string(pipe.img_gen_prompt)}"')
         if pipe.imgg_handle:
-            lines.append(f'imgg_handle = "{PipelexInterpreter.escape_toml_string(pipe.imgg_handle)}"')
+            lines.append(f'imgg_handle = "{PipelexInterpreter.escape_plx_string(pipe.imgg_handle)}"')
         if pipe.aspect_ratio:
             lines.append(f'aspect_ratio = "{pipe.aspect_ratio}"')
         if pipe.quality:
@@ -391,8 +396,8 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def jinja2_pipe_to_toml_string(pipe_name: str, pipe: PipeJinja2Blueprint, domain: str) -> str:
-        """Convert a PipeJinja2 blueprint directly to TOML section string."""
+    def jinja2_pipe_to_plx_string(pipe_name: str, pipe: PipeJinja2Blueprint, domain: str) -> str:
+        """Convert a PipeJinja2 blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
             f'type = "{pipe.type}"',
@@ -402,19 +407,19 @@ class PipelexInterpreter(BaseModel):
         # Add inputs if they exist
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
-        lines.append(f'output = "{PipelexInterpreter.escape_toml_string(pipe.output_concept_string_or_concept_code)}"')
+        lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
 
         # Add jinja2 template
         if pipe.jinja2:
-            lines.append(f'jinja2 = "{PipelexInterpreter.escape_toml_string(pipe.jinja2)}"')
+            lines.append(f'jinja2 = "{PipelexInterpreter.escape_plx_string(pipe.jinja2)}"')
         if pipe.jinja2_name:
-            lines.append(f'jinja2_name = "{PipelexInterpreter.escape_toml_string(pipe.jinja2_name)}"')
+            lines.append(f'jinja2_name = "{PipelexInterpreter.escape_plx_string(pipe.jinja2_name)}"')
 
         return "\n".join(lines)
 
     @staticmethod
-    def condition_pipe_to_toml_string(pipe_name: str, pipe: PipeConditionBlueprint, domain: str) -> str:
-        """Convert a PipeCondition blueprint directly to TOML section string."""
+    def condition_pipe_to_plx_string(pipe_name: str, pipe: PipeConditionBlueprint, domain: str) -> str:
+        """Convert a PipeCondition blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
             f'type = "{pipe.type}"',
@@ -424,7 +429,7 @@ class PipelexInterpreter(BaseModel):
         # Add inputs if they exist
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
-        lines.append(f'output = "{PipelexInterpreter.escape_toml_string(pipe.output_concept_string_or_concept_code)}"')
+        lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
 
         # Add pipe_map
         if pipe.pipe_map:
@@ -447,8 +452,8 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def parallel_pipe_to_toml_string(pipe_name: str, pipe: PipeParallelBlueprint, domain: str) -> str:
-        """Convert a PipeParallel blueprint directly to TOML section string."""
+    def parallel_pipe_to_plx_string(pipe_name: str, pipe: PipeParallelBlueprint, domain: str) -> str:
+        """Convert a PipeParallel blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
             f'type = "{pipe.type}"',
@@ -458,13 +463,13 @@ class PipelexInterpreter(BaseModel):
         # Add inputs if they exist
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
-        lines.append(f'output = "{PipelexInterpreter.escape_toml_string(pipe.output_concept_string_or_concept_code)}"')
+        lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
 
         # Add parallels array
         if pipe.parallels:
             lines.append("parallels = [")
             for parallel in pipe.parallels:
-                parallel_string = PipelexInterpreter.sub_pipe_to_toml_string(parallel)
+                parallel_string = PipelexInterpreter.sub_pipe_to_plx_string(parallel)
                 lines.append(f"    {parallel_string},")
             lines.append("]")
 
@@ -477,8 +482,8 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def batch_pipe_to_toml_string(pipe_name: str, pipe: PipeBatchBlueprint, domain: str) -> str:
-        """Convert a PipeBatch blueprint directly to TOML section string."""
+    def batch_pipe_to_plx_string(pipe_name: str, pipe: PipeBatchBlueprint, domain: str) -> str:
+        """Convert a PipeBatch blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
             f'type = "{pipe.type}"',
@@ -488,7 +493,7 @@ class PipelexInterpreter(BaseModel):
         # Add inputs if they exist
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
-        lines.append(f'output = "{PipelexInterpreter.escape_toml_string(pipe.output_concept_string_or_concept_code)}"')
+        lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
         lines.append(f'branch_pipe_code = "{pipe.branch_pipe_code}"')
 
         # Add optional fields
@@ -816,8 +821,8 @@ class PipelexInterpreter(BaseModel):
         return step_data
 
     @staticmethod
-    def sub_pipe_to_toml_string(sub_pipe: Any) -> str:
-        """Convert a sub pipe blueprint directly to a TOML inline table string."""
+    def sub_pipe_to_plx_string(sub_pipe: Any) -> str:
+        """Convert a sub pipe blueprint directly to a PLX inline table string."""
         parts = [f'pipe = "{sub_pipe.pipe}"', f'result = "{sub_pipe.result}"']
 
         # Add optional fields if they have non-default values
@@ -852,8 +857,8 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def sequence_pipe_to_toml_string(pipe_name: str, pipe: PipeSequenceBlueprint, domain: str) -> str:
-        """Convert a PipeSequence blueprint directly to TOML section string."""
+    def sequence_pipe_to_plx_string(pipe_name: str, pipe: PipeSequenceBlueprint, domain: str) -> str:
+        """Convert a PipeSequence blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
             f'type = "{pipe.type}"',
@@ -871,7 +876,7 @@ class PipelexInterpreter(BaseModel):
         if pipe.steps:
             lines.append("steps = [")
             for step in pipe.steps:
-                step_string = PipelexInterpreter.sub_pipe_to_toml_string(step)
+                step_string = PipelexInterpreter.sub_pipe_to_plx_string(step)
                 lines.append(f"    {step_string},")
             lines.append("]")
 
@@ -942,7 +947,7 @@ class PipelexInterpreter(BaseModel):
 
     @staticmethod
     def serialize_input_requirement(input_req: InputRequirementBlueprint) -> Dict[str, Any]:
-        """Serialize a single InputRequirementBlueprint to TOML format."""
+        """Serialize a single InputRequirementBlueprint to PLX format."""
         result: Dict[str, Any] = {"concept": input_req.concept}
         if input_req.multiplicity is not None:
             result["multiplicity"] = input_req.multiplicity
@@ -950,7 +955,7 @@ class PipelexInterpreter(BaseModel):
 
     @staticmethod
     def serialize_inputs(inputs: Mapping[str, Union[str, InputRequirementBlueprint]]) -> Dict[str, Any]:
-        """Convert InputRequirementBlueprint objects to proper TOML format for serialization."""
+        """Convert InputRequirementBlueprint objects to proper PLX format for serialization."""
         result: Dict[str, Any] = {}
         for key, value in inputs.items():
             if isinstance(value, InputRequirementBlueprint):
@@ -961,8 +966,8 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def inputs_to_toml_string(inputs: Mapping[str, Union[str, InputRequirementBlueprint]]) -> str:
-        """Convert inputs dictionary to TOML string format."""
+    def inputs_to_plx_string(inputs: Mapping[str, Union[str, InputRequirementBlueprint]]) -> str:
+        """Convert inputs dictionary to PLX string format."""
         inputs_dict = PipelexInterpreter.serialize_inputs(inputs)
         inputs_parts: list[str] = []
 
@@ -973,23 +978,23 @@ class PipelexInterpreter(BaseModel):
                 nested_dict: Dict[str, Any] = value
                 for nested_key, nested_value in nested_dict.items():
                     if isinstance(nested_value, str):
-                        nested_parts.append(f'{nested_key} = "{PipelexInterpreter.escape_toml_string(nested_value)}"')
+                        nested_parts.append(f'{nested_key} = "{PipelexInterpreter.escape_plx_string(nested_value)}"')
                     else:
                         nested_parts.append(f"{nested_key} = {str(nested_value).lower()}")
                 inputs_parts.append(f"{key} = {{ {', '.join(nested_parts)} }}")
             else:
                 # Simple string value
                 if isinstance(value, str):
-                    inputs_parts.append(f'{key} = "{PipelexInterpreter.escape_toml_string(value)}"')
+                    inputs_parts.append(f'{key} = "{PipelexInterpreter.escape_plx_string(value)}"')
                 else:
                     # Fallback for any other type
-                    inputs_parts.append(f'{key} = "{PipelexInterpreter.escape_toml_string(str(value))}"')
+                    inputs_parts.append(f'{key} = "{PipelexInterpreter.escape_plx_string(str(value))}"')
 
         return f"{{ {', '.join(inputs_parts)} }}"
 
     @staticmethod
     def add_inputs_to_lines_if_exist(lines: list[str], pipe_inputs: Optional[Mapping[str, Union[str, InputRequirementBlueprint]]]) -> None:
-        """Add inputs line to TOML lines if inputs exist."""
+        """Add inputs line to PLX lines if inputs exist."""
         if pipe_inputs:
             inputs_dict = PipelexInterpreter.serialize_inputs(pipe_inputs)
             inputs_parts: list[str] = []
@@ -999,13 +1004,13 @@ class PipelexInterpreter(BaseModel):
                     nested_dict: Dict[str, Any] = value
                     for nested_key, nested_value in nested_dict.items():
                         if isinstance(nested_value, str):
-                            nested_parts.append(f'{nested_key} = "{PipelexInterpreter.escape_toml_string(nested_value)}"')
+                            nested_parts.append(f'{nested_key} = "{PipelexInterpreter.escape_plx_string(nested_value)}"')
                         else:
                             nested_parts.append(f"{nested_key} = {str(nested_value).lower()}")
                     inputs_parts.append(f"{key} = {{ {', '.join(nested_parts)} }}")
                 else:
                     if isinstance(value, str):
-                        inputs_parts.append(f'{key} = "{PipelexInterpreter.escape_toml_string(value)}"')
+                        inputs_parts.append(f'{key} = "{PipelexInterpreter.escape_plx_string(value)}"')
                     else:
-                        inputs_parts.append(f'{key} = "{PipelexInterpreter.escape_toml_string(str(value))}"')
+                        inputs_parts.append(f'{key} = "{PipelexInterpreter.escape_plx_string(str(value))}"')
             lines.append(f"inputs = {{ {', '.join(inputs_parts)} }}")

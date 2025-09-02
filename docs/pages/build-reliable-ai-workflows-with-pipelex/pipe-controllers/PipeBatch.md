@@ -16,9 +16,9 @@ This is the ideal controller for processing collections of documents, images, or
 
 ## Configuration
 
-`PipeBatch` is configured in your pipeline's `.toml` file.
+`PipeBatch` is configured in your pipeline's `.plx` file.
 
-### TOML Parameters
+### PLX Parameters
 
 | Parameter          | Type         | Description                                                                                                                                      | Required |
 | ------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
@@ -40,7 +40,7 @@ This is the ideal controller for processing collections of documents, images, or
 
 Suppose you have a list of articles and you want to generate a summary for each one.
 
-```toml
+```plx
 # The pipe that knows how to summarize one article
 [pipe.summarize_one_article]
 type = "PipeLLM"

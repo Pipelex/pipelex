@@ -353,7 +353,6 @@ class PipeLLM(PipeOperator):
                             or domain.prompt_template_to_structure
                             or get_template(template_name="structure_from_preliminary_text_user")
                         )
-                        log.verbose(f"prompt_template_to_structure for pipe {self.code}: {prompt_template_to_structure}")
                         system_prompt = self.system_prompt_to_structure or domain.system_prompt
                         llm_prompt_2_proto = LLMPrompt(
                             system_text=system_prompt,

@@ -42,9 +42,9 @@ pipelex migrate run [-c/--config-folder-path PATH] [--dry-run] [--backups/--no-b
 
 ## Usage Tips
 
-1. Always run `pipelex validate all` after making changes to your configuration or pipelines
+1. Always run `pipelex validate all -c pipelex/libraries` after making changes to your configuration or pipelines
 2. Use `pipelex show config` to debug configuration issues
 3. When initializing a new project:
    - Start with `pipelex init config`
    - Then run `pipelex init libraries`
-   - Finally, validate your setup with `pipelex validate all`
+   - Finally, validate your setup with `pipelex validate all -c pipelex/libraries`

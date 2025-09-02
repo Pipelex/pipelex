@@ -252,7 +252,7 @@ Before finalizing your draft:
 ## From Draft to Implementation
 
 Once your markdown draft is complete, it can be translated into:
-1. A formal TOML pipeline definition with explicit pipe declarations
+1. A formal PLX pipeline definition with explicit pipe declarations
 2. Python structure classes for complex data types (when needed)
 3. Validated, executable Pipelex pipeline code
 

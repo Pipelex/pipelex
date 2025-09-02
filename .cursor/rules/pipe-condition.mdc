@@ -7,11 +7,11 @@ alwaysApply: false
 
 The PipeCondition controller allows you to implement conditional logic in your pipeline, choosing which pipe to execute based on an evaluated expression. It supports both direct expressions and expression templates.
 
-## Usage in TOML Configuration
+## Usage in PLX Configuration
 
 ### Basic Usage with Direct Expression
 
-```toml
+```plx
 [pipe.conditional_operation]
 type = "PipeCondition"
 description = "A conditonal pipe to decide wheter..."
@@ -25,7 +25,7 @@ medium = "process_medium"
 large = "process_large"
 ```
 or
-```toml
+```plx
 [pipe.conditional_operation]
 type = "PipeCondition"
 description = "A conditonal pipe to decide wheter..."
@@ -49,4 +49,4 @@ large = "process_large"
 
 # Important tip
 
-Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.
+Always run the cli `pipelex validate all -c pipelex/libraries` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

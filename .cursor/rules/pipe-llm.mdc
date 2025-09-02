@@ -14,7 +14,7 @@ PipeLLM is used to:
 ## Basic Usage
 
 ### Simple Text Generation
-```toml
+```plx
 [pipe.write_story]
 type = "PipeLLM"
 description = "Write a short story"
@@ -25,7 +25,7 @@ Write a short story about a programmer.
 ```
 
 ### Structured Data Extraction
-```toml
+```plx
 [pipe.extract_info]
 type = "PipeLLM"
 description = "Extract information"
@@ -56,7 +56,7 @@ class PersonInfo(StructuredContent): # The output models always have to be subcl
 You can specify LLM settings in two ways:
 
 1. **Direct in the pipe**:
-```toml
+```plx
 [pipe.analyze]
 type = "PipeLLM"
 description = "Analyze text"
@@ -66,7 +66,7 @@ prompt_template = "Analyze this text"
 ```
 
 2. **Using predefined settings** from `pipelex_libraries/llm_deck/base_llm_deck.toml`:
-```toml
+```plx
 [pipe.analyze]
 type = "PipeLLM"
 description = "Analyze text"
@@ -77,7 +77,7 @@ prompt_template = "Analyze this text"
 
 ### System Prompts
 Add system-level instructions:
-```toml
+```plx
 [pipe.expert_analysis]
 type = "PipeLLM"
 description = "Expert analysis"
@@ -88,7 +88,7 @@ prompt_template = "Analyze this data"
 
 ### Multiple Outputs
 Generate multiple results:
-```toml
+```plx
 [pipe.generate_ideas]
 type = "PipeLLM"
 description = "Generate ideas"
@@ -100,7 +100,7 @@ multiple_output = true  # Let the LLM decide how many to generate
 
 ### Vision Tasks
 Process images with VLMs:
-```toml
+```plx
 [pipe.analyze_image]
 type = "PipeLLM"
 description = "Analyze image"
@@ -111,4 +111,4 @@ prompt_template = "Describe what you see in this image"
 
 # Important tip
 
-Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.
+Always run the cli `pipelex validate all -c pipelex/libraries` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

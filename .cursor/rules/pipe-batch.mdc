@@ -7,9 +7,9 @@ alwaysApply: false
 
 The PipeBatch controller allows you to apply a pipe operation to each element in a list of inputs in parallele. It is created via a PipeSequence.
 
-## Usage in TOML Configuration
+## Usage in PLX Configuration
 
-```toml
+```plx
 [pipe.sequence_with_batch]
 type = "Sequence"
 description = "A Sequence of pipes"
@@ -29,4 +29,4 @@ steps = [
 
 # Important tip
 
-Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.
+Always run the cli `pipelex validate all -c pipelex/libraries` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

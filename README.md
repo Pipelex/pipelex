@@ -63,10 +63,10 @@ Pipelex makes it easy for developers to define and run repeatable AI workflows. 
 
 Build **pipelines** from modular pipes that snap together. Each pipe can use a different language model (LLM) or software to process knowledge. Pipes consistently deliver **structured, predictable outputs** at each stage.
 
-Pipelex uses TOML syntax, making workflows readable and shareable. Business professionals, developers, and AI coding agents can all understand and modify the same pipeline definitions.
+Pipelex uses its own syntax PLX, based on TOML, making workflows readable and shareable. Business professionals, developers, and AI coding agents can all understand and modify the same pipeline definitions.
 
 Example:
-```toml
+```plx
 [concept]
 Buyer = "The person who made the purchase"
 PurchaseDocumentText = "Transcript of a receipt, invoice, or order confirmation"
@@ -100,6 +100,8 @@ Follow these steps to get started:
 - Python ≥3.10
 - [pip](https://pip.pypa.io/en/stable/), [poetry](https://python-poetry.org/), or [uv](https://github.com/astral-sh/uv) package manager
 
+We **highly** recommend installing our own extension for PLX files into your IDE of choice. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to VS Code marketplace too and if you are using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
+
 ### Option #1: Run examples
 
 Visit the 
@@ -118,17 +120,13 @@ poetry add pipelex
 uv pip install pipelex
 ```
 
-## IDE extension
-
-We **highly** recommend installing an extension for TOML files into your IDE of choice. For VS Code, the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) extension does a great job of syntax coloring and checking.
-
 ### Optional Features
 
 The package supports the following additional features:
 
-- `anthropic`: Anthropic/Claude support
+- `anthropic`: Anthropic/Claude support+
 - `google`: Google models (Vertex) support
-- `mistralai`: Mistral AI support
+- `mistralai`: Mistral AI support√
 - `bedrock`: AWS Bedrock support
 - `fal`: Image generation with Black Forest Labs "FAL" service
 
@@ -153,9 +151,17 @@ uv pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
 
 ## Example: optimizing a tweet in 2 steps
 
-### 1. Define the pipeline in TOML
+Example with the extension you can download now on Cursor, Windsurf or another VS Code fork. (Coming soon for VS Code Marketplace)
 
-```toml
+<div>
+<a href="https://open-vsx.org/extension/Pipelex/pipelex">
+<img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/sample_code.png" alt="Pipelex Code Sample" style="max-width: 100%; height: auto;">
+</a>
+</div>
+
+### 1. Define the pipeline in PLX
+
+```plx
 domain = "tech_tweet"
 definition = "A pipeline for optimizing tech tweets using Twitter/X best practices"
 
@@ -189,10 +195,10 @@ Evaluate the tweet for these key issues:
 
 For each criterion, provide:
 1. A score (1-5) where 1 = not present, 5 = severely present
-2. If the problem is not present, no comment. Otherwise, explain of the issue and give concise guidance on fixing it, without providing an actual rewrite
+2. If the problem is not present, no comment. Otherwise, explain of the issue and give concise guidance on fixing it, 
+without providing an actual rewrite
 
 @draft_tweet
-
 """
 
 [pipe.optimize_tweet]

@@ -28,7 +28,7 @@ class TestPipeBatchSimple:
 
     async def test_simple_batch_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeBatch with a simple batch processing scenario."""
-        # Create PipeBatch instance - it will call the uppercase_transformer pipe from the TOML
+        # Create PipeBatch instance - it will call the uppercase_transformer pipe from the PLX
         domain = "test_integration"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept1",
@@ -47,7 +47,7 @@ class TestPipeBatchSimple:
 
         pipe_batch_blueprint = PipeBatchBlueprint(
             definition="Simple batch processing test",
-            branch_pipe_code="uppercase_transformer",  # This exists in the TOML file
+            branch_pipe_code="uppercase_transformer",  # This exists in the PLX file
             inputs={
                 "text_list": InputRequirementBlueprint(concept=concept_1.concept_string),
                 "text_item": InputRequirementBlueprint(concept=concept_2.concept_string),

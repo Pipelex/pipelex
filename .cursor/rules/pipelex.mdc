@@ -4,13 +4,13 @@ alwaysApply: true
 # Pipeline Guide
 
 - Always first write your "plan" in natural langage, then transcribe it in pipelex.
-- You should ALWAYS RUN the terminal command `pipelex validate` when you are writing a `.toml` file. It will ensure the pipe is runnable. If not, iterate.
+- You should ALWAYS RUN the terminal command `pipelex validate all -c pipelex/libraries` when you are writing a `.toml` file. It will ensure the pipe is runnable. If not, iterate.
 - Please use POSIX standard for files. (enmpty lines, no trailing whitespaces, etc.)
 
 # Pipeline Structure Guide
 
 ## Pipeline File Naming
-- Files must be `.toml` for pipelines (Always add an empty line at the end of the file, and do not add trailing whitespaces to TOML files at all)
+- Files must be `.plx` for pipelines (Always add an empty line at the end of the file, and do not add trailing whitespaces to PLX files at all)
 - Files must be `.py` for structures
 - Use descriptive names in `snake_case`
 
@@ -21,14 +21,14 @@ A pipeline file has three main sections:
 3. Pipe definitions
 
 ### Domain Statement
-```toml
+```plx
 domain = "domain_name"
 definition = "Description of the domain" # Optional
 ```
-Note: The domain name usually matches the toml filename for single-file domains. For multi-file domains, use the subdirectory name.
+Note: The domain name usually matches the plx filename for single-file domains. For multi-file domains, use the subdirectory name.
 
 ### Concept Definitions
-```toml
+```plx
 [concept]
 ConceptName = "Description of the concept" # Should be the same name as the Structure ClassName you want to output
 ```
@@ -43,7 +43,7 @@ yes
 
 ## Pipe Base Structure
 
-```toml
+```plx
 [pipe.your_pipe_name]
 type = "PipeLLM"
 description = "A description of what your pipe does"
@@ -52,14 +52,14 @@ output = "ConceptName"
 ```
 
 DO NOT WRITE:
-```toml
+```plx
 [pipe.your_pipe_name]
 type = "pipe_sequence"
 ```
 
 But it should be:
 
-```toml
+```plx
 [pipe.your_pipe_name]
 type = "PipeSequence"
 description = "....."
@@ -74,7 +74,7 @@ That means that the pipe validate_expense is missing the input `ocr_input` becau
 
 NEVER WRITE THE INPUTS BY BREAKING THE LINE LIKE THIS:
 <NEVER DO THIS>
-```toml
+```plx
 inputs = {
     input_1 = "ConceptName1",
     input_2 = "ConceptName2"
@@ -152,7 +152,7 @@ Look at the Pipes we have in order to adapt it. Pipes are organized in two categ
 PipeSequence executes multiple pipes in a defined order, where each step can use results from previous steps.
 
 ## Basic Structure
-```toml
+```plx
 [pipe.your_sequence_name]
 type = "PipeSequence"
 description = "Description of what this sequence does"
@@ -175,7 +175,7 @@ steps = [
 
 You can use PipeBatch functionality within steps using `batch_over` and `batch_as`:
 
-```toml
+```plx
 steps = [
     { pipe = "process_items", batch_over = "input_list", batch_as = "current_item", result = "processed_items"
     }
@@ -196,11 +196,11 @@ The result of a batched step will be a `ListContent` containing the outputs from
 
 The PipeCondition controller allows you to implement conditional logic in your pipeline, choosing which pipe to execute based on an evaluated expression. It supports both direct expressions and expression templates.
 
-## Usage in TOML Configuration
+## Usage in PLX Configuration
 
 ### Basic Usage with Direct Expression
 
-```toml
+```plx
 [pipe.conditional_operation]
 type = "PipeCondition"
 description = "A conditonal pipe to decide wheter..."
@@ -214,7 +214,7 @@ medium = "process_medium"
 large = "process_large"
 ```
 or
-```toml
+```plx
 [pipe.conditional_operation]
 type = "PipeCondition"
 description = "A conditonal pipe to decide wheter..."
@@ -240,9 +240,9 @@ large = "process_large"
 
 The PipeBatch controller allows you to apply a pipe operation to each element in a list of inputs in parallele. It is created via a PipeSequence.
 
-## Usage in TOML Configuration
+## Usage in PLX Configuration
 
-```toml
+```plx
 [pipe.sequence_with_batch]
 type = "PipeSequence"
 description = "A Sequence of pipes"
@@ -271,7 +271,7 @@ PipeLLM is used to:
 ## Basic Usage
 
 ### Simple Text Generation
-```toml
+```plx
 [pipe.write_story]
 type = "PipeLLM"
 description = "Write a short story"
@@ -282,7 +282,7 @@ Write a short story about a programmer.
 ```
 
 ### Structured Data Extraction
-```toml
+```plx
 [pipe.extract_info]
 type = "PipeLLM"
 description = "Extract information"
@@ -296,7 +296,7 @@ Extract person information from this text:
 
 ### System Prompts
 Add system-level instructions:
-```toml
+```plx
 [pipe.expert_analysis]
 type = "PipeLLM"
 description = "Expert analysis"
@@ -307,7 +307,7 @@ prompt_template = "Analyze this data"
 
 ### Multiple Outputs
 Generate multiple results:
-```toml
+```plx
 [pipe.generate_ideas]
 type = "PipeLLM"
 description = "Generate ideas"
@@ -319,7 +319,7 @@ multiple_output = true  # Let the LLM decide how many to generate
 
 ### Vision Tasks
 Process images with VLMs:
-```toml
+```plx
 [pipe.analyze_image]
 type = "PipeLLM"
 description = "Analyze image"
@@ -337,7 +337,7 @@ Extract text and images from an image or a PDF
 ## Basic Usage
 
 ### Simple Text Generation
-```toml
+```plx
 [pipe.extract_info]
 type = "PipeOcr"
 description = "extract the information"
@@ -369,7 +369,7 @@ This rule explains how to write prompt templates in PipeLLM definitions.
 If the inserted text is supposedly long text, made of several lines or paragraphs, you want it inserted inside a block, possibly a block tagged and delimlited with proper syntax as one would do in a markdown documentation. To include stuff as a block, use the "@" prefix.
 
 Example template:
-```toml
+```plx
 prompt_template = """
 Match the expense with its corresponding invoice:
 
@@ -388,7 +388,7 @@ In this example, the expense data and the invoices data are obviously made of se
 If the inserted text is short text and it makes sense to have it inserted directly into a sentence, you want it inserted inline. To insert stuff inline, use the "$" prefix. This will insert the stuff without delimiters and the content will be rendered as plain text.
 
 Example template:
-```toml
+```plx
 prompt_template = """
 Your goal is to summarize everything related to $topic in the provided text:
 
@@ -515,6 +515,6 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
     )
 ```
 
-ALWAYS RUN `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate until it works.
+ALWAYS RUN `pipelex validate all -c pipelex/libraries` when you are finished writing pipelines: This checks for errors. If there are errors, iterate until it works.
 Then, create an example file to run the pipeline in the `examples` folder.
 But don't write documentation unless asked explicitly to.

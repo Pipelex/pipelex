@@ -32,7 +32,7 @@ pipelex_libraries/         # Exported library root
 2. **Concept Loading**:
 
     - Loads native concepts first
-    - Loads custom concepts from TOML files
+    - Loads custom concepts from PLX files
     - Validates concept definitions and relationships
 
 3. **Pipe Loading**:
@@ -107,7 +107,7 @@ The library manager performs several validation steps:
 The library system includes specific error types:
 
 - `LibraryError`: Base error for library issues
-- `LibraryParsingError`: For TOML parsing issues
+- `LibraryParsingError`: For PLX parsing issues
 - `ConceptLibraryError`: For concept-related issues
 - `PipeLibraryError`: For pipe-related issues
 - `LLMDeckNotFoundError`: For missing LLM configurations
@@ -116,13 +116,13 @@ The library system includes specific error types:
 
 1. **Organization**:
 
-    - Keep related concepts and pipes in the same TOML file
+    - Keep related concepts and pipes in the same PLX file
     - Use meaningful domain names
     - Structure complex libraries using subdirectories
 
 2. **Validation**:
 
-    - Run `pipelex validate all` after making changes
+    - Run `pipelex validate all -c pipelex/libraries` after making changes
     - Check for domain consistency
     - Verify concept relationships
 

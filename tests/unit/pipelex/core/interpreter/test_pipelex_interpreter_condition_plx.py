@@ -1,16 +1,14 @@
-"""Test PipelexInterpreter Condition pipe to TOML string conversion."""
-
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
 
 
-class TestPipelexInterpreterConditionToml:
-    """Test Condition pipe to TOML string conversion."""
+class TestPipelexInterpreterConditionPLX:
+    """Test Condition pipe to PLX string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,blueprint,expected_toml",
+        "pipe_name,blueprint,expected_plx",
         [
             # Basic Condition pipe with expression
             (
@@ -50,7 +48,7 @@ expression_template = "{{ data.size if data.size > threshold else 'low' }}\"""",
             ),
         ],
     )
-    def test_condition_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeConditionBlueprint, expected_toml: str):
-        """Test converting Condition pipe blueprint to TOML string."""
-        result = PipelexInterpreter.condition_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
-        assert result == expected_toml
+    def test_condition_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeConditionBlueprint, expected_plx: str):
+        """Test converting Condition pipe blueprint to PLX string."""
+        result = PipelexInterpreter.condition_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        assert result == expected_plx

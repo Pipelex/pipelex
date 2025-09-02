@@ -19,7 +19,7 @@ def build_blueprint_cmd(
     ],
     output_path: Annotated[
         Optional[str],
-        typer.Option("--output", "-o", help="Path to save the generated TOML blueprint (optional)"),
+        typer.Option("--output", "-o", help="Path to save the generated PLX blueprint (optional)"),
     ] = None,
     relative_config_folder_path: Annotated[
         str,

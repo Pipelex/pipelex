@@ -11,7 +11,7 @@ alwaysApply: false
 # Pipeline Structure Guide
 
 ## Pipeline File Naming
-- Files must be `.toml` for pipelines
+- Files must be `.plx` for pipelines
 - Files must be `.py` for structures
 - Use descriptive names in `snake_case`
 
@@ -22,14 +22,14 @@ A pipeline file has three main sections:
 3. Pipe definitions
 
 ### Domain Statement
-```toml
+```plx
 domain = "domain_name"
 definition = "Description of the domain" # Optional
 ```
-Note: The domain name usually matches the toml filename for single-file domains. For multi-file domains, use the subdirectory name.
+Note: The domain name usually matches the plx filename for single-file domains. For multi-file domains, use the subdirectory name.
 
 ### Concept Definitions
-```toml
+```plx
 [concept]
 ConceptName = "Description of the concept" # Should be the same name as the Structure ClassName you want to output
 ```
@@ -44,7 +44,7 @@ Important Rules:
 
 ## Pipe Base Structure
 
-```toml
+```plx
 [pipe.your_pipe_name]
 type = "PipeLLM"
 description = "A description of what your pipe does"

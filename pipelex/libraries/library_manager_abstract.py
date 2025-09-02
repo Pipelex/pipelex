@@ -28,7 +28,7 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def load_from_file(self, toml_path: Path) -> None:
+    def load_from_file(self, plx_path: Path) -> None:
         pass
 
     @abstractmethod

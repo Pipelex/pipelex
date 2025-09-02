@@ -53,9 +53,9 @@ You would then call `register_my_functions()` when your Pipelex application init
 
 ## Configuration
 
-Once the function is registered, you can use it in your `.toml` file.
+Once the function is registered, you can use it in your `.plx` file.
 
-### TOML Parameters
+### PLX Parameters
 
 | Parameter       | Type   | Description                                                                 | Required |
 | --------------- | ------ | --------------------------------------------------------------------------- | -------- |
@@ -66,9 +66,9 @@ Once the function is registered, you can use it in your `.toml` file.
 
 ### Example
 
-This TOML snippet shows how to use the `combine_two_texts` function defined above. It assumes two previous pipes have produced outputs named `text_a` and `text_b`.
+This PLX snippet shows how to use the `combine_two_texts` function defined above. It assumes two previous pipes have produced outputs named `text_a` and `text_b`.
 
-```toml
+```plx
 [pipe.combine_them]
 type = "PipeFunc"
 description = "Combine two text inputs using a custom Python function"

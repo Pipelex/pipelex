@@ -12,7 +12,7 @@ Extract text and images from an image or a PDF
 ## Basic Usage
 
 ### Simple Text Generation
-```toml
+```plx
 [pipe.extract_info]
 type = "PipeOcr"
 description = "extract the information"
@@ -37,4 +37,4 @@ class PageContent(StructuredContent):
 
 # Important tip
 
-Always run the cli `pipelex validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.
+Always run the cli `pipelex validate all -c pipelex/libraries` when you are finished writing pipelines: This checks for errors. If there are errors, iterate.

@@ -1,5 +1,3 @@
-"""Test PipelexInterpreter ImgGen pipe to TOML string conversion."""
-
 import pytest
 
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio
@@ -7,11 +5,11 @@ from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
 
-class TestPipelexInterpreterImgGenToml:
-    """Test ImgGen pipe to TOML string conversion."""
+class TestPipelexInterpreterImgGenPLX:
+    """Test ImgGen pipe to PLX string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,blueprint,expected_toml",
+        "pipe_name,blueprint,expected_plx",
         [
             # Basic ImgGen pipe
             (
@@ -49,7 +47,7 @@ seed = 12345""",
             ),
         ],
     )
-    def test_img_gen_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeImgGenBlueprint, expected_toml: str):
-        """Test converting ImgGen pipe blueprint to TOML string."""
-        result = PipelexInterpreter.img_gen_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
-        assert result == expected_toml
+    def test_img_gen_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeImgGenBlueprint, expected_plx: str):
+        """Test converting ImgGen pipe blueprint to PLX string."""
+        result = PipelexInterpreter.img_gen_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        assert result == expected_plx

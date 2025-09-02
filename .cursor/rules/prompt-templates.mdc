@@ -1,6 +1,6 @@
 ---
 description: 
-globs: pipelex/libraries/pipelines/**/*.toml
+globs: pipelex/libraries/pipelines/**/*.plx
 alwaysApply: false
 ---
 This rule explains how to write prompt templates in PipeLLM definitions.
@@ -10,7 +10,7 @@ This rule explains how to write prompt templates in PipeLLM definitions.
 If the inserted text is supposedly long text, made of several lines or paragraphs, you want it inserted inside a block, possibly a block tagged and delimlited with proper syntax as one would do in a markdown documentation. To include stuff as a block, use the "@" prefix.
 
 Example template:
-```toml
+```plx
 prompt_template = """
 Match the expense with its corresponding invoice:
 
@@ -29,7 +29,7 @@ In this example, the expense data and the invoices data are obviously made of se
 If you want to conditionally insert a block only when the variable exists and is not empty, use the "@?" prefix. This is useful for optional fields that may or may not be present in your data.
 
 Example template:
-```toml
+```plx
 prompt_template = """
 User Profile:
 
@@ -52,7 +52,7 @@ In this example, the bio and contact_info will only be inserted if they exist. I
 If the inserted text is short text and it makes sense to have it inserted directly into a sentence, you want it inserted inline. To insert stuff inline, use the "$" prefix. This will insert the stuff without delimiters and the content will be rendered as plain text.
 
 Example template:
-```toml
+```plx
 prompt_template = """
 Your goal is to summarize everything related to $topic in the provided text:
 

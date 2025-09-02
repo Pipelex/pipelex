@@ -104,7 +104,7 @@ class TestPipelexInterpreterSerializeSubPipe:
         assert result == expected_result
 
     @pytest.mark.parametrize(
-        "sub_pipe_blueprint,expected_toml_string",
+        "sub_pipe_blueprint,expected_plx_string",
         [
             # Basic sub pipe (step in sequence)
             (
@@ -153,7 +153,7 @@ class TestPipelexInterpreterSerializeSubPipe:
             ),
         ],
     )
-    def test_sub_pipe_to_toml_string(self, sub_pipe_blueprint: SubPipeBlueprint, expected_toml_string: str):
-        """Test converting SubPipeBlueprint directly to TOML inline table string."""
-        result = PipelexInterpreter.sub_pipe_to_toml_string(sub_pipe_blueprint)
-        assert result == expected_toml_string
+    def test_sub_pipe_to_plx_string(self, sub_pipe_blueprint: SubPipeBlueprint, expected_plx_string: str):
+        """Test converting SubPipeBlueprint directly to PLX inline table string."""
+        result = PipelexInterpreter.sub_pipe_to_plx_string(sub_pipe_blueprint)
+        assert result == expected_plx_string

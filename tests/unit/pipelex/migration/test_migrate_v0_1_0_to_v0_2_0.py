@@ -2,16 +2,16 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.migration.migrate_v0_1_0_to_v0_2_0 import MigrationResult, TomlMigrator, migrate_concept_syntax
+from pipelex.migration.migrate_v0_1_0_to_v0_2_0 import MigrationResult, TOMLMigrator, migrate_concept_syntax
 
 
 class TestTomlMigrator:
     """Unit tests for TomlMigrator class."""
 
     @pytest.fixture
-    def migrator(self) -> TomlMigrator:
+    def migrator(self) -> TOMLMigrator:
         """Create a TomlMigrator instance."""
-        return TomlMigrator()
+        return TOMLMigrator()
 
     @pytest.fixture
     def sample_old_syntax_content(self) -> str:
@@ -61,7 +61,7 @@ definition = "This one is already migrated"
 refines = "Text"
 """
 
-    def test_pattern_matching(self, migrator: TomlMigrator) -> None:
+    def test_pattern_matching(self, migrator: TOMLMigrator) -> None:
         """Test that the regex pattern correctly identifies Concept = lines."""
         test_content = """[concept.TestConcept]
 Concept = "A test concept"
@@ -83,7 +83,7 @@ Concept = "This should be caught"
         assert matches[1].group(2) == "Concept"
         assert matches[1].group(4) == '"This should be caught"'
 
-    def test_pattern_replacement(self, migrator: TomlMigrator) -> None:
+    def test_pattern_replacement(self, migrator: TOMLMigrator) -> None:
         """Test that the regex pattern correctly replaces Concept = with definition =."""
         test_content = """[concept.TestConcept]
 Concept = "A test concept"
@@ -106,7 +106,7 @@ refines = "Text"
         result = migrator.migrate_content(test_content)
         assert result == expected_content
 
-    def test_preserves_formatting(self, migrator: TomlMigrator) -> None:
+    def test_preserves_formatting(self, migrator: TOMLMigrator) -> None:
         """Test that migration preserves indentation and spacing."""
         test_cases = [
             # No indentation
@@ -127,7 +127,7 @@ refines = "Text"
             result = migrator.migrate_content(original)
             assert result == expected, f"Failed for: {original}"
 
-    def test_ignores_non_concept_lines(self, migrator: TomlMigrator) -> None:
+    def test_ignores_non_concept_lines(self, migrator: TOMLMigrator) -> None:
         """Test that migration doesn't affect non-concept Concept = lines."""
         # These should NOT be changed
         test_content = """# This is a comment about Concept = something
@@ -139,7 +139,7 @@ prompt_template = "Define the Concept = whatever"
         # Should be unchanged since none start with Concept =
         assert result == test_content
 
-    def test_ignores_concept_inside_multiline_strings(self, migrator: TomlMigrator) -> None:
+    def test_ignores_concept_inside_multiline_strings(self, migrator: TOMLMigrator) -> None:
         """Test that migration ignores Concept = inside multiline strings."""
         test_content = '''domain = "test"
 
@@ -172,7 +172,7 @@ refines = "Document"
         assert 'Concept = "This should be migrated"' not in result
         assert 'Concept = "This should also be migrated"' not in result
 
-    def test_multiline_string_detection_with_single_quotes(self, migrator: TomlMigrator) -> None:
+    def test_multiline_string_detection_with_single_quotes(self, migrator: TOMLMigrator) -> None:
         """Test that multiline string detection works with both double and single quotes."""
         test_content = """domain = "test"
 
@@ -198,12 +198,12 @@ Concept = "Should also be migrated"
         # Concept inside single-quote multiline string should NOT be migrated
         assert 'Concept = "Should NOT be migrated"' in result
 
-    def test_needs_migration_detection(self, migrator: TomlMigrator, sample_old_syntax_content: str, sample_new_syntax_content: str) -> None:
+    def test_needs_migration_detection(self, migrator: TOMLMigrator, sample_old_syntax_content: str, sample_new_syntax_content: str) -> None:
         """Test needs_migration correctly identifies files that need migration."""
         assert migrator.needs_migration(sample_old_syntax_content) is True
         assert migrator.needs_migration(sample_new_syntax_content) is False
 
-    def test_get_migration_preview(self, migrator: TomlMigrator) -> None:
+    def test_get_migration_preview(self, migrator: TOMLMigrator) -> None:
         """Test getting preview of migration changes."""
         test_content = """[concept.TestConcept]
 Concept = "A test concept"
@@ -226,7 +226,7 @@ refines = "Text"
         assert changes[1]["new_line"] == 'definition = "Another concept"'
 
     def test_migrate_file_success(
-        self, migrator: TomlMigrator, tmp_path: Path, sample_old_syntax_content: str, sample_new_syntax_content: str
+        self, migrator: TOMLMigrator, tmp_path: Path, sample_old_syntax_content: str, sample_new_syntax_content: str
     ) -> None:
         """Test successful file migration."""
         test_file = tmp_path / "test.toml"
@@ -247,7 +247,7 @@ refines = "Text"
         # Check changes count
         assert changes_count == 2  # Two "Concept =" lines in the sample
 
-    def test_migrate_file_no_changes_needed(self, migrator: TomlMigrator, tmp_path: Path, sample_new_syntax_content: str) -> None:
+    def test_migrate_file_no_changes_needed(self, migrator: TOMLMigrator, tmp_path: Path, sample_new_syntax_content: str) -> None:
         """Test file migration when no changes are needed."""
         test_file = tmp_path / "test.toml"
         test_file.write_text(sample_new_syntax_content)
@@ -266,7 +266,7 @@ refines = "Text"
         assert changes_count == 0
 
     def test_migrate_file_without_backup(
-        self, migrator: TomlMigrator, tmp_path: Path, sample_old_syntax_content: str, sample_new_syntax_content: str
+        self, migrator: TOMLMigrator, tmp_path: Path, sample_old_syntax_content: str, sample_new_syntax_content: str
     ) -> None:
         """Test file migration without creating backup."""
         test_file = tmp_path / "test.toml"
@@ -285,7 +285,7 @@ refines = "Text"
         # Check changes count
         assert changes_count == 2
 
-    def test_find_toml_files(self, migrator: TomlMigrator, tmp_path: Path) -> None:
+    def test_find_toml_files(self, migrator: TOMLMigrator, tmp_path: Path) -> None:
         """Test finding TOML files in directory and subdirectories."""
         # Create some TOML files
         (tmp_path / "file1.toml").write_text("content1")
@@ -311,14 +311,14 @@ refines = "Text"
 
         assert toml_files == expected_files
 
-    def test_find_toml_files_nonexistent_directory(self, migrator: TomlMigrator, tmp_path: Path) -> None:
+    def test_find_toml_files_nonexistent_directory(self, migrator: TOMLMigrator, tmp_path: Path) -> None:
         """Test finding TOML files in nonexistent directory."""
         nonexistent_dir = tmp_path / "nonexistent"
 
         with pytest.raises(FileNotFoundError):
             migrator.find_toml_files(nonexistent_dir)
 
-    def test_migrate_directory_success(self, migrator: TomlMigrator, tmp_path: Path) -> None:
+    def test_migrate_directory_success(self, migrator: TOMLMigrator, tmp_path: Path) -> None:
         """Test successful directory migration."""
         # Create files with different states
         file1 = tmp_path / "file1.toml"
@@ -358,7 +358,7 @@ Concept = "Another old concept"
         assert not (tmp_path / "file2.toml.backup").exists()  # No changes needed
         assert (tmp_path / "file3.toml.backup").exists()
 
-    def test_migrate_directory_dry_run(self, migrator: TomlMigrator, tmp_path: Path) -> None:
+    def test_migrate_directory_dry_run(self, migrator: TOMLMigrator, tmp_path: Path) -> None:
         """Test directory migration in dry-run mode."""
         # Create file with old syntax
         test_file = tmp_path / "test.toml"
@@ -384,7 +384,7 @@ Concept = "Old syntax"
         backup_file = tmp_path / "test.toml.backup"
         assert not backup_file.exists()
 
-    def test_migrate_directory_no_toml_files(self, migrator: TomlMigrator, tmp_path: Path) -> None:
+    def test_migrate_directory_no_toml_files(self, migrator: TOMLMigrator, tmp_path: Path) -> None:
         """Test directory migration with no TOML files."""
         # Create non-TOML file
         (tmp_path / "file.txt").write_text("not toml")

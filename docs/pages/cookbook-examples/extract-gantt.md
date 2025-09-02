@@ -53,11 +53,11 @@ class GanttChart(StructuredContent):
     milestones: Optional[List[Milestone]]
 ```
 
-## The Pipeline Definition: `gantt.toml`
+## The Pipeline Definition: `gantt.plx`
 
 The `extract_gantt_by_steps` pipeline is a sequence of smaller, focused pipes. This is a great example of building a complex workflow from simple, reusable components.
 
-```toml
+```plx
 [pipe.extract_gantt_by_steps]
 type = "PipeSequence"
 description = "Extract all details from a gantt chart"
