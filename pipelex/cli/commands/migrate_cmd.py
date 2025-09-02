@@ -15,12 +15,12 @@ def do_migrate(
     dry_run: bool = False,
     backups: bool = True,
 ) -> None:
-    """Migrate PLX files to new syntax (Concept = -> definition = and PipeClassName = -> type/definition).
+    """Migrate TOML files to new syntax (Concept = -> definition = and PipeClassName = -> type/definition).
 
     The path can be:
     - A Pipelex libraries folder (we'll use its `pipelines` subfolder)
-    - A directory containing PLX files
-    - A single PLX file
+    - A directory containing TOML files
+    - A single TOML file
     """
     config_path = Path(target_path)
 
@@ -47,10 +47,10 @@ def do_migrate(
             typer.echo("❌ Migration failed due to errors")
             raise typer.Exit(1)
 
-        typer.echo(f"Found {result.files_processed} PLX file(s) to check")
+        typer.echo(f"Found {result.files_processed} TOML file(s) to check")
 
         if result.files_modified == 0:
-            typer.echo("✅ All PLX files are already using the new syntax")
+            typer.echo("✅ All TOML files are already using the new syntax")
             return
 
         if dry_run:
@@ -85,13 +85,13 @@ def do_migrate(
                     rel = Path(file_path.name)
                 typer.echo(f"✅ Migrated {rel}")
                 if create_backups:
-                    backup_path = file_path.with_suffix(".plx.backup")
+                    backup_path = file_path.with_suffix(".toml.backup")
                     typer.echo(f"   Backup saved to {backup_path.name}")
 
             typer.echo(f"\n✅ Migration completed: {result.total_changes} change(s) applied to {result.files_modified} file(s)")
             if create_backups:
                 typer.echo("   Backup files created with .backup extension")
-            typer.echo("   Run 'pipelex validate all' to verify the migration")
+            typer.echo("   Run 'pipelex validate all -c pipelex/libraries' to verify the migration")
     except FileNotFoundError as exc:
         typer.echo(f"❌ {exc}")
         raise typer.Exit(1)
@@ -111,7 +111,7 @@ def migrate_cmd(
         typer.Option(
             "--path",
             "-p",
-            help=("Path to Pipelex libraries folder (uses its pipelines), a directory of PLX files, or a single PLX file"),
+            help=("Path to Pipelex libraries folder (uses its pipelines), a directory of TOML files, or a single TOML file"),
         ),
     ] = "./pipelex_libraries",
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes without applying them")] = False,

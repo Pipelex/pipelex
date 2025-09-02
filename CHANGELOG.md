@@ -4,7 +4,11 @@
 
 ### Refacto
 
-- Changed the pipeline file extension from `.plx` to `.toml`: Updated the LibraryManager in consequence.
+- Changed the pipeline file extension from `.toml` to `.plx`: Updated the LibraryManager in consequence.
+
+## Fixed
+
+- Fixed the structuring_method behavior in the `PipeLLM` pipe.
 
 ### Changed
 

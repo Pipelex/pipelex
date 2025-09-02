@@ -15,7 +15,7 @@ class TestTomlMigrator:
 
     @pytest.fixture
     def sample_old_syntax_content(self) -> str:
-        """Sample PLX content with old Concept = syntax."""
+        """Sample TOML content with old Concept = syntax."""
         return """domain = "test"
 definition = "Test domain"
 
@@ -39,7 +39,7 @@ refines = "Text"
 
     @pytest.fixture
     def sample_new_syntax_content(self) -> str:
-        """Sample PLX content with new definition = syntax."""
+        """Sample TOML content with new definition = syntax."""
         return """domain = "test"
 definition = "Test domain"
 
@@ -299,8 +299,8 @@ refines = "Text"
         # Create non-TOML file (should be ignored)
         (tmp_path / "file.txt").write_text("not toml")
 
-        plx_files = migrator.find_toml_files(tmp_path)
-        plx_files.sort()  # Sort for consistent testing
+        toml_files = migrator.find_toml_files(tmp_path)
+        toml_files.sort()  # Sort for consistent testing
 
         expected_files = [
             tmp_path / "file1.toml",
@@ -309,9 +309,9 @@ refines = "Text"
         ]
         expected_files.sort()
 
-        assert plx_files == expected_files
+        assert toml_files == expected_files
 
-    def test_find_plx_files_nonexistent_directory(self, migrator: TOMLMigrator, tmp_path: Path) -> None:
+    def test_find_toml_files_nonexistent_directory(self, migrator: TOMLMigrator, tmp_path: Path) -> None:
         """Test finding TOML files in nonexistent directory."""
         nonexistent_dir = tmp_path / "nonexistent"
 

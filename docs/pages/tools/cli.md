@@ -34,7 +34,7 @@ pipelex show pipe PIPE_CODE [-c/--config-folder-path PATH]
 
 ### Migrate group
 
-Migrate PLX files to the new syntax.
+Migrate TOML files to the new syntax.
 
 ```bash
 pipelex migrate run [-c/--config-folder-path PATH] [--dry-run] [--backups/--no-backups]
