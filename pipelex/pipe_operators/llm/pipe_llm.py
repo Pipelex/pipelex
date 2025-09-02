@@ -297,7 +297,7 @@ class PipeLLM(PipeOperator):
         # Append output structure prompt if needed
         output_structure_prompt: Optional[str] = PipeLLM.get_output_structure_prompt(
             concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
-            is_with_preliminary_text=is_with_preliminary_text or False,
+            is_with_preliminary_text=is_with_preliminary_text,
         )
 
         llm_prompt_run_params = PipeRunParams.copy_by_injecting_multiplicity(
@@ -345,7 +345,11 @@ class PipeLLM(PipeOperator):
                         pipe = get_required_pipe(pipe_code=self.code)
                         # TODO: run_pipe() could get the domain at the same time as the pip_code
                         domain = get_required_domain(domain=pipe.domain)
-                        prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
+                        prompt_template_to_structure = (
+                            self.prompt_template_to_structure
+                            or domain.prompt_template_to_structure
+                            or get_template(template_name="structure_from_preliminary_text_user")
+                        )
                         system_prompt = self.system_prompt_to_structure or domain.system_prompt
                         llm_prompt_2_proto = LLMPrompt(
                             system_text=system_prompt,
@@ -361,7 +365,11 @@ class PipeLLM(PipeOperator):
                     domain = get_required_domain(domain=the_pipe.domain)
                 else:
                     domain = Domain.make_default()
-                prompt_template_to_structure = self.prompt_template_to_structure or domain.prompt_template_to_structure
+                prompt_template_to_structure = (
+                    self.prompt_template_to_structure
+                    or domain.prompt_template_to_structure
+                    or get_template(template_name="structure_from_preliminary_text_user")
+                )
                 system_prompt = self.system_prompt_to_structure or domain.system_prompt
                 llm_prompt_2_proto = LLMPrompt(
                     system_text=system_prompt,
