@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## [v0.9.0] - 2025-09-02
+
+### Refacto
+
+- Changed the pipeline file extension from `.plx` to `.toml`: Updated the LibraryManager in consequence.
 
 ### Changed
 
