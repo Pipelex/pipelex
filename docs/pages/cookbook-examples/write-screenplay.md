@@ -75,11 +75,11 @@ class Screenplay(StructuredContent):
     chapters: "ChapterList"
 ```
 
-## The Pipeline Definition: `screenplay_writer.toml`
+## The Pipeline Definition: `screenplay_writer.plx`
 
 The `generate_screenplay` pipeline is a master `PipeSequence` that orchestrates a series of smaller, specialized pipes. This is a perfect example of how to build a complex, creative workflow by breaking it down into manageable steps.
 
-```toml
+```plx
 [pipe.generate_screenplay]
 type = "PipeSequence"
 description = "Generate a complete screenplay from a pitch"

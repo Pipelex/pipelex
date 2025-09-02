@@ -44,7 +44,7 @@ class LibraryConfig(ConfigModel):
 
     @property
     def failing_pipelines_file_paths(self) -> List[str]:
-        return ["tests/test_pipelines/failing_pipelines.toml"]
+        return ["tests/test_pipelines/failing_pipelines.plx"]
 
     def get_llm_deck_paths(self) -> List[str]:
         llm_deck_paths = [str(path) for path in find_files_in_dir(dir_path=self.llm_deck_dir_path, pattern="*.toml", is_recursive=True)]

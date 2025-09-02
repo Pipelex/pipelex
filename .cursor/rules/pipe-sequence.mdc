@@ -9,7 +9,7 @@ alwaysApply: false
 PipeSequence executes multiple pipes in a defined order, where each step can use results from previous steps.
 
 ## Basic Structure
-```toml
+```plx
 [pipe.your_sequence_name]
 type = "PipeSequence"
 description = "Description of what this sequence does"
@@ -38,7 +38,7 @@ steps = [
 
 You can use PipeBatch functionality within steps using `batch_over` and `batch_as`:
 
-```toml
+```plx
 steps = [
     { pipe = "process_items", batch_over = "input_list", batch_as = "current_item", result = "processed_items"
     }

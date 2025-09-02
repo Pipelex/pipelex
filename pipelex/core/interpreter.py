@@ -70,7 +70,6 @@ class PipelexInterpreter(BaseModel):
                     with open(self.file_path, "w", encoding="utf-8") as file:
                         file.write(cleaned_content)
                     return cleaned_content
-
                 return file_content
 
             except Exception as exc:
@@ -94,7 +93,7 @@ class PipelexInterpreter(BaseModel):
             - Starts with "domain =" (ignoring leading whitespace)
         """
         # Check if it has .toml extension
-        if file_path.suffix != ".toml":
+        if file_path.suffix != ".plx":
             return False
 
         # Check if file exists
@@ -125,6 +124,9 @@ class PipelexInterpreter(BaseModel):
         """Make a PipelexBundleBlueprint from the file_path or file_content"""
         file_content = self.get_file_content()
         toml_data = self._parse_toml_content(file_content)
+
+        from pipelex import pretty_print
+        pretty_print(toml_data, title="TOML data")
         return PipelexBundleBlueprint.model_validate(toml_data)
 
     @staticmethod

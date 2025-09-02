@@ -7,16 +7,16 @@ The `PipeImgGen` operator is used to generate images from a text prompt using a 
 `PipeImgGen` takes a text prompt and a set of parameters, then calls an underlying image generation service (like DALL-E 3 or Stable Diffusion) to create one or more images.
 
 The prompt can be provided in two ways:
-1.  As a static string directly in the pipe's TOML definition using the `imgg_prompt` parameter.
+1.  As a static string directly in the pipe's PLX definition using the `imgg_prompt` parameter.
 2.  As a dynamic input by connecting a concept that is or refines `native.Text`.
 
 The pipe can be configured to generate a single image or a list of images.
 
 ## Configuration
 
-`PipeImgGen` is configured in your pipeline's `.toml` file.
+`PipeImgGen` is configured in your pipeline's `.plx` file.
 
-### TOML Parameters
+### PLX Parameters
 
 | Parameter               | Type            | Description                                                                                                                   | Required |
 | ----------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- |
@@ -38,7 +38,7 @@ The pipe can be configured to generate a single image or a list of images.
 
 This pipe generates one image of a futuristic car without requiring any input.
 
-```toml
+```plx
 [pipe.generate_car_image]
 type = "PipeImgGen"
 description = "Generate a futuristic car image"
@@ -53,7 +53,7 @@ quality = "hd"
 
 This pipe takes a text prompt as input and generates three variations of the image.
 
-```toml
+```plx
 [concept]
 ImagePrompt = "A text prompt for generating an image"
 

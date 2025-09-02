@@ -21,7 +21,7 @@ Each prompting style defines how prompts are formatted and presented to the LLM.
 
 ## Example Configuration
 
-```toml
+```plx
 [pipelex.prompting_config]
 default_prompting_style = "chat"
 

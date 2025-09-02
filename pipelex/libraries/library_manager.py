@@ -87,9 +87,9 @@ class LibraryManager(LibraryManagerAbstract):
         self.pipe_library.validate_with_libraries()
         self.domain_library.validate_with_libraries()
 
-    def _validate_toml_files(self):
-        """Validate all TOML files used by the library manager for formatting issues."""
-        log.debug("LibraryManager validating TOML file formatting")
+    def _validate_plx_files(self):
+        """Validate all PLX files used by the library manager for formatting issues."""
+        log.debug("LibraryManager validating PLX file formatting")
 
         # Validation of LLM deck paths
         llm_deck_paths = self.library_config.get_llm_deck_paths()
@@ -98,8 +98,8 @@ class LibraryManager(LibraryManagerAbstract):
                 try:
                     validate_toml_file(llm_deck_path)
                 except TOMLValidationError as exc:
-                    log.error(f"TOML formatting issues in LLM deck file '{llm_deck_path}': {exc}")
-                    raise LibraryError(f"TOML validation failed for LLM deck file '{llm_deck_path}': {exc}") from exc
+                    log.error(f"PLX formatting issues in LLM deck file '{llm_deck_path}': {exc}")
+                    raise LibraryError(f"PLX validation failed for LLM deck file '{llm_deck_path}': {exc}") from exc
 
         # Validation of template paths
         template_paths = self.library_config.get_templates_paths()
@@ -108,8 +108,8 @@ class LibraryManager(LibraryManagerAbstract):
                 try:
                     validate_toml_file(template_path)
                 except TOMLValidationError as exc:
-                    log.error(f"TOML formatting issues in template file '{template_path}': {exc}")
-                    raise LibraryError(f"TOML validation failed for template file '{template_path}': {exc}") from exc
+                    log.error(f"PLX formatting issues in template file '{template_path}': {exc}")
+                    raise LibraryError(f"PLX validation failed for template file '{template_path}': {exc}") from exc
 
     @override
     def setup(self) -> None:
@@ -134,37 +134,37 @@ class LibraryManager(LibraryManagerAbstract):
             library_dirs += [Path(self.library_config.test_pipelines_dir_path)]
         return library_dirs
 
-    def _get_pipelex_toml_files_from_dirs(self, dirs: List[Path]) -> List[Path]:
-        """Get all valid Pipelex TOML files from the given directories."""
+    def _get_pipelex_plx_files_from_dirs(self, dirs: List[Path]) -> List[Path]:
+        """Get all valid Pipelex PLX files from the given directories."""
 
-        all_toml_paths: List[Path] = []
+        all_plx_paths: List[Path] = []
         for dir_path in dirs:
             if not dir_path.exists():
                 raise LibraryError(f"Directory does not exist: {dir_path}")
 
             # Find all TOML files in the directory
-            toml_files = find_files_in_dir(
+            plx_files = find_files_in_dir(
                 dir_path=str(dir_path),
-                pattern="*.toml",
+                pattern="*.plx",
                 is_recursive=True,
             )
 
             # Filter to only include valid Pipelex files
-            for toml_file in toml_files:
-                if PipelexInterpreter.is_pipelex_file(toml_file):
-                    all_toml_paths.append(toml_file)
+            for plx_file in plx_files:
+                if PipelexInterpreter.is_pipelex_file(plx_file):
+                    all_plx_paths.append(plx_file)
                 else:
-                    log.debug(f"Skipping non-Pipelex TOML file: {toml_file}")
+                    log.debug(f"Skipping non-Pipelex PLX file: {plx_file}")
 
-        return all_toml_paths
+        return all_plx_paths
 
     @override
-    def load_from_file(self, toml_path: Path) -> None:
+    def load_from_file(self, plx_path: Path) -> None:
         """Load a single file - this method is kept for compatibility."""
-        if not PipelexInterpreter.is_pipelex_file(toml_path):
-            raise LibraryError(f"File is not a valid Pipelex TOML file: {toml_path}")
+        if not PipelexInterpreter.is_pipelex_file(plx_path):
+            raise LibraryError(f"File is not a valid Pipelex PLX file: {plx_path}")
 
-        blueprint = PipelexInterpreter(file_path=toml_path).make_pipelex_bundle_blueprint()
+        blueprint = PipelexInterpreter(file_path=plx_path).make_pipelex_bundle_blueprint()
         self.load_from_blueprint(blueprint)
 
     @override
@@ -230,12 +230,12 @@ class LibraryManager(LibraryManagerAbstract):
     @override
     def load_libraries(self, library_dirs: Optional[List[Path]] = None, library_file_paths: Optional[List[Path]] = None) -> None:
         dirs_to_use: List[Path] = self._get_pipeline_library_dirs()
-        all_toml_paths: List[Path] = self._get_pipelex_toml_files_from_dirs(dirs_to_use)
+        all_plx_paths: List[Path] = self._get_pipelex_plx_files_from_dirs(dirs_to_use)
 
         # Remove failing pipelines from the list
         failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
         failing_paths_set = {Path(fp) for fp in failing_pipelines_file_paths}
-        all_toml_paths = [path for path in all_toml_paths if path not in failing_paths_set]
+        all_plx_paths = [path for path in all_plx_paths if path not in failing_paths_set]
 
         if library_dirs is not None:
             dirs_to_use = library_dirs
@@ -245,12 +245,12 @@ class LibraryManager(LibraryManagerAbstract):
             ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_dir))
 
         if library_file_paths is not None:
-            all_toml_paths = library_file_paths
+            all_plx_paths = library_file_paths
 
         # Parse all blueprints first
         blueprints: List[PipelexBundleBlueprint] = []
-        for toml_file_path in all_toml_paths:
-            blueprint = PipelexInterpreter(file_path=toml_file_path).make_pipelex_bundle_blueprint()
+        for plx_file_path in all_plx_paths:
+            blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
             blueprints.append(blueprint)
 
         # Load all domains first

@@ -63,10 +63,10 @@ Pipelex makes it easy for developers to define and run repeatable AI workflows. 
 
 Build **pipelines** from modular pipes that snap together. Each pipe can use a different language model (LLM) or software to process knowledge. Pipes consistently deliver **structured, predictable outputs** at each stage.
 
-Pipelex uses TOML syntax, making workflows readable and shareable. Business professionals, developers, and AI coding agents can all understand and modify the same pipeline definitions.
+Pipelex uses its own syntax PLX, based on TOML, making workflows readable and shareable. Business professionals, developers, and AI coding agents can all understand and modify the same pipeline definitions.
 
 Example:
-```toml
+```plx
 [concept]
 Buyer = "The person who made the purchase"
 PurchaseDocumentText = "Transcript of a receipt, invoice, or order confirmation"
@@ -120,7 +120,7 @@ uv pip install pipelex
 
 ## IDE extension
 
-We **highly** recommend installing an extension for TOML files into your IDE of choice. For VS Code, the [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml) extension does a great job of syntax coloring and checking.
+We **highly** recommend installing our own extension for PLX files into your IDE of choice. You can find it in the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Pipelex.pipelex).
 
 ### Optional Features
 
@@ -153,9 +153,9 @@ uv pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
 
 ## Example: optimizing a tweet in 2 steps
 
-### 1. Define the pipeline in TOML
+### 1. Define the pipeline in PLX
 
-```toml
+```plx
 domain = "tech_tweet"
 definition = "A pipeline for optimizing tech tweets using Twitter/X best practices"
 

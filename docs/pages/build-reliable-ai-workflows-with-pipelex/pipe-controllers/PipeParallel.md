@@ -16,9 +16,9 @@ You must use `add_each_output`, `combined_output`, or both.
 
 ## Configuration
 
-`PipeParallel` is configured in your pipeline's `.toml` file.
+`PipeParallel` is configured in your pipeline's `.plx` file.
 
-### TOML Parameters
+### PLX Parameters
 
 | Parameter         | Type          | Description                                                                                                                                                                    | Required |
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
@@ -43,7 +43,7 @@ Each entry in the `parallels` array is a table with the following keys:
 
 Imagine you have a product description and you want to extract the product features and the product sentiment at the same time.
 
-```toml
+```plx
 [concept.ProductAnalysis]
 structure = "ProductAnalysis" # A Pydantic model with 'features' and 'sentiment' fields
 

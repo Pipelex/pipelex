@@ -11,9 +11,9 @@ A pipeline is composed of pipes. There are two fundamental types of pipes you wi
 *   **[Pipe Operators](pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeOcr`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
 *   **[Pipe Controllers](pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your workflow, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
 
-## Designing a Pipeline: Composition in TOML
+## Designing a Pipeline: Composition in PLX
 
-The most common way to design a pipeline is by defining and composing pipes in a `.toml` configuration file. This provides a clear, declarative way to see the structure of your workflow.
+The most common way to design a pipeline is by defining and composing pipes in a `.plx` configuration file. This provides a clear, declarative way to see the structure of your workflow.
 
 Each pipe, whether it's an operator or a controller, is defined in its own `[pipe.<pipe_name>]` table. The `<pipe_name>` becomes the unique identifier for that pipe.
 
@@ -23,8 +23,8 @@ Let's look at a simple example. Imagine we want a workflow that:
 
 We can achieve this with a `PipeLLM` operator.
 
-```toml
-# Filename: marketing_pipeline.toml
+```plx
+# Filename: marketing_pipeline.plx
 
 domain = "marketing"
 definition = "Marketing content generation domain"
@@ -57,8 +57,8 @@ The inputs specified will be required before the pipe is executed. Those inputs 
 
 The output concept is very important. Indeed, the output of your pipe wille be corresponding to the concept you specify. If the concept is structured, the output will be a structured object. If the concept is native, the output will be a string.
 
-```toml
-# Filename: marketing_pipeline.toml
+```plx
+# Filename: marketing_pipeline.plx
 
 domain = "marketing"
 definition = "Marketing content generation domain"
@@ -159,4 +159,4 @@ if __name__ == "__main__":
 -   `execute_pipeline`: Runs the specified pipe and waits for it to complete, returning the final output. This is useful for simple, synchronous-style interactions.
 -   `start_pipeline`: Immediately returns a `pipeline_run_id` and an `asyncio.Task`. This allows you to run pipelines in the background and manage them asynchronously, which is essential for complex, long-running, or parallel workflows.
 
-By combining declarative TOML definitions with a powerful Python execution model, Pipelex gives you a robust framework for building and running reliable AI workflows.
+By combining declarative PLX definitions with a powerful Python execution model, Pipelex gives you a robust framework for building and running reliable AI workflows.

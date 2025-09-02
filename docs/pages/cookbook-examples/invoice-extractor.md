@@ -57,11 +57,11 @@ class Invoice(StructuredContent):
     # ... other fields
 ```
 
-## The Pipeline Definition: `invoice.toml`
+## The Pipeline Definition: `invoice.plx`
 
-The entire workflow is defined in a TOML file. This declarative approach makes the pipeline easy to understand and modify. Here's a snippet from `invoice.toml`:
+The entire workflow is defined in a PLX file. This declarative approach makes the pipeline easy to understand and modify. Here's a snippet from `invoice.plx`:
 
-```toml
+```plx
 # The main pipeline, a sequence of steps
 [pipe.process_invoice]
 type = "PipeSequence"

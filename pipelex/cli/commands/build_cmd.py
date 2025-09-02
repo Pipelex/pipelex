@@ -35,7 +35,7 @@ def build_draft_pipeline_cmd(
     ] = None,
     output_path: Annotated[
         Optional[str],
-        typer.Option("--output", "-o", help="Path to save the generated TOML blueprint (optional)"),
+        typer.Option("--output", "-o", help="Path to save the generated PLX blueprint (optional)"),
     ] = None,
     raw: Annotated[
         bool,
@@ -104,7 +104,7 @@ def build_blueprint_cmd(
     ] = None,
     output_path: Annotated[
         Optional[str],
-        typer.Option("--output", "-o", help="Path to save the generated TOML blueprint (optional)"),
+        typer.Option("--output", "-o", help="Path to save the generated PLX blueprint (optional)"),
     ] = None,
     validate: Annotated[
         bool,

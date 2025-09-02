@@ -31,13 +31,13 @@ Ask yourself:
 
 ### Step 2: Design Schema Definitions
 
-Create a TOML file defining your structures using the syntax from `structured_output_generator.py`.
+Create a PLX file defining your structures using the syntax from `structured_output_generator.py`.
 
 ## Structure Definition Syntax
 
 ### Basic Structure Definition
 
-```toml
+```plx
 [structure.ModelName]
 definition = "Clear description of what this represents"
 
@@ -59,7 +59,7 @@ another_field = { type = "text", definition = "More detailed field", required = 
 
 ### Field Configuration Options
 
-```toml
+```plx
 # Required field (must be provided)
 title = { type = "text", definition = "Document title", required = true }
 
@@ -74,7 +74,7 @@ categories = { type = "list", item_type = "text", definition = "Document categor
 
 ### Simple Enum (List of Values)
 
-```toml
+```plx
 [enum.Priority]
 definition = "Task priority levels"
 values = ["low", "medium", "high", "urgent"]
@@ -82,7 +82,7 @@ values = ["low", "medium", "high", "urgent"]
 
 ### Descriptive Enum (Key-Value Pairs)
 
-```toml
+```plx
 [enum.DocumentType]
 definition = "Types of documents we can process"
 
@@ -95,7 +95,7 @@ marketing = "Marketing materials and content"
 
 ### Using Enums in Structures
 
-```toml
+```plx
 # Reference defined enum
 status = { type = "Priority", definition = "Current priority level" }
 
@@ -119,9 +119,9 @@ LLM[classify]: (document_content) → document_metadata
 LLM[analyze]: (page_info_list, document_metadata) → final_analysis
 ```
 
-**Structure Definition (document_analysis_structures.toml):**
+**Structure Definition (document_analysis_structures.plx):**
 
-```toml
+```plx
 # Enums for constrained values
 [enum.DocumentType]
 definition = "Types of documents we can process"
@@ -264,7 +264,7 @@ After defining structures, update your pipeline blueprint concepts to reference 
 
 **Use string reference when:**
 - Structure is reusable across multiple concepts or pipelines
-- Structure is complex and benefits from being defined in a separate TOML file
+- Structure is complex and benefits from being defined in a separate PLX file
 - You want to maintain separation between concept definitions and structure details
 
 **Use inline definition when:**
@@ -279,13 +279,13 @@ After defining structures, update your pipeline blueprint concepts to reference 
 
 ### Generating Python Classes
 
-**From TOML files:**
+**From PLX files:**
 ```python
-from pipelex.create.structured_output_generator import generate_structured_outputs_from_toml_file
+from pipelex.create.structured_output_generator import generate_structured_outputs_from_plx_file
 
-# Generate Python classes from TOML definitions
-generate_structured_outputs_from_toml_file(
-    "document_analysis_structures.toml",
+# Generate Python classes from PLX definitions
+generate_structured_outputs_from_plx_file(
+    "document_analysis_structures.plx",
     "document_analysis.py"
 )
 ```
@@ -354,7 +354,7 @@ Before finalizing your structure definitions:
 ## Common Patterns
 
 ### Contact Information
-```toml
+```plx
 [structure.ContactInfo]
 definition = "Contact information extracted from document"
 
@@ -367,7 +367,7 @@ address = "Physical address"
 ```
 
 ### Analysis Results
-```toml
+```plx
 [enum.Sentiment]
 definition = "Sentiment analysis results"
 values = ["positive", "negative", "neutral"]
@@ -383,7 +383,7 @@ word_count = { type = "integer", definition = "Total word count" }
 ```
 
 ### Classification Results
-```toml
+```plx
 [structure.Classification]
 definition = "Multi-class classification result"
 

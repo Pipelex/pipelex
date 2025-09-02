@@ -10,7 +10,7 @@ Every concept starts with a natural language definition. This definition serves 
 
 The simplest way to define a concept is with a descriptive sentence:
 
-```toml
+```plx
 [concept]
 Invoice = "A commercial document issued by a seller to a buyer"
 Employee = "A person employed by an organization"
@@ -22,7 +22,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
 **Key principles for concept definitions:**
 
 1. **Define what it is, not what it's for**
-   ```toml
+   ```plx
    # ❌ Wrong: includes usage context
    TextToSummarize = "Text that needs to be summarized"
    
@@ -31,7 +31,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
    ```
 
 2. **Use singular forms**
-   ```toml
+   ```plx
    # ❌ Wrong: plural form
    Invoices = "Commercial documents from sellers"
    
@@ -40,7 +40,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
    ```
 
 3. **Avoid unnecessary adjectives**
-   ```toml
+   ```plx
    # ❌ Wrong: includes subjective qualifier
    LongArticle = "A lengthy written composition"
    
@@ -52,8 +52,8 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
 
 Group concepts that naturally belong together in the same domain. A domain acts as a namespace for a set of related concepts and pipes, helping you organize and reuse your pipeline components. You can learn more about them in [Kick off a Knowledge Pipeline Project](kick-off-a-knowledge-pipeline-project.md#what-are-domains).
 
-```toml
-# pipelex_libraries/pipelines/finance.toml
+```plx
+# pipelex_libraries/pipelines/finance.plx
 domain = "finance"
 description = "Financial document processing"
 
@@ -145,10 +145,10 @@ class Meeting(StructuredContent):
 
 ### Linking Concepts to Models
 
-The connection between TOML definitions and Python models happens automatically through naming:
+The connection between PLX definitions and Python models happens automatically through naming:
 
-```toml
-# pipelex_libraries/pipelines/hr.toml
+```plx
+# pipelex_libraries/pipelines/hr.plx
 domain = "hr"
 
 [concept]
@@ -195,7 +195,7 @@ Sometimes concepts build on each other. A `Contract` is a kind of `Document`. A 
 
 Use the `refines` field to indicate when one concept is a more specific version of another:
 
-```toml
+```plx
 [concept]
 Document = "A written or printed record"
 
@@ -218,7 +218,7 @@ Concept refinement helps in two ways:
 
 For example, a pipe that processes `Document` can also process `Contract` or `EmploymentContract`:
 
-```toml
+```plx
 [pipe.extract_key_points]
 type = "PipeLLM"
 description = "Extract main points from any document"
@@ -305,7 +305,7 @@ class DynamicContent(StuffContent):
 
 Native concepts can be used directly in your pipeline definitions without any additional setup:
 
-```toml
+```plx
 [pipe.analyze_document]
 type = "PipeLLM"
 description = "Analyze a PDF document"
@@ -332,7 +332,7 @@ prompt_template = "Extract key information from this page content"
 
 You can create more specific concepts by refining native ones:
 
-```toml
+```plx
 [concept.Invoice]
 definition = "A commercial document issued by a seller to a buyer"
 refines = "PDF"

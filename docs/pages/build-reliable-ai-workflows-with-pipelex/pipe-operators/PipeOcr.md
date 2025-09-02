@@ -19,9 +19,9 @@ The `PageContent` object has the following structure:
 
 ## Configuration
 
-`PipeOcr` is configured in your pipeline's `.toml` file.
+`PipeOcr` is configured in your pipeline's `.plx` file.
 
-### TOML Parameters
+### PLX Parameters
 
 | Parameter                   | Type    | Description                                                                                                                              | Required |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
@@ -38,7 +38,7 @@ The `PageContent` object has the following structure:
 
 This example defines a pipe that takes a PDF, extracts text and full-page images, and outputs them as a list of pages.
 
-```toml
+```plx
 [concept]
 ScannedDocument = "A document that has been scanned as a PDF"
 

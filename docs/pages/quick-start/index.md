@@ -13,11 +13,11 @@ For illustration purposes, let's build **a character generator**. Each example r
 
 ### Write your first pipeline
 
-First, create a `.toml` library file in the `pipelex_libraries/pipelines` directory to store your pipe definition.
+First, create a `.plx` library file in the `pipelex_libraries/pipelines` directory to store your pipe definition.
 Run `pipelex init libraries` to create this directory if it doesn't exist. For now, keep all your pipeline definitions inside that folder only.
 
-`character.toml`
-```toml
+`character.plx`
+```plx
 domain = "characters"
 
 [pipe]
@@ -66,7 +66,7 @@ python character.py
 
 ### Indicate your LLM selection explicitly using the `llm` attribute
 
-```toml
+```plx
 [pipe.create_character]
 type = "PipeLLM"
 description = "Create a character."
@@ -78,7 +78,7 @@ Think of it and then output the character description."""
 
 ### Or use an LLM preset from the LLM deck
 
-```toml
+```plx
 [pipe.create_character]
 type = "PipeLLM"
 description = "Create a character."
@@ -118,16 +118,14 @@ class Character(StructuredContent):
     description: str
 ```
 
-ℹ️ We'll soon make it possible to define your structure directly in the `.toml` file, without having to write any python code
-
 ### Improve the pipeline
 
 It's time to specify that your output be a `Character` instance. Use the `output` field for that purpose.
 
 💡 Here, the concept name matches the class name (ie. `Character`), the `Character` class will automatically be considered as the structure to output.
 
-`pipelex_libraries/pipelines/characters.toml`
-```toml
+`pipelex_libraries/pipelines/characters.plx`
+```plx
 domain = "characters"
 
 [concept]
@@ -185,7 +183,7 @@ class CharacterMetadata(StructuredContent):
 
 💡 Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/). You can include a variable using the **classic** `{{ double.curly.braces }}`, and to make it simpler, we've added the possibility to just prefix your variable with the `@` symbol (recommended). Pipes declare their required inputs explicitly with the `inputs` table:
 
-```toml
+```plx
 [concept]
 Character = "A character from a book"
 CharacterMetadata = "Metadata regarding a character."

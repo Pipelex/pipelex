@@ -12,7 +12,7 @@ Extract text and images from an image or a PDF
 ## Basic Usage
 
 ### Simple Text Generation
-```toml
+```plx
 [pipe.extract_info]
 type = "PipeOcr"
 description = "extract the information"

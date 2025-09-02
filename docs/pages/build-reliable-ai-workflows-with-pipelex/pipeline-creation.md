@@ -7,7 +7,7 @@ Pipelex provides powerful tools to automatically generate pipeline blueprints fr
 The pipeline creation system works in several stages:
 
 1. **Draft Generation**: Convert natural language requirements into structured markdown drafts
-2. **Blueprint Creation**: Transform drafts into formal pipeline blueprints (TOML format)
+2. **Blueprint Creation**: Transform drafts into formal pipeline blueprints (PLX format)
 3. **Validation**: Automatically validate and fix common issues
 4. **Implementation**: Generate executable pipeline code
 
@@ -60,7 +60,7 @@ pipelex validate blueprint BLUEPRINT_PATH [OPTIONS]
 
 **Example:**
 ```bash
-pipelex validate blueprint pipelex/libraries/pipelines/temp/result_3/photopposite.toml \
+pipelex validate blueprint pipelex/libraries/pipelines/temp/result_3/photopposite.plx \
   -c pipelex/libraries
 ```
 
@@ -116,9 +116,9 @@ Returns: `opposite_photo` - Photo showing opposite of main feature
 
 ### 3. Blueprint Creation
 
-The draft is converted into a formal TOML blueprint:
+The draft is converted into a formal PLX blueprint:
 
-```toml
+```plx
 domain = "image_processing"
 definition = "Generate opposite version of photo's main feature"
 
@@ -173,7 +173,7 @@ output = "Image"
 
 The system automatically:
 
-- **Validates syntax**: Ensures TOML structure is correct
+- **Validates syntax**: Ensures PLX structure is correct
 - **Checks concepts**: Verifies all concepts are properly defined
 - **Validates inputs**: Ensures all pipe inputs are available
 - **Fixes errors**: Automatically adds missing inputs or corrects common issues
@@ -185,9 +185,9 @@ When you run the build command, several files are created:
 
 ```
 output_path_base_draft.md      # Original markdown draft
-output_path_base_rough.toml    # Initial blueprint
+output_path_base_rough.plx    # Initial blueprint
 output_path_base_rough.json    # Blueprint in JSON format
-output_path_base_fixed.toml    # Validated and fixed blueprint (if --validate used)
+output_path_base_fixed.plx    # Validated and fixed blueprint (if --validate used)
 output_path_base_fixed.json    # Fixed blueprint in JSON format
 ```
 
@@ -223,7 +223,7 @@ pipelex/libraries/pipelines/
     result_1/
     result_2/
   domain_name/            # Production pipelines
-    pipeline_name.toml
+    pipeline_name.plx
     structures.py
 ```
 
@@ -277,7 +277,7 @@ pipelex validate all -c pipelex/libraries
 pipelex validate pipe your_pipe_name -c pipelex/libraries
 
 # Check blueprint structure
-pipelex validate blueprint your_blueprint.toml -c pipelex/libraries --no-fix
+pipelex validate blueprint your_blueprint.plx -c pipelex/libraries --no-fix
 ```
 
 ## Next Steps

@@ -62,7 +62,7 @@ llm_to_extract = {
 
 Here's how to use these configurations in your pipelines:
 
-```toml
+```plx
 [pipe.generate_response]
 type = "PipeLLM"
 description = "Generate a creative response"

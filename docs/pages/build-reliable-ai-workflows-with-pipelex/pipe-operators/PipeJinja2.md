@@ -8,7 +8,7 @@ The `PipeJinja2` operator is a powerful utility for rendering [Jinja2 templates]
 
 The template itself can be provided in one of two ways:
 1.  **By Name**: Referring to a template file that has been loaded into Pipelex's template provider. This is the most common and maintainable method.
-2.  **Inline**: Providing the template as a multi-line string directly in the `.toml` file.
+2.  **Inline**: Providing the template as a multi-line string directly in the `.plx` file.
 
 ### Templating Context
 
@@ -16,9 +16,9 @@ The Jinja2 template has access to all the "stuffs" currently in the working memo
 
 ## Configuration
 
-`PipeJinja2` is configured in your pipeline's `.toml` file.
+`PipeJinja2` is configured in your pipeline's `.plx` file.
 
-### TOML Parameters
+### PLX Parameters
 
 | Parameter       | Type            | Description                                                                                               | Required                    |
 | --------------- | --------------- | --------------------------------------------------------------------------------------------------------- | --------------------------- |
@@ -50,8 +50,8 @@ Here is a summary of your activity this week:
 Report generated on: {{ report_date }}
 ```
 
-**Pipeline TOML definition:**
-```toml
+**Pipeline PLX definition:**
+```plx
 [pipe.generate_weekly_report]
 type = "PipeJinja2"
 description = "Generate a formatted weekly report for a user"

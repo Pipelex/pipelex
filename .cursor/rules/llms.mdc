@@ -36,7 +36,7 @@ And of course, llm_handles are automatically assigned for all models by their na
 
 Here is an example of using an llm_handle to specify which LLM to use in a PipeLLM:
 
-```toml
+```plx
 [pipe.hello_world]
 type = "PipeLLM"
 description = "Write text about Hello World."
@@ -61,7 +61,7 @@ llm_to_extract_invoice = { llm_handle = "claude-3-7-sonnet", temperature = 0.1, 
 
 The interest is that these presets can be used to set the LLM choice in a PipeLLM, like this:
 
-```toml
+```plx
 [pipe.extract_invoice]
 type = "PipeLLM"
 description = "Extract invoice information from an invoice text transcript"
