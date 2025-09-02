@@ -155,9 +155,10 @@ Example with the extension you can download now on Cursor, Windsurf or another V
 
 <div>
 <a href="https://open-vsx.org/extension/Pipelex/pipelex">
-<img src="https://raw.githubusercontent.com/Pipelex/pipelex/fix/preliminiary_text/.github/assets/sample_code.png" alt="Pipelex Code Sample" width="400" style="max-width: 100%; height: auto;">
+<img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/sample_code.png" alt="Pipelex Code Sample" style="max-width: 100%; height: auto;">
 </a>
 </div>
+
 ### 1. Define the pipeline in PLX
 
 ```plx
