@@ -1,5 +1,3 @@
-"""Test PipelexInterpreter input serialization for the two main cases."""
-
 from typing import Any
 
 import pytest
@@ -11,18 +9,18 @@ from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBluepri
 class TestPipelexInterpreterInputSpec:
     """Test input serialization for both simple strings and InputRequirementBlueprint objects."""
 
-    def test_inputs_to_toml_string_simple_strings(self):
-        """Test converting simple string inputs to TOML format like { text = "Text", topic = "Text" }."""
+    def test_inputs_to_plx_string_simple_strings(self):
+        """Test converting simple string inputs to PLX format like { text = "Text", topic = "Text" }."""
         # Simple string inputs (like "Text")
         simple_inputs = {"text": "Text", "topic": "Text"}
 
-        result = PipelexInterpreter.inputs_to_toml_string(simple_inputs)
+        result = PipelexInterpreter.inputs_to_plx_string(simple_inputs)
 
         expected = '{ text = "Text", topic = "Text" }'
         assert result == expected
 
-    def test_inputs_to_toml_string_input_requirement_blueprints(self):
-        """Test converting InputRequirementBlueprint inputs to TOML format like { text = { concept = "Text", multiplicity = 1 } }."""
+    def test_inputs_to_plx_string_input_requirement_blueprints(self):
+        """Test converting InputRequirementBlueprint inputs to PLX format like { text = { concept = "Text", multiplicity = 1 } }."""
         # InputRequirementBlueprint inputs
         complex_inputs = {
             "text": InputRequirementBlueprint(concept="Text", multiplicity=1),
@@ -31,7 +29,7 @@ class TestPipelexInterpreterInputSpec:
             "query": InputRequirementBlueprint(concept="Text", multiplicity=False),
         }
 
-        result = PipelexInterpreter.inputs_to_toml_string(complex_inputs)
+        result = PipelexInterpreter.inputs_to_plx_string(complex_inputs)
 
         expected = (
             '{ text = { concept = "Text", multiplicity = 1 }, problem = { concept = "Text" }, '

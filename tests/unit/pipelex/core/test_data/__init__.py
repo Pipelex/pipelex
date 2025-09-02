@@ -10,7 +10,7 @@ from .concepts.refining_concepts import REFINING_CONCEPT_TEST_CASES
 from .concepts.simple_concepts import SIMPLE_CONCEPT_TEST_CASES
 from .concepts.structured_concepts import STRUCTURED_CONCEPT_TEST_CASES
 from .domain.simple_domains import DOMAIN_TEST_CASES
-from .errors.invalid_toml import ERROR_TEST_CASES
+from .errors.invalid_plx import ERROR_TEST_CASES
 from .pipes.controllers.batch.pipe_batch import PIPE_BATCH_TEST_CASES
 from .pipes.controllers.condition.pipe_condition import PIPE_CONDITION_TEST_CASES
 from .pipes.controllers.parallel.pipe_parallel import PIPE_PARALLEL_TEST_CASES
@@ -23,7 +23,7 @@ from .pipes.operators.ocr.pipe_ocr import PIPE_OCR_TEST_CASES
 
 
 class InterpreterTestCases:
-    """Test cases for PipelexInterpreter with TOML content and expected blueprints."""
+    """Test cases for PipelexInterpreter with PLX content and expected blueprints."""
 
     # Aggregate all valid test cases from organized modules
     VALID_TEST_CASES: ClassVar[List[Tuple[str, str, PipelexBundleBlueprint]]] = [

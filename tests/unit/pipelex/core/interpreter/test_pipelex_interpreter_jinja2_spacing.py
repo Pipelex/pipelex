@@ -1,16 +1,14 @@
-"""Test PipelexInterpreter jinja2_pipe_to_toml_string function."""
-
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
 
 
-class TestPipelexInterpreterJinja2PipeTomlString:
-    """Test the jinja2_pipe_to_toml_string function directly."""
+class TestPipelexInterpreterJinja2PipePLX:
+    """Test the jinja2_pipe_to_plx_string function directly."""
 
     @pytest.mark.parametrize(
-        "pipe_name,blueprint,expected_result",
+        "pipe_name,blueprint,expected_plx",
         [
             # Basic Jinja2 pipe
             (
@@ -76,7 +74,7 @@ jinja2_name = "greeting_template\"""",
             ),
         ],
     )
-    def test_jinja2_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeJinja2Blueprint, expected_result: str):
-        """Test converting PipeJinja2Blueprint to TOML string with various configurations."""
-        result = PipelexInterpreter.jinja2_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
-        assert result == expected_result
+    def test_jinja2_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeJinja2Blueprint, expected_plx: str):
+        """Test converting PipeJinja2Blueprint to PLX string with various configurations."""
+        result = PipelexInterpreter.jinja2_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        assert result == expected_plx

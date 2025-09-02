@@ -1,5 +1,3 @@
-
-
 [generic_prompts]
 
 structure_from_preliminary_text_system = "You are a data modeling expert specialized in extracting structure from text."

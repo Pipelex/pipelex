@@ -1,5 +1,3 @@
-"""Test PipelexInterpreter Parallel pipe to TOML string conversion."""
-
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
@@ -7,11 +5,11 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParall
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
-class TestPipelexInterpreterParallelToml:
-    """Test Parallel pipe to TOML string conversion."""
+class TestPipelexInterpreterParallelPLX:
+    """Test Parallel pipe to PLX string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,blueprint,expected_toml",
+        "pipe_name,blueprint,expected_plx",
         [
             # Basic Parallel pipe
             (
@@ -65,7 +63,7 @@ combined_output = "MergedResults\"""",
             ),
         ],
     )
-    def test_parallel_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeParallelBlueprint, expected_toml: str):
-        """Test converting Parallel pipe blueprint to TOML string."""
-        result = PipelexInterpreter.parallel_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
-        assert result == expected_toml
+    def test_parallel_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeParallelBlueprint, expected_plx: str):
+        """Test converting Parallel pipe blueprint to PLX string."""
+        result = PipelexInterpreter.parallel_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        assert result == expected_plx

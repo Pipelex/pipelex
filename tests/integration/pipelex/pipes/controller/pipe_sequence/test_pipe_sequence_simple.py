@@ -41,7 +41,7 @@ class TestPipeSequenceSimple:
         concept_library.add_concepts([concept_1])
         concept_2 = concept_library.get_native_concept(native_concept=NativeConceptEnum.TEXT)
 
-        # Create PipeSequence instance - pipes are loaded from TOML files
+        # Create PipeSequence instance - pipes are loaded from PLX files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             definition="Simple sequence for text processing",
             inputs={"input_text": InputRequirementBlueprint(concept=concept_1.concept_string)},

@@ -407,9 +407,9 @@ class TestStructureGenerator:
 
     def test_mixed_structure_blueprint_normalization(self):
         """Test that mixed structure blueprints (strings and ConceptStructureBlueprint objects) are properly normalized."""
-        # Create a mixed structure blueprint similar to what would come from TOML parsing
+        # Create a mixed structure blueprint similar to what would come from PLX parsing
         mixed_structure_blueprint: Dict[str, ConceptStructureBlueprintType] = {
-            "name": "The name of the person",  # Simple string definition
+            "name": "The name of the person",
             "age": ConceptStructureBlueprint(definition="The age of the person", type=ConceptStructureBlueprintFieldType.NUMBER, required=True),
             "birthdate": ConceptStructureBlueprint(
                 definition="The birthdate of the person", type=ConceptStructureBlueprintFieldType.DATE, required=True

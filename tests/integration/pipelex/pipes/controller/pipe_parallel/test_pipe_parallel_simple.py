@@ -28,7 +28,7 @@ class TestPipeParallelSimple:
 
     async def test_parallel_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeParallel running three text analysis pipes in parallel."""
-        # Create PipeParallel instance - pipes are loaded from TOML files
+        # Create PipeParallel instance - pipes are loaded from PLX files
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel text analysis pipeline",
             inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")},

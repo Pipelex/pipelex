@@ -1,21 +1,21 @@
-"""Invalid TOML test cases focused on TOML structure and PipelexBundleBlueprint validation."""
+"""Invalid PLX test cases focused on PLX structure and PipelexBundleBlueprint validation."""
 
 from typing import List, Tuple, Type, Union
 
-import toml
 from pydantic import ValidationError
 
 from pipelex.core.domains.exceptions import DomainError
+from pipelex.core.interpreter import PLXDecodeError
 
-# TOML Syntax Errors
-INVALID_TOML_SYNTAX = (
-    "invalid_toml_syntax",
+# PLX Syntax Errors
+INVALID_PLX_SYNTAX = (
+    "invalid_plx_syntax",
     """domain = "test_domain"
-definition = "Domain with invalid TOML syntax"
+definition = "Domain with invalid PLX syntax"
 
 [concept]
 InvalidConcept = "This is missing a closing quote""",
-    toml.TomlDecodeError,
+    PLXDecodeError,
 )
 
 MALFORMED_SECTION = (
@@ -26,7 +26,7 @@ definition = "Domain with malformed section"
 [concept
 TestConcept = "Missing closing bracket"
 """,
-    toml.TomlDecodeError,
+    PLXDecodeError,
 )
 
 UNCLOSED_STRING = (
@@ -34,7 +34,7 @@ UNCLOSED_STRING = (
     """domain = "test_domain"
 definition = "Domain with unclosed string
 """,
-    toml.TomlDecodeError,
+    PLXDecodeError,
 )
 
 DUPLICATE_KEYS = (
@@ -46,7 +46,7 @@ definition = "Duplicate definition key"
 [concept]
 TestConcept = "A test concept"
 """,
-    toml.TomlDecodeError,
+    PLXDecodeError,
 )
 
 INVALID_ESCAPE_SEQUENCE = (
@@ -57,7 +57,7 @@ definition = "Domain with invalid escape sequence \\z"
 [concept]
 TestConcept = "A test concept"
 """,
-    toml.TomlDecodeError,
+    PLXDecodeError,
 )
 
 # PipelexBundleBlueprint Structure Errors
@@ -182,7 +182,7 @@ definition = "Domain with invalid table syntax"
 [concept.]
 InvalidName = "Empty table name"
 """,
-    toml.TomlDecodeError,
+    PLXDecodeError,
 )
 
 INVALID_ARRAY_SYNTAX = (
@@ -203,13 +203,13 @@ definition = "Domain with invalid array syntax"
 [concept]
 [concept]
 """,
-    toml.TomlDecodeError,
+    PLXDecodeError,
 )
 
 # Export all error test cases
 ERROR_TEST_CASES: List[Tuple[str, str, Union[Type[Exception], Tuple[Type[Exception], ...]]]] = [
-    # TOML Syntax Errors
-    INVALID_TOML_SYNTAX,
+    # PLX Syntax Errors
+    INVALID_PLX_SYNTAX,
     MALFORMED_SECTION,
     UNCLOSED_STRING,
     DUPLICATE_KEYS,

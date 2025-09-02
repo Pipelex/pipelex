@@ -1,5 +1,3 @@
-"""Test PipelexInterpreter LLM pipe to TOML string conversion."""
-
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
@@ -7,11 +5,11 @@ from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBluepri
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 
-class TestPipelexInterpreterLlmToml:
-    """Test LLM pipe to TOML string conversion."""
+class TestPipelexInterpreterLLMPLX:
+    """Test LLM pipe to PLX string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,blueprint,expected_toml",
+        "pipe_name,blueprint,expected_plx",
         [
             # Simple LLM pipe with string inputs
             (
@@ -90,7 +88,7 @@ prompt_template = "Generate ideas about: $topic\"""",
             ),
         ],
     )
-    def test_llm_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeLLMBlueprint, expected_toml: str):
-        """Test converting LLM pipe blueprint to TOML string."""
-        result = PipelexInterpreter.llm_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
-        assert result == expected_toml
+    def test_llm_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeLLMBlueprint, expected_plx: str):
+        """Test converting LLM pipe blueprint to PLX string."""
+        result = PipelexInterpreter.llm_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        assert result == expected_plx

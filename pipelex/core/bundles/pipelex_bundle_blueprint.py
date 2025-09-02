@@ -33,7 +33,7 @@ PipeBlueprintUnion = Annotated[
 
 
 class PipelexBundleBlueprint(BaseModel):
-    """Complete blueprint of a pipelex bundle TOML definition."""
+    """Complete blueprint of a pipelex bundle PLX definition."""
 
     model_config = ConfigDict(extra="forbid")
 

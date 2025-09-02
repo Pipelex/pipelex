@@ -52,9 +52,9 @@ async def do_draft_pipeline(
     draft = pipe_output.main_stuff_as(content_type=PipelineDraft)
     pretty_print(draft, title="Pipeline Draft")
     draft_dict = draft.smart_dump()
-    pretty_print(dict_to_toml(data=draft_dict), title="Pipeline Draft (TOML)")
+    pretty_print(dict_to_toml(data=draft_dict), title="Pipeline Draft (PLX)")
 
     # Save or display result
-    output_path = output_path or "pipelex/libraries/pipelines/temp/generated_blueprint.toml"
+    output_path = output_path or "pipelex/libraries/pipelines/temp/generated_blueprint.plx"
     save_toml_to_path(data=draft_dict, path=output_path)
     typer.echo(f"✅ Blueprint saved to '{output_path}'")

@@ -1,16 +1,14 @@
-"""Test PipelexInterpreter OCR pipe to TOML string conversion."""
-
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
 
-class TestPipelexInterpreterOcrToml:
-    """Test OCR pipe to TOML string conversion."""
+class TestPipelexInterpreterOcrPLX:
+    """Test OCR pipe to PLX string conversion."""
 
     @pytest.mark.parametrize(
-        "pipe_name,blueprint,expected_toml",
+        "pipe_name,blueprint,expected_plx",
         [
             # Basic OCR pipe
             (
@@ -42,7 +40,7 @@ output = "Page\"""",
             ),
         ],
     )
-    def test_ocr_pipe_to_toml_string(self, pipe_name: str, blueprint: PipeOcrBlueprint, expected_toml: str):
-        """Test converting OCR pipe blueprint to TOML string."""
-        result = PipelexInterpreter.ocr_pipe_to_toml_string(pipe_name, blueprint, "test_domain")
-        assert result == expected_toml
+    def test_ocr_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeOcrBlueprint, expected_plx: str):
+        """Test converting OCR pipe blueprint to PLX string."""
+        result = PipelexInterpreter.ocr_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        assert result == expected_plx

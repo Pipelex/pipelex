@@ -15,7 +15,7 @@ class PipeDraft(StructuredContent):
 
 
 class PipelineDraft(StructuredContent):
-    """Complete blueprint of a pipeline library TOML file."""
+    """Complete blueprint of a pipeline library PLX file."""
 
     # Domain information (required)
     domain: str
@@ -29,6 +29,6 @@ class PipelineDraft(StructuredContent):
 
 
 class PipelexBundleBlueprint(PipelexBundleBlueprintBaseModel, StructuredContent):
-    """Complete blueprint of a pipelex bundle TOML file."""
+    """Complete blueprint of a pipelex bundle PLX file."""
 
     pass

@@ -38,8 +38,8 @@ async def do_build_blueprint(
     output_path_base = output_path or "pipelex/libraries/pipelines/temp/gen_blueprint"
     draft_path = f"{output_path_base}_draft.md"
     save_text_to_path(text=pipeline_draft, path=draft_path, create_directory=True)
-    rough_toml_path = f"{output_path_base}_rough.toml"
-    save_text_to_path(text=PipelexInterpreter.make_toml_content(blueprint=blueprint), path=rough_toml_path)
+    rough_plx_path = f"{output_path_base}_rough.plx"
+    save_text_to_path(text=PipelexInterpreter.make_plx_content(blueprint=blueprint), path=rough_plx_path)
     rough_json_path = f"{output_path_base}_rough.json"
     save_as_json_to_path(object_to_save=blueprint, path=rough_json_path)
     log.info(f"✅ Rough blueprint saved to '{output_path_base}'")
