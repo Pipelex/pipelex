@@ -4,7 +4,7 @@ alwaysApply: true
 # Pipeline Guide
 
 - Always first write your "plan" in natural langage, then transcribe it in pipelex.
-- You should ALWAYS RUN the terminal command `pipelex validate all` when you are writing a `.toml` file. It will ensure the pipe is runnable. If not, iterate.
+- You should ALWAYS RUN the terminal command `pipelex validate all -c pipelex/libraries` when you are writing a `.toml` file. It will ensure the pipe is runnable. If not, iterate.
 - Please use POSIX standard for files. (enmpty lines, no trailing whitespaces, etc.)
 
 # Pipeline Structure Guide
@@ -515,6 +515,6 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
     )
 ```
 
-ALWAYS RUN `pipelex validate all` when you are finished writing pipelines: This checks for errors. If there are errors, iterate until it works.
+ALWAYS RUN `pipelex validate all -c pipelex/libraries` when you are finished writing pipelines: This checks for errors. If there are errors, iterate until it works.
 Then, create an example file to run the pipeline in the `examples` folder.
 But don't write documentation unless asked explicitly to.

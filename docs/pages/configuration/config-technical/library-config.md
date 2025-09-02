@@ -122,7 +122,7 @@ The library system includes specific error types:
 
 2. **Validation**:
 
-    - Run `pipelex validate all` after making changes
+    - Run `pipelex validate all -c pipelex/libraries` after making changes
     - Check for domain consistency
     - Verify concept relationships
 
