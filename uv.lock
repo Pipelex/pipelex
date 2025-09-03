@@ -477,15 +477,15 @@ wheels = [
 
 [[package]]
 name = "cocode"
-version = "0.0.15"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pipelex", extra = ["anthropic", "bedrock", "google"] },
     { name = "pygithub" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ba/71/11df50dcd296239d228c4fb89a51be1aeef91d5432d71a8a0da0d77cfad5/cocode-0.0.15.tar.gz", hash = "sha256:1a7cebf33dcc2fa8ae58ea990cb6ff0e96e9e37fecdf69c3a5e59651b9080d85", size = 43564, upload-time = "2025-08-29T13:52:33.395Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/64/bceae2bd63747244cff9c02f1aad04432bdcae89124c4ffefe3f854c2c3f/cocode-0.1.1.tar.gz", hash = "sha256:e6970e8266b16122c2d86b1de58a6195b43db5b8c4db680e3e9fed67209c3db6", size = 43697, upload-time = "2025-09-03T08:37:30.921Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/fe/9d74caefb69c0a597c7f4eb78afb8bc4357f6ef1d8b49a69f223722b459e/cocode-0.0.15-py3-none-any.whl", hash = "sha256:84f91b81bd6c9a9d2a2c75b0962b5f6b778de0dbb1fd6671d2f2fb35630f6d52", size = 60138, upload-time = "2025-08-29T13:52:32.214Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/f4/c7c0e38f0c407f9429c6e9c60aa07dd1a70bdded0936657306e8fb845cec/cocode-0.1.1-py3-none-any.whl", hash = "sha256:fb75f5e26e7c010c7382a054526e645229ae0eb89e881dc273c8cc93f37f6420", size = 60302, upload-time = "2025-09-03T08:37:29.485Z" },
 ]
 
 [[package]]
@@ -1952,7 +1952,7 @@ requires-dist = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'", specifier = ">=1.3.0" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.34.131" },
     { name = "boto3-stubs", marker = "extra == 'dev'", specifier = ">=1.35.24" },
-    { name = "cocode", marker = "extra == 'dev'", specifier = ">=0.0.15" },
+    { name = "cocode", marker = "extra == 'dev'", specifier = "==0.1.1" },
     { name = "fal-client", marker = "extra == 'fal'", specifier = ">=0.4.1" },
     { name = "filetype", specifier = ">=1.2.0" },
     { name = "google-auth-oauthlib", marker = "extra == 'google'", specifier = ">=1.2.1" },
