@@ -1,354 +1,327 @@
-from __future__ import annotations
-
-import dataclasses
-import enum
-import inspect
-import sys
-import types
-import typing
-from typing import Any, Dict, List, Set, Tuple, Type, cast, get_args, get_origin, get_type_hints
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Type, Union, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
-from typing_extensions import Annotated as TE_Annotated
-from typing_extensions import get_args as te_get_args
-from typing_extensions import get_origin as te_get_origin
+
+from pipelex.types import StrEnum
 
 
 class StructurePrinter:
-    """Render classes (Pydantic models, dataclasses, enums, domain types) into a readable string."""
-
-    _UNION_ORIGINS: Tuple[type, ...] = tuple(t for t in (getattr(typing, "Union", None), getattr(types, "UnionType", None)) if t)
-
-    # ---------- pretty printers ----------
-
-    @classmethod
-    def pretty_type(cls, tp: Any) -> str:
-        # Prefer stdlib origin/args, fallback to typing_extensions
-        origin = get_origin(tp) or te_get_origin(tp)
-        args = get_args(tp) or te_get_args(tp) or ()
-
-        # Handle cases where Annotated isn't recognized by get_origin
-        if origin is None:
-            s = str(tp)
-            if "Annotated[" in s or s.startswith("Annotated[") or s.startswith("typing.Annotated"):
-                try:
-                    ann_args = te_get_args(tp) or get_args(tp) or ()
-                    if ann_args:
-                        return cls.pretty_type(ann_args[0])
-                except Exception:
-                    pass
-            return getattr(tp, "__name__", s)
-
-        # Union / Optional
-        if origin in cls._UNION_ORIGINS:
-            non_none = [a for a in args if a is not type(None)]
-            if len(non_none) == 1 and len(args) == 2:
-                return f"Optional[{cls.pretty_type(non_none[0])}]"
-            return "Union[" + ", ".join(cls.pretty_type(a) for a in non_none) + "]"
-
-        # Literal (typing or typing_extensions)
-        if str(origin).endswith("Literal"):
-            lit = ", ".join(repr(getattr(a, "value", a)) for a in args)
-            return f"Literal[{lit}]"
-
-        # Annotated[T, ...] -> T
-        if str(origin).endswith("Annotated") or (TE_Annotated and origin is TE_Annotated):
-            if args:
-                return cls.pretty_type(args[0])
-            return str(tp)
-
-        # Containers
-        from typing import Dict as TDict
-        from typing import List as TList
-        from typing import Tuple as TTuple
-
-        if origin in (list, TList):
-            if args:
-                return f"List[{cls.pretty_type(args[0])}]"
-            return "List"
-        if origin in (dict, TDict):
-            if len(args) >= 2:
-                return f"Dict[{cls.pretty_type(args[0])}, {cls.pretty_type(args[1])}]"
-            return "Dict"
-        if origin in (tuple, TTuple):
-            return "Tuple[" + ", ".join(cls.pretty_type(a) for a in args) + "]"
-
-        # Fallback for other generics
-        name = getattr(origin, "__name__", str(origin))
-        inner = ", ".join(cls.pretty_type(a) for a in args)
-        return f"{name}[{inner}]" if inner else name
-
-    @classmethod
-    def extract_model_types(cls, tp: Any) -> Set[Type[Any]]:
-        """Collect class types appearing inside a type annotation (recursively).
-        Also collects Enum *types* when they appear as Literal values.
-        """
-        found: Set[Type[Any]] = set()
-        origin = get_origin(tp) or te_get_origin(tp)
+    def pretty_type(self, tp: object) -> str:
+        """Pretty print a type, with special handling for containers, literals and enums."""
+        origin = getattr(tp, "__origin__", None)
+        args = getattr(tp, "__args__", None)
         if origin is None:
             if isinstance(tp, type):
-                found.add(tp)
-            return found
+                return tp.__name__
+            return str(tp)
 
-        args = get_args(tp) or te_get_args(tp) or ()
+        if origin is Union and args:
+            non_none = [a for a in args if a is not type(None)]
+            if len(non_none) == 1 and len(args) == 2:
+                return f"Optional[{self.pretty_type(non_none[0])}]"
+            return f"Union[{', '.join(self.pretty_type(a) for a in args)}]"
 
-        # If Literal of enums, collect the enum's class
-        if str(origin).endswith("Literal"):
-            for a in args:
-                if isinstance(a, enum.Enum):
-                    found.add(type(a))
-
-        for a in args:
-            found |= cls.extract_model_types(a)
-        return found
-
-    # ---------- decisions ----------
-
-    @classmethod
-    def is_renderable_type(cls, _type: Any) -> bool:
-        if not isinstance(_type, type):
-            return False
-        if _type in (object, type):
-            return False
-        # render Pydantic models, dataclasses, enums, and your own domain classes
-        try:
-            is_pydantic = issubclass(_type, BaseModel)
-        except TypeError:
-            is_pydantic = False
-
-        try:
-            is_dc = dataclasses.is_dataclass(_type)
-        except Exception:
-            is_dc = False
-
-        try:
-            is_enum = issubclass(_type, enum.Enum)
-        except TypeError:
-            is_enum = False
-
-        module = getattr(_type, "__module__", None)
-        is_pipelex = module.startswith("pipelex.") if isinstance(module, str) else False
-
-        return is_pydantic or is_dc or is_enum or is_pipelex
-
-    @classmethod
-    def _is_content_base(cls, b: Type[Any], stop_at: Type[Any]) -> bool:
-        if b is stop_at:
-            return True
-        name = getattr(b, "__name__", "")
-        if name in {"StructuredContent", "TextContent", "ListContent"}:
-            return True
-        return b.__module__.startswith("pipelex.core.stuffs.stuff_content")
-
-    # ---------- rendering ----------
-
-    @classmethod
-    def _normalize_base_name(cls, b: Any) -> str:
-        """Return a non-generic display name for a base (strip T params)."""
-        base_origin = get_origin(b) or te_get_origin(b)
-        if base_origin is not None:
-            b = base_origin
-
-        # Try a clean __name__ first
-        name = cast(str, getattr(b, "__name__", None))
-        if name:
-            if "[" in name:
-                return name.split("[", 1)[0]
-            return name
-
-        # Fallback to str() patterns
-        text = str(b)
-        if "[" in text and "]" in text:
-            return text.split("[", 1)[0].split(".")[-1].strip()
-        if text.startswith("<class "):
-            inside = text.split("'")[1]
-            return inside.split(".")[-1]
-        return text
-
-    @classmethod
-    def _display_base_name(cls, c: Type[Any], stop_at: Type[Any]) -> str:
-        bases = list(c.__bases__)
-        # special rule: if stop_at among bases, show the base immediately to its LEFT
-        if stop_at in bases:
-            idx = bases.index(stop_at)
-            if idx > 0:
-                return cls._normalize_base_name(bases[idx - 1])
-            return cls._normalize_base_name(stop_at)
-        # otherwise show first non-object base, if any
-        for b in bases:
-            if b is not object:
-                return cls._normalize_base_name(b)
-        return "object"
-
-    @classmethod
-    def _class_doc(cls, c: Type[Any]) -> str:
-        """Own docstring only; suppress auto-docs for dataclasses."""
-        import inspect as _inspect
-
-        doc = (c.__dict__.get("__doc__") or "").strip()
-        if not doc:
-            return ""
-        if dataclasses.is_dataclass(c):
-            # Drop auto-generated signature-like docstrings (with or without quotes)
-            if doc.startswith(f"{c.__name__}(") and doc.endswith(")"):
-                return ""
-            try:
-                sig = str(_inspect.signature(c))
-                if doc == f"{c.__name__}{sig}":
-                    return ""
-            except Exception:
-                pass
-        return doc
-
-    @classmethod
-    def _field_names_declared_on(cls, c: Type[Any]) -> List[str]:
-        ann = c.__dict__.get("__annotations__", {})
-        return list(ann.keys())
-
-    @classmethod
-    def _field_names_from_noncontent_bases(cls, c: Type[Any], stop_at: Type[Any]) -> List[Tuple[Type[Any], str]]:
-        """
-        Include base *fields* only when the class uses multiple inheritance with the content base.
-        This matches the rule:
-        - Employee(Person):           do NOT include Person fields
-        - Mixed(BaseLeft, StructuredContent): include BaseLeft fields (left of stop_at)
-        """
-        pairs: List[Tuple[Type[Any], str]] = []
-        if stop_at not in c.__bases__:  # only in the StructuredContent MI case
-            return pairs
-        for b in c.__bases__:
-            if cls._is_content_base(b, stop_at):
-                continue
-            names = b.__dict__.get("__annotations__", {})
-            for name in names.keys():
-                pairs.append((b, name))
-        return pairs
-
-    @classmethod
-    def _get_hints(cls, owner: Type[Any], localns: Dict[str, Any]) -> Dict[str, Any]:
-        """Robust get_type_hints with module globals + caller locals; fall back to raw __annotations__ on failure."""
-        try:
-            owner_globals = sys.modules[owner.__module__].__dict__
-        except KeyError:
-            owner_globals = {}
-        try:
-            return get_type_hints(owner, globalns=owner_globals, localns=localns, include_extras=True)
-        except TypeError:
-            # Python version without include_extras support
-            try:
-                return get_type_hints(owner, globalns=owner_globals, localns=localns)
-            except Exception:
-                return dict(getattr(owner, "__annotations__", {}))
-        except Exception:
-            # Any evaluation error (e.g., unresolved forward refs) -> fallback
-            return dict(getattr(owner, "__annotations__", {}))
-
-    @classmethod
-    def _add_class(
-        cls,
-        c: Type[Any],
-        stop_at: Type[Any],
-        lines: List[str],
-        seen: Set[Type[Any]],
-        localns: Dict[str, Any],
-    ) -> None:
-        if c in seen or c is stop_at or c is object:
-            return
-        seen.add(c)
-
-        # --- Enum printing (with double-quoted strings) ---
-        if issubclass(c, enum.Enum):
-            base_name = cls._normalize_base_name(c.__bases__[0])
-            lines.append(f"class {c.__name__}({base_name}):")
-            doc = cls._class_doc(c)  # or for enum: c
-            if doc:
-                if "\n" in doc:
-                    ds = doc.splitlines()
-                    lines.append(f'    """{ds[0]}')
-                    for ln in ds[1:]:
-                        if ln.strip():
-                            lines.append("    " + ln.strip())
-                        else:
-                            lines.append("")
-                    lines.append('    """')
+        if str(origin).endswith("Literal") and args:  # Handle both typing.Literal and typing_extensions.Literal
+            # For enum values, just get their values
+            values: List[str] = []
+            for arg in args:
+                if isinstance(arg, Enum) or isinstance(arg, StrEnum):
+                    values.append(f'"{arg.value}"')
                 else:
-                    lines.append(f'    """{doc}"""')
-            for name, member in c.__members__.items():
-                val = member.value
-                if isinstance(val, str):
-                    val_out = '"' + val.replace('"', '\\"') + '"'
-                else:
-                    val_out = repr(val)
-                lines.append(f"    {name} = {val_out}")
-            lines.append("")
-            return
+                    values.append(repr(arg))
+            # Return multi-line format for Literal fields
+            if len(values) > 1:
+                return "Literal[\n        " + ",\n        ".join(values) + ",\n    ]"
+            return f"Literal[{', '.join(values)}]"
 
-        # header
-        base_name = cls._display_base_name(c, stop_at)
-        lines.append(f"class {c.__name__}({base_name}):")
+        if (origin is list or origin is List) and args:
+            return f"List[{self.pretty_type(args[0])}]"
+        if (origin is dict or origin is Dict) and args:
+            return f"Dict[{self.pretty_type(args[0])}, {self.pretty_type(args[1])}]"
+        return str(tp)
 
-        # docstring
-        doc = cls._class_doc(c)  # or for enum: c
-        if doc:
-            if "\n" in doc:
-                ds = doc.splitlines()
-                lines.append(f'    """{ds[0]}')
-                for ln in ds[1:]:
-                    if ln.strip():
-                        lines.append("    " + ln.strip())
+    def get_type_structure(
+        self,
+        tp: Type[Any],
+        seen_types: Optional[Set[str]] = None,
+        collected_types: Optional[Dict[str, Type[Any]]] = None,
+        collected_enums: Optional[Dict[str, Type[Enum]]] = None,
+        base_class: Type[Any] = BaseModel,
+    ) -> List[str]:
+        """
+        Get the structure of a type, listing referenced subclasses of base_class and enums.
+
+        Args:
+            tp: The type to analyze
+            seen_types: Set of already seen type names to avoid cycles
+            collected_types: Dictionary of collected types to analyze
+            collected_enums: Dictionary of collected enums
+            base_class: The base class to check for inheritance (defaults to BaseModel)
+        """
+        if seen_types is None:
+            seen_types = set()
+        if collected_types is None:
+            collected_types = {}
+        if collected_enums is None:
+            collected_enums = {}
+
+        def format_type(tp: Any) -> str:
+            """Format a type annotation nicely"""
+            origin = get_origin(tp)
+            if origin is None:
+                if isinstance(tp, type):
+                    return tp.__name__
+                return str(tp)
+
+            args = get_args(tp)
+            if origin is Union:
+                non_none = [a for a in args if a is not type(None)]
+                if len(non_none) == 1:
+                    return f"Optional[{format_type(non_none[0])}]"
+                return f"Union[{', '.join(format_type(a) for a in non_none)}]"
+
+            if str(origin).endswith("Literal") and args:  # Handle both typing.Literal and typing_extensions.Literal
+                # For enum values, just get their values
+                values: List[str] = []
+                enum_type = None
+                for arg in args:
+                    if isinstance(arg, Enum) or isinstance(arg, StrEnum):
+                        values.append(arg.value)
+                        if enum_type is None:
+                            enum_type = type(arg)
                     else:
-                        lines.append("")
-                lines.append('    """')
-            else:
-                lines.append(f'    """{doc}"""')
-        # fields declared directly on this class
-        own_names: List[str] = cls._field_names_declared_on(c)
-        # fields declared on bases that are NOT content bases
-        base_field_pairs = cls._field_names_from_noncontent_bases(c, stop_at)
+                        values.append(str(arg))
+                # Add enum type to collected_enums if found
+                if enum_type is not None:
+                    collected_enums[enum_type.__name__] = enum_type
+                # Return multi-line format for Literal fields
+                if len(values) > 1:
+                    lines: List[str] = []
+                    for value in values:
+                        lines.append(f'"{value}"')
+                    return "Literal[\n        " + ",\n        ".join(lines) + ",\n    ]"
+                return f"Literal[{', '.join(values)}]"
 
-        # Build list of (owner, field_name)
-        ordered_fields: List[Tuple[Type[Any], str]] = [(c, n) for n in own_names]
-        ordered_fields.extend(base_field_pairs)
+            if origin in (list, List):
+                return f"List[{format_type(args[0])}]"
+            if origin in (dict, Dict):
+                return f"Dict[{format_type(args[0])}, {format_type(args[1])}]"
+            return str(tp)
 
-        referenced: Set[Type[Any]] = set()
+        def collect_types(tp: Type[Any]) -> None:
+            """Recursively collect types and enums"""
+            origin = get_origin(tp)
+            args = get_args(tp)
 
-        if not ordered_fields:
-            lines.append("    # No fields")
-        else:
-            for owner, name in ordered_fields:
-                owner_hints = cls._get_hints(owner, localns=localns)
-                tp = owner_hints.get(name, Any)
+            if origin:
+                if origin is Union:
+                    non_none = [a for a in args if a is not type(None)]
+                    for arg in non_none:
+                        if isinstance(arg, type):
+                            collect_types(arg)
+                        elif hasattr(arg, "__origin__"):  # Handle nested generics
+                            collect_types(arg)
+                elif origin in (list, List):
+                    if isinstance(args[0], type):
+                        collect_types(args[0])
+                    elif hasattr(args[0], "__origin__"):  # Handle nested generics
+                        collect_types(args[0])
+                elif origin in (dict, Dict):
+                    for arg in args:
+                        if isinstance(arg, type):
+                            collect_types(arg)
+                        elif hasattr(arg, "__origin__"):  # Handle nested generics
+                            collect_types(arg)
+                return
 
-                # description via owner's model_fields (Pydantic v2)
-                desc = None
-                mf = getattr(owner, "model_fields", None)
-                if mf and name in mf:
-                    desc = getattr(mf[name], "description", None)
+            # Collect enums
+            if issubclass(tp, Enum) and tp not in collected_enums.values():
+                collected_enums[tp.__name__] = tp
+                return
 
-                pretty = cls.pretty_type(tp)
-                lines.append(f"    {name}: {pretty}" + (f"  # {desc}" if desc else ""))
+            # Collect model classes
+            if issubclass(tp, base_class) and tp.__name__ not in seen_types:
+                seen_types.add(tp.__name__)
+                collected_types[tp.__name__] = tp
 
-                referenced |= cls.extract_model_types(tp)
+                # Only collect immediate parent class if it's a custom class
+                for base in tp.__bases__:
+                    if (
+                        issubclass(base, BaseModel)
+                        and base is not BaseModel
+                        and base.__module__ != "pydantic.main"
+                        and base.__module__ != "abc"
+                        and not base.__module__.startswith("pipelex.core")
+                    ):
+                        collect_types(base)
 
-        lines.append("")  # blank line after each class
+                try:
+                    type_hints = get_type_hints(tp)
+                    model_fields = getattr(tp, "model_fields", {})
 
-        # recurse into referenced classes (deterministic order)
-        for r in sorted(referenced, key=lambda t: t.__name__):
-            if cls.is_renderable_type(r) and r is not stop_at and r not in seen:
-                cls._add_class(r, stop_at, lines, seen, localns)
+                    if model_fields:
+                        for fname, _ in model_fields.items():
+                            ftype = type_hints[fname]
+                            collect_types(ftype)
+                    elif hasattr(tp, "__annotations__"):
+                        for fname, ftype in type_hints.items():
+                            collect_types(ftype)
+                except (TypeError, AttributeError):
+                    # Handle cases where type hints cannot be retrieved
+                    pass
 
-    @classmethod
-    def render_model(cls, model_cls: Type[Any], stop_at: Type[Any]) -> str:
-        """Return a printable string describing `model_cls` and its referenced types."""
-        # Capture caller locals to resolve forward refs defined in test/local scopes
-        localns: Dict[str, Any] = {}
-        current_frame = inspect.currentframe()
-        if current_frame is not None:
-            caller_frame = current_frame.f_back
-            if caller_frame is not None:
-                localns = dict(caller_frame.f_locals)
+        # Start collection
+        collect_types(tp)
 
-        lines: List[str] = []
-        seen: Set[Type[Any]] = set()
-        cls._add_class(model_cls, stop_at, lines, seen, localns)
-        return "\n".join(lines).rstrip()
+        # Generate output
+        output: List[str] = []
+
+        # First output the main class and its dependencies
+        for class_name, class_type in collected_types.items():
+            if output:
+                output.append("")
+
+            # Get class docstring
+            doc = class_type.__doc__ and class_type.__doc__.strip()
+            base_class_name = class_type.__bases__[0].__name__
+
+            # Get generic parameters if any
+            type_args = get_args(class_type)
+            if type_args:
+                base_class_name = f"{base_class_name}[{', '.join(arg.__name__ for arg in type_args)}]"
+
+            # Class definition with docstring
+            output.append(f"class {class_name}({base_class_name}):")
+            if doc:
+                # Split docstring into lines and format each line
+                doc_lines = [line.rstrip() for line in doc.split("\n")]
+
+                # Remove empty lines from start and end
+                while doc_lines and not doc_lines[0].strip():
+                    doc_lines.pop(0)
+                while doc_lines and not doc_lines[-1].strip():
+                    doc_lines.pop()
+
+                if len(doc_lines) == 1:
+                    # Single line docstring
+                    output.append(f'    """{doc_lines[0]}"""')
+                else:
+                    # Multi-line docstring
+                    output.append(f'    """{doc_lines[0]}')
+
+                    # Add empty line after first line if there's content
+                    if doc_lines[1].strip():
+                        output.append("")
+
+                    # Add remaining lines with proper indentation
+                    for line in doc_lines[1:]:
+                        if line.strip():
+                            output.append(f"    {line.strip()}")
+                        else:
+                            output.append("")
+
+                    # Close the docstring
+                    output.append('    """')
+
+            # Handle empty classes or classes that only inherit fields
+            try:
+                type_hints = get_type_hints(class_type)
+                model_fields = getattr(class_type, "model_fields", {})
+
+                # Get and sort fields
+                if model_fields:
+                    fields = model_fields.items()
+                else:
+                    fields = [(type_k, type_hints[type_k]) for type_k in sorted(type_hints.keys())]
+
+                # Check if all fields are inherited
+                parent_fields: Set[str] = set()
+                for base in class_type.__bases__:
+                    try:
+                        parent_fields.update(get_type_hints(base).keys())
+                    except (TypeError, AttributeError):
+                        continue
+
+                current_fields = set(dict(fields).keys())
+                non_inherited_fields = current_fields - parent_fields
+
+                # Output fields
+                for fname, ftype in fields:
+                    if fname in non_inherited_fields or (fname == "items" and "List" in base_class_name):
+                        # Initialize is_optional to False by default
+                        is_optional = False
+
+                        if isinstance(ftype, type) and issubclass(ftype, BaseModel):
+                            ftype_str = ftype.__name__
+                        else:
+                            field_type = type_hints[fname]
+                            ftype_str = format_type(field_type)
+                            # Check if field is Optional
+                            field_origin = get_origin(field_type)
+                            field_args = get_args(field_type)
+                            is_optional = field_origin is Union and type(None) in field_args
+
+                        # Handle default values
+                        field_default = None
+                        field_description = None
+                        if model_fields:
+                            field_info = model_fields.get(fname)
+                            if field_info:
+                                if hasattr(field_info, "default") and field_info.default is not None:
+                                    # Skip PydanticUndefined default values
+                                    if str(field_info.default) != "PydanticUndefined":
+                                        field_default = field_info.default
+                                if hasattr(field_info, "description"):
+                                    field_description = field_info.description
+
+                        # Build the field line
+                        field_line = f"    {fname}: {ftype_str}"
+                        if is_optional:
+                            field_line += " = None"
+                        elif field_default is not None:
+                            if isinstance(field_default, bool):
+                                field_line += f" = {str(field_default)}"
+                            elif not isinstance(field_default, (BaseModel, list, dict)):
+                                field_line += f" = {repr(field_default)}"
+
+                        # Add description as a comment if available
+                        # First check if there's a direct field description from model_fields
+                        if field_description:
+                            field_line += f"  # {field_description}"
+                        # Then check if the field type itself has model_fields and a description
+                        # This handles nested content types that have field descriptions
+                        elif hasattr(ftype, "model_fields") and fname in ftype.model_fields and hasattr(ftype.model_fields[fname], "description"):  # type: ignore
+                            field_line += f"  # {ftype.model_fields[fname].description}"  # type: ignore
+
+                        # Split multi-line field lines
+                        if "\n" in field_line:
+                            lines = field_line.split("\n")
+                            output.extend(lines)
+                        else:
+                            output.append(field_line)
+                        continue
+
+                # If no fields were output, show inheritance comment
+                if len(output) == (2 if doc else 1):
+                    output.append(f"    # Inherits from {base_class_name}")
+                    output.append("    # No additional fields")
+            except (TypeError, AttributeError):
+                # If we can't get type hints, show inheritance comment
+                output.append(f"    # Inherits from {base_class_name}")
+                output.append("    # No additional fields")
+
+        # Then output all enum classes
+        for enum_name, enum_type in collected_enums.items():
+            if output:
+                output.append("")
+            output.append(f"class {enum_name}({enum_type.__bases__[0].__name__}):")
+            # Add enum docstring if available, but skip Python's default "An enumeration." docstring
+            # This ensures we only include meaningful custom docstrings
+            if enum_type.__doc__ and enum_type.__doc__.strip() != "An enumeration.":
+                doc = enum_type.__doc__.strip()
+                output.append(f'    """{doc}"""')
+            for member in enum_type:
+                output.append(f'    {member.name} = "{member.value}"')
+
+        return output

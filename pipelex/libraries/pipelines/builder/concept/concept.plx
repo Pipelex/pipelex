@@ -2,28 +2,26 @@ domain = "concept"
 definition = "Build and process concepts for Pipelex bundles from signatures and drafts."
 
 [concept]
-UserBrief = "A short, natural-language description of what the user wants."
+ConceptStructureSpecBlueprint = "A concept blueprint with structure but without full implementation."
 ConceptSpec = "A specification for a concept including its code, description, and a structure draft as plain text."
-ConceptStructureBlueprint = "A concept blueprint with structure but without full implementation."
-ConceptBlueprint = "A structured blueprint for a concept."
+ConceptSpecBlueprint = "A structured blueprint for a concept."
 
 [pipe.build_concept_blueprint]
 type = "PipeSequence"
-description = "Create a ConceptBlueprint from a brief, existing concepts, and concept rules."
+description = "Create a ConceptSpecBlueprint from a brief, existing concepts, and concept rules."
 inputs = { concept_spec = "ConceptSpec"}
-output = "ConceptBlueprint"
+output = "ConceptSpecBlueprint"
 steps = [
-    { pipe = "spec_to_structure", result = "concept_structure" },
-    { pipe = "to_concept_blueprint", result = "concept_blueprints" }
+    { pipe = "spec_to_structure", result = "concept_spec_structure" },
+    { pipe = "to_concept_blueprint", result = "concept_spec_blueprints" }
 ]
 
 [pipe.to_concept_spec]
 type = "PipeLLM"
 description = "From the brief and one signature, propose a ConceptSpec (with a structure draft in plain text)."
-inputs = { signature = "PipeSignature", brief = "UserBrief" }
+inputs = { signature = "PipeSignature", brief = "builder.UserBrief" }
 output = "ConceptSpec"
 llm = "llm_to_engineer"
-structuring_method = "preliminary_text"
 prompt_template = """
 Return a ConceptSpec for the concept implied by the signature.
 
@@ -37,14 +35,13 @@ Signature:
 
 [pipe.spec_to_structure]
 type = "PipeLLM"
-description = "Convert the ConceptSpec (with its structure draft) into a proper ConceptStructureBlueprint."
+description = "Convert the ConceptSpec (with its structure draft) into a proper ConceptStructureSpecBlueprint."
 inputs = { concept_spec = "ConceptSpec" }
-output = "ConceptStructureBlueprint"
+output = "ConceptStructureSpecBlueprint"
 multiple_output = true
 llm = "llm_to_engineer"
-structuring_method = "preliminary_text"
 prompt_template = """
-Create a ConceptStructureBlueprint from the ConceptSpec.
+Create a ConceptStructureSpecBlueprint from the ConceptSpec.
 ConceptSpec:
 @concept_spec
 
@@ -55,19 +52,16 @@ The field "choices" is for Literal values or enums. When it is provided, the fie
 
 [pipe.to_concept_blueprint]
 type = "PipeLLM"
-description = "Generate the final ConceptBlueprint using the spec, structure, and existing concept context."
-inputs = { concept_spec = "ConceptSpec", concept_structure = "ConceptStructureBlueprint"}
-output = "ConceptBlueprint"
-structuring_method = "preliminary_text"
+description = "Generate the final ConceptSpecBlueprint using the spec, structure, and existing concept context."
+inputs = { concept_spec = "ConceptSpec", concept_spec_structure = "ConceptStructureSpecBlueprint"}
+output = "ConceptSpecBlueprint"
 prompt_template = """
-Create a ConceptBlueprint using the ConceptSpec and ConceptStructureBlueprint.
+Create a ConceptSpecBlueprint using the ConceptSpec and ConceptStructureSpecBlueprint.
 
 ConceptSpec:
 @concept_spec
 
 Structure:
-@concept_structure
-
-The output structure should be a valid ConceptStructureBlueprint object.
+@concept_spec_structure
 """
 

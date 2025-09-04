@@ -52,12 +52,13 @@ class PipeCondition(PipeController):
         The output of the pipe condition should match the output of all the conditional pipes, and the default pipe.
         """
         for pipe_condition_pipe_map in self.pipe_map:
-            pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
-            if self.output.concept_string != pipe.output.concept_string and self.output.concept_string != "native.Dynamic":
-                raise PipeConditionError(
-                    f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
-                    f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'"
-                )
+            if pipe_condition_pipe_map.pipe_code != "continue":
+                pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
+                if self.output.concept_string != pipe.output.concept_string and self.output.concept_string != "native.Dynamic":
+                    raise PipeConditionError(
+                        f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
+                        f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'"
+                    )
         if self.default_pipe_code:
             default_pipe = get_required_pipe(pipe_code=self.default_pipe_code)
             if self.output.concept_string != default_pipe.output.concept_string and self.output.concept_string != "native.Dynamic":
@@ -164,9 +165,10 @@ class PipeCondition(PipeController):
 
         # 2. Add the inputs needed by all possible target pipes
         for pipe_condition_pipe_map in self.pipe_map:
-            pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
-            for input_name, requirement in pipe.needed_inputs().items:
-                needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
+            if pipe_condition_pipe_map.pipe_code != "continue":
+                pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
+                for input_name, requirement in pipe.needed_inputs().items:
+                    needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
 
         return needed_inputs
 
@@ -233,7 +235,7 @@ class PipeCondition(PipeController):
 
     @override
     def pipe_dependencies(self) -> Set[str]:
-        pipe_codes = [pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in self.pipe_map]
+        pipe_codes = [pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in self.pipe_map if pipe_condition_pipe_map.pipe_code != "continue"]
         if self.default_pipe_code:
             pipe_codes.append(self.default_pipe_code)
         return set(pipe_codes)
@@ -293,6 +295,7 @@ class PipeCondition(PipeController):
         )
         pipe_jinja2_output = cast(PipeJinja2Output, pipe_output_1)
         evaluated_expression = pipe_jinja2_output.rendered_text.strip()
+    
 
         if not evaluated_expression or evaluated_expression == "None":
             error_msg = f"Conditional expression returned an empty string in pipe {self.code}:"
@@ -320,6 +323,9 @@ class PipeCondition(PipeController):
             error_msg += f"\n\nExpression: {self.applied_expression_template}"
             error_msg += f"\n\nPipe map: {self.pipe_map}"
             raise PipeConditionError(error_msg)
+        
+        if chosen_pipe_code == "continue":
+            return PipeOutput(working_memory=working_memory)
 
         condition_details = self._make_pipe_condition_details(
             evaluated_expression=evaluated_expression,

@@ -5,6 +5,7 @@ definition = "Auto-generate a Pipelex bundle (concepts + pipes) from a short use
 UserBrief = "A short, natural-language description of what the user wants."
 PlanDraftText = "Natural-language pipeline plan text describing sequences, inputs, outputs."
 PipelexBundleBlueprint = "A Pipelex bundle blueprint."
+DryRunResult = "A result of a dry run of a pipelex bundle blueprint."
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Main
@@ -21,9 +22,10 @@ steps = [
     { pipe = "parallel_draft_to_specs" },
     { pipe = "materialize_concept_specs", result = "concept_specs" },
     { pipe = "materialize_pipe_signatures", result = "pipe_signatures" },
-    { pipe = "build_concept_blueprint", batch_over = "concept_specs", batch_as = "concept_spec", result = "concept_blueprints" },
-    { pipe = "create_pipes_from_signatures", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_blueprints" },
+    { pipe = "build_concept_blueprint", batch_over = "concept_specs", batch_as = "concept_spec", result = "concept_spec_blueprints" },
+    { pipe = "create_pipes_from_signatures", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_spec_blueprints" },
     { pipe = "compile_in_pipelex_bundle_blueprint", result = "pipelex_bundle_blueprint" }
+    { pipe = "validate_pipelex_bundle_blueprint", result = "pipelex_bundle_blueprint" }
 ]
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -182,7 +184,34 @@ Brief:
 [pipe.compile_in_pipelex_bundle_blueprint]
 type = "PipeFunc"
 description = "Compile the pipelex bundle blueprint."
-inputs = { pipe_blueprints = "PipeBlueprint", concept_blueprints = "ConceptBlueprint" }
+inputs = { pipe_spec_blueprints = "PipeBlueprint", concept_spec_blueprints = "ConceptSpecBlueprint" }
 output = "PipelexBundleBlueprint"
 function_name = "compile_in_pipelex_bundle_blueprint"
+
+[pipe.validate_pipelex_bundle_blueprint]
+type = "PipeSequence"
+description = "Validate the pipelex bundle blueprint."
+inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint" }
+output = "PipelexBundleBlueprint"
+steps = [
+    { pipe = "validate_dry_run", result = "dry_run_result" },
+    { pipe = "conditional_retry_func", result = "pipelex_bundle_blueprint" },
+]
+
+[pipe.validate_dry_run]
+type = "PipeFunc"
+description = "Validate the pipelex bundle blueprint."
+inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint" }
+output = "DryRunResult"
+function_name = "validate_pipelex_bundle_blueprint"
+
+[pipe.conditional_retry_func]
+type = "PipeCondition"
+description = "Route by pipelex_bundle_blueprint.type to the correct blueprint emitter."
+inputs = { dry_run_result = "DryRunResult" }
+output = "PipelexBundleBlueprint"
+expression = "dry_run_result.status"
+
+[pipe.conditional_retry_func.pipe_map]
+SUCCESS  = "continue"
 

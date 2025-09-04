@@ -523,26 +523,27 @@ class PipeLLM(PipeOperator):
         if not output_class:
             return ""
 
-        class_structure = StructurePrinter.render_model(output_class, stop_at=StuffContent)
+        class_structure = StructurePrinter().get_type_structure(tp=output_class, base_class=StuffContent)
 
         if not class_structure:
             return ""
+        class_structure_str = "\n".join(class_structure)
 
         # TODO: use proper prompt templating for this
         if is_with_preliminary_text:
             output_structure_prompt = (
-                f"\n\n---\nRequested output format: The requested output will be used to define the following class "
-                "(follow the rules if any): {class_name}\n"
-                f"{class_structure}\n"
+                "\n\n---\nRequested output format: The requested output will be used to define the following class "
+                f"(follow the rules if any): Re-declare all inherited fields in {class_name}; do not rely on inheritance in the final code."
+                f"{class_structure_str}\n"
                 "You do NOT need to output a formatted JSON object, another LLM will take care of that. "
                 "Just output the text representation of the class."
                 "DO NOT create information. If the information is not present, output the default value."
             )
         else:
             output_structure_prompt = (
-                f"\n\n---\nRequested output format: The output must conform to the following BaseModel "
-                "(follow the rules if any): {class_name}\n"
-                f"{class_structure}\n"
+                "\n\n---\nRequested output format: The output must conform to the following BaseModel "
+                f"(follow the rules if any): Re-declare all inherited fields in {class_name}; do not rely on inheritance in the final code."
+                f"{class_structure_str}\n"
                 "DO NOT create information. If the information is not present, output the default value."
             )
         return output_structure_prompt

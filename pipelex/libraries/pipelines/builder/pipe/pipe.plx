@@ -4,30 +4,26 @@ definition = "Build and process pipes."
 [concept]
 PipeSignature = "Pseudo-Pipelex step: code, type, description, inputs, output, optional children refs."
 PipeBlueprint = "A structured blueprint for a pipe (union)."
-# New/clarified concepts for this variant
-ConceptBlueprint = "A reusable PipeBlueprint identified by a unique code."
-ConceptIndex = "Map<string code, ConceptBlueprint>."
-
 # Pipe controllers
-PipeBatchBlueprint = "A structured blueprint for a pipe batch."
-PipeConditionBlueprint = "A structured blueprint for a pipe condition."
-PipeParallelBlueprint = "A structured blueprint for a pipe parallel."
-PipeSequenceBlueprint = "A structured blueprint for a pipe sequence."
+PipeBatchSpecBlueprint = "A structured blueprint for a pipe batch."
+PipeConditionSpecBlueprint = "A structured blueprint for a pipe condition."
+PipeParallelSpecBlueprint = "A structured blueprint for a pipe parallel."
+PipeSequenceSpecBlueprint = "A structured blueprint for a pipe sequence."
 # Pipe operators
-PipeFuncBlueprint = "A structured blueprint for a pipe func."
-PipeImgGenBlueprint = "A structured blueprint for a pipe img gen."
-PipeJinja2Blueprint = "A structured blueprint for a pipe jinja2."
-PipeLLMBlueprint = "A structured blueprint for a pipe llm."
-PipeOcrBlueprint = "A structured blueprint for a pipe ocr."
+PipeFuncSpecBlueprint = "A structured blueprint for a pipe func."
+PipeImgGenSpecBlueprint = "A structured blueprint for a pipe img gen."
+PipeJinja2SpecBlueprint = "A structured blueprint for a pipe jinja2."
+PipeLLMSpecBlueprint = "A structured blueprint for a pipe llm."
+PipeOcrSpecBlueprint = "A structured blueprint for a pipe ocr."
 
 [pipe]
 # ────────────────────────────────────────────────────────────────────────────────
-# NEW ENTRY POINT — takes PipeSignature[] + ConceptBlueprints → PipeBlueprint[]
+# NEW ENTRY POINT — takes PipeSignature[] + ConceptSpecBlueprints → PipeBlueprint[]
 # ────────────────────────────────────────────────────────────────────────────────
 [pipe.create_pipes_from_signatures]
 type = "PipeSequence"
-description = "PipeSignature[] + ConceptBlueprints → PipeBlueprint[] (linked & ready)."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint" }
+description = "PipeSignature[] + ConceptSpecBlueprints → PipeBlueprint[] (linked & ready)."
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint" }
 output = "Dynamic"
 steps = [
     { pipe = "generate_pipe_blueprint", result = "pipe_blueprint" },
@@ -37,7 +33,7 @@ steps = [
 [pipe.generate_pipe_blueprint]
 type = "PipeLLM"
 description = "Generate a PipeBlueprint from a PipeSignature."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint" }
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint" }
 output = "PipeBlueprint"
 structuring_method = "preliminary_text"
 llm = "llm_to_engineer"
@@ -48,7 +44,7 @@ Signature:
 @pipe_signature
 
 and here are the existing concepts:
-@concept_blueprints
+@concept_spec_blueprints
 """
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -57,7 +53,7 @@ and here are the existing concepts:
 [pipe.compile_one_signature_blueprint]
 type = "PipeCondition"
 description = "Route by signature.type to the correct blueprint emitter."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint", pipe_blueprint = "PipeBlueprint" }
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
 output = "Dynamic"
 expression = "pipe_signature.type"
 
@@ -79,13 +75,13 @@ PipeFunc      = "emit_func_from_signature"
 
 [pipe.emit_sequence_from_signature]
 type = "PipeLLM"
-description = "Build a PipeSequenceBlueprint from the signature (children referenced by code)."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeSequenceBlueprint"
+description = "Build a PipeSequenceSpecBlueprint from the signature (children referenced by code)."
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
+output = "PipeSequenceSpecBlueprint"
 structuring_method = "preliminary_text"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeSequenceBlueprint for this signature.
+Return a PipeSequenceSpecBlueprint for this signature.
 
 Signature:
 @pipe_signature
@@ -94,18 +90,18 @@ Here is the base PipeBlueprint:
 @pipe_blueprint
 
 And here are the concepts you can use:
-@concept_blueprints
+@concept_spec_blueprints
 """
 
 [pipe.emit_parallel_from_signature]
 type = "PipeLLM"
-description = "Build a PipeParallelBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeParallelBlueprint"
+description = "Build a PipeParallelSpecBlueprint from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
+output = "PipeParallelSpecBlueprint"
 structuring_method = "preliminary_text"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeParallelBlueprint for this signature.
+Return a PipeParallelSpecBlueprint for this signature.
 
 Signature:
 @pipe_signature
@@ -114,18 +110,18 @@ Here is the base PipeBlueprint:
 @pipe_blueprint
 
 And here are the concepts you can use:
-@concept_blueprints
+@concept_spec_blueprints
 """
 
 [pipe.emit_condition_from_signature]
 type = "PipeLLM"
 description = "Build a PipeConditionBlueprint from the signature (provide expression/pipe_map consistent with children)."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeConditionBlueprint"
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
+output = "PipeConditionSpecBlueprint"
 structuring_method = "preliminary_text"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeConditionBlueprint for this signature.
+Return a PipeConditionSpecBlueprint for this signature.
 
 Signature:
 @pipe_signature
@@ -134,18 +130,18 @@ Here is the base PipeBlueprint:
 @pipe_blueprint
 
 And here are the concepts you can use:
-@concept_blueprints
+@concept_spec_blueprints
 """
 
 [pipe.emit_batch_from_signature]
 type = "PipeLLM"
-description = "Build a PipeBatchBlueprint from the signature (choose branch_pipe_code/params)."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeBatchBlueprint"
+description = "Build a PipeBatchSpecBlueprint from the signature (choose branch_pipe_code/params)."
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
+output = "PipeBatchSpecBlueprint"
 structuring_method = "preliminary_text"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeBatchBlueprint for this signature.
+Return a PipeBatchSpecBlueprint for this signature.
 
 Signature:
 @pipe_signature
@@ -154,18 +150,18 @@ Here is the base PipeBlueprint:
 @pipe_blueprint
 
 And here are the concepts you can use:
-@concept_blueprints
+@concept_spec_blueprints
 """
 
 [pipe.emit_llm_from_signature]
 type = "PipeLLM"
-description = "Build a PipeLLMBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeLLMBlueprint"
+description = "Build a PipeLLMSpecBlueprint from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
+output = "PipeLLMSpecBlueprint"
 structuring_method = "preliminary_text"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeLLMBlueprint for this signature.
+Return a PipeLLMSpecBlueprint for this signature.
 
 Signature:
 @pipe_signature
@@ -174,17 +170,17 @@ Here is the base PipeBlueprint:
 @pipe_blueprint
 
 And here are the concepts you can use:
-@concept_blueprints
+@concept_spec_blueprints
 """
 
 [pipe.emit_ocr_from_signature]
 type = "PipeLLM"
-description = "Build a PipeOcrBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeOcrBlueprint"
+description = "Build a PipeOcrSpecBlueprint from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
+output = "PipeOcrSpecBlueprint"
 structuring_method = "preliminary_text"
 prompt_template = """
-Return a PipeOcrBlueprint for this signature.
+Return a PipeOcrSpecBlueprint for this signature.
 
 Signature:
 @pipe_signature
@@ -193,17 +189,17 @@ Here is the base PipeBlueprint:
 @pipe_blueprint
 
 And here are the concepts you can use:
-@concept_blueprints
+@concept_spec_blueprints
 """
 
 [pipe.emit_imggen_from_signature]
 type = "PipeLLM"
-description = "Build a PipeImgGenBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeImgGenBlueprint"
+description = "Build a PipeImgGenSpecBlueprint from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
+output = "PipeImgGenSpecBlueprint"
 structuring_method = "preliminary_text"
 prompt_template = """
-Return a PipeImgGenBlueprint for this signature.
+Return a PipeImgGenSpecBlueprint for this signature.
 
 Signature:
 @pipe_signature
@@ -212,17 +208,17 @@ Here is the base PipeBlueprint:
 @pipe_blueprint
 
 And here are the concepts you can use:
-@concept_blueprints
+@concept_spec_blueprints
 """
 
 [pipe.emit_jinja_from_signature]
 type = "PipeLLM"
-description = "Build a PipeJinja2Blueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeJinja2Blueprint"
+description = "Build a PipeJinja2SpecBlueprint from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
+output = "PipeJinja2SpecBlueprint"
 structuring_method = "preliminary_text"
 prompt_template = """
-Return a PipeJinja2Blueprint for this signature.
+Return a PipeJinja2SpecBlueprint for this signature.
 
 Signature:
 @pipe_signature
@@ -231,18 +227,18 @@ Here is the base PipeBlueprint:
 @pipe_blueprint
 
 And here are the concepts you can use:
-@concept_blueprints
+@concept_spec_blueprints
 """
 
 [pipe.emit_func_from_signature]
 type = "PipeLLM"
-description = "Build a PipeFuncBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_blueprints = "ConceptBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeFuncBlueprint"
+description = "Build a PipeFuncSpecBlueprint from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
+output = "PipeFuncSpecBlueprint"
 structuring_method = "preliminary_text"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeFuncBlueprint for this signature.
+Return a PipeFuncSpecBlueprint for this signature.
 
 Signature:
 @pipe_signature
@@ -251,6 +247,6 @@ Here is the base PipeBlueprint:
 @pipe_blueprint
 
 And here are the concepts you can use:
-@concept_blueprints
+@concept_spec_blueprints
 """
 
