@@ -23,9 +23,5 @@ async def do_build_blueprint(
         },
     )
     pretty_print(pipe_output, title="Pipe Output")
-    concepts = pipe_output.working_memory.get_stuff_as_list(name="concept_blueprints", item_type=ConceptBlueprint)
-    pipes = cast(ListContent[PipeBlueprintUnion], pipe_output.main_stuff)
-    blueprint = PipelexBundleBlueprint(
-        domain="test", concept={concept.the_concept_code: concept for concept in concepts.items}, pipe={pipe.pipe_code: pipe for pipe in pipes.items}
-    )
+    blueprint = pipe_output.working_memory.main_stuff_as(content_type=PipelexBundleBlueprint)
     pretty_print(blueprint, title="Pipelex Bundle Blueprint")

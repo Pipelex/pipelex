@@ -14,7 +14,7 @@ PipelexBundleBlueprint = "A Pipelex bundle blueprint."
 type = "PipeSequence"
 description = "Brief → PlanDraftText → (ConceptSpecsText, PipeSignaturesText) → PipeSignature[]."
 inputs = { brief = "UserBrief" }
-output = "Dynamic"
+output = "PipelexBundleBlueprint"
 multiple_output = true
 steps = [
     { pipe = "draft_planning_text", result = "plan_draft" },
@@ -23,7 +23,7 @@ steps = [
     { pipe = "materialize_pipe_signatures", result = "pipe_signatures" },
     { pipe = "build_concept_blueprint", batch_over = "concept_specs", batch_as = "concept_spec", result = "concept_blueprints" },
     { pipe = "create_pipes_from_signatures", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_blueprints" },
-    # { pipe = "compile_in_pipelex_bundle_blueprint", result = "pipelex_bundle_blueprint" }
+    { pipe = "compile_in_pipelex_bundle_blueprint", result = "pipelex_bundle_blueprint" }
 ]
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -180,19 +180,9 @@ Brief:
 """
 
 [pipe.compile_in_pipelex_bundle_blueprint]
-type = "PipeLLM"
+type = "PipeFunc"
 description = "Compile the pipelex bundle blueprint."
 inputs = { pipe_blueprints = "PipeBlueprint", concept_blueprints = "ConceptBlueprint" }
 output = "PipelexBundleBlueprint"
-llm = "llm_to_engineer"
-structuring_method = "preliminary_text"
-prompt_template = """
-Compile the pipelex bundle blueprint.
-
-PipeBlueprints:
-@pipe_blueprints
-
-ConceptBlueprints:
-@concept_blueprints
-"""
+function_name = "compile_in_pipelex_bundle_blueprint"
 

@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Annotated, Dict, Union
 
 from pydantic import Field
 
@@ -65,7 +65,7 @@ class PipeJinja2Blueprint(PipeJinja2BlueprintBaseModel, StructuredContent):
     pipe_code: str = Field(description="Pipe code. Must be snake_case.")
 
 
-PipeBlueprintUnion = Union[
+PipeBlueprintUnion = Annotated[
     PipeBatchBlueprint,
     PipeConditionBlueprint,
     PipeParallelBlueprint,
