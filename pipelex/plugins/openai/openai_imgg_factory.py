@@ -24,7 +24,7 @@ class OpenAIImggFactory:
                 AspectRatio.LANDSCAPE_4_3
                 | AspectRatio.LANDSCAPE_16_9
                 | AspectRatio.LANDSCAPE_21_9
-                | AspectRatio.PORTRAIT_4_3
+                | AspectRatio.PORTRAIT_3_4
                 | AspectRatio.PORTRAIT_9_16
                 | AspectRatio.PORTRAIT_9_21
             ):

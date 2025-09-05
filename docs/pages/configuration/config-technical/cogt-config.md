@@ -70,7 +70,7 @@ is_sync_mode = false
 # Default parameters for image generation
 [cogt.imgg_config.imgg_param_defaults]
 aspect_ratio = "square"  # Options: square, landscape_4_3, landscape_3_2, landscape_16_9, landscape_21_9,
-                         # portrait_4_3, portrait_2_3, portrait_9_16, portrait_9_21
+                         # portrait_3_4, portrait_2_3, portrait_9_16, portrait_9_21
 background = "auto"     # Options: transparent, opaque, auto
 quality = "low"        # Options: low, medium, high
 # nb_steps = 1          # Number of diffusion steps (28 is good for Flux, [1,2,4,8] for SDXL Lightning)
