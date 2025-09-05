@@ -37,7 +37,7 @@ Tagline = "A catchy marketing tagline"
 # 2. Define the pipe that does the work
 [pipe.generate_tagline]
 type = "PipeLLM"
-description = "Generate a catchy tagline for a product"
+definition = "Generate a catchy tagline for a product"
 inputs = { description = "ProductDescription" }
 output = "Tagline"
 prompt_template = """
@@ -72,7 +72,7 @@ Tagline = "A catchy marketing tagline"
 # 2. Define operator pipes
 [pipe.extract_keywords]
 type = "PipeLLM"
-description = "Extract keywords from a product description"
+definition = "Extract keywords from a product description"
 inputs = { description = "ProductDescription" }
 output = "Keyword"
 multiple_output = true
@@ -86,7 +86,7 @@ Focus on features, benefits, and unique selling points.
 
 [pipe.generate_tagline_from_keywords]
 type = "PipeLLM"
-description = "Generate a tagline from keywords"
+definition = "Generate a tagline from keywords"
 inputs = { keywords = "Keyword" }
 output = "Tagline"
 prompt_template = """
@@ -100,7 +100,7 @@ The tagline should be memorable, concise (under 10 words), and highlight the mai
 # 3. This controller pipe defines the two-step pipeline
 [pipe.description_to_tagline]
 type = "PipeSequence"
-description = "From product description to tagline"
+definition = "From product description to tagline"
 inputs = { description = "ProductDescription" }
 output = "Tagline"
 steps = [

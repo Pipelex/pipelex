@@ -47,7 +47,7 @@ Important Rules:
 ```plx
 [pipe.your_pipe_name]
 type = "PipeLLM"
-description = "A description of what your pipe does"
+definition = "A description of what your pipe does"
 inputs = { input_1 = "ConceptName1", input_2 = "ConceptName2" }
 output = "ConceptName"
 ```

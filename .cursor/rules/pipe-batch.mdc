@@ -12,7 +12,7 @@ The PipeBatch controller allows you to apply a pipe operation to each element in
 ```plx
 [pipe.sequence_with_batch]
 type = "Sequence"
-description = "A Sequence of pipes"
+definition = "A Sequence of pipes"
 inputs = { input_data = "ConceptName" }
 output = "OutputConceptName"
 steps = [

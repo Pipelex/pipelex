@@ -15,7 +15,7 @@ Extract text and images from an image or a PDF
 ```plx
 [pipe.extract_info]
 type = "PipeOcr"
-description = "extract the information"
+definition = "extract the information"
 inputs = { ocr_input = "PDF" } # or { ocr_input = "Image" } if its an image. This is the only input
 output = "Page"
 ```

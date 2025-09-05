@@ -13,13 +13,13 @@ The `optimize_tweet` function is the core of this example. It takes two strings,
 ```python
 async def optimize_tweet(draft_tweet_str: str, writing_style_str: str) -> OptimizedTweet:
     # Create the draft tweet stuff
-    draft_tweet = StuffFactory.make_stuff(
-        concept_str="tech_tweet.DraftTweet",
+    draft_tweet = StuffFactory.make_from_concept_string(
+        concept_string="tech_tweet.DraftTweet",
         content=TextContent(text=draft_tweet_str),
         name="draft_tweet",
     )
-    writing_style = StuffFactory.make_stuff(
-        concept_str="tech_tweet.WritingStyle",
+    writing_style = StuffFactory.make_from_concept_string(
+        concept_string="tech_tweet.WritingStyle",
         content=TextContent(text=writing_style_str),
         name="writing_style",
     )
@@ -62,7 +62,7 @@ This pipeline uses a two-step "analyze and optimize" sequence. The first pipe an
 ```plx
 [pipe.optimize_tweet_sequence]
 type = "PipeSequence"
-description = "Analyze and optimize a tech tweet in sequence"
+definition = "Analyze and optimize a tech tweet in sequence"
 inputs = { draft_tweet = "DraftTweet", writing_style = "WritingStyle" }
 output = "OptimizedTweet"
 steps = [
@@ -75,7 +75,7 @@ steps = [
 # This is the pipe that analyzes the draft tweet.
 [pipe.analyze_tweet]
 type = "PipeLLM"
-description = "Analyze the draft tweet and identify areas for improvement"
+definition = "Analyze the draft tweet and identify areas for improvement"
 inputs = { draft_tweet = "DraftTweet" }
 output = "TweetAnalysis"
 system_prompt = """

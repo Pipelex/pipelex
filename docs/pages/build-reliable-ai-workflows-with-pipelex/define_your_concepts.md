@@ -55,7 +55,7 @@ Group concepts that naturally belong together in the same domain. A domain acts 
 ```plx
 # pipelex_libraries/pipelines/finance.plx
 domain = "finance"
-description = "Financial document processing"
+definition = "Financial document processing"
 
 [concept]
 Invoice = "A commercial document issued by a seller to a buyer"
@@ -221,7 +221,7 @@ For example, a pipe that processes `Document` can also process `Contract` or `Em
 ```plx
 [pipe.extract_key_points]
 type = "PipeLLM"
-description = "Extract main points from any document"
+definition = "Extract main points from any document"
 inputs = { doc = "Document" }  # Can accept Document, Contract, or EmploymentContract
 output = "KeyPoints"
 ```
@@ -308,21 +308,21 @@ Native concepts can be used directly in your pipeline definitions without any ad
 ```plx
 [pipe.analyze_document]
 type = "PipeLLM"
-description = "Analyze a PDF document"
+definition = "Analyze a PDF document"
 inputs = { document = "PDF" }
 output = "Text"
 prompt_template = "Analyze this document and provide a summary"
 
 [pipe.process_image]
 type = "PipeLLM"
-description = "Describe an image"
+definition = "Describe an image"
 inputs = { photo = "Image" }
 output = "Text"
 prompt_template = "Describe what you see in this image"
 
 [pipe.extract_from_page]
 type = "PipeLLM"
-description = "Extract information from a document page"
+definition = "Extract information from a document page"
 inputs = { page_content = "Page" }
 output = "ExtractedInfo"
 prompt_template = "Extract key information from this page content"

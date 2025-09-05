@@ -23,7 +23,7 @@ This is the ideal controller for processing collections of documents, images, or
 | Parameter          | Type         | Description                                                                                                                                      | Required |
 | ------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
 | `type`             | string       | The type of the pipe: `PipeBatch`                                                                          | Yes      |
-| `description`      | string       | A description of the batch operation.                                                                           | Yes      |
+| `definition`      | string       | A description of the batch operation.                                                                           | Yes      |
 | `inputs`           | dictionary   | The input concept(s) for the batch operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
 | `output`           | string       | The output concept produced by the batch operation.                                                | Yes      |
 | `branch_pipe_code` | string       | The name of the single pipe to execute for each item in the input list.                                                                          | Yes      |
@@ -44,7 +44,7 @@ Suppose you have a list of articles and you want to generate a summary for each 
 # The pipe that knows how to summarize one article
 [pipe.summarize_one_article]
 type = "PipeLLM"
-description = "Summarize a single article"
+definition = "Summarize a single article"
 inputs = { article = "ArticleText" }
 output = "ArticleSummary"
 prompt_template = "Please provide a one-sentence summary of the following article:\n\n@article_text"
@@ -52,7 +52,7 @@ prompt_template = "Please provide a one-sentence summary of the following articl
 # The PipeBatch definition
 [pipe.summarize_all_articles]
 type = "PipeBatch"
-description = "Summarize a batch of articles in parallel"
+definition = "Summarize a batch of articles in parallel"
 inputs = { articles = "ArticleList" }  # This is the list to iterate over
 output = "SummaryList" # This will be the list of summaries
 branch_pipe_code = "summarize_one_article"

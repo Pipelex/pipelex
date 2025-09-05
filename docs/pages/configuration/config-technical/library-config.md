@@ -48,13 +48,29 @@ pipelex_libraries/         # Exported library root
 All paths are configurable through class variables in `LibraryConfig`:
 
 ```python
-package_name = "pipelex"
-internal_library_root = "libraries"
-exported_library_root = "pipelex_libraries"
-exported_pipelines_path = "pipelex_libraries/pipelines"
-exported_llm_integrations_path = "pipelex_libraries/llm_integrations"
-exported_llm_deck_path = "pipelex_libraries/llm_deck"
-exported_templates_path = "pipelex_libraries/templates"
+class LibraryConfig(ConfigModel):
+    package_name: ClassVar[str] = "pipelex"
+    config_dir_path: str = "pipelex_libraries"
+
+    @property
+    def config_file_path(self) -> str:
+        return f"{self.config_dir_path}/config.toml"
+
+    @property
+    def pipelines_dir_path(self) -> str:
+        return f"{self.config_dir_path}/pipelines"
+
+    @property
+    def llm_integrations_dir_path(self) -> str:
+        return f"{self.config_dir_path}/llm_integrations"
+
+    @property
+    def llm_deck_dir_path(self) -> str:
+        return f"{self.config_dir_path}/llm_deck"
+
+    @property
+    def templates_dir_path(self) -> str:
+        return f"{self.config_dir_path}/templates"
 ```
 
 ### Library Initialization
@@ -122,7 +138,7 @@ The library system includes specific error types:
 
 2. **Validation**:
 
-    - Run `pipelex validate all -c pipelex/libraries` after making changes
+    - Run `pipelex validate all -c ./pipelex_libraries` after making changes
     - Check for domain consistency
     - Verify concept relationships
 

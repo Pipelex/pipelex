@@ -14,7 +14,7 @@ The pipeline `power_extractor_dpe` is designed to recognize and extract the key 
 async def extract_dpe(pdf_url: str) -> Dpe:
     working_memory = WorkingMemoryFactory.make_from_pdf(
         pdf_url=pdf_url,
-        concept_str="PDF",
+        concept_string="PDF",
         name="pdf",
     )
     pipe_output = await execute_pipeline(
@@ -61,7 +61,7 @@ The pipeline uses a `PipeLLM` with a very specific prompt to extract the informa
 ```plx
 [pipe.write_markdown_from_page_content_dpe]
 type = "PipeLLM"
-description = "Write markdown from page content of a 'Diagnostic de Performance Energetique'"
+definition = "Write markdown from page content of a 'Diagnostic de Performance Energetique'"
 inputs = { page_content = "Page" }
 output = "Dpe" # The output is structured as a Dpe object
 llm = "llm_for_img_to_text"

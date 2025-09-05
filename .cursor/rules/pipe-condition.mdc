@@ -14,7 +14,7 @@ The PipeCondition controller allows you to implement conditional logic in your p
 ```plx
 [pipe.conditional_operation]
 type = "PipeCondition"
-description = "A conditonal pipe to decide wheter..."
+definition = "A conditonal pipe to decide wheter..."
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
@@ -28,7 +28,7 @@ or
 ```plx
 [pipe.conditional_operation]
 type = "PipeCondition"
-description = "A conditonal pipe to decide wheter..."
+definition = "A conditonal pipe to decide wheter..."
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression_template = "{{ input_data.category }}" # Jinja2 code

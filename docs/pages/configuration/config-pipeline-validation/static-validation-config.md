@@ -11,7 +11,7 @@ class StaticValidationReaction(StrEnum):
     IGNORE = "ignore"  # Silently ignore the error
 
 class StaticValidationConfig(ConfigModel):
-    default_reaction: StaticValidationReaction
+    default_reaction: StaticValidationReaction = Field(strict=False)
     reactions: Dict[StaticValidationErrorType, StaticValidationReaction]
 ```
 
@@ -38,6 +38,7 @@ default_reaction = "raise"
 missing_input_variable = "log"
 extraneous_input_variable = "log"
 inadequate_input_concept = "log"
+too_many_candidate_inputs = "log"
 ```
 
 ## Validation Process

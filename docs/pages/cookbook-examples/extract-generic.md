@@ -14,7 +14,7 @@ The `power_extractor` pipeline is at the heart of this example. After its execut
 async def extract_generic(pdf_url: str) -> TextAndImagesContent:
     working_memory = WorkingMemoryFactory.make_from_pdf(
         pdf_url=pdf_url,
-        concept_str="PDF",
+        concept_string="PDF",
         name="pdf",
     )
     pipe_output = await execute_pipeline(
@@ -31,9 +31,9 @@ The `merge_markdown_and_images` function is a great example of how you can add y
 ```python
 def merge_markdown_and_images(working_memory: WorkingMemory) -> TextAndImagesContent:
     # Pages extracted from the PDF by PipeOCR
-    page_contents_list = working_memory.get_stuff_as_list(item_type=PageContent, name="page_contents")
+    page_contents_list = working_memory.get_stuff_as_list(name="page_contents", item_type=PageContent)
     # Markdown text extracted from the Pages by PipeLLM
-    page_markdown_list = working_memory.get_stuff_as_list(item_type=TextContent, name="markdowns")
+    page_markdown_list = working_memory.get_stuff_as_list(name="markdowns", item_type=TextContent)
 
     # ... (check for length equality)
 

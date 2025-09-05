@@ -27,8 +27,8 @@ Here is an example of a function and its registration:
 ```python
 # in a file like my_custom_functions.py
 
-from pipelex.core.working_memory import WorkingMemory
-from pipelex.core.stuff_content import TextContent
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.tools.func_registry import func_registry
 
 def concatenate_texts(working_memory: WorkingMemory) -> TextContent:
@@ -71,7 +71,7 @@ This PLX snippet shows how to use the `combine_two_texts` function defined above
 ```plx
 [pipe.combine_them]
 type = "PipeFunc"
-description = "Combine two text inputs using a custom Python function"
+definition = "Combine two text inputs using a custom Python function"
 function_name = "combine_two_texts"
 output = "ConcatenatedText"
 ```

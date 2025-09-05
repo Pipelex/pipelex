@@ -5,12 +5,12 @@ The Cogt configuration manages all cognitive tools in Pipelex, including LLM (La
 ## Overview
 
 ```toml
-[pipelex.cogt]
+[cogt]
 # Main Cogt configuration sections
-[pipelex.cogt.inference_manager_config]
-[pipelex.cogt.llm_config]
-[pipelex.cogt.imgg_config]
-[pipelex.cogt.ocr_config]
+[cogt.inference_manager_config]
+[cogt.llm_config]
+[cogt.imgg_config]
+[cogt.ocr_config]
 ```
 
 ## Inference Manager Configuration
@@ -18,7 +18,7 @@ The Cogt configuration manages all cognitive tools in Pipelex, including LLM (La
 Controls automatic setup of various cognitive tools:
 
 ```toml
-[pipelex.cogt.inference_manager_config]
+[cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
 is_auto_setup_preset_imgg = true
 is_auto_setup_preset_ocr = true
@@ -29,7 +29,7 @@ is_auto_setup_preset_ocr = true
 Configuration for all Language Model interactions:
 
 ```toml
-[pipelex.cogt.llm_config]
+[cogt.llm_config]
 default_max_images = 4  # Maximum number of images in prompts
 
 # Platform preferences for different LLMs
@@ -60,7 +60,7 @@ When configuring LLM jobs, you can set:
 Configuration for image generation capabilities:
 
 ```toml
-[pipelex.cogt.imgg_config]
+[cogt.imgg_config]
 default_imgg_handle = "stable_diffusion"
 imgg_handles = ["stable_diffusion", "dall_e"]
 
@@ -113,9 +113,10 @@ Image generation jobs support these parameters:
 Configuration for Optical Character Recognition:
 
 ```toml
-[pipelex.cogt.ocr_config]
+[cogt.ocr_config]
 ocr_handles = ["tesseract", "azure_ocr"]
 page_output_text_file_name = "page_text.txt"
+default_page_views_dpi = 150
 ```
 
 ## Validation Rules
@@ -155,13 +156,13 @@ page_output_text_file_name = "page_text.txt"
 ## Example Complete Configuration
 
 ```toml
-[pipelex.cogt]
-[pipelex.cogt.inference_manager_config]
+[cogt]
+[cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
 is_auto_setup_preset_imgg = true
 is_auto_setup_preset_ocr = true
 
-[pipelex.cogt.llm_config]
+[cogt.llm_config]
 default_max_images = 4
 preferred_platforms = { "gpt-4" = "openai", "claude-3-opus" = "anthropic" }
 
@@ -172,7 +173,7 @@ max_retries = 3
 [pipelex.cogt.llm_config.instructor_config]
 is_openai_structured_output_enabled = true
 
-[pipelex.cogt.imgg_config]
+[cogt.imgg_config]
 default_imgg_handle = "stable_diffusion"
 imgg_handles = ["stable_diffusion", "dall_e"]
 
@@ -191,7 +192,7 @@ is_raw = false
 output_format = "png"
 seed = "auto"
 
-[pipelex.cogt.ocr_config]
+[cogt.ocr_config]
 ocr_handles = ["tesseract", "azure_ocr"]
 page_output_text_file_name = "page_text.txt"
 ```

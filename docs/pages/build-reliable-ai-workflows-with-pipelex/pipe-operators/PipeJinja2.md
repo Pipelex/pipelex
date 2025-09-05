@@ -54,7 +54,7 @@ Report generated on: {{ report_date }}
 ```plx
 [pipe.generate_weekly_report]
 type = "PipeJinja2"
-description = "Generate a formatted weekly report for a user"
+definition = "Generate a formatted weekly report for a user"
 output = "WeeklyReportText"
 jinja2_name = "weekly_report.md"
 extra_context = { report_date = "2023-10-27" }
