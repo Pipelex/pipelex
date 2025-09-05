@@ -59,7 +59,7 @@ If you prefer to migrate manually or need to handle special cases:
 
 1. **Locate your PLX files**: Find all pipeline library files (typically in your configured pipelines directory)
 2. **Update concept definitions**: Change `Concept =` to `definition =` in all `[concept.ConceptName]` sections
-3. **Validate syntax**: Run `pipelex validate all -c ./pipelex_libraries -c ./pipelex_libraries` to ensure your files are correctly formatted
+3. **Validate syntax**: Run `pipelex validate all -c path/to/your/pipelex/config/folder -c ./pipelex_libraries` to ensure your files are correctly formatted
 
 ### Examples
 
@@ -103,7 +103,7 @@ After migration, validate your pipeline files:
 
 ```bash
 # Validate all pipeline files
-pipelex validate all -c ./pipelex_libraries
+pipelex validate all -c path/to/your/pipelex/config/folder
 
 # Run a specific pipeline to test
 # Pipeline execution is done through Python code, not CLI
@@ -192,7 +192,7 @@ If you prefer to migrate manually:
    - Replace `PipeClassName = "description"` with:
      - `type = "PipeClassName"`
      - `definition = "description"`
-3. **Validate syntax**: Run `pipelex validate all -c ./pipelex_libraries -c ./pipelex_libraries` to ensure your files are correctly formatted
+3. **Validate syntax**: Run `pipelex validate all -c path/to/your/pipelex/config/folder -c ./pipelex_libraries` to ensure your files are correctly formatted
 
 ### Examples
 
@@ -254,7 +254,7 @@ After migration, validate your pipeline files:
 
 ```bash
 # Validate all pipeline files
-pipelex validate all -c ./pipelex_libraries
+pipelex validate all -c path/to/your/pipelex/config/folder
 
 # Run a specific pipeline to test
 # Pipeline execution is done through Python code, not CLI

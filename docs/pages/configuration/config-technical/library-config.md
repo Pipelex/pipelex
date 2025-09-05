@@ -106,7 +106,7 @@ The library system includes specific error types:
 
 2. **Validation**:
 
-    - Run `pipelex validate all -c ./pipelex_libraries` after making changes
+    - Run `pipelex validate all -c path/to/your/pipelex/config/folder` after making changes
     - Check for domain consistency
     - Verify concept relationships
 

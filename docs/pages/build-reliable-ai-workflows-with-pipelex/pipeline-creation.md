@@ -271,13 +271,13 @@ Generated blueprints automatically integrate with:
 
 ```bash
 # Validate your entire setup
-pipelex validate all -c ./pipelex_libraries
+pipelex validate all -c path/to/your/pipelex/config/folder
 
 # Test a specific pipe
-pipelex validate pipe your_pipe_name -c ./pipelex_libraries
+pipelex validate pipe your_pipe_name -c path/to/your/pipelex/config/folder
 
 # Check blueprint structure
-pipelex validate blueprint your_blueprint.plx -c ./pipelex_libraries --no-fix
+pipelex validate blueprint your_blueprint.plx -c path/to/your/pipelex/config/folder --no-fix
 ```
 
 ## Next Steps
