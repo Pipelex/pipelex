@@ -55,6 +55,6 @@ page_views = true
 page_views_dpi = 200
 ```
 
-The output of the PipeOcr has to be a concept compatible with the native `Page` concept. A concept is compatible with the `Page` concept if it refines the `Page` concept.
+The output of the PipeOcr must be exactly the native `Page` concept.
 
 To use this pipe, you would first need to load a PDF into the `ScannedDocument` concept. After the pipe runs, the `ExtractedPages` concept will contain a list of `PageContent` objects, where each object has the extracted text and a 200 DPI image of the corresponding page.

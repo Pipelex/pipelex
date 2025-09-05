@@ -48,7 +48,7 @@ pipelex migrate
 
 The migration command will:
 
-- Find all `.plx` files in your configured pipelines directory
+- Find all `.toml` files in your configured pipelines directory
 - Replace `Concept =` with `definition =` in concept definitions
 - Preserve all other formatting and comments
 - Create backups of modified files (with `.backup` extension)
@@ -177,7 +177,7 @@ pipelex migrate
 
 The migration command will:
 
-- Find all `.plx` files in your configured pipelines directory
+- Find all `.toml` files in your configured pipelines directory
 - Convert `PipeClassName = "description"` to `type = "PipeClassName"` and `definition = "description"`
 - Preserve all other formatting and comments
 - Create backups of modified files (with `.backup` extension)
