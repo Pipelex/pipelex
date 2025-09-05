@@ -72,7 +72,7 @@ from pipelex import log, pretty_print
 from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_report_delegate
-from pipelex_libraries.pipelines.base_library.retrieve import RetrievedExcerpt
+from pipelex.libraries.pipelines.base_library.retrieve import RetrievedExcerpt
 from pipelex.config_pipelex import get_config
 
 from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe

@@ -96,6 +96,28 @@ inputs = {
 Concepts and their structure classes are meant to indicate an idea.
 A Concept MUST NEVER be a plural noun and you should never create a SomeConceptList: lists and arrays are implicitly handled by Pipelex according to the context. Just define SomeConcept.
 
+**IMPORTANT: Never create unnecessary structure classes that only refine native concepts without adding fields.**
+
+DO NOT create structures like:
+```python
+class Joke(TextContent):
+    """A humorous text that makes people laugh."""
+    pass
+```
+
+If a concept only refines a native concept (like Text, Image, etc.) without adding new fields, simply declare it in the .plx file:
+```plx
+[concept]
+Joke = "A humorous text that makes people laugh."
+```
+If you simply need to refine another native concept, construct it like this:
+```plx
+[concept.Landscape]
+refines = "Image"
+```
+
+Only create a Python structure class when you need to add specific fields:
+
 ```python
 from datetime import datetime
 from typing import List, Optional
@@ -415,7 +437,7 @@ from pipelex.hub import get_pipeline_tracker, get_report_delegate
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
-from pipelex_libraries.pipelines.examples.extract_gantt.gantt import GanttChart
+from pipelex.libraries.pipelines.examples.extract_gantt.gantt import GanttChart
 
 SAMPLE_NAME = "extract_gantt"
 IMAGE_URL = "assets/gantt/gantt_tree_house.png"

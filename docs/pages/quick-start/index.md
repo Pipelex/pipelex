@@ -216,7 +216,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
-from pipelex_libraries.pipelines.screenplay import Character, CharacterMetadata
+from pipelex.libraries.pipelines.screenplay import Character, CharacterMetadata
 
 
 async def process_existing_character():
