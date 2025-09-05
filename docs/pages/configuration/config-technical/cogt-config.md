@@ -33,17 +33,17 @@ Configuration for all Language Model interactions:
 default_max_images = 100  # Maximum number of images in prompts
 
 # Platform preferences for different LLMs
-[pipelex.cogt.llm_config.preferred_platforms]
+[cogt.llm_config.preferred_platforms]
 gpt-4 = "openai"
 claude-3-opus = "anthropic"
 
 # Job configuration
-[pipelex.cogt.llm_config.llm_job_config]
+[cogt.llm_config.llm_job_config]
 is_streaming_enabled = false
 max_retries = 3  # Between 1 and 10
 
 # Instructor settings
-[pipelex.cogt.llm_config.instructor_config]
+[cogt.llm_config.instructor_config]
 is_openai_structured_output_enabled = false
 ```
 
@@ -61,16 +61,16 @@ Configuration for image generation capabilities:
 
 ```toml
 [cogt.imgg_config]
-default_imgg_handle = "stable_diffusion"
-imgg_handles = ["stable_diffusion", "dall_e"]
+default_imgg_handle = "fal-ai/flux-pro"
+imgg_handles = ["fal-ai/flux-pro", "fal-ai/fast-lightning-sdxl"]
 
-[pipelex.cogt.imgg_config.imgg_job_config]
-is_sync_mode = true
+[cogt.imgg_config.imgg_job_config]
+is_sync_mode = false
 
 # Default parameters for image generation
-[pipelex.cogt.imgg_config.imgg_param_defaults]
+[cogt.imgg_config.imgg_param_defaults]
 aspect_ratio = "square"  # Options: square, landscape_4_3, landscape_3_2, landscape_16_9, landscape_21_9,
-                         # portrait_3_4, portrait_2_3, portrait_9_16, portrait_9_21
+                         # portrait_4_3, portrait_2_3, portrait_9_16, portrait_9_21
 background = "auto"     # Options: transparent, opaque, auto
 quality = "low"        # Options: low, medium, high
 # nb_steps = 1          # Number of diffusion steps (28 is good for Flux, [1,2,4,8] for SDXL Lightning)
@@ -114,9 +114,9 @@ Configuration for Optical Character Recognition:
 
 ```toml
 [cogt.ocr_config]
-ocr_handles = ["tesseract", "azure_ocr"]
-page_output_text_file_name = "page_text.txt"
-default_page_views_dpi = 150
+ocr_handles = ["mistral/mistral-ocr-latest"]
+page_output_text_file_name = "page_text.md"
+default_page_views_dpi = 72
 ```
 
 ## Validation Rules
@@ -166,21 +166,21 @@ is_auto_setup_preset_ocr = true
 default_max_images = 100
 preferred_platforms = { "gpt-4" = "openai", "claude-3-opus" = "anthropic" }
 
-[pipelex.cogt.llm_config.llm_job_config]
+[cogt.llm_config.llm_job_config]
 is_streaming_enabled = false
 max_retries = 3
 
-[pipelex.cogt.llm_config.instructor_config]
+[cogt.llm_config.instructor_config]
 is_openai_structured_output_enabled = false
 
 [cogt.imgg_config]
 default_imgg_handle = "fal-ai/flux-pro/v1.1-ultra"
 imgg_handles = ["fal-ai/flux-pro", "fal-ai/fast-lightning-sdxl"]
 
-[pipelex.cogt.imgg_config.imgg_job_config]
+[cogt.imgg_config.imgg_job_config]
 is_sync_mode = false
 
-[pipelex.cogt.imgg_config.imgg_param_defaults]
+[cogt.imgg_config.imgg_param_defaults]
 aspect_ratio = "square"
 background = "auto"
 quality = "low"
@@ -193,6 +193,6 @@ output_format = "jpg"
 seed = "auto"
 
 [cogt.ocr_config]
-ocr_handles = ["tesseract", "azure_ocr"]
-page_output_text_file_name = "page_text.txt"
+ocr_handles = ["mistral/mistral-ocr-latest"]
+page_output_text_file_name = "page_text.md"
 ```

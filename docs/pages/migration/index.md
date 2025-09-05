@@ -40,10 +40,10 @@ Use the built-in migration command to automatically update your PLX files:
 
 ```bash
 # Preview changes without applying them
-pipelex migrate --dry-run
+pipelex migrate run --dry-run
 
 # Apply the migration to all PLX files
-pipelex migrate
+pipelex migrate run
 ```
 
 The migration command will:
@@ -169,10 +169,10 @@ Use the built-in migration command to automatically update your PLX files:
 
 ```bash
 # Preview changes without applying them
-pipelex migrate --dry-run
+pipelex migrate run --dry-run
 
 # Apply the migration to all PLX files
-pipelex migrate
+pipelex migrate run
 ```
 
 The migration command will:
