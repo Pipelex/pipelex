@@ -114,10 +114,7 @@ Always fix any issues reported by these tools before proceeding.
 ## Pipelines
 
 - All pipeline definitions go in `pipelex/libraries/pipelines/`
-- Always validate pipelines after writing:
-  ```bash
-  pipelex validate all -c pipelex/libraries
-  ```
+- Always validate pipelines after creation/edit with `make validate`.
   Iterate if there are errors.
 
 ## Project Structure
