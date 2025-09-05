@@ -1,6 +1,5 @@
 ---
-description: 
-globs: 
+globs: *.plx,*.toml
 alwaysApply: false
 ---
 # Rules to choose LLM models used in PipeLLMs.
