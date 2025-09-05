@@ -11,7 +11,7 @@ class StaticValidationReaction(StrEnum):
     IGNORE = "ignore"  # Silently ignore the error
 
 class StaticValidationConfig(ConfigModel):
-    default_reaction: StaticValidationReaction = Field(strict=False)
+    default_reaction: StaticValidationReaction
     reactions: Dict[StaticValidationErrorType, StaticValidationReaction]
 ```
 
