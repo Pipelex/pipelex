@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.9.1] - 2025-09-05
+
+### Fixed
+- Fixed many inconsistencies in the documentation.
+
 ## [v0.9.0] - 2025-09-02
 
 ### Refacto

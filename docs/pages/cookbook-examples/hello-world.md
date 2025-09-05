@@ -17,7 +17,7 @@ The `hello_world` function demonstrates the simplest possible Pipelex pipeline. 
 ```python
 import asyncio
 
-from pipelex import pretty_print
+from pipelex.tools.misc.pretty import pretty_print
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
@@ -52,7 +52,7 @@ definition = "Discovering Pipelex"
 [pipe]
 [pipe.hello_world]
 type = "PipeLLM"
-description = "Write text about Hello World."
+definition = "Write text about Hello World."
 output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
 prompt = """

@@ -143,6 +143,7 @@ keywords_to_hilight = []
 ```toml
 [pipelex.log_config]
 default_log_level = "INFO"
+log_mode = "rich"
 is_console_logging_enabled = true
 json_logs_indent = 4
 presentation_line_width = 120

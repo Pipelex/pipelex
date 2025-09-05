@@ -40,15 +40,15 @@ Use the built-in migration command to automatically update your PLX files:
 
 ```bash
 # Preview changes without applying them
-pipelex migrate --dry-run
+pipelex migrate run --dry-run
 
 # Apply the migration to all PLX files
-pipelex migrate
+pipelex migrate run
 ```
 
 The migration command will:
 
-- Find all `.plx` files in your configured pipelines directory
+- Find all `.toml` files in your configured pipelines directory
 - Replace `Concept =` with `definition =` in concept definitions
 - Preserve all other formatting and comments
 - Create backups of modified files (with `.backup` extension)
@@ -59,7 +59,7 @@ If you prefer to migrate manually or need to handle special cases:
 
 1. **Locate your PLX files**: Find all pipeline library files (typically in your configured pipelines directory)
 2. **Update concept definitions**: Change `Concept =` to `definition =` in all `[concept.ConceptName]` sections
-3. **Validate syntax**: Run `pipelex validate all -c pipelex/libraries` to ensure your files are correctly formatted
+3. **Validate syntax**: Run `pipelex validate all -c path/to/your/pipelex/config/folder -c ./pipelex_libraries` to ensure your files are correctly formatted
 
 ### Examples
 
@@ -103,10 +103,10 @@ After migration, validate your pipeline files:
 
 ```bash
 # Validate all pipeline files
-pipelex validate all
+pipelex validate all -c path/to/your/pipelex/config/folder
 
 # Run a specific pipeline to test
-pipelex run your-pipeline-name
+# Pipeline execution is done through Python code, not CLI (coming soon)
 ```
 
 ### Troubleshooting
@@ -169,15 +169,15 @@ Use the built-in migration command to automatically update your PLX files:
 
 ```bash
 # Preview changes without applying them
-pipelex migrate --dry-run
+pipelex migrate run --dry-run
 
 # Apply the migration to all PLX files
-pipelex migrate
+pipelex migrate run
 ```
 
 The migration command will:
 
-- Find all `.plx` files in your configured pipelines directory
+- Find all `.toml` files in your configured pipelines directory
 - Convert `PipeClassName = "description"` to `type = "PipeClassName"` and `definition = "description"`
 - Preserve all other formatting and comments
 - Create backups of modified files (with `.backup` extension)
@@ -192,7 +192,7 @@ If you prefer to migrate manually:
    - Replace `PipeClassName = "description"` with:
      - `type = "PipeClassName"`
      - `definition = "description"`
-3. **Validate syntax**: Run `pipelex validate all -c pipelex/libraries` to ensure your files are correctly formatted
+3. **Validate syntax**: Run `pipelex validate all -c path/to/your/pipelex/config/folder -c ./pipelex_libraries` to ensure your files are correctly formatted
 
 ### Examples
 
@@ -254,10 +254,10 @@ After migration, validate your pipeline files:
 
 ```bash
 # Validate all pipeline files
-pipelex validate all
+pipelex validate all -c path/to/your/pipelex/config/folder
 
 # Run a specific pipeline to test
-pipelex run your-pipeline-name
+# Pipeline execution is done through Python code, not CLI (coming soon)
 ```
 
 ---

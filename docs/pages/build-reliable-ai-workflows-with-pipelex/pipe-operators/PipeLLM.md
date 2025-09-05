@@ -24,7 +24,7 @@ Images must be declared in the `inputs` section of your pipe definition. The ima
 ```plx
 [pipe.describe_image]
 type = "PipeLLM"
-description = "Describe an image"
+definition = "Describe an image"
 inputs = { image = "Image" }
 output = "VisualDescription"
 prompt_template = """
@@ -41,7 +41,7 @@ You can use any concept that refines `Image` as an input, and choose descriptive
 ```plx
 [pipe.analyze_wedding]
 type = "PipeLLM"
-description = "Analyze wedding photo"
+definition = "Analyze wedding photo"
 inputs = { wedding_photo = "images.Photo" }
 output = "PhotoAnalysis"
 prompt_template = """
@@ -56,7 +56,7 @@ When working with structured content that contains image fields (like `PageConte
 ```plx
 [pipe.analyze_page_view]
 type = "PipeLLM"
-description = "Analyze the visual layout of a page"
+definition = "Analyze the visual layout of a page"
 inputs = { "page_content.page_view" = "Image" }
 output = "LayoutAnalysis"
 prompt_template = """
@@ -77,7 +77,7 @@ You can include multiple images in a single prompt by listing them in the inputs
 ```plx
 [pipe.compare_images]
 type = "PipeLLM"
-description = "Compare two images"
+definition = "Compare two images"
 inputs = { 
     first_image = "Image",
     second_image = "Image"
@@ -95,7 +95,7 @@ You can mix any stuff and image inputs in the same pipe:
 ```plx
 [pipe.analyze_document_with_context]
 type = "PipeLLM"
-description = "Analyze a document page with additional context"
+definition = "Analyze a document page with additional context"
 inputs = { 
     context = "Text",
     document.page_view = "Image"
@@ -117,8 +117,8 @@ Analyze the document page shown in the image and explain how it relates to the p
 | Parameter                   | Type                | Description                                                                                                                                                                  | Required |
 | --------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                      | string              | The type of the pipe: `PipeLLM`                                                                          | Yes      |
-| `description`               | string              | A description of the LLM operation.                                                                           | Yes      |
-| `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. For images within structured content, use dot notation (e.g., `"page.image"`).                                                     | Yes       |
+| `definition`               | string              | A description of the LLM operation.                                                                           | Yes      |
+| `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. For images within structured content, use dot notation (e.g., `"page.image_argurment"`)
 | `output`                    | string              | The output concept produced by the LLM operation.                                                | Yes      |
 | `llm`                       | string or table     | Specifies the LLM preset(s) to use. Can be a single preset or a table mapping different presets for different generation modes (e.g., `main`, `object_direct`).              | No       |
 | `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Can be inline text or a reference to a template file (`"file:path/to/prompt.md"`).  | No       |
@@ -149,7 +149,7 @@ This pipe takes no input and writes a poem.
 ```plx
 [pipe.write_poem]
 type = "PipeLLM"
-description = "Write a short poem"
+definition = "Write a short poem"
 output = "Text"
 llm = "llm_for_creative_writing"
 prompt = """
@@ -164,7 +164,7 @@ This pipe summarizes an input text, using a `prompt_template` to inject the inpu
 ```plx
 [pipe.summarize_text]
 type = "PipeLLM"
-description = "Summarize a text"
+definition = "Summarize a text"
 inputs = { text = "TextToSummarize" }
 output = "TextSummary"
 prompt_template = """
@@ -183,7 +183,7 @@ This pipe takes an image of a table and uses a VLM to extract the content as an 
 ```plx
 [pipe.extract_table_from_image]
 type = "PipeLLM"
-description = "Extract table data from an image"
+definition = "Extract table data from an image"
 inputs = { image = "TableScreenshot" }
 output = "TableData"
 prompt_template = """
@@ -201,7 +201,7 @@ structure = "Expense" # Assumes a Pydantic model 'Expense' is defined
 
 [pipe.process_expense_report]
 type = "PipeLLM"
-description = "Process an expense report"
+definition = "Process an expense report"
 inputs = { report = "ExpenseReport" }
 output = "ProcessedExpenseReport"
 prompt_template = """

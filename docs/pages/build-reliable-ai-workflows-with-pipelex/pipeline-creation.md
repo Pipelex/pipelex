@@ -128,7 +128,7 @@ OppositePhotoPrompt = "Prompt for generating opposite version of photo"
 
 [pipe.gen_photopposite]
 type = "PipeSequence"
-description = "Generate opposite version of photo's main feature"
+definition = "Generate opposite version of photo's main feature"
 output = "Image"
 steps = [
     { pipe = "analyze_photo", result = "analysis" },
@@ -138,7 +138,7 @@ steps = [
 
 [pipe.analyze_photo]
 type = "PipeLLM"
-description = "Analyze photo content and identify main feature"
+definition = "Analyze photo content and identify main feature"
 inputs = { photo = "Image" }
 output = "PhotoAnalysis"
 prompt_template = """
@@ -151,7 +151,7 @@ Focus on the dominant element, color, mood, or characteristic that defines this 
 
 [pipe.create_opposite_concept]
 type = "PipeLLM"
-description = "Create concept for opposite version"
+definition = "Create concept for opposite version"
 inputs = { analysis = "PhotoAnalysis" }
 output = "OppositePhotoPrompt"
 prompt_template = """
@@ -164,7 +164,7 @@ Describe what the opposite would look like, focusing on reversing the main featu
 
 [pipe.render_opposite]
 type = "PipeImgGen"
-description = "Generate the opposite photo"
+definition = "Generate the opposite photo"
 inputs = { opposite_concept = "OppositePhotoPrompt" }
 output = "Image"
 ```
@@ -271,13 +271,13 @@ Generated blueprints automatically integrate with:
 
 ```bash
 # Validate your entire setup
-pipelex validate all -c pipelex/libraries
+pipelex validate all -c path/to/your/pipelex/config/folder
 
 # Test a specific pipe
-pipelex validate pipe your_pipe_name -c pipelex/libraries
+pipelex validate pipe your_pipe_name -c path/to/your/pipelex/config/folder
 
 # Check blueprint structure
-pipelex validate blueprint your_blueprint.plx -c pipelex/libraries --no-fix
+pipelex validate blueprint your_blueprint.plx -c path/to/your/pipelex/config/folder --no-fix
 ```
 
 ## Next Steps

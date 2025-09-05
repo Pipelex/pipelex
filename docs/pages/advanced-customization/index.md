@@ -14,6 +14,7 @@ There are two main ways to inject custom implementations:
 from pipelex import Pipelex
 
 pipelex = Pipelex(
+    config_dir_path="./pipelex_libraries",
     template_provider=MyTemplateProvider(),
     llm_model_provider=MyLLMProvider(),
     inference_manager=MyInferenceManager(),
@@ -76,13 +77,13 @@ Pipelex supports injection of the following components:
 
 1. **Template Provider** (`TemplateLibrary`)
 
-    - Protocol: `TemplateLibraryProtocol`
+    - Protocol: `TemplateProviderAbstract`
     - Default: `TemplateLibrary`
     - [Details](template-provider-injection.md)
 
 2. **LLM Model Provider** (`LLMModelLibrary`)
 
-    - Protocol: `LLMModelLibraryProtocol`
+    - Protocol: `LLMModelProviderAbstract`
     - Default: `LLMModelLibrary`
     - [Details](llm-model-provider-injection.md)
 
@@ -112,7 +113,7 @@ Pipelex supports injection of the following components:
 
 7. **Secrets Provider** (`EnvSecretsProvider`)
 
-    - Protocol: `SecretsProviderProtocol`
+    - Protocol: `SecretsProviderAbstract`
     - Default: `EnvSecretsProvider`
     - [Details](secrets-provider-injection.md)
 

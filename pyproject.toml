@@ -67,7 +67,7 @@ docs = [
 
 dev = [
     "boto3-stubs>=1.35.24",
-    "cocode==0.1.1",
+    "cocode==0.1.2",
     "mypy>=1.11.2",
     "pyright==1.1.398",
     "pandas-stubs>=2.2.3.241126",

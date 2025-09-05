@@ -1,0 +1,124 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Coding Standards & Best Practices
+
+This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
+
+## Type Hints
+
+1. **Always Use Type Hints**
+   - Every function parameter must be typed
+   - Every function return must be typed
+   - Use type hints for all variables where type is not obvious
+   - Use types with Uppercase first letter (Dict[], List[], etc.)
+
+2. **StrEnum**
+   - Import from `pipelex.types`:
+   ```python
+   from pipelex.types import StrEnum
+   ```
+
+## BaseModel Standards
+
+- Respect Pydantic v2 standards
+- Keep models focused and single-purpose
+- Use descriptive field names
+- Use type hints for all fields
+- Document complex validations
+- Use Optional[] for nullable fields
+- Use Field(default_factory=...) for mutable defaults
+
+## Factory Pattern
+
+- Use Factory Pattern for object creation when dealing with multiple implementations
+
+## Documentation
+
+1. **Docstring Format**
+   ```python
+   def process_image(image_path: str, size: Tuple[int, int]) -> bytes:
+       """Process and resize an image.
+       
+       Args:
+           image_path: Path to the source image
+           size: Tuple of (width, height) for resizing
+           
+       Returns:
+           Processed image as bytes
+       """
+       pass
+   ```
+
+2. **Class Documentation**
+   ```python
+   class ImageProcessor:
+       """Handles image processing operations.
+       
+       Provides methods for resizing, converting, and optimizing images.
+       """
+   ```
+
+## Error Handling
+
+1. **Graceful Error Handling**
+   - Use try/except blocks with specific exceptions
+   - Convert third-party exceptions to custom ones
+   ```python
+   try:
+       from fal_client import AsyncClient as FalAsyncClient
+   except ImportError as exc:
+       raise MissingDependencyError(
+           "fal-client", "fal", 
+           "The fal-client SDK is required to use FAL models."
+       ) from exc
+   ```
+
+## Code Quality Checks
+
+### Linting and Type Checking
+
+Before finalizing a task, run:
+```bash
+make fix-unused-imports
+make check
+```
+
+This runs multiple code quality tools:
+- Pyright: Static type checking
+- Ruff: Fast Python linter  
+- Mypy: Static type checker
+
+Always fix any issues reported by these tools before proceeding.
+
+### Running Tests
+
+1. **Quick Test Run** (no LLM/image generation):
+   ```bash
+   make tp
+   ```
+   Runs tests with markers: `(dry_runnable or not (inference or llm or imgg or ocr)) and not (needs_output or pipelex_api)`
+
+2. **Specific Tests**:
+   ```bash
+   make tp TEST=TestClassName
+   # or
+   make tp TEST=test_function_name
+   ```
+   Note: Matches names starting with the provided string.
+
+**Important**: Never run `make ti`, `make test-inference`, `make to`, `make test-ocr`, `make tg`, or `make test-imgg` - these use costly inference.
+
+## Pipelines
+
+- All pipeline definitions go in `pipelex/libraries/pipelines/`
+- Always validate pipelines after creation/edit with `make validate`.
+  Iterate if there are errors.
+
+## Project Structure
+
+- **Pipelines**: `pipelex/libraries/pipelines/`
+- **Tests**: `tests/` directory
+- **Documentation**: `docs/` directory

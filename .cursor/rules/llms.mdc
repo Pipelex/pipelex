@@ -1,6 +1,5 @@
 ---
-description: 
-globs: 
+globs: *.plx,*.toml
 alwaysApply: false
 ---
 # Rules to choose LLM models used in PipeLLMs.
@@ -39,7 +38,7 @@ Here is an example of using an llm_handle to specify which LLM to use in a PipeL
 ```plx
 [pipe.hello_world]
 type = "PipeLLM"
-description = "Write text about Hello World."
+definition = "Write text about Hello World."
 output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
 prompt_template = """
@@ -64,7 +63,7 @@ The interest is that these presets can be used to set the LLM choice in a PipeLL
 ```plx
 [pipe.extract_invoice]
 type = "PipeLLM"
-description = "Extract invoice information from an invoice text transcript"
+definition = "Extract invoice information from an invoice text transcript"
 inputs = { invoice_text = "InvoiceText" }
 output = "Invoice"
 llm = "llm_to_extract_invoice"
@@ -81,4 +80,4 @@ The setting here `llm = "llm_to_extract_invoice"` works because "llm_to_extract_
 You must not use an LLM preset in a PipeLLM that does not exist in the deck. If needed, you can add llm presets.
 
 
-You can override the predefined llm presets in [overrides.toml](mdc:pipelex/libraries/llm_deck/overrides.toml).
+You can override the predefined llm presets in [overrides.toml](../../pipelex/libraries/llm_deck/overrides.toml).

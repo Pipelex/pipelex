@@ -35,9 +35,11 @@ Each validation error type can be configured to have one of three reactions:
 default_reaction = "raise"
 
 [pipelex.static_validation_config.reactions]
-missing_input_variable = "log"
-extraneous_input_variable = "log"
-inadequate_input_concept = "log"
+# Enable one of these to tolerate some static validation errors, like you would for pyright or some linters
+# missing_input_variable = "log"
+# extraneous_input_variable = "log"
+# inadequate_input_concept = "log"
+# too_many_candidate_inputs = "log"
 ```
 
 ## Validation Process

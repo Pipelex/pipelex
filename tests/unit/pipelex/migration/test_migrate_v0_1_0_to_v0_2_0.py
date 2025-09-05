@@ -131,7 +131,7 @@ refines = "Text"
         """Test that migration doesn't affect non-concept Concept = lines."""
         # These should NOT be changed
         test_content = """# This is a comment about Concept = something
-description = "This pipe works with Concept = something"
+definition = "This pipe works with Concept = something"
 prompt_template = "Define the Concept = whatever"
 """
 

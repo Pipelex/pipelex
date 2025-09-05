@@ -14,7 +14,7 @@ The pipeline `power_extractor_proof_of_purchase` is specifically designed to han
 async def extract_proof_of_purchase(pdf_url: str) -> ProofOfPurchase:
     working_memory = WorkingMemoryFactory.make_from_pdf(
         pdf_url=pdf_url,
-        concept_str="PDF",
+        concept_string="PDF",
         name="pdf",
     )
     pipe_output = await execute_pipeline(
@@ -57,7 +57,7 @@ The pipeline uses a powerful `PipeLLM` to extract the structured data from the d
 ```plx
 [pipe.write_markdown_from_page_content_proof_of_purchase]
 type = "PipeLLM"
-description = "Write markdown from page content"
+definition = "Write markdown from page content"
 inputs = { "page_content.page_view" = "Page" } # The LLM receives the image of the page
 output = "ProofOfPurchase" # The LLM is forced to output a ProofOfPurchase object
 llm = "llm_for_img_to_text"

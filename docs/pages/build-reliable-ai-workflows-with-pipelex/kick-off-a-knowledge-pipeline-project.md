@@ -18,7 +18,7 @@ Answer = "A response to a question"
 [pipe]
 [pipe.answer_question]
 type = "PipeLLM"
-description = "Answer a question"
+definition = "Answer a question"
 inputs = { question = "tutorial.Question" }
 output = "tutorial.Answer"
 prompt_template = """
@@ -64,7 +64,7 @@ A domain consists of:
     [pipe]
     [pipe.summarize_invoice]
     type = "PipeLLM"
-    description = "Summarize an invoice to extract key information"
+    definition = "Summarize an invoice to extract key information"
     inputs = { invoice = "finance.Invoice" }
     output = "finance.InvoiceSummary"
     ```
@@ -115,8 +115,8 @@ When using a domain in your code, you refer to concepts with `domain.ConceptName
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 
 # The concept_code combines domain and concept names
-invoice_stuff = StuffFactory.make_stuff(
-    concept_str="finance.Invoice",  # domain.ConceptName
+invoice_stuff = StuffFactory.make_from_concept_string(
+    concept_string="finance.Invoice",  # domain.ConceptName
     name="invoice_123",
     content=invoice_data # dictionary or Invoice object
 )

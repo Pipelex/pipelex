@@ -104,7 +104,6 @@ class ConfigManager:
            - pipelex_local.toml (before env)
            - pipelex_{environment}.toml
            - pipelex_{run_mode}.toml
-           - pipelex_user.toml (after env)
 
         Returns:
             Dict[str, Any]: The merged configuration dictionary

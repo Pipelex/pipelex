@@ -41,22 +41,6 @@ pipelex_libraries/         # Exported library root
     - Validates pipe configurations
     - Links pipes with their respective domains
 
-## Configuration Options
-
-### Path Configuration
-
-All paths are configurable through class variables in `LibraryConfig`:
-
-```python
-package_name = "pipelex"
-internal_library_root = "libraries"
-exported_library_root = "pipelex_libraries"
-exported_pipelines_path = "pipelex_libraries/pipelines"
-exported_llm_integrations_path = "pipelex_libraries/llm_integrations"
-exported_llm_deck_path = "pipelex_libraries/llm_deck"
-exported_templates_path = "pipelex_libraries/templates"
-```
-
 ### Library Initialization
 
 Use the CLI command to initialize libraries:
@@ -122,7 +106,7 @@ The library system includes specific error types:
 
 2. **Validation**:
 
-    - Run `pipelex validate all -c pipelex/libraries` after making changes
+    - Run `pipelex validate all -c path/to/your/pipelex/config/folder` after making changes
     - Check for domain consistency
     - Verify concept relationships
 

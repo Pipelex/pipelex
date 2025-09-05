@@ -23,11 +23,11 @@ You must use `add_each_output`, `combined_output`, or both.
 | Parameter         | Type          | Description                                                                                                                                                                    | Required |
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
 | `type`            | string        | The type of the pipe: `PipeParallel`                                                                          | Yes      |
-| `description`     | string        | A description of the parallel operation.                                                                           | Yes      |
+| `definition`     | string        | A description of the parallel operation.                                                                           | Yes      |
 | `inputs`    | dictionary  | The input concept(s) for the parallel operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
 | `output`   | string          | The output concept produced by the parallel operation.                                                | Yes      |
 | `parallels`       | array of tables| An array defining the pipes to run in parallel. Each table is a sub-pipe definition.                                                                                           | Yes      |
-| `add_each_output` | boolean       | If `true`, adds the output of each parallel pipe to the working memory individually. Defaults to `false`.                                                                       | No       |
+| `add_each_output` | boolean       | If `true`, adds the output of each parallel pipe to the working memory individually. Defaults to `true`.                                                                       | No       |
 | `combined_output` | string        | The name of a concept to use for a single, combined output object. The structure of this concept must have fields that match the `result` names from the `parallels` array.      | No       |
 
 ### Parallel Step Configuration
@@ -49,23 +49,23 @@ structure = "ProductAnalysis" # A Pydantic model with 'features' and 'sentiment'
 
 [pipe.extract_features]
 type = "PipeLLM"
-description = "Extract features from text"
+definition = "Extract features from text"
 inputs = { description = "ProductDescription" }
 output = "ProductFeatures"
 
 [pipe.analyze_sentiment]
 type = "PipeLLM"
-description = "Analyze sentiment of text"
+definition = "Analyze sentiment of text"
 inputs = { description = "ProductDescription" }
 output = "ProductSentiment"
 
 # The PipeParallel definition
 [pipe.analyze_product_in_parallel]
 type = "PipeParallel"
-description = "Extract features and sentiment at the same time"
+definition = "Extract features and sentiment at the same time"
 inputs = { description = "ProductDescription" }
 output = "ProductAnalysis" # This name is for the combined output
-add_each_output = false
+add_each_output = true
 combined_output = "ProductAnalysis"
 parallels = [
     { pipe = "extract_features", result = "features" },

@@ -35,7 +35,7 @@ When using `api_key_method = "secret_provider"`, Pipelex will:
    - `AWS_REGION`
 
 ⚠️ **Important**: To use the secret provider method, you must:
-1. Configure a secret provider in your project using the `SecretsProviderProtocol`: See more in the [Secrets](../../advanced-customization/secrets-provider-injection.md) documentation.
+1. Configure a secret provider in your project using the `SecretsProviderAbstract`: See more in the [Secrets](../../advanced-customization/secrets-provider-injection.md) documentation.
 2. Store your AWS credentials in your secret provider
 3. Ensure your secret provider is properly authenticated
 

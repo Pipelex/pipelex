@@ -82,7 +82,7 @@ class TestFooBar:
 
 - Always test with `make t` -> it runs pytest using proper settings
 - If some pytest tests fail, run pytest on the failed ones with the required verbosity to diagnose the issue
-- If all unit tests pass, run `make validate` -> it runs a minimal version of our app with just the inits and data loading (`pipelex validate all -c pipelex/libraries` under the hood)
+- If all unit tests pass, run `make validate` -> it runs a minimal version of our app with just the inits and data loading (`pipelex validate all -c pipelex/libraries` under the hood) in the python environment.
 
 ## PR Instructions
 

@@ -51,7 +51,7 @@ Each subsequent configuration file in this sequence can override settings from t
 - Base config: `pipelex.toml`
 - Local overrides: `pipelex_local.toml`
 - Environment overrides: `pipelex_dev.toml`, `pipelex_staging.toml`, `pipelex_prod.toml`, etc.
-- Run mode overrides: `pipelex_normal.toml`, `pipelex_unit_test.toml`, etc.
+- Run mode overrides: `pipelex_normal.toml`, `tests/pipelex_unit_test.toml`, etc.
 - Super user overrides: `pipelex_super.toml`
 
 NB: The run_mode unit_test is used for testing purposes.
@@ -69,5 +69,5 @@ NB: The run_mode unit_test is used for testing purposes.
 1. **Version Control**: Include your base `pipelex.toml` in version control
 2. **Environment Overrides**: Use environment-specific files for sensitive or environment-dependent settings
 3. **Documentation**: Comment any custom settings for team reference
-4. **Validation**: Run `pipelex validate all -c pipelex/libraries` after making configuration changes
+4. **Validation**: Run `pipelex validate all -c path/to/your/pipelex/config/folder` after making configuration changes
 5. **Gitignore**: Add local and sensitive override files to `.gitignore`

@@ -60,7 +60,7 @@ definition = "Test"
 
 [pipe.test_pipe]
 type = "PipeLLM"
-description = "Test"
+definition = "Test"
 prompt_template = """
 Output this only: "test"
 """   

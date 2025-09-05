@@ -163,7 +163,7 @@ structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
 default_reaction = "raise"
 
 [pipelex.static_validation_config.reactions]
-# enable one of these to tolerate some static validation errors, like you would for pyright or some linters
+# default_reaction is on raise
 # missing_input_variable = "log"
 # extraneous_input_variable = "log"
 # inadequate_input_concept = "log"

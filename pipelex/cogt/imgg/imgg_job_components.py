@@ -12,7 +12,7 @@ class AspectRatio(StrEnum):
     LANDSCAPE_3_2 = "landscape_3_2"
     LANDSCAPE_16_9 = "landscape_16_9"
     LANDSCAPE_21_9 = "landscape_21_9"
-    PORTRAIT_3_4 = "portrait_4_3"
+    PORTRAIT_3_4 = "portrait_3_4"
     PORTRAIT_2_3 = "portrait_2_3"
     PORTRAIT_9_16 = "portrait_9_16"
     PORTRAIT_9_21 = "portrait_9_21"

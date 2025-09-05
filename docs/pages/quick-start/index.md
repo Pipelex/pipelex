@@ -23,7 +23,7 @@ domain = "characters"
 [pipe]
 [pipe.create_character]
 type = "PipeLLM"
-description = "Creates a character."
+definition = "Creates a character."
 output = "Text"
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
@@ -69,7 +69,7 @@ python character.py
 ```plx
 [pipe.create_character]
 type = "PipeLLM"
-description = "Create a character."
+definition = "Create a character."
 output = "Text"
 llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
 prompt_template = """You are a book writer. Your task is to create a character.
@@ -81,7 +81,7 @@ Think of it and then output the character description."""
 ```plx
 [pipe.create_character]
 type = "PipeLLM"
-description = "Create a character."
+definition = "Create a character."
 output = "Text"
 llm = "llm_for_creative_writing"
 prompt_template = """You are a book writer. Your task is to create a character.
@@ -134,7 +134,7 @@ Character = "A character is a fiction story" # <- Define here your output concep
 [pipe]
 [pipe.create_character]
 type = "PipeLLM"
-description = "Create a character. Get a structured result."
+definition = "Create a character. Get a structured result."
 output = "Character"    # <- This is the output concept for your pipe
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
@@ -191,7 +191,7 @@ CharacterMetadata = "Metadata regarding a character."
 [pipe]
 [pipe.extract_character_1]
 type = "PipeLLM"
-description = "Get character information from a description."
+definition = "Get character information from a description."
 inputs = { character = "Character" }  # <- These are the inputs of your pipe, usable in the prompt_template
 output = "CharacterMetadata"
 prompt_template = """
@@ -235,8 +235,8 @@ async def process_existing_character():
         He moves with quiet purpose and speaks with a calm, thoughtful cadence that suggests he's always listening for more than just what's said.""",
     )
     # Wrap it into a stuff object
-    character_stuff = StuffFactory.make_stuff(
-        concept_code="character.Character", # <- `character` is the domain, `Character` is the concept name
+    character_stuff = StuffFactory.make_from_concept_string(
+        concept_string="character.Character", # <- `character` is the domain, `Character` is the concept name
         name="character",
         content=character,
     )
@@ -245,7 +245,7 @@ async def process_existing_character():
         stuff=character_stuff,
     )
     # Run the pipe identified by its pipe_code (it's the name of the pipe)
-    pipe_output, pipeline_run_id = await execute_pipeline(
+    pipe_output = await execute_pipeline(
         pipe_code="extract_character_1",
         working_memory=working_memory,
     )
