@@ -154,6 +154,7 @@ nav:
       - Reporting Delegate: pages/advanced-customization/reporting-delegate-injection.md
       - Pipeline Tracker: pages/advanced-customization/pipeline-tracker-injection.md
       - Activity Manager: pages/advanced-customization/activity-manager-injection.md
+      - Storage Provider: pages/advanced-customization/storage-provider-injection.md
       - Template Provider: pages/advanced-customization/template-provider-injection.md
       - Content Generator: pages/advanced-customization/content-generator-injection.md
       - LLM Model Provider: pages/advanced-customization/llm-model-provider-injection.md
