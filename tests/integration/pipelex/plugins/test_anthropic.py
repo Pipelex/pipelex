@@ -8,6 +8,7 @@ from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_anthropic_models
 
 
+# TODO: fix this: test works for Anthropic but not if you set peferred platform for Anthropic is Bedrock
 # make t VERBOSE=2 TEST=TestAnthropic
 @pytest.mark.gha_disabled
 @pytest.mark.codex_disabled
