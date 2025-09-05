@@ -1,7 +1,124 @@
----
-alwaysApply: true
----
-# Pipeline Guide
+Concatenation
+# Coding Standards & Best Practices
+
+This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
+
+## Type Hints
+
+1. **Always Use Type Hints**
+   - Every function parameter must be typed
+   - Every function return must be typed
+   - Use type hints for all variables where type is not obvious
+   - Use types with Uppercase first letter (Dict[], List[], etc.)
+
+2. **StrEnum**
+   - Import from `pipelex.types`:
+   ```python
+   from pipelex.types import StrEnum
+   ```
+
+## BaseModel Standards
+
+- Respect Pydantic v2 standards
+- Keep models focused and single-purpose
+- Use descriptive field names
+- Use type hints for all fields
+- Document complex validations
+- Use Optional[] for nullable fields
+- Use Field(default_factory=...) for mutable defaults
+
+## Factory Pattern
+
+- Use Factory Pattern for object creation when dealing with multiple implementations
+
+## Documentation
+
+1. **Docstring Format**
+   ```python
+   def process_image(image_path: str, size: Tuple[int, int]) -> bytes:
+       """Process and resize an image.
+       
+       Args:
+           image_path: Path to the source image
+           size: Tuple of (width, height) for resizing
+           
+       Returns:
+           Processed image as bytes
+       """
+       pass
+   ```
+
+2. **Class Documentation**
+   ```python
+   class ImageProcessor:
+       """Handles image processing operations.
+       
+       Provides methods for resizing, converting, and optimizing images.
+       """
+   ```
+
+## Error Handling
+
+1. **Graceful Error Handling**
+   - Use try/except blocks with specific exceptions
+   - Convert third-party exceptions to custom ones
+   ```python
+   try:
+       from fal_client import AsyncClient as FalAsyncClient
+   except ImportError as exc:
+       raise MissingDependencyError(
+           "fal-client", "fal", 
+           "The fal-client SDK is required to use FAL models."
+       ) from exc
+   ```
+
+## Code Quality Checks
+
+### Linting and Type Checking
+
+Before finalizing a task, run:
+```bash
+make fix-unused-imports
+make check
+```
+
+This runs multiple code quality tools:
+- Pyright: Static type checking
+- Ruff: Fast Python linter  
+- Mypy: Static type checker
+
+Always fix any issues reported by these tools before proceeding.
+
+### Running Tests
+
+1. **Quick Test Run** (no LLM/image generation):
+   ```bash
+   make tp
+   ```
+   Runs tests with markers: `(dry_runnable or not (inference or llm or imgg or ocr)) and not (needs_output or pipelex_api)`
+
+2. **Specific Tests**:
+   ```bash
+   make tp TEST=TestClassName
+   # or
+   make tp TEST=test_function_name
+   ```
+   Note: Matches names starting with the provided string.
+
+**Important**: Never run `make ti`, `make test-inference`, `make to`, `make test-ocr`, `make tg`, or `make test-imgg` - these use costly inference.
+
+## Pipelines
+
+- All pipeline definitions go in `pipelex/libraries/pipelines/`
+- Always validate pipelines after creation/edit with `make validate`.
+  Iterate if there are errors.
+
+## Project Structure
+
+- **Pipelines**: `pipelex/libraries/pipelines/`
+- **Tests**: `tests/` directory
+- **Documentation**: `docs/` directory
+ # Pipeline Guide
 
 - Always first write your "plan" in natural langage, then transcribe it in pipelex.
 - You should ALWAYS RUN the terminal command `make validate` when you are writing a `.plx` file. It will ensure the pipe is runnable. If not, iterate.
@@ -535,3 +652,270 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
 ALWAYS RUN `make validate` when you are finished writing pipelines: This checks for errors. If there are errors, iterate until it works.
 Then, create an example file to run the pipeline in the `examples` folder.
 But don't write documentation unless asked explicitly to.
+
+# Rules to choose LLM models used in PipeLLMs.
+
+## LLM Handles
+
+In order to use it in a pipe, an LLM is referenced by its llm_handle and possibly by an llm_preset.
+Both llm_handles and llm_presets are defined in this toml config file: [base_llm_deck.toml](mdc:pipelex/libraries/llm_deck/base_llm_deck.toml)
+
+## LLM Handles
+
+An llm_handle matches the handle (an id of sorts) with the full specification of the LLM to use, i.e.:
+- llm_name
+- llm_version
+- llm_platform_choice
+
+The declaration of llm_handles looks like this in toml syntax:
+```toml
+[llm_handles]
+gpt-4o-2024-11-20 = { llm_name = "gpt-4o", llm_version = "2024-11-20" }
+```
+
+In mosty cases, we only want to use version "latest" and llm_platform_choice "default" in which case the declaration is simply a match of the llm_handle to the llm_name, like this:
+```toml
+best-claude = "claude-4-opus"
+best-gemini = "gemini-2.5-pro"
+best-mistral = "mistral-large"
+```
+
+And of course, llm_handles are automatically assigned for all models by their name, with version "latest" and llm_platform_choice "default".
+
+## Using an LLM Handle in a PipeLLM
+
+Here is an example of using an llm_handle to specify which LLM to use in a PipeLLM:
+
+```plx
+[pipe.hello_world]
+type = "PipeLLM"
+definition = "Write text about Hello World."
+output = "Text"
+llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
+prompt_template = """
+Write a haiku about Hello World.
+"""
+```
+
+As you can see, to use the LLM, you must also indicate the temperature (float between 0 and 1) and max_tokens (either an int or the string "auto").
+
+## LLM Presets
+
+Presets are meant to record the choice of an llm with its hyper parameters (temperature and max_tokens) if it's good for a particular task. LLM Presets are skill-oriented.
+
+Examples:
+```toml
+llm_to_reason = { llm_handle = "o4-mini", temperature = 1, max_tokens = "auto" }
+llm_to_extract_invoice = { llm_handle = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
+```
+
+The interest is that these presets can be used to set the LLM choice in a PipeLLM, like this:
+
+```plx
+[pipe.extract_invoice]
+type = "PipeLLM"
+definition = "Extract invoice information from an invoice text transcript"
+inputs = { invoice_text = "InvoiceText" }
+output = "Invoice"
+llm = "llm_to_extract_invoice"
+prompt_template = """
+Extract invoice information from this invoice:
+
+The category of this invoice is: $invoice_details.category.
+
+@invoice_text
+"""
+```
+
+The setting here `llm = "llm_to_extract_invoice"` works because "llm_to_extract_invoice" has been declared as an llm_preset in the deck.
+You must not use an LLM preset in a PipeLLM that does not exist in the deck. If needed, you can add llm presets.
+
+
+You can override the predefined llm presets in [overrides.toml](../../pipelex/libraries/llm_deck/overrides.toml).
+
+These rules apply when writing unit tests.
+- Always use pytest
+
+## Test file structure
+
+- Name test files with `test_` prefix
+- Use descriptive names that match the functionality being tested
+- Place test files in the appropriate test category directory:
+    - `tests/unit/` - for unit tests that test individual functions/classes in isolation
+    - `tests/integration/` - for integration tests that test component interactions
+    - `tests/e2e/` - for end-to-end tests that test complete workflows
+    - `tests/test_pipelines/` - for test pipeline definitions (PLX files and their structuring python files)
+- Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
+- Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `tests.pipelex.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
+- Always put test inside Test classes.
+- The pipelex pipelines should be stored in `tests/test_pipelines` as well as the related structured Output classes that inherit from `StructuredContent`
+
+## Markers
+
+Apply the appropriate markers:
+- "llm: uses an LLM to generate text or objects"
+- "imgg: uses an image generation AI"
+- "inference: uses either an LLM or an image generation AI"
+- "gha_disabled: will not be able to run properly on GitHub Actions"
+
+Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
+
+## Tips
+
+- Never use the unittest.mock. Use pytest-mock
+
+## Test Class Structure
+
+Always group the tests of a module into a test class:
+
+```python
+@pytest.mark.llm
+@pytest.mark.inference
+@pytest.mark.asyncio(loop_scope="class")
+class TestFooBar:
+    @pytest.mark.parametrize(
+        "topic test_case_blueprint",
+        [
+            TestCases.CASE_1,
+            TestCases.CASE_2,
+        ],
+    )
+    async def test_pipe_processing(
+        self,
+        request: FixtureRequest,
+        topic: str,
+        test_case_blueprint: StuffBlueprint,
+    ):
+        # Test implementation
+```
+
+Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get the test name using `cast(str, request.node.originalname),  # type: ignore`. 
+
+# Pipe tests
+
+## Required imports for pipe tests
+
+```python
+import pytest
+from pytest import FixtureRequest
+from pipelex import log, pretty_print
+from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.hub import get_report_delegate
+from pipelex_libraries.pipelines.base_library.retrieve import RetrievedExcerpt
+from pipelex.config_pipelex import get_config
+
+from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
+from pipelex.core.pipes.pipe_output import PipeOutput, PipeOutputType
+from pipelex.core.pipes.pipe_run_params import PipeRunParams
+from pipelex.core.pipes.pipe_run_params import PipeRunParams
+from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+```
+
+## Pipe test implementation steps
+
+1. Create Stuff from blueprint:
+
+```python
+stuff = StuffFactory.make_stuff(
+    concept_code="RetrievedExcerpt",
+    domain="retrieve",
+    content=RetrievedExcerpt(text="<Some retrieved text>", justification="<Some justification>")
+    name="retrieved_text",
+)
+```
+
+2. Create Working Memory:
+
+```python
+working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+```
+
+3. Run the pipe:
+
+```python
+pipe_output: PipeOutput = await pipe_router.run_pipe(
+    pipe_code="pipe_name",
+    pipe_run_params=PipeRunParamsFactory.make_run_params(),
+    working_memory=working_memory,
+    job_metadata=JobMetadata(),
+)
+```
+
+4. Log output and generate report:
+
+```python
+pretty_print(pipe_output, title=f"Pipe output")
+get_report_delegate().generate_report()
+```
+
+5. Basic assertions:
+
+```python
+assert pipe_output is not None
+assert pipe_output.working_memory is not None
+assert pipe_output.main_stuff is not None
+```
+
+## Test Data Organization
+
+- If it's not already there, create a `test_data.py` file in the test directory
+- Define test cases using `StuffBlueprint`:
+
+```python
+class TestCases:
+    CASE_BLUEPRINT_1 = StuffBlueprint(
+        name="test_case_1",
+        concept_code="domain.ConceptName1",
+        value="test_value"
+    )
+    CASE_BLUEPRINT_2 = StuffBlueprint(
+        name="test_case_2",
+        concept_code="domain.ConceptName2",
+        value="test_value"
+    )
+
+    CASE_BLUEPRINTS: ClassVar[List[Tuple[str, str]]] = [  # topic, blueprint"
+        ("topic1", CASE_BLUEPRINT_1),
+        ("topic2", CASE_BLUEPRINT_2),
+    ]
+```
+
+Note how we avoid initializing a default mutable value within a class instance, instead we use ClassVar.
+Also note that we provide a topic for the test case, which is purely for convenience.
+
+## Best Practices for Testing
+
+- Use parametrize for multiple test cases
+- Test both success and failure cases
+- Verify working memory state
+- Check output structure and content
+- Use meaningful test case names
+- Include docstrings explaining test purpose
+- Log outputs for debugging
+- Generate reports for cost tracking
+
+# Test-Driven Development Guide
+
+This document outlines our test-driven development (TDD) process and the tools available for testing.
+
+## TDD Cycle
+
+1. **Write a Test First**
+[pytest.mdc](pytest.mdc)
+
+2. **Write the Code**
+   - Implement the minimum amount of code needed to pass the test
+   - Follow the project's coding standards
+   - Keep it simple - don't write more than needed
+
+3. **Run Linting and Type Checking**
+[coding_standards.mdc](coding_standards.mdc)
+
+4. **Refactor if needed**
+If the code needs refactoring, with the best practices [coding_standards.mdc](coding_standards.mdc)
+
+5. **Validate tests**
+
+Remember: The key to TDD is writing the test first and letting it drive your implementation. Always run the full test suite and quality checks before considering a feature complete.
+
