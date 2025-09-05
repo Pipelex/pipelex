@@ -227,6 +227,11 @@ If a concept only refines a native concept (like Text, Image, etc.) without addi
 [concept]
 Joke = "A humorous text that makes people laugh."
 ```
+If you simply need to refine another native concept, construct it like this:
+```plx
+[concept.Landscape]
+refines = "Image"
+```
 
 Only create a Python structure class when you need to add specific fields:
 
