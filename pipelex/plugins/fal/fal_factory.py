@@ -37,7 +37,7 @@ class FalFactory:
             case AspectRatio.LANDSCAPE_21_9:
                 return "landscape_21_9"
             case AspectRatio.PORTRAIT_3_4:
-                return "portrait_3_4"
+                return "portrait_4_3"
             case AspectRatio.PORTRAIT_9_16:
                 return "portrait_16_9"
             case AspectRatio.PORTRAIT_9_21:
