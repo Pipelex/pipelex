@@ -50,7 +50,11 @@ definition = "Route based on category field"
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
-pipe_map = { small = "process_small", medium = "process_medium", large = "process_large" }
+
+[pipe.route_by_category.pipe_map]
+small = "process_small"
+medium = "process_medium"
+large = "process_large"
 
 # Define the pipes that PipeCondition can route to
 [pipe.process_small]
@@ -95,7 +99,10 @@ inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 expression = "classification.type"
 default_pipe_code = "process_unknown"
-pipe_map = { invoice = "process_invoice", receipt = "process_receipt" }
+
+[pipe.route_with_fallback.pipe_map]
+invoice = "process_invoice"
+receipt = "process_receipt"
 
 [pipe.process_invoice]
 type = "PipeLLM"
