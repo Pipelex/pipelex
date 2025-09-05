@@ -106,7 +106,7 @@ After migration, validate your pipeline files:
 pipelex validate all -c path/to/your/pipelex/config/folder
 
 # Run a specific pipeline to test
-# Pipeline execution is done through Python code, not CLI
+# Pipeline execution is done through Python code, not CLI (coming soon)
 ```
 
 ### Troubleshooting
@@ -257,7 +257,7 @@ After migration, validate your pipeline files:
 pipelex validate all -c path/to/your/pipelex/config/folder
 
 # Run a specific pipeline to test
-# Pipeline execution is done through Python code, not CLI
+# Pipeline execution is done through Python code, not CLI (coming soon)
 ```
 
 ---
