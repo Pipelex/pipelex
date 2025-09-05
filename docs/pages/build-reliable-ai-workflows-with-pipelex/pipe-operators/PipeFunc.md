@@ -60,7 +60,7 @@ Once the function is registered, you can use it in your `.plx` file.
 | Parameter       | Type   | Description                                                                 | Required |
 | --------------- | ------ | --------------------------------------------------------------------------- | -------- |
 | `type`          | string | The type of the pipe: `PipeFunc`                                                                          | Yes      |
-| `description`   | string | A description of the function operation.                                                                   | Yes      |
+| `definition`   | string | A description of the function operation.                                                                   | Yes      |
 | `function_name` | string | The unique name used to register the Python function (e.g., "combine_two_texts"). | Yes      |
 | `output`        | string | The concept to associate with the function's return value.                  | Yes      |
 

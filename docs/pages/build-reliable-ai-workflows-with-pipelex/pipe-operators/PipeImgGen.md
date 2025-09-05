@@ -21,7 +21,7 @@ The pipe can be configured to generate a single image or a list of images.
 | Parameter               | Type            | Description                                                                                                                   | Required |
 | ----------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                  | string          | The type of the pipe: `PipeImgGen`                                                                          | Yes      |
-| `description`           | string          | A description of the image generation operation.                                                                           | Yes      |
+| `definition`           | string          | A description of the image generation operation.                                                                           | Yes      |
 | `inputs`                | dictionary      | The input concept(s) for the image generation operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
 | `output`                | string          | The output concept produced by the image generation operation.                                                | Yes      |
 | `imgg_prompt`        | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |

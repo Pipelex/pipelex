@@ -26,7 +26,7 @@ The `PageContent` object has the following structure:
 | Parameter                   | Type    | Description                                                                                                                              | Required |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                      | string  | The type of the pipe: `PipeOcr`                                                                          | Yes      |
-| `description`               | string  | A description of the OCR operation.                                                                   | Yes      |
+| `definition`               | string  | A description of the OCR operation.                                                                   | Yes      |
 | `inputs`                    | Fixed  | The input for the PipeOcr is the key `ocr_input` and the value is either of concept `Image` or `Pdf`.                                                     | Yes       |
 | `output`                    | string  | The output concept produced by the OCR operation.                                                | Yes      |
 | `page_images`               | boolean | If `true`, any images found within the document pages will be extracted and included in the output. Defaults to `false`.                 | No       |

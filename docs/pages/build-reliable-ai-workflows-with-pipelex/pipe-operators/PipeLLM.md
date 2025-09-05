@@ -117,7 +117,7 @@ Analyze the document page shown in the image and explain how it relates to the p
 | Parameter                   | Type                | Description                                                                                                                                                                  | Required |
 | --------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                      | string              | The type of the pipe: `PipeLLM`                                                                          | Yes      |
-| `description`               | string              | A description of the LLM operation.                                                                           | Yes      |
+| `definition`               | string              | A description of the LLM operation.                                                                           | Yes      |
 | `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. For images within structured content, use dot notation (e.g., `"page.image_argurment"`)
 | `output`                    | string              | The output concept produced by the LLM operation.                                                | Yes      |
 | `llm`                       | string or table     | Specifies the LLM preset(s) to use. Can be a single preset or a table mapping different presets for different generation modes (e.g., `main`, `object_direct`).              | No       |
