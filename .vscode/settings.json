@@ -20,5 +20,8 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "djlint.showInstallError": false
+    "djlint.showInstallError": false,
+    "files.associations": {
+        "*.plx": "plx"
+    }
 }

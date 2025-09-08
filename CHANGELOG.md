@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.9.3] - 2025-09-06
+
+### Added
+
+ - Better support for BlackboxAI IDE
+ - VS Code extensions recommendations file with Pipelex, Ruff, and MyPy extensions
+ - File association for .plx files in VS Code settings
+
+## [v0.9.2] - 2025-09-05
+
+### Fixed
+
+- Fix the rules of all agents.
+
+### Added
+
+- Added agent rule for copilot
+- Added a rule to forbidden structuring basic text concepts
+
 ## [v0.9.1] - 2025-09-05
 
 ### Fixed
