@@ -3,7 +3,7 @@ from typing import Literal, Optional
 from pydantic import Field
 
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
 
 
 class PipeOcrBlueprint(PipeBlueprint):

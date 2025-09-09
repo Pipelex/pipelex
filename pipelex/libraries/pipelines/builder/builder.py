@@ -1,9 +1,7 @@
 from typing import Annotated, Dict, Optional, Union, cast
 
 from pydantic import ConfigDict, Field, field_validator
-from pipelex.types import StrEnum
-from pipelex.pipe_works.pipe_dry import dry_run_pipe
-from pipelex import pretty_print
+
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent
@@ -18,6 +16,7 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_llm import PipeLLMBlueprint, 
 from pipelex.libraries.pipelines.builder.pipe.pipe_ocr import PipeOcrBlueprint, PipeOcrSpecBlueprint
 from pipelex.libraries.pipelines.builder.pipe.pipe_parallel import PipeParallelBlueprint, PipeParallelSpecBlueprint
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence import PipeSequenceBlueprint, PipeSequenceSpecBlueprint
+from pipelex.types import StrEnum
 
 
 class PipelexBundleBlueprintDraft(StructuredContent):
@@ -178,9 +177,11 @@ def compile_in_pipelex_bundle_blueprint(working_memory: WorkingMemory) -> Pipele
         },
     )
 
+
 class DryRunStatus(StrEnum):
     SUCCESS = "SUCCESS"
-    FAILURE = "FAILURE" 
+    FAILURE = "FAILURE"
+
 
 class DryRunResult(StructuredContent):
     """A result of a dry run of a pipelex bundle blueprint."""
@@ -188,9 +189,15 @@ class DryRunResult(StructuredContent):
     status: DryRunStatus
     error_message: Optional[str] = None
 
+
 def validate_pipelex_bundle_blueprint(working_memory: WorkingMemory) -> DryRunResult:
     """Validate a pipelex bundle blueprint."""
     # pipelex_bundle_blueprint = working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleBlueprint)
     # dry_run_result = dry_run_pipes(pipes=pipelex_bundle_blueprint.pipe.values())
     # return DryRunResult(status=dry_run_result.status, error_message=dry_run_result.error_message)
     return DryRunResult(status=DryRunStatus.SUCCESS)
+
+
+def return_pipelex_bundle_blueprint(working_memory: WorkingMemory) -> PipelexBundleBlueprint:
+    """Return the pipelex bundle blueprint from working memory."""
+    return working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleBlueprint)

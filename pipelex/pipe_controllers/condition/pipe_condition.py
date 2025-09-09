@@ -235,7 +235,9 @@ class PipeCondition(PipeController):
 
     @override
     def pipe_dependencies(self) -> Set[str]:
-        pipe_codes = [pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in self.pipe_map if pipe_condition_pipe_map.pipe_code != "continue"]
+        pipe_codes = [
+            pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in self.pipe_map if pipe_condition_pipe_map.pipe_code != "continue"
+        ]
         if self.default_pipe_code:
             pipe_codes.append(self.default_pipe_code)
         return set(pipe_codes)
@@ -295,7 +297,6 @@ class PipeCondition(PipeController):
         )
         pipe_jinja2_output = cast(PipeJinja2Output, pipe_output_1)
         evaluated_expression = pipe_jinja2_output.rendered_text.strip()
-    
 
         if not evaluated_expression or evaluated_expression == "None":
             error_msg = f"Conditional expression returned an empty string in pipe {self.code}:"
@@ -323,7 +324,7 @@ class PipeCondition(PipeController):
             error_msg += f"\n\nExpression: {self.applied_expression_template}"
             error_msg += f"\n\nPipe map: {self.pipe_map}"
             raise PipeConditionError(error_msg)
-        
+
         if chosen_pipe_code == "continue":
             return PipeOutput(working_memory=working_memory)
 

@@ -1,7 +1,8 @@
 from typing import Any, Optional, Type
 
 import instructor
-from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock
+from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock, BadRequestError
+from instructor.exceptions import InstructorRetryException
 from typing_extensions import override
 
 from pipelex import log
@@ -16,6 +17,20 @@ from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
+
+class AnthropicLLMWorkerError(Exception):
+    """Base exception for Anthropic LLM Worker errors."""
+    pass
+
+
+class AnthropicBadRequestError(AnthropicLLMWorkerError):
+    """Raised when Anthropic API returns a BadRequestError."""
+    pass
+
+
+class AnthropicInstructorError(AnthropicLLMWorkerError):
+    """Raised when Instructor encounters an error with Anthropic."""
+    pass
 
 class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
@@ -76,13 +91,19 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     ) -> str:
         message = await AnthropicFactory.make_user_message(llm_job=llm_job)
         max_tokens = self._adapt_max_tokens(max_tokens=llm_job.job_params.max_tokens)
-        response = await self.anthropic_async_client.messages.create(
+        try:
+            response = await self.anthropic_async_client.messages.create(
             messages=[message],
             system=llm_job.llm_prompt.system_text or NOT_GIVEN,
             model=self.llm_engine.llm_id,
-            temperature=llm_job.job_params.temperature,
-            max_tokens=max_tokens,
-        )
+                temperature=llm_job.job_params.temperature,
+                max_tokens=max_tokens,
+            )
+        except BadRequestError as exc:
+            log.error(f"Error generating text with model `{self.llm_engine.llm_id}` on platform `{self.llm_engine.llm_platform}`, "
+            f"system: {llm_job.llm_prompt.system_text}, message: {message}: {exc}")
+            raise AnthropicBadRequestError(f"Error generating text with model `{self.llm_engine.llm_id}` "
+            f"on platform `{self.llm_engine.llm_platform}`: {exc}") from exc
 
         single_content_block = response.content[0]
         if single_content_block.type != "text":
@@ -107,14 +128,22 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     ) -> BaseModelTypeVar:
         messages = await AnthropicFactory.make_simple_messages(llm_job=llm_job)
         max_tokens = self._adapt_max_tokens(max_tokens=llm_job.job_params.max_tokens)
-        result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-            messages=messages,
-            response_model=schema,
-            max_retries=llm_job.job_config.max_retries,
-            model=self.llm_engine.llm_id,
-            temperature=llm_job.job_params.temperature,
-            max_tokens=max_tokens,
-        )
+        try:
+            result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
+                messages=messages,
+                response_model=schema,
+                max_retries=llm_job.job_config.max_retries,
+                model=self.llm_engine.llm_id,
+                temperature=llm_job.job_params.temperature,
+                max_tokens=max_tokens,
+            )
+        except BadRequestError as exc:
+            log.error(f"Error generating object with model {self.llm_engine.llm_id}: {exc}")
+            raise AnthropicBadRequestError(f"Error generating object with model {self.llm_engine.llm_id}: {exc}") from exc
+        except InstructorRetryException as exc:
+            log.error(f"Instructor retry exception with model {self.llm_engine.llm_id}: {exc}")
+            raise AnthropicInstructorError(f"Instructor failed after retries with model {self.llm_engine.llm_id}: {exc}") from exc
+        
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)
 

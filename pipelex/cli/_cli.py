@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex.cli.commands import init_app, migrate_app, show_app, validate_app
 from pipelex.cli.commands.build_cmd import build_app
+from pipelex.cli.commands.builder_debug_cmd import builder_debug_app
 
 
 class PipelexCLI(TyperGroup):
@@ -38,3 +39,4 @@ app.add_typer(validate_app, name="validate", help="Validation and dry-run comman
 app.add_typer(show_app, name="show", help="Show and list commands")
 app.add_typer(migrate_app, name="migrate", help="Migration commands")
 app.add_typer(build_app, name="build", help="Build artifacts like pipeline blueprints")
+app.add_typer(builder_debug_app, name="builder-debug", help="Debug and test intermediate steps of the builder pipeline")
