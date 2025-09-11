@@ -132,17 +132,19 @@ class PipelexBundleBlueprint(StructuredContent):
 
     def to_core_blueprint(self) -> PipelexBundleBlueprintCore:
         """Convert this PipelexBundleBlueprint to the core PipelexBundleBlueprint."""
-        concept: Optional[Dict[str, Union[ConceptBlueprintCore, str]]] = {}
+        concept: Optional[Dict[str, Union[ConceptBlueprintCore, str]]] = None
 
         if self.concept:
+            concept = {}
             for concept_code, concept_blueprint in self.concept.items():
                 if isinstance(concept_blueprint, ConceptBlueprint):
                     concept[concept_code] = concept_blueprint.to_core_blueprint()
                 else:
                     concept[concept_code] = ConceptBlueprintCore(definition=concept_code, structure=concept_blueprint)
 
-        pipe: Optional[Dict[str, PipeBlueprintUnionCore]] = {}
+        pipe: Optional[Dict[str, PipeBlueprintUnionCore]] = None
         if self.pipe:
+            pipe = {}
             for pipe_code, pipe_blueprint in self.pipe.items():
                 pipe_blueprint_typed: PipeBlueprintUnion = pipe_blueprint
                 pipe[pipe_code] = pipe_blueprint_typed.to_core_blueprint(pipe_code, self.domain)

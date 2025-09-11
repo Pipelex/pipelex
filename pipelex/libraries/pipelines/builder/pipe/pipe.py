@@ -96,8 +96,9 @@ class PipeBlueprint(StructuredContent):
     def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeBlueprintCore:
         """Convert this PipeBlueprint to the core PipeBlueprint."""
         # Convert inputs
-        converted_inputs: Optional[Dict[str, Union[str, InputRequirementBlueprintCore]]] = {}
+        converted_inputs: Optional[Dict[str, Union[str, InputRequirementBlueprintCore]]] = None
         if self.inputs:
+            converted_inputs = {}
             for input_name, input_spec in self.inputs.items():
                 if isinstance(input_spec, InputRequirementBlueprint):
                     converted_inputs[input_name] = input_spec.to_core_input_requirement(domain)
