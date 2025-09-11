@@ -304,11 +304,9 @@ class StructurePrinter:
 
                 # If no fields were output, show inheritance comment
                 if len(output) == (2 if doc else 1):
-                    output.append(f"    # Inherits from {base_class_name}")
                     output.append("    # No additional fields")
             except (TypeError, AttributeError):
                 # If we can't get type hints, show inheritance comment
-                output.append(f"    # Inherits from {base_class_name}")
                 output.append("    # No additional fields")
 
         # Then output all enum classes

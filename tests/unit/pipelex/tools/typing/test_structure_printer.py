@@ -6,7 +6,7 @@ from typing import Any, Set
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.stuff_content import StructuredContent, StuffContent
 from pipelex.tools.typing.structure_printer import StructurePrinter
 from tests.unit.pipelex.tools.typing.data import (
     EXTRACT_MODEL_TYPES_CASES,
@@ -40,7 +40,7 @@ class TestStructurePrinter:
     # ---------- render_model (exact match cases) ----------
     @pytest.mark.parametrize("cls, expected", RENDER_MODEL_CASES)
     def test_render_model_exact(self, cls: Any, expected: str):
-        out = StructurePrinter().get_type_structure(tp=cls, base_class=StructuredContent)
+        out = "\n".join(StructurePrinter().get_type_structure(tp=cls, base_class=StuffContent))
 
         pretty_print(out, title=f"out for {cls}")
         assert out == expected
