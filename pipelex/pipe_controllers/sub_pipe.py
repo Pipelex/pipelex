@@ -7,6 +7,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
+from pipelex.core.stuffs.stuff_content import ListContent
 from pipelex.exceptions import PipeInputError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
@@ -41,21 +42,19 @@ class SubPipe(BaseModel):
         # Case 1: Batch processing
         if batch_params := self.batch_params:
             try:
-                working_memory.get_stuff(name=batch_params.input_list_stuff_name)
+                working_memory.get_typed_object_or_attribute(name=batch_params.input_list_stuff_name, wanted_type=ListContent)
             except WorkingMemoryStuffNotFoundError as exc:
                 raise PipeInputError(
                     f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
                     f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
                 ) from exc
 
-            # Create blueprint for PipeBatch
             pipe_batch_blueprint = PipeBatchBlueprint(
                 definition=f"Batch processing for {self.pipe_code}",
                 branch_pipe_code=self.pipe_code,
                 output=sub_pipe.output.code,
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
-                # inputs should be of type: Dict[str, InputRequirementBlueprint]
                 inputs={
                     batch_params.input_item_stuff_name: InputRequirementBlueprint(
                         concept=sub_pipe.inputs.root[batch_params.input_item_stuff_name].concept.concept_string

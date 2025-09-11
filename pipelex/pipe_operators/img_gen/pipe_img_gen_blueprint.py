@@ -1,6 +1,6 @@
 from typing import Literal, Optional, Union
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
@@ -32,7 +32,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
         is_raw: Whether to return raw image data instead of processed format.
         seed: Random seed for reproducibility. Use integer value or 'auto' for random seed.
         nb_output: Number of images to generate. Defaults to single image. Must be >= 1.
-        img_gen_prompt_var_name: Variable name for dynamic prompt generation from inputs.
+        img_gen_prompt_var_name: Variable name for dynamic prompt generation from inputs. Will default to "prompt"
 
     Validation Rules:
         1. Quality and nb_steps are mutually exclusive (cannot specify both).
@@ -47,6 +47,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeImgGen"] = "PipeImgGen"
+    category: Literal["PipeOperator"] = "PipeOperator"
     img_gen_prompt: Optional[str] = None
     imgg_handle: Optional[ImggHandle] = None
     aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
@@ -70,3 +71,10 @@ class PipeImgGenBlueprint(PipeBlueprint):
         ):
             raise PipeDefinitionError(f"PipeImgGenBlueprint should have no more than one of {excess_attributes_list} among them")
         return self
+
+    @field_validator("img_gen_prompt_var_name")
+    @classmethod
+    def validate_input_var_name_not_provided_as_attribute(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            raise PipeDefinitionError("img_gen_prompt_var_name must be None before input validation")
+        return value

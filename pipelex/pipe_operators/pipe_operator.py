@@ -14,7 +14,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeOperator(PipeAbstract):
-    type: Literal["PipeOperator"] = "PipeOperator"
+    category: Literal["PipeOperator"] = "PipeOperator"
 
     @override
     async def run_pipe(

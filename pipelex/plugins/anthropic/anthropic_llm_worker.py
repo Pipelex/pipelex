@@ -20,17 +20,21 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 class AnthropicLLMWorkerError(Exception):
     """Base exception for Anthropic LLM Worker errors."""
+
     pass
 
 
 class AnthropicBadRequestError(AnthropicLLMWorkerError):
     """Raised when Anthropic API returns a BadRequestError."""
+
     pass
 
 
 class AnthropicInstructorError(AnthropicLLMWorkerError):
     """Raised when Instructor encounters an error with Anthropic."""
+
     pass
+
 
 class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
@@ -93,17 +97,20 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         max_tokens = self._adapt_max_tokens(max_tokens=llm_job.job_params.max_tokens)
         try:
             response = await self.anthropic_async_client.messages.create(
-            messages=[message],
-            system=llm_job.llm_prompt.system_text or NOT_GIVEN,
-            model=self.llm_engine.llm_id,
+                messages=[message],
+                system=llm_job.llm_prompt.system_text or NOT_GIVEN,
+                model=self.llm_engine.llm_id,
                 temperature=llm_job.job_params.temperature,
                 max_tokens=max_tokens,
             )
         except BadRequestError as exc:
-            log.error(f"Error generating text with model `{self.llm_engine.llm_id}` on platform `{self.llm_engine.llm_platform}`, "
-            f"system: {llm_job.llm_prompt.system_text}, message: {message}: {exc}")
-            raise AnthropicBadRequestError(f"Error generating text with model `{self.llm_engine.llm_id}` "
-            f"on platform `{self.llm_engine.llm_platform}`: {exc}") from exc
+            log.error(
+                f"Error generating text with model `{self.llm_engine.llm_id}` on platform `{self.llm_engine.llm_platform}`, "
+                f"system: {llm_job.llm_prompt.system_text}, message: {message}: {exc}"
+            )
+            raise AnthropicBadRequestError(
+                f"Error generating text with model `{self.llm_engine.llm_id}` on platform `{self.llm_engine.llm_platform}`: {exc}"
+            ) from exc
 
         single_content_block = response.content[0]
         if single_content_block.type != "text":
@@ -143,7 +150,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         except InstructorRetryException as exc:
             log.error(f"Instructor retry exception with model {self.llm_engine.llm_id}: {exc}")
             raise AnthropicInstructorError(f"Instructor failed after retries with model {self.llm_engine.llm_id}: {exc}") from exc
-        
+
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)
 

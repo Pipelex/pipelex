@@ -77,6 +77,12 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         for concept in concepts:
             self.add_new_concept(concept=concept)
 
+    def remove_concepts_by_codes(self, concept_codes: List[str]) -> None:
+        """Remove concepts by their codes."""
+        for concept_code in concept_codes:
+            if concept_code in self.root:
+                del self.root[concept_code]
+
     @override
     def is_compatible(self, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
         if Concept.are_concept_compatible(concept_1=tested_concept, concept_2=wanted_concept, strict=strict):

@@ -12,7 +12,7 @@ description = "Create a ConceptSpecBlueprint from a brief, existing concepts, an
 inputs = { concept_spec = "ConceptSpec"}
 output = "ConceptSpecBlueprint"
 steps = [
-    { pipe = "spec_to_structure", result = "concept_spec_structure" },
+    { pipe = "spec_to_structure", result = "concept_spec_structures" },
     { pipe = "to_concept_blueprint", result = "concept_spec_blueprints" }
 ]
 
@@ -42,26 +42,20 @@ multiple_output = true
 llm = "llm_to_engineer"
 prompt_template = """
 Create a ConceptStructureSpecBlueprint from the ConceptSpec.
-ConceptSpec:
-@concept_spec
-
 Please focus only on the structure.
 The field "choices" is for Literal values or enums. When it is provided, the field "type" must be None. But the choices array cannot be empty.
 
-"""
-
-[pipe.to_concept_blueprint]
-type = "PipeLLM"
-description = "Generate the final ConceptSpecBlueprint using the spec, structure, and existing concept context."
-inputs = { concept_spec = "ConceptSpec", concept_spec_structure = "ConceptStructureSpecBlueprint"}
-output = "ConceptSpecBlueprint"
-prompt_template = """
-Create a ConceptSpecBlueprint using the ConceptSpec and ConceptStructureSpecBlueprint.
+The field "definition" IS NOT a structure. It is a general definition of the concept.
+If the field "structure" is empty, return an empty list.
 
 ConceptSpec:
 @concept_spec
-
-Structure:
-@concept_spec_structure
 """
+
+[pipe.to_concept_blueprint]
+type = "PipeFunc"
+description = "Generate the final ConceptSpecBlueprint using the spec and structure manually."
+inputs = { concept_spec = "ConceptSpec", concept_spec_structures = "ConceptStructureSpecBlueprint"}
+output = "ConceptSpecBlueprint"
+function_name = "create_concept_spec_blueprint"
 

@@ -78,6 +78,12 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     def get_pipes_dict(self) -> Dict[str, PipeAbstract]:
         return self.root
 
+    def remove_pipes_by_codes(self, pipe_codes: List[str]) -> None:
+        """Remove pipes by their codes."""
+        for pipe_code in pipe_codes:
+            if pipe_code in self.root:
+                del self.root[pipe_code]
+
     @override
     def teardown(self) -> None:
         self.root = {}

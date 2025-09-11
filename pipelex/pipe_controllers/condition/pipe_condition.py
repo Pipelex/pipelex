@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set, Union, cast
+from typing import Dict, List, Literal, Optional, Set, Union, cast
 
 import shortuuid
 from pydantic import field_validator, model_validator
@@ -35,6 +35,7 @@ from pipelex.tools.typing.validation_utils import has_exactly_one_among_attribut
 
 
 class PipeCondition(PipeController):
+    type: Literal["PipeCondition"] = "PipeCondition"
     expression_template: Optional[str] = None
     expression: Optional[str] = None
     # TODO: rething this pipe_map.
@@ -135,14 +136,28 @@ class PipeCondition(PipeController):
         return self
 
     @override
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         """
         Calculate the inputs needed by this PipeCondition.
 
         The inputs are:
         1. Inputs needed by the condition expression/expression_template
         2. Inputs needed by ALL possible target pipes (since we don't know which will be chosen)
+
+        Args:
+            visited_pipes: Set of pipe codes currently being processed to prevent infinite recursion.
+                          If None, starts recursion detection with an empty set.
         """
+        if visited_pipes is None:
+            visited_pipes = set()
+
+        # If we've already visited this pipe, stop recursion
+        if self.code in visited_pipes:
+            return PipeInputSpecFactory.make_empty()
+
+        # Add this pipe to visited set for recursive calls
+        visited_pipes_with_current = visited_pipes | {self.code}
+
         needed_inputs = PipeInputSpecFactory.make_empty()
 
         # 1. Add the variables from the expression/expression_template
@@ -167,7 +182,10 @@ class PipeCondition(PipeController):
         for pipe_condition_pipe_map in self.pipe_map:
             if pipe_condition_pipe_map.pipe_code != "continue":
                 pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
-                for input_name, requirement in pipe.needed_inputs().items:
+                # Use the centralized recursion detection
+                pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
+
+                for input_name, requirement in pipe_needed_inputs.items:
                     needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
 
         return needed_inputs

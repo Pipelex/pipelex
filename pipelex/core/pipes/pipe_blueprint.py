@@ -9,6 +9,11 @@ from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import StrEnum
 
 
+class AllowedPipeCategories(StrEnum):
+    PIPE_OPERATOR = "PipeOperator"
+    PIPE_CONTROLLER = "PipeController"
+
+
 class AllowedPipeTypes(StrEnum):
     # Pipe Operators
     PIPE_FUNC = "PipeFunc"
@@ -24,34 +29,7 @@ class AllowedPipeTypes(StrEnum):
 
 
 class PipeBlueprint(BaseModel):
-    """Blueprint defining a pipe component in the Pipelex framework.
-
-    Pipes are the fundamental processing units in Pipelex workflows. They transform
-    input concepts into output concepts through various operations like LLM processing,
-    image generation, OCR, or custom functions.
-
-    Attributes:
-        type: The pipe type (PipeFunc, PipeLLM, PipeImgGen, PipeOcr, PipeBatch,
-              PipeCondition, PipeParallel, PipeSequence). Uses Any type to avoid
-              type override conflicts but validated at runtime.
-        definition: Natural language description of what the pipe does.
-        inputs: Input concept specifications. Can be either:
-               - A string (concept string/code in PascalCase)
-               - An InputRequirementBlueprint with additional constraints
-               Dictionary keys are input names, values are concept specifications.
-        output_concept_string_or_concept_code: Output concept code in PascalCase format.
-                                              Aliased as 'output' in serialization.
-
-    Validation Rules:
-        1. Pipe type: Must be one of the AllowedPipeTypes enum values.
-        2. Output concept: Must be valid concept string or code in PascalCase.
-        3. Input concepts: When provided, must use PascalCase for concept references.
-        4. Pipe codes: When validating pipe codes, must be in snake_case format.
-
-    Raises:
-        PipeBlueprintError: When validation rules are violated.
-    """
-
+    category: Any
     type: Any  # TODO: Find a better way to handle this.
     definition: Optional[str] = None
     inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
@@ -63,6 +41,14 @@ class PipeBlueprint(BaseModel):
         allowed_types = [_type.value for _type in AllowedPipeTypes]
         if value not in allowed_types:
             raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {allowed_types}")
+        return value
+
+    @field_validator("category", mode="after")
+    def validate_pipe_category(cls, value: Any) -> Any:
+        """Validate that the pipe category is one of the allowed values."""
+        allowed_categories = [_category.value for _category in AllowedPipeCategories]
+        if value not in allowed_categories:
+            raise PipeBlueprintError(f"Invalid pipe category '{value}'. Must be one of: {allowed_categories}")
         return value
 
     @field_validator("output_concept_string_or_concept_code", mode="before")

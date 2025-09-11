@@ -64,6 +64,7 @@ class PipeLLMBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeLLM"] = "PipeLLM"
+    category: Literal["PipeOperator"] = "PipeOperator"
     system_prompt_template: Optional[str] = None
     system_prompt_template_name: Optional[str] = None
     system_prompt_name: Optional[str] = None

@@ -1,12 +1,13 @@
 from typing import Literal, Optional, Union
 
 from pydantic import Field, model_validator
-from typing_extensions import Self
+from typing_extensions import Self, override
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Quality
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
+from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint as PipeImgGenBlueprintCore
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
 
 
@@ -32,7 +33,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
         is_raw: Whether to return raw image data instead of processed format.
         seed: Random seed for reproducibility. Use integer value or 'auto' for random seed.
         nb_output: Number of images to generate. Defaults to single image. Must be >= 1.
-        img_gen_prompt_var_name: Variable name for dynamic prompt generation from inputs.
+        img_gen_prompt_var_name: Variable name for dynamic prompt generation from inputs. Do not assign anything
 
     Validation Rules:
         1. Quality and nb_steps are mutually exclusive (cannot specify both).
@@ -47,6 +48,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeImgGen"] = "PipeImgGen"
+    category: Literal["PipeOperator"] = "PipeOperator"
     img_gen_prompt: Optional[str] = None
     imgg_handle: Optional[ImggHandle] = None
     aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
@@ -58,7 +60,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
     is_raw: Optional[bool] = None
     seed: Optional[Union[int, Literal["auto"]]] = None
     nb_output: Optional[int] = Field(default=None, ge=1)
-    img_gen_prompt_var_name: Optional[str] = None
+    img_gen_prompt_var_name: Optional[str] = "prompt"
 
     @model_validator(mode="after")
     def validate_imgg_prompt_and_imgg_prompt_stuff_name(self) -> Self:
@@ -70,6 +72,30 @@ class PipeImgGenBlueprint(PipeBlueprint):
         ):
             raise PipeDefinitionError(f"PipeImgGenBlueprint should have no more than one of {excess_attributes_list} among them")
         return self
+
+    @override
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeImgGenBlueprintCore:
+        """Convert this PipeImgGenBlueprint to the core PipeImgGenBlueprint."""
+        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+        return PipeImgGenBlueprintCore(
+            definition=base_blueprint.definition,
+            inputs=base_blueprint.inputs,
+            output=base_blueprint.output_concept_string_or_concept_code,
+            type=self.type,
+            category=self.category,
+            img_gen_prompt=self.img_gen_prompt,
+            imgg_handle=self.imgg_handle,
+            aspect_ratio=self.aspect_ratio,
+            quality=self.quality,
+            nb_steps=self.nb_steps,
+            guidance_scale=self.guidance_scale,
+            is_moderated=self.is_moderated,
+            safety_tolerance=self.safety_tolerance,
+            is_raw=self.is_raw,
+            seed=self.seed,
+            nb_output=self.nb_output,
+            img_gen_prompt_var_name=self.img_gen_prompt_var_name,
+        )
 
 
 class PipeImgGenSpecBlueprint(PipeImgGenBlueprint):

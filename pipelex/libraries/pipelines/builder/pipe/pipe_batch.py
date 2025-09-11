@@ -1,8 +1,10 @@
 from typing import Literal, Optional
 
 from pydantic import Field
+from typing_extensions import override
 
 from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint as PipeBatchBlueprintCore
 
 
 class PipeBatchBlueprint(PipeBlueprint):
@@ -35,9 +37,25 @@ class PipeBatchBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeBatch"] = "PipeBatch"
+    category: Literal["PipeController"] = "PipeController"
     branch_pipe_code: str
     input_list_name: Optional[str] = None
     input_item_name: Optional[str] = None
+
+    @override
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeBatchBlueprintCore:
+        """Convert this PipeBatchBlueprint to the core PipeBatchBlueprint."""
+        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+        return PipeBatchBlueprintCore(
+            definition=base_blueprint.definition,
+            inputs=base_blueprint.inputs,
+            output=base_blueprint.output_concept_string_or_concept_code,
+            type=self.type,
+            category=self.category,
+            branch_pipe_code=self.branch_pipe_code,
+            input_list_name=self.input_list_name,
+            input_item_name=self.input_item_name,
+        )
 
 
 class PipeBatchSpecBlueprint(PipeBatchBlueprint):

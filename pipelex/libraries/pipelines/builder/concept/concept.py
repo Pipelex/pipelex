@@ -1,17 +1,19 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprintError, ConceptStructureBlueprintError
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint as ConceptBlueprintCore
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprintError, ConceptStructureBlueprintError, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint as ConceptStructureBlueprintCore
 from pipelex.core.concepts.concept_native import NativeConceptEnum, is_native_concept
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptStringOrConceptCodeError
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.tools.misc.string_utils import is_pascal_case
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
-from pipelex.types import StrEnum
 
 
 class ConceptSpec(StructuredContent):
@@ -21,16 +23,11 @@ class ConceptSpec(StructuredContent):
         description="A description of a dict with fieldnames as keys, and values being a "
         "dict with: definition, type, item_type, key_type, value_type, choices, required, default_value"
     )
-
-
-class ConceptStructureBlueprintFieldType(StrEnum):
-    TEXT = "text"
-    LIST = "list"
-    DICT = "dict"
-    INTEGER = "integer"
-    BOOLEAN = "boolean"
-    NUMBER = "number"
-    DATE = "date"
+    refines: Optional[str] = Field(
+        default=None,
+        description="The native concept this concept extends (Text, Image, PDF, TextAndImages, Number, Page) "
+        "in PascalCase format. Cannot be used together with 'structure'.",
+    )
 
 
 class ConceptStructureBlueprint(StructuredContent):
@@ -152,6 +149,19 @@ class ConceptStructureBlueprint(StructuredContent):
             f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
         )
 
+    def to_core_blueprint(self) -> ConceptStructureBlueprintCore:
+        """Convert this ConceptStructureBlueprint to the core ConceptStructureBlueprint."""
+        return ConceptStructureBlueprintCore(
+            definition=self.definition,
+            type=self.type,
+            item_type=self.item_type,
+            key_type=self.key_type,
+            value_type=self.value_type,
+            choices=self.choices,
+            required=self.required,
+            default_value=self.default_value,
+        )
+
 
 class ConceptStructureSpecBlueprint(ConceptStructureBlueprint):
     the_field_name: str = Field(description="Field name. Must be snake_case.")
@@ -197,7 +207,6 @@ class ConceptBlueprint(StructuredContent):
 
     definition: str
     structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = None
-    # TODO: restore possibility of multiple refiles
     refines: Optional[str] = None
 
     @classmethod
@@ -306,6 +315,51 @@ class ConceptBlueprint(StructuredContent):
                 )
         return values
 
+    def to_core_blueprint(self) -> ConceptBlueprintCore:
+        """Convert this ConceptBlueprint to the original core ConceptBlueprint."""
+        converted_structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprintCore]]]] = None
+        if self.structure:
+            # Convert structure dict with ConceptStructureBlueprint objects to ConceptStructureBlueprintCore objects
+            converted_structure = {}
+            if isinstance(self.structure, str):
+                converted_structure = self.structure
+            else:
+                for field_name, field_spec in cast(Dict[str, ConceptStructureBlueprint], self.structure).items():
+                    converted_structure[field_name] = field_spec.to_core_blueprint()
+
+        return ConceptBlueprintCore(definition=self.definition, structure=converted_structure, refines=self.refines)
+
 
 class ConceptSpecBlueprint(ConceptBlueprint):
     the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
+
+
+async def create_concept_spec_blueprint(working_memory: WorkingMemory) -> ConceptSpecBlueprint:
+    """Create a ConceptSpecBlueprint manually from ConceptSpec and ConceptStructureSpecBlueprint."""
+    # Get the inputs from working memory
+    concept_spec = working_memory.get_stuff_as(name="concept_spec", content_type=ConceptSpec)
+    concept_spec_structures_stuff = working_memory.get_stuff_as_list(name="concept_spec_structures", item_type=ConceptStructureSpecBlueprint)
+
+    structure_dict: Dict[str, Union[str, ConceptStructureBlueprint]] = {}
+    for structure_item in concept_spec_structures_stuff.items:
+        structure_blueprint = ConceptStructureBlueprint(
+            definition=structure_item.definition,
+            type=structure_item.type,
+            item_type=structure_item.item_type,
+            key_type=structure_item.key_type,
+            value_type=structure_item.value_type,
+            choices=structure_item.choices,
+            required=structure_item.required,
+            default_value=structure_item.default_value,
+        )
+        structure_dict[structure_item.the_field_name] = structure_blueprint
+
+    # Create the ConceptSpecBlueprint
+    concept_spec_blueprint = ConceptSpecBlueprint(
+        the_concept_code=concept_spec.the_concept_code,
+        definition=concept_spec.description,
+        structure=structure_dict,
+        refines=concept_spec.refines,
+    )
+
+    return concept_spec_blueprint

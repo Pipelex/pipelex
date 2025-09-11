@@ -1,9 +1,11 @@
 from typing import Literal, Optional
 
 from pydantic import Field
+from typing_extensions import override
 
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
+from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint as PipeOcrBlueprintCore
 
 
 class PipeOcrBlueprint(PipeBlueprint):
@@ -37,11 +39,25 @@ class PipeOcrBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeOcr"] = "PipeOcr"
+    category: Literal["PipeOperator"] = "PipeOperator"
     ocr_platform: Optional[OcrPlatform] = None
     page_images: Optional[bool] = None
     page_image_captions: Optional[bool] = None
     page_views: Optional[bool] = None
     page_views_dpi: Optional[int] = None
+
+    @override
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeOcrBlueprintCore:
+        """Convert this PipeOcrBlueprint to the core PipeOcrBlueprint."""
+        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+
+        return PipeOcrBlueprintCore(
+            definition=base_blueprint.definition,
+            inputs=base_blueprint.inputs,
+            output=base_blueprint.output_concept_string_or_concept_code,
+            type=self.type,
+            category=self.category,
+        )
 
 
 class PipeOcrSpecBlueprint(PipeOcrBlueprint):

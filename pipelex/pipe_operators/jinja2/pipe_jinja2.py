@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, Optional, Set
+from typing import Any, ClassVar, Dict, Literal, Optional, Set
 
 from jinja2 import TemplateSyntaxError
 from pydantic import ConfigDict, model_validator
@@ -38,6 +38,7 @@ class PipeJinja2Output(PipeOutput):
 
 
 class PipeJinja2(PipeOperator):
+    type: Literal["PipeJinja2"] = "PipeJinja2"
     model_config = ConfigDict(extra="forbid", strict=False)
 
     adhoc_pipe_code: ClassVar[str] = "jinja2_render"
@@ -86,7 +87,7 @@ class PipeJinja2(PipeOperator):
             log.debug(f"Validated jinja2 template '{self.jinja2_name}':\n{the_template}")
 
     @override
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         needed_inputs = PipeInputSpecFactory.make_empty()
         for input_name, requirement in self.inputs.root.items():
             needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)

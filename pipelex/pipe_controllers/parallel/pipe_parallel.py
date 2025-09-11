@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Coroutine, Dict, List, Optional, Set
+from typing import Any, Coroutine, Dict, List, Literal, Optional, Set
 
 from pydantic import model_validator
 from typing_extensions import Self, override
@@ -23,7 +23,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeParallel(PipeController):
-    """Runs a list of pipes in parallel to produce a list of results."""
+    type: Literal["PipeParallel"] = "PipeParallel"
 
     parallel_sub_pipes: List[SubPipe]
     add_each_output: bool
@@ -34,16 +34,31 @@ class PipeParallel(PipeController):
         return set()
 
     @override
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         """
         Calculate the inputs needed by this PipeParallel.
         This is the inputs needed by ALL parallel sub-pipes since they all run simultaneously.
+
+        Args:
+            visited_pipes: Set of pipe codes currently being processed to prevent infinite recursion.
+                          If None, starts recursion detection with an empty set.
         """
+        if visited_pipes is None:
+            visited_pipes = set()
+
+        # If we've already visited this pipe, stop recursion
+        if self.code in visited_pipes:
+            return PipeInputSpecFactory.make_empty()
+
+        # Add this pipe to visited set for recursive calls
+        visited_pipes_with_current = visited_pipes | {self.code}
+
         needed_inputs = PipeInputSpecFactory.make_empty()
 
         for sub_pipe in self.parallel_sub_pipes:
             pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
-            pipe_needed_inputs = pipe.needed_inputs()
+            # Use the centralized recursion detection
+            pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
             if sub_pipe.batch_params:
                 needed_inputs.add_requirement(
                     variable_name=sub_pipe.batch_params.input_list_stuff_name,

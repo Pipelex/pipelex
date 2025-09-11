@@ -1,9 +1,11 @@
 from typing import List, Literal
 
 from pydantic import Field
+from typing_extensions import override
 
 from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
 from pipelex.libraries.pipelines.builder.pipe.sub_pipe import SubPipeBlueprint
+from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint as PipeSequenceBlueprintCore
 
 
 class PipeSequenceBlueprint(PipeBlueprint):
@@ -29,7 +31,27 @@ class PipeSequenceBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeSequence"] = "PipeSequence"
+    category: Literal["PipeController"] = "PipeController"
     steps: List[SubPipeBlueprint]
+
+    @override
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeSequenceBlueprintCore:
+        """Convert this PipeSequenceBlueprint to the core PipeSequenceBlueprint."""
+        # Get base fields using parent method
+        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+
+        # Convert the steps from SubPipeBlueprint to SubPipe
+        core_steps = [step.to_core_sub_pipe() for step in self.steps]
+
+        # Create the specific PipeSequenceBlueprint with all fields
+        return PipeSequenceBlueprintCore(
+            definition=base_blueprint.definition,
+            inputs=base_blueprint.inputs,
+            output=base_blueprint.output_concept_string_or_concept_code,
+            type=self.type,
+            category=self.category,
+            steps=core_steps,
+        )
 
 
 class PipeSequenceSpecBlueprint(PipeSequenceBlueprint):

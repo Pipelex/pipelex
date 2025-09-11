@@ -1,20 +1,46 @@
 from typing import Literal, Optional, Union
 
 from pydantic import Field, field_validator, model_validator
-from typing_extensions import Self
+from typing_extensions import Self, override
 
 from pipelex.cogt.exceptions import LLMSettingsValidationError
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingOrPresetId
+from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting as LLMSettingCore
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import LLMSettingOrPresetId as LLMSettingOrPresetIdCore
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint as PipeLLMBlueprintCore
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
-from pipelex.types import StrEnum
 
 
-class StructuringMethod(StrEnum):
-    DIRECT = "direct"
-    PRELIMINARY_TEXT = "preliminary_text"
+class LLMSetting(StructuredContent):
+    llm_handle: str
+    temperature: float = Field(..., ge=0, le=1)
+    max_tokens: Optional[int] = None
+
+    @field_validator("max_tokens", mode="before")
+    @classmethod
+    def validate_max_tokens(cls, value: Union[int, Literal["auto"], None]) -> Optional[int]:
+        if value is None:
+            return None
+        elif isinstance(value, str) and value == "auto":
+            return None
+        elif isinstance(value, int):  # pyright: ignore[reportUnnecessaryIsInstance]
+            return value
+
+    @model_validator(mode="after")
+    def validate_temperature(self) -> Self:
+        if self.llm_handle.startswith("gemini") and self.temperature > 1:
+            error_msg = (
+                f"Gemini LLMs such as '{self.llm_handle}' support temperatures up to 2 but we normalize between 0 and 1, "
+                f"so you can't set a temperature of {self.temperature}"
+            )
+            raise LLMSettingsValidationError(error_msg)
+        return self
+
+
+LLMSettingOrPresetId = Union[LLMSetting, str]
 
 
 class PipeLLMBlueprint(PipeBlueprint):
@@ -66,6 +92,7 @@ class PipeLLMBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeLLM"] = "PipeLLM"
+    category: Literal["PipeOperator"] = "PipeOperator"
     system_prompt_template: Optional[str] = None
     system_prompt_template_name: Optional[str] = None
     system_prompt_name: Optional[str] = None
@@ -105,35 +132,49 @@ class PipeLLMBlueprint(PipeBlueprint):
             raise PipeDefinitionError(f"PipeLLMBlueprint should have no more than one of {excess_attributes_list} among them")
         return self
 
+    @override
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeLLMBlueprintCore:
+        """Convert this PipeLLMBlueprint to the core PipeLLMBlueprint."""
+        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+        llm: Optional[LLMSettingOrPresetIdCore] = None
+        if isinstance(self.llm, LLMSetting):
+            llm = LLMSettingCore(llm_handle=self.llm.llm_handle, temperature=self.llm.temperature, max_tokens=self.llm.max_tokens)
+        elif isinstance(self.llm, str):
+            llm = self.llm
 
-class LLMSetting(StructuredContent):
-    llm_handle: str
-    temperature: float = Field(..., ge=0, le=1)
-    max_tokens: Optional[int] = None
-
-    @field_validator("max_tokens", mode="before")
-    @classmethod
-    def validate_max_tokens(cls, value: Union[int, Literal["auto"], None]) -> Optional[int]:
-        if value is None:
-            return None
-        elif isinstance(value, str) and value == "auto":
-            return None
-        elif isinstance(value, int):  # pyright: ignore[reportUnnecessaryIsInstance]
-            return value
-
-    @model_validator(mode="after")
-    def validate_temperature(self) -> Self:
-        if self.llm_handle.startswith("gemini") and self.temperature > 1:
-            error_msg = (
-                f"Gemini LLMs such as '{self.llm_handle}' support temperatures up to 2 but we normalize between 0 and 1, "
-                f"so you can't set a temperature of {self.temperature}"
+        llm_to_structure: Optional[LLMSettingOrPresetIdCore] = None
+        if isinstance(self.llm_to_structure, LLMSetting):
+            llm_to_structure = LLMSettingCore(
+                llm_handle=self.llm_to_structure.llm_handle,
+                temperature=self.llm_to_structure.temperature,
+                max_tokens=self.llm_to_structure.max_tokens,
             )
-            raise LLMSettingsValidationError(error_msg)
-        return self
+        elif isinstance(self.llm_to_structure, str):
+            llm_to_structure = self.llm_to_structure
+
+        return PipeLLMBlueprintCore(
+            definition=base_blueprint.definition,
+            inputs=base_blueprint.inputs,
+            output=base_blueprint.output_concept_string_or_concept_code,
+            type=self.type,
+            category=self.category,
+            system_prompt_template=self.system_prompt_template,
+            system_prompt_template_name=self.system_prompt_template_name,
+            system_prompt_name=self.system_prompt_name,
+            system_prompt=self.system_prompt,
+            prompt_template=self.prompt_template,
+            template_name=self.template_name,
+            prompt_name=self.prompt_name,
+            prompt=self.prompt,
+            llm=llm,
+            llm_to_structure=llm_to_structure,
+            structuring_method=self.structuring_method,
+            prompt_template_to_structure=self.prompt_template_to_structure,
+            system_prompt_to_structure=self.system_prompt_to_structure,
+            nb_output=self.nb_output,
+            multiple_output=self.multiple_output,
+        )
 
 
 class PipeLLMSpecBlueprint(PipeLLMBlueprint):
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
-
-
-LLMSettingOrPresetId = Union[LLMSetting, str]

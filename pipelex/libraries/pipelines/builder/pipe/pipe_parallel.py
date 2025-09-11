@@ -1,10 +1,12 @@
 from typing import List, Literal, Optional
 
 from pydantic import Field, field_validator
+from typing_extensions import override
 
 from pipelex.libraries.pipelines.builder.concept.concept import ConceptBlueprint
 from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
 from pipelex.libraries.pipelines.builder.pipe.sub_pipe import SubPipeBlueprint
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint as PipeParallelBlueprintCore
 
 
 class PipeParallelBlueprint(PipeBlueprint):
@@ -34,6 +36,7 @@ class PipeParallelBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeParallel"] = "PipeParallel"
+    category: Literal["PipeController"] = "PipeController"
     parallels: List[SubPipeBlueprint]
     add_each_output: bool = True
     combined_output: Optional[str] = None
@@ -43,6 +46,27 @@ class PipeParallelBlueprint(PipeBlueprint):
         if combined_output:
             ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=combined_output)
         return combined_output
+
+    @override
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeParallelBlueprintCore:
+        """Convert this PipeParallelBlueprint to the core PipeParallelBlueprint."""
+        # Get base fields using parent method
+        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+
+        # Convert the parallels from SubPipeBlueprint to SubPipe
+        core_parallels = [parallel.to_core_sub_pipe() for parallel in self.parallels]
+
+        # Create the specific PipeParallelBlueprint with all fields
+        return PipeParallelBlueprintCore(
+            definition=base_blueprint.definition,
+            inputs=base_blueprint.inputs,
+            output=base_blueprint.output_concept_string_or_concept_code,
+            type=self.type,
+            category=self.category,
+            parallels=core_parallels,
+            add_each_output=self.add_each_output,
+            combined_output=self.combined_output,
+        )
 
 
 class PipeParallelSpecBlueprint(PipeParallelBlueprint):

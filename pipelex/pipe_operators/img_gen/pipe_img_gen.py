@@ -53,6 +53,7 @@ DEFAULT_PROMPT_VAR_NAME = "prompt"
 
 
 class PipeImgGen(PipeOperator):
+    type: Literal["PipeImgGen"] = "PipeImgGen"
     imgg_prompt: Optional[str] = None
     # TODO: wrap this up in imgg llm_presets like for llm
     imgg_handle: Optional[ImggHandle] = None
@@ -94,7 +95,7 @@ class PipeImgGen(PipeOperator):
             )
 
     @override
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         needed_inputs = PipeInputSpecFactory.make_empty()
         if self.imgg_prompt:
             needed_inputs.add_requirement(

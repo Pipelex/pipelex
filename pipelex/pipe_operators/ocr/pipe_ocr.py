@@ -1,4 +1,4 @@
-from typing import List, Optional, Set
+from typing import List, Literal, Optional, Set
 
 from pydantic import model_validator
 from typing_extensions import Self, override
@@ -42,6 +42,7 @@ PIPE_OCR_INPUT_NAME = "ocr_input"
 
 
 class PipeOcr(PipeOperator):
+    type: Literal["PipeOcr"] = "PipeOcr"
     ocr_engine: Optional[OcrEngine] = None
     should_caption_images: bool
     should_include_images: bool
@@ -139,7 +140,7 @@ class PipeOcr(PipeOperator):
                     raise missing_input_var_error
 
     @override
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         return PipeInputSpecFactory.make_from_blueprint(
             domain=self.domain,
             blueprint={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept=self.inputs.root[PIPE_OCR_INPUT_NAME].concept.concept_string)},

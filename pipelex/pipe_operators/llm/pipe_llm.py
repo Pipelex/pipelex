@@ -1,4 +1,4 @@
-from typing import List, Optional, Set, Type, cast
+from typing import List, Literal, Optional, Set, Type, cast
 
 from pydantic import model_validator
 from typing_extensions import Self, override
@@ -57,6 +57,7 @@ class PipeLLMOutput(PipeOutput):
 
 
 class PipeLLM(PipeOperator):
+    type: Literal["PipeLLM"] = "PipeLLM"
     llm_prompt_spec: LLMPromptSpec
     llm_choices: Optional[LLMSettingChoices] = None
     structuring_method: Optional[StructuringMethod] = None
@@ -104,7 +105,7 @@ class PipeLLM(PipeOperator):
             )
 
     @override
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
         # The images are not tagged in the prompt_template.
         # Therefore if an image is provided in the inputs, it becomes a needed input.

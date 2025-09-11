@@ -12,7 +12,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeController(PipeAbstract):
-    type: Literal["PipeController"] = "PipeController"
+    category: Literal["PipeController"] = "PipeController"
 
     @override
     async def run_pipe(

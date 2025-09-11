@@ -1,8 +1,15 @@
 from typing import Dict, Literal, Optional
 
 from pydantic import Field, RootModel
+from typing_extensions import override
 
 from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import (
+    PipeConditionBlueprint as PipeConditionBlueprintCore,
+)
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import (
+    PipeConditionPipeMapBlueprint as PipeConditionPipeMapBlueprintCore,
+)
 
 PipeConditionPipeMapRoot = Dict[str, str]
 
@@ -51,11 +58,35 @@ class PipeConditionBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeCondition"] = "PipeCondition"
+    category: Literal["PipeController"] = "PipeController"
     expression_template: Optional[str] = None
     expression: Optional[str] = None
     pipe_map: PipeConditionPipeMapBlueprint = Field(default_factory=PipeConditionPipeMapBlueprint)
     default_pipe_code: Optional[str] = None
     add_alias_from_expression_to: Optional[str] = None
+
+    @override
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeConditionBlueprintCore:
+        """Convert this PipeConditionBlueprint to the core PipeConditionBlueprint."""
+        # Get base fields using parent method
+        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+
+        # Convert the pipe_map from PipeConditionPipeMapBlueprint to dict
+        pipe_map_dict = PipeConditionPipeMapBlueprintCore(root=dict(self.pipe_map.root))
+
+        # Create the specific PipeConditionBlueprint with all fields
+        return PipeConditionBlueprintCore(
+            definition=base_blueprint.definition,
+            inputs=base_blueprint.inputs,
+            output=base_blueprint.output_concept_string_or_concept_code,
+            type=self.type,
+            category=self.category,
+            expression_template=self.expression_template,
+            expression=self.expression,
+            pipe_map=pipe_map_dict,
+            default_pipe_code=self.default_pipe_code,
+            add_alias_from_expression_to=self.add_alias_from_expression_to,
+        )
 
 
 class PipeConditionSpecBlueprint(PipeConditionBlueprint):

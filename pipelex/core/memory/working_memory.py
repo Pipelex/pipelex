@@ -208,6 +208,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     @override
     def get_typed_object_or_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
         # TODO: Add unit tests for this method
+        # TODO: Refactor this method. In the python paradigm, we should not have those ".", but arrays with field names.
         if "." in name:
             parts = name.split(".", 1)  # Split only at the first dot
             base_name = parts[0]

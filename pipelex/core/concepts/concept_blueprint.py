@@ -31,39 +31,6 @@ class ConceptStructureBlueprintFieldType(StrEnum):
 
 
 class ConceptStructureBlueprint(BaseModel):
-    """Blueprint defining a field in the structure of a concept, used as a Pydantic V2 model.
-
-    This class represents the schema for a single field in a concept's structure. It supports
-    various field types including text, list, dict, integer, boolean, number, and date, as well
-    as choice-based fields (enums).
-
-    Attributes:
-        definition: Natural language description of the field's purpose and usage.
-        type: The field's data type. When 'dict', both key_type and value_type must be specified.
-              When None, choices must be provided (creating an enum field).
-        item_type: For 'list' type fields, specifies the type of items in the list.
-        key_type: For 'dict' type fields, specifies the type of dictionary keys. Required when type='dict'.
-        value_type: For 'dict' type fields, specifies the type of dictionary values. Required when type='dict'.
-        choices: List of valid string choices for enum fields. When provided, type must be None.
-        required: Whether the field is mandatory. Defaults to True unless explicitly set to False.
-        default_value: Default value for the field. Must match the specified type, and for choice
-                      fields must be one of the valid choices. When provided, type must be specified
-                      (unless choices are provided).
-
-    Validation Rules:
-        1. Choice fields (enums): When type is None, choices must be provided and non-empty.
-        2. Dictionary fields: When type is 'dict', both key_type and value_type are required.
-        3. Default values: When default_value is provided:
-           - For typed fields: type must be specified and default_value must match that type
-           - For choice fields: default_value must be one of the valid choices
-           - Type validation includes: text (str), integer (int), boolean (bool),
-             number (int/float), list (list), dict (dict)
-        4. List fields: When type is 'list', item_type should specify the type of list items.
-
-    Raises:
-        ConceptStructureBlueprintError: When validation rules are violated.
-    """
-
     definition: str
     type: Optional[ConceptStructureBlueprintFieldType] = None
     item_type: Optional[str] = None
@@ -150,40 +117,6 @@ class ConceptStructureBlueprint(BaseModel):
 
 
 class ConceptBlueprint(BaseModel):
-    """Blueprint defining a concept that can be used in the Pipelex framework.
-
-    A concept represents a structured data type that can either define its own structure
-    or refine an existing native concept. Concepts are fundamental building blocks in
-    Pipelex workflows for data validation and transformation.
-
-    Attributes:
-        definition: Natural language description of what the concept represents and its purpose.
-        structure: The concept's field structure. Can be either:
-                  - A string referring to another concept
-                  - A dictionary where keys are field names (in snake_case) and values are
-                    either strings (concept references) or ConceptStructureBlueprint instances
-                  Cannot be used together with 'refines'.
-        refines: The native concept this concept extends (Text, Image, PDF, TextAndImages,
-                Number, Page) in PascalCase format. Cannot be used together with 'structure'.
-
-    Validation Rules:
-        1. Mutual exclusivity: A concept must have either 'structure' or 'refines', but not both.
-        2. Field names: When structure is a dict, all keys must be valid snake_case identifiers.
-        3. Concept codes: Must be in PascalCase format (letters and numbers only, starting
-           with uppercase, no dots).
-        4. Concept strings: Format is "domain.ConceptCode" where domain is lowercase and
-           ConceptCode is PascalCase.
-        5. Native concepts: When refining, must be one of the valid native concepts.
-        6. Structure values: In structure dict, values must be either valid concept strings
-           or ConceptStructureBlueprint instances.
-
-
-    Raises:
-        ConceptBlueprintError: When validation rules are violated.
-        ConceptCodeError: When concept code format is invalid.
-        ConceptStringError: When concept string format is invalid.
-    """
-
     model_config = ConfigDict(extra="forbid")
 
     definition: str

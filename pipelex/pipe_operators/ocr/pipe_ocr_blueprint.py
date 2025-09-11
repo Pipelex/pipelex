@@ -35,6 +35,7 @@ class PipeOcrBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeOcr"] = "PipeOcr"
+    category: Literal["PipeOperator"] = "PipeOperator"
     ocr_platform: Optional[OcrPlatform] = None
     page_images: Optional[bool] = None
     page_image_captions: Optional[bool] = None

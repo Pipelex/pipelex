@@ -16,6 +16,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class PipeAbstract(ABC, BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
+    category: Any
     type: Any
     code: str
     domain: str
@@ -59,9 +60,16 @@ class PipeAbstract(ABC, BaseModel):
         pass
 
     @abstractmethod
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         """
-        Return the inputs that are needed for the pipe to run. (Mostly the inputs of the pipe themselves)
+        Return the inputs that are needed for the pipe to run.
+
+        Args:
+            visited_pipes: Set of pipe codes currently being processed to prevent infinite recursion.
+                          If None, starts recursion detection with an empty set.
+
+        Returns:
+            PipeInputSpec containing all needed inputs for this pipe
         """
         pass
 

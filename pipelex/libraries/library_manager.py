@@ -185,6 +185,22 @@ class LibraryManager(LibraryManagerAbstract):
 
         return pipes
 
+    @override
+    def remove_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
+        """Remove all components (domain, concepts, pipes) that were loaded from a blueprint."""
+        # Remove pipes first (they may depend on concepts)
+        if blueprint.pipe is not None:
+            pipe_codes_to_remove = [f"{pipe_name}" for pipe_name in blueprint.pipe.keys()]
+            self.pipe_library.remove_pipes_by_codes(pipe_codes=pipe_codes_to_remove)
+
+        # Remove concepts second (they may depend on domain)
+        if blueprint.concept is not None:
+            concept_codes_to_remove = [f"{blueprint.domain}.{concept_name}" for concept_name in blueprint.concept.keys()]
+            self.concept_library.remove_concepts_by_codes(concept_codes=concept_codes_to_remove)
+
+        # Remove domain last
+        self.domain_library.remove_domain_by_code(domain_code=blueprint.domain)
+
     def _load_domain_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> Domain:
         """Create a Domain from blueprint."""
         return DomainFactory.make_from_blueprint(

@@ -5,6 +5,7 @@ from typing_extensions import Self
 
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.exceptions import PipeDefinitionError
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint as SubPipeBlueprintCore
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
 
 
@@ -66,3 +67,14 @@ class SubPipeBlueprint(StructuredContent):
             raise PipeDefinitionError(f"In pipe '{self.pipe}': When 'batch_as' is specified, 'batch_over' must also be provided")
 
         return self
+
+    def to_core_sub_pipe(self) -> SubPipeBlueprintCore:
+        """Convert this SubPipeBlueprint to the core SubPipe."""
+        return SubPipeBlueprintCore(
+            pipe=self.pipe,
+            result=self.result,
+            nb_output=self.nb_output,
+            multiple_output=self.multiple_output,
+            batch_over=self.batch_over,
+            batch_as=self.batch_as,
+        )

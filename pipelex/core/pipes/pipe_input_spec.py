@@ -35,11 +35,6 @@ PipeInputSpecRoot = Dict[str, InputRequirement]
 
 
 class PipeInputSpec(RootModel[PipeInputSpecRoot]):
-    """
-    A PipeInputSpec is a dictionary of variable names and their corresponding concept codes.
-    It's meant to hold the required input variables declared by a pipe.
-    """
-
     root: PipeInputSpecRoot = Field(default_factory=dict)
 
     @field_validator("root", mode="wrap")
