@@ -46,7 +46,7 @@ class TestImageInputs:
         # Verify output
         if pipe_run_mode != PipeRunMode.DRY:
             article = pipe_output.main_stuff_as(content_type=Article)
-            assert article.title == "2037 AI-Lympics"
+            assert article.title == "2037 AI-Lympics PARIS"
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
