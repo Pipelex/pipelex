@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+ - Image handling in `AnthropicFactory` now converts image URLs to `base64` data URLs with proper MIME type prefix
+
 ## [v0.9.3] - 2025-09-06
 
 ### Added
