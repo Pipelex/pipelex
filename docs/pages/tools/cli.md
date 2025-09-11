@@ -32,14 +32,6 @@ pipelex show pipes [-c/--config-folder-path PATH]
 pipelex show pipe PIPE_CODE [-c/--config-folder-path PATH]
 ```
 
-### Migrate group
-
-Migrate TOML files to the new syntax.
-
-```bash
-pipelex migrate run [-p/--path PATH] [--dry-run] [--backups/--no-backups]
-```
-
 ## Usage Tips
 
 1. Always run `pipelex validate all -c path/to/your/pipelex/config/folder` after making changes to your configuration or pipelines
