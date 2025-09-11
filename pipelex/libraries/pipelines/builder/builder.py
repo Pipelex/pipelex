@@ -263,6 +263,7 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
 
     return ListContent[PipeFailure](items=failed_pipes)
 
+
 async def reconstruct_bundle_with_all_fixes(working_memory: WorkingMemory) -> PipelexBundleBlueprint:
     """Reconstruct the bundle blueprint with all the fixed pipes."""
     pipelex_bundle_blueprint = working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleBlueprint)

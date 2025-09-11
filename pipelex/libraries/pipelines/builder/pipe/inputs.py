@@ -3,9 +3,10 @@ from typing import Optional
 from pydantic import field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint as InputRequirementBlueprintCore
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuffs.stuff_content import StructuredContent
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint as InputRequirementBlueprintCore
+
 
 class InputRequirementBlueprint(StructuredContent):
     """Blueprint specifying input requirements for a pipe in the Pipelex framework.

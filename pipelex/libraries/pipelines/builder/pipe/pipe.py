@@ -5,10 +5,10 @@ from pydantic import Field, field_validator
 from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint as PipeBlueprintCore
+from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint as InputRequirementBlueprintCore
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.libraries.pipelines.builder.concept.concept import ConceptBlueprint, ConceptSpec
 from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint as InputRequirementBlueprintCore
 from pipelex.tools.misc.string_utils import is_snake_case
 
 
@@ -103,7 +103,6 @@ class PipeBlueprint(StructuredContent):
                     converted_inputs[input_name] = input_spec.to_core_input_requirement(domain)
                 else:
                     converted_inputs[input_name] = InputRequirementBlueprintCore(concept=input_spec)
-
 
         return PipeBlueprintCore(
             definition=self.definition,

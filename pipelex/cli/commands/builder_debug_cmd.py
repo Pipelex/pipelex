@@ -398,8 +398,12 @@ def test_validation_cmd(
         analyzed_task_concept = ConceptBlueprint(
             definition="The result of task analysis",
             structure={
-                "task_id": ConceptStructureBlueprint(definition="Unique task identifier", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
-                "status": ConceptStructureBlueprint(definition="Task completion status", choices=["pending", "in_progress", "completed", "failed"], required=True),
+                "task_id": ConceptStructureBlueprint(
+                    definition="Unique task identifier", type=ConceptStructureBlueprintFieldType.TEXT, required=True
+                ),
+                "status": ConceptStructureBlueprint(
+                    definition="Task completion status", choices=["pending", "in_progress", "completed", "failed"], required=True
+                ),
             },
         )
 
@@ -520,15 +524,16 @@ def test_validation_cmd(
         )
         pretty_print(pipe_output, title="Pipe Output")
         from pipelex.libraries.pipelines.builder.builder import PipelexBundleBlueprint
+
         blueprint = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleBlueprint)
         pretty_print(blueprint, title="Pipelex Bundle Blueprint")
         from pipelex.core.interpreter import PipelexInterpreter
+
         plx_content = PipelexInterpreter.make_plx_content(blueprint=blueprint.to_core_blueprint())
         pretty_print(plx_content, title="PLX Content")
 
         with open(".built.plx", "w") as f:
             f.write(plx_content)
-
 
     asyncio.run(run_validation_test())
 
