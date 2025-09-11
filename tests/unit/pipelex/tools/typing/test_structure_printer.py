@@ -3,7 +3,6 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 from pytest import FixtureRequest
-from pipelex import pretty_print
 
 from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent, TextContent
 from pipelex.tools.typing.structure_printer import StructurePrinter

@@ -21,14 +21,14 @@ from pipelex.cogt.image.prompt_image import (
     PromptImageTypedBytesOrUrl,
     PromptImageUrl,
 )
+from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.hub import get_plugin_manager, get_secrets_provider
-from pipelex.tools.misc.base_64_utils import (
-    load_binary_as_base64_async,
-)
+from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 
 
 class AnthropicFactoryError(CogtError):
@@ -166,7 +166,9 @@ class AnthropicFactory:
         if isinstance(prompt_image, PromptImageBytes):
             typed_bytes_or_url = prompt_image.make_prompt_image_typed_bytes()
         elif isinstance(prompt_image, PromptImageUrl):
-            typed_bytes_or_url = prompt_image.url
+            image_bytes = await PromptImageFactory().make_promptimagebytes_from_url_async(prompt_image)
+            file_type = detect_file_type_from_base64(image_bytes.base_64)
+            typed_bytes_or_url = PromptImageTypedBytes(base_64=image_bytes.base_64, file_type=file_type)
         elif isinstance(prompt_image, PromptImagePath):
             b64 = await load_binary_as_base64_async(prompt_image.file_path)
             typed_bytes_or_url = PromptImageTypedBytes(base_64=b64, file_type=prompt_image.get_file_type())

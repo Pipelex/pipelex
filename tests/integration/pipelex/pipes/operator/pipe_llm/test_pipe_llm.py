@@ -10,7 +10,7 @@ from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBluepri
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.hub import get_pipe_provider, get_pipe_router, get_report_delegate, get_library_manager
+from pipelex.hub import get_pipe_provider, get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLMOutput
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
