@@ -1,4 +1,5 @@
 import pytest
+from anthropic import AuthenticationError
 from rich import box
 from rich.console import Console
 from rich.table import Table
@@ -23,11 +24,13 @@ class TestAnthropic:
     ):
         try:
             anthropic_models_list = await anthropic_list_anthropic_models(llm_platform=llm_platform_for_anthropic_sdk)
+        except AuthenticationError as auth_exc:
+            pytest.fail(f"Authentication error for Anthropic: {auth_exc}")
         except LLMSDKError as exc:
             if "does not support listing models" in str(exc):
                 pytest.skip(f"Skipping: {exc}")
             else:
-                raise exc
+                pytest.fail(f"Error listing Anthropic models: {exc}")
         if pytestconfig.get_verbosity() >= 2:
             # Create and configure the table
             console = Console()
