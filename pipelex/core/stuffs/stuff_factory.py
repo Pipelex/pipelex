@@ -133,7 +133,9 @@ class StuffFactory:
         try:
             the_stuff_content = the_subclass.model_validate(obj=stuff_contents)
         except ValidationError as exc:
-            raise StuffFactoryError(f"Error combining stuffs: {format_pydantic_validation_error(exc=exc)}") from exc
+            raise StuffFactoryError(
+                f"Error combining stuffs for concept {concept.code}, stuff named `{name}`: {format_pydantic_validation_error(exc=exc)}"
+            ) from exc
         return cls.make_stuff(
             concept=concept,
             content=the_stuff_content,

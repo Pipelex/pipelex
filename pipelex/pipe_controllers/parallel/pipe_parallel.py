@@ -189,6 +189,7 @@ class PipeParallel(PipeController):
                     f"PipeParallel requires unique output names for each parallel sub pipe, but {sub_pipe_output_name} is already used"
                 )
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
+            log.debug(f"PipeParallel '{self.code}': output_stuff_contents[{sub_pipe_output_name}]: {output_stuff_contents[sub_pipe_output_name]}")
 
         if self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(

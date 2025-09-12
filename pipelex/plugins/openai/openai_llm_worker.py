@@ -90,11 +90,13 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.CUSTOM_GEMMA_3
                     | LLMFamily.CUSTOM_MISTRAL_SMALL_3_1
                     | LLMFamily.CUSTOM_QWEN_3
+                    | LLMFamily.CUSTOM_BLACKBOXAI
                     | LLMFamily.PERPLEXITY_SEARCH
                     | LLMFamily.PERPLEXITY_RESEARCH
                     | LLMFamily.PERPLEXITY_REASONING
                     | LLMFamily.PERPLEXITY_DEEPSEEK
                     | LLMFamily.GROK_3
+                    | LLMFamily.PIPELEX_INFERENCE
                 ):
                     response = await self.openai_client_for_text.chat.completions.create(
                         model=self.llm_engine.llm_id,
@@ -191,11 +193,13 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.CUSTOM_GEMMA_3
                     | LLMFamily.CUSTOM_MISTRAL_SMALL_3_1
                     | LLMFamily.CUSTOM_QWEN_3
+                    | LLMFamily.CUSTOM_BLACKBOXAI
                     | LLMFamily.PERPLEXITY_SEARCH
                     | LLMFamily.PERPLEXITY_RESEARCH
                     | LLMFamily.PERPLEXITY_REASONING
                     | LLMFamily.PERPLEXITY_DEEPSEEK
                     | LLMFamily.GROK_3
+                    | LLMFamily.PIPELEX_INFERENCE
                 ):
                     result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                         model=self.llm_engine.llm_id,
