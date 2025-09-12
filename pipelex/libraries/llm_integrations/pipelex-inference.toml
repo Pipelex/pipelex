@@ -1,0 +1,33 @@
+
+# OpenAI Models
+[pipelex-inference."pipelex/gpt-4o-mini".latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
+platform_llm_id = { custom_llm = "pipelex/gpt-4o-mini" }
+preferred_platform = "custom_llm"
+
+# Anthropic Models
+[pipelex-inference."pipelex/claude-3.7-sonnet".latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
+platform_llm_id = { custom_llm = "pipelex/claude-3.7-sonnet" }
+preferred_platform = "custom_llm"
+
+# Google Models using VertexAI
+[pipelex-inference."pipelex/gemini-2.0-flash-vertex".latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
+platform_llm_id = { custom_llm = "pipelex/gemini-2.0-flash-vertex" }
+preferred_platform = "custom_llm"
+
+# Google Models using Google API
+[pipelex-inference."pipelex/gemini-2.0-flash".latest]
+is_gen_object_supported = true
+is_vision_supported = true
+cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
+platform_llm_id = { custom_llm = "gemini/gemini-2.0-flash" }
+preferred_platform = "custom_llm"
+
