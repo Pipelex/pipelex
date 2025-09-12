@@ -13,7 +13,7 @@ DryRunResult = "A result of a dry run of a pipelex bundle blueprint."
 # Main
 # ────────────────────────────────────────────────────────────────────────────────
 
-[pipe.build_drafts_from_brief]
+[pipe.pipe_builder]
 type = "PipeSequence"
 description = "Brief → PlanDraftText → (ConceptSpecsText, PipeSignaturesText) → PipeSignature[]."
 inputs = { brief = "UserBrief" }
@@ -133,6 +133,7 @@ Return PipeSignaturesText listing every pipe to build:
 - Controller pipes must reference children by their codes consistently
 - The Pipe Controllers, if they mention pipes, they should always mention existing pipes.
 - Add as much details as possible for the description.
+- No more than 10 PipeSignatures
 
 Here are the ESSENTIAL features for each pipe type that should be included in important_features (only include these key ones):
 
@@ -192,6 +193,8 @@ Plan:
 
 Brief:
 @brief
+
+No more than 10 PipeSignatures
 """
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -245,6 +248,8 @@ ConceptSpecs:
 
 Brief:
 @brief
+
+No more than 10 PipeSignatures
 """
 
 [pipe.compile_in_pipelex_bundle_blueprint]

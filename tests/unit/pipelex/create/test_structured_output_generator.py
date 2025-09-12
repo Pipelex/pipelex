@@ -5,7 +5,7 @@ from typing import Dict, Union
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.create.structured_output_generator import StructureGenerator
+from pipelex.core.concepts.structure_generator import StructureGenerator
 
 
 class TestStructureGenerator:
