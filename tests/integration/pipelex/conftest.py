@@ -139,7 +139,7 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
 @pytest.fixture(
     params=[
         # LLMPlatform.ANTHROPIC,
-        # LLMPlatform.AZURE_OPENAI,
+        LLMPlatform.AZURE_OPENAI,
         # LLMPlatform.BEDROCK,
         # LLMPlatform.BEDROCK_ANTHROPIC,
         # LLMPlatform.MISTRAL,
@@ -147,7 +147,7 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
         # LLMPlatform.PERPLEXITY,
         # LLMPlatform.VERTEXAI,
         # LLMPlatform.XAI,
-        LLMPlatform.CUSTOM_LLM,
+        # LLMPlatform.CUSTOM_LLM,
     ]
 )
 def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
@@ -157,7 +157,7 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
 
 @pytest.fixture(
     params=[
-        # "gpt-5-mini-2025-08-07",
+        "gpt-5-mini-2025-08-07",
         # "gpt-5-nano-2025-08-07",
         # "gpt-5-chat-2025-08-07",
         # "gpt-5-mini",
@@ -195,7 +195,7 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
         # "grok-3-mini",
         # "pipelex/gpt-4o-mini",
         # "pipelex/claude-3.7-sonnet",
-        "vertex_ai/gemini-2.0-flash",
+        # "vertex_ai/gemini-2.0-flash",
     ]
 )
 def llm_id(request: pytest.FixtureRequest) -> str:

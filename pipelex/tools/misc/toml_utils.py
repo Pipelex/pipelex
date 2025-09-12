@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, Dict, List, Mapping, Optional, cast
 
@@ -17,6 +18,38 @@ class TOMLValidationError(Exception):
     """Raised when TOML file has formatting issues that could cause problems."""
 
     pass
+
+
+def substitute_env_vars(content: str) -> str:
+    """Substitute ${ENV_VAR} and ${ENV_VAR:default} patterns with environment variable values.
+
+    Args:
+        content: TOML content with environment variable placeholders
+
+    Returns:
+        Content with environment variables substituted
+
+    Raises:
+        ValueError: If required environment variable is missing and no default provided
+    """
+
+    def replace_env_var(match: re.Match[str]) -> str:
+        var_with_default = match.group(1)
+
+        if ":" in var_with_default:
+            var_name, default_value = var_with_default.split(":", 1)
+            return os.getenv(var_name, default_value)
+        else:
+            var_name = var_with_default
+            value = os.getenv(var_name)
+            if value is None:
+                raise ValueError(f"Environment variable '{var_name}' is required but not set")
+            return value
+
+    # Pattern matches ${VAR_NAME} or ${VAR_NAME:default_value}
+    # Restrict to not match across newlines or quotes
+    pattern = r"\$\{([^}\n\"']+)\}"
+    return re.sub(pattern, replace_env_var, content)
 
 
 def validate_toml_content(content: str, file_path: Optional[str] = None) -> None:
@@ -90,17 +123,19 @@ def clean_trailing_whitespace(content: str) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def load_toml_from_path(path: str) -> Dict[str, Any]:
-    """Load TOML from path.
+def load_toml_from_path(path: str, is_env_var_substitution_enabled: bool = False) -> Dict[str, Any]:
+    """Load TOML from path with optional environment variable substitution.
 
     Args:
         path: Path to the TOML file
+        is_env_var_substitution_enabled: If True, substitute ${ENV_VAR} patterns with environment variables
 
     Returns:
         Dictionary loaded from TOML
 
     Raises:
         toml.TomlDecodeError: If TOML parsing fails, with file path included
+        TOMLValidationError: If environment variable substitution is enabled and a required variable is missing
     """
     try:
         with open(path, "r", encoding="utf-8") as file:
@@ -113,19 +148,26 @@ def load_toml_from_path(path: str) -> Dict[str, Any]:
             with open(path, "w", encoding="utf-8") as file:
                 file.write(cleaned_content)
 
+        # Apply environment variable substitution if enabled
+        if is_env_var_substitution_enabled:
+            try:
+                cleaned_content = substitute_env_vars(cleaned_content)
+            except ValueError as exc:
+                raise TOMLValidationError(f"Environment variable substitution failed in file '{path}': {exc}") from exc
+
         dict_from_toml = toml.loads(cleaned_content)
         return dict_from_toml
     except toml.TomlDecodeError as exc:
         raise toml.TomlDecodeError(f"TOML parsing error in file '{path}': {exc}", exc.doc, exc.pos) from exc
 
 
-def failable_load_toml_from_path(path: str) -> Optional[Dict[str, Any]]:
+def failable_load_toml_from_path(path: str, is_env_var_substitution_enabled: bool = False) -> Optional[Dict[str, Any]]:
     """Load TOML from path with failure handling."""
     if not path_exists(path):
         return None
     try:
-        return load_toml_from_path(path)
-    except toml.TomlDecodeError as exc:
+        return load_toml_from_path(path, is_env_var_substitution_enabled=is_env_var_substitution_enabled)
+    except (toml.TomlDecodeError, TOMLValidationError) as exc:
         print(f"Failed to parse TOML file '{path}': {exc}")
         return None
 
