@@ -18,6 +18,7 @@
  - Modified Jinja2 filter to use default TagStyle.TICKS instead of raising error
  - Added proper error handling for Unicode decode errors when loading model libraries
  - Improved error handling in Anthropic plugin tests with specific AuthenticationError handling
+ - Updated mypy to version 1.18.1
 
 ## [v0.9.4] - 2025-09-06
 
