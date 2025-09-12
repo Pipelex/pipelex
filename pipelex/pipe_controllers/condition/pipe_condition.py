@@ -53,6 +53,8 @@ class PipeCondition(PipeController):
         Validate the output for the pipe condition.
         The output of the pipe condition should match the output of all the conditional pipes, and the default pipe.
         """
+        # This pipe CONTINUE enables to leave a PipeCondition and continue the sequence.
+        # This system though has to be rethink. It might not be the best solution
         for pipe_condition_pipe_map in self.pipe_map:
             if pipe_condition_pipe_map.pipe_code != SpecificPipeCodesEnum.CONTINUE:
                 pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
@@ -144,17 +146,6 @@ class PipeCondition(PipeController):
 
     @override
     def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
-        """
-        Calculate the inputs needed by this PipeCondition.
-
-        The inputs are:
-        1. Inputs needed by the condition expression/expression_template
-        2. Inputs needed by ALL possible target pipes (since we don't know which will be chosen)
-
-        Args:
-            visited_pipes: Set of pipe codes currently being processed to prevent infinite recursion.
-                          If None, starts recursion detection with an empty set.
-        """
         if visited_pipes is None:
             visited_pipes = set()
 

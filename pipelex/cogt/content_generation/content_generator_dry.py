@@ -65,6 +65,10 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             __use_examples__ = True
             __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
+        # `factory_use_contruct=True` prevents from running the model_validator/field_validator.
+        # It is that way because the dry run was failing a lot of pipes that had validation test on the
+        # field values. For example, if a string requires to be a snake_case, the ObjectFactory would
+        # generate something like `DOIJZjoDoIJDZOjDZJo` which is... not a snake_case.
         obj = ObjectFactory.build(factory_use_construct=True)
         return obj
 

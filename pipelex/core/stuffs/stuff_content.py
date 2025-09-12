@@ -33,7 +33,7 @@ class StuffContent(ABC, CustomBaseModel):
         return f"some {self.__class__.__name__}"
 
     def smart_dump(self) -> Union[str, Dict[str, Any], List[str], List[Dict[str, Any]]]:
-        return self.model_dump(serialize_as_any=True, by_alias=True)
+        return self.model_dump(serialize_as_any=True)
 
     @override
     def __str__(self) -> str:
@@ -379,7 +379,7 @@ class StructuredContent(StuffContent):
 
     @override
     def smart_dump(self):
-        return self.model_dump(serialize_as_any=True, by_alias=True)
+        return self.model_dump(serialize_as_any=True)
 
     @override
     def rendered_html(self) -> str:

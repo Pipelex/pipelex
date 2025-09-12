@@ -8,16 +8,6 @@ PipeConditionPipeMapRoot = Dict[str, str]
 
 
 class PipeConditionPipeMapBlueprint(RootModel[PipeConditionPipeMapRoot]):
-    """Blueprint for condition-to-pipe mapping in PipeCondition.
-
-    Maps condition values to pipe codes for conditional execution.
-
-    Attributes:
-        root: Dictionary mapping condition results (keys) to pipe codes (values).
-              Each key represents a possible condition outcome, and its value
-              is the pipe code to execute when that condition is met.
-    """
-
     root: PipeConditionPipeMapRoot = Field(default_factory=dict)
 
 

@@ -96,6 +96,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        print_intermediate_outputs: Optional[bool] = False,
     ) -> PipeOutput:
         pass
 

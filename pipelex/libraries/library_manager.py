@@ -187,22 +187,20 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def remove_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
-        """Remove all components (domain, concepts, pipes) that were loaded from a blueprint."""
-        # Remove pipes first (they may depend on concepts)
         if blueprint.pipe is not None:
-            pipe_codes_to_remove = [f"{pipe_name}" for pipe_name in blueprint.pipe.keys()]
-            self.pipe_library.remove_pipes_by_codes(pipe_codes=pipe_codes_to_remove)
+            self.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
 
-        # Remove concepts second (they may depend on domain)
+        # Remove concepts (they may depend on domain)
         if blueprint.concept is not None:
-            concept_codes_to_remove = [f"{blueprint.domain}.{concept_name}" for concept_name in blueprint.concept.keys()]
+            concept_codes_to_remove = [
+                ConceptFactory.construct_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
+                for concept_code in blueprint.concept.keys()
+            ]
             self.concept_library.remove_concepts_by_codes(concept_codes=concept_codes_to_remove)
 
-        # Remove domain last
         self.domain_library.remove_domain_by_code(domain_code=blueprint.domain)
 
     def _load_domain_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> Domain:
-        """Create a Domain from blueprint."""
         return DomainFactory.make_from_blueprint(
             blueprint=DomainBlueprint(
                 code=blueprint.domain,
@@ -214,7 +212,6 @@ class LibraryManager(LibraryManagerAbstract):
         )
 
     def _load_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[Concept]:
-        """Create Concepts from blueprint."""
         concepts: List[Concept] = []
 
         if blueprint.concept is not None:
@@ -231,7 +228,6 @@ class LibraryManager(LibraryManagerAbstract):
         return concepts
 
     def _load_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[PipeAbstract]:
-        """Create Pipes from blueprint."""
         pipes: List[PipeAbstract] = []
         if blueprint.pipe is not None:
             for pipe_name, pipe_blueprint in blueprint.pipe.items():

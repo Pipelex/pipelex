@@ -35,14 +35,6 @@ class PipeParallel(PipeController):
 
     @override
     def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
-        """
-        Calculate the inputs needed by this PipeParallel.
-        This is the inputs needed by ALL parallel sub-pipes since they all run simultaneously.
-
-        Args:
-            visited_pipes: Set of pipe codes currently being processed to prevent infinite recursion.
-                          If None, starts recursion detection with an empty set.
-        """
         if visited_pipes is None:
             visited_pipes = set()
 

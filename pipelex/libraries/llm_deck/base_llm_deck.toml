@@ -21,7 +21,7 @@ best-mistral = "mistral-large"
 best-grok = "grok-3"
 
 cheap_llm_for_text = "gpt-4o-mini"
-cheap_llm_for_object = "gpt-4o-mini"
+cheap_llm_for_object = "gpt-4o"
 
 base_llm_for_text = "gpt-4o-mini"
 base_llm_for_object = "gpt-4o-mini"
@@ -88,5 +88,5 @@ llm_to_extract_tables = { llm_handle = "best-claude", temperature = 0.1 }
 
 [llm_choice_defaults]
 for_text = "cheap_llm_for_text"
-for_object = "llm_to_reason"
+for_object = "cheap_llm_for_object"
 

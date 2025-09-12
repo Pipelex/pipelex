@@ -14,7 +14,8 @@ from pipelex.types import StrEnum
 
 class SpecificPipeCodesEnum(StrEnum):
     CONTINUE = "continue"
-    BREAK = "break"
+    # TODO: Implement the break pipe: It should enable to leave the current sequence.
+    # BREAK = "break"
 
 
 class PipeController(PipeAbstract):
@@ -27,6 +28,7 @@ class PipeController(PipeAbstract):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        print_intermediate_outputs: Optional[bool] = False,
     ) -> PipeOutput:
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         self.monitor_pipe_stack(pipe_run_params=pipe_run_params)

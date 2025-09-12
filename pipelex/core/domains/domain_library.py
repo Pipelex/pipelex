@@ -30,7 +30,6 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
             self.root[domain_code] = domain
 
     def remove_domain_by_code(self, domain_code: str) -> None:
-        """Remove domain by its code."""
         if domain_code in self.root:
             del self.root[domain_code]
 

@@ -69,13 +69,6 @@ class PipeBatch(PipeController):
 
     @override
     def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
-        """
-        Calculate the inputs needed by this PipeBatch.
-
-        Args:
-            visited_pipes: Set of pipe codes currently being processed to prevent infinite recursion.
-                          If None, starts recursion detection with an empty set.
-        """
         return self.inputs
 
     async def _run_batch_pipe(
