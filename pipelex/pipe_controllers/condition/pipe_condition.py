@@ -8,6 +8,7 @@ from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
 from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
@@ -55,14 +56,20 @@ class PipeCondition(PipeController):
         for pipe_condition_pipe_map in self.pipe_map:
             if pipe_condition_pipe_map.pipe_code != SpecificPipeCodesEnum.CONTINUE:
                 pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
-                if self.output.concept_string != pipe.output.concept_string and self.output.concept_string != "native.Dynamic":
+                if (
+                    self.output.concept_string != pipe.output.concept_string
+                    and self.output.concept_string != SpecialDomain.NATIVE.value + "." + NativeConceptEnum.DYNAMIC.value
+                ):
                     raise PipeConditionError(
                         f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                         f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'"
                     )
         if self.default_pipe_code:
             default_pipe = get_required_pipe(pipe_code=self.default_pipe_code)
-            if self.output.concept_string != default_pipe.output.concept_string and self.output.concept_string != "native.Dynamic":
+            if (
+                self.output.concept_string != default_pipe.output.concept_string
+                and self.output.concept_string != SpecialDomain.NATIVE.value + "." + NativeConceptEnum.DYNAMIC.value
+            ):
                 raise PipeConditionError(
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                     f"not matching the output concept code '{default_pipe.output.concept_string}' of the default pipe '{self.default_pipe_code}'"
