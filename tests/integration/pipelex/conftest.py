@@ -143,11 +143,11 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
         # LLMPlatform.BEDROCK,
         # LLMPlatform.BEDROCK_ANTHROPIC,
         # LLMPlatform.MISTRAL,
-        # LLMPlatform.OPENAI,
+        LLMPlatform.OPENAI,
         # LLMPlatform.PERPLEXITY,
         # LLMPlatform.VERTEXAI,
         # LLMPlatform.XAI,
-        LLMPlatform.CUSTOM_LLM,
+        # LLMPlatform.CUSTOM_LLM,
     ]
 )
 def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
@@ -164,7 +164,7 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
         # "gpt-5-nano",
         # "gpt-5-chat-latest",
         # "gpt-5",
-        # "gpt-4o-mini",
+        "gpt-4o-mini",
         # "open-mixtral-8x7b",
         # "google/gemini-2.0-flash",
         # "google/gemini-2.5-pro-preview-05-06",
@@ -195,7 +195,7 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
         # "grok-3-mini",
         # "pipelex/gpt-4o-mini",
         # "pipelex/claude-3.7-sonnet",
-        "vertex_ai/gemini-2.0-flash",
+        # "vertex_ai/gemini-2.0-flash",
     ]
 )
 def llm_id(request: pytest.FixtureRequest) -> str:

@@ -21,6 +21,7 @@
  - Updated `mypy` to version `1.18.1`
  - Image handling in `AnthropicFactory` now converts image URLs to `base64` data URLs with proper MIME type prefix
  - Put back Discord link in `README.md`
+ - Pinned `instructor` to version `<1.10.0` to avoid errors with `mypy`
 
 ## [v0.9.4] - 2025-09-06
 
