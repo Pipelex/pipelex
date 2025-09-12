@@ -17,6 +17,7 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
+from pipelex.cogt.inference.inference_backend_library import InferenceBackendLibrary
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
@@ -68,6 +69,7 @@ class Pipelex(metaclass=MetaSingleton):
         class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
         llm_model_provider: Optional[LLMModelLibrary] = None,
+        inference_backend_library: Optional[InferenceBackendLibrary] = None,
         inference_manager: Optional[InferenceManager] = None,
         pipeline_manager: Optional[PipelineManager] = None,
         pipeline_tracker: Optional[PipelineTracker] = None,
@@ -105,6 +107,9 @@ class Pipelex(metaclass=MetaSingleton):
         # cogt
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
+
+        self.inference_backend_library = inference_backend_library or InferenceBackendLibrary.make_empty()
+
         self.llm_model_provider = llm_model_provider or LLMModelLibrary.make_empty(config_dir_path=config_dir_path)
         self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
         self.inference_manager = inference_manager or InferenceManager()
@@ -168,6 +173,8 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
         self.plugin_manager.setup(library_config=self.library_manager.library_config)
+        self.inference_backend_library.setup()
+        self.inference_backend_library.load_backends()
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())
