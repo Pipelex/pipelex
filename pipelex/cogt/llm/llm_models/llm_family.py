@@ -154,9 +154,8 @@ class LLMFamily(StrEnum):
                 return LLMCreator.META
             case LLMFamily.CUSTOM_QWEN_3:
                 return LLMCreator.ALIBABA
-            case LLMFamily.CUSTOM_BLACKBOXAI:
-                return LLMCreator.OPENAI
-            case LLMFamily.PIPELEX_INFERENCE:
+            case LLMFamily.CUSTOM_BLACKBOXAI | LLMFamily.PIPELEX_INFERENCE:
+                # TODO: this doesn't make sense for multi-model providers, needs full refactor
                 return LLMCreator.OPENAI
 
     @property
