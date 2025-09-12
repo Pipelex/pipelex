@@ -23,7 +23,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
     params=[
         # "o1",
         # "gpt-4o",
-        "gpt-4o-mini",
+        # "gpt-4o-mini",
         # "gpt-4-5-preview",
         # "o1-mini",
         # "o3-mini",
@@ -50,6 +50,10 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "bedrock-meta-llama-3-3-70b-instruct",
         # "bedrock-nova-pro",
         # "sonar",
+        # "pipelex/gpt-4o-mini",
+        # "pipelex/claude-3.7-sonnet",
+        # "pipelex/gemini-2.0-flash-vertex",
+        "pipelex/gemini-2.0-flash",
     ]
 )
 def llm_handle(request: pytest.FixtureRequest) -> str:
@@ -92,19 +96,20 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
     params=[
         # LLMFamily.GPT_4,
         # LLMFamily.GPT_4O,
-        # LLMFamily.GPT_5,
+        LLMFamily.GPT_5,
         # LLMFamily.GPT_4_5,
         # LLMFamily.GPT_4_1,
         # LLMFamily.O_SERIES,
         # LLMFamily.CLAUDE_3_7,
         # LLMFamily.CLAUDE_4,
-        LLMFamily.CLAUDE_4_1,
+        # LLMFamily.CLAUDE_4_1,
         # LLMFamily.PERPLEXITY_SEARCH,
         # LLMFamily.PERPLEXITY_REASONING,
         # LLMFamily.PERPLEXITY_RESEARCH,
         # LLMFamily.PERPLEXITY_DEEPSEEK,
         # LLMFamily.GEMINI,
         # LLMFamily.GEMMA,
+        # LLMFamily.CUSTOM_BLACKBOXAI,
     ]
 )
 def llm_family(request: pytest.FixtureRequest) -> LLMFamily:
@@ -134,15 +139,15 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
 @pytest.fixture(
     params=[
         # LLMPlatform.ANTHROPIC,
-        LLMPlatform.AZURE_OPENAI,
+        # LLMPlatform.AZURE_OPENAI,
         # LLMPlatform.BEDROCK,
         # LLMPlatform.BEDROCK_ANTHROPIC,
         # LLMPlatform.MISTRAL,
         # LLMPlatform.OPENAI,
         # LLMPlatform.PERPLEXITY,
         # LLMPlatform.VERTEXAI,
-        # LLMPlatform.CUSTOM_LLM,
         # LLMPlatform.XAI,
+        LLMPlatform.CUSTOM_LLM,
     ]
 )
 def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
@@ -152,9 +157,9 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
 
 @pytest.fixture(
     params=[
-        "gpt-5-mini-2025-08-07",
-        "gpt-5-nano-2025-08-07",
-        "gpt-5-chat-2025-08-07",
+        # "gpt-5-mini-2025-08-07",
+        # "gpt-5-nano-2025-08-07",
+        # "gpt-5-chat-2025-08-07",
         # "gpt-5-mini",
         # "gpt-5-nano",
         # "gpt-5-chat-latest",
@@ -183,6 +188,14 @@ def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
         # "llama4:scout",
         # "mistral-small3.1:24b",
         # "qwen3:8b",
+        # "blackboxai/openai/gpt-4o-mini",
+        # "pipelex/openai/gpt-4o-mini",
+        # "openai/gpt-4o-mini",
+        # "grok-3",
+        # "grok-3-mini",
+        # "pipelex/gpt-4o-mini",
+        # "pipelex/claude-3.7-sonnet",
+        "vertex_ai/gemini-2.0-flash",
     ]
 )
 def llm_id(request: pytest.FixtureRequest) -> str:
