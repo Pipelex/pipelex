@@ -1,0 +1,24 @@
+
+# OpenAI Models
+["pipelex/gpt-4o-mini".latest]
+model_id = "pipelex/gpt-4o-mini"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
+
+# Anthropic Models
+["pipelex/claude-3.7-sonnet".latest]
+model_id = "pipelex/claude-3.7-sonnet"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
+
+# Google Models using VertexAI
+["pipelex/gemini-2.0-flash-vertex".latest]
+model_id = "pipelex/gemini-2.0-flash-vertex"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
+
+# Google Models using Google API
+["pipelex/gemini-2.0-flash".latest]
+model_id = "gemini/gemini-2.0-flash"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }

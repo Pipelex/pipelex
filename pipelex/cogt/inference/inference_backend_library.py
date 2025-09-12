@@ -48,4 +48,4 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot], InferenceB
             self.root[backend_name] = backend
             log.debug(f"Loaded inference backend '{backend_name}'")
 
-        pretty_print(self.root, title="Inference Backends")
+        # pretty_print(self.root, title="Inference Backends")

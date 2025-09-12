@@ -1,0 +1,21 @@
+[gemini."gemini-2.0-flash".latest]
+is_gen_object_supported = true
+is_vision_supported = true
+max_prompt_images = 3000
+cost_per_million_tokens_usd = { input = 0.1, output = 0.4 }
+platform_llm_id = { vertexai = "google/gemini-2.0-flash" }
+
+[gemini."gemini-2.5-pro"."latest"]
+is_gen_object_supported = true
+is_vision_supported = true
+max_prompt_images = 3000
+cost_per_million_tokens_usd = { input = 0.0, output = 0.0 }
+platform_llm_id = { vertexai = "google/gemini-2.5-pro" }
+
+[gemini."gemini-2.5-flash".latest]
+is_gen_object_supported = true
+is_vision_supported = true
+max_prompt_images = 3000
+cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
+platform_llm_id = { vertexai = "google/gemini-2.5-flash" }
+

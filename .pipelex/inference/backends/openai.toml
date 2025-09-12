@@ -1,0 +1,119 @@
+[gpt-3.5-turbo.latest]
+model_id = "gpt-3.5-turbo-1106"
+features = ["structured_generation"]
+cost_per_million_tokens_usd = { input = 0.5, output = 1.5 }
+
+[gpt-4.latest]
+model_id = "gpt-4"
+features = []
+cost_per_million_tokens_usd = { input = 30.0, output = 60.0 }
+
+[gpt-4-turbo.0125-preview]
+model_id = "gpt-4-0125-preview"
+features = ["structured_generation"]
+cost_per_million_tokens_usd = { input = 10.0, output = 30.0 }
+
+[gpt-4-turbo.1106-preview]
+model_id = "gpt-4-1106-preview"
+features = ["structured_generation"]
+cost_per_million_tokens_usd = { input = 10.0, output = 30.0 }
+
+[gpt-4-turbo."2024-04-09"]
+model_id = "gpt-4-turbo-2024-04-09"
+features = ["structured_generation"]
+cost_per_million_tokens_usd = { input = 10.0, output = 30.0 }
+
+[gpt-4-turbo.latest]
+model_id = "gpt-4-turbo"
+features = ["structured_generation"]
+cost_per_million_tokens_usd = { input = 10.0, output = 30.0 }
+
+[gpt-4o."2024-05-13"]
+model_id = "gpt-4o-2024-05-13"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 5.0, output = 15.0 }
+
+[gpt-4o."2024-08-06"]
+model_id = "gpt-4o-2024-08-06"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 2.5, output = 10.0 }
+
+[gpt-4o."2024-11-20"]
+model_id = "gpt-4o-2024-11-20"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 2.5, output = 10.0 }
+
+[gpt-4o.latest]
+model_id = "gpt-4o"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 2.5, output = 10.0 }
+
+[gpt-4o-mini."2024-07-18"]
+model_id = "gpt-4o-mini-2024-07-18"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
+
+[gpt-4o-mini.latest]
+model_id = "gpt-4o-mini"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
+
+[gpt-4.1.latest]
+model_id = "gpt-4.1"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 2, output = 8 }
+
+[gpt-4.1-mini.latest]
+model_id = "gpt-4.1-mini"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 0.4, output = 1.6 }
+
+[gpt-4.1-nano.latest]
+model_id = "gpt-4.1-nano"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 0.1, output = 0.4 }
+
+[o1-mini.latest]
+model_id = "o1-mini"
+features = []
+cost_per_million_tokens_usd = { input = 3.0, output = 12.0 }
+
+[o1.latest]
+model_id = "o1"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 15.0, output = 60.0 }
+
+[o3-mini.latest]
+model_id = "o3-mini"
+features = ["structured_generation"]
+cost_per_million_tokens_usd = { input = 1.1, output = 4.4 }
+
+[o3.latest]
+model_id = "o3"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 10.0, output = 40.0 }
+
+[o4-mini.latest]
+model_id = "o4-mini"
+features = ["structured_generation"]
+cost_per_million_tokens_usd = { input = 1.1, output = 4.4 }
+
+[gpt-5.latest]
+model_id = "gpt-5"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 1.25, output = 10.0 }
+
+[gpt-5-mini.latest]
+model_id = "gpt-5-mini"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 0.25, output = 2.0 }
+
+[gpt-5-nano.latest]
+model_id = "gpt-5-nano"
+features = ["structured_generation", "vision"]
+cost_per_million_tokens_usd = { input = 0.05, output = 0.4 }
+
+[gpt-5-chat.latest]
+model_id = "gpt-5-chat-latest"
+features = ["vision"]
+cost_per_million_tokens_usd = { input = 1.25, output = 10.0 }

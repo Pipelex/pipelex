@@ -1,0 +1,30 @@
+
+
+[custom-gemma-3."gemma3:4b".latest]
+is_gen_object_supported = false
+is_vision_supported = true
+max_prompt_images = 3000
+cost_per_million_tokens_usd = { input = 0, output = 0 }
+platform_llm_id = { custom_llm = "gemma3:4b" }
+
+[custom-llama-4."llama4:scout".latest]
+is_gen_object_supported = false
+is_vision_supported = true
+max_prompt_images = 3000
+cost_per_million_tokens_usd = { input = 0, output = 0 }
+platform_llm_id = { custom_llm = "llama4:scout" }
+
+["custom-mistral-small3.1"."mistral-small3.1".latest]
+is_gen_object_supported = false
+is_vision_supported = true
+max_prompt_images = 3000
+cost_per_million_tokens_usd = { input = 0, output = 0 }
+platform_llm_id = { custom_llm = "mistral-small3.1:24b" }
+
+["custom-qwen3"."qwen3:8b".latest]
+is_gen_object_supported = false
+is_vision_supported = false
+cost_per_million_tokens_usd = { input = 0, output = 0 }
+platform_llm_id = { custom_llm = "qwen3:8b" }
+# TODO: support <think> tokens
+

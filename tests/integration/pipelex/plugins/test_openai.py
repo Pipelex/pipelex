@@ -32,3 +32,5 @@ class TestOpenAI:
         if pytestconfig.get_verbosity() >= 2:
             list_of_ids = [model.id for model in openai_models_list]
             pretty_print(list_of_ids, title=f"models available for {llm_platform_for_openai_sdk}")
+
+        pretty_print(openai_models_list)
