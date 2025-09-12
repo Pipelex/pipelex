@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## [v0.9.5] - 2025-09-12
+
+### Highlight
+ - Pinned `instructor` to version `<1.10.0` to avoid errors with `mypy`
 
 ### Added
  - Added `PIPELEX_INFERENCE` LLM family enum value
@@ -18,8 +21,11 @@
  - Modified `Jinja2` filter to use default `TagStyle.TICKS` instead of raising error
  - Added proper error handling for Unicode decode errors when loading model libraries
  - Improved error handling in Anthropic plugin tests with specific `AuthenticationError` handling
- - Updated `mypy` to version `1.18.1`
  - Image handling in `AnthropicFactory` now converts image URLs to `base64` data URLs with proper MIME type prefix
+ - Put back Discord link in `README.md`
+
+### Fixed
+ - Pinned `instructor` to version `<1.10.0` to avoid errors with `mypy`
 
 ## [v0.9.4] - 2025-09-06
 
