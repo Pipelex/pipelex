@@ -1,24 +1,27 @@
+default_sdk = "openai"
 
 # OpenAI Models
-["pipelex/gpt-4o-mini"]
+[gpt-4o-mini]
 model_id = "pipelex/gpt-4o-mini"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
 
 # Anthropic Models
-["pipelex/claude-3.7-sonnet"]
+["claude-3.7-sonnet"]
 model_id = "pipelex/claude-3.7-sonnet"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
 
-# Google Models using VertexAI
-["pipelex/gemini-2.0-flash-vertex"]
-model_id = "pipelex/gemini-2.0-flash-vertex"
+# Google Models using Google API
+["gemini-2.0-flash"]
+model_id = "gemini/gemini-2.0-flash"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
 
-# Google Models using Google API
-["pipelex/gemini-2.0-flash"]
-model_id = "gemini/gemini-2.0-flash"
+# TO BE REMOVED
+
+# Google Models using VertexAI
+["gemini-2.0-flash-vertex"]
+model_id = "pipelex/gemini-2.0-flash-vertex"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
