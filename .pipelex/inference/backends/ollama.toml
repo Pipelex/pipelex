@@ -1,0 +1,25 @@
+default_sdk = "openai"
+
+[gemma3-4b]
+model_id = "gemma3:4b"
+features = []
+max_prompt_images = 3000
+cost_per_million_tokens_usd = { input = 0, output = 0 }
+
+[llama4-scout]
+model_id = "llama4:scout"
+features = []
+max_prompt_images = 3000
+cost_per_million_tokens_usd = { input = 0, output = 0 }
+
+[mistral-small3.1-24b]
+model_id = "mistral-small3.1:24b"
+features = []
+max_prompt_images = 3000
+cost_per_million_tokens_usd = { input = 0, output = 0 }
+
+[qwen3-8b]
+model_id = "qwen3:8b"
+features = []
+cost_per_million_tokens_usd = { input = 0, output = 0 }
+# TODO: support <think> tokens
