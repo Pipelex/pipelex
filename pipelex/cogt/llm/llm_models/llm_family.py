@@ -102,6 +102,8 @@ class LLMFamily(StrEnum):
     CUSTOM_QWEN_3 = "custom-qwen3"
     CUSTOM_BLACKBOXAI = "custom-blackboxai"
 
+    PIPELEX_INFERENCE = "pipelex-inference"
+
     @property
     def creator(self) -> LLMCreator:
         match self:
@@ -153,6 +155,8 @@ class LLMFamily(StrEnum):
             case LLMFamily.CUSTOM_QWEN_3:
                 return LLMCreator.ALIBABA
             case LLMFamily.CUSTOM_BLACKBOXAI:
+                return LLMCreator.OPENAI
+            case LLMFamily.PIPELEX_INFERENCE:
                 return LLMCreator.OPENAI
 
     @property

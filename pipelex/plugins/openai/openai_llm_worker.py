@@ -96,6 +96,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.PERPLEXITY_REASONING
                     | LLMFamily.PERPLEXITY_DEEPSEEK
                     | LLMFamily.GROK_3
+                    | LLMFamily.PIPELEX_INFERENCE
                 ):
                     response = await self.openai_client_for_text.chat.completions.create(
                         model=self.llm_engine.llm_id,
@@ -198,6 +199,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.PERPLEXITY_REASONING
                     | LLMFamily.PERPLEXITY_DEEPSEEK
                     | LLMFamily.GROK_3
+                    | LLMFamily.PIPELEX_INFERENCE
                 ):
                     result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                         model=self.llm_engine.llm_id,
