@@ -64,7 +64,9 @@ def render_any_tagged_for_jinja2(context: Context, value: Any, tag_name: Optiona
     if tag_style_str:
         tag_style = TagStyle(tag_style_str)
     else:
-        raise Jinja2ContextError(f"Tag style is required for Jinja2 tag filter (context.name = {context.name})")
+        # raise Jinja2ContextError(f"Tag style is required for Jinja2 tag filter (context.name = {context.name})")
+        # TODO: ignoring this error is a workaround, the real bug will be fixed as part of a full refactor of the jinja2 filters
+        tag_style = TagStyle.TICKS
 
     tagged: Any
     if tag_name:
