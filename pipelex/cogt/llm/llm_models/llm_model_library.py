@@ -73,9 +73,14 @@ class LLMModelLibrary(LLMModelProviderAbstract, RootModel[LLMModelLibraryRoot]):
         if not os.path.exists(libraries_path):
             raise LLMModelLibraryError(f"LLM model library path `{libraries_path}` not found. Please run `pipelex init-libraries` to create it.")
         llm_library: LLMModelLibraryDict = {}
-        for library_file_name in sorted(os.listdir(libraries_path)):
+        library_file_names = os.listdir(libraries_path)
+        library_file_names = [file_name for file_name in library_file_names if file_name.endswith(".toml")]
+        for library_file_name in sorted(library_file_names):
             library_path = os.path.join(libraries_path, library_file_name)
-            llm_families: LLMModelLibraryDict = load_toml_from_path(library_path)
+            try:
+                llm_families: LLMModelLibraryDict = load_toml_from_path(library_path)
+            except UnicodeDecodeError as exc:
+                raise LLMModelLibraryError(f"Failed to load LLM model library file '{library_file_name}' from '{library_path}': {exc}")
             llm_library.update(llm_families)
         return llm_library
 
