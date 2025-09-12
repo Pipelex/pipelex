@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+ - Added PIPELEX_INFERENCE LLM family enum value
+ - Added support for PIPELEX_INFERENCE in OpenAI LLM worker
+ - Added Azure OpenAI platform support for Grok models (grok-3 and grok-3-mini)
+ - Added debug logging for PipeParallel output contents
+ - Added TOML file filtering in LLM model library loading
+ - Added error handling for Unicode decode errors in LLM model library
+ - Added new test model configurations for pipelex and vertex_ai platforms
+
+### Changed
+ - Improved error messages in StuffFactory to include concept code and stuff name
+ - Disabled gen_object_supported for all Grok models (grok-3, grok-3-mini, grok-3-fast)
+ - Updated test configurations to use different LLM models and platforms
+ - Modified Jinja2 filter to use default TagStyle.TICKS instead of raising error
+ - Added proper error handling for Unicode decode errors when loading model libraries
+ - Improved error handling in Anthropic plugin tests with specific AuthenticationError handling
+
 ## [v0.9.4] - 2025-09-06
 
 ### Added
