@@ -10,17 +10,17 @@ model_id = "gpt-4o-mini-2024-07-18"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
 
-[gpt-4.1]
+["gpt-4.1"]
 model_id = "gpt-4.1-2025-04-14"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 2, output = 8 }
 
-[gpt-4.1-mini]
+["gpt-4.1-mini"]
 model_id = "gpt-4.1-mini-2025-04-14"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.4, output = 1.6 }
 
-[gpt-4.1-nano]
+["gpt-4.1-nano"]
 model_id = "gpt-4.1-nano-2025-04-14"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.1, output = 0.4 }
@@ -54,3 +54,4 @@ cost_per_million_tokens_usd = { input = 0.05, output = 0.4 }
 model_id = "gpt-5-chat-2025-08-07"
 features = ["vision"]
 cost_per_million_tokens_usd = { input = 1.25, output = 10.0 }
+

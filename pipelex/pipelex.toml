@@ -2,7 +2,7 @@
 
 [pipelex]
 extra_env_files = []
-inference_backends_config_path = ".pipelex/inference/inference_backends.toml"
+inference_config_path = ".pipelex/inference/"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags

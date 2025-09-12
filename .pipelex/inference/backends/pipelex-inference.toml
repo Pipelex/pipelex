@@ -25,3 +25,4 @@ cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
 model_id = "pipelex/gemini-2.0-flash-vertex"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.15, output = 0.60 }
+

@@ -7,7 +7,6 @@ cost_per_million_tokens_usd = { input = 0.5, output = 1.5 }
 
 [gpt-4]
 model_id = "gpt-4"
-features = []
 cost_per_million_tokens_usd = { input = 30.0, output = 60.0 }
 
 [gpt-4-turbo]
@@ -35,17 +34,17 @@ model_id = "gpt-4o-mini"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
 
-[gpt-4.1]
+["gpt-4.1"]
 model_id = "gpt-4.1"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 2, output = 8 }
 
-[gpt-4.1-mini]
+["gpt-4.1-mini"]
 model_id = "gpt-4.1-mini"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.4, output = 1.6 }
 
-[gpt-4.1-nano]
+["gpt-4.1-nano"]
 model_id = "gpt-4.1-nano"
 features = ["structured_generation", "vision"]
 cost_per_million_tokens_usd = { input = 0.1, output = 0.4 }

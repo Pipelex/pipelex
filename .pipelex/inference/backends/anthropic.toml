@@ -55,3 +55,4 @@ max_tokens = 32000
 features = ["structured_generation", "vision"]
 max_prompt_images = 100
 cost_per_million_tokens_usd = { input = 3.0, output = 15.0 }
+
