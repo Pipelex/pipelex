@@ -26,7 +26,7 @@ from pipelex.exceptions import (
 )
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
-from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.pipe_controllers.pipe_controller import PipeController, SpecificPipeCodesEnum
 from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2Output
 from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
 from pipelex.pipe_operators.jinja2.pipe_jinja2_factory import PipeJinja2Factory
@@ -53,7 +53,7 @@ class PipeCondition(PipeController):
         The output of the pipe condition should match the output of all the conditional pipes, and the default pipe.
         """
         for pipe_condition_pipe_map in self.pipe_map:
-            if pipe_condition_pipe_map.pipe_code != "continue":
+            if pipe_condition_pipe_map.pipe_code != SpecificPipeCodesEnum.CONTINUE:
                 pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
                 if self.output.concept_string != pipe.output.concept_string and self.output.concept_string != "native.Dynamic":
                     raise PipeConditionError(
@@ -180,7 +180,7 @@ class PipeCondition(PipeController):
 
         # 2. Add the inputs needed by all possible target pipes
         for pipe_condition_pipe_map in self.pipe_map:
-            if pipe_condition_pipe_map.pipe_code != "continue":
+            if pipe_condition_pipe_map.pipe_code != SpecificPipeCodesEnum.CONTINUE:
                 pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
                 # Use the centralized recursion detection
                 pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
@@ -254,7 +254,9 @@ class PipeCondition(PipeController):
     @override
     def pipe_dependencies(self) -> Set[str]:
         pipe_codes = [
-            pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in self.pipe_map if pipe_condition_pipe_map.pipe_code != "continue"
+            pipe_condition_pipe_map.pipe_code
+            for pipe_condition_pipe_map in self.pipe_map
+            if pipe_condition_pipe_map.pipe_code != SpecificPipeCodesEnum.CONTINUE
         ]
         if self.default_pipe_code:
             pipe_codes.append(self.default_pipe_code)
@@ -343,7 +345,7 @@ class PipeCondition(PipeController):
             error_msg += f"\n\nPipe map: {self.pipe_map}"
             raise PipeConditionError(error_msg)
 
-        if chosen_pipe_code == "continue":
+        if chosen_pipe_code == SpecificPipeCodesEnum.CONTINUE:
             return PipeOutput(working_memory=working_memory)
 
         condition_details = self._make_pipe_condition_details(
