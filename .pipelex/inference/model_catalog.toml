@@ -1,1 +1,74 @@
+# Model Catalog - Routes models to their backends
+# ================================================
+# This file controls which backend serves which model.
+# Simply change the 'active' field to switch configurations.
 
+# Which configuration to use (change this to switch routing)
+active = "smart_routing"
+
+# ============================================
+# Configuration Profiles
+# ============================================
+
+# Profile 1: Route everything through Anthropic
+[configs.all_anthropic]
+description = "Use Anthropic backend for all supported models"
+default = "anthropic"
+# No specific routes needed - everything goes to default
+
+# Profile 2: Route everything through Pipelex Inference
+[configs.all_pipelex]
+description = "Use Pipelex Inference backend for all models"
+default = "pipelex-inference"
+# No specific routes needed - everything goes to default
+
+# Profile 3: Smart routing based on model type
+[configs.smart_routing]
+description = "Route Claude models to Anthropic, everything else to Pipelex"
+default = "pipelex-inference"                                                # Fallback for unmatched models
+
+# Specific routing rules (checked in order)
+[configs.smart_routing.routes]
+# Pattern matching: "model-pattern" = "backend-name"
+"claude-*" = "anthropic"         # All Claude models go to Anthropic
+"gpt-*" = "pipelex-inference"    # GPT models to Pipelex
+"gemini-*" = "pipelex-inference" # Gemini models to Pipelex
+"grok-*" = "pipelex-inference"   # Grok models to Pipelex
+"*-sdxl" = "pipelex-inference"   # Image models to Pipelex
+
+# Profile 4: Cost-optimized routing
+[configs.cost_optimized]
+description = "Route to cheapest available backend for each model"
+default = "pipelex-inference"
+
+[configs.cost_optimized.routes]
+# Route specific high-cost models to potentially cheaper backends
+"claude-3-opus" = "anthropic"   # Keep expensive models on native backend
+"claude-4-opus" = "anthropic"
+"claude-4-1-opus" = "anthropic"
+# Everything else goes to Pipelex for cost savings
+
+# Profile 5: Development/Testing
+[configs.development]
+description = "Testing configuration - all to Pipelex with exceptions"
+default = "pipelex-inference"
+
+[configs.development.routes]
+# Test specific models on their native backends
+"claude-3-7-sonnet" = "anthropic" # Test latest Claude on native
+
+# ============================================
+# Custom Configurations
+# ============================================
+# Add your own configurations below following the same pattern:
+#
+# [configs.your_config_name]
+# description = "What this configuration does"
+# default = "backend-name"  # Where to route models by default
+# [configs.your_config_name.routes]
+# "model-pattern" = "backend-name"  # Specific routing rules
+#
+# Pattern matching supports:
+# - Exact names: "gpt-4o-mini" 
+# - Wildcards: "claude-*" (matches all models starting with claude-)
+# - Partial wildcards: "*-sonnet" (matches all sonnet variants)

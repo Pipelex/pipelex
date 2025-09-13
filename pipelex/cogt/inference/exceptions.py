@@ -8,3 +8,11 @@ class InferenceBackendError(Exception):
 
 class InferenceBackendLibraryError(Exception):
     pass
+
+
+class ModelCatalogError(Exception):
+    pass
+
+
+class ModelCatalogLibraryError(Exception):
+    pass
