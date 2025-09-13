@@ -17,8 +17,8 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
-from pipelex.cogt.inference.inference_backend_library import InferenceBackendLibrary
 from pipelex.cogt.inference.inference_manager import InferenceManager
+from pipelex.cogt.inference_backend.backend_library import InferenceBackendLibrary
 from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
 from pipelex.config import PipelexConfig, get_config

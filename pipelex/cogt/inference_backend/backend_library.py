@@ -4,12 +4,12 @@ from pydantic import Field, RootModel, ValidationError
 from typing_extensions import override
 
 from pipelex import log, pretty_print
-from pipelex.cogt.inference.exceptions import InferenceBackendLibraryError, InferenceModelSpecError
-from pipelex.cogt.inference.inference_backend import InferenceBackend
-from pipelex.cogt.inference.inference_backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
-from pipelex.cogt.inference.inference_backend_provider import InferenceBackendProviderAbstract
-from pipelex.cogt.inference.inference_model_spec import InferenceModelSpec
-from pipelex.cogt.inference.inference_model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
+from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceModelSpecError
+from pipelex.cogt.inference_backend.backend import InferenceBackend
+from pipelex.cogt.inference_backend.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
+from pipelex.cogt.inference_backend.backend_provider import InferenceBackendProviderAbstract
+from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
+from pipelex.cogt.inference_backend.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
 from pipelex.config import get_config
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path
 

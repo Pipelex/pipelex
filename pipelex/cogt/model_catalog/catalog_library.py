@@ -4,13 +4,13 @@ from pydantic import Field, RootModel, ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.inference.exceptions import ModelCatalogError, ModelCatalogLibraryError
-from pipelex.cogt.inference.model_catalog_config import ModelCatalogConfig
-from pipelex.cogt.inference.model_catalog_factory import (
+from pipelex.cogt.exceptions import ModelCatalogError, ModelCatalogLibraryError
+from pipelex.cogt.model_catalog.catalog_config import ModelCatalogConfig
+from pipelex.cogt.model_catalog.catalog_factory import (
     ModelCatalogBlueprint,
     ModelCatalogFactory,
 )
-from pipelex.cogt.inference.model_catalog_provider import ModelCatalogProviderAbstract
+from pipelex.cogt.model_catalog.catalog_provider import ModelCatalogProviderAbstract
 from pipelex.config import get_config
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path
 

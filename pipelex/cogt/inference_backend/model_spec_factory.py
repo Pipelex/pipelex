@@ -2,8 +2,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from pipelex.cogt.inference.exceptions import InferenceModelSpecError
-from pipelex.cogt.inference.inference_model_spec import InferenceModelSpec
+from pipelex.cogt.exceptions import InferenceModelSpecError
+from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.token_category import TokenCostsByCategoryDict
 
 

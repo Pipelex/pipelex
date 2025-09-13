@@ -2,7 +2,7 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from pipelex.cogt.inference.model_catalog_config import ModelCatalogConfig
+from pipelex.cogt.model_catalog.catalog_config import ModelCatalogConfig
 
 
 class ModelCatalogConfigBlueprint(BaseModel):

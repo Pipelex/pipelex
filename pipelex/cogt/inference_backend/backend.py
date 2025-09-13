@@ -2,8 +2,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from pipelex.cogt.inference.inference_backend_service import InferenceService
-from pipelex.cogt.inference.inference_model_spec import InferenceModelSpec
+from pipelex.cogt.inference_backend.backend_service import InferenceService
+from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.types import StrEnum
 
 

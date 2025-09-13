@@ -142,3 +142,23 @@ class MissingPluginError(CogtError):
 
 class OcrCapabilityError(CogtError):
     pass
+
+
+class ModelCatalogError(CogtError):
+    pass
+
+
+class ModelCatalogLibraryError(CogtError):
+    pass
+
+
+class InferenceModelSpecError(CogtError):
+    pass
+
+
+class InferenceBackendError(CogtError):
+    pass
+
+
+class InferenceBackendLibraryError(CogtError):
+    pass

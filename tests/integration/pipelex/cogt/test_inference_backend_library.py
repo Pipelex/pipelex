@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.cogt.inference.inference_backend_library import InferenceBackendLibrary
+from pipelex.cogt.inference_backend.backend_library import InferenceBackendLibrary
 
 
 class TestInferenceBackendLibrary:
