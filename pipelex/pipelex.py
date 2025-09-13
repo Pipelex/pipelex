@@ -19,7 +19,6 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.inference_backend.backend_library import InferenceBackendLibrary
-from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
@@ -198,10 +197,9 @@ class Pipelex(metaclass=MetaSingleton):
             self.library_manager.setup()
             llm_deck = self.library_manager.load_deck()
             for llm_model in self.llm_model_provider.get_all_llm_models():
-                if llm_model.version == LATEST_VERSION_NAME:
-                    llm_deck.add_llm_name_as_handle_with_defaults(
-                        llm_name=llm_model.llm_name,
-                    )
+                llm_deck.add_llm_name_as_handle_with_defaults(
+                    llm_name=llm_model.llm_name,
+                )
             self.library_manager.load_libraries()
             self.pipelex_hub.set_llm_deck_provider(llm_deck_provider=llm_deck)
         except ValidationError as exc:

@@ -14,7 +14,7 @@ class LLMEngine(BaseModel):
     def validate_llm_platform(self) -> Self:
         if self.llm_platform not in self.llm_model.platform_llm_id:
             raise LLMModelPlatformError(
-                f"Missing id for {self.llm_model.name_and_version} on platform '{self.llm_platform}', provided ids: {self.llm_model.platform_llm_id}"
+                f"Missing id for {self.llm_model.llm_name} on platform '{self.llm_platform}', provided ids: {self.llm_model.platform_llm_id}"
             )
         return self
 
@@ -25,13 +25,12 @@ class LLMEngine(BaseModel):
     @property
     def desc(self) -> str:
         return f"""llm name:         '{self.llm_model.llm_name}':
-version:          '{self.llm_model.version}'
 platform:         '{self.llm_platform}'
 platform llm id:  '{self.llm_id}'"""
 
     @property
     def tag(self) -> str:
-        return f"{self.llm_platform}:{self.llm_model.llm_name}:{self.llm_model.version}:id-[{self.llm_id}]"
+        return f"{self.llm_platform}:{self.llm_model.llm_name}:id-[{self.llm_id}]"
 
     @property
     def is_gen_object_supported(self) -> bool:

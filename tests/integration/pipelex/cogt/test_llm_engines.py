@@ -64,7 +64,7 @@ class TestLLMEngines:
                 user_text=LLMTestConstants.USER_TEXT_SHORT,
                 llm_job_params=llm_job_params,
             )
-            log.info(f"Running inference for {llm_model.name_and_version_and_platform}")
+            log.info(f"Running inference for {llm_model.name_and_platform}")
             await self.run_inference(llm_worker=llm_worker, llm_job=llm_job)
             count += 1
         if count > 0:

@@ -15,7 +15,6 @@ class LLMTokenCostReportField(StrEnum):
     LLM_NAME = "llm_name"
     LLM_PLATFORM = "llm_platform"
     LLM_FAMILY = "llm_family"
-    VERSION = "version"
     PLATFORM_LLM_ID = "platform_llm_id"
     NB_TOKENS_INPUT = "nb_tokens_input"
     NB_TOKENS_INPUT_CACHED = "nb_tokens_input_cached"
@@ -41,7 +40,6 @@ class LLMTokenCostReport(BaseModel):
     llm_name: str
     llm_platform: LLMPlatform
     llm_family: LLMFamily
-    version: str
     platform_llm_id: str
 
     nb_tokens_by_category: NbTokensByCategoryDict
@@ -55,7 +53,6 @@ class LLMTokenCostReport(BaseModel):
             LLMTokenCostReportField.LLM_NAME: self.llm_name,
             LLMTokenCostReportField.LLM_PLATFORM: self.llm_platform,
             LLMTokenCostReportField.LLM_FAMILY: self.llm_family,
-            LLMTokenCostReportField.VERSION: self.version,
             LLMTokenCostReportField.PLATFORM_LLM_ID: self.platform_llm_id,
         }
         the_dict.update(dict_for_llm)
@@ -75,7 +72,7 @@ class LLMTokenCostReport(BaseModel):
 def model_cost_per_token(llm_engine: LLMEngine, token_type: TokenCategory) -> float:
     # cost_per_million_tokens_usd should be missing only for models that we run on our own GPUs
     if not llm_engine.llm_model.cost_per_million_tokens_usd:
-        log.warning(f"cost_per_million_tokens_usd is not set for model {llm_engine.llm_model.name_and_version}")
+        log.warning(f"cost_per_million_tokens_usd is not set for model {llm_engine.llm_model.llm_name}")
         return 0.0
     # all token types are not used for all models
     if token_type == TokenCategory.INPUT_CACHED:
@@ -85,7 +82,7 @@ def model_cost_per_token(llm_engine: LLMEngine, token_type: TokenCategory) -> fl
             # according to openai docs, cached input tokens are discounted 50%
             return 0.5 * cost_per_million_tokens / 1000000
         else:
-            model = llm_engine.llm_model.name_and_version
+            model = llm_engine.llm_model.llm_name
             log.warning(f"cost is not set for model {model} neither for {TokenCategory.INPUT} nor {TokenCategory.INPUT_CACHED}")
             return 0.0
     elif token_type == TokenCategory.INPUT_NON_CACHED:
@@ -111,7 +108,6 @@ class LLMTokensUsage(BaseModel):
             llm_name=self.llm_engine.llm_model.llm_name,
             llm_platform=self.llm_engine.llm_platform,
             llm_family=self.llm_engine.llm_model.llm_family,
-            version=self.llm_engine.llm_model.version,
             platform_llm_id=self.llm_engine.llm_id,
             nb_tokens_by_category=self.nb_tokens_by_category,
             costs_by_token_category=costs_by_token_category,

@@ -8,9 +8,9 @@
 llm_external_handles = []
 
 # Match a llm_handle with either just and llm_name
-# or a complete blueprint including llm_version (defaulting to "latest") and llm_platform_choice (defaulting to "default").
+# or a complete blueprint including llm_platform_choice (defaulting to "default").
 [llm_handles]
-gpt-4o-2024-11-20 = { llm_name = "gpt-4o", llm_version = "2024-11-20" }
+gpt-4o-2024-11-20 = { llm_name = "gpt-4o" }
 base-claude = "claude-4-sonnet"
 base-gpt = "gpt-5"
 
@@ -89,4 +89,3 @@ llm_to_extract_tables = { llm_handle = "best-claude", temperature = 0.1 }
 [llm_choice_defaults]
 for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
-

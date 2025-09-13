@@ -21,7 +21,6 @@ class LLMEngineFactory:
         llm_platform_choice = llm_engine_blueprint.llm_platform_choice
         llm_model = get_llm_models_provider().get_llm_model(
             llm_name=llm_engine_blueprint.llm_name,
-            llm_version=llm_engine_blueprint.llm_version,
             llm_platform_choice=llm_platform_choice,
         )
 

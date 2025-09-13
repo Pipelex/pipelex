@@ -56,7 +56,6 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
         llm_engine_blueprint = self.llm_handles[llm_handle]
         llm_model = llm_models_provider.get_llm_model(
             llm_name=llm_engine_blueprint.llm_name,
-            llm_version=llm_engine_blueprint.llm_version,
             llm_platform_choice=llm_engine_blueprint.llm_platform_choice,
         )
         return llm_model
@@ -69,14 +68,13 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
             return None
         llm_model = llm_models_provider.get_optional_llm_model(
             llm_name=llm_engine_blueprint.llm_name,
-            llm_version=llm_engine_blueprint.llm_version,
             llm_platform_choice=llm_engine_blueprint.llm_platform_choice,
         )
         return llm_model
 
     @override
     @classmethod
-    def final_validate(cls, deck: Self):
+    def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]
         for llm_preset_id, llm_setting in deck.llm_presets.items():
             llm_model = deck.find_llm_model(llm_handle=llm_setting.llm_handle)
             try:

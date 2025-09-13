@@ -1,13 +1,11 @@
 from pydantic import field_validator
 
-from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
 from pipelex.cogt.llm.llm_models.llm_platform import DEFAULT_PLATFORM_INDICATOR, LLMPlatform, LLMPlatformChoice
 from pipelex.tools.config.models import ConfigModel
 
 
 class LLMEngineBlueprint(ConfigModel):
     llm_name: str
-    llm_version: str = LATEST_VERSION_NAME
     llm_platform_choice: LLMPlatformChoice = "default"
 
     @field_validator("llm_platform_choice", mode="before")

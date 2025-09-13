@@ -19,7 +19,6 @@ class LLMModelProviderAbstract(ABC):
     def get_llm_model(
         self,
         llm_name: str,
-        llm_version: str,
         llm_platform_choice: LLMPlatformChoice,
     ) -> LLMModel:
         pass
@@ -28,7 +27,6 @@ class LLMModelProviderAbstract(ABC):
     def get_optional_llm_model(
         self,
         llm_name: str,
-        llm_version: str,
         llm_platform_choice: LLMPlatformChoice,
     ) -> Optional[LLMModel]:
         pass

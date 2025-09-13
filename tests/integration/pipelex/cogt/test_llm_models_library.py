@@ -32,7 +32,7 @@ def print_models(models: List[LLMModel], title: Optional[str] = None):
     table.add_column("Default platform")
     table.add_column("Platform ids")
 
-    sorted_models = sorted(models, key=lambda m: (m.llm_family, m.llm_name, m.version))
+    sorted_models = sorted(models, key=lambda m: (m.llm_family, m.llm_name))
     for model in sorted_models:
         platform_elemnts: List[RenderableType] = []
         for platform, llm_id in model.platform_llm_id.items():
@@ -48,7 +48,6 @@ def print_models(models: List[LLMModel], title: Optional[str] = None):
             Text(model.llm_family.creator, model.llm_family.creator.console_color),
             model.llm_family,
             model.llm_name,
-            model.version,
             model.default_platform,
             platforms,
         )
@@ -64,9 +63,8 @@ class TestLLMModelsDB:
         assert len(all_llm_models) > 0, "No LLM models found"
         assert all(isinstance(model, LLMModel) for model in all_llm_models), "Invalid model type found"
         for llm_model in all_llm_models:
-            log.debug(f"Checking model: {llm_model.name_and_version}")
+            log.debug(f"Checking model: {llm_model.llm_name}")
             assert llm_model.llm_name, "Missing llm_name"
-            assert llm_model.version, "Missing version"
             assert llm_model.llm_family, "Missing llm_family"
             assert llm_model.default_platform, "Missing default_platform"
             assert llm_model.platform_llm_id, "Missing platform_llm_id"
@@ -89,15 +87,12 @@ class TestLLMModelsDB:
     def test_get_llm_model(
         self,
         llm_name: str,
-        llm_version: str,
         llm_platform_choice: LLMPlatformChoice,
     ):
-        model = get_llm_models_provider().get_llm_model(llm_name=llm_name, llm_version=llm_version, llm_platform_choice=llm_platform_choice)
+        model = get_llm_models_provider().get_llm_model(llm_name=llm_name, llm_platform_choice=llm_platform_choice)
         pretty_print(model)
         assert isinstance(model, LLMModel)
         assert model.llm_name == llm_name
-        if llm_version != "latest":
-            assert model.version == llm_version
         if llm_platform_choice == "default":
             assert model.default_platform in model.platform_llm_id
         else:
@@ -126,7 +121,6 @@ class TestLLMModelsDB:
     ):
         engine_card: LLMEngineBlueprint = LLMEngineBlueprint(
             llm_name=llm_name,
-            llm_version=llm_version,
             llm_platform_choice=llm_platform_choice,
         )
         engine = LLMEngineFactory.make_llm_engine(engine_card)
@@ -135,4 +129,3 @@ class TestLLMModelsDB:
         assert engine is not None
         assert isinstance(engine, LLMEngine)
         assert engine.llm_model.llm_name == llm_name
-        assert engine.llm_model.version == llm_version
