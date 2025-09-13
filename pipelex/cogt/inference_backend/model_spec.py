@@ -7,6 +7,7 @@ from pipelex.config import ConfigModel
 
 
 class InferenceModelSpec(ConfigModel):
+    name: str
     sdk: str
     model_id: str
     inputs: List[str] = Field(default_factory=list)
@@ -14,3 +15,18 @@ class InferenceModelSpec(ConfigModel):
     costs: Dict[CostCategory, float] = Field(strict=False)
     max_tokens: Optional[int]
     max_prompt_images: Optional[int]
+
+    # TODO: investigate if this is needed
+    is_system_prompt_supported: bool = True
+
+    @property
+    def tag(self) -> str:
+        return f"{self.sdk}.{self.model_id}"
+
+    @property
+    def desc(self) -> str:
+        return f"{self.sdk}.{self.model_id}"
+
+    @property
+    def is_gen_object_supported(self) -> bool:
+        return "structured" in self.outputs

@@ -1,8 +1,7 @@
 from typing import Optional
 
 from pipelex.cogt.exceptions import MissingDependencyError
-from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
+from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.config import get_config
@@ -14,14 +13,14 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 class LLMWorkerFactory:
     @staticmethod
     def make_llm_worker(
-        llm_engine: LLMEngine,
+        inference_model: InferenceModelSpec,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> LLMWorkerInternalAbstract:
-        llm_sdk_handle = PluginSdkHandle.get_for_llm_platform(llm_platform=llm_engine.llm_platform)
+        llm_sdk_handle = PluginSdkHandle(inference_model.sdk)
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         llm_worker: LLMWorkerInternalAbstract
-        match llm_engine.llm_platform:
-            case LLMPlatform.OPENAI | LLMPlatform.AZURE_OPENAI | LLMPlatform.PERPLEXITY | LLMPlatform.XAI:
+        match llm_sdk_handle:
+            case PluginSdkHandle.OPENAI | PluginSdkHandle.AZURE_OPENAI:
                 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 
                 structure_method: Optional[StructureMethod] = None
@@ -34,55 +33,55 @@ class LLMWorkerFactory:
                     llm_sdk_handle=llm_sdk_handle
                 ) or plugin_sdk_registry.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
-                    llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=llm_engine.llm_platform),
+                    llm_sdk_instance=OpenAIFactory.make_openai_client(plugin_sdk_handle=llm_sdk_handle),
                 )
 
                 llm_worker = OpenAILLMWorker(
                     sdk_instance=llm_sdk_instance,
-                    llm_engine=llm_engine,
+                    llm_engine=inference_model,
                     structure_method=structure_method,
                     reporting_delegate=reporting_delegate,
                 )
-            case LLMPlatform.VERTEXAI:
-                try:
-                    import google.auth  # noqa: F401
-                except ImportError as exc:
-                    raise MissingDependencyError("google-auth-oauthlib", "google", "This dependency is required to connect to google.") from exc
+            # case LLMPlatform.VERTEXAI:
+            #     try:
+            #         import google.auth  # noqa: F401
+            #     except ImportError as exc:
+            #         raise MissingDependencyError("google-auth-oauthlib", "google", "This dependency is required to connect to google.") from exc
 
-                from pipelex.plugins.openai.openai_factory import OpenAIFactory
-                from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker
+            #     from pipelex.plugins.openai.openai_factory import OpenAIFactory
+            #     from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker
 
-                llm_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle
-                ) or plugin_sdk_registry.set_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle,
-                    llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=llm_engine.llm_platform),
-                )
+            #     llm_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
+            #         llm_sdk_handle=llm_sdk_handle
+            #     ) or plugin_sdk_registry.set_llm_sdk_instance(
+            #         llm_sdk_handle=llm_sdk_handle,
+            #         llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=inference_model.llm_platform),
+            #     )
 
-                llm_worker = OpenAILLMWorker(
-                    sdk_instance=llm_sdk_instance,
-                    llm_engine=llm_engine,
-                    structure_method=StructureMethod.INSTRUCTOR_VERTEX_JSON,
-                    reporting_delegate=reporting_delegate,
-                )
-            case LLMPlatform.CUSTOM_LLM:
-                from pipelex.plugins.openai.openai_factory import OpenAIFactory
-                from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker
+            #     llm_worker = OpenAILLMWorker(
+            #         sdk_instance=llm_sdk_instance,
+            #         llm_engine=inference_model,
+            #         structure_method=StructureMethod.INSTRUCTOR_VERTEX_JSON,
+            #         reporting_delegate=reporting_delegate,
+            #     )
+            # case LLMPlatform.CUSTOM_LLM:
+            #     from pipelex.plugins.openai.openai_factory import OpenAIFactory
+            #     from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker
 
-                llm_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle
-                ) or plugin_sdk_registry.set_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle,
-                    llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=llm_engine.llm_platform),
-                )
+            #     llm_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
+            #         llm_sdk_handle=llm_sdk_handle
+            #     ) or plugin_sdk_registry.set_llm_sdk_instance(
+            #         llm_sdk_handle=llm_sdk_handle,
+            #         llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=inference_model.llm_platform),
+            #     )
 
-                llm_worker = OpenAILLMWorker(
-                    sdk_instance=llm_sdk_instance,
-                    llm_engine=llm_engine,
-                    structure_method=StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED,
-                    reporting_delegate=reporting_delegate,
-                )
-            case LLMPlatform.ANTHROPIC | LLMPlatform.BEDROCK_ANTHROPIC:
+            #     llm_worker = OpenAILLMWorker(
+            #         sdk_instance=llm_sdk_instance,
+            #         llm_engine=inference_model,
+            #         structure_method=StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED,
+            #         reporting_delegate=reporting_delegate,
+            #     )
+            case PluginSdkHandle.ANTHROPIC | PluginSdkHandle.BEDROCK_ANTHROPIC:
                 try:
                     import anthropic  # noqa: F401
                 except ImportError as exc:
@@ -103,16 +102,16 @@ class LLMWorkerFactory:
                     llm_sdk_handle=llm_sdk_handle
                 ) or plugin_sdk_registry.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
-                    llm_sdk_instance=AnthropicFactory.make_anthropic_client(llm_platform=llm_engine.llm_platform),
+                    llm_sdk_instance=AnthropicFactory.make_anthropic_client(plugin_sdk_handle=llm_sdk_handle),
                 )
 
                 llm_worker = AnthropicLLMWorker(
                     sdk_instance=llm_sdk_instance,
-                    llm_engine=llm_engine,
+                    inference_model=inference_model,
                     structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
-            case LLMPlatform.MISTRAL:
+            case PluginSdkHandle.MISTRAL:
                 try:
                     import mistralai  # noqa: F401
                 except ImportError as exc:
@@ -138,11 +137,11 @@ class LLMWorkerFactory:
 
                 llm_worker = MistralLLMWorker(
                     sdk_instance=llm_sdk_instance,
-                    llm_engine=llm_engine,
+                    llm_engine=inference_model,
                     structure_method=StructureMethod.INSTRUCTOR_MISTRAL_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
-            case LLMPlatform.BEDROCK:
+            case PluginSdkHandle.BEDROCK:
                 try:
                     import aioboto3  # noqa: F401
                     import boto3  # noqa: F401
@@ -163,7 +162,9 @@ class LLMWorkerFactory:
 
                 llm_worker = BedrockLLMWorker(
                     sdk_instance=llm_sdk_instance,
-                    llm_engine=llm_engine,
+                    llm_engine=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
+            case PluginSdkHandle.FAL:
+                raise NotImplementedError("FAL is not supported here")
         return llm_worker

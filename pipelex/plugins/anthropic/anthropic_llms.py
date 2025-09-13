@@ -4,18 +4,18 @@ from anthropic import AsyncAnthropic
 from anthropic.types import ModelInfo
 
 from pipelex.cogt.exceptions import LLMModelProviderError, LLMSDKError
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
+from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 
 
-async def anthropic_list_anthropic_models(llm_platform: LLMPlatform) -> List[ModelInfo]:
+async def anthropic_list_anthropic_models(plugin_sdk_handle: PluginSdkHandle) -> List[ModelInfo]:
     """
     List available Anthropic models.
 
     Returns:
         List[ModelInfo]: A list of Anthropic model information objects
     """
-    anthropic_client = AnthropicFactory.make_anthropic_client(llm_platform=llm_platform)
+    anthropic_client = AnthropicFactory.make_anthropic_client(plugin_sdk_handle=plugin_sdk_handle)
     if not hasattr(anthropic_client, "models"):
         raise LLMSDKError(f"{type(anthropic_client).__name__} does not support listing models")
     if not isinstance(anthropic_client, AsyncAnthropic):

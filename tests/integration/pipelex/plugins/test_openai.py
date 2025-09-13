@@ -2,7 +2,6 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.exceptions import LLMSDKError
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
 

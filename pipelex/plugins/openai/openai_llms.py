@@ -3,17 +3,12 @@ from typing import List
 from openai.types import Model
 
 from pipelex.cogt.exceptions import LLMSDKError
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 
 
-async def openai_list_available_models(llm_platform: LLMPlatform) -> List[Model]:
-    openai_client_async = OpenAIFactory.make_openai_client(llm_platform=llm_platform)
-    match llm_platform:
-        case LLMPlatform.VERTEXAI | LLMPlatform.PERPLEXITY | LLMPlatform.CUSTOM_LLM:
-            raise LLMSDKError(f"Platform '{llm_platform}' does not support listing models with OpenAI SDK")
-        case _:
-            pass
+async def openai_list_available_models(plugin_sdk_handle: PluginSdkHandle) -> List[Model]:
+    openai_client_async = OpenAIFactory.make_openai_client(plugin_sdk_handle=plugin_sdk_handle)
 
     models = await openai_client_async.models.list()
     data = models.data

@@ -3,8 +3,8 @@ from datetime import datetime
 from typing_extensions import override
 
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
+from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams, LLMJobReport
-from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 
@@ -23,7 +23,7 @@ class LLMJob(InferenceJobAbstract):
     def validate_before_execution(self):
         self.llm_prompt.validate_before_execution()
 
-    def llm_job_before_start(self, llm_engine: LLMEngine):
+    def llm_job_before_start(self, llm_engine: InferenceModelSpec):
         # Reset metadata
         self.job_metadata.started_at = datetime.now()
 

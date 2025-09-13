@@ -4,8 +4,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMEngineParameterError, SdkTypeError
+from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
@@ -18,13 +18,13 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        llm_engine: LLMEngine,
+        llm_engine: InferenceModelSpec,
         structure_method: Optional[StructureMethod] = None,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
-            llm_engine=llm_engine,
+            inference_model=llm_engine,
             structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
@@ -37,7 +37,9 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
         if default_max_tokens := llm_engine.llm_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise LLMEngineParameterError(f"No max_tokens provided for llm model '{self.llm_engine.llm_model.desc}', but it is required for Bedrock")
+            raise LLMEngineParameterError(
+                f"No max_tokens provided for llm model '{self.inference_model.llm_model.desc}', but it is required for Bedrock"
+            )
         self.bedrock_client_for_text = sdk_instance
 
     @override
@@ -47,12 +49,12 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
     ) -> str:
         message = BedrockFactory.make_simple_message(llm_job=llm_job)
 
-        log.debug(self.llm_engine.llm_id)
+        log.debug(self.inference_model.llm_id)
 
         bedrock_response_text, nb_tokens_by_category = await self.bedrock_client_for_text.chat(
             messages=message.to_dict_list(),
             system_text=llm_job.llm_prompt.system_text,
-            model=self.llm_engine.llm_id,
+            model=self.inference_model.llm_id,
             temperature=llm_job.job_params.temperature,
             max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
         )

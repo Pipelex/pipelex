@@ -1,4 +1,3 @@
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
 from pipelex.types import StrEnum
 
@@ -33,11 +32,11 @@ class LLMCreator(StrEnum):
     def console_color(self) -> str:
         match self:
             case LLMCreator.OPENAI:
-                return LLMPlatform.OPENAI.console_color
+                return "deep_pink1"
             case LLMCreator.ANTHROPIC:
-                return LLMPlatform.ANTHROPIC.console_color
+                return "turquoise2"
             case LLMCreator.MISTRAL:
-                return LLMPlatform.MISTRAL.console_color
+                return "gold3"
             case LLMCreator.META:
                 return "dodger_blue2"
             case LLMCreator.GOOGLE:

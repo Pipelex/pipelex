@@ -9,7 +9,7 @@ from rich.table import Table
 from pipelex import log
 from pipelex.cogt.exceptions import CostRegistryError
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage, model_cost_per_token
-from pipelex.cogt.llm.token_category import TokenCategory
+from pipelex.cogt.llm.token_category import CostCategory
 
 CostRegistryRoot = List[LLMTokenCostReport]
 
@@ -153,24 +153,24 @@ class CostRegistry(RootModel[CostRegistryRoot]):
     def complete_cost_report(cls, llm_tokens_usage: LLMTokensUsage) -> LLMTokenCostReport:
         cost_report = llm_tokens_usage.compute_cost_report()
         # compute the input_non_cached tokens
-        if cost_report.nb_tokens_by_category.get(TokenCategory.INPUT_NON_CACHED) is not None:
+        if cost_report.nb_tokens_by_category.get(CostCategory.INPUT_NON_CACHED) is not None:
             raise CostRegistryError("TokenCategory.INPUT_NON_CACHED already exists in the cost report")
         # we use pop to remove input tokens which will be replaced by "input joined"
-        nb_tokens_input_joined = cost_report.nb_tokens_by_category.pop(TokenCategory.INPUT, 0)
-        cost_report.costs_by_token_category.pop(TokenCategory.INPUT, None)
+        nb_tokens_input_joined = cost_report.nb_tokens_by_category.pop(CostCategory.INPUT, 0)
+        cost_report.costs_by_token_category.pop(CostCategory.INPUT, None)
 
-        nb_tokens_input_cached = cost_report.nb_tokens_by_category.get(TokenCategory.INPUT_CACHED, 0)
+        nb_tokens_input_cached = cost_report.nb_tokens_by_category.get(CostCategory.INPUT_CACHED, 0)
         nb_tokens_input_non_cached = nb_tokens_input_joined - nb_tokens_input_cached
-        cost_report.nb_tokens_by_category[TokenCategory.INPUT_JOINED] = nb_tokens_input_joined
-        cost_report.nb_tokens_by_category[TokenCategory.INPUT_NON_CACHED] = nb_tokens_input_non_cached
-        cost_report.nb_tokens_by_category[TokenCategory.INPUT_CACHED] = nb_tokens_input_cached
+        cost_report.nb_tokens_by_category[CostCategory.INPUT_JOINED] = nb_tokens_input_joined
+        cost_report.nb_tokens_by_category[CostCategory.INPUT_NON_CACHED] = nb_tokens_input_non_cached
+        cost_report.nb_tokens_by_category[CostCategory.INPUT_CACHED] = nb_tokens_input_cached
 
-        cost_report.costs_by_token_category[TokenCategory.INPUT_NON_CACHED] = nb_tokens_input_non_cached * model_cost_per_token(
-            llm_engine=llm_tokens_usage.llm_engine, token_type=TokenCategory.INPUT_NON_CACHED
+        cost_report.costs_by_token_category[CostCategory.INPUT_NON_CACHED] = nb_tokens_input_non_cached * model_cost_per_token(
+            inference_model=llm_tokens_usage.llm_engine, token_type=CostCategory.INPUT_NON_CACHED
         )
-        costs_input_cached = cost_report.costs_by_token_category.get(TokenCategory.INPUT_CACHED, 0)
-        cost_report.costs_by_token_category[TokenCategory.INPUT_CACHED] = costs_input_cached
-        cost_report.costs_by_token_category[TokenCategory.INPUT_JOINED] = (
-            costs_input_cached + cost_report.costs_by_token_category[TokenCategory.INPUT_NON_CACHED]
+        costs_input_cached = cost_report.costs_by_token_category.get(CostCategory.INPUT_CACHED, 0)
+        cost_report.costs_by_token_category[CostCategory.INPUT_CACHED] = costs_input_cached
+        cost_report.costs_by_token_category[CostCategory.INPUT_JOINED] = (
+            costs_input_cached + cost_report.costs_by_token_category[CostCategory.INPUT_NON_CACHED]
         )
         return cost_report

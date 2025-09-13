@@ -15,21 +15,21 @@ from openai.types.completion_usage import CompletionUsage
 from pipelex import log
 from pipelex.cogt.exceptions import LLMEngineParameterError, LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
+from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
 from pipelex.hub import get_plugin_manager, get_secrets_provider
+from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 
 
 class OpenAIFactory:
     @classmethod
-    def make_openai_client(cls, llm_platform: LLMPlatform) -> openai.AsyncClient:
+    def make_openai_client(cls, plugin_sdk_handle: PluginSdkHandle) -> openai.AsyncClient:
         the_client: openai.AsyncOpenAI
         api_key: Optional[str] = None
-        match llm_platform:
-            case LLMPlatform.AZURE_OPENAI:
+        match plugin_sdk_handle:
+            case PluginSdkHandle.AZURE_OPENAI:
                 azure_openai_config = get_plugin_manager().plugin_configs.azure_openai_config
                 endpoint, api_version, api_key = azure_openai_config.configure(secrets_provider=get_secrets_provider())
 
@@ -39,48 +39,54 @@ class OpenAIFactory:
                     api_key=api_key,
                     api_version=api_version,
                 )
-            case LLMPlatform.PERPLEXITY:
-                perplexity_config = get_plugin_manager().plugin_configs.perplexity_config
-                endpoint, api_key = perplexity_config.configure(secrets_provider=get_secrets_provider())
+            # case LLMPlatform.PERPLEXITY:
+            #     perplexity_config = get_plugin_manager().plugin_configs.perplexity_config
+            #     endpoint, api_key = perplexity_config.configure(secrets_provider=get_secrets_provider())
 
-                log.verbose(f"Making perplexity AsyncOpenAI client with endpoint: {endpoint}")
-                the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=endpoint,
-                )
-            case LLMPlatform.OPENAI:
+            #     log.verbose(f"Making perplexity AsyncOpenAI client with endpoint: {endpoint}")
+            #     the_client = openai.AsyncOpenAI(
+            #         api_key=api_key,
+            #         base_url=endpoint,
+            #     )
+            case PluginSdkHandle.OPENAI:
                 openai_config = get_plugin_manager().plugin_configs.openai_config
                 api_key = openai_config.get_api_key(secrets_provider=get_secrets_provider())
                 the_client = openai.AsyncOpenAI(api_key=api_key)
-            case LLMPlatform.VERTEXAI:
-                vertexai_config = get_plugin_manager().plugin_configs.vertexai_config
-                endpoint, api_key = vertexai_config.configure(secrets_provider=get_secrets_provider())
+            # case LLMPlatform.VERTEXAI:
+            #     vertexai_config = get_plugin_manager().plugin_configs.vertexai_config
+            #     endpoint, api_key = vertexai_config.configure(secrets_provider=get_secrets_provider())
 
-                log.verbose(f"Making vertex AsyncOpenAI client with endpoint: {endpoint}")
-                the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=endpoint,
-                )
-            case LLMPlatform.XAI:
-                xai_config = get_plugin_manager().plugin_configs.xai_config
-                endpoint, api_key = xai_config.configure(secrets_provider=get_secrets_provider())
+            #     log.verbose(f"Making vertex AsyncOpenAI client with endpoint: {endpoint}")
+            #     the_client = openai.AsyncOpenAI(
+            #         api_key=api_key,
+            #         base_url=endpoint,
+            #     )
+            # case LLMPlatform.XAI:
+            #     xai_config = get_plugin_manager().plugin_configs.xai_config
+            #     endpoint, api_key = xai_config.configure(secrets_provider=get_secrets_provider())
 
-                log.verbose(f"Making Xai AsyncOpenAI client with endpoint: {endpoint}")
-                the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=endpoint,
-                )
-            case LLMPlatform.CUSTOM_LLM:
-                custom_endpoint_config = get_plugin_manager().plugin_configs.custom_endpoint_config
-                base_url, api_key = custom_endpoint_config.configure(secrets_provider=get_secrets_provider())
+            #     log.verbose(f"Making Xai AsyncOpenAI client with endpoint: {endpoint}")
+            #     the_client = openai.AsyncOpenAI(
+            #         api_key=api_key,
+            #         base_url=endpoint,
+            #     )
+            # case LLMPlatform.CUSTOM_LLM:
+            #     custom_endpoint_config = get_plugin_manager().plugin_configs.custom_endpoint_config
+            #     base_url, api_key = custom_endpoint_config.configure(secrets_provider=get_secrets_provider())
 
-                log.verbose(f"Making custom AsyncOpenAI client with base_url: {base_url}")
-                the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=base_url,
-                )
-            case LLMPlatform.ANTHROPIC | LLMPlatform.BEDROCK | LLMPlatform.BEDROCK_ANTHROPIC | LLMPlatform.MISTRAL:
-                raise LLMEngineParameterError(f"Platform '{llm_platform}' is not supported by this factory '{cls.__name__}'")
+            #     log.verbose(f"Making custom AsyncOpenAI client with base_url: {base_url}")
+            #     the_client = openai.AsyncOpenAI(
+            #         api_key=api_key,
+            #         base_url=base_url,
+            #     )
+            case (
+                PluginSdkHandle.ANTHROPIC
+                | PluginSdkHandle.BEDROCK
+                | PluginSdkHandle.BEDROCK_ANTHROPIC
+                | PluginSdkHandle.MISTRAL
+                | PluginSdkHandle.FAL
+            ):
+                raise LLMEngineParameterError(f"Platform '{plugin_sdk_handle}' is not supported by this factory '{cls.__name__}'")
 
         return the_client
 
@@ -88,7 +94,7 @@ class OpenAIFactory:
     def make_simple_messages(
         cls,
         llm_job: LLMJob,
-        llm_engine: LLMEngine,
+        inference_model: InferenceModelSpec,
     ) -> List[ChatCompletionMessageParam]:
         """
         Makes a list of messages with a system message (if provided) and followed by a user message.
@@ -96,7 +102,7 @@ class OpenAIFactory:
         llm_prompt = llm_job.llm_prompt
         messages: List[ChatCompletionMessageParam] = []
         user_contents: List[ChatCompletionContentPartParam] = []
-        if llm_engine.llm_model.is_system_prompt_supported and (system_content := llm_prompt.system_text):
+        if inference_model.is_system_prompt_supported and (system_content := llm_prompt.system_text):
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
         # TODO: confirm that we can prompt without user_contents, for instance if we have only images,
         # otherwise consider using a default user_content
@@ -156,15 +162,15 @@ class OpenAIFactory:
     @staticmethod
     def make_nb_tokens_by_category(usage: CompletionUsage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
-            TokenCategory.INPUT: usage.prompt_tokens,
-            TokenCategory.OUTPUT: usage.completion_tokens,
+            CostCategory.INPUT: usage.prompt_tokens,
+            CostCategory.OUTPUT: usage.completion_tokens,
         }
         if prompt_tokens_details := usage.prompt_tokens_details:
-            nb_tokens_by_category[TokenCategory.INPUT_AUDIO] = prompt_tokens_details.audio_tokens or 0
-            nb_tokens_by_category[TokenCategory.INPUT_CACHED] = prompt_tokens_details.cached_tokens or 0
+            nb_tokens_by_category[CostCategory.INPUT_AUDIO] = prompt_tokens_details.audio_tokens or 0
+            nb_tokens_by_category[CostCategory.INPUT_CACHED] = prompt_tokens_details.cached_tokens or 0
         if completion_tokens_details := usage.completion_tokens_details:
-            nb_tokens_by_category[TokenCategory.OUTPUT_AUDIO] = completion_tokens_details.audio_tokens or 0
-            nb_tokens_by_category[TokenCategory.OUTPUT_REASONING] = completion_tokens_details.reasoning_tokens or 0
-            nb_tokens_by_category[TokenCategory.OUTPUT_ACCEPTED_PREDICTION] = completion_tokens_details.accepted_prediction_tokens or 0
-            nb_tokens_by_category[TokenCategory.OUTPUT_REJECTED_PREDICTION] = completion_tokens_details.rejected_prediction_tokens or 0
+            nb_tokens_by_category[CostCategory.OUTPUT_AUDIO] = completion_tokens_details.audio_tokens or 0
+            nb_tokens_by_category[CostCategory.OUTPUT_REASONING] = completion_tokens_details.reasoning_tokens or 0
+            nb_tokens_by_category[CostCategory.OUTPUT_ACCEPTED_PREDICTION] = completion_tokens_details.accepted_prediction_tokens or 0
+            nb_tokens_by_category[CostCategory.OUTPUT_REJECTED_PREDICTION] = completion_tokens_details.rejected_prediction_tokens or 0
         return nb_tokens_by_category

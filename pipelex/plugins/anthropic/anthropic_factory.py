@@ -23,10 +23,10 @@ from pipelex.cogt.image.prompt_image import (
 )
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
 from pipelex.config import get_config
 from pipelex.hub import get_plugin_manager, get_secrets_provider
+from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 
@@ -38,15 +38,15 @@ class AnthropicFactoryError(CogtError):
 class AnthropicFactory:
     @staticmethod
     def make_anthropic_client(
-        llm_platform: LLMPlatform,
+        plugin_sdk_handle: PluginSdkHandle,
     ) -> Union[AsyncAnthropic, AsyncAnthropicBedrock]:
         # TODO: also support Anthropic with VertexAI
-        match llm_platform:
-            case LLMPlatform.ANTHROPIC:
+        match plugin_sdk_handle:
+            case PluginSdkHandle.ANTHROPIC:
                 anthropic_config = get_plugin_manager().plugin_configs.anthropic_config
                 api_key = anthropic_config.get_api_key(secrets_provider=get_secrets_provider())
                 return AsyncAnthropic(api_key=api_key)
-            case LLMPlatform.BEDROCK_ANTHROPIC:
+            case PluginSdkHandle.BEDROCK_ANTHROPIC:
                 aws_config = get_config().pipelex.aws_config
                 aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()
                 return AsyncAnthropicBedrock(
@@ -55,7 +55,8 @@ class AnthropicFactory:
                     aws_region=aws_region,
                 )
             case _:
-                raise AnthropicFactoryError(f"Unsupported LLM platform for Anthropic sdk: '{llm_platform}'")
+                # TODO: list all cases
+                raise AnthropicFactoryError(f"Unsupported LLM platform for Anthropic sdk: '{plugin_sdk_handle}'")
 
     @classmethod
     async def make_user_message(
@@ -209,15 +210,15 @@ class AnthropicFactory:
     @staticmethod
     def make_nb_tokens_by_category(usage: Usage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
-            TokenCategory.INPUT: usage.input_tokens,
-            TokenCategory.OUTPUT: usage.output_tokens,
+            CostCategory.INPUT: usage.input_tokens,
+            CostCategory.OUTPUT: usage.output_tokens,
         }
         return nb_tokens_by_category
 
     @staticmethod
     def make_nb_tokens_by_category_from_nb(nb_input: int, nb_output: int) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
-            TokenCategory.INPUT: nb_input,
-            TokenCategory.OUTPUT: nb_output,
+            CostCategory.INPUT: nb_input,
+            CostCategory.OUTPUT: nb_output,
         }
         return nb_tokens_by_category

@@ -7,8 +7,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, SdkTypeError
+from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
@@ -20,13 +20,13 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        llm_engine: LLMEngine,
+        llm_engine: InferenceModelSpec,
         structure_method: Optional[StructureMethod] = None,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
-            llm_engine=llm_engine,
+            inference_model=llm_engine,
             structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
@@ -37,7 +37,9 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         if default_max_tokens := llm_engine.llm_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise LLMEngineParameterError(f"No max_tokens provided for llm model '{self.llm_engine.llm_model.desc}', but it is required for Mistral")
+            raise LLMEngineParameterError(
+                f"No max_tokens provided for llm model '{self.inference_model.llm_model.desc}', but it is required for Mistral"
+            )
         self.mistral_client_for_text: Mistral = sdk_instance
 
         if structure_method:
@@ -55,7 +57,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         messages = MistralFactory.make_simple_messages(llm_job=llm_job)
         response: Optional[ChatCompletionResponse] = await self.mistral_client_for_text.chat.complete_async(
             messages=messages,
-            model=self.llm_engine.llm_id,
+            model=self.inference_model.llm_id,
             temperature=llm_job.job_params.temperature,
             max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
         )
@@ -81,7 +83,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
             response_model=schema,
             messages=MistralFactory.make_simple_messages_openai_typed(llm_job=llm_job),
-            model=self.llm_engine.llm_id,
+            model=self.inference_model.llm_id,
             temperature=llm_job.job_params.temperature,
             max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
         )

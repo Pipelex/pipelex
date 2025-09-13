@@ -5,7 +5,6 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex.cogt.exceptions import LLMSDKError
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_anthropic_models
 
 

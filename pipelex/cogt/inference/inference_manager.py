@@ -8,8 +8,7 @@ from pipelex.cogt.imgg.imgg_engine_factory import ImggEngineFactory
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.imgg.imgg_worker_factory import ImggWorkerFactory
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
-from pipelex.cogt.llm.llm_models.llm_engine_blueprint import LLMEngineBlueprint
-from pipelex.cogt.llm.llm_models.llm_engine_factory import LLMEngineFactory
+from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
@@ -64,21 +63,20 @@ class InferenceManager(InferenceManagerProtocol):
     @override
     def setup_llm_workers(self):
         log.verbose("Setting up LLM Workers...")
-        llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
-        log.verbose(f"{len(llm_handle_to_llm_engine_blueprint)} LLM engine_cards found")
-        for llm_handle, llm_engine_blueprint in llm_handle_to_llm_engine_blueprint.items():
-            self._setup_one_internal_llm_worker(llm_engine_blueprint=llm_engine_blueprint, llm_handle=llm_handle)
-            log.verbose(f"Setup LLM worker for '{llm_handle}' on {llm_engine_blueprint.llm_platform_choice}")
+        llm_handle_to_inference_model = get_llm_deck().llm_handles
+        log.verbose(f"{len(llm_handle_to_inference_model)} LLM engine_cards found")
+        for llm_handle, inference_model in llm_handle_to_inference_model.items():
+            self._setup_one_internal_llm_worker(inference_model=inference_model, llm_handle=llm_handle)
+            log.verbose(f"Setup LLM worker for '{llm_handle}' using sdk {inference_model.sdk}")
         log.debug("Done setting up LLM Workers (async)")
 
     def _setup_one_internal_llm_worker(
         self,
-        llm_engine_blueprint: LLMEngineBlueprint,
+        inference_model: InferenceModelSpec,
         llm_handle: str,
     ) -> LLMWorkerInternalAbstract:
-        llm_engine = LLMEngineFactory.make_llm_engine(llm_engine_blueprint=llm_engine_blueprint)
         llm_worker = LLMWorkerFactory.make_llm_worker(
-            llm_engine=llm_engine,
+            inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
         )
         self.llm_workers[llm_handle] = llm_worker
@@ -93,9 +91,9 @@ class InferenceManager(InferenceManagerProtocol):
                 f"No LLM worker for '{llm_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_llm"
             )
 
-        llm_engine_blueprint = get_llm_deck().get_llm_engine_blueprint(llm_handle=llm_handle)
+        inference_model = get_llm_deck().get_inference_model(llm_handle=llm_handle)
         llm_worker = self._setup_one_internal_llm_worker(
-            llm_engine_blueprint=llm_engine_blueprint,
+            inference_model=inference_model,
             llm_handle=llm_handle,
         )
 

@@ -1,7 +1,5 @@
 import pytest
 
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-
 
 @pytest.fixture(params=LLMPlatform.list_openai_related())
 def llm_platform_for_openai_sdk(request: pytest.FixtureRequest) -> LLMPlatform:

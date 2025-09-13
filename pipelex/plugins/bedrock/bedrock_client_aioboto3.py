@@ -5,7 +5,7 @@ from types_aiobotocore_bedrock_runtime.type_defs import ConverseResponseTypeDef
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
 from pipelex.plugins.bedrock.bedrock_message import BedrockMessageDictList
 
@@ -41,8 +41,8 @@ class BedrockClientAioboto3(BedrockClientProtocol):
             resp_dict: Dict[str, Any] = cast(Dict[str, Any], conversation_response)
             usage_dict: Dict[str, Any] = resp_dict["usage"]
             nb_tokens_by_category: NbTokensByCategoryDict = {
-                TokenCategory.INPUT: usage_dict["inputTokens"],
-                TokenCategory.OUTPUT: usage_dict["outputTokens"],
+                CostCategory.INPUT: usage_dict["inputTokens"],
+                CostCategory.OUTPUT: usage_dict["outputTokens"],
             }
             response_text: str = resp_dict["output"]["message"]["content"][0]["text"]
             return response_text, nb_tokens_by_category

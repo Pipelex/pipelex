@@ -65,6 +65,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot], InferenceB
                 try:
                     model_spec_blueprint = InferenceModelSpecBlueprint.model_validate(model_spec_dict)
                     model_spec = InferenceModelSpecFactory.make_inference_model_spec(
+                        name=model_spec_name,
                         blueprint=model_spec_blueprint,
                         default_sdk=default_sdk,
                     )

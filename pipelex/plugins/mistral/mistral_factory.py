@@ -22,7 +22,7 @@ from openai.types.chat import (
 from pipelex.cogt.exceptions import PromptImageFormatError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
 from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
 from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
@@ -110,8 +110,8 @@ class MistralFactory:
     @staticmethod
     def make_nb_tokens_by_category(usage: UsageInfo) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
-            TokenCategory.INPUT: usage.prompt_tokens,
-            TokenCategory.OUTPUT: usage.completion_tokens,
+            CostCategory.INPUT: usage.prompt_tokens,
+            CostCategory.OUTPUT: usage.completion_tokens,
         }
         return nb_tokens_by_category
 
