@@ -10,7 +10,8 @@ from pipelex.hub import get_required_config
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
 from pipelex.tools.aws.aws_config import AwsConfig
-from pipelex.tools.config.models import ConfigModel, ConfigRoot
+from pipelex.tools.config.config_model import ConfigModel
+from pipelex.tools.config.config_root import ConfigRoot
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.types import StrEnum

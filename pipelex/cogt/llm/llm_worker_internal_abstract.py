@@ -49,7 +49,7 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         llm_job: LLMJob,
     ):
         await super()._before_job(llm_job=llm_job)
-        llm_job.llm_job_before_start(llm_engine=self.inference_model)
+        llm_job.llm_job_before_start(inference_model=self.inference_model)
 
     @override
     def _check_can_perform_job(self, llm_job: LLMJob):
@@ -58,10 +58,10 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
 
     def _check_vision_support(self, llm_job: LLMJob):
         if llm_job.llm_prompt.user_images:
-            if not self.inference_model.llm_model.is_vision_supported:
+            if not self.inference_model.is_vision_supported:
                 raise LLMCapabilityError(f"LLM Engine '{self.inference_model.tag}' does not support vision.")
 
             nb_images = len(llm_job.llm_prompt.user_images)
-            max_prompt_images = self.inference_model.llm_model.max_prompt_images or 5000
+            max_prompt_images = self.inference_model.max_prompt_images or 5000
             if nb_images > max_prompt_images:
                 raise LLMCapabilityError(f"LLM Engine '{self.inference_model.tag}' does not accept that many images: {nb_images}.")

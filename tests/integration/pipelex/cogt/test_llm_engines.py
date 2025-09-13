@@ -1,15 +1,11 @@
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.cogt.llm.llm_models.llm_family import LLMCreator, LLMFamily
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
-from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
-from pipelex.hub import get_inference_manager, get_llm_deck, get_report_delegate
-from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
+from pipelex.hub import get_inference_manager, get_llm_deck
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
 
 

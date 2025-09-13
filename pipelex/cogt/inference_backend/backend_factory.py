@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pipelex.cogt.inference_backend.backend import InferenceBackend
 from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
-from pipelex.config import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 
 
 class InferenceBackendBlueprint(ConfigModel):

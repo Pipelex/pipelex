@@ -4,7 +4,7 @@ from pydantic import Field
 
 from pipelex import log
 from pipelex.cogt.exceptions import MissingDependencyError
-from pipelex.tools.config.models import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.environment import EnvVarNotFoundError, get_required_env
 from pipelex.tools.exceptions import CredentialsError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path

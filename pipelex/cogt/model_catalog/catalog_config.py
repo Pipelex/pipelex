@@ -2,7 +2,7 @@ from typing import Dict
 
 from pydantic import Field
 
-from pipelex.config import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 
 
 class ModelCatalogConfig(ConfigModel):

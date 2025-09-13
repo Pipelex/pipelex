@@ -2,7 +2,7 @@ from pydantic import Field
 
 from pipelex import log
 from pipelex.cogt.exceptions import CogtError
-from pipelex.tools.config.models import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.environment import EnvVarNotFoundError, get_required_env
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract

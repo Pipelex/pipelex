@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional, Union
 
-from pipelex.tools.config.models import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 
 
 class TrackerConfig(ConfigModel):

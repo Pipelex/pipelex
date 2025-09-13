@@ -19,7 +19,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.inference_backend.backend_library import InferenceBackendLibrary
-from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
+from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
@@ -45,7 +45,7 @@ from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
-from pipelex.tools.config.models import ConfigRoot
+from pipelex.tools.config.config_root import ConfigRoot
 from pipelex.tools.func_registry import func_registry
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
@@ -67,7 +67,6 @@ class Pipelex(metaclass=MetaSingleton):
         config_cls: Optional[Type[ConfigRoot]] = None,
         class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
-        llm_model_provider: Optional[LLMModelLibrary] = None,
         inference_backend_library: Optional[InferenceBackendLibrary] = None,
         inference_manager: Optional[InferenceManager] = None,
         pipeline_manager: Optional[PipelineManager] = None,
@@ -109,8 +108,6 @@ class Pipelex(metaclass=MetaSingleton):
 
         self.inference_backend_library = inference_backend_library or InferenceBackendLibrary.make_empty()
 
-        self.llm_model_provider = llm_model_provider or LLMModelLibrary.make_empty(config_dir_path=config_dir_path)
-        self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
@@ -193,13 +190,9 @@ class Pipelex(metaclass=MetaSingleton):
     def setup_libraries(self):
         try:
             self.template_provider.setup()
-            self.llm_model_provider.setup()
             self.library_manager.setup()
-            llm_deck = self.library_manager.load_deck()
-            for llm_model in self.llm_model_provider.get_all_llm_models():
-                llm_deck.add_llm_name_as_handle_with_defaults(
-                    llm_name=llm_model.llm_name,
-                )
+            # TODO: load the Deck
+            llm_deck = LLMDeck()
             self.library_manager.load_libraries()
             self.pipelex_hub.set_llm_deck_provider(llm_deck_provider=llm_deck)
         except ValidationError as exc:
@@ -226,7 +219,6 @@ class Pipelex(metaclass=MetaSingleton):
         # cogt
         self.inference_manager.teardown()
         self.reporting_delegate.teardown()
-        self.llm_model_provider.teardown()
         self.plugin_manager.teardown()
 
         # tools

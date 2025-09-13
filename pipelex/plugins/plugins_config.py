@@ -8,7 +8,7 @@ from pipelex.plugins.openai.openai_config import OpenAIConfig
 from pipelex.plugins.openai.perplexity_config import PerplexityConfig
 from pipelex.plugins.openai.vertexai_config import VertexAIConfig
 from pipelex.plugins.openai.xai_config import XaiConfig
-from pipelex.tools.config.models import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 
 
 class PluginConfig(ConfigModel):

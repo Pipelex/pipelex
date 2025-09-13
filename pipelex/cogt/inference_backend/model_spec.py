@@ -1,9 +1,10 @@
-from typing import Dict, List, Optional, cast
+from typing import Dict, List, Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from pipelex.cogt.inference_backend.cost_category import CostCategory
-from pipelex.config import ConfigModel
+from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
+from pipelex.tools.config.config_model import ConfigModel
 
 
 class InferenceModelSpec(ConfigModel):
@@ -30,3 +31,11 @@ class InferenceModelSpec(ConfigModel):
     @property
     def is_gen_object_supported(self) -> bool:
         return "structured" in self.outputs
+
+    @property
+    def is_vision_supported(self) -> bool:
+        return "images" in self.inputs
+
+    @property
+    def llm_family(self) -> LLMFamily:
+        return LLMFamily(self.model_id.split("-")[0])

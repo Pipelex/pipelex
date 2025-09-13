@@ -23,7 +23,7 @@ class LLMJob(InferenceJobAbstract):
     def validate_before_execution(self):
         self.llm_prompt.validate_before_execution()
 
-    def llm_job_before_start(self, llm_engine: InferenceModelSpec):
+    def llm_job_before_start(self, inference_model: InferenceModelSpec):
         # Reset metadata
         self.job_metadata.started_at = datetime.now()
 
@@ -33,7 +33,8 @@ class LLMJob(InferenceJobAbstract):
         # Reset info
         self.job_report.llm_tokens_usage = LLMTokensUsage(
             job_metadata=self.job_metadata,
-            llm_engine=llm_engine,
+            inference_model_name=inference_model.name,
+            inference_model_id=inference_model.model_id,
             nb_tokens_by_category={},
         )
 

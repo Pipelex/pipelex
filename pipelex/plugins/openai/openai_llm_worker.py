@@ -22,13 +22,13 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        llm_engine: InferenceModelSpec,
+        inference_model: InferenceModelSpec,
         structure_method: Optional[StructureMethod],
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
-            inference_model=llm_engine,
+            inference_model=inference_model,
             structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
@@ -59,11 +59,11 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         )
 
         try:
-            match self.inference_model.llm_model.llm_family:
+            match self.inference_model.llm_family:
                 case LLMFamily.O_SERIES | LLMFamily.GPT_5:
                     # for o1 models, we must use temperature=1, and tokens limit is named max_completion_tokens
                     response = await self.openai_client_for_text.chat.completions.create(
-                        model=self.inference_model.llm_id,
+                        model=self.inference_model.model_id,
                         temperature=1,
                         max_completion_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
                         seed=llm_job.job_params.seed,
@@ -72,7 +72,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                 case LLMFamily.GEMINI:
                     # for gemini models, we multiply the temperature by 2 because the range is 0-2
                     response = await self.openai_client_for_text.chat.completions.create(
-                        model=self.inference_model.llm_id,
+                        model=self.inference_model.model_id,
                         temperature=llm_job.job_params.temperature * 2,
                         max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
                         seed=llm_job.job_params.seed,
@@ -99,7 +99,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.PIPELEX_INFERENCE
                 ):
                     response = await self.openai_client_for_text.chat.completions.create(
-                        model=self.inference_model.llm_id,
+                        model=self.inference_model.model_id,
                         temperature=llm_job.job_params.temperature,
                         max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
                         seed=llm_job.job_params.seed,
@@ -125,23 +125,21 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.BEDROCK_META_LLAMA_3
                     | LLMFamily.BEDROCK_AMAZON_NOVA
                 ):
-                    raise LLMEngineParameterError(f"LLM family {self.inference_model.llm_model.llm_family} is not supported by OpenAILLMWorker")
+                    raise LLMEngineParameterError(f"LLM family {self.inference_model.llm_family} is not supported by OpenAILLMWorker")
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here
             raise LLMModelNotFoundError(
-                f"OpenAI model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.llm_model.desc}\n{not_found_error}"
+                f"OpenAI model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}"
             ) from not_found_error
         except APIConnectionError as api_connection_error:
             raise LLMCompletionError(f"OpenAI API connection error: {api_connection_error}") from api_connection_error
         except BadRequestError as bad_request_error:
-            raise LLMCompletionError(
-                f"OpenAI bad request error with model: {self.inference_model.llm_model.desc}:\n{bad_request_error}"
-            ) from bad_request_error
+            raise LLMCompletionError(f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}") from bad_request_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message
         response_text = openai_message.content
         if response_text is None:
-            raise LLMCompletionError(f"OpenAI response message content is None: {response}\nmodel: {self.inference_model.llm_model.desc}")
+            raise LLMCompletionError(f"OpenAI response message content is None: {response}\nmodel: {self.inference_model.desc}")
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
             llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)
@@ -158,11 +156,11 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             inference_model=self.inference_model,
         )
         try:
-            match self.inference_model.llm_model.llm_family:
+            match self.inference_model.llm_family:
                 case LLMFamily.O_SERIES | LLMFamily.GPT_5:
                     # for o1 models, we must use temperature=1, and tokens limit is named max_completion_tokens
                     result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-                        model=self.inference_model.llm_id,
+                        model=self.inference_model.model_id,
                         temperature=1,
                         max_completion_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
                         seed=llm_job.job_params.seed,
@@ -173,7 +171,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                 case LLMFamily.GEMINI:
                     # for gemini models, we multiply the temperature by 2 because the range is 0-2
                     result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-                        model=self.inference_model.llm_id,
+                        model=self.inference_model.model_id,
                         temperature=llm_job.job_params.temperature * 2,
                         max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
                         seed=llm_job.job_params.seed,
@@ -202,7 +200,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.PIPELEX_INFERENCE
                 ):
                     result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-                        model=self.inference_model.llm_id,
+                        model=self.inference_model.model_id,
                         temperature=llm_job.job_params.temperature,
                         max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
                         seed=llm_job.job_params.seed,
@@ -230,13 +228,11 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.BEDROCK_META_LLAMA_3
                     | LLMFamily.BEDROCK_AMAZON_NOVA
                 ):
-                    raise LLMEngineParameterError(f"LLM family {self.inference_model.llm_model.llm_family} is not supported by OpenAILLMWorker")
+                    raise LLMEngineParameterError(f"LLM family {self.inference_model.llm_family} is not supported by OpenAILLMWorker")
         except NotFoundError as exc:
-            raise LLMCompletionError(f"OpenAI model or deployment '{self.inference_model.llm_id}' not found: {exc}") from exc
+            raise LLMCompletionError(f"OpenAI model or deployment '{self.inference_model.model_id}' not found: {exc}") from exc
         except BadRequestError as bad_request_error:
-            raise LLMCompletionError(
-                f"OpenAI bad request error with model: {self.inference_model.llm_model.desc}:\n{bad_request_error}"
-            ) from bad_request_error
+            raise LLMCompletionError(f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}") from bad_request_error
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)

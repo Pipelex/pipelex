@@ -18,13 +18,13 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        llm_engine: InferenceModelSpec,
+        inference_model: InferenceModelSpec,
         structure_method: Optional[StructureMethod] = None,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
-            inference_model=llm_engine,
+            inference_model=inference_model,
             structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
@@ -34,12 +34,10 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
                 f"Provided sdk_instance for {self.__class__.__name__} is not of type BedrockClientProtocol: it's a '{type(sdk_instance)}'"
             )
 
-        if default_max_tokens := llm_engine.llm_model.max_tokens:
+        if default_max_tokens := inference_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise LLMEngineParameterError(
-                f"No max_tokens provided for llm model '{self.inference_model.llm_model.desc}', but it is required for Bedrock"
-            )
+            raise LLMEngineParameterError(f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Bedrock")
         self.bedrock_client_for_text = sdk_instance
 
     @override
@@ -49,12 +47,12 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
     ) -> str:
         message = BedrockFactory.make_simple_message(llm_job=llm_job)
 
-        log.debug(self.inference_model.llm_id)
+        log.debug(self.inference_model.model_id)
 
         bedrock_response_text, nb_tokens_by_category = await self.bedrock_client_for_text.chat(
             messages=message.to_dict_list(),
             system_text=llm_job.llm_prompt.system_text,
-            model=self.inference_model.llm_id,
+            model=self.inference_model.model_id,
             temperature=llm_job.job_params.temperature,
             max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
         )

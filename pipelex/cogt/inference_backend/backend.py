@@ -3,7 +3,7 @@ from typing import List, Optional
 from pydantic import Field
 
 from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
-from pipelex.config import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 
 
 class InferenceBackend(ConfigModel):

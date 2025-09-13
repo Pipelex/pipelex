@@ -38,7 +38,7 @@ class LLMWorkerFactory:
 
                 llm_worker = OpenAILLMWorker(
                     sdk_instance=llm_sdk_instance,
-                    llm_engine=inference_model,
+                    inference_model=inference_model,
                     structure_method=structure_method,
                     reporting_delegate=reporting_delegate,
                 )
@@ -137,7 +137,7 @@ class LLMWorkerFactory:
 
                 llm_worker = MistralLLMWorker(
                     sdk_instance=llm_sdk_instance,
-                    llm_engine=inference_model,
+                    inference_model=inference_model,
                     structure_method=StructureMethod.INSTRUCTOR_MISTRAL_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
@@ -162,7 +162,7 @@ class LLMWorkerFactory:
 
                 llm_worker = BedrockLLMWorker(
                     sdk_instance=llm_sdk_instance,
-                    llm_engine=inference_model,
+                    inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
             case PluginSdkHandle.FAL:

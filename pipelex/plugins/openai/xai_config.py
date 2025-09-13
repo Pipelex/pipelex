@@ -3,7 +3,7 @@ from typing import Tuple
 from pydantic import Field
 
 from pipelex import log
-from pipelex.tools.config.models import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.environment import EnvVarNotFoundError, get_required_env
 from pipelex.tools.exceptions import CredentialsError
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError

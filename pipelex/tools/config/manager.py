@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 import toml
 
-from pipelex.tools.config.models import (
+from pipelex.tools.config.config_root import (
     CONFIG_BASE_OVERRIDES_AFTER_ENV,
     CONFIG_BASE_OVERRIDES_BEFORE_ENV,
 )

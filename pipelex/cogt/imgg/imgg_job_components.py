@@ -2,7 +2,7 @@ from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from pipelex.tools.config.models import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 from pipelex.types import StrEnum
 
 

@@ -1,20 +1,9 @@
-from typing import Any, Dict, Optional, Type, TypeVar, Union, cast
+from typing import Dict, Optional, Type, TypeVar, Union
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict
 
-from pipelex.tools.exceptions import ConfigModelError, ConfigValidationError
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.exceptions import ConfigModelError
 from pipelex.types import StrEnum
-
-CONFIG_BASE_OVERRIDES_BEFORE_ENV = ["local"]
-CONFIG_BASE_OVERRIDES_AFTER_ENV = ["super"]
-
-
-class SecretMethod(StrEnum):
-    NONE = "none"
-    ENV_VAR = "env_var"
-    SECRET_PROVIDER = "secret_provider"
-
 
 StrEnumType = TypeVar("StrEnumType", bound=StrEnum)
 
@@ -65,32 +54,3 @@ class ConfigModel(BaseModel):
             A dictionary where the keys are converted to the given StrEnum type.
         """
         return {key_enum_cls(key): value for key, value in input_dict.items()}
-
-
-class ConfigRoot(ConfigModel):
-    """
-    Main configuration class for the project.
-
-    Attributes:
-        project_name (str): Name of the current project.
-    """
-
-    project_name: Optional[str] = None
-
-    def __init__(self, **kwargs: Any):
-        """
-        Initialize the Config instance.
-
-        Args:
-            **kwargs: Keyword arguments for configuration.
-
-        Raises:
-            ConfigValidationError: If the provided data is invalid.
-        """
-
-        try:
-            super().__init__(**kwargs)
-        except ValidationError as exc:
-            validation_error_msg = format_pydantic_validation_error(exc)
-            error_msg = f"Could not create config of type {type(self)} with provided data: {validation_error_msg}"
-            raise ConfigValidationError(message=error_msg) from exc

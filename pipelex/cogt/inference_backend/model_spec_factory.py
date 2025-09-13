@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from pipelex.cogt.exceptions import InferenceModelSpecError
 from pipelex.cogt.inference_backend.cost_category import CostCategory
 from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
-from pipelex.config import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 
 
 class InferenceModelSpecBlueprint(ConfigModel):

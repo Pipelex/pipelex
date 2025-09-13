@@ -166,7 +166,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         cost_report.nb_tokens_by_category[CostCategory.INPUT_CACHED] = nb_tokens_input_cached
 
         cost_report.costs_by_token_category[CostCategory.INPUT_NON_CACHED] = nb_tokens_input_non_cached * model_cost_per_token(
-            inference_model=llm_tokens_usage.llm_engine, token_type=CostCategory.INPUT_NON_CACHED
+            inference_model_name=llm_tokens_usage.inference_model_name, token_type=CostCategory.INPUT_NON_CACHED
         )
         costs_input_cached = cost_report.costs_by_token_category.get(CostCategory.INPUT_CACHED, 0)
         cost_report.costs_by_token_category[CostCategory.INPUT_CACHED] = costs_input_cached

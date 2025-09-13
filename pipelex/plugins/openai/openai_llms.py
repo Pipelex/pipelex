@@ -2,7 +2,6 @@ from typing import List
 
 from openai.types import Model
 
-from pipelex.cogt.exceptions import LLMSDKError
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 

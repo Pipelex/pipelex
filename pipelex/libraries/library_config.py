@@ -1,6 +1,6 @@
 from typing import ClassVar, List
 
-from pipelex.tools.config.models import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.misc.file_utils import copy_file_from_package, copy_folder_from_package, find_files_in_dir
 
 PIPELEX_LIBRARIES_PATH = "libraries"

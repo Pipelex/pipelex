@@ -5,7 +5,6 @@ from typing import Any, ClassVar, Dict, List, Optional, Type
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.config import get_config
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
@@ -33,10 +32,6 @@ from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path, validate_toml_file
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.types import StrEnum
-
-
-class LLMDeckNotFoundError(LibraryError):
-    pass
 
 
 class LibraryComponent(StrEnum):
@@ -72,17 +67,11 @@ class LibraryManager(LibraryManagerAbstract):
         self.concept_library = concept_library
         self.pipe_library = pipe_library
         self.library_config = library_config
-        self.llm_deck: Optional[LLMDeck] = None
 
     @override
     def validate_libraries(self):
         log.debug("LibraryManager validating libraries")
 
-        if self.llm_deck is None:
-            raise LibraryError("LLM deck is not loaded")
-
-        self.llm_deck.validate_llm_presets()
-        LLMDeck.final_validate(deck=self.llm_deck)
         self.concept_library.validate_with_libraries()
         self.pipe_library.validate_with_libraries()
         self.domain_library.validate_with_libraries()
@@ -276,22 +265,22 @@ class LibraryManager(LibraryManagerAbstract):
         self.pipe_library.add_pipes(pipes=all_pipes)
 
     # TODO: move to LLMDeckManager
-    def load_deck(self) -> LLMDeck:
-        llm_deck_paths = self.library_config.get_llm_deck_paths()
-        full_llm_deck_dict: Dict[str, Any] = {}
-        if not llm_deck_paths:
-            raise LLMDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
+    # def load_deck(self) -> LLMDeck:
+    #     llm_deck_paths = self.library_config.get_llm_deck_paths()
+    #     full_llm_deck_dict: Dict[str, Any] = {}
+    #     if not llm_deck_paths:
+    #         raise LLMDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
 
-        for llm_deck_path in llm_deck_paths:
-            if not os.path.exists(llm_deck_path):
-                raise LLMDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
-            try:
-                llm_deck_dict = load_toml_from_path(path=llm_deck_path)
-                log.debug(f"Loaded LLM deck from {llm_deck_path}")
-                deep_update(full_llm_deck_dict, llm_deck_dict)
-            except Exception as exc:
-                log.error(f"Failed to load LLM deck file '{llm_deck_path}': {exc}")
-                raise
+    #     for llm_deck_path in llm_deck_paths:
+    #         if not os.path.exists(llm_deck_path):
+    #             raise LLMDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
+    #         try:
+    #             llm_deck_dict = load_toml_from_path(path=llm_deck_path)
+    #             log.debug(f"Loaded LLM deck from {llm_deck_path}")
+    #             deep_update(full_llm_deck_dict, llm_deck_dict)
+    #         except Exception as exc:
+    #             log.error(f"Failed to load LLM deck file '{llm_deck_path}': {exc}")
+    #             raise
 
-        self.llm_deck = LLMDeck.model_validate(full_llm_deck_dict)
-        return self.llm_deck
+    #     self.llm_deck = LLMDeck.model_validate(full_llm_deck_dict)
+    #     return self.llm_deck

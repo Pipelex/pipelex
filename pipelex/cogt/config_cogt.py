@@ -1,11 +1,11 @@
-from typing import Dict, List, Optional, cast
+from typing import List
 
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams, ImggJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
-from pipelex.tools.config.models import ConfigModel
+from pipelex.tools.config.config_model import ConfigModel
 
 
 class OcrConfig(ConfigModel):

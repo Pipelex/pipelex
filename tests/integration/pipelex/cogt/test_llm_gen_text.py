@@ -63,7 +63,7 @@ class TestLLMGenText:
             temperature += 0.2
             if temperature > 1:
                 break
-            if isinstance(llm_worker, LLMWorkerInternalAbstract) and llm_worker.inference_model.llm_model.llm_family == LLMFamily.O_SERIES:
+            if isinstance(llm_worker, LLMWorkerInternalAbstract) and llm_worker.inference_model.llm_family == LLMFamily.O_SERIES:
                 log.warning("LLMFamily O_series, forcing temprature to 1, setting minimum tokens to avoid empty output")
                 completion_max_tokens = max(max_tokens, 2000)
                 llm_job.job_params = job_params_base.model_copy(update={"max_tokens": completion_max_tokens, "temperature": 1})
