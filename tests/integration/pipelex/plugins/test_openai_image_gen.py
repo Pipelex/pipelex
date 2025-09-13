@@ -2,6 +2,7 @@ import pytest
 
 from pipelex.cogt.exceptions import ImggGenerationError
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from tests.conftest import TEST_OUTPUTS_DIR
@@ -14,7 +15,7 @@ from tests.integration.pipelex.test_data import IMGGTestCases
 class TestImggByOpenAIGpt:
     @pytest.mark.parametrize("topic, image_desc", IMGGTestCases.IMAGE_DESC)
     async def test_gpt_image_generation(self, topic: str, image_desc: str):
-        client = OpenAIFactory.make_openai_client(LLMPlatform.OPENAI)
+        client = OpenAIFactory.make_openai_client(PluginSdkHandle.OPENAI)
         result = await client.images.generate(
             prompt=image_desc,
             model="gpt-image-1",

@@ -3,6 +3,7 @@ import pytest
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_models.llm_family import LLMCreator, LLMFamily
+from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 
 
 @pytest.fixture(
@@ -137,20 +138,16 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
 # TODO: build llm_id/platform combos dynalically from config data
 @pytest.fixture(
     params=[
-        # LLMPlatform.ANTHROPIC,
-        LLMPlatform.AZURE_OPENAI,
-        # LLMPlatform.BEDROCK,
-        # LLMPlatform.BEDROCK_ANTHROPIC,
-        # LLMPlatform.MISTRAL,
-        LLMPlatform.OPENAI,
-        # LLMPlatform.PERPLEXITY,
-        # LLMPlatform.VERTEXAI,
-        # LLMPlatform.XAI,
-        # LLMPlatform.CUSTOM_LLM,
+        # PluginSdkHandle.ANTHROPIC,
+        PluginSdkHandle.AZURE_OPENAI,
+        # PluginSdkHandle.BEDROCK,
+        # PluginSdkHandle.BEDROCK_ANTHROPIC,
+        # PluginSdkHandle.MISTRAL,
+        PluginSdkHandle.OPENAI,
     ]
 )
-def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
-    assert isinstance(request.param, LLMPlatform)
+def plugin_sdk_handle(request: pytest.FixtureRequest) -> PluginSdkHandle:
+    assert isinstance(request.param, PluginSdkHandle)
     return request.param
 
 
