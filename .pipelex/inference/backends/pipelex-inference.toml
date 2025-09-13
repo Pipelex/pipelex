@@ -7,6 +7,12 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.17, output = 0.66 }
 
+[gpt-image-1]
+model_id = "pipelex/gpt-image-1"
+inputs = ["text"]
+outputs = ["images"]
+costs = { input = 5, output = 0.01 }
+
 # Anthropic Models
 ["claude-4-sonnet"]
 model_id = "pipelex/claude-4-sonnet"
@@ -33,3 +39,11 @@ model_id = "grok-3-mini"
 inputs = ["text"]
 outputs = ["text"]
 costs = { input = 0.3, output = 0.5 }
+
+# Flux Models
+[fast-lightning-sdxl]
+model_id = "pipelex/fast-lightning-sdxl"
+inputs = ["text"]
+outputs = ["images"]
+costs = { input = 0.01, output = 0.01 }
+

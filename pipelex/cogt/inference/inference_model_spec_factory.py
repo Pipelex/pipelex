@@ -11,8 +11,9 @@ class InferenceModelSpecBlueprint(BaseModel):
     enabled: bool = True
     sdk: Optional[str] = None
     model_id: str
-    features: List[str] = Field(default_factory=list)
-    cost_per_million_tokens_usd: TokenCostsByCategoryDict
+    inputs: List[str] = Field(default_factory=list)
+    outputs: List[str] = Field(default_factory=list)
+    costs: TokenCostsByCategoryDict
     max_tokens: Optional[int] = None
     max_prompt_images: Optional[int] = None
 
@@ -30,8 +31,9 @@ class InferenceModelSpecFactory(BaseModel):
         return InferenceModelSpec(
             sdk=sdk,
             model_id=blueprint.model_id,
-            features=blueprint.features,
-            cost_per_million_tokens_usd=blueprint.cost_per_million_tokens_usd,
+            inputs=blueprint.inputs,
+            outputs=blueprint.outputs,
+            costs=blueprint.costs,
             max_tokens=blueprint.max_tokens,
             max_prompt_images=blueprint.max_prompt_images,
         )

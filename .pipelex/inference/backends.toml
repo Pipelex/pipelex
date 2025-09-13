@@ -10,11 +10,13 @@ api_key = "${BLACKBOX_API_KEY}"
 services = ["llm", "image_gen"]
 
 [azure_openai]
+enabled = false
 endpoint = "${AZURE_API_BASE}"
 api_key = "${AZURE_API_KEY}"
 services = ["llm", "image_gen"]
 
 [anthropic]
+enabled = false
 api_key = "${ANTHROPIC_API_KEY}"
 services = ["llm"]
 
