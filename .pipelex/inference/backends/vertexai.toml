@@ -4,16 +4,16 @@ default_sdk = "openai"
 model_id = "google/gemini-2.0-flash"
 features = ["structured_generation", "vision"]
 max_prompt_images = 3000
-cost_per_million_tokens_usd = { input = 0.1, output = 0.4 }
+costs = { input = 0.1, output = 0.4 }
 
 ["gemini-2.5-pro"]
 model_id = "google/gemini-2.5-pro"
 features = ["structured_generation", "vision"]
 max_prompt_images = 3000
-cost_per_million_tokens_usd = { input = 0.0, output = 0.0 }
+costs = { input = 0.0, output = 0.0 }
 
 ["gemini-2.5-flash"]
 model_id = "google/gemini-2.5-flash"
 features = ["structured_generation", "vision"]
 max_prompt_images = 3000
-cost_per_million_tokens_usd = { input = 0.15, output = 0.6 }
+costs = { input = 0.15, output = 0.6 }

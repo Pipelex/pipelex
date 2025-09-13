@@ -3,28 +3,33 @@ default_sdk = "openai"
 # OpenAI Models
 [gpt-4o-mini]
 model_id = "pipelex/gpt-4o-mini"
-features = ["structured_generation", "vision"]
-cost_per_million_tokens_usd = { input = 0.17, output = 0.66 }
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.17, output = 0.66 }
 
 # Anthropic Models
 ["claude-4-sonnet"]
 model_id = "pipelex/claude-4-sonnet"
-features = ["structured_generation", "vision"]
-cost_per_million_tokens_usd = { input = 3, output = 15 }
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
 
 # Google Models using Google API
 ["gemini-2.0-flash"]
 model_id = "gemini/gemini-2.0-flash"
-features = ["structured_generation", "vision"]
-cost_per_million_tokens_usd = { input = 0.10, output = 0.40 }
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.10, output = 0.40 }
 
 ["gemini-2.5-flash"]
 model_id = "gemini/gemini-2.5-flash"
-features = ["structured_generation", "vision"]
-cost_per_million_tokens_usd = { input = 0.30, output = 2.50 }
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.30, output = 2.50 }
 
 # XAI Models
 [grok-3-mini]
 model_id = "grok-3-mini"
-features = []
-cost_per_million_tokens_usd = { input = 0.3, output = 0.5 }
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.3, output = 0.5 }
