@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Type, TypeVar, Union
+from typing import Any, Dict, Optional, Type, TypeVar, Union, cast
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
@@ -48,6 +48,23 @@ class ConfigModel(BaseModel):
             return {key: value_enum_cls(value) for key, value in input_dict.items()}
         else:
             raise ConfigModelError("Either key_enum_cls or value_enum_cls must be provided.")
+
+    @staticmethod
+    def transform_dict_of_floats_str_to_enum(
+        input_dict: Dict[str, float],
+        key_enum_cls: Type[StrEnumType],
+    ) -> Dict[StrEnumType, float]:
+        """
+        Transforms a dictionary with str keys and float values into a dictionary with enum keys and float values.
+
+        Args:
+            input_dict: Dictionary with string values to be transformed.
+            key_enum_cls: The StrEnum class to convert the keys to
+
+        Returns:
+            A dictionary where the keys are converted to the given StrEnum type.
+        """
+        return {key_enum_cls(key): value for key, value in input_dict.items()}
 
 
 class ConfigRoot(ConfigModel):

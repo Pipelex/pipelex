@@ -1,9 +1,11 @@
-from typing import Dict, Optional
+from typing import Dict
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from pipelex.config import ConfigModel
 
 
-class ModelCatalogConfig(BaseModel):
+class ModelCatalogConfig(ConfigModel):
     """Configuration for model routing to backends."""
 
     description: str

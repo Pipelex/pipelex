@@ -1,17 +1,14 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
-
 from pipelex.cogt.inference_backend.backend import InferenceBackend
-from pipelex.cogt.inference_backend.backend_service import InferenceService
 from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
+from pipelex.config import ConfigModel
 
 
-class InferenceBackendBlueprint(BaseModel):
+class InferenceBackendBlueprint(ConfigModel):
     enabled: bool = True
     endpoint: Optional[str] = None
     api_key: Optional[str] = None
-    services: List[InferenceService] = Field(default_factory=list)
 
 
 class InferenceBackendFactory:
@@ -24,6 +21,5 @@ class InferenceBackendFactory:
         return InferenceBackend(
             endpoint=inference_backend_blueprint.endpoint,
             api_key=inference_backend_blueprint.api_key,
-            services=inference_backend_blueprint.services,
             model_specs=model_specs,
         )

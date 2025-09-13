@@ -1,8 +1,3 @@
-import pytest
-
-from pipelex.cogt.inference_backend.backend_library import InferenceBackendLibrary
-
-
 class TestInferenceBackendLibrary:
     """Integration tests for InferenceBackendLibrary."""
 

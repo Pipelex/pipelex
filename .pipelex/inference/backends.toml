@@ -1,27 +1,22 @@
 [pipelex-inference]
 endpoint = "https://inference.pipelex.com/v1"
 api_key = "${PIPELEX_INFERENCE_API_KEY}"
-services = ["llm", "image_gen"]
 
 [blackboxai]
 enabled = false
 endpoint = "https://api.blackbox.ai/v1"
 api_key = "${BLACKBOX_API_KEY}"
-services = ["llm", "image_gen"]
 
 [azure_openai]
 enabled = false
 endpoint = "${AZURE_API_BASE}"
 api_key = "${AZURE_API_KEY}"
-services = ["llm", "image_gen"]
 
 [anthropic]
 enabled = false
 api_key = "${ANTHROPIC_API_KEY}"
-services = ["llm"]
 
 [ollama]
 enabled = false
 endpoint = "http://localhost:11434/v1"
-services = ["llm"]
 

@@ -1,21 +1,29 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from pipelex.cogt.exceptions import InferenceModelSpecError
+from pipelex.cogt.inference_backend.cost_category import CostCategory
 from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
-from pipelex.cogt.llm.token_category import TokenCostsByCategoryDict
+from pipelex.config import ConfigModel
 
 
-class InferenceModelSpecBlueprint(BaseModel):
+class InferenceModelSpecBlueprint(ConfigModel):
     enabled: bool = True
     sdk: Optional[str] = None
     model_id: str
     inputs: List[str] = Field(default_factory=list)
     outputs: List[str] = Field(default_factory=list)
-    costs: TokenCostsByCategoryDict
+    costs: Dict[CostCategory, float] = Field(strict=False)
     max_tokens: Optional[int] = None
     max_prompt_images: Optional[int] = None
+
+    @field_validator("costs", mode="before")
+    def validate_costs(cls, value: Dict[str, float]) -> Dict[CostCategory, float]:
+        return ConfigModel.transform_dict_of_floats_str_to_enum(
+            input_dict=value,
+            key_enum_cls=CostCategory,
+        )
 
 
 class InferenceModelSpecFactory(BaseModel):

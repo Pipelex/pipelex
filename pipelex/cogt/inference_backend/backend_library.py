@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 from pydantic import Field, RootModel, ValidationError
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceModelSpecError
 from pipelex.cogt.inference_backend.backend import InferenceBackend
 from pipelex.cogt.inference_backend.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory

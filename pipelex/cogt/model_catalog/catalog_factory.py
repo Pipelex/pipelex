@@ -1,11 +1,12 @@
-from typing import Dict, Optional
+from typing import Dict
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from pipelex.cogt.model_catalog.catalog_config import ModelCatalogConfig
+from pipelex.config import ConfigModel
 
 
-class ModelCatalogConfigBlueprint(BaseModel):
+class ModelCatalogConfigBlueprint(ConfigModel):
     """Blueprint for creating ModelCatalogConfig instances."""
 
     description: str
@@ -13,7 +14,7 @@ class ModelCatalogConfigBlueprint(BaseModel):
     routes: Dict[str, str] = Field(default_factory=dict)
 
 
-class ModelCatalogBlueprint(BaseModel):
+class ModelCatalogBlueprint(ConfigModel):
     """Blueprint for the entire model catalog."""
 
     active: str
