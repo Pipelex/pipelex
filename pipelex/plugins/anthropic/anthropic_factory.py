@@ -40,7 +40,6 @@ class AnthropicFactory:
     def make_anthropic_client(
         plugin_sdk_handle: PluginSdkHandle,
     ) -> Union[AsyncAnthropic, AsyncAnthropicBedrock]:
-        # TODO: also support Anthropic with VertexAI
         match plugin_sdk_handle:
             case PluginSdkHandle.ANTHROPIC:
                 anthropic_config = get_plugin_manager().plugin_configs.anthropic_config
@@ -54,9 +53,8 @@ class AnthropicFactory:
                     aws_access_key=aws_access_key_id,
                     aws_region=aws_region,
                 )
-            case _:
-                # TODO: list all cases
-                raise AnthropicFactoryError(f"Unsupported LLM platform for Anthropic sdk: '{plugin_sdk_handle}'")
+            case PluginSdkHandle.OPENAI | PluginSdkHandle.AZURE_OPENAI | PluginSdkHandle.MISTRAL | PluginSdkHandle.BEDROCK | PluginSdkHandle.FAL:
+                raise AnthropicFactoryError(f"Unsupported PluginSdkHandle for Anthropic sdk: '{plugin_sdk_handle}'")
 
     @classmethod
     async def make_user_message(

@@ -115,6 +115,17 @@ def plugin_sdk_handle(request: pytest.FixtureRequest) -> PluginSdkHandle:
 
 @pytest.fixture(
     params=[
+        PluginSdkHandle.ANTHROPIC,
+        PluginSdkHandle.BEDROCK_ANTHROPIC,
+    ]
+)
+def plugin_sdk_handle_for_anthropic_sdk(request: pytest.FixtureRequest) -> PluginSdkHandle:
+    assert isinstance(request.param, PluginSdkHandle)
+    return request.param
+
+
+@pytest.fixture(
+    params=[
         # None,
         "https://inference.pipelex.com/v1",
     ]

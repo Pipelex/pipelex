@@ -20,10 +20,12 @@ class TestAnthropic:
     async def test_anthropic_list_models(
         self,
         pytestconfig: pytest.Config,
-        plugin_sdk_handle: PluginSdkHandle,
+        plugin_sdk_handle_for_anthropic_sdk: PluginSdkHandle,
     ):
         try:
-            anthropic_models_list = await anthropic_list_anthropic_models(plugin_sdk_handle=plugin_sdk_handle)
+            anthropic_models_list = await anthropic_list_anthropic_models(
+                plugin_sdk_handle=plugin_sdk_handle_for_anthropic_sdk,
+            )
         except AuthenticationError as auth_exc:
             pytest.fail(f"Authentication error for Anthropic: {auth_exc}")
         except LLMSDKError as exc:
