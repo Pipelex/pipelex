@@ -148,10 +148,6 @@ class RoutingProfileLibraryError(CogtError):
     pass
 
 
-class ModelCatalogLibraryError(CogtError):
-    pass
-
-
 class InferenceModelSpecError(CogtError):
     pass
 
