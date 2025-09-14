@@ -2,7 +2,7 @@ import os
 from typing import Any, Dict, List
 
 from pipelex import log
-from pipelex.cogt.model_deck.llm_deck import LLMDeck, LLMDeckBlueprint
+from pipelex.cogt.model_deck.llm_deck import LLMDeckBlueprint
 from pipelex.exceptions import (
     LibraryError,
 )

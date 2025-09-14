@@ -18,7 +18,6 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
-from pipelex.cogt.model_deck.deck_manager import DeckManager
 from pipelex.cogt.model_deck.models_manager import ModelsManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
