@@ -34,7 +34,6 @@ class InferenceModelSpecFactory(BaseModel):
         name: str,
         blueprint: InferenceModelSpecBlueprint,
         fallback_sdk: Optional[str],
-        endpoint: Optional[str],
     ) -> InferenceModelSpec:
         sdk = blueprint.sdk or fallback_sdk
         if not sdk:
@@ -43,7 +42,6 @@ class InferenceModelSpecFactory(BaseModel):
             backend_name=backend_name,
             name=name,
             sdk=sdk,
-            endpoint=endpoint,
             model_id=blueprint.model_id,
             inputs=blueprint.inputs,
             outputs=blueprint.outputs,

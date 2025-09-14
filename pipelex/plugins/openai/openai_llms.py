@@ -10,12 +10,10 @@ from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 async def openai_list_available_models(
     plugin_sdk_handle: PluginSdkHandle,
     backend: InferenceBackend,
-    endpoint: Optional[str],
 ) -> List[Model]:
     openai_client_async = OpenAIFactory.make_openai_client(
         plugin_sdk_handle=plugin_sdk_handle,
         backend=backend,
-        endpoint=endpoint,
     )
 
     models = await openai_client_async.models.list()

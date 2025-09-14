@@ -30,7 +30,6 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         LLMWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
         self.inference_model = inference_model
         self.structure_method = structure_method
-        self.backend = get_models_manager().get_inference_backend(inference_model.backend_name)
 
     #########################################################
     # Instance methods

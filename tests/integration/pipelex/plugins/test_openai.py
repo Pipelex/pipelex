@@ -24,14 +24,12 @@ class TestOpenAI:
         pytestconfig: pytest.Config,
         plugin_sdk_handle: PluginSdkHandle,
         backend_name: str,
-        openai_endpoint: Optional[str],
     ):
         backend = get_models_manager().get_inference_backend(backend_name)
         try:
             openai_models_list = await openai_list_available_models(
                 plugin_sdk_handle=plugin_sdk_handle,
                 backend=backend,
-                endpoint=openai_endpoint,
             )
         except LLMSDKError as exc:
             if "does not support listing models" in str(exc):

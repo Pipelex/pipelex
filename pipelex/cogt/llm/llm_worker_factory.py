@@ -38,7 +38,6 @@ class LLMWorkerFactory:
                     llm_sdk_instance=OpenAIFactory.make_openai_client(
                         plugin_sdk_handle=llm_sdk_handle,
                         backend=backend,
-                        endpoint=inference_model.endpoint,
                     ),
                 )
 

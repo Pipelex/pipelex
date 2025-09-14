@@ -30,10 +30,9 @@ class OpenAIFactory:
         cls,
         plugin_sdk_handle: PluginSdkHandle,
         backend: InferenceBackend,
-        endpoint: Optional[str],
     ) -> openai.AsyncClient:
         the_client: openai.AsyncOpenAI
-        api_key: Optional[str] = None
+        # api_key: Optional[str] = None
         match plugin_sdk_handle:
             case PluginSdkHandle.AZURE_OPENAI:
                 azure_openai_config = get_plugin_manager().plugin_configs.azure_openai_config
@@ -57,11 +56,9 @@ class OpenAIFactory:
             case PluginSdkHandle.OPENAI:
                 # openai_config = get_plugin_manager().plugin_configs.openai_config
                 # api_key = openai_config.get_api_key(secrets_provider=get_secrets_provider())
-                api_key = backend.api_key
-                endpoint = backend.endpoint
                 the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=endpoint,
+                    api_key=backend.api_key,
+                    base_url=backend.endpoint,
                 )
             # case LLMPlatform.VERTEXAI:
             #     vertexai_config = get_plugin_manager().plugin_configs.vertexai_config

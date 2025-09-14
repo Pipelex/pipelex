@@ -20,7 +20,6 @@ class TestImggByOpenAIGpt:
         client = OpenAIFactory.make_openai_client(
             PluginSdkHandle.OPENAI,
             backend=backend,
-            endpoint=None,
         )
         result = await client.images.generate(
             prompt=image_desc,

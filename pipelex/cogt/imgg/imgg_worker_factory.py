@@ -63,7 +63,6 @@ class ImggWorkerFactory:
                     llm_sdk_instance=OpenAIFactory.make_openai_client(
                         plugin_sdk_handle=PluginSdkHandle.OPENAI,
                         backend=backend,
-                        endpoint=None,
                     ),
                 )
 
