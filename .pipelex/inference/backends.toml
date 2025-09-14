@@ -7,6 +7,10 @@ enabled = true
 endpoint = "https://api.blackbox.ai/v1"
 api_key = "${BLACKBOX_API_KEY}"
 
+[openai]
+enabled = true
+api_key = "${OPENAI_API_KEY}"
+
 [azure_openai]
 enabled = true
 endpoint = "${AZURE_API_BASE}"

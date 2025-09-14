@@ -1,7 +1,7 @@
 default_sdk = "openai"
 default_prompting_target = "openai"
 
-[gpt-3.5-turbo]
+["gpt-3.5-turbo"]
 model_id = "gpt-3.5-turbo-1106"
 inputs = ["text"]
 outputs = ["text", "structured"]
@@ -17,7 +17,7 @@ inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 10.0, output = 30.0 }
 
-[gpt-4o-2024-11-20."2024-11-20"]
+[gpt-4o-2024-11-20]
 model_id = "gpt-4o-2024-11-20"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
@@ -112,3 +112,4 @@ model_id = "gpt-5-chat-latest"
 inputs = ["text", "images"]
 outputs = ["text"]
 costs = { input = 1.25, output = 10.0 }
+
