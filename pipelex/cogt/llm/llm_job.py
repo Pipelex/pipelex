@@ -3,10 +3,10 @@ from datetime import datetime
 from typing_extensions import override
 
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
-from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams, LLMJobReport
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 
 class LLMJob(InferenceJobAbstract):

@@ -1,9 +1,9 @@
 from typing import Optional
 
 from pipelex.cogt.exceptions import MissingDependencyError
-from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.hub import get_plugin_manager
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle

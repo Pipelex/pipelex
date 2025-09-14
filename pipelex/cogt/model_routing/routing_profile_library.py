@@ -1,84 +1,59 @@
 from typing import Dict, Optional
 
 from pydantic import Field, RootModel, ValidationError
-from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import ModelCatalogError, ModelCatalogLibraryError
-from pipelex.cogt.model_catalog.catalog_config import ModelCatalogConfig
-from pipelex.cogt.model_catalog.catalog_factory import (
+from pipelex.cogt.model_routing.routing_profile import RoutingProfile
+from pipelex.cogt.model_routing.routing_profile_factory import (
     ModelCatalogBlueprint,
-    ModelCatalogFactory,
+    RoutingProfileFactory,
 )
-from pipelex.cogt.model_catalog.catalog_provider import ModelCatalogProviderAbstract
 from pipelex.config import get_config
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path
 
-ModelCatalogLibraryRoot = Dict[str, ModelCatalogConfig]
+RoutingProfileLibraryRoot = Dict[str, RoutingProfile]
 
 
-class ModelCatalogLibrary(RootModel[ModelCatalogLibraryRoot], ModelCatalogProviderAbstract):
+class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
     """Library for managing model catalog configurations."""
 
-    root: ModelCatalogLibraryRoot = Field(default_factory=dict)
+    root: RoutingProfileLibraryRoot = Field(default_factory=dict)
     _active_config: Optional[str] = None
 
-    @override
-    def setup(self) -> None:
-        """Set up the model catalog library."""
-        pass
-
-    @override
-    def teardown(self) -> None:
-        """Tear down the model catalog library."""
-        self.root = {}
-        self._active_config = None
-
-    @override
-    def reset(self) -> None:
-        """Reset the model catalog library."""
-        self.teardown()
-        self.setup()
-
-    @classmethod
-    def make_empty(cls) -> "ModelCatalogLibrary":
-        """Create an empty model catalog library."""
-        return cls(root={})
-
-    @override
-    def load_catalog(self) -> None:
+    def load(self) -> None:
         """Load the model catalog configuration from TOML file."""
-        inference_config_path = get_config().pipelex.inference_config_path
-        catalog_toml_path = f"{inference_config_path}/model_catalog.toml"
+        routing_profile_library_path = get_config().cogt.inference_config.routing_profile_library_path
 
         try:
             catalog_dict = load_toml_from_path(
-                path=catalog_toml_path,
+                path=routing_profile_library_path,
                 is_env_var_substitution_enabled=True,
             )
         except (FileNotFoundError, TOMLValidationError) as exc:
-            raise ModelCatalogLibraryError(f"Failed to load model catalog from file '{catalog_toml_path}': {exc}") from exc
+            raise ModelCatalogLibraryError(f"Failed to load routing profile library from file '{routing_profile_library_path}': {exc}") from exc
 
         try:
             catalog_blueprint = ModelCatalogBlueprint.model_validate(catalog_dict)
         except ValidationError as exc:
-            raise ModelCatalogLibraryError(f"Invalid model catalog configuration in '{catalog_toml_path}': {exc}") from exc
+            raise ModelCatalogLibraryError(f"Invalid routing profile library configuration in '{routing_profile_library_path}': {exc}") from exc
 
         # Validate that the active config exists
         if catalog_blueprint.active not in catalog_blueprint.configs:
             raise ModelCatalogLibraryError(
-                f"Active configuration '{catalog_blueprint.active}' not found in catalog. "
+                f"Active configuration '{catalog_blueprint.active}' not found in library. "
                 f"Available configurations: {list(catalog_blueprint.configs.keys())}"
             )
 
         # Load all configurations
-        self.root = ModelCatalogFactory.make_model_catalog_configs(catalog_blueprint)
+        self.root = {}
+        for config_name, config_blueprint in catalog_blueprint.configs.items():
+            self.root[config_name] = RoutingProfileFactory.make_routing_profile(blueprint=config_blueprint)
         self._active_config = catalog_blueprint.active
 
         log.debug(f"Loaded model catalog with active configuration: '{self._active_config}'")
         log.debug(f"Available configurations: {list(self.root.keys())}")
 
-    @override
     def get_backend_for_model(self, model_name: str) -> str:
         """Get the backend name for a given model.
 
@@ -107,7 +82,7 @@ class ModelCatalogLibrary(RootModel[ModelCatalogLibraryRoot], ModelCatalogProvid
         """Get the name of the currently active configuration."""
         return self._active_config
 
-    def get_config(self, config_name: str) -> Optional[ModelCatalogConfig]:
+    def get_config(self, config_name: str) -> Optional[RoutingProfile]:
         """Get a specific configuration by name.
 
         Args:

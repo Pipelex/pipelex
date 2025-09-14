@@ -100,7 +100,6 @@ class Pipelex(ConfigModel):
     log_config: LogConfig
     aws_config: AwsConfig
 
-    inference_config_path: str
     library_config: LibraryConfig
     static_validation_config: StaticValidationConfig
     generic_template_names: GenericTemplateNames

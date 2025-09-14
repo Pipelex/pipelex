@@ -5,7 +5,7 @@ from pydantic import Field
 from pipelex.tools.config.config_model import ConfigModel
 
 
-class ModelCatalogConfig(ConfigModel):
+class RoutingProfile(ConfigModel):
     """Configuration for model routing to backends."""
 
     description: str

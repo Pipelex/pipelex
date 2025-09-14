@@ -41,7 +41,23 @@ class InferenceManagerConfig(ConfigModel):
     is_auto_setup_preset_ocr: bool
 
 
+class InferenceConfig(ConfigModel):
+    inference_config_path: str
+
+    @property
+    def routing_profile_library_path(self) -> str:
+        return f"{self.inference_config_path}/routing_profiles.toml"
+
+    @property
+    def backends_library_path(self) -> str:
+        return f"{self.inference_config_path}/backends.toml"
+
+    def model_specs_path(self, backend_name: str) -> str:
+        return f"{self.inference_config_path}/backends/{backend_name}.toml"
+
+
 class Cogt(ConfigModel):
+    inference_config: InferenceConfig
     inference_manager_config: InferenceManagerConfig
     llm_config: LLMConfig
     imgg_config: ImggConfig

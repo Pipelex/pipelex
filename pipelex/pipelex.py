@@ -17,10 +17,9 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
-from pipelex.cogt.inference.deck_manager import DeckManager
 from pipelex.cogt.inference.inference_manager import InferenceManager
-from pipelex.cogt.inference_backend.backend_library import InferenceBackendLibrary
-from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
+from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
+from pipelex.cogt.model_deck.deck_manager import DeckManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
@@ -171,7 +170,7 @@ class Pipelex(metaclass=MetaSingleton):
         # cogt
         self.plugin_manager.setup(library_config=self.library_manager.library_config)
         self.inference_backend_library.setup()
-        self.inference_backend_library.load_backends()
+        self.inference_backend_library.load()
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())

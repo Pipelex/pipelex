@@ -8,10 +8,10 @@ from pipelex.cogt.imgg.imgg_engine_factory import ImggEngineFactory
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.imgg.imgg_worker_factory import ImggWorkerFactory
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
-from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.cogt.ocr.ocr_worker_factory import OcrWorkerFactory

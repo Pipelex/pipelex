@@ -2,8 +2,8 @@ from typing import Dict, List, Optional
 
 from pydantic import Field
 
-from pipelex.cogt.inference_backend.cost_category import CostCategory
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
+from pipelex.cogt.model_backends.cost_category import CostCategory
 from pipelex.tools.config.config_model import ConfigModel
 
 

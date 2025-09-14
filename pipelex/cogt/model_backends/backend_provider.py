@@ -15,5 +15,5 @@ class InferenceBackendProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def load_backends(self) -> None:
+    def load(self) -> None:
         pass

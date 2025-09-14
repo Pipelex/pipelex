@@ -5,11 +5,11 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceModelSpecError
-from pipelex.cogt.inference_backend.backend import InferenceBackend
-from pipelex.cogt.inference_backend.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
-from pipelex.cogt.inference_backend.backend_provider import InferenceBackendProviderAbstract
-from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
-from pipelex.cogt.inference_backend.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
+from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
+from pipelex.cogt.model_backends.backend_provider import InferenceBackendProviderAbstract
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
 from pipelex.config import get_config
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path
 
@@ -37,21 +37,20 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot], InferenceB
         return cls(root={})
 
     @override
-    def load_backends(self):
-        inference_config_path = get_config().pipelex.inference_config_path
-        backends_toml_path = f"{inference_config_path}/backends.toml"
+    def load(self):
+        backends_library_path = get_config().cogt.inference_config.backends_library_path
         try:
             backends_dict = load_toml_from_path(
-                path=backends_toml_path,
+                path=backends_library_path,
                 is_env_var_substitution_enabled=True,
             )
         except (FileNotFoundError, TOMLValidationError) as exc:
-            raise InferenceBackendLibraryError(f"Failed to load inference backend library from file '{backends_toml_path}': {exc}") from exc
+            raise InferenceBackendLibraryError(f"Failed to load inference backend library from file '{backends_library_path}': {exc}") from exc
         for backend_name, backend_dict in backends_dict.items():
             backend_blueprint = InferenceBackendBlueprint.model_validate(backend_dict)
             if not backend_blueprint.enabled:
                 continue
-            path_to_model_specs_toml = f"{inference_config_path}/backends/{backend_name}.toml"
+            path_to_model_specs_toml = get_config().cogt.inference_config.model_specs_path(backend_name=backend_name)
             try:
                 model_specs_dict = load_toml_from_path(
                     path=path_to_model_specs_toml,

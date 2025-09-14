@@ -1,4 +1,4 @@
-# Model Catalog - Routes models to their backends
+# Routing profile library - Routes models to their backends
 # ================================================
 # This file controls which backend serves which model.
 # Simply change the 'active' field to switch configurations.

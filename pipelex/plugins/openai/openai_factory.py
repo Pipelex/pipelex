@@ -15,9 +15,9 @@ from openai.types.completion_usage import CompletionUsage
 from pipelex import log
 from pipelex.cogt.exceptions import LLMEngineParameterError, LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
-from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
