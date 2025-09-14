@@ -54,6 +54,7 @@ class LLMCreator(StrEnum):
 
 
 class LLMFamily(StrEnum):
+    GPT = "gpt"
     GPT_3 = "gpt-3"
     GPT_3_5 = "gpt-3.5"
     GPT_4 = "gpt-4"
@@ -107,7 +108,8 @@ class LLMFamily(StrEnum):
     def creator(self) -> LLMCreator:
         match self:
             case (
-                LLMFamily.GPT_4
+                LLMFamily.GPT
+                | LLMFamily.GPT_4
                 | LLMFamily.GPT_3_5
                 | LLMFamily.GPT_3
                 | LLMFamily.O_SERIES

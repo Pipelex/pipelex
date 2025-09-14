@@ -22,11 +22,11 @@ class InferenceModelSpec(ConfigModel):
 
     @property
     def tag(self) -> str:
-        return f"{self.sdk}.{self.model_id}"
+        return f"[{self.sdk}SDK]({self.model_id})"
 
     @property
     def desc(self) -> str:
-        return f"{self.sdk}.{self.model_id}"
+        return f"[{self.sdk}SDK]({self.model_id})"
 
     @property
     def is_gen_object_supported(self) -> bool:
@@ -38,4 +38,5 @@ class InferenceModelSpec(ConfigModel):
 
     @property
     def llm_family(self) -> LLMFamily:
-        return LLMFamily(self.model_id.split("-")[0])
+        last_part = self.model_id.split("/")[-1]
+        return LLMFamily(last_part.split("-")[0])

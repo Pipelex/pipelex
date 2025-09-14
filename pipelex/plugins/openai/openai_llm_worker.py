@@ -79,7 +79,8 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                         messages=messages,
                     )
                 case (
-                    LLMFamily.GPT_4
+                    LLMFamily.GPT
+                    | LLMFamily.GPT_4
                     | LLMFamily.GPT_3_5
                     | LLMFamily.GPT_3
                     | LLMFamily.GPT_4_5
@@ -180,7 +181,8 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                         max_retries=llm_job.job_config.max_retries,
                     )
                 case (
-                    LLMFamily.GPT_4
+                    LLMFamily.GPT
+                    | LLMFamily.GPT_4
                     | LLMFamily.GPT_3_5
                     | LLMFamily.GPT_3
                     | LLMFamily.GPT_4_5
