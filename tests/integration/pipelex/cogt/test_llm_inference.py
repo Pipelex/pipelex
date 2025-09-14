@@ -1,17 +1,12 @@
-from typing import Tuple
 
 import pytest
 
 from pipelex import log, pretty_print
 from pipelex.cogt.exceptions import LLMCapabilityError, PromptImageFormatError
-from pipelex.cogt.image.prompt_image import PromptImageBytes, PromptImagePath
-from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
-from pipelex.cogt.llm.llm_job import LLMJob
+from pipelex.cogt.image.prompt_image import PromptImagePath
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
-from pipelex.hub import get_inference_manager, get_llm_worker
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64
+from pipelex.hub import get_inference_manager
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, LLMVisionTestCases, Person
 
 

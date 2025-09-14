@@ -3,10 +3,9 @@ from typing import Any, Dict, Optional
 
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.cogt.exceptions import ModelsManagerError
 from pipelex.cogt.model_backends.backend import InferenceBackend
-from pipelex.cogt.model_backends.backend_factory import InferenceBackendFactory
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_deck.llm_deck import LLMDeck, LLMDeckBlueprint

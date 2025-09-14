@@ -5,7 +5,7 @@ from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCompletionError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod

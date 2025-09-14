@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import re
 from typing import Any, Dict, List, Mapping, Optional, cast
 
@@ -10,6 +9,7 @@ from pydantic import BaseModel
 from tomlkit import array, document, inline_table, table
 from tomlkit import string as tk_string
 
+from pipelex.tools.environment import EnvVarNotFoundError, substitute_env_vars
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 
@@ -18,38 +18,6 @@ class TOMLValidationError(Exception):
     """Raised when TOML file has formatting issues that could cause problems."""
 
     pass
-
-
-def substitute_env_vars(content: str) -> str:
-    """Substitute ${ENV_VAR} and ${ENV_VAR:default} patterns with environment variable values.
-
-    Args:
-        content: TOML content with environment variable placeholders
-
-    Returns:
-        Content with environment variables substituted
-
-    Raises:
-        ValueError: If required environment variable is missing and no default provided
-    """
-
-    def replace_env_var(match: re.Match[str]) -> str:
-        var_with_default = match.group(1)
-
-        if ":" in var_with_default:
-            var_name, default_value = var_with_default.split(":", 1)
-            return os.getenv(var_name, default_value)
-        else:
-            var_name = var_with_default
-            value = os.getenv(var_name)
-            if value is None:
-                raise ValueError(f"Environment variable '{var_name}' is required but not set")
-            return value
-
-    # Pattern matches ${VAR_NAME} or ${VAR_NAME:default_value}
-    # Restrict to not match across newlines or quotes
-    pattern = r"\$\{([^}\n\"']+)\}"
-    return re.sub(pattern, replace_env_var, content)
 
 
 def validate_toml_content(content: str, file_path: Optional[str] = None) -> None:
@@ -152,7 +120,7 @@ def load_toml_from_path(path: str, is_env_var_substitution_enabled: bool = False
         if is_env_var_substitution_enabled:
             try:
                 cleaned_content = substitute_env_vars(cleaned_content)
-            except ValueError as exc:
+            except EnvVarNotFoundError as exc:
                 raise TOMLValidationError(f"Environment variable substitution failed in file '{path}': {exc}") from exc
 
         dict_from_toml = toml.loads(cleaned_content)

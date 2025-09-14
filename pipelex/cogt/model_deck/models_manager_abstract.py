@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Dict
 
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
