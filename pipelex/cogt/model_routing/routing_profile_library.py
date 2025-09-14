@@ -1,6 +1,7 @@
 from typing import Dict, Optional
 
 from pydantic import Field, RootModel, ValidationError
+from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.exceptions import ModelCatalogLibraryError, RoutingProfileLibraryError
@@ -22,7 +23,7 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
     _active_config: Optional[str] = None
 
     @classmethod
-    def make_empty(cls):
+    def make_empty(cls) -> Self:
         return cls(root={})
 
     def reset(self) -> None:

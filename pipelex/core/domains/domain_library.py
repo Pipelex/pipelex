@@ -1,7 +1,7 @@
 from typing import Dict, Optional
 
 from pydantic import RootModel
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_provider_abstract import DomainProviderAbstract
@@ -18,7 +18,7 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
         self.root = {}
 
     @classmethod
-    def make_empty(cls):
+    def make_empty(cls) -> Self:
         return cls(root={})
 
     def add_domain(self, domain: Domain):

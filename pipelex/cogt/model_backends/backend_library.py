@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Set
 
 from pydantic import Field, RootModel, ValidationError
+from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceModelSpecError
@@ -21,7 +22,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         self.root = {}
 
     @classmethod
-    def make_empty(cls):
+    def make_empty(cls) -> Self:
         return cls(root={})
 
     def load(self):
