@@ -1,4 +1,5 @@
 default_sdk = "mistral"
+default_prompting_target = "mistral"
 
 [ministral-3b]
 model_id = "ministral-3b-latest"

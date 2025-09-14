@@ -9,9 +9,9 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
+from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -59,74 +59,16 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         )
 
         try:
-            match self.inference_model.llm_family:
-                case LLMFamily.O_SERIES | LLMFamily.GPT_5:
-                    # for o1 models, we must use temperature=1, and tokens limit is named max_completion_tokens
-                    response = await self.openai_client_for_text.chat.completions.create(
-                        model=self.inference_model.model_id,
-                        temperature=1,
-                        max_completion_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-                        seed=llm_job.job_params.seed,
-                        messages=messages,
-                    )
-                case LLMFamily.GEMINI:
-                    # for gemini models, we multiply the temperature by 2 because the range is 0-2
-                    response = await self.openai_client_for_text.chat.completions.create(
-                        model=self.inference_model.model_id,
-                        temperature=llm_job.job_params.temperature * 2,
-                        max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-                        seed=llm_job.job_params.seed,
-                        messages=messages,
-                    )
-                case (
-                    LLMFamily.GPT
-                    | LLMFamily.GPT_4
-                    | LLMFamily.GPT_3_5
-                    | LLMFamily.GPT_3
-                    | LLMFamily.GPT_4_5
-                    | LLMFamily.GPT_4_1
-                    | LLMFamily.GPT_4O
-                    | LLMFamily.GPT_5_CHAT
-                    | LLMFamily.CUSTOM_LLAMA_4
-                    | LLMFamily.CUSTOM_GEMMA_3
-                    | LLMFamily.CUSTOM_MISTRAL_SMALL_3_1
-                    | LLMFamily.CUSTOM_QWEN_3
-                    | LLMFamily.CUSTOM_BLACKBOXAI
-                    | LLMFamily.PERPLEXITY_SEARCH
-                    | LLMFamily.PERPLEXITY_RESEARCH
-                    | LLMFamily.PERPLEXITY_REASONING
-                    | LLMFamily.PERPLEXITY_DEEPSEEK
-                    | LLMFamily.GROK_3
-                    | LLMFamily.PIPELEX_INFERENCE
-                ):
-                    response = await self.openai_client_for_text.chat.completions.create(
-                        model=self.inference_model.model_id,
-                        temperature=llm_job.job_params.temperature,
-                        max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-                        seed=llm_job.job_params.seed,
-                        messages=messages,
-                    )
-                case (
-                    LLMFamily.CLAUDE_3
-                    | LLMFamily.CLAUDE_3_5
-                    | LLMFamily.CLAUDE_3_7
-                    | LLMFamily.CLAUDE_4
-                    | LLMFamily.CLAUDE_4_1
-                    | LLMFamily.MISTRAL_7B
-                    | LLMFamily.MISTRAL_8X7B
-                    | LLMFamily.MISTRAL_LARGE
-                    | LLMFamily.MISTRAL_SMALL
-                    | LLMFamily.MISTRAL_CODESTRAL
-                    | LLMFamily.MINISTRAL
-                    | LLMFamily.PIXTRAL
-                    | LLMFamily.LLAMA_3
-                    | LLMFamily.LLAMA_3_1
-                    | LLMFamily.BEDROCK_MISTRAL_LARGE
-                    | LLMFamily.BEDROCK_ANTHROPIC_CLAUDE
-                    | LLMFamily.BEDROCK_META_LLAMA_3
-                    | LLMFamily.BEDROCK_AMAZON_NOVA
-                ):
-                    raise LLMEngineParameterError(f"LLM family {self.inference_model.llm_family} is not supported by OpenAILLMWorker")
+            temperature = llm_job.job_params.temperature
+            if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
+                temperature *= 2
+            response = await self.openai_client_for_text.chat.completions.create(
+                model=self.inference_model.model_id,
+                temperature=temperature,
+                max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
+                seed=llm_job.job_params.seed,
+                messages=messages,
+            )
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here
             raise LLMModelNotFoundError(
@@ -157,80 +99,18 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             inference_model=self.inference_model,
         )
         try:
-            match self.inference_model.llm_family:
-                case LLMFamily.O_SERIES | LLMFamily.GPT_5:
-                    # for o1 models, we must use temperature=1, and tokens limit is named max_completion_tokens
-                    result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-                        model=self.inference_model.model_id,
-                        temperature=1,
-                        max_completion_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-                        seed=llm_job.job_params.seed,
-                        messages=messages,
-                        response_model=schema,
-                        max_retries=llm_job.job_config.max_retries,
-                    )
-                case LLMFamily.GEMINI:
-                    # for gemini models, we multiply the temperature by 2 because the range is 0-2
-                    result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-                        model=self.inference_model.model_id,
-                        temperature=llm_job.job_params.temperature * 2,
-                        max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-                        seed=llm_job.job_params.seed,
-                        messages=messages,
-                        response_model=schema,
-                        max_retries=llm_job.job_config.max_retries,
-                    )
-                case (
-                    LLMFamily.GPT
-                    | LLMFamily.GPT_4
-                    | LLMFamily.GPT_3_5
-                    | LLMFamily.GPT_3
-                    | LLMFamily.GPT_4_5
-                    | LLMFamily.GPT_4_1
-                    | LLMFamily.GPT_4O
-                    | LLMFamily.GPT_5_CHAT
-                    | LLMFamily.CUSTOM_LLAMA_4
-                    | LLMFamily.CUSTOM_GEMMA_3
-                    | LLMFamily.CUSTOM_MISTRAL_SMALL_3_1
-                    | LLMFamily.CUSTOM_QWEN_3
-                    | LLMFamily.CUSTOM_BLACKBOXAI
-                    | LLMFamily.PERPLEXITY_SEARCH
-                    | LLMFamily.PERPLEXITY_RESEARCH
-                    | LLMFamily.PERPLEXITY_REASONING
-                    | LLMFamily.PERPLEXITY_DEEPSEEK
-                    | LLMFamily.GROK_3
-                    | LLMFamily.PIPELEX_INFERENCE
-                ):
-                    result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-                        model=self.inference_model.model_id,
-                        temperature=llm_job.job_params.temperature,
-                        max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-                        seed=llm_job.job_params.seed,
-                        messages=messages,
-                        response_model=schema,
-                        max_retries=llm_job.job_config.max_retries,
-                    )
-                case (
-                    LLMFamily.CLAUDE_3
-                    | LLMFamily.CLAUDE_3_5
-                    | LLMFamily.CLAUDE_3_7
-                    | LLMFamily.CLAUDE_4
-                    | LLMFamily.CLAUDE_4_1
-                    | LLMFamily.MISTRAL_7B
-                    | LLMFamily.MISTRAL_8X7B
-                    | LLMFamily.MISTRAL_LARGE
-                    | LLMFamily.MISTRAL_SMALL
-                    | LLMFamily.MISTRAL_CODESTRAL
-                    | LLMFamily.MINISTRAL
-                    | LLMFamily.PIXTRAL
-                    | LLMFamily.LLAMA_3
-                    | LLMFamily.LLAMA_3_1
-                    | LLMFamily.BEDROCK_MISTRAL_LARGE
-                    | LLMFamily.BEDROCK_ANTHROPIC_CLAUDE
-                    | LLMFamily.BEDROCK_META_LLAMA_3
-                    | LLMFamily.BEDROCK_AMAZON_NOVA
-                ):
-                    raise LLMEngineParameterError(f"LLM family {self.inference_model.llm_family} is not supported by OpenAILLMWorker")
+            temperature = llm_job.job_params.temperature
+            if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
+                temperature *= 2
+            result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
+                model=self.inference_model.model_id,
+                temperature=temperature,
+                max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
+                seed=llm_job.job_params.seed,
+                messages=messages,
+                response_model=schema,
+                max_retries=llm_job.job_config.max_retries,
+            )
         except NotFoundError as exc:
             raise LLMCompletionError(f"OpenAI model or deployment '{self.inference_model.model_id}' not found: {exc}") from exc
         except BadRequestError as bad_request_error:

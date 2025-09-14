@@ -2,8 +2,9 @@ from typing import Dict, List, Optional
 
 from pydantic import Field
 
-from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
+from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
 from pipelex.cogt.model_backends.cost_category import CostCategory
+from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.tools.config.config_model import ConfigModel
 
 
@@ -17,6 +18,8 @@ class InferenceModelSpec(ConfigModel):
     costs: Dict[CostCategory, float] = Field(strict=False)
     max_tokens: Optional[int]
     max_prompt_images: Optional[int]
+    prompting_target: Optional[LLMPromptingTarget] = Field(default=None, strict=False)
+    constraints: List[ModelConstraints] = Field(default_factory=list)
 
     # TODO: investigate if this is needed
     is_system_prompt_supported: bool = True
@@ -36,8 +39,3 @@ class InferenceModelSpec(ConfigModel):
     @property
     def is_vision_supported(self) -> bool:
         return "images" in self.inputs
-
-    @property
-    def llm_family(self) -> LLMFamily:
-        last_part = self.model_id.split("/")[-1]
-        return LLMFamily(last_part.split("-")[0])

@@ -7,9 +7,9 @@ from pipelex import log, pretty_print
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.hub import get_llm_worker, get_models_manager, get_report_delegate
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
@@ -63,12 +63,15 @@ class TestLLMGenText:
             temperature += 0.2
             if temperature > 1:
                 break
-            if isinstance(llm_worker, LLMWorkerInternalAbstract) and llm_worker.inference_model.llm_family == LLMFamily.O_SERIES:
-                log.warning("LLMFamily O_series, forcing temprature to 1, setting minimum tokens to avoid empty output")
-                completion_max_tokens = max(max_tokens, 2000)
-                llm_job.job_params = job_params_base.model_copy(update={"max_tokens": completion_max_tokens, "temperature": 1})
-            else:
-                llm_job.job_params = job_params_base.model_copy(update={"max_tokens": max_tokens, "temperature": temperature})
+            llm_job.job_params = job_params_base.model_copy(update={"max_tokens": max_tokens, "temperature": temperature})
+            if isinstance(llm_worker, LLMWorkerInternalAbstract):
+                if ModelConstraints.TEMPERATURE_MUST_BE_1 in llm_worker.inference_model.constraints:
+                    log.warning("ModelConstraints TEMPERATURE_MUST_BE_1, forcing temprature to 1, setting minimum tokens to avoid empty output")
+                    llm_job.job_params = job_params_base.model_copy(update={"temperature": 1})
+                if ModelConstraints.MAX_TOKENS_MUST_BE_HIGH_ENOUGH in llm_worker.inference_model.constraints:
+                    log.warning("ModelConstraints MAX_TOKENS_MUST_BE_HIGH_ENOUGH, forcing max tokens to at least2000")
+                    completion_max_tokens = max(max_tokens, 2000)
+                    llm_job.job_params = job_params_base.model_copy(update={"max_tokens": completion_max_tokens})
             task: asyncio.Task[str] = asyncio.create_task(llm_worker.gen_text(llm_job=llm_job))
             tasks.append(task)
 

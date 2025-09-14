@@ -1,5 +1,6 @@
 
 default_sdk = "openai"
+default_prompting_target = "anthropic"
 
 # OpenAI Models
 [gpt-4o-mini]

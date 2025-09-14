@@ -1,4 +1,5 @@
 default_sdk = "openai"
+default_prompting_target = "anthropic"
 
 [gemma3-4b]
 model_id = "gemma3:4b"

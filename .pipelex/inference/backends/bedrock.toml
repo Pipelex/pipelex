@@ -1,4 +1,5 @@
 default_sdk = "boto3"
+default_prompting_target = "anthropic"
 
 [bedrock-mistral-large]
 model_id = "mistral.mistral-large-2407-v1:0"

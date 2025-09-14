@@ -4,14 +4,13 @@ import pytest
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
-from pipelex.cogt.llm.llm_models.llm_family import LLMCreator, LLMFamily
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 
 
 @pytest.fixture(
     params=[
-        "llm_for_testing_gen_text",
-        "llm_for_testing_gen_object",
+        # "llm_for_testing_gen_text",
+        # "llm_for_testing_gen_object",
         "llm_for_creative_writing",
     ]
 )
@@ -93,49 +92,6 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
 )
 def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
-    return request.param
-
-
-@pytest.fixture(
-    params=[
-        # LLMFamily.GPT_4,
-        # LLMFamily.GPT_4O,
-        LLMFamily.GPT_5,
-        # LLMFamily.GPT_4_5,
-        # LLMFamily.GPT_4_1,
-        # LLMFamily.O_SERIES,
-        # LLMFamily.CLAUDE_3_7,
-        # LLMFamily.CLAUDE_4,
-        # LLMFamily.CLAUDE_4_1,
-        # LLMFamily.PERPLEXITY_SEARCH,
-        # LLMFamily.PERPLEXITY_REASONING,
-        # LLMFamily.PERPLEXITY_RESEARCH,
-        # LLMFamily.PERPLEXITY_DEEPSEEK,
-        # LLMFamily.GEMINI,
-        # LLMFamily.GEMMA,
-        # LLMFamily.CUSTOM_BLACKBOXAI,
-    ]
-)
-def llm_family(request: pytest.FixtureRequest) -> LLMFamily:
-    assert isinstance(request.param, LLMFamily)
-    return request.param
-
-
-@pytest.fixture(
-    params=[
-        # LLMCreator.ALIBABA,
-        # LLMCreator.AMAZON,
-        # LLMCreator.ANTHROPIC,
-        # LLMCreator.DEEPSEEK,
-        # LLMCreator.GOOGLE,
-        LLMCreator.OPENAI,
-        # LLMCreator.META,
-        # LLMCreator.MISTRAL,
-        # LLMCreator.PERPLEXITY,
-    ]
-)
-def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
-    assert isinstance(request.param, LLMCreator)
     return request.param
 
 

@@ -4,8 +4,8 @@ from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self
 
 from pipelex.cogt.exceptions import LLMDeckValidatonError, LLMHandleNotFoundError, LLMPresetNotFoundError, LLMSettingsValidationError
-from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults, LLMSettingOrPresetId
+from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.exceptions import ConfigValidationError
@@ -80,14 +80,11 @@ class LLMDeck(ConfigModel):
                         f"which is greater than the model's max_tokens of {inference_model.max_tokens}"
                     )
                 )
-        match inference_model.llm_family:
-            case LLMFamily.O_SERIES:
-                if llm_setting.temperature != 1:
-                    raise LLMSettingsValidationError(
-                        f"O-series LLMs like '{llm_setting.llm_handle}' must have a temperature of 1, not {llm_setting.temperature}"
-                    )
-            case _:
-                pass
+        if ModelConstraints.TEMPERATURE_MUST_BE_1 in inference_model.constraints and llm_setting.temperature != 1:
+            raise LLMSettingsValidationError(
+                f"LLM setting '{llm_setting.llm_handle}' has a temperature of {llm_setting.temperature}, "
+                f"which is not allowed by the model's constraints: it must be 1"
+            )
 
     # @field_validator("llm_handles", mode="before")
     # @classmethod

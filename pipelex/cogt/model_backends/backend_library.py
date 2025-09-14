@@ -5,6 +5,7 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceModelSpecError
+from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -47,6 +48,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             except (FileNotFoundError, TOMLValidationError) as exc:
                 raise InferenceBackendLibraryError(f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}") from exc
             default_sdk: Optional[str] = model_specs_dict.pop("default_sdk", None)
+            default_prompting_target: Optional[LLMPromptingTarget] = model_specs_dict.pop("default_prompting_target", None)
             backend_model_specs: Dict[str, InferenceModelSpec] = {}
             for model_spec_name, model_spec_dict in model_specs_dict.items():
                 try:
@@ -55,6 +57,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         backend_name=backend_name,
                         name=model_spec_name,
                         blueprint=model_spec_blueprint,
+                        default_prompting_target=default_prompting_target,
                         fallback_sdk=default_sdk,
                     )
                     backend_model_specs[model_spec_name] = model_spec

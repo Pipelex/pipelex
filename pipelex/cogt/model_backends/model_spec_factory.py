@@ -3,7 +3,9 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex.cogt.exceptions import InferenceModelSpecError
+from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
 from pipelex.cogt.model_backends.cost_category import CostCategory
+from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.tools.config.config_model import ConfigModel
 
@@ -17,6 +19,8 @@ class InferenceModelSpecBlueprint(ConfigModel):
     costs: Dict[CostCategory, float] = Field(strict=False)
     max_tokens: Optional[int] = None
     max_prompt_images: Optional[int] = None
+    prompting_target: Optional[LLMPromptingTarget] = Field(default=None, strict=False)
+    constraints: List[ModelConstraints] = Field(default_factory=list)
 
     @field_validator("costs", mode="before")
     def validate_costs(cls, value: Dict[str, float]) -> Dict[CostCategory, float]:
@@ -33,11 +37,13 @@ class InferenceModelSpecFactory(BaseModel):
         backend_name: str,
         name: str,
         blueprint: InferenceModelSpecBlueprint,
+        default_prompting_target: Optional[LLMPromptingTarget],
         fallback_sdk: Optional[str],
     ) -> InferenceModelSpec:
         sdk = blueprint.sdk or fallback_sdk
         if not sdk:
             raise InferenceModelSpecError("No sdk choice provided")
+        prompting_target = blueprint.prompting_target or default_prompting_target
         return InferenceModelSpec(
             backend_name=backend_name,
             name=name,
@@ -48,4 +54,6 @@ class InferenceModelSpecFactory(BaseModel):
             costs=blueprint.costs,
             max_tokens=blueprint.max_tokens,
             max_prompt_images=blueprint.max_prompt_images,
+            prompting_target=prompting_target,
+            constraints=blueprint.constraints,
         )
