@@ -97,7 +97,6 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
     return request.param
 
 
-# TODO: build llm_id/platform combos dynalically from config data
 @pytest.fixture(
     params=[
         # PluginSdkHandle.ANTHROPIC,
@@ -109,6 +108,17 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
     ]
 )
 def plugin_sdk_handle(request: pytest.FixtureRequest) -> PluginSdkHandle:
+    assert isinstance(request.param, PluginSdkHandle)
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        PluginSdkHandle.AZURE_OPENAI,
+        PluginSdkHandle.OPENAI,
+    ]
+)
+def plugin_sdk_handle_for_openai_sdk(request: pytest.FixtureRequest) -> PluginSdkHandle:
     assert isinstance(request.param, PluginSdkHandle)
     return request.param
 

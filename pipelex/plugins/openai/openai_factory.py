@@ -13,7 +13,7 @@ from openai.types.chat.chat_completion_content_part_image_param import ImageURL
 from openai.types.completion_usage import CompletionUsage
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMEngineParameterError, LLMPromptParameterError
+from pipelex.cogt.exceptions import CogtError, LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
@@ -22,6 +22,10 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
+
+
+class OpenAIFactoryError(CogtError):
+    pass
 
 
 class OpenAIFactory:
@@ -59,7 +63,7 @@ class OpenAIFactory:
                 | PluginSdkHandle.MISTRAL
                 | PluginSdkHandle.FAL
             ):
-                raise LLMEngineParameterError(f"Platform '{plugin_sdk_handle}' is not supported by this factory '{cls.__name__}'")
+                raise OpenAIFactoryError(f"PluginSdkHandle '{plugin_sdk_handle}' is not supported by OpenAIFactory")
 
         return the_client
 

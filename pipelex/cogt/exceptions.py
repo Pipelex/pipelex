@@ -31,14 +31,6 @@ class LLMWorkerError(CogtError):
     pass
 
 
-class LLMEngineParameterError(CogtError):
-    pass
-
-
-class LLMSDKError(CogtError):
-    pass
-
-
 class LLMPresetNotFoundError(CogtError):
     pass
 
@@ -52,10 +44,6 @@ class LLMDeckValidatonError(CogtError):
 
 
 class LLMHandleNotFoundError(CogtError):
-    pass
-
-
-class LLMModelProviderError(CogtError):
     pass
 
 

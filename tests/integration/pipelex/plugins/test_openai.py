@@ -1,7 +1,6 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.cogt.exceptions import LLMSDKError
 from pipelex.hub import get_models_manager, get_plugin_manager, get_secrets_provider
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
@@ -20,22 +19,26 @@ class TestOpenAI:
     async def test_openai_list_available_models(
         self,
         pytestconfig: pytest.Config,
-        plugin_sdk_handle: PluginSdkHandle,
+        plugin_sdk_handle_for_openai_sdk: PluginSdkHandle,
         backend_name: str,
     ):
         backend = get_models_manager().get_required_inference_backend(backend_name)
-        try:
-            openai_models_list = await openai_list_available_models(
-                plugin_sdk_handle=plugin_sdk_handle,
-                backend=backend,
-            )
-        except LLMSDKError as exc:
-            if "does not support listing models" in str(exc):
-                pytest.skip(f"Skipping: {exc}")
-            else:
-                raise exc
+        # try:
+        #     openai_models_list = await openai_list_available_models(
+        #         plugin_sdk_handle=plugin_sdk_handle_for_openai_sdk,
+        #         backend=backend,
+        #     )
+        # except LLMSDKError as exc:
+        #     if "does not support listing models" in str(exc):
+        #         pytest.skip(f"Skipping: {exc}")
+        #     else:
+        #         raise exc
+        openai_models_list = await openai_list_available_models(
+            plugin_sdk_handle=plugin_sdk_handle_for_openai_sdk,
+            backend=backend,
+        )
         if pytestconfig.get_verbosity() >= 2:
             list_of_ids = [model.id for model in openai_models_list]
-            pretty_print(list_of_ids, title=f"models available for {plugin_sdk_handle}")
+            pretty_print(list_of_ids, title=f"models available for {plugin_sdk_handle_for_openai_sdk}")
 
         pretty_print(openai_models_list)

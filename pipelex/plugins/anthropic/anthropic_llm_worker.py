@@ -5,12 +5,13 @@ from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, SdkTypeError
+from pipelex.cogt.exceptions import CogtError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_plugin_manager
+from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicWorkerConfigurationError
 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -35,7 +36,9 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         if default_max_tokens := inference_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise LLMEngineParameterError(f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Anthropic")
+            raise AnthropicWorkerConfigurationError(
+                f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Anthropic"
+            )
 
         # Verify if the sdk_instance is compatible with the current LLM platform
         if isinstance(sdk_instance, (AsyncAnthropic, AsyncAnthropicBedrock)):

@@ -4,7 +4,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from pipelex.cogt.exceptions import LLMSDKError
+from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError
 from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_anthropic_models
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 
@@ -28,7 +28,7 @@ class TestAnthropic:
             )
         except AuthenticationError as auth_exc:
             pytest.fail(f"Authentication error for Anthropic: {auth_exc}")
-        except LLMSDKError as exc:
+        except AnthropicSDKUnsupportedError as exc:
             if "does not support listing models" in str(exc):
                 pytest.skip(f"Skipping: {exc}")
             else:

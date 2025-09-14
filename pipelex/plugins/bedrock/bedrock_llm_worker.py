@@ -3,7 +3,7 @@ from typing import Any, Optional, Type
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCapabilityError, LLMEngineParameterError, SdkTypeError
+from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
@@ -12,6 +12,10 @@ from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtoco
 from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+
+class BedrockWorkerConfigurationError(CogtError):
+    pass
 
 
 class BedrockLLMWorker(LLMWorkerInternalAbstract):
@@ -37,7 +41,9 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
         if default_max_tokens := inference_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise LLMEngineParameterError(f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Bedrock")
+            raise BedrockWorkerConfigurationError(
+                f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Bedrock"
+            )
         self.bedrock_client_for_text = sdk_instance
 
     @override
