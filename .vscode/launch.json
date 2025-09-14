@@ -16,14 +16,14 @@
             "justMyCode": false
         },
         {
-            "name": "Debug test boot",
+            "name": "Debug test without inference",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
             "args": [
                 "-s",
                 "-vv",
-                "-k test_boot"
+                "-k test_pipe_llm_with_external_llm_handle"
             ],
             "console": "integratedTerminal"
         },
