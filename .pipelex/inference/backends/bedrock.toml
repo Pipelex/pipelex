@@ -1,4 +1,4 @@
-default_sdk = "boto3"
+default_sdk = "bedrock"
 default_prompting_target = "anthropic"
 
 [bedrock-mistral-large]
