@@ -10,6 +10,7 @@ class InferenceBackend(ConfigModel):
     name: str
     endpoint: Optional[str] = None
     api_key: Optional[str] = None
+    api_version: Optional[str] = None
     model_specs: Dict[str, InferenceModelSpec] = Field(default_factory=dict)
 
     def list_model_names(self) -> List[str]:

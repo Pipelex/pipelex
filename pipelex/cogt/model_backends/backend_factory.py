@@ -10,6 +10,7 @@ class InferenceBackendBlueprint(ConfigModel):
     enabled: bool = True
     endpoint: Optional[str] = None
     api_key: Optional[str] = None
+    api_version: Optional[str] = None
 
 
 class InferenceBackendFactory:
@@ -22,11 +23,9 @@ class InferenceBackendFactory:
     ) -> InferenceBackend:
         endpoint = blueprint.endpoint
         api_key = blueprint.api_key
+        api_version = blueprint.api_version
         # Deal with special authentication for some backends
         match name:
-            # case "azure_openai":
-            #     azure_openai_config = get_plugin_manager().plugin_configs.azure_openai_config
-            #     endpoint, _, api_key = azure_openai_config.configure(secrets_provider=get_secrets_provider())
             case "vertexai":
                 vertexai_config = get_plugin_manager().plugin_configs.vertexai_config
                 endpoint, api_key = vertexai_config.configure(secrets_provider=get_secrets_provider())
@@ -36,5 +35,6 @@ class InferenceBackendFactory:
             name=name,
             endpoint=endpoint,
             api_key=api_key,
+            api_version=api_version,
             model_specs=model_specs,
         )

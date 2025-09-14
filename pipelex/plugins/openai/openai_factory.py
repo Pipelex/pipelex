@@ -36,21 +36,18 @@ class OpenAIFactory:
         backend: InferenceBackend,
     ) -> openai.AsyncClient:
         the_client: openai.AsyncOpenAI
-        # api_key: Optional[str] = None
         match plugin_sdk_handle:
             case PluginSdkHandle.AZURE_OPENAI:
-                azure_openai_config = get_plugin_manager().plugin_configs.azure_openai_config
-                endpoint, api_version, api_key = azure_openai_config.configure(secrets_provider=get_secrets_provider())
-
-                log.debug(f"Making AsyncAzureOpenAI client with endpoint: {endpoint}, api_version: {api_version}")
+                log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
+                if backend.endpoint is None:
+                    raise OpenAIFactoryError("Azure OpenAI endpoint is not set")
                 the_client = openai.AsyncAzureOpenAI(
-                    azure_endpoint=endpoint,
-                    api_key=api_key,
-                    api_version=api_version,
+                    azure_endpoint=backend.endpoint,
+                    api_key=backend.api_key,
+                    api_version=backend.api_version,
                 )
+
             case PluginSdkHandle.OPENAI:
-                # openai_config = get_plugin_manager().plugin_configs.openai_config
-                # api_key = openai_config.get_api_key(secrets_provider=get_secrets_provider())
                 log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
                     api_key=backend.api_key,

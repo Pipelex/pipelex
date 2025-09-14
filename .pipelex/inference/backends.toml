@@ -15,6 +15,7 @@ api_key = "${OPENAI_API_KEY}"
 enabled = true
 endpoint = "${AZURE_API_BASE}"
 api_key = "${AZURE_API_KEY}"
+api_version = "${AZURE_API_VERSION}"
 
 [anthropic]
 enabled = true
