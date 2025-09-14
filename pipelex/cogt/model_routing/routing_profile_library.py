@@ -56,14 +56,14 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
             raise RoutingProfileLibraryError(f"Invalid routing profile library configuration in '{routing_profile_library_path}': {exc}") from exc
 
         # Validate that the active config exists
-        if catalog_blueprint.active not in catalog_blueprint.configs:
+        if catalog_blueprint.active not in catalog_blueprint.profiles:
             raise RoutingProfileLibraryError(
-                f"Active profile '{catalog_blueprint.active}' not found in library. Available profiles: {list(catalog_blueprint.configs.keys())}"
+                f"Active profile '{catalog_blueprint.active}' not found in library. Available profiles: {list(catalog_blueprint.profiles.keys())}"
             )
 
         # Load all profiles
         self.root = {}
-        for config_name, config_blueprint in catalog_blueprint.configs.items():
+        for config_name, config_blueprint in catalog_blueprint.profiles.items():
             self.root[config_name] = RoutingProfileFactory.make_routing_profile(
                 name=config_name,
                 blueprint=config_blueprint,

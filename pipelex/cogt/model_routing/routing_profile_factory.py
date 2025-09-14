@@ -18,7 +18,7 @@ class RoutingProfileLibraryBlueprint(ConfigModel):
     """Blueprint for the entire routing profile library."""
 
     active: str
-    configs: Dict[str, RoutingProfileBlueprint] = Field(default_factory=dict)
+    profiles: Dict[str, RoutingProfileBlueprint] = Field(default_factory=dict)
 
 
 class RoutingProfileFactory:

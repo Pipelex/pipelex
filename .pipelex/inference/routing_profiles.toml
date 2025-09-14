@@ -1,31 +1,31 @@
 # Routing profile library - Routes models to their backends
 # ================================================
 # This file controls which backend serves which model.
-# Simply change the 'active' field to switch configurations.
+# Simply change the 'active' field to switch profiles.
 
-# Which configuration to use (change this to switch routing)
+# Which profile to use (change this to switch routing)
 active = "all_azure_openai"
 
 # ============================================
-# Configuration Profiles
+# Routing Profiles
 # ============================================
 
-[configs.all_pipelex]
+[profiles.all_pipelex]
 description = "Use Pipelex Inference backend for all models"
 default = "pipelex-inference"
 
-[configs.all_anthropic]
+[profiles.all_anthropic]
 description = "Use Anthropic backend for all supported models"
 default = "anthropic"
 
-[configs.all_azure_openai]
+[profiles.all_azure_openai]
 description = "Use Azure OpenAI backend for all supported models"
 default = "azure_openai"
 
-[configs.to_test_all_backends]
+[profiles.to_test_all_backends]
 description = "Route models to each of the supported backends"
 
-[configs.to_test_all_backends.routes]
+[profiles.to_test_all_backends.routes]
 "gpt-4o-mini" = "pipelex-inference"
 "gpt-5-mini" = "openai"
 "gpt-5-chat" = "azure_openai"
@@ -43,11 +43,11 @@ description = "Route models to each of the supported backends"
 "grok-3-mini" = "xai"
 # "grok-3-fast" = "azure_openai"
 
-[configs.custom_routing]
+[profiles.custom_routing]
 description = "Custom routing"
 default = "pipelex-inference"
 
-[configs.custom_routing.routes]
+[profiles.custom_routing.routes]
 # Pattern matching: "model-pattern" = "backend-name"
 "gpt-*" = "pipelex-inference"
 "claude-*" = "pipelex-inference"
@@ -57,14 +57,14 @@ default = "pipelex-inference"
 
 
 # ============================================
-# Custom Configurations
+# Custom Profiles
 # ============================================
-# Add your own configurations below following the same pattern:
+# Add your own profiles below following the same pattern:
 #
-# [configs.your_config_name]
-# description = "What this configuration does"
+# [profiles.your_profile_name]
+# description = "What this profile does"
 # default = "backend-name"  # Where to route models by default
-# [configs.your_config_name.routes]
+# [profiles.your_profile_name.routes]
 # "model-pattern" = "backend-name"  # Specific routing rules
 #
 # Pattern matching supports:
