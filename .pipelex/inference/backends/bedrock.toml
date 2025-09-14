@@ -73,7 +73,7 @@ outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
-[claude-4-1-opus]
+["claude-4.1-opus"]
 sdk = "bedrock_anthropic"
 model_id = "us.anthropic.claude-opus-4-1-20250805-v1:0"
 max_tokens = 32000

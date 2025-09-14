@@ -4,7 +4,7 @@
 # Simply change the 'active' field to switch profiles.
 
 # Which profile to use (change this to switch routing)
-active = "to_test_all_backends"
+active = "all_pipelex"
 
 # ============================================
 # Routing Profiles

@@ -21,12 +21,12 @@ class TestGetRequiredEnv:
 
     def test_get_required_env_missing_raises_error(self, mocker: MockerFixture):
         mocker.patch.dict(os.environ, {}, clear=True)
-        with pytest.raises(EnvVarNotFoundError, match="Missing 'MISSING_VAR 'in environment."):
+        with pytest.raises(EnvVarNotFoundError, match="Environment variable 'MISSING_VAR' is required but not set"):
             get_required_env("MISSING_VAR")
 
     def test_get_required_env_empty_string_raises_error(self, mocker: MockerFixture):
         mocker.patch.dict(os.environ, {"EMPTY_VAR": ""})
-        with pytest.raises(EnvVarNotFoundError, match="Missing 'EMPTY_VAR 'in environment."):
+        with pytest.raises(EnvVarNotFoundError, match="Environment variable 'EMPTY_VAR' is required but not set"):
             get_required_env("EMPTY_VAR")
 
 

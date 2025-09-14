@@ -10,7 +10,7 @@ base-claude = "claude-4-sonnet"
 base-gpt = "gpt-5"
 
 best-gpt = "gpt-5"
-best-claude = "claude-4-1-opus"
+best-claude = "claude-4.1-opus"
 best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-large"
 best-grok = "grok-3"
@@ -21,7 +21,7 @@ cheap_llm_for_object = "gpt-4o-mini"
 base_llm_for_text = "gpt-4o-mini"
 base_llm_for_object = "gpt-4o-mini"
 
-llm_to_engineer = ["claude-4-1-opus", "gemini-2.5-pro"]
+llm_to_engineer = ["claude-4.1-opus", "gemini-2.5-pro"]
 llm_for_large_codebase = ["gemini-2.5-pro", "claude-4-sonnet", "gpt-5"]
 
 ####################################################################################################
