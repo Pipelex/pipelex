@@ -24,3 +24,4 @@ model_id = "grok-3-mini-fast-latest"
 inputs = ["text"]
 outputs = ["text"]
 costs = { input = 0.15, output = 4 }
+

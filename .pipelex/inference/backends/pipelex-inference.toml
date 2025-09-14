@@ -8,6 +8,42 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.17, output = 0.66 }
 
+["gpt-4.1"]
+model_id = "pipelex/gpt-4.1"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+
+["gpt-4.1-mini"]
+model_id = "pipelex/gpt-4.1-mini"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 1.6 }
+
+["gpt-4.1-nano"]
+model_id = "pipelex/gpt-4.1-nano"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.4 }
+
+[gpt-5-nano]
+model_id = "pipelex/gpt-5-nano"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.40 }
+
+[gpt-5-mini]
+model_id = "pipelex/gpt-5-mini"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 2.00 }
+
+[gpt-5-chat]
+model_id = "pipelex/gpt-5-chat"
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 1.25, output = 10.00 }
+
 [gpt-image-1]
 model_id = "pipelex/gpt-image-1"
 inputs = ["text"]
@@ -35,6 +71,12 @@ outputs = ["text", "structured"]
 costs = { input = 0.30, output = 2.50 }
 
 # XAI Models
+[grok-3]
+model_id = "grok-3"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 3, output = 15 }
+
 [grok-3-mini]
 model_id = "grok-3-mini"
 inputs = ["text"]

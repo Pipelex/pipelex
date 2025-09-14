@@ -55,10 +55,20 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "pipelex/claude-3.7-sonnet",
         # "pipelex/gemini-2.0-flash-vertex",
         # "pipelex/gemini-2.0-flash",
-        "gpt-4o-mini",
-        # "claude-4-sonnet",
         # "best-claude",
         # "llm_to_engineer",
+        # "gpt-5-nano",
+        # "gpt-4o-mini",
+        "gpt-5-mini",
+        # "gpt-5-chat",
+        # "claude-4-sonnet",
+        # "claude-3.5-sonnet",
+        # "claude-3.7-sonnet",
+        # "gemini-2.5-flash",
+        # "gemini-2.0-flash",
+        # "gemini-2.5-pro",
+        # "grok-3",
+        # "grok-3-mini",
     ]
 )
 def llm_handle(request: pytest.FixtureRequest) -> str:

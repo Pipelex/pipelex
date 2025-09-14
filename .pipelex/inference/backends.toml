@@ -24,3 +24,11 @@ api_key = "${ANTHROPIC_API_KEY}"
 enabled = true
 endpoint = "http://localhost:11434/v1"
 
+[xai]
+enabled = true
+endpoint = "https://api.x.ai/v1"
+api_key = "${XAI_API_KEY}"
+
+[bedrock]
+enabled = true
+
