@@ -144,7 +144,7 @@ class OcrCapabilityError(CogtError):
     pass
 
 
-class ModelCatalogError(CogtError):
+class RoutingProfileLibraryError(CogtError):
     pass
 
 

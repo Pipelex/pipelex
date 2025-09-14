@@ -16,7 +16,7 @@ from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.cogt.ocr.ocr_worker_factory import OcrWorkerFactory
 from pipelex.config import get_config
-from pipelex.hub import get_llm_deck, get_report_delegate
+from pipelex.hub import get_models_manager, get_report_delegate
 
 
 class InferenceManager(InferenceManagerProtocol):
@@ -63,7 +63,7 @@ class InferenceManager(InferenceManagerProtocol):
     @override
     def setup_llm_workers(self):
         log.verbose("Setting up LLM Workers...")
-        llm_handle_to_inference_model = get_llm_deck().get_all_inference_models()
+        llm_handle_to_inference_model = get_models_manager().get_all_inference_models()
         log.verbose(f"{len(llm_handle_to_inference_model)} LLM engine_cards found")
         for llm_handle, inference_model in llm_handle_to_inference_model.items():
             self._setup_one_internal_llm_worker(inference_model=inference_model, llm_handle=llm_handle)
@@ -91,7 +91,7 @@ class InferenceManager(InferenceManagerProtocol):
                 f"No LLM worker for '{llm_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_llm"
             )
 
-        inference_model = get_llm_deck().get_inference_model(llm_handle=llm_handle)
+        inference_model = get_models_manager().get_inference_model(llm_handle=llm_handle)
         llm_worker = self._setup_one_internal_llm_worker(
             inference_model=inference_model,
             llm_handle=llm_handle,

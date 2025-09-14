@@ -60,7 +60,7 @@ class LLMTokenCostReport(BaseModel):
 
 
 def model_cost_per_token(inference_model_name: str, token_type: CostCategory) -> float:
-    # inference_model = get_llm_deck().get_inference_model(inference_model_name)
+    # inference_model = get_models_manager().get_inference_model(inference_model_name)
     # # cost_per_million_tokens_usd should be missing only for models that we run on our own GPUs
     # if not inference_model.costs:
     #     log.warning(f"cost_per_million_tokens_usd is not set for model {inference_model.name}")

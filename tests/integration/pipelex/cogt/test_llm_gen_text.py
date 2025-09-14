@@ -10,12 +10,12 @@ from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.hub import get_llm_deck, get_llm_worker, get_report_delegate
+from pipelex.hub import get_llm_worker, get_models_manager, get_report_delegate
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 
 def get_worker_and_job(llm_preset_id: str, user_text: str) -> Tuple[LLMWorkerAbstract, LLMJob]:
-    llm_setting = get_llm_deck().get_llm_setting(llm_setting_or_preset_id=llm_preset_id)
+    llm_setting = get_models_manager().get_llm_deck().get_llm_setting(llm_setting_or_preset_id=llm_preset_id)
     pretty_print(llm_setting, title=llm_preset_id)
     pretty_print(user_text)
     llm_worker = get_llm_worker(llm_handle=llm_setting.llm_handle)

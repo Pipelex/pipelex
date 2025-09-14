@@ -39,7 +39,7 @@ from pipelex.hub import (
     get_class_registry,
     get_concept_provider,
     get_content_generator,
-    get_llm_deck,
+    get_models_manager,
     get_optional_pipe,
     get_required_concept,
     get_required_domain,
@@ -265,27 +265,24 @@ class PipeLLM(PipeOperator):
             llm_for_text_choice = self.llm_choices.for_text
             llm_for_object_choice = self.llm_choices.for_object
 
+        llm_deck = get_models_manager().get_llm_deck()
+
         # Choice of main LLM for text first from this PipeLLM setting (self.llm_choices)
         # or from the llm_choice_overrides or fallback on the llm_choice_defaults
         llm_setting_or_preset_id_for_text: LLMSettingOrPresetId = (
-            llm_for_text_choice or get_llm_deck().llm_choice_overrides.for_text or get_llm_deck().llm_choice_defaults.for_text
+            llm_for_text_choice or llm_deck.llm_choice_overrides.for_text or llm_deck.llm_choice_defaults.for_text
         )
-        llm_setting_main: LLMSetting = get_llm_deck().get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_text)
+        llm_setting_main: LLMSetting = llm_deck.get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_text)
 
         # Choice of main LLM for object from this PipeLLM setting (self.llm_choices)
         # OR FROM THE llm_for_text_choice (if any)
         # then fallback on the llm_choice_overrides or llm_choice_defaults
         llm_setting_or_preset_id_for_object: LLMSettingOrPresetId = (
-            llm_for_object_choice
-            or llm_for_text_choice
-            or get_llm_deck().llm_choice_overrides.for_object
-            or get_llm_deck().llm_choice_defaults.for_object
+            llm_for_object_choice or llm_for_text_choice or llm_deck.llm_choice_overrides.for_object or llm_deck.llm_choice_defaults.for_object
         )
-        llm_setting_for_object: LLMSetting = get_llm_deck().get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_object)
+        llm_setting_for_object: LLMSetting = llm_deck.get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_object)
 
-        if not self.llm_prompt_spec.prompting_style and (
-            llm_model := get_llm_deck().get_optional_inference_model(llm_handle=llm_setting_main.llm_handle)
-        ):
+        if not self.llm_prompt_spec.prompting_style and (llm_model := llm_deck.get_optional_inference_model(llm_handle=llm_setting_main.llm_handle)):
             llm_family = llm_model.llm_family
             prompting_target = llm_setting_main.prompting_target or llm_family.prompting_target
             self.llm_prompt_spec.prompting_style = get_config().pipelex.prompting_config.get_prompting_style(

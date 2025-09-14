@@ -3,7 +3,7 @@ from typing import Dict, Optional
 from pydantic import Field, RootModel, ValidationError
 
 from pipelex import log
-from pipelex.cogt.exceptions import ModelCatalogError, ModelCatalogLibraryError
+from pipelex.cogt.exceptions import ModelCatalogLibraryError, RoutingProfileLibraryError
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_factory import (
     ModelCatalogBlueprint,
@@ -74,10 +74,10 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
             ModelCatalogError: If no active configuration is set or config not found
         """
         if not self._active_config:
-            raise ModelCatalogError("No active model catalog configuration loaded")
+            raise RoutingProfileLibraryError("No active model catalog configuration loaded")
 
         if self._active_config not in self.root:
-            raise ModelCatalogError(f"Active configuration '{self._active_config}' not found in loaded catalog")
+            raise RoutingProfileLibraryError(f"Active configuration '{self._active_config}' not found in loaded catalog")
 
         active_config = self.root[self._active_config]
         backend = active_config.get_backend_for_model(model_name)
@@ -85,21 +85,26 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         log.debug(f"Routing model '{model_name}' to backend '{backend}' using config '{self._active_config}'")
         return backend
 
-    def get_active_config_name(self) -> Optional[str]:
+    def get_active_routing_profile_name(self) -> Optional[str]:
         """Get the name of the currently active configuration."""
         return self._active_config
 
-    def get_config(self, config_name: str) -> Optional[RoutingProfile]:
-        """Get a specific configuration by name.
-
-        Args:
-            config_name: Name of the configuration to retrieve
-
-        Returns:
-            ModelCatalogConfig if found, None otherwise
-        """
-        return self.root.get(config_name)
-
-    def list_config_names(self) -> list[str]:
-        """Get a list of all available configuration names."""
+    def list_routing_profile_names(self) -> list[str]:
+        """Get a list of all available routing profile names."""
         return list(self.root.keys())
+
+    def get_required_routing_profile(self, routing_profile_name: str) -> RoutingProfile:
+        routing_profile = self.root.get(routing_profile_name)
+        if not routing_profile:
+            raise RoutingProfileLibraryError(f"Routing profile '{routing_profile_name}' not found in loaded routing profile library")
+        return routing_profile
+
+    def get_required_active_routing_profile(self) -> RoutingProfile:
+        """Get the required active routing profile."""
+        if not self._active_config:
+            raise RoutingProfileLibraryError("No active routing profile loaded")
+
+        active_config_name: str = self._active_config
+
+        active_routing_profile = self.get_required_routing_profile(routing_profile_name=active_config_name)
+        return active_routing_profile

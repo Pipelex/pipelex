@@ -1,7 +1,8 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import Field
 
+from pipelex.cogt.exceptions import InferenceBackendError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.tools.config.config_model import ConfigModel
 
@@ -9,4 +10,15 @@ from pipelex.tools.config.config_model import ConfigModel
 class InferenceBackend(ConfigModel):
     endpoint: Optional[str] = None
     api_key: Optional[str] = None
-    model_specs: List[InferenceModelSpec] = Field(default_factory=list)
+    model_specs: Dict[str, InferenceModelSpec] = Field(default_factory=dict)
+
+    def list_model_names(self) -> List[str]:
+        """List the names of all models in the backend."""
+        return list(self.model_specs.keys())
+
+    def get_required_model_spec(self, model_name: str) -> InferenceModelSpec:
+        """Get a model spec by name."""
+        model_spec = self.model_specs.get(model_name)
+        if not model_spec:
+            raise InferenceBackendError(f"Model spec '{model_name}' not found in backend")
+        return model_spec

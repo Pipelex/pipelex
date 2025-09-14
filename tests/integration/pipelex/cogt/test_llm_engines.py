@@ -38,7 +38,7 @@ class TestLLMEngines:
 
     # async def test_one_llm_engine_by_llm_id_and_sdk(self, llm_job_params: LLMJobParams, llm_id: str, plugin_sdk_handle: PluginSdkHandle):
     #     log.info(f"Testing {llm_id} on {plugin_sdk_handle}")
-    #     llm_models = get_llm_deck().llm_handles.values()
+    #     llm_models = get_models_manager().llm_handles.values()
     #     count = 0
     #     for llm_model in llm_models:
     #         platform_llm_id = llm_model.platform_llm_id.get(llm_platform)
@@ -67,7 +67,7 @@ class TestLLMEngines:
     #         pytest.fail(f"No llm_engines found for llm_id '{llm_id}' on platform '{llm_platform}'")
 
     # async def test_llm_engines_from_one_family(self, llm_job_params: LLMJobParams, llm_family: LLMFamily):
-    #     llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
+    #     llm_handle_to_llm_engine_blueprint = get_models_manager().llm_handles
     #     count = 0
     #     for _, llm_engine_blueprint in llm_handle_to_llm_engine_blueprint.items():
     #         llm_engine = LLMEngineFactory.make_llm_engine(llm_engine_blueprint=llm_engine_blueprint)
@@ -88,7 +88,7 @@ class TestLLMEngines:
     #     log.info(f"Tested {count} llm_engines for family {llm_family}")
 
     # async def test_llm_engines_from_one_creator(self, llm_job_params: LLMJobParams, llm_creator: LLMCreator):
-    #     llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
+    #     llm_handle_to_llm_engine_blueprint = get_models_manager().llm_handles
     #     for _, llm_engine_blueprint in llm_handle_to_llm_engine_blueprint.items():
     #         llm_engine = LLMEngineFactory.make_llm_engine(llm_engine_blueprint=llm_engine_blueprint)
     #         if llm_engine.llm_model.llm_family.creator != llm_creator:
@@ -127,7 +127,7 @@ class TestLLMEngines:
 
     # async def test_llm_handle_to_llm_engine_default(self, llm_job_params: LLMJobParams):
     #     inference_manager = get_inference_manager()
-    #     llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
+    #     llm_handle_to_llm_engine_blueprint = get_models_manager().llm_handles
     #     for llm_handle in llm_handle_to_llm_engine_blueprint.keys():
     #         llm_worker = inference_manager.get_llm_worker(llm_handle=llm_handle)
     #         assert llm_worker

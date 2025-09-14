@@ -9,6 +9,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.model_deck.llm_deck import LLMDeck
 from pipelex.cogt.model_deck.models_manager_abstract import ModelsManagerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.core.concepts.concept import Concept

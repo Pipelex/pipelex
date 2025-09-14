@@ -2,7 +2,7 @@ import os
 from typing import Any, Dict, List
 
 from pipelex import log
-from pipelex.cogt.model_deck.llm_deck import LLMDeck
+from pipelex.cogt.model_deck.llm_deck import LLMDeck, LLMDeckBlueprint
 from pipelex.exceptions import (
     LibraryError,
 )
@@ -16,20 +16,22 @@ class LLMDeckNotFoundError(Exception):
 
 
 class DeckManager:
-    @property
-    def llm_deck_dir_path(self) -> str:
+    @classmethod
+    def llm_deck_dir_path(cls) -> str:
         return ".pipelex/inference/deck"
 
-    def get_llm_deck_paths(self) -> List[str]:
-        llm_deck_paths = [str(path) for path in find_files_in_dir(dir_path=self.llm_deck_dir_path, pattern="*.toml", is_recursive=True)]
+    @classmethod
+    def get_llm_deck_paths(cls) -> List[str]:
+        llm_deck_paths = [str(path) for path in find_files_in_dir(dir_path=cls.llm_deck_dir_path(), pattern="*.toml", is_recursive=True)]
         llm_deck_paths.sort()
         return llm_deck_paths
 
-    def _validate_toml_files(self):
+    @classmethod
+    def _validate_toml_files(cls):
         log.debug("LibraryManager deck TOML file formatting")
 
         # Validation of LLM deck paths
-        llm_deck_paths = self.get_llm_deck_paths()
+        llm_deck_paths = cls.get_llm_deck_paths()
         for llm_deck_path in llm_deck_paths:
             if os.path.exists(llm_deck_path):
                 try:
@@ -38,8 +40,9 @@ class DeckManager:
                     log.error(f"TOML formatting issues in LLM deck file '{llm_deck_path}': {exc}")
                     raise LibraryError(f"TOML validation failed for LLM deck file '{llm_deck_path}': {exc}") from exc
 
-    def load_deck(self) -> LLMDeck:
-        llm_deck_paths = self.get_llm_deck_paths()
+    @classmethod
+    def load_deck_blueprint(cls) -> LLMDeckBlueprint:
+        llm_deck_paths = cls.get_llm_deck_paths()
         full_llm_deck_dict: Dict[str, Any] = {}
         if not llm_deck_paths:
             raise LLMDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
@@ -55,5 +58,5 @@ class DeckManager:
                 log.error(f"Failed to load LLM deck file '{llm_deck_path}': {exc}")
                 raise
 
-        llm_deck = LLMDeck.model_validate(full_llm_deck_dict)
-        return llm_deck
+        llm_deck_blueprint = LLMDeckBlueprint.model_validate(full_llm_deck_dict)
+        return llm_deck_blueprint
