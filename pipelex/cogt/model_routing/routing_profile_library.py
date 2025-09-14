@@ -23,6 +23,14 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
     root: RoutingProfileLibraryRoot = Field(default_factory=dict)
     _active_config: Optional[str] = None
 
+    @property
+    def active_profile(self) -> RoutingProfile:
+        if not self._active_config:
+            raise RoutingProfileLibraryError("No active routing profile loaded")
+        if self._active_config not in self.root:
+            raise RoutingProfileLibraryError(f"Active routing profile '{self._active_config}' not found in loaded routing profile library")
+        return self.root[self._active_config]
+
     @classmethod
     def make_empty(cls) -> Self:
         return cls(root={})
@@ -50,11 +58,10 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         # Validate that the active config exists
         if catalog_blueprint.active not in catalog_blueprint.configs:
             raise ModelCatalogLibraryError(
-                f"Active configuration '{catalog_blueprint.active}' not found in library. "
-                f"Available configurations: {list(catalog_blueprint.configs.keys())}"
+                f"Active profile '{catalog_blueprint.active}' not found in library. Available profiles: {list(catalog_blueprint.configs.keys())}"
             )
 
-        # Load all configurations
+        # Load all profiles
         self.root = {}
         for config_name, config_blueprint in catalog_blueprint.configs.items():
             self.root[config_name] = RoutingProfileFactory.make_routing_profile(
@@ -63,8 +70,8 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
             )
         self._active_config = catalog_blueprint.active
 
-        log.debug(f"Loaded model catalog with active configuration: '{self._active_config}'")
-        log.debug(f"Available configurations: {list(self.root.keys())}")
+        log.debug(f"Loaded model catalog with active profile: '{self._active_config}'")
+        log.debug(f"Available profiles: {list(self.root.keys())}")
 
     def get_backend_match_for_model_from_active_routing_profile(self, model_name: str) -> Optional[BackendMatchForModel]:
         """Get the backend name for a given model.
@@ -76,21 +83,13 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
             Backend name to use for this model
 
         Raises:
-            ModelCatalogError: If no active configuration is set or config not found
+            ModelCatalogError: If no active profile is set or config not found
         """
-        if not self._active_config:
-            raise RoutingProfileLibraryError("No active model catalog configuration loaded")
-
-        if self._active_config not in self.root:
-            raise RoutingProfileLibraryError(f"Active configuration '{self._active_config}' not found in loaded catalog")
-
-        active_config = self.root[self._active_config]
-        backend_match_for_model = active_config.get_backend_match_for_model(model_name)
+        profile = self.active_profile
+        log.debug(f"Getting backend match for model '{model_name}' from active profile '{profile.name}'")
+        backend_match_for_model = profile.get_backend_match_for_model(model_name)
+        log.debug(f"Backend match for model '{model_name}' from active profile '{profile.name}': {backend_match_for_model}")
         return backend_match_for_model
-
-    def get_active_routing_profile_name(self) -> Optional[str]:
-        """Get the name of the currently active configuration."""
-        return self._active_config
 
     def list_routing_profile_names(self) -> list[str]:
         """Get a list of all available routing profile names."""
@@ -101,13 +100,3 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         if not routing_profile:
             raise RoutingProfileLibraryError(f"Routing profile '{routing_profile_name}' not found in loaded routing profile library")
         return routing_profile
-
-    # def get_required_active_routing_profile(self) -> RoutingProfile:
-    #     """Get the required active routing profile."""
-    #     if not self._active_config:
-    #         raise RoutingProfileLibraryError("No active routing profile loaded")
-
-    #     active_config_name: str = self._active_config
-
-    #     active_routing_profile = self.get_required_routing_profile(routing_profile_name=active_config_name)
-    #     return active_routing_profile

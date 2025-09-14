@@ -37,6 +37,7 @@ class ModelsManager(ModelsManagerAbstract):
         self.inference_backend_library.load()
         llm_deck_blueprint = DeckManager.load_deck_blueprint()
         self.llm_deck = self.build_deck(llm_deck_blueprint=llm_deck_blueprint)
+        pretty_print(self.llm_deck, title="LLM Deck")
 
     def build_deck(self, llm_deck_blueprint: LLMDeckBlueprint) -> LLMDeck:
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()

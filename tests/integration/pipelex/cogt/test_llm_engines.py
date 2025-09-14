@@ -24,7 +24,7 @@ class TestLLMEngines:
         else:
             log.info(f"No object generation supported for this worker: '{llm_worker.desc}'")
 
-    async def test_one_llm_engine_by_llm_handle(self, llm_job_params: LLMJobParams, llm_handle: str):
+    async def test_llm_handle(self, llm_job_params: LLMJobParams, llm_handle: str):
         log.info(f"Testing llm_handle '{llm_handle}'")
         inference_manager = get_inference_manager()
         llm_worker = inference_manager.get_llm_worker(llm_handle=llm_handle)
