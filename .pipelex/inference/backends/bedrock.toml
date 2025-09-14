@@ -3,20 +3,23 @@ default_sdk = "boto3"
 [bedrock-mistral-large]
 model_id = "mistral.mistral-large-2407-v1:0"
 max_tokens = 8192
-features = []
+inputs = ["text"]
+outputs = ["text"]
 costs = { input = 4.0, output = 12.0 }
 
 [bedrock-meta-llama-3-3-70b-instruct]
 model_id = "us.meta.llama3-3-70b-instruct-v1:0"
 max_tokens = 8192
-features = []
+inputs = ["text"]
+outputs = ["text"]
 # TODO: find out the actual cost per million tokens for llama3 on bedrock
 costs = { input = 3.0, output = 15.0 }
 
 [bedrock-nova-pro]
 model_id = "us.amazon.nova-pro-v1:0"
 max_tokens = 5120
-features = []
+inputs = ["text"]
+outputs = ["text"]
 # TODO: find out the actual cost per million tokens for nova on bedrock
 costs = { input = 3.0, output = 15.0 }
 
@@ -28,7 +31,8 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "anthropic"
 model_id = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
 max_tokens = 8192
-features = ["structured_generation", "vision"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
@@ -36,7 +40,8 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "anthropic"
 model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"
 max_tokens = 8192
-features = ["structured_generation", "vision"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
@@ -44,7 +49,8 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "anthropic"
 model_id = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 max_tokens = 8192
-features = ["structured_generation", "vision"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
@@ -52,7 +58,8 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "anthropic"
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 max_tokens = 64000
-features = ["structured_generation", "vision"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
@@ -60,7 +67,8 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "anthropic"
 model_id = "us.anthropic.claude-opus-4-20250514-v1:0"
 max_tokens = 32000
-features = ["structured_generation", "vision"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
@@ -68,6 +76,7 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "anthropic"
 model_id = "us.anthropic.claude-opus-4-1-20250805-v1:0"
 max_tokens = 32000
-features = ["structured_generation", "vision"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }

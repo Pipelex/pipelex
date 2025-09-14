@@ -77,7 +77,7 @@ api_key_method = "env"
 [cogt]
 
 [cogt.inference_config]
-inference_config_path = ".pipelex/inference/"
+inference_config_path = ".pipelex/inference"
 
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true

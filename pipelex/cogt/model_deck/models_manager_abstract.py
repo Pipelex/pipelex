@@ -28,5 +28,5 @@ class ModelsManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_inference_backend(self, backend_name: str) -> InferenceBackend:
+    def get_required_inference_backend(self, backend_name: str) -> InferenceBackend:
         pass

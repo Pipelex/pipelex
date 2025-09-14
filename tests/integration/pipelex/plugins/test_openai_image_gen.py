@@ -16,7 +16,7 @@ from tests.integration.pipelex.test_data import IMGGTestCases
 class TestImggByOpenAIGpt:
     @pytest.mark.parametrize("topic, image_desc", IMGGTestCases.IMAGE_DESC)
     async def test_gpt_image_generation(self, topic: str, image_desc: str):
-        backend = get_models_manager().get_inference_backend("openai")
+        backend = get_models_manager().get_required_inference_backend("openai")
         client = OpenAIFactory.make_openai_client(
             PluginSdkHandle.OPENAI,
             backend=backend,

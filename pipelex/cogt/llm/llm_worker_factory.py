@@ -17,7 +17,7 @@ class LLMWorkerFactory:
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> LLMWorkerInternalAbstract:
         llm_sdk_handle = PluginSdkHandle(inference_model.sdk)
-        backend = get_models_manager().get_inference_backend(inference_model.backend_name)
+        backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         llm_worker: LLMWorkerInternalAbstract
         match llm_sdk_handle:

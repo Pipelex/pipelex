@@ -1,4 +1,3 @@
-
 import pytest
 
 from pipelex import pretty_print
@@ -24,7 +23,7 @@ class TestOpenAI:
         plugin_sdk_handle: PluginSdkHandle,
         backend_name: str,
     ):
-        backend = get_models_manager().get_inference_backend(backend_name)
+        backend = get_models_manager().get_required_inference_backend(backend_name)
         try:
             openai_models_list = await openai_list_available_models(
                 plugin_sdk_handle=plugin_sdk_handle,

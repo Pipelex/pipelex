@@ -22,7 +22,7 @@ class ImggWorkerFactory:
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> ImggWorkerAbstract:
         imgg_sdk_handle = PluginSdkHandle.get_for_imgg_engine(imgg_platform=imgg_engine.imgg_platform)
-        backend = get_models_manager().get_inference_backend("openai")
+        backend = get_models_manager().get_required_inference_backend("openai")
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         imgg_worker: ImggWorkerAbstract
         match imgg_engine.imgg_platform:

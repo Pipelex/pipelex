@@ -162,3 +162,11 @@ class InferenceBackendError(CogtError):
 
 class InferenceBackendLibraryError(CogtError):
     pass
+
+
+class RoutingProfileError(CogtError):
+    pass
+
+
+class ModelsManagerError(CogtError):
+    pass

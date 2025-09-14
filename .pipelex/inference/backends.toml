@@ -3,12 +3,12 @@ endpoint = "https://inference.pipelex.com/v1"
 api_key = "${PIPELEX_INFERENCE_API_KEY}"
 
 [blackboxai]
-enabled = false
+enabled = true
 endpoint = "https://api.blackbox.ai/v1"
 api_key = "${BLACKBOX_API_KEY}"
 
 [azure_openai]
-enabled = false
+enabled = true
 endpoint = "${AZURE_API_BASE}"
 api_key = "${AZURE_API_KEY}"
 
@@ -17,6 +17,6 @@ enabled = true
 api_key = "${ANTHROPIC_API_KEY}"
 
 [ollama]
-enabled = false
+enabled = true
 endpoint = "http://localhost:11434/v1"
 

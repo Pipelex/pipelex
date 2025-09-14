@@ -2,24 +2,30 @@ default_sdk = "openai"
 
 [sonar-pro]
 model_id = "sonar-pro"
-features = []
+inputs = ["text"]
+outputs = ["text"]
 
 [sonar]
 model_id = "sonar"
-features = []
+inputs = ["text"]
+outputs = ["text"]
 
 [sonar-deep-research]
 model_id = "sonar-deep-research"
-features = []
+inputs = ["text"]
+outputs = ["text"]
 
 [sonar-reasoning-pro]
 model_id = "sonar-reasoning-pro"
-features = []
+inputs = ["text"]
+outputs = ["text"]
 
 [sonar-reasoning]
 model_id = "sonar-reasoning"
-features = []
+inputs = ["text"]
+outputs = ["text"]
 
 [perplexity-deepseek-r1]
 model_id = "r1-1776"
-features = []
+inputs = ["text"]
+outputs = ["text"]

@@ -27,6 +27,7 @@ class RoutingProfileFactory:
     @classmethod
     def make_routing_profile(
         cls,
+        name: str,
         blueprint: RoutingProfileBlueprint,
     ) -> RoutingProfile:
         """Create a ModelCatalogConfig from a blueprint.
@@ -38,6 +39,7 @@ class RoutingProfileFactory:
             ModelCatalogConfig instance
         """
         return RoutingProfile(
+            name=name,
             description=blueprint.description,
             default=blueprint.default,
             routes=blueprint.routes,

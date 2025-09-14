@@ -5,6 +5,7 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.exceptions import ModelCatalogLibraryError, RoutingProfileLibraryError
+from pipelex.cogt.model_routing.routing_models import BackendMatchForModel
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_factory import (
     ModelCatalogBlueprint,
@@ -56,13 +57,16 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         # Load all configurations
         self.root = {}
         for config_name, config_blueprint in catalog_blueprint.configs.items():
-            self.root[config_name] = RoutingProfileFactory.make_routing_profile(blueprint=config_blueprint)
+            self.root[config_name] = RoutingProfileFactory.make_routing_profile(
+                name=config_name,
+                blueprint=config_blueprint,
+            )
         self._active_config = catalog_blueprint.active
 
         log.debug(f"Loaded model catalog with active configuration: '{self._active_config}'")
         log.debug(f"Available configurations: {list(self.root.keys())}")
 
-    def get_backend_for_model(self, model_name: str) -> str:
+    def get_backend_match_for_model_from_active_routing_profile(self, model_name: str) -> Optional[BackendMatchForModel]:
         """Get the backend name for a given model.
 
         Args:
@@ -81,10 +85,8 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
             raise RoutingProfileLibraryError(f"Active configuration '{self._active_config}' not found in loaded catalog")
 
         active_config = self.root[self._active_config]
-        backend = active_config.get_backend_for_model(model_name)
-
-        log.debug(f"Routing model '{model_name}' to backend '{backend}' using config '{self._active_config}'")
-        return backend
+        backend_match_for_model = active_config.get_backend_match_for_model(model_name)
+        return backend_match_for_model
 
     def get_active_routing_profile_name(self) -> Optional[str]:
         """Get the name of the currently active configuration."""
@@ -100,12 +102,12 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
             raise RoutingProfileLibraryError(f"Routing profile '{routing_profile_name}' not found in loaded routing profile library")
         return routing_profile
 
-    def get_required_active_routing_profile(self) -> RoutingProfile:
-        """Get the required active routing profile."""
-        if not self._active_config:
-            raise RoutingProfileLibraryError("No active routing profile loaded")
+    # def get_required_active_routing_profile(self) -> RoutingProfile:
+    #     """Get the required active routing profile."""
+    #     if not self._active_config:
+    #         raise RoutingProfileLibraryError("No active routing profile loaded")
 
-        active_config_name: str = self._active_config
+    #     active_config_name: str = self._active_config
 
-        active_routing_profile = self.get_required_routing_profile(routing_profile_name=active_config_name)
-        return active_routing_profile
+    #     active_routing_profile = self.get_required_routing_profile(routing_profile_name=active_config_name)
+    #     return active_routing_profile

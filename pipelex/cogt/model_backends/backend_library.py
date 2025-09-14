@@ -63,7 +63,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' "
                         f"from file '{path_to_model_specs_toml}': {exc}"
                     )
-            backend = InferenceBackend(endpoint=backend_blueprint.endpoint, api_key=backend_blueprint.api_key, model_specs=backend_model_specs)
+            backend = InferenceBackend(
+                name=backend_name,
+                endpoint=backend_blueprint.endpoint,
+                api_key=backend_blueprint.api_key,
+                model_specs=backend_model_specs,
+            )
             self.root[backend_name] = backend
             log.debug(f"Loaded inference backend '{backend_name}'")
 
@@ -77,9 +82,17 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             all_model_names.update(backend.list_model_names())
         return sorted(all_model_names)
 
-    def get_required_backend(self, backend_name: str) -> InferenceBackend:
+    def get_all_models_and_possible_backends(self) -> Dict[str, List[str]]:
+        """Get a dictionary of all models and their possible backends."""
+        all_models_and_possible_backends: Dict[str, List[str]] = {}
+        for backend in self.root.values():
+            for model_name in backend.list_model_names():
+                if model_name not in all_models_and_possible_backends:
+                    all_models_and_possible_backends[model_name] = []
+                all_models_and_possible_backends[model_name].append(backend.name)
+        return all_models_and_possible_backends
+
+    def get_inference_backend(self, backend_name: str) -> Optional[InferenceBackend]:
         """Get a backend by name."""
         backend = self.root.get(backend_name)
-        if not backend:
-            raise InferenceBackendLibraryError(f"Backend '{backend_name}' not found in inference backend library")
         return backend
