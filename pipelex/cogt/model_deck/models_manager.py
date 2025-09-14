@@ -26,10 +26,6 @@ class ModelsManager(ModelsManagerAbstract):
             raise RuntimeError("LLM deck is not initialized")
         return self.llm_deck
 
-    # @property
-    # def routing_profile(self) -> RoutingProfile:
-    #     return self.routing_profile_library.get_required_active_routing_profile()
-
     @override
     def teardown(self) -> None:
         self.routing_profile_library.reset()
@@ -71,7 +67,7 @@ class ModelsManager(ModelsManagerAbstract):
                             f"which was matched exactly in routing profile '{backend_match_for_model.routing_profile_name}'"
                         )
                     case BackendMatchingMethod.PATTERN_MATCH:
-                        log.debug(
+                        log.verbose(
                             f"Model spec '{model_name}' not found in backend '{matched_backend_name}' but it's OK because "
                             f"it was only matched by pattern in routing profile '{backend_match_for_model.routing_profile_name}'"
                         )

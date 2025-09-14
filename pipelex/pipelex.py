@@ -190,7 +190,6 @@ class Pipelex(metaclass=MetaSingleton):
         try:
             self.template_provider.setup()
             self.library_manager.setup()
-            self.models_manager.setup()
             self.library_manager.load_libraries()
         except ValidationError as exc:
             error_msg = format_pydantic_validation_error(exc)

@@ -23,8 +23,8 @@
             "args": [
                 "-s",
                 "-vv",
-                "-m inference",
-                "-k test_pipe_run"
+                // "-m inference",
+                "-k test_boot"
             ],
             "console": "integratedTerminal"
         },
