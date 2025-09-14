@@ -16,13 +16,6 @@ class InferenceBackend(ConfigModel):
         """List the names of all models in the backend."""
         return list(self.model_specs.keys())
 
-    # def get_required_model_spec(self, model_name: str) -> InferenceModelSpec:
-    #     """Get a model spec by name."""
-    #     model_spec = self.model_specs.get(model_name)
-    #     if not model_spec:
-    #         raise InferenceBackendError(f"Model spec '{model_name}' not found in backend '{self.name}'")
-    #     return model_spec
-
     def get_model_spec(self, model_name: str) -> Optional[InferenceModelSpec]:
         """Get a model spec by name."""
         model_spec = self.model_specs.get(model_name)

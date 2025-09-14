@@ -91,7 +91,7 @@ default_max_images = 100
 is_openai_structured_output_enabled = false
 
 [cogt.llm_config.llm_job_config]
-max_retries = 3
+max_retries = 1
 is_streaming_enabled = false
 
 ####################################################################################################

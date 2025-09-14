@@ -6,6 +6,7 @@ from typing_extensions import override
 from pipelex import log, pretty_print
 from pipelex.cogt.exceptions import ModelsManagerError
 from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.cogt.model_backends.backend_factory import InferenceBackendFactory
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_deck.llm_deck import LLMDeck, LLMDeckBlueprint
@@ -85,10 +86,9 @@ class ModelsManager(ModelsManagerAbstract):
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
         llm_handles: Dict[str, InferenceModelSpec] = {}
 
-        pretty_print(all_models_and_possible_backends, title="all_models_and_possible_backends")
+        # pretty_print(all_models_and_possible_backends, title="all_models_and_possible_backends")
 
-        backend_names = self.inference_backend_library.list_backend_names()
-        pretty_print(backend_names, title="Enabled backends")
+        # pretty_print(self.inference_backend_library.list_backend_names(), title="Enabled backends")
 
         for model_name, available_backends in all_models_and_possible_backends.items():
             backend_match_for_model = self.routing_profile_library.get_backend_match_for_model_from_active_routing_profile(
@@ -96,7 +96,7 @@ class ModelsManager(ModelsManagerAbstract):
             )
             if backend_match_for_model is None:
                 # raise ModelsManagerError(f"No backend match found for model '{model_name}'")
-                log.warning(f"No backend match found for model '{model_name}'")
+                log.verbose(f"No backend match found for model '{model_name}'")
                 continue
             matched_backend_name = backend_match_for_model.backend_name
             backend = self.inference_backend_library.get_inference_backend(backend_name=matched_backend_name)

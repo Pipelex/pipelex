@@ -32,3 +32,6 @@ api_key = "${XAI_API_KEY}"
 [bedrock]
 enabled = true
 
+[vertexai]
+enabled = true
+

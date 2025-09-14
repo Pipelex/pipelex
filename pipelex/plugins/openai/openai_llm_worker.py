@@ -62,6 +62,9 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             temperature = llm_job.job_params.temperature
             if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
                 temperature *= 2
+            if ModelConstraints.TEMPERATURE_MUST_BE_1 in self.inference_model.constraints and temperature != 1:
+                log.warning(f"OpenAI model {self.inference_model.desc} used with a temperature of {temperature}, but it must be 1 for this model")
+                temperature = 1
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
                 temperature=temperature,
@@ -102,6 +105,9 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             temperature = llm_job.job_params.temperature
             if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
                 temperature *= 2
+            if ModelConstraints.TEMPERATURE_MUST_BE_1 in self.inference_model.constraints and temperature != 1:
+                log.warning(f"OpenAI model {self.inference_model.desc} used with a temperature of {temperature}, but it must be 1 for this model")
+                temperature = 1
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 model=self.inference_model.model_id,
                 temperature=temperature,

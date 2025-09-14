@@ -28,7 +28,7 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug test llm_handle",
+            "name": "Debug test inference",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
@@ -36,7 +36,7 @@
                 "-s",
                 "-vv",
                 "-m inference",
-                "-k test_llm_handle"
+                "-k test_simple_gen"
             ],
             "console": "integratedTerminal"
         },

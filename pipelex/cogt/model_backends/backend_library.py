@@ -6,7 +6,7 @@ from typing_extensions import Self
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceModelSpecError
 from pipelex.cogt.model_backends.backend import InferenceBackend
-from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint
+from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
@@ -66,10 +66,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' "
                         f"from file '{path_to_model_specs_toml}': {exc}"
                     )
-            backend = InferenceBackend(
+            backend = InferenceBackendFactory.make_inference_backend(
                 name=backend_name,
-                endpoint=backend_blueprint.endpoint,
-                api_key=backend_blueprint.api_key,
+                blueprint=backend_blueprint,
                 model_specs=backend_model_specs,
             )
             self.root[backend_name] = backend

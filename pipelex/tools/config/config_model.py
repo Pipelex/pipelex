@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Type, TypeVar, Union
+from typing import Dict, List, Optional, Type, TypeVar, Union
 
 from pydantic import BaseModel, ConfigDict
 
@@ -54,3 +54,10 @@ class ConfigModel(BaseModel):
             A dictionary where the keys are converted to the given StrEnum type.
         """
         return {key_enum_cls(key): value for key, value in input_dict.items()}
+
+    @staticmethod
+    def transform_list_of_str_to_enum(
+        input_list: List[str],
+        enum_cls: Type[StrEnumType],
+    ) -> List[StrEnumType]:
+        return [enum_cls(item) for item in input_list]

@@ -19,18 +19,7 @@ from tests.integration.pipelex.cogt.test_data import LLMTestConstants, LLMVision
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestLLMInference:
-    async def run_inference(self, llm_worker: LLMWorkerAbstract, llm_job: LLMJob):
-        generated_text = await llm_worker.gen_text(llm_job=llm_job)
-        assert generated_text
-        pretty_print(generated_text)
-        if llm_worker.is_gen_object_supported:
-            generated_object = await llm_worker.gen_object(llm_job=llm_job, schema=Person)
-            assert generated_object
-            pretty_print(generated_object)
-        else:
-            log.info(f"No object generation supported for this worker: '{llm_worker.desc}'")
-
-    async def test_gen_text_from_text(self, llm_job_params: LLMJobParams, llm_handle: str):
+    async def test_simple_gen_text_from_text(self, llm_job_params: LLMJobParams, llm_handle: str):
         log.info(f"Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
@@ -39,7 +28,24 @@ class TestLLMInference:
             user_text=LLMTestConstants.USER_TEXT_SHORT,
             llm_job_params=llm_job_params,
         )
-        await self.run_inference(llm_worker=llm_worker, llm_job=llm_job)
+        generated_text = await llm_worker.gen_text(llm_job=llm_job)
+        assert generated_text
+        pretty_print(generated_text)
+
+    async def test_simple_gen_object_from_text(self, llm_job_params: LLMJobParams, llm_handle: str):
+        log.info(f"Testing llm_handle '{llm_handle}'")
+        llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
+        log.info(f"Using llm_worker: {llm_worker.desc}")
+        llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
+            system_text=None,
+            user_text=LLMTestConstants.USER_TEXT_SHORT,
+            llm_job_params=llm_job_params,
+        )
+        if not llm_worker.is_gen_object_supported:
+            pytest.skip(f"No object generation supported for this worker: '{llm_worker.desc}'")
+        generated_object = await llm_worker.gen_object(llm_job=llm_job, schema=Person)
+        assert generated_object
+        pretty_print(generated_object)
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
     async def test_gen_text_from_image(self, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):

@@ -29,6 +29,13 @@ class InferenceModelSpecBlueprint(ConfigModel):
             key_enum_cls=CostCategory,
         )
 
+    @field_validator("constraints", mode="before")
+    def validate_constraints(cls, value: List[str]) -> List[ModelConstraints]:
+        return ConfigModel.transform_list_of_str_to_enum(
+            input_list=value,
+            enum_cls=ModelConstraints,
+        )
+
 
 class InferenceModelSpecFactory(BaseModel):
     @classmethod
