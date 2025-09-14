@@ -171,7 +171,7 @@ key4 = "$not_a_placeholder"
         """Test with a real-world providers.toml example."""
         monkeypatch.setenv("AZURE_API_BASE", "https://my-azure.openai.azure.com")
 
-        toml_content = """[pipelex-inference]
+        toml_content = """[pipelex_inference]
 endpoint = "https://inference.pipelex.com/v1"
 
 [azure_openai]
@@ -185,6 +185,6 @@ endpoint = "https://api.blackbox.ai/v1"
 
         result = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
 
-        assert result["pipelex-inference"]["endpoint"] == "https://inference.pipelex.com/v1"
+        assert result["pipelex_inference"]["endpoint"] == "https://inference.pipelex.com/v1"
         assert result["azure_openai"]["endpoint"] == "https://my-azure.openai.azure.com"
         assert result["blackboxai"]["endpoint"] == "https://api.blackbox.ai/v1"

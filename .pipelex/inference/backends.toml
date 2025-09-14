@@ -1,4 +1,4 @@
-[pipelex-inference]
+[pipelex_inference]
 endpoint = "https://inference.pipelex.com/v1"
 api_key = "${PIPELEX_INFERENCE_API_KEY}"
 
