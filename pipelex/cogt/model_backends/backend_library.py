@@ -66,6 +66,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             self.root[backend_name] = backend
             log.debug(f"Loaded inference backend '{backend_name}'")
 
+    def list_backend_names(self) -> List[str]:
+        return list(self.root.keys())
+
     def list_all_model_names(self) -> List[str]:
         """List the names of all models in all backends."""
         all_model_names: Set[str] = set()

@@ -2,6 +2,7 @@ from typing import Dict, List, Optional
 
 from typing_extensions import override
 
+from pipelex import pretty_print
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_deck.deck_manager import DeckManager
@@ -45,6 +46,11 @@ class ModelsManager(ModelsManagerAbstract):
     def build_deck(self, llm_deck_blueprint: LLMDeckBlueprint) -> LLMDeck:
         all_model_names = self.list_all_model_names()
         llm_handles: Dict[str, InferenceModelSpec] = {}
+
+        pretty_print(all_model_names, title="all_model_names")
+
+        backend_names = self.inference_backend_library.list_backend_names()
+        pretty_print(backend_names, title="Enabled backends")
 
         for model_name in all_model_names:
             backend_name = self.routing_profile.get_backend_for_model(model_name)

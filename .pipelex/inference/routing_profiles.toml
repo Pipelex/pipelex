@@ -69,6 +69,7 @@ default = "pipelex-inference"
 # "model-pattern" = "backend-name"  # Specific routing rules
 #
 # Pattern matching supports:
-# - Exact names: "gpt-4o-mini" 
+# - Exact names: "gpt-4o-mini"
 # - Wildcards: "claude-*" (matches all models starting with claude-)
 # - Partial wildcards: "*-sonnet" (matches all sonnet variants)
+

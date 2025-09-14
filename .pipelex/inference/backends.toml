@@ -13,7 +13,7 @@ endpoint = "${AZURE_API_BASE}"
 api_key = "${AZURE_API_KEY}"
 
 [anthropic]
-enabled = false
+enabled = true
 api_key = "${ANTHROPIC_API_KEY}"
 
 [ollama]
