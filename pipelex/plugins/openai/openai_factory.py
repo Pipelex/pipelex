@@ -44,15 +44,6 @@ class OpenAIFactory:
                     api_key=api_key,
                     api_version=api_version,
                 )
-            # case LLMPlatform.PERPLEXITY:
-            #     perplexity_config = get_plugin_manager().plugin_configs.perplexity_config
-            #     endpoint, api_key = perplexity_config.configure(secrets_provider=get_secrets_provider())
-
-            #     log.verbose(f"Making perplexity AsyncOpenAI client with endpoint: {endpoint}")
-            #     the_client = openai.AsyncOpenAI(
-            #         api_key=api_key,
-            #         base_url=endpoint,
-            #     )
             case PluginSdkHandle.OPENAI:
                 # openai_config = get_plugin_manager().plugin_configs.openai_config
                 # api_key = openai_config.get_api_key(secrets_provider=get_secrets_provider())
@@ -61,33 +52,6 @@ class OpenAIFactory:
                     api_key=backend.api_key,
                     base_url=backend.endpoint,
                 )
-            # case LLMPlatform.VERTEXAI:
-            #     vertexai_config = get_plugin_manager().plugin_configs.vertexai_config
-            #     endpoint, api_key = vertexai_config.configure(secrets_provider=get_secrets_provider())
-
-            #     log.verbose(f"Making vertex AsyncOpenAI client with endpoint: {endpoint}")
-            #     the_client = openai.AsyncOpenAI(
-            #         api_key=api_key,
-            #         base_url=endpoint,
-            #     )
-            # case LLMPlatform.XAI:
-            #     xai_config = get_plugin_manager().plugin_configs.xai_config
-            #     endpoint, api_key = xai_config.configure(secrets_provider=get_secrets_provider())
-
-            #     log.verbose(f"Making Xai AsyncOpenAI client with endpoint: {endpoint}")
-            #     the_client = openai.AsyncOpenAI(
-            #         api_key=api_key,
-            #         base_url=endpoint,
-            #     )
-            # case LLMPlatform.CUSTOM_LLM:
-            #     custom_endpoint_config = get_plugin_manager().plugin_configs.custom_endpoint_config
-            #     base_url, api_key = custom_endpoint_config.configure(secrets_provider=get_secrets_provider())
-
-            #     log.verbose(f"Making custom AsyncOpenAI client with base_url: {base_url}")
-            #     the_client = openai.AsyncOpenAI(
-            #         api_key=api_key,
-            #         base_url=base_url,
-            #     )
             case (
                 PluginSdkHandle.ANTHROPIC
                 | PluginSdkHandle.BEDROCK

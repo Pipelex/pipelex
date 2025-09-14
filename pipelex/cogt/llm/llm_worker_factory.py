@@ -46,45 +46,6 @@ class LLMWorkerFactory:
                     structure_method=structure_method,
                     reporting_delegate=reporting_delegate,
                 )
-            # case LLMPlatform.VERTEXAI:
-            #     try:
-            #         import google.auth  # noqa: F401
-            #     except ImportError as exc:
-            #         raise MissingDependencyError("google-auth-oauthlib", "google", "This dependency is required to connect to google.") from exc
-
-            #     from pipelex.plugins.openai.openai_factory import OpenAIFactory
-            #     from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker
-
-            #     llm_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
-            #         llm_sdk_handle=llm_sdk_handle
-            #     ) or plugin_sdk_registry.set_llm_sdk_instance(
-            #         llm_sdk_handle=llm_sdk_handle,
-            #         llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=inference_model.llm_platform),
-            #     )
-
-            #     llm_worker = OpenAILLMWorker(
-            #         sdk_instance=llm_sdk_instance,
-            #         llm_engine=inference_model,
-            #         structure_method=StructureMethod.INSTRUCTOR_VERTEX_JSON,
-            #         reporting_delegate=reporting_delegate,
-            #     )
-            # case LLMPlatform.CUSTOM_LLM:
-            #     from pipelex.plugins.openai.openai_factory import OpenAIFactory
-            #     from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker
-
-            #     llm_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
-            #         llm_sdk_handle=llm_sdk_handle
-            #     ) or plugin_sdk_registry.set_llm_sdk_instance(
-            #         llm_sdk_handle=llm_sdk_handle,
-            #         llm_sdk_instance=OpenAIFactory.make_openai_client(llm_platform=inference_model.llm_platform),
-            #     )
-
-            #     llm_worker = OpenAILLMWorker(
-            #         sdk_instance=llm_sdk_instance,
-            #         llm_engine=inference_model,
-            #         structure_method=StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED,
-            #         reporting_delegate=reporting_delegate,
-            #     )
             case PluginSdkHandle.ANTHROPIC | PluginSdkHandle.BEDROCK_ANTHROPIC:
                 try:
                     import anthropic  # noqa: F401
