@@ -21,8 +21,8 @@ cheap_llm_for_object = "gpt-4o-mini"
 base_llm_for_text = "gpt-4o-mini"
 base_llm_for_object = "gpt-4o-mini"
 
-llm_to_engineer = ["fake", "claude-4-1-opus", "gemini-2.5-pro"]
-llm_for_large_codebases = ["gemini-2.5-pro", "claude-4-1-opus", "gpt-5"]
+llm_to_engineer = ["claude-4-1-opus", "gemini-2.5-pro"]
+llm_for_large_codebase = ["gemini-2.5-pro", "claude-4-sonnet", "gpt-5"]
 
 ####################################################################################################
 # LLM Presets

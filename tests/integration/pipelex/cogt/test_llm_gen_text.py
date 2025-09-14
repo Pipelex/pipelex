@@ -32,7 +32,7 @@ def get_worker_and_job(llm_preset_id: str, user_text: str) -> Tuple[LLMWorkerAbs
 @pytest.mark.asyncio(loop_scope="class")
 class TestLLMGenText:
     @pytest.mark.parametrize("topic, prompt_text", LLMTestCases.SINGLE_TEXT)
-    async def test_gen_text_async_using_handle(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str):
+    async def test_gen_text_using_handle(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str):
         pretty_print(prompt_text, title=topic)
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
@@ -45,14 +45,14 @@ class TestLLMGenText:
         get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("topic, prompt_text", LLMTestCases.SINGLE_TEXT)
-    async def test_gen_text_async_using_llm_preset(self, llm_preset_id: str, topic: str, prompt_text: str):
+    async def test_gen_text_using_llm_preset(self, llm_preset_id: str, topic: str, prompt_text: str):
         llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text)
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)
 
     @pytest.mark.parametrize("topic, prompt_text", LLMTestCases.SINGLE_TEXT)
-    async def test_gen_text_async_multiple_using_llm_preset(self, llm_preset_id: str, topic: str, prompt_text: str):
+    async def test_gen_text_multiple_using_llm_preset(self, llm_preset_id: str, topic: str, prompt_text: str):
         llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text)
         job_params_base = llm_job.job_params
         max_tokens = 30

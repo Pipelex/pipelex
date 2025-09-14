@@ -22,9 +22,30 @@ default = "anthropic"
 description = "Use Azure OpenAI backend for all supported models"
 default = "azure_openai"
 
+[configs.to_test_all_backends]
+description = "Route models to each of the supported backends"
+
+[configs.to_test_all_backends.routes]
+"gpt-4o-mini" = "pipelex-inference"
+"gpt-5-mini" = "openai"
+"gpt-5-chat" = "azure_openai"
+"gpt-5-nano" = "blackboxai"
+
+"claude-4-sonnet" = "pipelex-inference"
+"claude-3.5-sonnet" = "bedrock"
+"claude-3.7-sonnet" = "blackboxai"
+
+"gemini-2.5-flash" = "pipelex-inference"
+"gemini-2.0-flash" = "blackboxai"
+"gemini-2.5-pro" = "vertexai"
+
+"grok-3" = "pipelex-inference"
+"grok-3-mini" = "xai"
+# "grok-3-fast" = "azure_openai"
+
 [configs.custom_routing]
 description = "Custom routing"
-default = "pipelex-inference"  # Fallback for unmatched models
+default = "pipelex-inference"
 
 [configs.custom_routing.routes]
 # Pattern matching: "model-pattern" = "backend-name"

@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 
 from pydantic import Field
 
@@ -10,7 +10,7 @@ class RoutingProfileBlueprint(ConfigModel):
     """Blueprint for creating RoutingProfile instances."""
 
     description: str
-    default: str
+    default: Optional[str] = None
     routes: Dict[str, str] = Field(default_factory=dict)
 
 
