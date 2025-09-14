@@ -1,4 +1,3 @@
-
 import pytest
 
 from pipelex import log, pretty_print
