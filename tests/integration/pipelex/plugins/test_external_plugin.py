@@ -8,7 +8,7 @@ from pipelex import log, pretty_print
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
+from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
 from pipelex.core.concepts.concept_native import NativeConceptEnum

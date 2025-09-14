@@ -1,7 +1,7 @@
 from pipelex.types import StrEnum
 
 
-class LLMPromptingTarget(StrEnum):
+class PromptingTarget(StrEnum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     MISTRAL = "mistral"

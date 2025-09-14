@@ -7,7 +7,7 @@ from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, LLMModelNotFoundError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod

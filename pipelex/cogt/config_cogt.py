@@ -6,6 +6,7 @@ from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams, ImggJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.tools.config.config_model import ConfigModel
+from pipelex.tools.misc.file_utils import find_files_in_dir
 
 
 class OcrConfig(ConfigModel):
@@ -54,6 +55,19 @@ class InferenceConfig(ConfigModel):
 
     def model_specs_path(self, backend_name: str) -> str:
         return f"{self.inference_config_path}/backends/{backend_name}.toml"
+
+    def get_llm_deck_paths(self) -> List[str]:
+        """Get all LLM deck TOML file paths sorted alphabetically."""
+        llm_deck_paths = [
+            str(path)
+            for path in find_files_in_dir(
+                dir_path=f"{self.inference_config_path}/deck",
+                pattern="*.toml",
+                is_recursive=True,
+            )
+        ]
+        llm_deck_paths.sort()
+        return llm_deck_paths
 
 
 class Cogt(ConfigModel):

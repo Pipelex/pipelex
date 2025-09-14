@@ -2,9 +2,9 @@ from typing import Dict, List, Optional
 
 from pydantic import Field
 
-from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
 from pipelex.cogt.model_backends.cost_category import CostCategory
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
+from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.tools.config.config_model import ConfigModel
 
 
@@ -18,7 +18,7 @@ class InferenceModelSpec(ConfigModel):
     costs: Dict[CostCategory, float] = Field(strict=False)
     max_tokens: Optional[int]
     max_prompt_images: Optional[int]
-    prompting_target: Optional[LLMPromptingTarget] = Field(default=None, strict=False)
+    prompting_target: Optional[PromptingTarget] = Field(default=None, strict=False)
     constraints: List[ModelConstraints] = Field(default_factory=list)
 
     # TODO: investigate if this is needed

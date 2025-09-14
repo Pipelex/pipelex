@@ -154,7 +154,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         cost_report = llm_tokens_usage.compute_cost_report()
         # compute the input_non_cached tokens
         if cost_report.nb_tokens_by_category.get(CostCategory.INPUT_NON_CACHED) is not None:
-            raise CostRegistryError("TokenCategory.INPUT_NON_CACHED already exists in the cost report")
+            raise CostRegistryError("CostRegistry.INPUT_NON_CACHED already exists in the cost report")
         # we use pop to remove input tokens which will be replaced by "input joined"
         nb_tokens_input_joined = cost_report.nb_tokens_by_category.pop(CostCategory.INPUT, 0)
         cost_report.costs_by_token_category.pop(CostCategory.INPUT, None)

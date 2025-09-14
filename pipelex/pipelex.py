@@ -19,6 +19,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.model_deck.models_manager import ModelsManager
+from pipelex.cogt.model_deck.models_manager_abstract import ModelsManagerAbstract
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
@@ -66,7 +67,7 @@ class Pipelex(metaclass=MetaSingleton):
         config_cls: Optional[Type[ConfigRoot]] = None,
         class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
-        models_manager: Optional[ModelsManager] = None,
+        models_manager: Optional[ModelsManagerAbstract] = None,
         inference_manager: Optional[InferenceManager] = None,
         pipeline_manager: Optional[PipelineManager] = None,
         pipeline_tracker: Optional[PipelineTracker] = None,
@@ -105,7 +106,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
 
-        self.models_manager = models_manager or ModelsManager()
+        self.models_manager: ModelsManagerAbstract = models_manager or ModelsManager()
         self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
 
         self.inference_manager = inference_manager or InferenceManager()

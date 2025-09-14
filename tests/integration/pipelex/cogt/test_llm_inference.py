@@ -12,7 +12,7 @@ from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestLLMEngines:
+class TestLLMInference:
     async def run_inference(self, llm_worker: LLMWorkerAbstract, llm_job: LLMJob):
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
