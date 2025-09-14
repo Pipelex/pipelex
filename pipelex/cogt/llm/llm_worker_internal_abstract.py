@@ -6,7 +6,9 @@ from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
+from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.hub import get_models_manager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -28,6 +30,7 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         LLMWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
         self.inference_model = inference_model
         self.structure_method = structure_method
+        self.backend = get_models_manager().get_inference_backend(inference_model.backend_name)
 
     #########################################################
     # Instance methods

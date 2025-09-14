@@ -1,8 +1,10 @@
+from typing import Optional
+
 import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.exceptions import LLMSDKError
-from pipelex.hub import get_plugin_manager, get_secrets_provider
+from pipelex.hub import get_models_manager, get_plugin_manager, get_secrets_provider
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 
@@ -21,9 +23,16 @@ class TestOpenAI:
         self,
         pytestconfig: pytest.Config,
         plugin_sdk_handle: PluginSdkHandle,
+        backend_name: str,
+        openai_endpoint: Optional[str],
     ):
+        backend = get_models_manager().get_inference_backend(backend_name)
         try:
-            openai_models_list = await openai_list_available_models(plugin_sdk_handle=plugin_sdk_handle)
+            openai_models_list = await openai_list_available_models(
+                plugin_sdk_handle=plugin_sdk_handle,
+                backend=backend,
+                endpoint=openai_endpoint,
+            )
         except LLMSDKError as exc:
             if "does not support listing models" in str(exc):
                 pytest.skip(f"Skipping: {exc}")

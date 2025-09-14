@@ -52,9 +52,11 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 try:
                     model_spec_blueprint = InferenceModelSpecBlueprint.model_validate(model_spec_dict)
                     model_spec = InferenceModelSpecFactory.make_inference_model_spec(
+                        backend_name=backend_name,
                         name=model_spec_name,
                         blueprint=model_spec_blueprint,
-                        default_sdk=default_sdk,
+                        fallback_sdk=default_sdk,
+                        endpoint=backend_blueprint.endpoint,
                     )
                     backend_model_specs[model_spec_name] = model_spec
                 except (InferenceModelSpecError, ValidationError) as exc:

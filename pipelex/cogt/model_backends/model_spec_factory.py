@@ -30,16 +30,20 @@ class InferenceModelSpecFactory(BaseModel):
     @classmethod
     def make_inference_model_spec(
         cls,
+        backend_name: str,
         name: str,
         blueprint: InferenceModelSpecBlueprint,
-        default_sdk: Optional[str],
+        fallback_sdk: Optional[str],
+        endpoint: Optional[str],
     ) -> InferenceModelSpec:
-        sdk = blueprint.sdk or default_sdk
+        sdk = blueprint.sdk or fallback_sdk
         if not sdk:
             raise InferenceModelSpecError("No sdk choice provided")
         return InferenceModelSpec(
+            backend_name=backend_name,
             name=name,
             sdk=sdk,
+            endpoint=endpoint,
             model_id=blueprint.model_id,
             inputs=blueprint.inputs,
             outputs=blueprint.outputs,

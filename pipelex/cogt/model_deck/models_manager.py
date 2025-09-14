@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 from typing_extensions import override
 
 from pipelex import pretty_print
+from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_deck.deck_manager import DeckManager
@@ -76,3 +77,7 @@ class ModelsManager(ModelsManagerAbstract):
         if self.llm_deck is None:
             raise RuntimeError("LLM deck is not initialized")
         return self.llm_deck.get_inference_model(llm_handle=llm_handle)
+
+    @override
+    def get_inference_backend(self, backend_name: str) -> InferenceBackend:
+        return self.inference_backend_library.get_required_backend(backend_name)

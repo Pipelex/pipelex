@@ -4,7 +4,7 @@ from pipelex.cogt.exceptions import CogtError, MissingDependencyError
 from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_platform import ImggPlatform
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
-from pipelex.hub import get_plugin_manager, get_secret
+from pipelex.hub import get_models_manager, get_plugin_manager, get_secret
 from pipelex.plugins.openai.openai_imgg_worker import OpenAIImggWorker
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -22,6 +22,7 @@ class ImggWorkerFactory:
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> ImggWorkerAbstract:
         imgg_sdk_handle = PluginSdkHandle.get_for_imgg_engine(imgg_platform=imgg_engine.imgg_platform)
+        backend = get_models_manager().get_inference_backend("openai")
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         imgg_worker: ImggWorkerAbstract
         match imgg_engine.imgg_platform:
@@ -59,7 +60,11 @@ class ImggWorkerFactory:
                     llm_sdk_handle=imgg_sdk_handle
                 ) or plugin_sdk_registry.set_llm_sdk_instance(
                     llm_sdk_handle=imgg_sdk_handle,
-                    llm_sdk_instance=OpenAIFactory.make_openai_client(plugin_sdk_handle=PluginSdkHandle.OPENAI),
+                    llm_sdk_instance=OpenAIFactory.make_openai_client(
+                        plugin_sdk_handle=PluginSdkHandle.OPENAI,
+                        backend=backend,
+                        endpoint=None,
+                    ),
                 )
 
                 imgg_worker = OpenAIImggWorker(

@@ -1,3 +1,5 @@
+from typing import Optional
+
 import pytest
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
@@ -53,7 +55,9 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "pipelex/gpt-4o-mini",
         # "pipelex/claude-3.7-sonnet",
         # "pipelex/gemini-2.0-flash-vertex",
-        "pipelex/gemini-2.0-flash",
+        # "pipelex/gemini-2.0-flash",
+        "gpt-4o-mini",
+        # "claude-4-sonnet",
     ]
 )
 def llm_handle(request: pytest.FixtureRequest) -> str:
@@ -139,7 +143,7 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
 @pytest.fixture(
     params=[
         # PluginSdkHandle.ANTHROPIC,
-        PluginSdkHandle.AZURE_OPENAI,
+        # PluginSdkHandle.AZURE_OPENAI,
         # PluginSdkHandle.BEDROCK,
         # PluginSdkHandle.BEDROCK_ANTHROPIC,
         # PluginSdkHandle.MISTRAL,
@@ -148,6 +152,17 @@ def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
 )
 def plugin_sdk_handle(request: pytest.FixtureRequest) -> PluginSdkHandle:
     assert isinstance(request.param, PluginSdkHandle)
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        # None,
+        "https://inference.pipelex.com/v1",
+    ]
+)
+def openai_endpoint(request: pytest.FixtureRequest) -> Optional[str]:
+    assert isinstance(request.param, str) or request.param is None
     return request.param
 
 

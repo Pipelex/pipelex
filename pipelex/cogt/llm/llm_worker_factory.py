@@ -3,9 +3,10 @@ from typing import Optional
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
+from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
-from pipelex.hub import get_plugin_manager
+from pipelex.hub import get_models_manager, get_plugin_manager
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -17,6 +18,7 @@ class LLMWorkerFactory:
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> LLMWorkerInternalAbstract:
         llm_sdk_handle = PluginSdkHandle(inference_model.sdk)
+        backend = get_models_manager().get_inference_backend(inference_model.backend_name)
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         llm_worker: LLMWorkerInternalAbstract
         match llm_sdk_handle:
@@ -33,7 +35,11 @@ class LLMWorkerFactory:
                     llm_sdk_handle=llm_sdk_handle
                 ) or plugin_sdk_registry.set_llm_sdk_instance(
                     llm_sdk_handle=llm_sdk_handle,
-                    llm_sdk_instance=OpenAIFactory.make_openai_client(plugin_sdk_handle=llm_sdk_handle),
+                    llm_sdk_instance=OpenAIFactory.make_openai_client(
+                        plugin_sdk_handle=llm_sdk_handle,
+                        backend=backend,
+                        endpoint=inference_model.endpoint,
+                    ),
                 )
 
                 llm_worker = OpenAILLMWorker(

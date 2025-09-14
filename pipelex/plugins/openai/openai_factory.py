@@ -17,6 +17,7 @@ from pipelex.cogt.exceptions import LLMEngineParameterError, LLMPromptParameterE
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
+from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
@@ -25,7 +26,12 @@ from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 
 class OpenAIFactory:
     @classmethod
-    def make_openai_client(cls, plugin_sdk_handle: PluginSdkHandle) -> openai.AsyncClient:
+    def make_openai_client(
+        cls,
+        plugin_sdk_handle: PluginSdkHandle,
+        backend: InferenceBackend,
+        endpoint: Optional[str],
+    ) -> openai.AsyncClient:
         the_client: openai.AsyncOpenAI
         api_key: Optional[str] = None
         match plugin_sdk_handle:
@@ -49,9 +55,14 @@ class OpenAIFactory:
             #         base_url=endpoint,
             #     )
             case PluginSdkHandle.OPENAI:
-                openai_config = get_plugin_manager().plugin_configs.openai_config
-                api_key = openai_config.get_api_key(secrets_provider=get_secrets_provider())
-                the_client = openai.AsyncOpenAI(api_key=api_key)
+                # openai_config = get_plugin_manager().plugin_configs.openai_config
+                # api_key = openai_config.get_api_key(secrets_provider=get_secrets_provider())
+                api_key = backend.api_key
+                endpoint = backend.endpoint
+                the_client = openai.AsyncOpenAI(
+                    api_key=api_key,
+                    base_url=endpoint,
+                )
             # case LLMPlatform.VERTEXAI:
             #     vertexai_config = get_plugin_manager().plugin_configs.vertexai_config
             #     endpoint, api_key = vertexai_config.configure(secrets_provider=get_secrets_provider())
