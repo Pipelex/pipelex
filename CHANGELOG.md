@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- New way to load inference models:
+
+model_catalog: model name -> model backend which defines the model id, features (inputs, outputs), costs
+
+deck:
+  handle -> model name waterfall, i.e. first choice (if available), other wise fallback
+and
+  presets: preset id -> llm_handle, temperature, max_tokens
+
 ## [v0.9.5] - 2025-09-12
 
 ### Highlight

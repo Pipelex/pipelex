@@ -2,15 +2,10 @@
 # LLM Deck base
 
 ####################################################################################################
-# LLM Handles
+# Aliases
 ####################################################################################################
 
-llm_external_handles = []
-
-# Match a llm_handle with either just and llm_name
-# or a complete blueprint including llm_platform_choice (defaulting to "default").
-[llm_handles]
-gpt-4o-2024-11-20 = { llm_name = "gpt-4o" }
+[aliases]
 base-claude = "claude-4-sonnet"
 base-gpt = "gpt-5"
 
@@ -26,6 +21,8 @@ cheap_llm_for_object = "gpt-4o-mini"
 base_llm_for_text = "gpt-4o-mini"
 base_llm_for_object = "gpt-4o-mini"
 
+llm_to_engineer = ["claude-4-1-opus", "gemini-2.5-pro"]
+llm_for_large_codebases = ["gemini-2.5-pro", "claude-4-1-opus", "gpt-5"]
 
 ####################################################################################################
 # LLM Presets
@@ -89,4 +86,3 @@ llm_to_extract_tables = { llm_handle = "best-claude", temperature = 0.1 }
 [llm_choice_defaults]
 for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
-

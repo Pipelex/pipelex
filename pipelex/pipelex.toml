@@ -92,10 +92,6 @@ is_openai_structured_output_enabled = false
 max_retries = 3
 is_streaming_enabled = false
 
-[cogt.llm_config.preferred_platforms]
-# These overrride the defaults set for any llm handle
-# "gpt-4o-mini" = "openai"
-
 ####################################################################################################
 # Image generation config
 ####################################################################################################

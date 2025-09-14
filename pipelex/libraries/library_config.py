@@ -27,10 +27,6 @@ class LibraryConfig(ConfigModel):
         return f"{self.config_dir_path}/llm_integrations"
 
     @property
-    def llm_deck_dir_path(self) -> str:
-        return f"{self.config_dir_path}/llm_deck"
-
-    @property
     def templates_dir_path(self) -> str:
         return f"{self.config_dir_path}/templates"
 
@@ -45,11 +41,6 @@ class LibraryConfig(ConfigModel):
     @property
     def failing_pipelines_file_paths(self) -> List[str]:
         return ["tests/test_pipelines/failing_pipelines.plx"]
-
-    def get_llm_deck_paths(self) -> List[str]:
-        llm_deck_paths = [str(path) for path in find_files_in_dir(dir_path=self.llm_deck_dir_path, pattern="*.toml", is_recursive=True)]
-        llm_deck_paths.sort()
-        return llm_deck_paths
 
     def get_templates_paths(self) -> List[str]:
         return [str(path) for path in find_files_in_dir(dir_path=self.templates_dir_path, pattern="*.toml", is_recursive=True)]
@@ -91,15 +82,6 @@ class LibraryConfig(ConfigModel):
             folder_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/llm_integrations",
             target_dir=self.llm_integrations_dir_path,
             overwrite=overwrite,
-        )
-
-        # llm_deck
-        copy_folder_from_package(
-            package_name=self.package_name,
-            folder_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/llm_deck",
-            target_dir=self.llm_deck_dir_path,
-            overwrite=overwrite,
-            non_overwrite_files=["overrides.toml"],
         )
 
         # templates

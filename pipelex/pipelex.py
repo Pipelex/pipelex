@@ -17,6 +17,7 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
+from pipelex.cogt.inference.deck_manager import DeckManager
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.inference_backend.backend_library import InferenceBackendLibrary
 from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
@@ -192,7 +193,8 @@ class Pipelex(metaclass=MetaSingleton):
             self.template_provider.setup()
             self.library_manager.setup()
             # TODO: load the Deck
-            llm_deck = LLMDeck()
+            deck_manager = DeckManager()
+            llm_deck = deck_manager.load_deck()
             self.library_manager.load_libraries()
             self.pipelex_hub.set_llm_deck_provider(llm_deck_provider=llm_deck)
         except ValidationError as exc:

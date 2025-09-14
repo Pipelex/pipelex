@@ -8,7 +8,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 )
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
-from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
+from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.core.concepts.concept import Concept
@@ -49,7 +49,7 @@ class PipelexHub:
         self._class_registry: Optional[ClassRegistryAbstract] = None
         self._storage_provider: Optional[StorageProviderAbstract] = None
         # cogt
-        self._llm_deck_provider: Optional[LLMDeckAbstract] = None
+        self._llm_deck_provider: Optional[LLMDeck] = None
         self._plugin_manager: Optional[PluginManager] = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
@@ -125,7 +125,7 @@ class PipelexHub:
 
     # cogt
 
-    def set_llm_deck_provider(self, llm_deck_provider: LLMDeckAbstract):
+    def set_llm_deck_provider(self, llm_deck_provider: LLMDeck):
         self._llm_deck_provider = llm_deck_provider
 
     def set_plugin_manager(self, plugin_manager: PluginManager):
@@ -210,7 +210,7 @@ class PipelexHub:
 
     # cogt
 
-    def get_required_llm_deck(self) -> LLMDeckAbstract:
+    def get_required_llm_deck(self) -> LLMDeck:
         if self._llm_deck_provider is None:
             raise RuntimeError("LLMDeck is not initialized")
         return self._llm_deck_provider
@@ -326,7 +326,7 @@ def get_class_registry() -> ClassRegistryAbstract:
 # cogt
 
 
-def get_llm_deck() -> LLMDeckAbstract:
+def get_llm_deck() -> LLMDeck:
     return get_pipelex_hub().get_required_llm_deck()
 
 

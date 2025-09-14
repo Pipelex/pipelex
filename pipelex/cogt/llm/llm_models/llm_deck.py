@@ -1,25 +1,43 @@
-from typing import Dict, Optional, Union
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Union
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.exceptions import LLMDeckValidatonError, LLMHandleNotFoundError, LLMPresetNotFoundError, LLMSettingsValidationError
 from pipelex.cogt.inference_backend.model_spec import InferenceModelSpec
-from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
 from pipelex.cogt.llm.llm_models.llm_family import LLMFamily
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
+from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults, LLMSettingOrPresetId
 from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.exceptions import ConfigValidationError
 
 LLM_PRESET_DISABLED = "disabled"
 
+Waterfall = List[str]
 
-class LLMDeck(LLMDeckAbstract, ConfigModel):
-    ############################################################
-    # LLMDeckAbstract overrides
-    ############################################################
 
-    @override
+class LLMDeckBlueprint(ConfigModel):
+    aliases: Dict[str, str | Waterfall] = Field(default_factory=dict)
+    llm_presets: Dict[str, LLMSetting] = Field(default_factory=dict)
+    llm_choice_defaults: LLMSettingChoicesDefaults
+    llm_choice_overrides: LLMSettingChoices = LLMSettingChoices(
+        for_text=None,
+        for_object=None,
+    )
+
+
+class LLMDeck(ConfigModel):
+    llm_handles: Dict[str, InferenceModelSpec] = Field(default_factory=dict)
+    llm_presets: Dict[str, LLMSetting] = Field(default_factory=dict)
+    llm_choice_defaults: LLMSettingChoicesDefaults
+    llm_choice_overrides: LLMSettingChoices = LLMSettingChoices(
+        for_text=None,
+        for_object=None,
+    )
+
+    def get_all_inference_models(self) -> Dict[str, InferenceModelSpec]:
+        return self.llm_handles
+
     def check_llm_setting(self, llm_setting_or_preset_id: LLMSettingOrPresetId, is_disabled_allowed: bool = False):
         if isinstance(llm_setting_or_preset_id, LLMSetting):
             return
@@ -30,14 +48,6 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
             return
         raise LLMPresetNotFoundError(f"llm preset id '{preset_id}' not found in deck")
 
-    # @override
-    # def get_llm_engine_blueprint(self, llm_handle: str) -> LLMEngineBlueprint:
-    #     the_engine_blueprint = self.llm_handles.get(llm_handle)
-    #     if not the_engine_blueprint:
-    #         raise LLMHandleNotFoundError(f"LLM Engine blueprint for llm_handle '{llm_handle}' not found in deck's engine blueprints")
-    #     return the_engine_blueprint
-
-    @override
     def get_llm_setting(self, llm_setting_or_preset_id: LLMSettingOrPresetId) -> LLMSetting:
         if isinstance(llm_setting_or_preset_id, LLMSetting):
             return llm_setting_or_preset_id
@@ -48,29 +58,6 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
                 raise LLMPresetNotFoundError(f"LLM preset '{llm_setting_or_preset_id}' not found in deck")
             return the_llm_preset
 
-    # @override
-    # def find_llm_model(self, llm_handle: str) -> InferenceModelSpec:
-    #     llm_models_provider = get_llm_models_provider()
-    #     llm_engine_blueprint = self.llm_handles[llm_handle]
-    #     llm_model = llm_models_provider.get_llm_model(
-    #         llm_name=llm_engine_blueprint.llm_name,
-    #         llm_platform_choice=llm_engine_blueprint.llm_platform_choice,
-    #     )
-    #     return llm_model
-
-    # @override
-    # def find_optional_llm_model(self, llm_handle: str) -> Optional[InferenceModelSpec]:
-    #     llm_models_provider = get_llm_models_provider()
-    #     llm_engine_blueprint = self.llm_handles.get(llm_handle)
-    #     if not llm_engine_blueprint:
-    #         return None
-    #     llm_model = llm_models_provider.get_optional_llm_model(
-    #         llm_name=llm_engine_blueprint.llm_name,
-    #         llm_platform_choice=llm_engine_blueprint.llm_platform_choice,
-    #     )
-    #     return llm_model
-
-    @override
     @classmethod
     def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]
         for llm_preset_id, llm_setting in deck.llm_presets.items():
@@ -81,7 +68,7 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
                 raise LLMDeckValidatonError(f"LLM preset '{llm_preset_id}' is invalid: {exc}")
 
     ############################################################
-    #### LLMDeck concrete validations
+    #### LLMDeck validations
     ############################################################
 
     @classmethod
@@ -156,6 +143,11 @@ class LLMDeck(LLMDeckAbstract, ConfigModel):
             self.check_llm_setting(llm_setting_or_preset_id=llm_setting)
         return
 
-    @override
     def get_optional_inference_model(self, llm_handle: str) -> Optional[InferenceModelSpec]:
         return self.llm_handles.get(llm_handle)
+
+    def get_inference_model(self, llm_handle: str) -> InferenceModelSpec:
+        if inference_model := self.get_optional_inference_model(llm_handle=llm_handle):
+            return inference_model
+        else:
+            raise LLMHandleNotFoundError(f"LLM handle '{llm_handle}' not found in deck")

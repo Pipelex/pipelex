@@ -76,19 +76,9 @@ class LibraryManager(LibraryManagerAbstract):
         self.pipe_library.validate_with_libraries()
         self.domain_library.validate_with_libraries()
 
-    def _validate_plx_files(self):
-        """Validate all PLX files used by the library manager for formatting issues."""
-        log.debug("LibraryManager validating PLX file formatting")
-
-        # Validation of LLM deck paths
-        llm_deck_paths = self.library_config.get_llm_deck_paths()
-        for llm_deck_path in llm_deck_paths:
-            if os.path.exists(llm_deck_path):
-                try:
-                    validate_toml_file(llm_deck_path)
-                except TOMLValidationError as exc:
-                    log.error(f"PLX formatting issues in LLM deck file '{llm_deck_path}': {exc}")
-                    raise LibraryError(f"PLX validation failed for LLM deck file '{llm_deck_path}': {exc}") from exc
+    def _validate_toml_files(self):
+        """Validate all TOML files used by the library manager for formatting issues."""
+        log.debug("LibraryManager validating TOML file formatting")
 
         # Validation of template paths
         template_paths = self.library_config.get_templates_paths()
@@ -106,7 +96,6 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def teardown(self) -> None:
-        self.llm_deck = None
         self.pipe_library.teardown()
         self.concept_library.teardown()
         self.domain_library.teardown()
@@ -263,24 +252,3 @@ class LibraryManager(LibraryManagerAbstract):
             pipes = self._load_pipes_from_blueprint(blueprint)
             all_pipes.extend(pipes)
         self.pipe_library.add_pipes(pipes=all_pipes)
-
-    # TODO: move to LLMDeckManager
-    # def load_deck(self) -> LLMDeck:
-    #     llm_deck_paths = self.library_config.get_llm_deck_paths()
-    #     full_llm_deck_dict: Dict[str, Any] = {}
-    #     if not llm_deck_paths:
-    #         raise LLMDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
-
-    #     for llm_deck_path in llm_deck_paths:
-    #         if not os.path.exists(llm_deck_path):
-    #             raise LLMDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
-    #         try:
-    #             llm_deck_dict = load_toml_from_path(path=llm_deck_path)
-    #             log.debug(f"Loaded LLM deck from {llm_deck_path}")
-    #             deep_update(full_llm_deck_dict, llm_deck_dict)
-    #         except Exception as exc:
-    #             log.error(f"Failed to load LLM deck file '{llm_deck_path}': {exc}")
-    #             raise
-
-    #     self.llm_deck = LLMDeck.model_validate(full_llm_deck_dict)
-    #     return self.llm_deck

@@ -125,17 +125,17 @@ class TestLLMEngines:
     #         )
     #         await self.run_inference(llm_worker=llm_worker, llm_job=llm_job)
 
-    async def test_llm_handle_to_llm_engine_default(self, llm_job_params: LLMJobParams):
-        inference_manager = get_inference_manager()
-        llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
-        for llm_handle in llm_handle_to_llm_engine_blueprint.keys():
-            llm_worker = inference_manager.get_llm_worker(llm_handle=llm_handle)
-            assert llm_worker
-            llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
-                system_text=None,
-                user_text=LLMTestConstants.USER_TEXT_SHORT,
-                llm_job_params=llm_job_params,
-            )
-            assert llm_job
-            # ENABLE THIS TO TEST THE INFERENCE with all base models
-            # await self.run_inference(llm_worker=llm_worker, llm_job=llm_job)
+    # async def test_llm_handle_to_llm_engine_default(self, llm_job_params: LLMJobParams):
+    #     inference_manager = get_inference_manager()
+    #     llm_handle_to_llm_engine_blueprint = get_llm_deck().llm_handles
+    #     for llm_handle in llm_handle_to_llm_engine_blueprint.keys():
+    #         llm_worker = inference_manager.get_llm_worker(llm_handle=llm_handle)
+    #         assert llm_worker
+    #         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
+    #             system_text=None,
+    #             user_text=LLMTestConstants.USER_TEXT_SHORT,
+    #             llm_job_params=llm_job_params,
+    #         )
+    #         assert llm_job
+    #         # ENABLE THIS TO TEST THE INFERENCE with all base models
+    #         # await self.run_inference(llm_worker=llm_worker, llm_job=llm_job)

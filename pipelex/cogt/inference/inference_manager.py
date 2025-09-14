@@ -63,7 +63,7 @@ class InferenceManager(InferenceManagerProtocol):
     @override
     def setup_llm_workers(self):
         log.verbose("Setting up LLM Workers...")
-        llm_handle_to_inference_model = get_llm_deck().llm_handles
+        llm_handle_to_inference_model = get_llm_deck().get_all_inference_models()
         log.verbose(f"{len(llm_handle_to_inference_model)} LLM engine_cards found")
         for llm_handle, inference_model in llm_handle_to_inference_model.items():
             self._setup_one_internal_llm_worker(inference_model=inference_model, llm_handle=llm_handle)
