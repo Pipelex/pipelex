@@ -86,9 +86,7 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
             RoutingProfileLibraryError: If no active profile is set or config not found
         """
         profile = self.active_profile
-        log.debug(f"Getting backend match for model '{model_name}' from active profile '{profile.name}'")
         backend_match_for_model = profile.get_backend_match_for_model(model_name)
-        log.debug(f"Backend match for model '{model_name}' from active profile '{profile.name}': {backend_match_for_model}")
         return backend_match_for_model
 
     def list_routing_profile_names(self) -> list[str]:

@@ -137,7 +137,8 @@ class ModelsManager(ModelsManagerAbstract):
             llm_handles[model_name] = model_spec
 
         llm_deck = LLMDeck(
-            llm_handles=llm_handles,
+            inference_models=llm_handles,
+            aliases=llm_deck_blueprint.aliases,
             llm_presets=llm_deck_blueprint.llm_presets,
             llm_choice_defaults=llm_deck_blueprint.llm_choice_defaults,
             llm_choice_overrides=llm_deck_blueprint.llm_choice_overrides,
@@ -145,16 +146,10 @@ class ModelsManager(ModelsManagerAbstract):
         return llm_deck
 
     @override
-    def get_all_inference_models(self) -> Dict[str, InferenceModelSpec]:
-        if self.llm_deck is None:
-            raise RuntimeError("LLM deck is not initialized")
-        return self.llm_deck.llm_handles
-
-    @override
     def get_inference_model(self, llm_handle: str) -> InferenceModelSpec:
         if self.llm_deck is None:
             raise RuntimeError("LLM deck is not initialized")
-        return self.llm_deck.get_inference_model(llm_handle=llm_handle)
+        return self.llm_deck.get_required_inference_model(llm_handle=llm_handle)
 
     @override
     def get_required_inference_backend(self, backend_name: str) -> InferenceBackend:

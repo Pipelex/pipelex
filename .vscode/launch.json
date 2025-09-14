@@ -16,15 +16,27 @@
             "justMyCode": false
         },
         {
-            "name": "Debug tests",
+            "name": "Debug test boot",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
             "args": [
                 "-s",
                 "-vv",
-                // "-m inference",
                 "-k test_boot"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug test llm_handle",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vv",
+                "-m inference",
+                "-k test_llm_handle"
             ],
             "console": "integratedTerminal"
         },

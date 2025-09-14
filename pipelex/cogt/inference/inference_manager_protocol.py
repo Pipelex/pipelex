@@ -17,8 +17,6 @@ class InferenceManagerProtocol(Protocol):
     # LLM Workers
     ####################################################################################################
 
-    def setup_llm_workers(self): ...
-
     def get_llm_worker(self, llm_handle: str) -> LLMWorkerAbstract: ...
 
     def set_llm_worker_from_external_plugin(

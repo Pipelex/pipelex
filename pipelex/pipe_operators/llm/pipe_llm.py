@@ -283,7 +283,7 @@ class PipeLLM(PipeOperator):
         llm_setting_for_object: LLMSetting = llm_deck.get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_object)
 
         if not self.llm_prompt_spec.prompting_style:
-            inference_model = llm_deck.get_inference_model(llm_handle=llm_setting_main.llm_handle)
+            inference_model = llm_deck.get_required_inference_model(llm_handle=llm_setting_main.llm_handle)
             prompting_target = llm_setting_main.prompting_target or inference_model.prompting_target
             self.llm_prompt_spec.prompting_style = get_config().pipelex.prompting_config.get_prompting_style(
                 prompting_target=prompting_target,

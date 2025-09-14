@@ -1,8 +1,9 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self
 
+from pipelex import log
 from pipelex.cogt.exceptions import LLMDeckValidatonError, LLMHandleNotFoundError, LLMPresetNotFoundError, LLMSettingsValidationError
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults, LLMSettingOrPresetId
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
@@ -12,11 +13,11 @@ from pipelex.tools.exceptions import ConfigValidationError
 
 LLM_PRESET_DISABLED = "disabled"
 
-Waterfall = List[str]
+Waterfall = Union[str, List[str]]
 
 
 class LLMDeckBlueprint(ConfigModel):
-    aliases: Dict[str, str | Waterfall] = Field(default_factory=dict)
+    aliases: Dict[str, Waterfall] = Field(default_factory=dict)
     llm_presets: Dict[str, LLMSetting] = Field(default_factory=dict)
     llm_choice_defaults: LLMSettingChoicesDefaults
     llm_choice_overrides: LLMSettingChoices = LLMSettingChoices(
@@ -26,16 +27,15 @@ class LLMDeckBlueprint(ConfigModel):
 
 
 class LLMDeck(ConfigModel):
-    llm_handles: Dict[str, InferenceModelSpec] = Field(default_factory=dict)
+    inference_models: Dict[str, InferenceModelSpec] = Field(default_factory=dict)
+    aliases: Dict[str, Waterfall] = Field(default_factory=dict)
+
     llm_presets: Dict[str, LLMSetting] = Field(default_factory=dict)
     llm_choice_defaults: LLMSettingChoicesDefaults
     llm_choice_overrides: LLMSettingChoices = LLMSettingChoices(
         for_text=None,
         for_object=None,
     )
-
-    def get_all_inference_models(self) -> Dict[str, InferenceModelSpec]:
-        return self.llm_handles
 
     def check_llm_setting(self, llm_setting_or_preset_id: LLMSettingOrPresetId, is_disabled_allowed: bool = False):
         if isinstance(llm_setting_or_preset_id, LLMSetting):
@@ -60,7 +60,7 @@ class LLMDeck(ConfigModel):
     @classmethod
     def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]
         for llm_preset_id, llm_setting in deck.llm_presets.items():
-            inference_model = deck.get_inference_model(llm_handle=llm_setting.llm_handle)
+            inference_model = deck.get_required_inference_model(llm_handle=llm_setting.llm_handle)
             try:
                 cls._validate_llm_setting(llm_setting=llm_setting, inference_model=inference_model)
             except ConfigValidationError as exc:
@@ -125,7 +125,7 @@ class LLMDeck(ConfigModel):
 
     def validate_llm_presets(self) -> Self:
         for llm_preset_id, llm_setting in self.llm_presets.items():
-            if llm_setting.llm_handle not in self.llm_handles:
+            if llm_setting.llm_handle not in self.inference_models:
                 raise LLMHandleNotFoundError(f"llm_handle '{llm_setting.llm_handle}' for llm_preset '{llm_preset_id}' not found in deck")
         return self
 
@@ -140,10 +140,24 @@ class LLMDeck(ConfigModel):
         return
 
     def get_optional_inference_model(self, llm_handle: str) -> Optional[InferenceModelSpec]:
-        return self.llm_handles.get(llm_handle)
-
-    def get_inference_model(self, llm_handle: str) -> InferenceModelSpec:
-        if inference_model := self.get_optional_inference_model(llm_handle=llm_handle):
+        if inference_model := self.inference_models.get(llm_handle):
             return inference_model
-        else:
+        elif redirection := self.aliases.get(llm_handle):
+            log.debug(f"Redirection for '{llm_handle}': {redirection}")
+            if isinstance(redirection, str):
+                alias_list = [redirection]
+            else:
+                alias_list = redirection
+            for alias in alias_list:
+                if inference_model := self.get_optional_inference_model(llm_handle=alias):
+                    return inference_model
+        log.warning(f"Skipping LLM handle '{llm_handle}' because it's not found in deck")
+        return None
+
+    def get_required_inference_model(self, llm_handle: str) -> InferenceModelSpec:
+        inference_model = self.get_optional_inference_model(llm_handle=llm_handle)
+        if inference_model is None:
             raise LLMHandleNotFoundError(f"LLM handle '{llm_handle}' not found in deck")
+        if llm_handle not in self.inference_models:
+            log.dev(f"LLM handle '{llm_handle}' is an alias which resolves to '{inference_model.name}'")
+        return inference_model

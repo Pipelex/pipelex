@@ -16,10 +16,6 @@ class ModelsManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_all_inference_models(self) -> Dict[str, InferenceModelSpec]:
-        pass
-
-    @abstractmethod
     def get_inference_model(self, llm_handle: str) -> InferenceModelSpec:
         pass
 
