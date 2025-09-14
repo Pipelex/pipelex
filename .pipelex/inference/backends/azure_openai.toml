@@ -1,4 +1,4 @@
-default_sdk = "openai"
+default_sdk = "azure_openai"
 
 [gpt-4o]
 model_id = "gpt-4o-2024-11-20"

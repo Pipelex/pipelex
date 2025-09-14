@@ -30,11 +30,11 @@ default = "pipelex-inference"                                                # F
 # Specific routing rules (checked in order)
 [configs.smart_routing.routes]
 # Pattern matching: "model-pattern" = "backend-name"
-"claude-*" = "anthropic"         # All Claude models go to Anthropic
-"gpt-*" = "pipelex-inference"    # GPT models to Pipelex
-"gemini-*" = "pipelex-inference" # Gemini models to Pipelex
-"grok-*" = "pipelex-inference"   # Grok models to Pipelex
-"*-sdxl" = "pipelex-inference"   # Image models to Pipelex
+"gpt-*" = "pipelex-inference"
+"claude-*" = "pipelex-inference"
+"gemini-*" = "pipelex-inference"
+"grok-*" = "pipelex-inference"
+"*-sdxl" = "pipelex-inference"
 
 # Profile 4: Cost-optimized routing
 [configs.cost_optimized]

@@ -38,7 +38,7 @@ class OpenAIFactory:
                 azure_openai_config = get_plugin_manager().plugin_configs.azure_openai_config
                 endpoint, api_version, api_key = azure_openai_config.configure(secrets_provider=get_secrets_provider())
 
-                log.verbose(f"Making AsyncAzureOpenAI client with endpoint: {endpoint}, api_version: {api_version}")
+                log.debug(f"Making AsyncAzureOpenAI client with endpoint: {endpoint}, api_version: {api_version}")
                 the_client = openai.AsyncAzureOpenAI(
                     azure_endpoint=endpoint,
                     api_key=api_key,
@@ -56,6 +56,7 @@ class OpenAIFactory:
             case PluginSdkHandle.OPENAI:
                 # openai_config = get_plugin_manager().plugin_configs.openai_config
                 # api_key = openai_config.get_api_key(secrets_provider=get_secrets_provider())
+                log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
                     api_key=backend.api_key,
                     base_url=backend.endpoint,

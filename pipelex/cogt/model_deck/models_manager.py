@@ -56,7 +56,7 @@ class ModelsManager(ModelsManagerAbstract):
             matched_backend_name = backend_match_for_model.backend_name
             backend = self.inference_backend_library.get_inference_backend(backend_name=matched_backend_name)
             if backend is None:
-                raise ModelsManagerError(f"Backend '{matched_backend_name}' not found for model '{model_name}'")
+                raise ModelsManagerError(f"Backend '{matched_backend_name}', requested for model '{model_name}', could not be found")
             model_spec = backend.get_model_spec(model_name)
             if model_spec is None:
                 # Not finding the model spec can be an error or not according to the matching method

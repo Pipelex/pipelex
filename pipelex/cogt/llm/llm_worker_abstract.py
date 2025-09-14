@@ -31,7 +31,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     @property
     @override
     def desc(self) -> str:
-        return "LLM Worker • if you're using an external plugin, override this method to describe your llm worker"
+        return "If you're using an external plugin, override this method to describe your llm worker"
 
     @property
     @abstractmethod

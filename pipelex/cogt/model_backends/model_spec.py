@@ -23,11 +23,11 @@ class InferenceModelSpec(ConfigModel):
 
     @property
     def tag(self) -> str:
-        return f"[{self.sdk}SDK]({self.model_id})"
+        return f"[{self.sdk}][{self.backend_name}][{self.model_id}]"
 
     @property
     def desc(self) -> str:
-        return f"[{self.sdk}SDK]({self.model_id})"
+        return f"SDK[{self.sdk}]•Backend[{self.backend_name}]•Model[{self.model_id}]"
 
     @property
     def is_gen_object_supported(self) -> bool:
