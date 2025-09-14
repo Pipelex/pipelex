@@ -18,8 +18,8 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
-from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_deck.deck_manager import DeckManager
+from pipelex.cogt.model_deck.models_manager import ModelsManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
@@ -67,7 +67,7 @@ class Pipelex(metaclass=MetaSingleton):
         config_cls: Optional[Type[ConfigRoot]] = None,
         class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
-        inference_backend_library: Optional[InferenceBackendLibrary] = None,
+        models_manager: Optional[ModelsManager] = None,
         inference_manager: Optional[InferenceManager] = None,
         pipeline_manager: Optional[PipelineManager] = None,
         pipeline_tracker: Optional[PipelineTracker] = None,
@@ -106,7 +106,8 @@ class Pipelex(metaclass=MetaSingleton):
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
 
-        self.inference_backend_library = inference_backend_library or InferenceBackendLibrary.make_empty()
+        self.models_manager = models_manager or ModelsManager()
+        self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
 
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
@@ -169,8 +170,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
         self.plugin_manager.setup(library_config=self.library_manager.library_config)
-        self.inference_backend_library.setup()
-        self.inference_backend_library.load()
+        self.models_manager.setup()
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())
@@ -191,11 +191,8 @@ class Pipelex(metaclass=MetaSingleton):
         try:
             self.template_provider.setup()
             self.library_manager.setup()
-            # TODO: load the Deck
-            deck_manager = DeckManager()
-            llm_deck = deck_manager.load_deck()
+            self.models_manager.setup()
             self.library_manager.load_libraries()
-            self.pipelex_hub.set_llm_deck_provider(llm_deck_provider=llm_deck)
         except ValidationError as exc:
             error_msg = format_pydantic_validation_error(exc)
             raise PipelexSetupError(f"Could not setup libraries because of: {error_msg}") from exc

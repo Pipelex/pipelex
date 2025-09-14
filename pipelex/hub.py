@@ -9,7 +9,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
-from pipelex.cogt.model_deck.llm_deck import LLMDeck
+from pipelex.cogt.model_deck.models_manager_abstract import ModelsManagerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
@@ -49,7 +49,7 @@ class PipelexHub:
         self._class_registry: Optional[ClassRegistryAbstract] = None
         self._storage_provider: Optional[StorageProviderAbstract] = None
         # cogt
-        self._llm_deck_provider: Optional[LLMDeck] = None
+        self._models_manager: Optional[ModelsManagerAbstract] = None
         self._plugin_manager: Optional[PluginManager] = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
@@ -125,8 +125,8 @@ class PipelexHub:
 
     # cogt
 
-    def set_llm_deck_provider(self, llm_deck_provider: LLMDeck):
-        self._llm_deck_provider = llm_deck_provider
+    def set_models_manager(self, models_manager: ModelsManagerAbstract):
+        self._models_manager = models_manager
 
     def set_plugin_manager(self, plugin_manager: PluginManager):
         self._plugin_manager = plugin_manager
@@ -210,10 +210,10 @@ class PipelexHub:
 
     # cogt
 
-    def get_required_llm_deck(self) -> LLMDeck:
-        if self._llm_deck_provider is None:
-            raise RuntimeError("LLMDeck is not initialized")
-        return self._llm_deck_provider
+    def get_required_models_manager(self) -> ModelsManagerAbstract:
+        if self._models_manager is None:
+            raise RuntimeError("ModelsManager is not initialized")
+        return self._models_manager
 
     def get_plugin_manager(self) -> PluginManager:
         if self._plugin_manager is None:
@@ -326,8 +326,8 @@ def get_class_registry() -> ClassRegistryAbstract:
 # cogt
 
 
-def get_llm_deck() -> LLMDeck:
-    return get_pipelex_hub().get_required_llm_deck()
+def get_models_manager() -> ModelsManagerAbstract:
+    return get_pipelex_hub().get_required_models_manager()
 
 
 def get_plugin_manager() -> PluginManager:

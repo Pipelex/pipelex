@@ -1,13 +1,11 @@
 from typing import Dict, List, Optional
 
 from pydantic import Field, RootModel, ValidationError
-from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceModelSpecError
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
-from pipelex.cogt.model_backends.backend_provider import InferenceBackendProviderAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
 from pipelex.config import get_config
@@ -16,27 +14,16 @@ from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_pa
 InferenceBackendLibraryRoot = Dict[str, InferenceBackend]
 
 
-class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot], InferenceBackendProviderAbstract):
+class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     root: InferenceBackendLibraryRoot = Field(default_factory=dict)
 
-    @override
-    def setup(self):
-        pass
-
-    @override
-    def teardown(self):
-        self.root = {}
-
-    @override
     def reset(self):
-        self.teardown()
-        self.setup()
+        self.root = {}
 
     @classmethod
     def make_empty(cls):
         return cls(root={})
 
-    @override
     def load(self):
         backends_library_path = get_config().cogt.inference_config.backends_library_path
         try:

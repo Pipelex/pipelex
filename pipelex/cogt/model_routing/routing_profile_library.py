@@ -21,6 +21,13 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
     root: RoutingProfileLibraryRoot = Field(default_factory=dict)
     _active_config: Optional[str] = None
 
+    @classmethod
+    def make_empty(cls):
+        return cls(root={})
+
+    def reset(self) -> None:
+        self.root = {}
+
     def load(self) -> None:
         """Load the model catalog configuration from TOML file."""
         routing_profile_library_path = get_config().cogt.inference_config.routing_profile_library_path
