@@ -60,9 +60,10 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gpt-5-nano",
         # "gpt-4o-mini",
         # "gpt-5-mini",
-        "gpt-5-chat",
+        # "gpt-5-chat",
         # "claude-4-sonnet",
         # "claude-3.5-sonnet",
+        "claude-3.5-sonnet-v2"
         # "claude-3.7-sonnet",
         # "gemini-2.5-flash-lite",
         # "gemini-2.5-flash",

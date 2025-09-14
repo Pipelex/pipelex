@@ -26,7 +26,7 @@ class InferenceModelSpec(ConfigModel):
 
     @property
     def tag(self) -> str:
-        return f"[{self.sdk}][{self.backend_name}][{self.model_id}]"
+        return f"[{self.sdk}@{self.backend_name}]({self.model_id})"
 
     @property
     def desc(self) -> str:

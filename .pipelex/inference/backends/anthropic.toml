@@ -17,7 +17,7 @@ outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 15.0, output = 75.0 }
 
-[claude-3-5-sonnet]
+["claude-3.5-sonnet"]
 model_id = "claude-3-5-sonnet-20240620"
 max_tokens = 8192
 inputs = ["text", "images"]
@@ -25,7 +25,7 @@ outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
-[claude-3-5-sonnet-v2]
+["claude-3.5-sonnet-v2"]
 model_id = "claude-3-5-sonnet-20241022"
 max_tokens = 8192
 inputs = ["text", "images"]
@@ -33,7 +33,7 @@ outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
-[claude-3-7-sonnet]
+["claude-3.7-sonnet"]
 model_id = "claude-3-7-sonnet-20250219"
 max_tokens = 8192
 inputs = ["text", "images"]
@@ -57,7 +57,7 @@ outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
-[claude-4-1-opus]
+["claude-4.1-opus"]
 model_id = "claude-opus-4-1-20250805"
 max_tokens = 32000
 inputs = ["text", "images"]

@@ -57,6 +57,12 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 3, output = 15 }
 
+["claude-4.1-opus"]
+model_id = "pipelex/claude-4.1-opus"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 15, output = 75 }
+
 # Google Models using Google API
 ["gemini-2.0-flash"]
 model_id = "gemini/gemini-2.0-flash"

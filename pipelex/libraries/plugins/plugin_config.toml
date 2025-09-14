@@ -7,9 +7,6 @@
 image_output_compression = 100
 api_key_method = "env"
 
-[azure_openai_config]
-api_key_method = "env"
-
 # TODO: handle multiple azure openai accounts with different resource groups and account names for various llm model
 
 [perplexity_config]
@@ -28,7 +25,7 @@ api_key_method = "env"
 client_method = "aioboto3"
 
 [anthropic_config]
-claude_4_reduced_tokens_limit = 8192  # use "unlimited" to enable the full 32/64K tokens Opus/Sonet but it raises streaming/timeout issues
+claude_4_reduced_tokens_limit = 8192 # use "unlimited" to enable the full 32/64K tokens Opus/Sonet but it raises streaming/timeout issues
 api_key_method = "env"
 
 [custom_endpoint_config]

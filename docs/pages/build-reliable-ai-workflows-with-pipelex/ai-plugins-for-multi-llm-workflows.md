@@ -8,7 +8,6 @@ The Plugins Configuration manages all external service integrations in Pipelex, 
 [pipelex.plugins]
 # Plugin sections
 [pipelex.plugins.anthropic_config]
-[pipelex.plugins.azure_openai_config]
 [pipelex.plugins.bedrock_config]
 [pipelex.plugins.vertexai_config]
 [pipelex.plugins.mistral_config]
@@ -43,16 +42,11 @@ Environment Variables:
 
 ### 2. Azure OpenAI Configuration
 
-```toml
-[pipelex.plugins.azure_openai_config]
-api_key_method = "env"  # or "secret_provider"
-```
-
 Environment Variables:
 
-- `AZURE_OPENAI_API_KEY`: API key
-- `AZURE_OPENAI_API_ENDPOINT`: API endpoint URL
-- `AZURE_OPENAI_API_VERSION`: API version
+- `AZURE_API_KEY`: API key
+- `AZURE_API_BASE`: API endpoint URL
+- `AZURE_API_VERSION`: API version
 
 ### 3. AWS Bedrock Configuration
 
@@ -205,9 +199,6 @@ Each plugin has its own error types:
 
 [pipelex.plugins.anthropic_config]
 claude_4_reduced_tokens_limit = 8192  # Use "unlimited" for full 32/64K tokens
-api_key_method = "env"
-
-[pipelex.plugins.azure_openai_config]
 api_key_method = "env"
 
 [pipelex.plugins.bedrock_config]

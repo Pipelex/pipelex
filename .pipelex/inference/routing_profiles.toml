@@ -33,6 +33,7 @@ description = "Route models to each of the supported backends"
 
 "claude-4-sonnet" = "pipelex-inference"
 "claude-3.5-sonnet" = "bedrock"
+"claude-3.5-sonnet-v2" = "anthropic"
 "claude-3.7-sonnet" = "blackboxai"
 
 "gemini-2.5-flash-lite" = "pipelex-inference"
