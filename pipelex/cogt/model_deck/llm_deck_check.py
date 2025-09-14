@@ -1,6 +1,5 @@
 from pipelex.cogt.exceptions import LLMPresetNotFoundError
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingOrPresetId
-from pipelex.cogt.model_deck.models_manager import ModelsManager
 from pipelex.hub import get_models_manager
 
 
