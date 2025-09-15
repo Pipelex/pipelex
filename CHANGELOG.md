@@ -19,7 +19,6 @@
 
 - Control whether to fallback from one provider to another when the first is not unavailable for the required model
 - Refactor the old choice defaults / override system
-- Remove old plugin configs, let the backend config specify directly whether to use env vars or secrets from the secret provider
 - Make image generation work the same way as LLM
 - Update documentation
 
