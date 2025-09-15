@@ -660,32 +660,30 @@ But don't write documentation unless asked explicitly to.
 
 # Rules to choose LLM models used in PipeLLMs.
 
+## LLM Configuration System
+
+In order to use it in a pipe, an LLM is referenced by its llm_handle (alias) and possibly by an llm_preset.
+LLM configurations are managed through the new inference backend system with files located in `.pipelex/inference/`:
+
+- **Model Deck**: `.pipelex/inference/deck/base_deck.toml` and `.pipelex/inference/deck/overrides.toml`
+- **Backends**: `.pipelex/inference/backends.toml` and `.pipelex/inference/backends/*.toml`
+- **Routing**: `.pipelex/inference/routing_profiles.toml`
+
 ## LLM Handles
 
-In order to use it in a pipe, an LLM is referenced by its llm_handle and possibly by an llm_preset.
-Both llm_handles and llm_presets are defined in this toml config file: [base_llm_deck.toml](mdc:pipelex/libraries/llm_deck/base_llm_deck.toml)
+An llm_handle can be either:
+1. **A direct model name** (like "gpt-4o-mini", "claude-3-sonnet") - automatically available for all models loaded by the inference backend system
+2. **An alias** - user-defined shortcuts that map to model names, defined in the `[aliases]` section:
 
-## LLM Handles
-
-An llm_handle matches the handle (an id of sorts) with the full specification of the LLM to use, i.e.:
-- llm_name
-- llm_version
-- llm_platform_choice
-
-The declaration of llm_handles looks like this in toml syntax:
 ```toml
-[llm_handles]
-gpt-4o-2024-11-20 = { llm_name = "gpt-4o", llm_version = "2024-11-20" }
-```
-
-In mosty cases, we only want to use version "latest" and llm_platform_choice "default" in which case the declaration is simply a match of the llm_handle to the llm_name, like this:
-```toml
-best-claude = "claude-4-opus"
+[aliases]
+best-claude = "claude-4.1-opus"
 best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-large"
+base-gpt = "gpt-5"
 ```
 
-And of course, llm_handles are automatically assigned for all models by their name, with version "latest" and llm_platform_choice "default".
+The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
 
 ## Using an LLM Handle in a PipeLLM
 
@@ -736,7 +734,7 @@ The setting here `llm = "llm_to_extract_invoice"` works because "llm_to_extract_
 You must not use an LLM preset in a PipeLLM that does not exist in the deck. If needed, you can add llm presets.
 
 
-You can override the predefined llm presets in [overrides.toml](../../pipelex/libraries/llm_deck/overrides.toml).
+You can override the predefined llm presets in `.pipelex/inference/deck/overrides.toml`.
 
 These rules apply when writing unit tests.
 - Always use pytest
