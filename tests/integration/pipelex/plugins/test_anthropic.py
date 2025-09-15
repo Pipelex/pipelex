@@ -6,7 +6,7 @@ from rich.table import Table
 
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError
 from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_anthropic_models
-from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
+from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
 # TODO: fix this: test works for Anthropic but not if you set peferred platform for Anthropic is Bedrock
@@ -20,11 +20,11 @@ class TestAnthropic:
     async def test_anthropic_list_models(
         self,
         pytestconfig: pytest.Config,
-        plugin_sdk_handle_for_anthropic_sdk: PluginSdkHandle,
+        plugin_for_anthropic: Plugin,
     ):
         try:
             anthropic_models_list = await anthropic_list_anthropic_models(
-                plugin_sdk_handle=plugin_sdk_handle_for_anthropic_sdk,
+                plugin=plugin_for_anthropic,
             )
         except AuthenticationError as auth_exc:
             pytest.fail(f"Authentication error for Anthropic: {auth_exc}")

@@ -5,17 +5,17 @@ from anthropic.types import ModelInfo
 
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicModelListingError, AnthropicSDKUnsupportedError
 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
-from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
+from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
-async def anthropic_list_anthropic_models(plugin_sdk_handle: PluginSdkHandle) -> List[ModelInfo]:
+async def anthropic_list_anthropic_models(plugin: Plugin) -> List[ModelInfo]:
     """
     List available Anthropic models.
 
     Returns:
         List[ModelInfo]: A list of Anthropic model information objects
     """
-    anthropic_client = AnthropicFactory.make_anthropic_client(plugin_sdk_handle=plugin_sdk_handle)
+    anthropic_client = AnthropicFactory.make_anthropic_client(plugin=plugin)
     if not hasattr(anthropic_client, "models"):
         raise AnthropicSDKUnsupportedError(f"{type(anthropic_client).__name__} does not support listing models")
     if not isinstance(anthropic_client, AsyncAnthropic):

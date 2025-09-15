@@ -6,7 +6,7 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.hub import get_models_manager, get_plugin_manager
-from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
+from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -16,12 +16,12 @@ class LLMWorkerFactory:
         inference_model: InferenceModelSpec,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ) -> LLMWorkerInternalAbstract:
-        llm_sdk_handle = PluginSdkHandle(inference_model.sdk)
+        plugin = Plugin.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         llm_worker: LLMWorkerInternalAbstract
-        match llm_sdk_handle:
-            case PluginSdkHandle.OPENAI | PluginSdkHandle.AZURE_OPENAI:
+        match plugin.sdk:
+            case "openai" | "azure_openai":
                 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 
                 structure_method: Optional[StructureMethod] = None
@@ -30,23 +30,21 @@ class LLMWorkerFactory:
 
                 from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker
 
-                llm_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle
-                ) or plugin_sdk_registry.set_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle,
-                    llm_sdk_instance=OpenAIFactory.make_openai_client(
-                        plugin_sdk_handle=llm_sdk_handle,
+                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=OpenAIFactory.make_openai_client(
+                        plugin=plugin,
                         backend=backend,
                     ),
                 )
 
                 llm_worker = OpenAILLMWorker(
-                    sdk_instance=llm_sdk_instance,
+                    sdk_instance=sdk_instance,
                     inference_model=inference_model,
                     structure_method=structure_method,
                     reporting_delegate=reporting_delegate,
                 )
-            case PluginSdkHandle.ANTHROPIC | PluginSdkHandle.BEDROCK_ANTHROPIC:
+            case "anthropic" | "bedrock_anthropic":
                 try:
                     import anthropic  # noqa: F401
                 except ImportError as exc:
@@ -63,20 +61,18 @@ class LLMWorkerFactory:
                 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
                 from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 
-                llm_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle
-                ) or plugin_sdk_registry.set_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle,
-                    llm_sdk_instance=AnthropicFactory.make_anthropic_client(plugin_sdk_handle=llm_sdk_handle),
+                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=AnthropicFactory.make_anthropic_client(plugin=plugin),
                 )
 
                 llm_worker = AnthropicLLMWorker(
-                    sdk_instance=llm_sdk_instance,
+                    sdk_instance=sdk_instance,
                     inference_model=inference_model,
                     structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
-            case PluginSdkHandle.MISTRAL:
+            case "mistral":
                 try:
                     import mistralai  # noqa: F401
                 except ImportError as exc:
@@ -93,20 +89,18 @@ class LLMWorkerFactory:
                 from pipelex.plugins.mistral.mistral_factory import MistralFactory
                 from pipelex.plugins.mistral.mistral_llm_worker import MistralLLMWorker
 
-                llm_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle
-                ) or plugin_sdk_registry.set_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle,
-                    llm_sdk_instance=MistralFactory.make_mistral_client(),
+                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=MistralFactory.make_mistral_client(),
                 )
 
                 llm_worker = MistralLLMWorker(
-                    sdk_instance=llm_sdk_instance,
+                    sdk_instance=sdk_instance,
                     inference_model=inference_model,
                     structure_method=StructureMethod.INSTRUCTOR_MISTRAL_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
-            case PluginSdkHandle.BEDROCK:
+            case "bedrock":
                 try:
                     import aioboto3  # noqa: F401
                     import boto3  # noqa: F401
@@ -118,18 +112,16 @@ class LLMWorkerFactory:
                 from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory
                 from pipelex.plugins.bedrock.bedrock_llm_worker import BedrockLLMWorker
 
-                llm_sdk_instance = plugin_sdk_registry.get_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle
-                ) or plugin_sdk_registry.set_llm_sdk_instance(
-                    llm_sdk_handle=llm_sdk_handle,
-                    llm_sdk_instance=BedrockFactory.make_bedrock_client(),
+                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=BedrockFactory.make_bedrock_client(),
                 )
 
                 llm_worker = BedrockLLMWorker(
-                    sdk_instance=llm_sdk_instance,
+                    sdk_instance=sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
-            case PluginSdkHandle.FAL:
-                raise NotImplementedError("FAL is not supported here")
+            case _:
+                raise NotImplementedError(f"Plugin '{plugin}' is not supported")
         return llm_worker

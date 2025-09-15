@@ -26,26 +26,37 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
 from pipelex.config import get_config
 from pipelex.hub import get_plugin_manager, get_secrets_provider
-from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
+from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
+from pipelex.types import StrEnum
 
 
 class AnthropicFactoryError(CogtError):
     pass
 
 
+class AnthropicSdkVariant(StrEnum):
+    ANTHROPIC = "anthropic"
+    BEDROCK_ANTHROPIC = "bedrock_anthropic"
+
+
 class AnthropicFactory:
     @staticmethod
     def make_anthropic_client(
-        plugin_sdk_handle: PluginSdkHandle,
+        plugin: Plugin,
     ) -> Union[AsyncAnthropic, AsyncAnthropicBedrock]:
-        match plugin_sdk_handle:
-            case PluginSdkHandle.ANTHROPIC:
+        try:
+            sdk_variant = AnthropicSdkVariant(plugin.sdk)
+        except ValueError:
+            raise AnthropicFactoryError(f"Plugin '{plugin}' is not supported by AnthropicFactory")
+
+        match sdk_variant:
+            case AnthropicSdkVariant.ANTHROPIC:
                 anthropic_config = get_plugin_manager().plugin_configs.anthropic_config
                 api_key = anthropic_config.get_api_key(secrets_provider=get_secrets_provider())
                 return AsyncAnthropic(api_key=api_key)
-            case PluginSdkHandle.BEDROCK_ANTHROPIC:
+            case AnthropicSdkVariant.BEDROCK_ANTHROPIC:
                 aws_config = get_config().pipelex.aws_config
                 aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()
                 return AsyncAnthropicBedrock(
@@ -53,8 +64,6 @@ class AnthropicFactory:
                     aws_access_key=aws_access_key_id,
                     aws_region=aws_region,
                 )
-            case PluginSdkHandle.OPENAI | PluginSdkHandle.AZURE_OPENAI | PluginSdkHandle.MISTRAL | PluginSdkHandle.BEDROCK | PluginSdkHandle.FAL:
-                raise AnthropicFactoryError(f"Unsupported PluginSdkHandle for Anthropic sdk: '{plugin_sdk_handle}'")
 
     @classmethod
     async def make_user_message(

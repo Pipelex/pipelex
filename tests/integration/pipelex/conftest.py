@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
-from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
+from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
 @pytest.fixture(
@@ -107,38 +107,23 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        # PluginSdkHandle.ANTHROPIC,
-        # PluginSdkHandle.AZURE_OPENAI,
-        # PluginSdkHandle.BEDROCK,
-        # PluginSdkHandle.BEDROCK_ANTHROPIC,
-        # PluginSdkHandle.MISTRAL,
-        PluginSdkHandle.OPENAI,
+        Plugin(sdk="openai", backend="openai"),
+        Plugin(sdk="azure_openai", backend="azure_openai"),
     ]
 )
-def plugin_sdk_handle(request: pytest.FixtureRequest) -> PluginSdkHandle:
-    assert isinstance(request.param, PluginSdkHandle)
+def plugin_for_openai(request: pytest.FixtureRequest) -> Plugin:
+    assert isinstance(request.param, Plugin)
     return request.param
 
 
 @pytest.fixture(
     params=[
-        PluginSdkHandle.AZURE_OPENAI,
-        PluginSdkHandle.OPENAI,
+        Plugin(sdk="anthropic", backend="anthropic"),
+        Plugin(sdk="bedrock_anthropic", backend="bedrock_anthropic"),
     ]
 )
-def plugin_sdk_handle_for_openai_sdk(request: pytest.FixtureRequest) -> PluginSdkHandle:
-    assert isinstance(request.param, PluginSdkHandle)
-    return request.param
-
-
-@pytest.fixture(
-    params=[
-        PluginSdkHandle.ANTHROPIC,
-        PluginSdkHandle.BEDROCK_ANTHROPIC,
-    ]
-)
-def plugin_sdk_handle_for_anthropic_sdk(request: pytest.FixtureRequest) -> PluginSdkHandle:
-    assert isinstance(request.param, PluginSdkHandle)
+def plugin_for_anthropic(request: pytest.FixtureRequest) -> Plugin:
+    assert isinstance(request.param, Plugin)
     return request.param
 
 

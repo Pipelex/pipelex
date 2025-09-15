@@ -19,24 +19,35 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
+from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
+from pipelex.types import StrEnum
 
 
 class OpenAIFactoryError(CogtError):
     pass
 
 
+class OpenAISdkVariant(StrEnum):
+    AZURE_OPENAI = "azure_openai"
+    OPENAI = "openai"
+
+
 class OpenAIFactory:
     @classmethod
     def make_openai_client(
         cls,
-        plugin_sdk_handle: PluginSdkHandle,
+        plugin: Plugin,
         backend: InferenceBackend,
     ) -> openai.AsyncClient:
+        try:
+            sdk_variant = OpenAISdkVariant(plugin.sdk)
+        except ValueError:
+            raise OpenAIFactoryError(f"Plugin '{plugin}' is not supported by OpenAIFactory")
+
         the_client: openai.AsyncOpenAI
-        match plugin_sdk_handle:
-            case PluginSdkHandle.AZURE_OPENAI:
+        match sdk_variant:
+            case OpenAISdkVariant.AZURE_OPENAI:
                 log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 if backend.endpoint is None:
                     raise OpenAIFactoryError("Azure OpenAI endpoint is not set")
@@ -46,20 +57,12 @@ class OpenAIFactory:
                     api_version=backend.api_version,
                 )
 
-            case PluginSdkHandle.OPENAI:
+            case OpenAISdkVariant.OPENAI:
                 log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
                     api_key=backend.api_key,
                     base_url=backend.endpoint,
                 )
-            case (
-                PluginSdkHandle.ANTHROPIC
-                | PluginSdkHandle.BEDROCK
-                | PluginSdkHandle.BEDROCK_ANTHROPIC
-                | PluginSdkHandle.MISTRAL
-                | PluginSdkHandle.FAL
-            ):
-                raise OpenAIFactoryError(f"PluginSdkHandle '{plugin_sdk_handle}' is not supported by OpenAIFactory")
 
         return the_client
 

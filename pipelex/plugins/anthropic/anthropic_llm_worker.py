@@ -12,8 +12,8 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_plugin_manager
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicWorkerConfigurationError
-from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
-from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
+from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory, AnthropicSdkVariant
+from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -42,9 +42,9 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
 
         # Verify if the sdk_instance is compatible with the current LLM platform
         if isinstance(sdk_instance, (AsyncAnthropic, AsyncAnthropicBedrock)):
-            if inference_model.sdk == PluginSdkHandle.ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropic)):
+            if inference_model.sdk == AnthropicSdkVariant.ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropic)):
                 raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
-            elif inference_model.sdk == PluginSdkHandle.BEDROCK_ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropicBedrock)):
+            elif inference_model.sdk == AnthropicSdkVariant.BEDROCK_ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropicBedrock)):
                 raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
         else:
             raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
