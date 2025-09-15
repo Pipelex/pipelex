@@ -31,10 +31,6 @@ class LibraryConfig(ConfigModel):
         return f"{self.config_dir_path}/templates"
 
     @property
-    def plugins_dir_path(self) -> str:
-        return f"{self.config_dir_path}/plugins"
-
-    @property
     def test_pipelines_dir_path(self) -> str:
         return "tests/test_pipelines"
 
@@ -44,10 +40,6 @@ class LibraryConfig(ConfigModel):
 
     def get_templates_paths(self) -> List[str]:
         return [str(path) for path in find_files_in_dir(dir_path=self.templates_dir_path, pattern="*.toml", is_recursive=True)]
-
-    def get_default_plugin_config_path(self) -> str:
-        """Get the default plugin config path."""
-        return f"{self.plugins_dir_path}/plugin_config.toml"
 
     def export_libraries(self, overwrite: bool = False) -> None:
         """Duplicate pipelex libraries files in the client project, preserving directory structure."""
@@ -89,13 +81,5 @@ class LibraryConfig(ConfigModel):
             package_name=self.package_name,
             folder_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/templates",
             target_dir=self.templates_dir_path,
-            overwrite=overwrite,
-        )
-
-        # plugins
-        copy_folder_from_package(
-            package_name=self.package_name,
-            folder_path_in_package=f"{PIPELEX_LIBRARIES_PATH}/plugins",
-            target_dir=self.plugins_dir_path,
             overwrite=overwrite,
         )
