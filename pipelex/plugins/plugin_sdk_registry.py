@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, RootModel
 from pipelex.cogt.imgg.imgg_platform import ImggPlatform
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
-from pipelex.types import StrEnum
 
 
 class Plugin(BaseModel):

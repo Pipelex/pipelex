@@ -13,7 +13,6 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_plugin_manager
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicWorkerConfigurationError
 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory, AnthropicSdkVariant
-from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
