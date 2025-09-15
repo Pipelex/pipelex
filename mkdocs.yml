@@ -140,6 +140,7 @@ nav:
     - Technical Configuration:
       - AWS: pages/configuration/config-technical/aws-config.md
       - Cogt: pages/configuration/config-technical/cogt-config.md
+      - Inference Backend: pages/configuration/config-technical/inference-backend-config.md
       - Library: pages/configuration/config-technical/library-config.md
       - Feature: pages/configuration/config-advanced/feature-config.md
   - Development:

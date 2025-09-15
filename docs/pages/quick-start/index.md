@@ -87,12 +87,12 @@ llm = "llm_for_creative_writing"
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 
-# The llm deck above is defined in `pipelex_libraries/llm_deck/base_llm_deck.toml` as:
+# The llm deck above is defined in `.pipelex/inference/deck/base_deck.toml` as:
 # llm_for_creative_writing = { llm_handle = "best-claude", temperature = 0.9 }
 # it's a base preset that we provide. you can add your own presets, too.
 ```
 
-💡 We have a lot of [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/pipelex/libraries/llm_deck/base_llm_deck.toml).
+💡 We have a lot of [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/.pipelex/inference/deck/base_deck.toml).
 Make sure you have credentials for the underlying LLM provider (and added your API key to the `.env`) and select the one you want!
 
 Learn more about LLM presets, LLM handles and LLM deck in our [LLM Configuration Guide](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md)

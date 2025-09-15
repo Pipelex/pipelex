@@ -45,7 +45,6 @@ make install                  - Create local virtualenv & install all dependenci
 make update                   - Upgrade dependencies via uv
 make validate                 - Run the setup sequence to validate the config and libraries
 make build                    - Build the wheels
-make doc                      - Serve documentation locally with mkdocs
 
 make format                   - format with ruff format
 make lint                     - lint with ruff check
@@ -85,7 +84,7 @@ make fix-unused-imports       - Fix unused imports with ruff
 make fui                      - Shorthand -> fix-unused-imports
 make check-TODOs              - Check for TODOs
 
-make docs                     - Serve documentation with mkdocs
+make docs                     - Serve documentation locally with mkdocs
 make docs-check               - Check documentation build with mkdocs
 make docs-deploy              - Deploy documentation with mkdocs
 

@@ -2,37 +2,36 @@
 
 ## Overview
 
-Pipelex provides a flexible way to configure and manage your LLM (Large Language Model) integrations through three main concepts:
+Pipelex provides a flexible way to configure and manage your LLM (Large Language Model) integrations through the inference backend configuration system. 
 
-- LLM Handles
-- LLM Presets
-- LLM Deck
+The system provides three main concepts for LLM configuration:
 
-Those configuration are present in the `pipelex_libraries/llm_deck` directory.
+- LLM Handles (Aliases)
+- LLM Presets  
+- Model Deck
 
-## LLM Handles
+For complete details about the inference backend configuration system, see the [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) documentation.
 
-An LLM handle is a unique identifier that maps to a specific LLM configuration. It defines:
+## LLM Handles (Aliases)
 
-- The LLM name (e.g., `gpt-4o-mini`, `claude-4-sonnet`, `mistral-large`, `gemini-2.5-flash`)
-- The model version
-- The platform-specific settings (OpenAI, Anthropic, etc...)
+An LLM handle can be either:
 
-### Example Handle Configurations
+1. **A direct model name** (like "gpt-4o-mini", "claude-3-sonnet") - automatically available for all models loaded by the inference backend system
+2. **An alias** - user-defined shortcuts that map to model names, defined in the `[aliases]` section:
 
-```toml
-[llm_handles]
-gpt-4o-2024-11-20 = { llm_name = "gpt-4o", llm_version = "2024-11-20" }
-```
-
-There's a much simpler syntax if you want a handle to the latest version and default platform:
+### Example Alias Configurations
 
 ```toml
-[llm_handles]
-best-claude = "claude-4-opus"
+[aliases]
+best-claude = "claude-4.1-opus"
+best-gemini = "gemini-2.5-pro"
+best-mistral = "mistral-large"
+base-gpt = "gpt-5"
 ```
 
-💡 Defining a llm_handle is alway meant to describe what model it is. Never define a llm_handle to describe what it is for or what it's good at. LLM Settings are for that.
+The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
+
+💡 Defining an alias is always meant to describe what model it is. Never define an alias to describe what it is for or what it's good at. LLM Presets are for that.
 
 ## LLM Settings & LLM Presets
 
@@ -92,21 +91,29 @@ Extract the weather data from this text:
 """
 ```
 
-## LLM Deck
+## Model Deck
 
-The LLM deck is your central configuration hub for all LLM-related settings. It's stored in the `pipelex_libraries/llm_deck` directory and consists of:
+The Model Deck is your central configuration hub for all LLM-related settings. It's stored in the `.pipelex/inference/deck/` directory and consists of:
 
-- `base_llm_deck.toml`: Core LLM configurations
+- `base_deck.toml`: Core LLM configurations including aliases and presets
 - `overrides.toml`: Custom overrides for specific use cases
 
 ### Directory Structure
 
 ```bash
-pipelex_libraries/
-└── llm_deck/
-    ├── base_llm_deck.toml
-    └── overrides.toml
+.pipelex/
+└── inference/
+    ├── backends.toml              # Backend configurations
+    ├── routing_profiles.toml      # Model routing rules
+    ├── backends/                  # Individual backend model specs
+    │   ├── openai.toml
+    │   ├── anthropic.toml
+    │   └── ...
+    └── deck/                      # Model deck configurations
+        ├── base_deck.toml         # Aliases and presets
+        └── overrides.toml         # Custom overrides
 ```
+
 
 
 ## Best Practices
