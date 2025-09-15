@@ -42,6 +42,7 @@ def _setup_ci_env_vars():
             "AZURE_OPENAI_API_ENDPOINT": "https://ci-placeholder.openai.azure.com",
             "AZURE_OPENAI_API_VERSION": "2025-04-01-preview",
             "AZURE_OPENAI_API_KEY": "ci-placeholder-azure-key",
+            "AZURE_API_BASE": "https://ci-placeholder.openai.azure.com",
             "ANTHROPIC_API_KEY": "sk-ant-ci-placeholder-key",
             "MISTRAL_API_KEY": "ci-placeholder-mistral-key",
             "PERPLEXITY_API_KEY": "ci-placeholder-perplexity-key",
