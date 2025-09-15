@@ -113,13 +113,13 @@ def _get_env_var(var_name: str) -> str:
     """Get environment variable, raising VarNotFoundError if not found."""
     try:
         return get_required_env(var_name)
-    except EnvVarNotFoundError as e:
-        raise VarNotFoundError(str(e)) from e
+    except EnvVarNotFoundError as exc:
+        raise VarNotFoundError(f"Could not get variable '{var_name}': {str(exc)}") from exc
 
 
 def _get_secret(secret_name: str) -> str:
     """Get secret, raising VarNotFoundError if not found."""
     try:
         return get_secrets_provider().get_secret(secret_id=secret_name)
-    except SecretNotFoundError as e:
-        raise VarNotFoundError(f"Secret '{secret_name}' not found: {str(e)}") from e
+    except SecretNotFoundError as exc:
+        raise VarNotFoundError(f"Could not get variable '{secret_name}': {str(exc)}") from exc
