@@ -62,7 +62,7 @@ def substitute_env_vars(content: str) -> str:
         Content with environment variables substituted
 
     Raises:
-        ValueError: If required environment variable is missing and no default provided
+        EnvVarNotFoundError: If required environment variable is missing and no default provided
     """
 
     def replace_env_var(match: re.Match[str]) -> str:

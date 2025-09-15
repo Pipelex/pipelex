@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Mapping, Optional, cast
+from typing import Any, Dict, List, Mapping, Optional, Union, cast
 
 import toml
 import tomlkit
@@ -10,6 +10,7 @@ from tomlkit import array, document, inline_table, table
 from tomlkit import string as tk_string
 
 from pipelex.tools.environment import EnvVarNotFoundError, substitute_env_vars
+from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 
@@ -116,14 +117,15 @@ def load_toml_from_path(path: str, is_env_var_substitution_enabled: bool = False
             with open(path, "w", encoding="utf-8") as file:
                 file.write(cleaned_content)
 
-        # Apply environment variable substitution if enabled
+        # Parse TOML first
+        dict_from_toml = toml.loads(cleaned_content)
+
+        # Apply environment variable substitution to string values in the dictionary if enabled
         if is_env_var_substitution_enabled:
             try:
-                cleaned_content = substitute_env_vars(cleaned_content)
+                dict_from_toml = apply_to_strings_recursive(dict_from_toml, substitute_env_vars)
             except EnvVarNotFoundError as exc:
                 raise TOMLValidationError(f"Environment variable substitution failed in file '{path}': {exc}") from exc
-
-        dict_from_toml = toml.loads(cleaned_content)
         return dict_from_toml
     except toml.TomlDecodeError as exc:
         raise toml.TomlDecodeError(f"TOML parsing error in file '{path}': {exc}", exc.doc, exc.pos) from exc

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -234,3 +235,147 @@ Output this only: "large"
         error_msg = str(exc_info.value)
         assert "Trailing whitespace" in error_msg
         assert problematic_file in error_msg
+
+    def test_load_toml_with_env_var_substitution_simple(self, tmp_path: Path) -> None:
+        """Test loading TOML with simple environment variable substitution."""
+        # Set up environment variables for testing
+        os.environ["TEST_USER"] = "john_doe"
+        os.environ["TEST_VERSION"] = "1.2.3"
+
+        try:
+            toml_content = """domain = "${TEST_USER}_domain"
+version = "v${TEST_VERSION}"
+description = "Test for user ${TEST_USER}"
+
+[config]
+user_name = "${TEST_USER}"
+app_version = "${TEST_VERSION}"
+static_value = "no_substitution"
+number_value = 42
+"""
+
+            toml_file = tmp_path / "test_env.toml"
+            toml_file.write_text(toml_content)
+
+            # Test with env var substitution enabled
+            result = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+
+            assert result["domain"] == "john_doe_domain"
+            assert result["version"] == "v1.2.3"
+            assert result["description"] == "Test for user john_doe"
+            assert result["config"]["user_name"] == "john_doe"
+            assert result["config"]["app_version"] == "1.2.3"
+            assert result["config"]["static_value"] == "no_substitution"  # No env vars
+            assert result["config"]["number_value"] == 42  # Non-string unchanged
+
+            # Test with env var substitution disabled (default)
+            result_no_sub = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=False)
+
+            assert result_no_sub["domain"] == "${TEST_USER}_domain"  # No substitution
+            assert result_no_sub["version"] == "v${TEST_VERSION}"  # No substitution
+
+        finally:
+            # Clean up environment variables
+            os.environ.pop("TEST_USER", None)
+            os.environ.pop("TEST_VERSION", None)
+
+    def test_load_toml_with_env_var_substitution_nested_structures(self, tmp_path: Path) -> None:
+        """Test loading TOML with env var substitution in nested structures and lists."""
+        # Set up environment variables
+        os.environ["TEST_HOST"] = "localhost"
+        os.environ["TEST_PORT"] = "8080"
+        os.environ["TEST_ENV"] = "development"
+
+        try:
+            toml_content = """domain = "test_domain"
+
+[database]
+host = "${TEST_HOST}"
+port = "${TEST_PORT}"
+config = { env = "${TEST_ENV}", timeout = 30 }
+
+[servers]
+primary = "${TEST_HOST}:${TEST_PORT}"
+urls = ["http://${TEST_HOST}:${TEST_PORT}/api", "https://${TEST_HOST}:9443/secure"]
+
+[[services]]
+name = "api_${TEST_ENV}"
+endpoint = "${TEST_HOST}:${TEST_PORT}"
+
+[[services]]
+name = "static"
+endpoint = "cdn.example.com"
+"""
+
+            toml_file = tmp_path / "test_nested_env.toml"
+            toml_file.write_text(toml_content)
+
+            result = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+
+            # Test nested dictionary substitution
+            assert result["database"]["host"] == "localhost"
+            assert result["database"]["port"] == "8080"
+            assert result["database"]["config"]["env"] == "development"
+            assert result["database"]["config"]["timeout"] == 30  # Non-string unchanged
+
+            # Test string with multiple env vars
+            assert result["servers"]["primary"] == "localhost:8080"
+
+            # Test list with env var substitution
+            expected_urls = ["http://localhost:8080/api", "https://localhost:9443/secure"]
+            assert result["servers"]["urls"] == expected_urls
+
+            # Test array of tables
+            assert result["services"][0]["name"] == "api_development"
+            assert result["services"][0]["endpoint"] == "localhost:8080"
+            assert result["services"][1]["name"] == "static"  # No env vars
+            assert result["services"][1]["endpoint"] == "cdn.example.com"  # No env vars
+
+        finally:
+            # Clean up
+            for var in ["TEST_HOST", "TEST_PORT", "TEST_ENV"]:
+                os.environ.pop(var, None)
+
+    def test_load_toml_with_env_var_substitution_with_defaults(self, tmp_path: Path) -> None:
+        """Test loading TOML with environment variable substitution using default values."""
+        # Only set one env var, let the other use defaults
+        os.environ["TEST_EXISTING"] = "exists"
+
+        try:
+            toml_content = """domain = "test_domain"
+existing_var = "${TEST_EXISTING}"
+missing_with_default = "${TEST_MISSING:default_value}"
+nested_default = "${TEST_NESTED:prod_${TEST_EXISTING}}"
+
+[config]
+values = ["${TEST_EXISTING}", "${TEST_MISSING:fallback}", "static"]
+"""
+
+            toml_file = tmp_path / "test_defaults.toml"
+            toml_file.write_text(toml_content)
+
+            result = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+
+            assert result["existing_var"] == "exists"
+            assert result["missing_with_default"] == "default_value"
+            assert result["nested_default"] == "prod_${TEST_EXISTING}"  # Default values are not recursively substituted
+            assert result["config"]["values"] == ["exists", "fallback", "static"]
+
+        finally:
+            os.environ.pop("TEST_EXISTING", None)
+
+    def test_load_toml_with_env_var_substitution_missing_required_var(self, tmp_path: Path) -> None:
+        """Test that missing required environment variables raise an error."""
+        toml_content = """domain = "test_domain"
+required_var = "${REQUIRED_MISSING_VAR}"
+"""
+
+        toml_file = tmp_path / "test_missing_var.toml"
+        toml_file.write_text(toml_content)
+
+        with pytest.raises(TOMLValidationError) as exc_info:
+            load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+
+        error_msg = str(exc_info.value)
+        assert "Environment variable substitution failed" in error_msg
+        assert "REQUIRED_MISSING_VAR" in error_msg
