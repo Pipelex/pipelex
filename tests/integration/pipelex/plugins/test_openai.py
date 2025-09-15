@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.hub import get_models_manager, get_plugin_manager, get_secrets_provider
+from pipelex.hub import get_models_manager
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
 from pipelex.plugins.plugin_sdk_registry import Plugin
 
