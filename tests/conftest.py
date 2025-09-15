@@ -1,5 +1,4 @@
 import atexit
-import json
 import os
 
 import pytest
@@ -84,10 +83,7 @@ def _setup_ci_env_vars():
             content = f.read()
 
         # Disable vertexai backend for CI
-        content = content.replace(
-            "[vertexai]\nenabled = true",
-            "[vertexai]\nenabled = false"
-        )
+        content = content.replace("[vertexai]\nenabled = true", "[vertexai]\nenabled = false")
 
         with open(backends_path, "w") as f:
             f.write(content)
