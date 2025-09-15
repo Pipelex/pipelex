@@ -52,6 +52,7 @@ def _setup_ci_env_vars():
             # GCP_CREDENTIALS_FILE_PATH intentionally omitted - let it be None if not set
             "XAI_API_KEY": "ci-placeholder-xai-key",
             "XAI_API_ENDPOINT": "https://api.x.ai/v1/",
+            "BLACKBOX_API_KEY": "ci-placeholder-blackbox-key",
             "CUSTOM_ENDPOINT_BASE_URL": "http://localhost:11434/v1/",
             "CUSTOM_ENDPOINT_API_KEY": "ci-placeholder-custom-key",
         }
