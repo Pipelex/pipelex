@@ -41,11 +41,9 @@ class ImggWorkerFactory:
 
                 from pipelex.plugins.fal.fal_imgg_worker import FalImggWorker
 
-                imgg_sdk_instance = plugin_sdk_registry.get_imgg_sdk_instance(
-                    img_gen_plugin=img_gen_plugin
-                ) or plugin_sdk_registry.set_imgg_sdk_instance(
-                    img_gen_plugin=img_gen_plugin,
-                    imgg_sdk_instance=FalAsyncClient(key=fal_api_key),
+                imgg_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=img_gen_plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=img_gen_plugin,
+                    sdk_instance=FalAsyncClient(key=fal_api_key),
                 )
 
                 imgg_worker = FalImggWorker(

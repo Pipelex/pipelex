@@ -67,17 +67,3 @@ class PluginSdkRegistry(RootModel[PluginSdkRegistryRoot]):
     def set_sdk_instance(self, plugin: Plugin, sdk_instance: Any) -> Any:
         self.root[plugin.sdk_handle] = sdk_instance
         return sdk_instance
-
-    def get_ocr_sdk_instance(self, ocr_plugin: Plugin) -> Optional[Any]:
-        return self.root.get(ocr_plugin.sdk_handle)
-
-    def set_ocr_sdk_instance(self, ocr_plugin: Plugin, ocr_sdk_instance: Any) -> Any:
-        self.root[ocr_plugin.sdk_handle] = ocr_sdk_instance
-        return ocr_sdk_instance
-
-    def get_imgg_sdk_instance(self, img_gen_plugin: Plugin) -> Optional[Any]:
-        return self.root.get(img_gen_plugin.sdk_handle)
-
-    def set_imgg_sdk_instance(self, img_gen_plugin: Plugin, imgg_sdk_instance: Any) -> Any:
-        self.root[img_gen_plugin.sdk_handle] = imgg_sdk_instance
-        return imgg_sdk_instance
