@@ -9,10 +9,10 @@ from pydantic import BaseModel
 from tomlkit import array, document, inline_table, table
 from tomlkit import string as tk_string
 
-from pipelex.tools.environment import EnvVarNotFoundError, substitute_env_vars
 from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
+from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarNotFoundError, substitute_vars
 
 
 class TOMLValidationError(Exception):
@@ -92,19 +92,19 @@ def clean_trailing_whitespace(content: str) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def load_toml_from_path(path: str, is_env_var_substitution_enabled: bool = False) -> Dict[str, Any]:
-    """Load TOML from path with optional environment variable substitution.
+def load_toml_from_path(path: str, is_var_substitution_enabled: bool = False) -> Dict[str, Any]:
+    """Load TOML from path with optional variable substitution.
 
     Args:
         path: Path to the TOML file
-        is_env_var_substitution_enabled: If True, substitute ${ENV_VAR} patterns with environment variables
+        is_var_substitution_enabled: If True, substitute ${VAR}, ${env:VAR}, ${secret:VAR} patterns with values
 
     Returns:
         Dictionary loaded from TOML
 
     Raises:
         toml.TomlDecodeError: If TOML parsing fails, with file path included
-        TOMLValidationError: If environment variable substitution is enabled and a required variable is missing
+        TOMLValidationError: If variable substitution is enabled and a required variable is missing
     """
     try:
         with open(path, "r", encoding="utf-8") as file:
@@ -120,23 +120,23 @@ def load_toml_from_path(path: str, is_env_var_substitution_enabled: bool = False
         # Parse TOML first
         dict_from_toml = toml.loads(cleaned_content)
 
-        # Apply environment variable substitution to string values in the dictionary if enabled
-        if is_env_var_substitution_enabled:
+        # Apply variable substitution to string values in the dictionary if enabled
+        if is_var_substitution_enabled:
             try:
-                dict_from_toml = apply_to_strings_recursive(dict_from_toml, substitute_env_vars)
-            except EnvVarNotFoundError as exc:
-                raise TOMLValidationError(f"Environment variable substitution failed in file '{path}': {exc}") from exc
+                dict_from_toml = apply_to_strings_recursive(dict_from_toml, substitute_vars)
+            except (VarNotFoundError, UnknownVarPrefixError) as exc:
+                raise TOMLValidationError(f"Variable substitution failed in file '{path}': {exc}") from exc
         return dict_from_toml
     except toml.TomlDecodeError as exc:
         raise toml.TomlDecodeError(f"TOML parsing error in file '{path}': {exc}", exc.doc, exc.pos) from exc
 
 
-def failable_load_toml_from_path(path: str, is_env_var_substitution_enabled: bool = False) -> Optional[Dict[str, Any]]:
+def failable_load_toml_from_path(path: str, is_var_substitution_enabled: bool = False) -> Optional[Dict[str, Any]]:
     """Load TOML from path with failure handling."""
     if not path_exists(path):
         return None
     try:
-        return load_toml_from_path(path, is_env_var_substitution_enabled=is_env_var_substitution_enabled)
+        return load_toml_from_path(path, is_var_substitution_enabled=is_var_substitution_enabled)
     except (toml.TomlDecodeError, TOMLValidationError) as exc:
         print(f"Failed to parse TOML file '{path}': {exc}")
         return None

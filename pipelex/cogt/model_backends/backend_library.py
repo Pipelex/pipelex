@@ -31,7 +31,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         try:
             backends_dict = load_toml_from_path(
                 path=backends_library_path,
-                is_env_var_substitution_enabled=True,
+                is_var_substitution_enabled=True,
             )
         except (FileNotFoundError, TOMLValidationError) as exc:
             raise InferenceBackendLibraryError(f"Failed to load inference backend library from file '{backends_library_path}': {exc}") from exc
@@ -43,7 +43,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             try:
                 model_specs_dict = load_toml_from_path(
                     path=path_to_model_specs_toml,
-                    is_env_var_substitution_enabled=True,
+                    is_var_substitution_enabled=True,
                 )
             except (FileNotFoundError, TOMLValidationError) as exc:
                 raise InferenceBackendLibraryError(f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}") from exc

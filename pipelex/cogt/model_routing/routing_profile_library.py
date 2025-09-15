@@ -45,7 +45,7 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         try:
             catalog_dict = load_toml_from_path(
                 path=routing_profile_library_path,
-                is_env_var_substitution_enabled=True,
+                is_var_substitution_enabled=True,
             )
         except (FileNotFoundError, TOMLValidationError) as exc:
             raise RoutingProfileLibraryError(f"Failed to load routing profile library from file '{routing_profile_library_path}': {exc}") from exc

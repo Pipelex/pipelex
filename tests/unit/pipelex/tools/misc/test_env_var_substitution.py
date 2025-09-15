@@ -76,7 +76,7 @@ database_name = "${DB_NAME:test_db}"
         toml_file = tmp_path / "config.toml"
         toml_file.write_text(toml_content)
 
-        result = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+        result = load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
 
         assert result["database_host"] == "localhost"
         assert result["database_port"] == "5432"
@@ -90,7 +90,7 @@ database_port = "${DB_PORT}"
         toml_file = tmp_path / "config.toml"
         toml_file.write_text(toml_content)
 
-        result = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=False)
+        result = load_toml_from_path(str(toml_file), is_var_substitution_enabled=False)
 
         # Should keep the placeholders as-is
         assert result["database_host"] == "${DB_HOST}"
@@ -104,7 +104,7 @@ database_port = "${DB_PORT}"
         toml_file.write_text(toml_content)
 
         with pytest.raises(TOMLValidationError) as exc_info:
-            load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+            load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
 
         error_msg = str(exc_info.value)
         assert "Environment variable substitution failed" in error_msg
@@ -119,7 +119,7 @@ database_port = "${DB_PORT}"
         toml_file = tmp_path / "config.toml"
         toml_file.write_text(toml_content)
 
-        result = failable_load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+        result = failable_load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
 
         assert result is not None
         assert result["status"] == "success"
@@ -131,7 +131,7 @@ database_port = "${DB_PORT}"
         toml_file = tmp_path / "config.toml"
         toml_file.write_text(toml_content)
 
-        result = failable_load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+        result = failable_load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
 
         assert result is None
 
@@ -183,7 +183,7 @@ endpoint = "https://api.blackbox.ai/v1"
         toml_file = tmp_path / "providers.toml"
         toml_file.write_text(toml_content)
 
-        result = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+        result = load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
 
         assert result["pipelex_inference"]["endpoint"] == "https://inference.pipelex.com/v1"
         assert result["azure_openai"]["endpoint"] == "https://my-azure.openai.azure.com"

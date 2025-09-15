@@ -236,8 +236,8 @@ Output this only: "large"
         assert "Trailing whitespace" in error_msg
         assert problematic_file in error_msg
 
-    def test_load_toml_with_env_var_substitution_simple(self, tmp_path: Path) -> None:
-        """Test loading TOML with simple environment variable substitution."""
+    def test_load_toml_with_var_substitution_simple(self, tmp_path: Path) -> None:
+        """Test loading TOML with simple variable substitution using environment variables."""
         # Set up environment variables for testing
         os.environ["TEST_USER"] = "john_doe"
         os.environ["TEST_VERSION"] = "1.2.3"
@@ -257,8 +257,8 @@ number_value = 42
             toml_file = tmp_path / "test_env.toml"
             toml_file.write_text(toml_content)
 
-            # Test with env var substitution enabled
-            result = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+            # Test with variable substitution enabled
+            result = load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
 
             assert result["domain"] == "john_doe_domain"
             assert result["version"] == "v1.2.3"
@@ -268,8 +268,8 @@ number_value = 42
             assert result["config"]["static_value"] == "no_substitution"  # No env vars
             assert result["config"]["number_value"] == 42  # Non-string unchanged
 
-            # Test with env var substitution disabled (default)
-            result_no_sub = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=False)
+            # Test with variable substitution disabled (default)
+            result_no_sub = load_toml_from_path(str(toml_file), is_var_substitution_enabled=False)
 
             assert result_no_sub["domain"] == "${TEST_USER}_domain"  # No substitution
             assert result_no_sub["version"] == "v${TEST_VERSION}"  # No substitution
@@ -310,7 +310,7 @@ endpoint = "cdn.example.com"
             toml_file = tmp_path / "test_nested_env.toml"
             toml_file.write_text(toml_content)
 
-            result = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+            result = load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
 
             # Test nested dictionary substitution
             assert result["database"]["host"] == "localhost"
@@ -354,7 +354,7 @@ values = ["${TEST_EXISTING}", "${TEST_MISSING:fallback}", "static"]
             toml_file = tmp_path / "test_defaults.toml"
             toml_file.write_text(toml_content)
 
-            result = load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+            result = load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
 
             assert result["existing_var"] == "exists"
             assert result["missing_with_default"] == "default_value"
@@ -374,8 +374,8 @@ required_var = "${REQUIRED_MISSING_VAR}"
         toml_file.write_text(toml_content)
 
         with pytest.raises(TOMLValidationError) as exc_info:
-            load_toml_from_path(str(toml_file), is_env_var_substitution_enabled=True)
+            load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
 
         error_msg = str(exc_info.value)
-        assert "Environment variable substitution failed" in error_msg
+        assert "Variable substitution failed" in error_msg
         assert "REQUIRED_MISSING_VAR" in error_msg
