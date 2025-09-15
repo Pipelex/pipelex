@@ -1,3 +1,5 @@
+import atexit
+import json
 import os
 
 import pytest
@@ -53,7 +55,7 @@ def _setup_ci_env_vars():
             "GCP_PROJECT_ID": "ci-placeholder-project",
             "GCP_REGION": "us-central1",
             "GCP_LOCATION": "us-central1",
-            # GCP_CREDENTIALS_FILE_PATH intentionally omitted - let it be None if not set
+            "GCP_CREDENTIALS_FILE_PATH": "/tmp/ci-placeholder-gcp-credentials.json",
             "XAI_API_KEY": "ci-placeholder-xai-key",
             "XAI_API_ENDPOINT": "https://api.x.ai/v1/",
             "BLACKBOX_API_KEY": "ci-placeholder-blackbox-key",
@@ -66,11 +68,53 @@ def _setup_ci_env_vars():
         for key, value in ci_placeholders.items():
             os.environ[key] = value
 
+        # Temporarily modify backends.toml to disable problematic backends in CI
+        backends_path = ".pipelex/inference/backends.toml"
+        backup_path = ".pipelex/inference/backends.toml.backup"
+
+        # Create backup if it doesn't exist
+        if not os.path.exists(backup_path):
+            with open(backends_path, "r") as f:
+                original_content = f.read()
+            with open(backup_path, "w") as f:
+                f.write(original_content)
+
+        # Modify the original file to disable vertexai
+        with open(backends_path, "r") as f:
+            content = f.read()
+
+        # Disable vertexai backend for CI
+        content = content.replace(
+            "[vertexai]\nenabled = true",
+            "[vertexai]\nenabled = false"
+        )
+
+        with open(backends_path, "w") as f:
+            f.write(content)
+
         print(f"[yellow]Set {len(ci_placeholders)} placeholder environment variables[/yellow]")
+
+
+def _restore_ci_backends_file():
+    """Restore original backends.toml file if we're in CI and a backup exists."""
+    if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+        backends_path = ".pipelex/inference/backends.toml"
+        backup_path = ".pipelex/inference/backends.toml.backup"
+
+        if os.path.exists(backup_path):
+            with open(backup_path, "r") as f:
+                original_content = f.read()
+            with open(backends_path, "w") as f:
+                f.write(original_content)
+            os.remove(backup_path)
+            print("[yellow]Restored original backends.toml file[/yellow]")
 
 
 # Set up CI environment variables before any imports that might need them
 _setup_ci_env_vars()
+
+# Register cleanup function to restore backends file
+atexit.register(_restore_ci_backends_file)
 
 
 @pytest.fixture(scope="module", autouse=True)
