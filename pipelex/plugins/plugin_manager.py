@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pipelex.plugins.plugin_sdk_registry import PluginSdkRegistry
 
 

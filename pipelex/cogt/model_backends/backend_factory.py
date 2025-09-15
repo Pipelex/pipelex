@@ -4,7 +4,6 @@ from pydantic import Field
 
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.hub import get_plugin_manager
 from pipelex.tools.config.config_model import ConfigModel
 
 

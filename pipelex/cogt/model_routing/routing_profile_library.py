@@ -43,10 +43,7 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         routing_profile_library_path = get_config().cogt.inference_config.routing_profile_library_path
 
         try:
-            catalog_dict = load_toml_from_path(
-                path=routing_profile_library_path,
-                is_var_substitution_enabled=True,
-            )
+            catalog_dict = load_toml_from_path(path=routing_profile_library_path)
         except (FileNotFoundError, TOMLValidationError) as exc:
             raise RoutingProfileLibraryError(f"Failed to load routing profile library from file '{routing_profile_library_path}': {exc}") from exc
 

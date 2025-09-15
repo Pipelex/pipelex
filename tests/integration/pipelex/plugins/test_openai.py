@@ -11,10 +11,6 @@ from pipelex.plugins.plugin_sdk_registry import Plugin
 @pytest.mark.codex_disabled
 @pytest.mark.asyncio(loop_scope="class")
 class TestOpenAI:
-    async def test_openai_api_key(self):
-        openai_config = get_plugin_manager().plugin_configs.openai_config
-        assert openai_config.get_api_key(secrets_provider=get_secrets_provider())
-
     # pytest -k test_openai_list_available_models -s -vv
     async def test_openai_list_available_models(
         self,

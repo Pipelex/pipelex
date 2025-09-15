@@ -64,24 +64,6 @@ api_key = "default_key"
 """
         assert result == expected
 
-    def test_load_toml_with_env_substitution_enabled(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test loading TOML with environment variable substitution enabled."""
-        monkeypatch.setenv("DB_HOST", "localhost")
-        monkeypatch.setenv("DB_PORT", "5432")
-
-        toml_content = """database_host = "${DB_HOST}"
-database_port = "${DB_PORT}"
-database_name = "${DB_NAME:test_db}"
-"""
-        toml_file = tmp_path / "config.toml"
-        toml_file.write_text(toml_content)
-
-        result = load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
-
-        assert result["database_host"] == "localhost"
-        assert result["database_port"] == "5432"
-        assert result["database_name"] == "test_db"
-
     def test_load_toml_with_env_substitution_disabled(self, tmp_path: Path) -> None:
         """Test loading TOML with environment variable substitution disabled (default)."""
         toml_content = """database_host = "${DB_HOST}"
@@ -90,55 +72,11 @@ database_port = "${DB_PORT}"
         toml_file = tmp_path / "config.toml"
         toml_file.write_text(toml_content)
 
-        result = load_toml_from_path(str(toml_file), is_var_substitution_enabled=False)
+        result = load_toml_from_path(str(toml_file))
 
         # Should keep the placeholders as-is
         assert result["database_host"] == "${DB_HOST}"
         assert result["database_port"] == "${DB_PORT}"
-
-    def test_load_toml_with_env_substitution_missing_var(self, tmp_path: Path) -> None:
-        """Test loading TOML with missing required environment variable."""
-        toml_content = """database_host = "${MISSING_VAR}"
-"""
-        toml_file = tmp_path / "config.toml"
-        toml_file.write_text(toml_content)
-
-        with pytest.raises(TOMLValidationError) as exc_info:
-            load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
-
-        error_msg = str(exc_info.value)
-        assert "Environment variable substitution failed" in error_msg
-        assert "MISSING_VAR" in error_msg
-
-    def test_failable_load_with_env_substitution(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test failable loading with environment variable substitution."""
-        monkeypatch.setenv("TEST_VALUE", "success")
-
-        toml_content = """status = "${TEST_VALUE}"
-"""
-        toml_file = tmp_path / "config.toml"
-        toml_file.write_text(toml_content)
-
-        result = failable_load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
-
-        assert result is not None
-        assert result["status"] == "success"
-
-    def test_failable_load_with_missing_env_var(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test failable loading with missing environment variable returns None."""
-        toml_content = """status = "${MISSING_VAR}"
-"""
-        toml_file = tmp_path / "config.toml"
-        toml_file.write_text(toml_content)
-
-        result = failable_load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
-
-        assert result is None
-
-        # Check that an error message was printed
-        captured = capsys.readouterr()
-        assert "Failed to parse TOML file" in captured.out
-        assert "MISSING_VAR" in captured.out
 
     def testsubstitute_env_vars_with_special_chars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test substitution with special characters in values."""
@@ -166,25 +104,3 @@ key3 = "also not a placeholder}"
 key4 = "$not_a_placeholder"
 """
         assert result == expected
-
-    def test_real_world_providers_toml(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test with a real-world providers.toml example."""
-        monkeypatch.setenv("AZURE_API_BASE", "https://my-azure.openai.azure.com")
-
-        toml_content = """[pipelex_inference]
-endpoint = "https://inference.pipelex.com/v1"
-
-[azure_openai]
-endpoint = "${AZURE_API_BASE}"
-
-[blackboxai]
-endpoint = "https://api.blackbox.ai/v1"
-"""
-        toml_file = tmp_path / "providers.toml"
-        toml_file.write_text(toml_content)
-
-        result = load_toml_from_path(str(toml_file), is_var_substitution_enabled=True)
-
-        assert result["pipelex_inference"]["endpoint"] == "https://inference.pipelex.com/v1"
-        assert result["azure_openai"]["endpoint"] == "https://my-azure.openai.azure.com"
-        assert result["blackboxai"]["endpoint"] == "https://api.blackbox.ai/v1"

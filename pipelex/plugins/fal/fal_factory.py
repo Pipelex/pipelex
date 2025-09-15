@@ -8,7 +8,6 @@ from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, OutputFormat, Quality
 from pipelex.config import get_config
-from pipelex.hub import get_plugin_manager
 
 
 class FalFactory:

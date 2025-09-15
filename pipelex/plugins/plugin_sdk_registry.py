@@ -8,17 +8,6 @@ from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 
 
 class Plugin(BaseModel):
-    # OPENAI = "openai"
-    # AZURE_OPENAI = "azure_openai"
-    # ANTHROPIC = "anthropic"
-    # BEDROCK_ANTHROPIC = "bedrock_anthropic"
-    # MISTRAL = "mistral"
-    # BEDROCK = "bedrock"
-    # # PERPLEXITY_OPENAI = "perplexity_openai"
-    # # VERTEXAI_OPENAI = "vertexai_openai"
-    # # XAI_OPENAI = "xai_openai"
-    # # CUSTOM_LLM_OPENAI = "custom_llm_openai"
-    # FAL = "fal"
     sdk: str
     backend: str
 

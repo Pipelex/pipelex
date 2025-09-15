@@ -169,7 +169,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
         self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
-        self.plugin_manager.setup(library_config=self.library_manager.library_config)
+        self.plugin_manager.setup()
         self.models_manager.setup()
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()

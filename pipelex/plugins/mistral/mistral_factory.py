@@ -23,9 +23,11 @@ from pipelex.cogt.exceptions import PromptImageFormatError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
+from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
 from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import encode_to_base64, load_binary_as_base64
 
 
@@ -35,10 +37,11 @@ class MistralFactory:
     #########################################################
 
     @classmethod
-    def make_mistral_client(cls) -> Mistral:
-        return Mistral(
-            api_key=get_plugin_manager().plugin_configs.mistral_config.api_key(secrets_provider=get_secrets_provider()),
-        )
+    def make_mistral_client(
+        cls,
+        backend: InferenceBackend,
+    ) -> Mistral:
+        return Mistral(api_key=backend.api_key)
 
     #########################################################
     # Message

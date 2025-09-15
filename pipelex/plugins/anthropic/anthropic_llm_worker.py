@@ -10,7 +10,6 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.hub import get_plugin_manager
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicWorkerConfigurationError
 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory, AnthropicSdkVariant
 from pipelex.reporting.reporting_protocol import ReportingProtocol

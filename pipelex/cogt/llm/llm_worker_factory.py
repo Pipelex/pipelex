@@ -92,7 +92,7 @@ class LLMWorkerFactory:
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=MistralFactory.make_mistral_client(),
+                    sdk_instance=MistralFactory.make_mistral_client(backend=backend),
                 )
 
                 llm_worker = MistralLLMWorker(

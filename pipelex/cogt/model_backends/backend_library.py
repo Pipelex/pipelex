@@ -11,7 +11,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.config import get_config
-from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path
+from pipelex.tools.misc.toml_secret_utils import TOMLSecretValidationError, load_toml_from_path_with_secret_substitution
 
 InferenceBackendLibraryRoot = Dict[str, InferenceBackend]
 
@@ -29,29 +29,28 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def load(self):
         backends_library_path = get_config().cogt.inference_config.backends_library_path
         try:
-            backends_dict = load_toml_from_path(
+            backends_dict = load_toml_from_path_with_secret_substitution(
                 path=backends_library_path,
-                is_var_substitution_enabled=True,
             )
-        except (FileNotFoundError, TOMLValidationError) as exc:
+        except (FileNotFoundError, TOMLSecretValidationError) as exc:
             raise InferenceBackendLibraryError(f"Failed to load inference backend library from file '{backends_library_path}': {exc}") from exc
         for backend_name, backend_dict in backends_dict.items():
             # We'll split the read settings into standard fields and extra config
             standard_fields = InferenceBackendBlueprint.model_fields.keys()
             extra_config: Dict[str, Any] = {}
+            inference_backend_blueprint_dict = backend_dict.copy()
             for key in backend_dict.keys():
                 if key not in standard_fields:
-                    extra_config[key] = backend_dict.pop(key)
-            backend_blueprint = InferenceBackendBlueprint.model_validate(backend_dict)
+                    extra_config[key] = inference_backend_blueprint_dict.pop(key)
+            backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
             if not backend_blueprint.enabled:
                 continue
             path_to_model_specs_toml = get_config().cogt.inference_config.model_specs_path(backend_name=backend_name)
             try:
-                model_specs_dict = load_toml_from_path(
+                model_specs_dict = load_toml_from_path_with_secret_substitution(
                     path=path_to_model_specs_toml,
-                    is_var_substitution_enabled=True,
                 )
-            except (FileNotFoundError, TOMLValidationError) as exc:
+            except (FileNotFoundError, TOMLSecretValidationError) as exc:
                 raise InferenceBackendLibraryError(f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}") from exc
             default_sdk: Optional[str] = model_specs_dict.pop("default_sdk", None)
             default_prompting_target: Optional[PromptingTarget] = model_specs_dict.pop("default_prompting_target", None)
