@@ -4,32 +4,28 @@ from typing import Any, Dict, Optional
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ModelsManagerError
+from pipelex.cogt.exceptions import ModelDeckNotFoundError, ModelsManagerError
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.model_deck.llm_deck import LLMDeck, LLMDeckBlueprint
-from pipelex.cogt.model_deck.models_manager_abstract import ModelsManagerAbstract
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile_library import RoutingProfileLibrary
+from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
+from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.exceptions import LibraryError
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path, validate_toml_file
 
 
-class LLMDeckNotFoundError(Exception):
-    pass
-
-
-class ModelsManager(ModelsManagerAbstract):
+class ModelManager(ModelManagerAbstract):
     def __init__(self) -> None:
         self.routing_profile_library = RoutingProfileLibrary.make_empty()
         self.inference_backend_library = InferenceBackendLibrary.make_empty()
-        self.llm_deck: Optional[LLMDeck] = None
+        self.llm_deck: Optional[ModelDeck] = None
 
     @override
-    def get_llm_deck(self) -> LLMDeck:
+    def get_llm_deck(self) -> ModelDeck:
         if self.llm_deck is None:
             raise RuntimeError("LLM deck is not initialized")
         return self.llm_deck
@@ -61,15 +57,15 @@ class ModelsManager(ModelsManagerAbstract):
                     raise LibraryError(f"TOML validation failed for LLM deck file '{llm_deck_path}': {exc}") from exc
 
     @classmethod
-    def load_deck_blueprint(cls) -> LLMDeckBlueprint:
+    def load_deck_blueprint(cls) -> ModelDeckBlueprint:
         llm_deck_paths = get_config().cogt.inference_config.get_llm_deck_paths()
         full_llm_deck_dict: Dict[str, Any] = {}
         if not llm_deck_paths:
-            raise LLMDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
+            raise ModelDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
 
         for llm_deck_path in llm_deck_paths:
             if not os.path.exists(llm_deck_path):
-                raise LLMDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
+                raise ModelDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
             try:
                 llm_deck_dict = load_toml_from_path(path=llm_deck_path)
                 log.debug(f"Loaded LLM deck from {llm_deck_path}")
@@ -78,10 +74,10 @@ class ModelsManager(ModelsManagerAbstract):
                 log.error(f"Failed to load LLM deck file '{llm_deck_path}': {exc}")
                 raise
 
-        llm_deck_blueprint = LLMDeckBlueprint.model_validate(full_llm_deck_dict)
+        llm_deck_blueprint = ModelDeckBlueprint.model_validate(full_llm_deck_dict)
         return llm_deck_blueprint
 
-    def build_deck(self, llm_deck_blueprint: LLMDeckBlueprint) -> LLMDeck:
+    def build_deck(self, llm_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
         llm_handles: Dict[str, InferenceModelSpec] = {}
 
@@ -137,7 +133,7 @@ class ModelsManager(ModelsManagerAbstract):
                             )
             llm_handles[model_name] = model_spec
 
-        llm_deck = LLMDeck(
+        llm_deck = ModelDeck(
             inference_models=llm_handles,
             aliases=llm_deck_blueprint.aliases,
             llm_presets=llm_deck_blueprint.llm_presets,

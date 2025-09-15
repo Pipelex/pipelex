@@ -39,7 +39,7 @@ class LLMSettingsValidationError(CogtError):
     pass
 
 
-class LLMDeckValidatonError(CogtError):
+class ModelDeckValidatonError(CogtError):
     pass
 
 
@@ -153,4 +153,8 @@ class RoutingProfileError(CogtError):
 
 
 class ModelsManagerError(CogtError):
+    pass
+
+
+class ModelDeckNotFoundError(CogtError):
     pass

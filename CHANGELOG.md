@@ -2,16 +2,26 @@
 
 ## Unreleased
 
-### Changed
+### Highlight: complete revamped loading and choosing inference models:
 
-- New way to load inference models:
+- Get up and running in seconds using pipelex_inference backend: 1 api key giving you access to all the classic models from commercial and open-source providers. Get your api key from our website.
+- You can also configure and enable the other backends you want to use
+- Configure `model_routing`:
+  - Map model name -> backend
+  - quick setup thanks to default and pattern-matching
+- Model deck:
+  - Add aliases mapping a handle -> model name, e.g. llm_for_swe = "claude-4-sonnet"
+  - You can also configure a waterfall, i.e. it gets first choice (if available), other wise fallsback, and so on and so forth
+- Presets:
+  - Unchanged, you can still configure: `preset_id` -> { llm_handle, temperature, max_tokens }
 
-model_catalog: model name -> model backend which defines the model id, features (inputs, outputs), costs
+### Remaining todo
 
-deck:
-  handle -> model name waterfall, i.e. first choice (if available), other wise fallback
-and
-  presets: preset id -> llm_handle, temperature, max_tokens
+- Control whether to fallback from one provider to another when the first is not unavailable for the required model
+- Refactor the old choice defaults / override system
+- Remove old plugin configs, let the backend config specify directly whether to use env vars or secrets from the secret provider
+- Make image generation work the same way as LLM
+- Update documentation
 
 ## [v0.9.5] - 2025-09-12
 

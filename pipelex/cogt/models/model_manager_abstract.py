@@ -2,10 +2,10 @@ from abc import ABC, abstractmethod
 
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.model_deck.llm_deck import LLMDeck
+from pipelex.cogt.models.model_deck import ModelDeck
 
 
-class ModelsManagerAbstract(ABC):
+class ModelManagerAbstract(ABC):
     @abstractmethod
     def teardown(self) -> None:
         pass
@@ -19,7 +19,7 @@ class ModelsManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_llm_deck(self) -> LLMDeck:
+    def get_llm_deck(self) -> ModelDeck:
         pass
 
     @abstractmethod

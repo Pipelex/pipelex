@@ -94,7 +94,7 @@ The library system includes specific error types:
 - `LibraryParsingError`: For PLX parsing issues
 - `ConceptLibraryError`: For concept-related issues
 - `PipeLibraryError`: For pipe-related issues
-- `LLMDeckNotFoundError`: For missing LLM configurations
+- `ModelDeckNotFoundError`: For missing LLM configurations
 
 ## Best Practices
 

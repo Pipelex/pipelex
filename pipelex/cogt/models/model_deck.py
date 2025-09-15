@@ -4,7 +4,7 @@ from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMDeckValidatonError, LLMHandleNotFoundError, LLMPresetNotFoundError, LLMSettingsValidationError
+from pipelex.cogt.exceptions import LLMHandleNotFoundError, LLMPresetNotFoundError, LLMSettingsValidationError, ModelDeckValidatonError
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults, LLMSettingOrPresetId
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -16,7 +16,7 @@ LLM_PRESET_DISABLED = "disabled"
 Waterfall = Union[str, List[str]]
 
 
-class LLMDeckBlueprint(ConfigModel):
+class ModelDeckBlueprint(ConfigModel):
     aliases: Dict[str, Waterfall] = Field(default_factory=dict)
     llm_presets: Dict[str, LLMSetting] = Field(default_factory=dict)
     llm_choice_defaults: LLMSettingChoicesDefaults
@@ -26,7 +26,7 @@ class LLMDeckBlueprint(ConfigModel):
     )
 
 
-class LLMDeck(ConfigModel):
+class ModelDeck(ConfigModel):
     inference_models: Dict[str, InferenceModelSpec] = Field(default_factory=dict)
     aliases: Dict[str, Waterfall] = Field(default_factory=dict)
 
@@ -64,10 +64,10 @@ class LLMDeck(ConfigModel):
             try:
                 cls._validate_llm_setting(llm_setting=llm_setting, inference_model=inference_model)
             except ConfigValidationError as exc:
-                raise LLMDeckValidatonError(f"LLM preset '{llm_preset_id}' is invalid: {exc}")
+                raise ModelDeckValidatonError(f"LLM preset '{llm_preset_id}' is invalid: {exc}")
 
     ############################################################
-    #### LLMDeck validations
+    #### ModelDeck validations
     ############################################################
 
     @classmethod
@@ -86,19 +86,6 @@ class LLMDeck(ConfigModel):
                 f"which is not allowed by the model's constraints: it must be 1"
             )
 
-    # @field_validator("llm_handles", mode="before")
-    # @classmethod
-    # def validate_llm_handles(cls, value: Dict[str, Union[LLMEngineBlueprint, str]]) -> Dict[str, LLMEngineBlueprint]:
-    #     the_dict: Dict[str, LLMEngineBlueprint] = {}
-    #     for llm_handle, llm_engine_spec in value.items():
-    #         if isinstance(llm_engine_spec, str):
-    #             the_dict[llm_handle] = LLMEngineBlueprint(llm_name=llm_engine_spec)
-    #         elif isinstance(llm_engine_spec, dict):
-    #             the_dict[llm_handle] = LLMEngineBlueprint.model_validate(llm_engine_spec)
-    #         else:
-    #             raise ConfigValidationError(f"Invalid LLM engine blueprint for '{llm_handle}' is a {type(llm_engine_spec)}: {llm_engine_spec}")
-    #     return the_dict
-
     @field_validator("llm_choice_defaults", mode="after")
     @classmethod
     def validate_llm_choice_defaults(cls, llm_choice_defaults: LLMSettingChoices) -> LLMSettingChoices:
@@ -116,12 +103,6 @@ class LLMDeck(ConfigModel):
         if value.for_object == LLM_PRESET_DISABLED:
             value.for_object = None
         return value
-
-    # def add_llm_name_as_handle_with_defaults(self, llm_name: str):
-    #     if llm_name in self.llm_handles:
-    #         raise ConfigValidationError(f"LLM engine blueprint for '{llm_name}' is already defined in llm deck's llm_handles")
-    #     # TODO: sort the defaults by llm family
-    #     self.llm_handles[llm_name] = LLMEngineBlueprint(llm_name=llm_name)
 
     def validate_llm_presets(self) -> Self:
         for llm_preset_id, llm_setting in self.llm_presets.items():

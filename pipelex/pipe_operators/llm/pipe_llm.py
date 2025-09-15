@@ -11,7 +11,7 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
-from pipelex.cogt.model_deck.llm_deck_check import check_llm_setting_with_deck
+from pipelex.cogt.models.model_deck_check import check_llm_setting_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
