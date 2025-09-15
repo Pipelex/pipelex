@@ -34,6 +34,7 @@ def _setup_ci_env_vars():
         ci_placeholders = {
             "PIPELEX_API_TOKEN": "ci-placeholder-token",
             "PIPELEX_API_BASE_URL": "https://app.pipelex.ai/api/v1",
+            "PIPELEX_INFERENCE_API_KEY": "ci-placeholder-inference-key",
             "OPENAI_API_KEY": "sk-ci-placeholder-key",
             "AWS_ACCESS_KEY_ID": "ci-placeholder-aws-key",
             "AWS_SECRET_ACCESS_KEY": "ci-placeholder-aws-secret",
