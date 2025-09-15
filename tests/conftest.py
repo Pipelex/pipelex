@@ -43,6 +43,8 @@ def _setup_ci_env_vars():
             "AZURE_OPENAI_API_VERSION": "2025-04-01-preview",
             "AZURE_OPENAI_API_KEY": "ci-placeholder-azure-key",
             "AZURE_API_BASE": "https://ci-placeholder.openai.azure.com",
+            "AZURE_API_KEY": "ci-placeholder-azure-api-key",
+            "AZURE_API_VERSION": "2025-04-01-preview",
             "ANTHROPIC_API_KEY": "sk-ant-ci-placeholder-key",
             "MISTRAL_API_KEY": "ci-placeholder-mistral-key",
             "PERPLEXITY_API_KEY": "ci-placeholder-perplexity-key",
@@ -50,6 +52,7 @@ def _setup_ci_env_vars():
             "FAL_API_KEY": "ci-placeholder-fal-key",
             "GCP_PROJECT_ID": "ci-placeholder-project",
             "GCP_REGION": "us-central1",
+            "GCP_LOCATION": "us-central1",
             # GCP_CREDENTIALS_FILE_PATH intentionally omitted - let it be None if not set
             "XAI_API_KEY": "ci-placeholder-xai-key",
             "XAI_API_ENDPOINT": "https://api.x.ai/v1/",
