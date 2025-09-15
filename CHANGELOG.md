@@ -15,13 +15,6 @@
 - Presets:
   - Unchanged, you can still configure: `preset_id` -> { llm_handle, temperature, max_tokens }
 
-### Remaining todo
-
-- Control whether to fallback from one provider to another when the first is not unavailable for the required model
-- Refactor the old choice defaults / override system
-- Make image generation work the same way as LLM
-- Update documentation
-
 ## [v0.9.5] - 2025-09-12
 
 ### Highlight
