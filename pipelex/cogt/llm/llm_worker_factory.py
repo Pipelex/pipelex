@@ -63,11 +63,12 @@ class LLMWorkerFactory:
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=AnthropicFactory.make_anthropic_client(plugin=plugin),
+                    sdk_instance=AnthropicFactory.make_anthropic_client(plugin=plugin, backend=backend),
                 )
 
                 llm_worker = AnthropicLLMWorker(
                     sdk_instance=sdk_instance,
+                    extra_config=backend.extra_config,
                     inference_model=inference_model,
                     structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS,
                     reporting_delegate=reporting_delegate,
@@ -100,7 +101,7 @@ class LLMWorkerFactory:
                     structure_method=StructureMethod.INSTRUCTOR_MISTRAL_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
-            case "bedrock":
+            case "bedrock_boto3" | "bedrock_aioboto3":
                 try:
                     import aioboto3  # noqa: F401
                     import boto3  # noqa: F401
@@ -114,7 +115,7 @@ class LLMWorkerFactory:
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=BedrockFactory.make_bedrock_client(),
+                    sdk_instance=BedrockFactory.make_bedrock_client(plugin=plugin, backend=backend),
                 )
 
                 llm_worker = BedrockLLMWorker(

@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
@@ -10,7 +10,7 @@ class InferenceBackend(ConfigModel):
     name: str
     endpoint: Optional[str] = None
     api_key: Optional[str] = None
-    api_version: Optional[str] = None
+    extra_config: Dict[str, Any] = Field(default_factory=dict)
     model_specs: Dict[str, InferenceModelSpec] = Field(default_factory=dict)
 
     def list_model_names(self) -> List[str]:
@@ -21,3 +21,7 @@ class InferenceBackend(ConfigModel):
         """Get a model spec by name."""
         model_spec = self.model_specs.get(model_name)
         return model_spec
+
+    def get_extra_config(self, key: str) -> Optional[Any]:
+        """Get an extra config by key."""
+        return self.extra_config.get(key)

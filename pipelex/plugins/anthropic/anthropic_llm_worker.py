@@ -1,4 +1,4 @@
-from typing import Any, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 import instructor
 from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock
@@ -15,12 +15,18 @@ from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicWorkerConfig
 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory, AnthropicSdkVariant
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.types import StrEnum
+
+
+class AnthropicExtraField(StrEnum):
+    CLAUDE_4_TOKENS_LIMIT = "claude_4_tokens_limit"
 
 
 class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,
+        extra_config: Dict[str, Any],
         inference_model: InferenceModelSpec,
         structure_method: Optional[StructureMethod] = None,
         reporting_delegate: Optional[ReportingProtocol] = None,
@@ -31,9 +37,10 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
-        self.default_max_tokens: int
-        if default_max_tokens := inference_model.max_tokens:
-            self.default_max_tokens = default_max_tokens
+        self.extra_config: Dict[str, Any] = extra_config
+        self.default_max_tokens: int = 0
+        if inference_model.max_tokens:
+            self.default_max_tokens = inference_model.max_tokens
         else:
             raise AnthropicWorkerConfigurationError(
                 f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Anthropic"
@@ -63,10 +70,12 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     # TODO: implement streaming behind the scenes to avoid timeout/streaming errors with Claude 4 and high tokens
     def _adapt_max_tokens(self, max_tokens: Optional[int]) -> int:
         max_tokens = max_tokens or self.default_max_tokens
-        if claude_4_tokens_limit := get_plugin_manager().plugin_configs.anthropic_config.claude_4_tokens_limit:
-            if max_tokens > claude_4_tokens_limit:
-                max_tokens = claude_4_tokens_limit
-                log.warning(f"Max tokens is greater than the claude 4 reduced tokens limit, reducing to {max_tokens}")
+
+        if (claude_4_tokens_limit := self.extra_config.get(AnthropicExtraField.CLAUDE_4_TOKENS_LIMIT)) and max_tokens > claude_4_tokens_limit:
+            max_tokens = claude_4_tokens_limit
+            log.warning(f"Max tokens is greater than the claude 4 reduced tokens limit, reducing to {max_tokens}")
+        if not max_tokens:
+            raise AnthropicWorkerConfigurationError(f"Max tokens is None for model {self.inference_model.desc}")
         return max_tokens
 
     @override

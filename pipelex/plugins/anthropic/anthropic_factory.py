@@ -24,8 +24,8 @@ from pipelex.cogt.image.prompt_image import (
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
+from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.config import get_config
-from pipelex.hub import get_plugin_manager, get_secrets_provider
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
@@ -45,6 +45,7 @@ class AnthropicFactory:
     @staticmethod
     def make_anthropic_client(
         plugin: Plugin,
+        backend: InferenceBackend,
     ) -> Union[AsyncAnthropic, AsyncAnthropicBedrock]:
         try:
             sdk_variant = AnthropicSdkVariant(plugin.sdk)
@@ -53,9 +54,10 @@ class AnthropicFactory:
 
         match sdk_variant:
             case AnthropicSdkVariant.ANTHROPIC:
-                anthropic_config = get_plugin_manager().plugin_configs.anthropic_config
-                api_key = anthropic_config.get_api_key(secrets_provider=get_secrets_provider())
-                return AsyncAnthropic(api_key=api_key)
+                return AsyncAnthropic(
+                    api_key=backend.api_key,
+                    base_url=backend.endpoint,
+                )
             case AnthropicSdkVariant.BEDROCK_ANTHROPIC:
                 aws_config = get_config().pipelex.aws_config
                 aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()

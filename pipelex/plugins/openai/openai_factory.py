@@ -33,6 +33,10 @@ class OpenAISdkVariant(StrEnum):
     OPENAI = "openai"
 
 
+class AzureExtraField(StrEnum):
+    API_VERSION = "api_version"
+
+
 class OpenAIFactory:
     @classmethod
     def make_openai_client(
@@ -54,7 +58,7 @@ class OpenAIFactory:
                 the_client = openai.AsyncAzureOpenAI(
                     azure_endpoint=backend.endpoint,
                     api_key=backend.api_key,
-                    api_version=backend.api_version,
+                    api_version=backend.get_extra_config(AzureExtraField.API_VERSION),
                 )
 
             case OpenAISdkVariant.OPENAI:

@@ -1,4 +1,4 @@
-default_sdk = "bedrock"
+default_sdk = "bedrock_aioboto3"
 default_prompting_target = "anthropic"
 
 [bedrock-mistral-large]
@@ -81,4 +81,3 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-

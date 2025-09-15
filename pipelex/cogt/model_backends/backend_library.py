@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from pydantic import Field, RootModel, ValidationError
 from typing_extensions import Self
@@ -36,6 +36,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         except (FileNotFoundError, TOMLValidationError) as exc:
             raise InferenceBackendLibraryError(f"Failed to load inference backend library from file '{backends_library_path}': {exc}") from exc
         for backend_name, backend_dict in backends_dict.items():
+            # We'll split the read settings into standard fields and extra config
+            standard_fields = InferenceBackendBlueprint.model_fields.keys()
+            extra_config: Dict[str, Any] = {}
+            for key in backend_dict.keys():
+                if key not in standard_fields:
+                    extra_config[key] = backend_dict.pop(key)
             backend_blueprint = InferenceBackendBlueprint.model_validate(backend_dict)
             if not backend_blueprint.enabled:
                 continue
@@ -69,6 +75,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             backend = InferenceBackendFactory.make_inference_backend(
                 name=backend_name,
                 blueprint=backend_blueprint,
+                extra_config=extra_config,
                 model_specs=backend_model_specs,
             )
             self.root[backend_name] = backend

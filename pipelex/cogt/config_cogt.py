@@ -5,6 +5,7 @@ from pydantic import Field
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams, ImggJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
+from pipelex.plugins.fal.fal_config import FalConfig
 from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.misc.file_utils import find_files_in_dir
 
@@ -20,6 +21,7 @@ class ImggConfig(ConfigModel):
     imgg_job_config: ImggJobConfig
     imgg_param_defaults: ImggJobParamsDefaults
     imgg_handles: List[str]
+    fal_config: FalConfig
 
     def make_default_imgg_job_params(self) -> ImggJobParams:
         return self.imgg_param_defaults.make_imgg_job_params()

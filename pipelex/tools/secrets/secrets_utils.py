@@ -1,5 +1,4 @@
 import re
-from typing import Optional
 
 from pipelex.hub import get_secrets_provider
 from pipelex.tools.environment import EnvVarNotFoundError, get_optional_env, get_required_env
