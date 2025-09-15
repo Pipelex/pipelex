@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.tools.misc.toml_secret_utils import (
+from pipelex.tools.secrets.toml_secret_utils import (
     TOMLSecretValidationError,
     load_toml_from_path_with_secret_substitution,
 )

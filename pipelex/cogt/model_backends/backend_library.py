@@ -11,7 +11,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.config import get_config
-from pipelex.tools.misc.toml_secret_utils import TOMLSecretValidationError, load_toml_from_path_with_secret_substitution
+from pipelex.tools.secrets.toml_secret_utils import TOMLSecretValidationError, load_toml_from_path_with_secret_substitution
 
 InferenceBackendLibraryRoot = Dict[str, InferenceBackend]
 
