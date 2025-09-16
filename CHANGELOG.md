@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added `FuncRegistryUtils` to register functions in a pipelex folder that have a specific signature.
+
 ## [v0.9.5] - 2025-09-12
 
 ### Highlight
