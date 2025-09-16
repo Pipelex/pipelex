@@ -5,7 +5,6 @@ import boto3
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
 from pipelex.plugins.bedrock.bedrock_message import BedrockMessageDictList

@@ -1,6 +1,4 @@
-from typing import Dict
 
-from pipelex import log
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 
 

@@ -24,7 +24,6 @@ from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, Promp
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
-from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 from pipelex.tools.misc.base_64_utils import encode_to_base64, load_binary_as_base64

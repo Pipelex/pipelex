@@ -1,6 +1,6 @@
 from typing import Dict
 
-from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
+from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.types import StrEnum
 
 
