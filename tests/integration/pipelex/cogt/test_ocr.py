@@ -16,7 +16,7 @@ from tests.cases import ImageTestCases, PDFTestCases
 @pytest.mark.asyncio(loop_scope="class")
 class TestOcr:
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
-    async def test_ocr_pdr_path(self, file_path: str):
+    async def test_ocr_pdf_path(self, file_path: str):
         ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(pdf_uri=file_path),
@@ -27,7 +27,7 @@ class TestOcr:
         assert ocr_output.pages
 
     @pytest.mark.parametrize("url", PDFTestCases.DOCUMENT_URLS)
-    async def test_ocr_url(self, url: str):
+    async def test_ocr_pdf_url(self, url: str):
         ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(pdf_uri=url),
