@@ -44,5 +44,13 @@ class OcrWorkerFactory:
                     ocr_engine=ocr_engine,
                     reporting_delegate=reporting_delegate,
                 )
+            case OcrPlatform.BASIC:
+                from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker
+
+                ocr_worker = Pypdfium2Worker(
+                    sdk_instance=None,
+                    ocr_engine=ocr_engine,
+                    reporting_delegate=reporting_delegate,
+                )
 
         return ocr_worker

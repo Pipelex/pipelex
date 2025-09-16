@@ -42,6 +42,7 @@ PIPE_OCR_INPUT_NAME = "ocr_input"
 
 
 class PipeOcr(PipeOperator):
+    ocr_handle: OcrHandle
     should_caption_images: bool
     should_include_images: bool
     should_include_page_views: bool
@@ -166,7 +167,6 @@ class PipeOcr(PipeOperator):
         else:
             raise PipeDefinitionError("PipeOcr should have a non-None image_stuff_name or pdf_stuff_name")
 
-        ocr_handle = OcrHandle.MISTRAL_OCR
         ocr_job_params = OcrJobParams(
             should_include_images=self.should_include_images,
             should_caption_images=self.should_caption_images,
@@ -179,7 +179,7 @@ class PipeOcr(PipeOperator):
         )
         ocr_output = await content_generator.make_ocr_extract_pages(
             ocr_input=ocr_input,
-            ocr_handle=ocr_handle,
+            ocr_handle=self.ocr_handle,
             job_metadata=job_metadata,
             ocr_job_params=ocr_job_params,
             ocr_job_config=OcrJobConfig(),
