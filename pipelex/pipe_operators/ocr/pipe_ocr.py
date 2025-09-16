@@ -42,7 +42,6 @@ PIPE_OCR_INPUT_NAME = "ocr_input"
 
 
 class PipeOcr(PipeOperator):
-    ocr_engine: Optional[OcrEngine] = None
     should_caption_images: bool
     should_include_images: bool
     should_include_page_views: bool
