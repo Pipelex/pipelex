@@ -8,9 +8,10 @@ from rich.table import Table
 
 from pipelex import log
 from pipelex.cogt.exceptions import CostRegistryError
-from pipelex.cogt.llm.costs_per_token import model_cost_per_token
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage
-from pipelex.cogt.llm.token_category import CostCategory, CostsByCategoryDict
+from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
+from pipelex.cogt.usage.costs_per_token import model_cost_per_token
+from pipelex.cogt.usage.token_category import TokenCategory
 
 CostRegistryRoot = List[LLMTokenCostReport]
 
@@ -153,7 +154,13 @@ class CostRegistry(RootModel[CostRegistryRoot]):
     @classmethod
     def compute_cost_report(cls, llm_tokens_usage: LLMTokensUsage) -> LLMTokenCostReport:
         costs_by_token_category: CostsByCategoryDict = {
-            token_type: (model_cost_per_token(costs=llm_tokens_usage.unit_costs, token_type=token_type) * nb_tokens)
+            token_type.to_cost_category: (
+                model_cost_per_token(
+                    costs=llm_tokens_usage.unit_costs,
+                    cost_category=token_type.to_cost_category,
+                )
+                * nb_tokens
+            )
             for token_type, nb_tokens in llm_tokens_usage.nb_tokens_by_category.items()
         }
         token_cost_report = LLMTokenCostReport(
@@ -169,20 +176,20 @@ class CostRegistry(RootModel[CostRegistryRoot]):
     def complete_cost_report(cls, llm_tokens_usage: LLMTokensUsage) -> LLMTokenCostReport:
         cost_report = cls.compute_cost_report(llm_tokens_usage=llm_tokens_usage)
         # compute the input_non_cached tokens
-        if cost_report.nb_tokens_by_category.get(CostCategory.INPUT_NON_CACHED) is not None:
+        if cost_report.nb_tokens_by_category.get(TokenCategory.INPUT_NON_CACHED) is not None:
             raise CostRegistryError("CostCategory.INPUT_NON_CACHED already exists in the cost report")
         # we use pop to remove input tokens which will be replaced by "input joined"
-        nb_tokens_input_joined = cost_report.nb_tokens_by_category.pop(CostCategory.INPUT, 0)
+        nb_tokens_input_joined = cost_report.nb_tokens_by_category.pop(TokenCategory.INPUT, 0)
         cost_report.costs_by_token_category.pop(CostCategory.INPUT, None)
 
-        nb_tokens_input_cached = cost_report.nb_tokens_by_category.get(CostCategory.INPUT_CACHED, 0)
+        nb_tokens_input_cached = cost_report.nb_tokens_by_category.get(TokenCategory.INPUT_CACHED, 0)
         nb_tokens_input_non_cached = nb_tokens_input_joined - nb_tokens_input_cached
-        cost_report.nb_tokens_by_category[CostCategory.INPUT_JOINED] = nb_tokens_input_joined
-        cost_report.nb_tokens_by_category[CostCategory.INPUT_NON_CACHED] = nb_tokens_input_non_cached
-        cost_report.nb_tokens_by_category[CostCategory.INPUT_CACHED] = nb_tokens_input_cached
+        cost_report.nb_tokens_by_category[TokenCategory.INPUT_JOINED] = nb_tokens_input_joined
+        cost_report.nb_tokens_by_category[TokenCategory.INPUT_NON_CACHED] = nb_tokens_input_non_cached
+        cost_report.nb_tokens_by_category[TokenCategory.INPUT_CACHED] = nb_tokens_input_cached
 
         cost_report.costs_by_token_category[CostCategory.INPUT_NON_CACHED] = nb_tokens_input_non_cached * model_cost_per_token(
-            costs=llm_tokens_usage.unit_costs, token_type=CostCategory.INPUT_NON_CACHED
+            costs=llm_tokens_usage.unit_costs, cost_category=CostCategory.INPUT_NON_CACHED
         )
         costs_input_cached = cost_report.costs_by_token_category.get(CostCategory.INPUT_CACHED, 0)
         cost_report.costs_by_token_category[CostCategory.INPUT_CACHED] = costs_input_cached

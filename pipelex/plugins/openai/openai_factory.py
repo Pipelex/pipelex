@@ -16,9 +16,10 @@ from pipelex import log
 from pipelex.cogt.exceptions import CogtError, LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 from pipelex.types import StrEnum
@@ -142,15 +143,15 @@ class OpenAIFactory:
     @staticmethod
     def make_nb_tokens_by_category(usage: CompletionUsage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
-            CostCategory.INPUT: usage.prompt_tokens,
-            CostCategory.OUTPUT: usage.completion_tokens,
+            TokenCategory.INPUT: usage.prompt_tokens,
+            TokenCategory.OUTPUT: usage.completion_tokens,
         }
         if prompt_tokens_details := usage.prompt_tokens_details:
-            nb_tokens_by_category[CostCategory.INPUT_AUDIO] = prompt_tokens_details.audio_tokens or 0
-            nb_tokens_by_category[CostCategory.INPUT_CACHED] = prompt_tokens_details.cached_tokens or 0
+            nb_tokens_by_category[TokenCategory.INPUT_AUDIO] = prompt_tokens_details.audio_tokens or 0
+            nb_tokens_by_category[TokenCategory.INPUT_CACHED] = prompt_tokens_details.cached_tokens or 0
         if completion_tokens_details := usage.completion_tokens_details:
-            nb_tokens_by_category[CostCategory.OUTPUT_AUDIO] = completion_tokens_details.audio_tokens or 0
-            nb_tokens_by_category[CostCategory.OUTPUT_REASONING] = completion_tokens_details.reasoning_tokens or 0
-            nb_tokens_by_category[CostCategory.OUTPUT_ACCEPTED_PREDICTION] = completion_tokens_details.accepted_prediction_tokens or 0
-            nb_tokens_by_category[CostCategory.OUTPUT_REJECTED_PREDICTION] = completion_tokens_details.rejected_prediction_tokens or 0
+            nb_tokens_by_category[TokenCategory.OUTPUT_AUDIO] = completion_tokens_details.audio_tokens or 0
+            nb_tokens_by_category[TokenCategory.OUTPUT_REASONING] = completion_tokens_details.reasoning_tokens or 0
+            nb_tokens_by_category[TokenCategory.OUTPUT_ACCEPTED_PREDICTION] = completion_tokens_details.accepted_prediction_tokens or 0
+            nb_tokens_by_category[TokenCategory.OUTPUT_REJECTED_PREDICTION] = completion_tokens_details.rejected_prediction_tokens or 0
         return nb_tokens_by_category

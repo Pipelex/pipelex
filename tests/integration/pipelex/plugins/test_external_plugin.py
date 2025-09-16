@@ -10,7 +10,8 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
-from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
+from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.hub import get_inference_manager, get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLMOutput
@@ -39,8 +40,8 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
 
         if llm_tokens_usage := llm_job.job_report.llm_tokens_usage:
             nb_tokens_by_category: NbTokensByCategoryDict = {
-                CostCategory.INPUT: 100,
-                CostCategory.OUTPUT: 100,
+                TokenCategory.INPUT: 100,
+                TokenCategory.OUTPUT: 100,
             }
             llm_tokens_usage.nb_tokens_by_category = nb_tokens_by_category
         return response_text

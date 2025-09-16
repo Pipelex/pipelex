@@ -3,10 +3,10 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex.cogt.exceptions import InferenceModelSpecError
-from pipelex.cogt.model_backends.cost_category import CostCategory
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
+from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.tools.config.config_model import ConfigModel
 
 
@@ -16,14 +16,14 @@ class InferenceModelSpecBlueprint(ConfigModel):
     model_id: str
     inputs: List[str] = Field(default_factory=list)
     outputs: List[str] = Field(default_factory=list)
-    costs: Dict[CostCategory, float] = Field(strict=False)
+    costs: CostsByCategoryDict = Field(strict=False)
     max_tokens: Optional[int] = None
     max_prompt_images: Optional[int] = None
     prompting_target: Optional[PromptingTarget] = Field(default=None, strict=False)
     constraints: List[ModelConstraints] = Field(default_factory=list)
 
     @field_validator("costs", mode="before")
-    def validate_costs(cls, value: Dict[str, float]) -> Dict[CostCategory, float]:
+    def validate_costs(cls, value: Dict[str, float]) -> CostsByCategoryDict:
         return ConfigModel.transform_dict_of_floats_str_to_enum(
             input_dict=value,
             key_enum_cls=CostCategory,

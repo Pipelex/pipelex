@@ -1,3 +1,5 @@
+from typing import Dict
+
 from pipelex.types import StrEnum
 
 
@@ -12,3 +14,6 @@ class CostCategory(StrEnum):
     OUTPUT_REASONING = "output_reasoning"
     OUTPUT_ACCEPTED_PREDICTION = "output_accepted_prediction"
     OUTPUT_REJECTED_PREDICTION = "output_rejected_prediction"
+
+
+CostsByCategoryDict = Dict[CostCategory, float]

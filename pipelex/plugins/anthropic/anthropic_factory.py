@@ -23,8 +23,9 @@ from pipelex.cogt.image.prompt_image import (
 )
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.token_category import CostCategory, NbTokensByCategoryDict
 from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
@@ -219,15 +220,15 @@ class AnthropicFactory:
     @staticmethod
     def make_nb_tokens_by_category(usage: Usage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
-            CostCategory.INPUT: usage.input_tokens,
-            CostCategory.OUTPUT: usage.output_tokens,
+            TokenCategory.INPUT: usage.input_tokens,
+            TokenCategory.OUTPUT: usage.output_tokens,
         }
         return nb_tokens_by_category
 
     @staticmethod
     def make_nb_tokens_by_category_from_nb(nb_input: int, nb_output: int) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
-            CostCategory.INPUT: nb_input,
-            CostCategory.OUTPUT: nb_output,
+            TokenCategory.INPUT: nb_input,
+            TokenCategory.OUTPUT: nb_output,
         }
         return nb_tokens_by_category

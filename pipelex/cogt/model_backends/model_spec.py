@@ -2,9 +2,9 @@ from typing import Dict, List, Optional
 
 from pydantic import Field
 
-from pipelex.cogt.model_backends.cost_category import CostCategory
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
+from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.tools.config.config_model import ConfigModel
 
 
@@ -15,7 +15,7 @@ class InferenceModelSpec(ConfigModel):
     model_id: str
     inputs: List[str] = Field(default_factory=list)
     outputs: List[str] = Field(default_factory=list)
-    costs: Dict[CostCategory, float] = Field(strict=False)
+    costs: CostsByCategoryDict = Field(strict=False)
     max_tokens: Optional[int]
     max_prompt_images: Optional[int]
     prompting_target: Optional[PromptingTarget] = Field(default=None, strict=False)

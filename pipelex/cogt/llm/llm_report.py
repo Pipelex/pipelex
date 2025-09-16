@@ -2,7 +2,8 @@ from typing import Any, Dict
 
 from pydantic import BaseModel
 
-from pipelex.cogt.llm.token_category import CostCategory, CostsByCategoryDict, NbTokensByCategoryDict
+from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import StrEnum
 
@@ -21,7 +22,7 @@ class LLMTokenCostReportField(StrEnum):
     COST_OUTPUT = "cost_output"
 
     @staticmethod
-    def report_field_for_nb_tokens_by_category(token_category: CostCategory) -> str:
+    def report_field_for_nb_tokens_by_category(token_category: TokenCategory) -> str:
         return f"nb_tokens_{token_category}"
 
     @staticmethod
@@ -62,6 +63,6 @@ class LLMTokenCostReport(BaseModel):
 class LLMTokensUsage(BaseModel):
     job_metadata: JobMetadata
     inference_model_name: str
-    unit_costs: Dict[CostCategory, float]
+    unit_costs: CostsByCategoryDict
     inference_model_id: str
     nb_tokens_by_category: NbTokensByCategoryDict
