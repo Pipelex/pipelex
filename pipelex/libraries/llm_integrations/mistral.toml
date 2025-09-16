@@ -68,3 +68,16 @@ is_vision_supported = true
 cost_per_million_tokens_usd = { input = 2.0, output = 6.0 }
 platform_llm_id = { mistral = "pixtral-large-latest" }
 
+[mistral-medium.mistral-medium.latest]
+max_tokens = 128000
+is_gen_object_supported = true
+cost_per_million_tokens_usd = { input = 0.4, output = 2.0 }
+platform_llm_id = { mistral = "mistral-medium-latest" }
+
+
+[mistral-medium.mistral-medium."2508"]
+max_tokens = 128000
+is_gen_object_supported = true
+cost_per_million_tokens_usd = { input = 0.4, output = 2.0 }
+platform_llm_id = { mistral = "mistral-medium-2508" }
+

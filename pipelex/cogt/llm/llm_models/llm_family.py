@@ -75,6 +75,7 @@ class LLMFamily(StrEnum):
     MISTRAL_8X7B = "mistral-8x7b"
     MISTRAL_LARGE = "mistral-large"
     MISTRAL_SMALL = "mistral-small"
+    MISTRAL_MEDIUM = "mistral-medium"
     MISTRAL_CODESTRAL = "mistral-codestral"
     MINISTRAL = "ministral"
     PIXTRAL = "pixtral"
@@ -128,6 +129,7 @@ class LLMFamily(StrEnum):
                 | LLMFamily.MISTRAL_8X7B
                 | LLMFamily.MISTRAL_LARGE
                 | LLMFamily.MISTRAL_SMALL
+                | LLMFamily.MISTRAL_MEDIUM
                 | LLMFamily.MISTRAL_CODESTRAL
                 | LLMFamily.MINISTRAL
                 | LLMFamily.PIXTRAL
