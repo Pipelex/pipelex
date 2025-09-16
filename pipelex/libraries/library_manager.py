@@ -28,6 +28,7 @@ from pipelex.exceptions import (
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
+from pipelex.tools.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path, validate_toml_file
@@ -243,6 +244,7 @@ class LibraryManager(LibraryManagerAbstract):
         # Register classes in the directories
         for library_dir in dirs_to_use:
             ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_dir))
+            FuncRegistryUtils.register_funcs_in_folder(folder_path=str(library_dir))
 
         if library_file_paths is not None:
             all_plx_paths = library_file_paths
