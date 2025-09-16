@@ -34,6 +34,7 @@ class LLMJob(InferenceJobAbstract):
         self.job_report.llm_tokens_usage = LLMTokensUsage(
             job_metadata=self.job_metadata,
             inference_model_name=inference_model.name,
+            unit_costs=inference_model.costs,
             inference_model_id=inference_model.model_id,
             nb_tokens_by_category={},
         )

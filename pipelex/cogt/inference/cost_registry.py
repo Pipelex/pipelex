@@ -8,8 +8,9 @@ from rich.table import Table
 
 from pipelex import log
 from pipelex.cogt.exceptions import CostRegistryError
-from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage, model_cost_per_token
-from pipelex.cogt.llm.token_category import CostCategory
+from pipelex.cogt.llm.costs_per_token import model_cost_per_token
+from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage
+from pipelex.cogt.llm.token_category import CostCategory, CostsByCategoryDict
 
 CostRegistryRoot = List[LLMTokenCostReport]
 
@@ -150,8 +151,23 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         return input_non_cached_cost + input_cached_cost + output_cost
 
     @classmethod
+    def compute_cost_report(cls, llm_tokens_usage: LLMTokensUsage) -> LLMTokenCostReport:
+        costs_by_token_category: CostsByCategoryDict = {
+            token_type: (model_cost_per_token(costs=llm_tokens_usage.unit_costs, token_type=token_type) * nb_tokens)
+            for token_type, nb_tokens in llm_tokens_usage.nb_tokens_by_category.items()
+        }
+        token_cost_report = LLMTokenCostReport(
+            job_metadata=llm_tokens_usage.job_metadata,
+            inference_model_name=llm_tokens_usage.inference_model_name,
+            platform_llm_id=llm_tokens_usage.inference_model_id,
+            nb_tokens_by_category=llm_tokens_usage.nb_tokens_by_category,
+            costs_by_token_category=costs_by_token_category,
+        )
+        return token_cost_report
+
+    @classmethod
     def complete_cost_report(cls, llm_tokens_usage: LLMTokensUsage) -> LLMTokenCostReport:
-        cost_report = llm_tokens_usage.compute_cost_report()
+        cost_report = cls.compute_cost_report(llm_tokens_usage=llm_tokens_usage)
         # compute the input_non_cached tokens
         if cost_report.nb_tokens_by_category.get(CostCategory.INPUT_NON_CACHED) is not None:
             raise CostRegistryError("CostCategory.INPUT_NON_CACHED already exists in the cost report")
@@ -166,7 +182,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         cost_report.nb_tokens_by_category[CostCategory.INPUT_CACHED] = nb_tokens_input_cached
 
         cost_report.costs_by_token_category[CostCategory.INPUT_NON_CACHED] = nb_tokens_input_non_cached * model_cost_per_token(
-            inference_model_name=llm_tokens_usage.inference_model_name, token_type=CostCategory.INPUT_NON_CACHED
+            costs=llm_tokens_usage.unit_costs, token_type=CostCategory.INPUT_NON_CACHED
         )
         costs_input_cached = cost_report.costs_by_token_category.get(CostCategory.INPUT_CACHED, 0)
         cost_report.costs_by_token_category[CostCategory.INPUT_CACHED] = costs_input_cached

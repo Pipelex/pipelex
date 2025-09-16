@@ -59,48 +59,9 @@ class LLMTokenCostReport(BaseModel):
         return the_dict
 
 
-def model_cost_per_token(inference_model_name: str, token_type: CostCategory) -> float:
-    # inference_model = get_models_manager().get_inference_model(inference_model_name)
-    # # cost_per_million_tokens_usd should be missing only for models that we run on our own GPUs
-    # if not inference_model.costs:
-    #     log.warning(f"cost_per_million_tokens_usd is not set for model {inference_model.name}")
-    #     return 0.0
-    # # all token types are not used for all models
-    # if token_type == CostCategory.INPUT_CACHED:
-    #     if cost_per_million_tokens := inference_model.costs.get(CostCategory.INPUT_CACHED):
-    #         return cost_per_million_tokens / 1000000
-    #     elif cost_per_million_tokens := inference_model.costs.get(CostCategory.INPUT):
-    #         # according to openai docs, cached input tokens are discounted 50%
-    #         return 0.5 * cost_per_million_tokens / 1000000
-    #     else:
-    #         model = inference_model.name
-    #         log.warning(f"cost is not set for model {model} neither for {CostCategory.INPUT} nor {CostCategory.INPUT_CACHED}")
-    #         return 0.0
-    # elif token_type == CostCategory.INPUT_NON_CACHED:
-    #     return model_cost_per_token(inference_model_name=inference_model_name, token_type=CostCategory.INPUT)
-    # elif cost_per_million_tokens := inference_model.costs.get(token_type):
-    #     return cost_per_million_tokens / 1000000
-    # else:
-    #     return 0.0
-    return 0.0
-
-
 class LLMTokensUsage(BaseModel):
     job_metadata: JobMetadata
     inference_model_name: str
+    unit_costs: Dict[CostCategory, float]
     inference_model_id: str
     nb_tokens_by_category: NbTokensByCategoryDict
-
-    def compute_cost_report(self) -> LLMTokenCostReport:
-        costs_by_token_category: CostsByCategoryDict = {
-            token_type: (model_cost_per_token(inference_model_name=self.inference_model_name, token_type=token_type) * nb_tokens)
-            for token_type, nb_tokens in self.nb_tokens_by_category.items()
-        }
-        token_cost_report = LLMTokenCostReport(
-            job_metadata=self.job_metadata,
-            inference_model_name=self.inference_model_name,
-            platform_llm_id=self.inference_model_id,
-            nb_tokens_by_category=self.nb_tokens_by_category,
-            costs_by_token_category=costs_by_token_category,
-        )
-        return token_cost_report
