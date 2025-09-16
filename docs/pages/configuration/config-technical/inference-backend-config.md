@@ -32,6 +32,43 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
         └── overrides.toml      # Custom overrides
 ```
 
+## Pipelex Inference
+
+Pipelex Inference is a unified inference backend that provides access to all major LLM providers through a single API key. This is the recommended approach for getting started quickly with Pipelex.
+
+### Benefits
+
+- **Single API Key**: Access OpenAI, Anthropic, Google, Mistral, and more with one key
+- **Simplified Configuration**: No need to manage multiple provider credentials
+- **Automatic Routing**: Models are automatically routed to their respective providers
+
+### Setup
+
+1. Join our Discord community to get your free Pipelex Inference API key (no credit card required, limited time offer):
+   - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join
+   - Request your API key in the appropriate channel once you're in
+2. Set the environment variable:
+   ```bash
+   export PIPELEX_INFERENCE_API_KEY="your-api-key"
+   ```
+3. Configure in `.pipelex/inference/backends.toml`:
+   ```toml
+   [pipelex_inference]
+   enabled = true
+   api_key = "${PIPELEX_INFERENCE_API_KEY}"
+   ```
+
+### Usage
+
+Once configured, all models are available through the unified backend. Use standard model names in your pipelines:
+
+```plx
+[pipe.example]
+type = "PipeLLM"
+llm = { llm_handle = "claude-4-sonnet", temperature = 0.7 }
+# Model automatically routed through Pipelex Inference
+```
+
 ## Inference Backends
 
 Backends represent LLM service providers. Each backend is configured with its endpoint and authentication details.

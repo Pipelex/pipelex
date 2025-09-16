@@ -14,9 +14,9 @@ Before you can make LLM calls with Pipelex, you need to configure API keys. You 
 
 Get **free access** to all well-known commercial and open-source LLMs with a single API key:
 
-1. **Get your free Pipelex Inference key** (no credit card required, limited time offer)
-   - Join our Discord community at [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
-   - Request your API key in the appropriate channel
+1. **Join our Discord community to get your free Pipelex Inference key** (no credit card required, limited time offer)
+   - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join
+   - Request your API key in the appropriate channel once you're in
 
 2. **Set up your environment**:
    ```bash
