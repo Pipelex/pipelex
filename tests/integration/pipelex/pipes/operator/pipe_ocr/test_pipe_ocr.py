@@ -48,6 +48,9 @@ class TestPipeOCR:
         image_url: str,
         setup: Any,
     ):
+        if ocr_handle == OcrHandle.BASIC_OCR:
+            pytest.skip("Basic OCR is not supported for image processing")
+
         pipe_ocr_blueprint = PipeOcrBlueprint(
             definition="OCR test for image processing",
             inputs={"page_scan": InputRequirementBlueprint(concept=NativeConceptEnum.IMAGE.value)},
