@@ -4,6 +4,7 @@ from pydantic import Field
 
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.plugins.openai.vertexai_factory import VertexAIFactory
 from pipelex.tools.config.config_model import ConfigModel
 
 
@@ -29,8 +30,6 @@ class InferenceBackendFactory:
         # Deal with special authentication for some backends
         match name:
             case "vertexai":
-                from pipelex.plugins.openai.vertexai_factory import VertexAIFactory
-
                 endpoint, api_key = VertexAIFactory.make_endpoint_and_api_key(extra_config=extra_config)
             case _:
                 pass

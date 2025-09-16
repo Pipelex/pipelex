@@ -1,5 +1,4 @@
 import os
-import re
 from typing import Optional
 
 from dotenv import load_dotenv
