@@ -2,9 +2,6 @@ from typing import List, Optional
 
 from typing_extensions import override
 
-from pipelex.cogt.ocr.ocr_engine_factory import OcrEngineFactory
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
-from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol

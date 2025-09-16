@@ -37,6 +37,7 @@ class PyPdfium2Renderer:
     _pdfium_lock: asyncio.Lock = asyncio.Lock()  # shared per process
 
     # ---- internal blocking helper ------------------------------------
+    # TODO: Needs UT
     @staticmethod
     def _render_pdf_pages_sync(pdf_input: PdfInput, scale: float) -> List[Image.Image]:
         pdf_doc = pdfium.PdfDocument(pdf_input)
@@ -56,6 +57,7 @@ class PyPdfium2Renderer:
         pdf_doc.close()
         return images
 
+    # TODO: Needs UT
     @staticmethod
     def _get_text_from_pdf_pages_sync(pdf_input: PdfInput) -> List[str]:
         pdf_doc = pdfium.PdfDocument(pdf_input)

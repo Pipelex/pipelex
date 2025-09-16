@@ -1,20 +1,13 @@
 from typing import Any, Dict, Optional
 
-from mistralai import Mistral
 from typing_extensions import override
 
-from pipelex import log
-from pipelex.cogt.exceptions import OcrCapabilityError, SdkTypeError
 from pipelex.cogt.ocr.ocr_engine import OcrEngine
 from pipelex.cogt.ocr.ocr_input import OcrInputError
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import OcrOutput, Page
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
-from pipelex.plugins.mistral.mistral_factory import MistralFactory
-from pipelex.plugins.mistral.mistral_utils import upload_file_for_ocr
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
-from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 
