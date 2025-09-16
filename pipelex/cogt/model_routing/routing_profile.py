@@ -4,6 +4,7 @@ from pydantic import Field
 
 from pipelex.cogt.model_routing.routing_models import BackendMatchForModel, BackendMatchingMethod
 from pipelex.tools.config.config_model import ConfigModel
+from pipelex.tools.misc.string_utils import matches_wildcard_pattern
 
 
 class RoutingProfile(ConfigModel):
@@ -35,7 +36,7 @@ class RoutingProfile(ConfigModel):
 
         # Check pattern matches
         for pattern, backend in self.routes.items():
-            if self._matches_pattern(model_name, pattern):
+            if matches_wildcard_pattern(model_name, pattern):
                 return BackendMatchForModel(
                     model_name=model_name,
                     backend_name=backend,
@@ -55,34 +56,3 @@ class RoutingProfile(ConfigModel):
             )
         else:
             return None
-
-    def _matches_pattern(self, model_name: str, pattern: str) -> bool:
-        """Check if a model name matches a pattern.
-
-        Supports wildcards (*) at the beginning, end, or both.
-
-        Args:
-            model_name: The model name to check
-            pattern: The pattern to match against
-
-        Returns:
-            True if the model name matches the pattern
-        """
-        if pattern == "*":
-            return True
-
-        if pattern.startswith("*") and pattern.endswith("*"):
-            # Pattern like "*sonnet*"
-            middle = pattern[1:-1]
-            return middle in model_name
-        elif pattern.startswith("*"):
-            # Pattern like "*sonnet"
-            suffix = pattern[1:]
-            return model_name.endswith(suffix)
-        elif pattern.endswith("*"):
-            # Pattern like "claude-*"
-            prefix = pattern[:-1]
-            return model_name.startswith(prefix)
-        else:
-            # Exact match
-            return model_name == pattern

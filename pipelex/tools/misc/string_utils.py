@@ -204,3 +204,48 @@ def is_snake_case(word: str) -> bool:
 
 def is_pascal_case(word: str) -> bool:
     return re.match(r"^[A-Z][a-zA-Z0-9]*$", word) is not None
+
+
+def matches_wildcard_pattern(text: str, pattern: str) -> bool:
+    """Check if a text matches a wildcard pattern.
+
+    Supports wildcards (*) at the beginning, end, or both.
+    A single asterisk (*) matches any text.
+
+    Args:
+        text: The text to check against the pattern
+        pattern: The pattern to match against, supporting wildcards (*)
+
+    Returns:
+        True if the text matches the pattern
+
+    Examples:
+        >>> matches_wildcard_pattern("claude-3-sonnet", "claude-*")
+        True
+        >>> matches_wildcard_pattern("gpt-4o-mini", "*mini")
+        True
+        >>> matches_wildcard_pattern("mistral-large", "*large*")
+        True
+        >>> matches_wildcard_pattern("any-model", "*")
+        True
+        >>> matches_wildcard_pattern("exact-match", "exact-match")
+        True
+    """
+    if pattern == "*":
+        return True
+
+    if pattern.startswith("*") and pattern.endswith("*"):
+        # Pattern like "*sonnet*"
+        middle = pattern[1:-1]
+        return middle in text
+    elif pattern.startswith("*"):
+        # Pattern like "*sonnet"
+        suffix = pattern[1:]
+        return text.endswith(suffix)
+    elif pattern.endswith("*"):
+        # Pattern like "claude-*"
+        prefix = pattern[:-1]
+        return text.startswith(prefix)
+    else:
+        # Exact match
+        return text == pattern
