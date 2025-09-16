@@ -153,16 +153,13 @@ class CostRegistry(RootModel[CostRegistryRoot]):
 
     @classmethod
     def compute_cost_report(cls, llm_tokens_usage: LLMTokensUsage) -> LLMTokenCostReport:
-        costs_by_token_category: CostsByCategoryDict = {
-            token_type.to_cost_category: (
-                model_cost_per_token(
-                    costs=llm_tokens_usage.unit_costs,
-                    cost_category=token_type.to_cost_category,
-                )
-                * nb_tokens
+        costs_by_token_category: CostsByCategoryDict = {}
+        for token_type, nb_tokens in llm_tokens_usage.nb_tokens_by_category.items():
+            cost_per_token = model_cost_per_token(
+                costs=llm_tokens_usage.unit_costs,
+                cost_category=token_type.to_cost_category,
             )
-            for token_type, nb_tokens in llm_tokens_usage.nb_tokens_by_category.items()
-        }
+            costs_by_token_category[token_type.to_cost_category] = cost_per_token * nb_tokens
         token_cost_report = LLMTokenCostReport(
             job_metadata=llm_tokens_usage.job_metadata,
             inference_model_name=llm_tokens_usage.inference_model_name,

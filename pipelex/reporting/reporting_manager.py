@@ -5,10 +5,10 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import ReportingManagerError
-from pipelex.cogt.inference.cost_registry import CostRegistry
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
+from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import ReportingConfig
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
