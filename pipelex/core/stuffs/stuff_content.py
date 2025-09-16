@@ -385,7 +385,7 @@ class StructuredContent(StuffContent):
     def rendered_html(self) -> str:
         dict_dump = clean_model_to_dict(obj=self)
 
-        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType]
+        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
             json=dict_dump,  # pyright: ignore[reportArgumentType]
             clubbing=True,
             table_attributes="",
@@ -451,7 +451,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
     def rendered_html(self) -> str:
         list_dump = [item.smart_dump() for item in self.items]
 
-        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType]
+        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
             json=list_dump,  # pyright: ignore[reportArgumentType]
             clubbing=True,
             table_attributes="",

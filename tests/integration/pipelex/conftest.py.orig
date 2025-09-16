@@ -4,8 +4,13 @@ import pytest
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
+<<<<<<< HEAD
 from pipelex.plugins.plugin_sdk_registry import Plugin
+=======
+from pipelex.cogt.llm.llm_models.llm_family import LLMCreator, LLMFamily
+from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
+from pipelex.cogt.ocr.ocr_handle import OcrHandle
+>>>>>>> dev
 
 
 @pytest.fixture(
@@ -222,7 +227,7 @@ def imgg_handle(request: pytest.FixtureRequest) -> ImggHandle:
 @pytest.fixture(
     params=[
         OcrHandle.BASIC_OCR,
-        OcrHandle.MISTRAL_OCR,
+        # OcrHandle.MISTRAL_OCR,
     ]
 )
 def ocr_handle(request: pytest.FixtureRequest) -> OcrHandle:

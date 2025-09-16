@@ -20,6 +20,8 @@ class Plugin(BaseModel):
         match ocr_platform:
             case OcrPlatform.MISTRAL:
                 return Plugin(sdk="mistral", backend="mistral")
+            case OcrPlatform.BASIC:
+                return Plugin(sdk="basic", backend="none")
 
     @classmethod
     def make_for_imgg_engine(cls, imgg_platform: ImggPlatform) -> "Plugin":
