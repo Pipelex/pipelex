@@ -38,6 +38,8 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "mistral-large",
         # "ministral-3b",
         # "ministral-8b",
+        "mistral-medium",
+        "mistral-medium-2508",
         # "pixtral-12b",
         # "pixtral-large",
         # "gemini-1-5-pro",
@@ -62,7 +64,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gpt-5-mini",
         # "gpt-5-chat",
         # "claude-4-sonnet",
-        "claude-4.1-opus",
+        # "claude-4.1-opus",
         # "claude-3.5-sonnet",
         # "claude-3.5-sonnet-v2"
         # "claude-3.7-sonnet",
@@ -83,7 +85,7 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
         # "o1",
         # "o3-mini",
         # "gpt-4o",
-        "gpt-4o-mini",
+        # "gpt-4o-mini",
         # "gpt-5-mini",
         # "gpt-5-nano",
         # "gpt-5-chat",
@@ -97,6 +99,8 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
         # "gemini-2.5-pro",
         # "gemini-2.5-flash",
         # "mistral-small3.1",
+        "mistral-medium",
+        "mistral-medium-2508",
         # "qwen3:8b",
     ]
 )

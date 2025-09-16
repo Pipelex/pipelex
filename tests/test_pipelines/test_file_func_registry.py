@@ -4,7 +4,6 @@ from pydantic import Field
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent
-from pipelex.tools.func_registry import func_registry
 
 
 class FilePath(StructuredContent):
@@ -44,6 +43,3 @@ def read_file_content(working_memory: WorkingMemory) -> ListContent[CodebaseFile
             )
 
     return ListContent[CodebaseFileContent](items=codebase_files)
-
-
-func_registry.register_function(read_file_content, name="read_file_content")
