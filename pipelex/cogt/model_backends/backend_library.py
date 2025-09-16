@@ -11,7 +11,9 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.config import get_config
-from pipelex.tools.secrets.toml_secret_utils import TOMLSecretValidationError, load_toml_from_path_with_secret_substitution
+from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
+from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarNotFoundError, substitute_vars
 
 InferenceBackendLibraryRoot = Dict[str, InferenceBackend]
 
@@ -29,10 +31,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def load(self):
         backends_library_path = get_config().cogt.inference_config.backends_library_path
         try:
-            backends_dict = load_toml_from_path_with_secret_substitution(
-                path=backends_library_path,
-            )
-        except (FileNotFoundError, TOMLSecretValidationError) as exc:
+            backends_dict_from_toml = load_toml_from_path(path=backends_library_path)
+            try:
+                backends_dict = apply_to_strings_recursive(backends_dict_from_toml, substitute_vars)
+            except (VarNotFoundError, UnknownVarPrefixError) as exc:
+                raise InferenceBackendLibraryError(f"Variable substitution failed in file '{backends_library_path}': {exc}") from exc
+        except (FileNotFoundError, InferenceBackendLibraryError) as exc:
             raise InferenceBackendLibraryError(f"Failed to load inference backend library from file '{backends_library_path}': {exc}") from exc
         for backend_name, backend_dict in backends_dict.items():
             # We'll split the read settings into standard fields and extra config
@@ -47,10 +51,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 continue
             path_to_model_specs_toml = get_config().cogt.inference_config.model_specs_path(backend_name=backend_name)
             try:
-                model_specs_dict = load_toml_from_path_with_secret_substitution(
+                model_specs_dict_from_toml = load_toml_from_path(
                     path=path_to_model_specs_toml,
                 )
-            except (FileNotFoundError, TOMLSecretValidationError) as exc:
+                try:
+                    model_specs_dict = apply_to_strings_recursive(model_specs_dict_from_toml, substitute_vars)
+                except (VarNotFoundError, UnknownVarPrefixError) as exc:
+                    raise InferenceModelSpecError(f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}") from exc
+            except (FileNotFoundError, InferenceModelSpecError) as exc:
                 raise InferenceBackendLibraryError(f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}") from exc
             default_sdk: Optional[str] = model_specs_dict.pop("default_sdk", None)
             default_prompting_target: Optional[PromptingTarget] = model_specs_dict.pop("default_prompting_target", None)
