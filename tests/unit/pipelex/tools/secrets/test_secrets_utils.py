@@ -119,7 +119,7 @@ class TestSubstituteVars:
         mock_secrets_provider.get_secret.side_effect = SecretNotFoundError("Secret not found")
         mocker.patch("pipelex.tools.secrets.secrets_utils.get_secrets_provider", return_value=mock_secrets_provider)
 
-        with pytest.raises(VarNotFoundError, match="Secret 'MISSING_SECRET' not found"):
+        with pytest.raises(VarNotFoundError, match="Could not get variable 'MISSING_SECRET': Secret not found"):
             substitute_vars("Value: ${secret:MISSING_SECRET}")
 
     def test_missing_default_secret_raises_error(self, mocker: MockerFixture, mock_secrets_provider: Any) -> None:
@@ -129,7 +129,7 @@ class TestSubstituteVars:
         mock_secrets_provider.get_secret.side_effect = SecretNotFoundError("Secret not found")
         mocker.patch("pipelex.tools.secrets.secrets_utils.get_secrets_provider", return_value=mock_secrets_provider)
 
-        with pytest.raises(VarNotFoundError, match="Secret 'MISSING_SECRET' not found"):
+        with pytest.raises(VarNotFoundError, match="Could not get variable 'MISSING_SECRET': Secret not found"):
             substitute_vars("Value: ${MISSING_SECRET}")
 
     def test_fallback_both_missing_raises_error(self, mocker: MockerFixture, mock_secrets_provider: Any) -> None:
