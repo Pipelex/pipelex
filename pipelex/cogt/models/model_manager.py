@@ -81,10 +81,6 @@ class ModelManager(ModelManagerAbstract):
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
         llm_handles: Dict[str, InferenceModelSpec] = {}
 
-        # pretty_print(all_models_and_possible_backends, title="all_models_and_possible_backends")
-
-        # pretty_print(self.inference_backend_library.list_backend_names(), title="Enabled backends")
-
         for model_name, available_backends in all_models_and_possible_backends.items():
             backend_match_for_model = self.routing_profile_library.get_backend_match_for_model_from_active_routing_profile(
                 model_name=model_name,
