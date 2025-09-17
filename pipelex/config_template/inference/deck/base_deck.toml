@@ -1,0 +1,93 @@
+
+# LLM Deck base
+
+####################################################################################################
+# Aliases
+####################################################################################################
+
+[aliases]
+base-claude = "claude-4-sonnet"
+base-gpt = "gpt-5"
+base-gemini = "gemini-2.5-flash"
+base-mistral = "mistral-medium"
+
+best-gpt = "gpt-5"
+best-claude = "claude-4.1-opus"
+best-gemini = "gemini-2.5-pro"
+best-mistral = "mistral-medium"
+best-grok = "grok-3"
+
+cheap_llm_for_text = "gpt-4o-mini"
+cheap_llm_for_object = "gpt-4o-mini"
+
+base_llm_for_text = "gpt-4o-mini"
+base_llm_for_object = "gpt-4o-mini"
+
+llm_to_engineer = ["claude-4.1-opus", "gemini-2.5-pro"]
+llm_for_large_codebase = ["gemini-2.5-pro", "claude-4-sonnet", "gpt-5"]
+
+####################################################################################################
+# LLM Presets
+####################################################################################################
+
+[llm_presets]
+
+####################################################################################################
+# LLM Presets — General purpose
+
+cheap_llm_for_text = { llm_handle = "cheap_llm_for_text", temperature = 0.5 }
+cheap_llm_for_short_text = { llm_handle = "cheap_llm_for_text", temperature = 0.5, max_tokens = 50 }
+cheap_llm_for_object = { llm_handle = "cheap_llm_for_object", temperature = 0.5 }
+cheap_llm_to_structure = { llm_handle = "cheap_llm_for_object", temperature = 0.1 }
+
+llm_for_testing_gen_text = { llm_handle = "base_llm_for_text", temperature = 0.5 }
+llm_for_testing_gen_object = { llm_handle = "base_llm_for_object", temperature = 0.5 }
+
+####################################################################################################
+# LLM Presets — Specific skills
+
+# Cheap llm
+llm_cheap = { llm_handle = "base-gemini", temperature = 0.1 }
+
+# Generation skills
+llm_for_factual_writing = { llm_handle = "base-gpt", temperature = 0.1 }
+llm_for_creative_writing = { llm_handle = "claude-4-sonnet", temperature = 0.9 }
+
+# Reasoning skills
+llm_to_reason_short = { llm_handle = "base-claude", temperature = 0.5, max_tokens = 500 }
+llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
+llm_to_reason_on_diagram = { llm_handle = "best-claude", temperature = 0.5 }
+
+# Search and answer skills
+llm_to_answer = { llm_handle = "best-claude", temperature = 0.1 }
+llm_to_retrieve = { llm_handle = "best-gemini", temperature = 0.1 }
+llm_for_enrichment = { llm_handle = "gpt-4o", temperature = 0.1 }
+llm_to_enrich = { llm_handle = "best-claude", temperature = 0.1 }
+llm_for_question_and_excerpt_reformulation = { llm_handle = "gpt-4o", temperature = 0.9 }
+
+# Engineering skills
+llm_to_engineer = { llm_handle = "best-claude", temperature = 0.2 }
+llm_to_pipelex = { llm_handle = "best-claude", temperature = 0.2 }
+# llm_to_pipelex = { llm_handle = "gpt-5-mini", temperature = 0.2 }
+
+# Image skills
+llm_to_write_imgg_prompt = { llm_handle = "best-claude", temperature = 0.2 }
+llm_to_describe_img = { llm_handle = "best-claude", temperature = 0.5 }
+llm_to_design_fashion = { llm_handle = "best-claude", temperature = 0.7 }
+llm_for_img_to_text = { llm_handle = "best-claude", temperature = 0.1 }
+
+# Extraction skills
+llm_to_extract_diagram = { llm_handle = "best-claude", temperature = 0.5 }
+llm_to_extract_invoice = { llm_handle = "claude-3-7-sonnet", temperature = 0.1 }
+llm_to_extract_invoice_from_scan = { llm_handle = "best-claude", temperature = 0.5 }
+llm_to_extract_legal_terms = { llm_handle = "best-claude", temperature = 0.1 }
+llm_to_extract_tables = { llm_handle = "best-claude", temperature = 0.1 }
+
+####################################################################################################
+# LLM Choices
+####################################################################################################
+
+[llm_choice_defaults]
+for_text = "cheap_llm_for_text"
+for_object = "cheap_llm_for_object"
+

@@ -1,0 +1,27 @@
+default_sdk = "openai"
+default_prompting_target = "anthropic"
+
+[grok-3]
+model_id = "grok-3"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 3, output = 15 }
+
+[grok-3-mini]
+model_id = "grok-3-mini"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.3, output = 0.5 }
+
+[grok-3-fast]
+model_id = "grok-3-fast-latest"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 5, output = 25 }
+
+[grok-3-mini-fast]
+model_id = "grok-3-mini-fast-latest"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.15, output = 4 }
+
