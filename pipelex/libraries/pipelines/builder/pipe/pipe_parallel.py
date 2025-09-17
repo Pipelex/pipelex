@@ -60,7 +60,7 @@ class PipeParallelBlueprint(PipeBlueprint):
         return PipeParallelBlueprintCore(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
-            output=base_blueprint.output_concept_string_or_concept_code,
+            output=base_blueprint.output,
             type=self.type,
             category=self.category,
             parallels=core_parallels,

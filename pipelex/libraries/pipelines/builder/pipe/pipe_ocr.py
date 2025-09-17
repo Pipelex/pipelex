@@ -41,6 +41,7 @@ class PipeOcrBlueprint(PipeBlueprint):
 
     type: Literal["PipeOcr"] = "PipeOcr"
     category: Literal["PipeOperator"] = "PipeOperator"
+    ocr_handle: OcrHandle
     ocr_platform: Optional[OcrPlatform] = None
     page_images: Optional[bool] = None
     page_image_captions: Optional[bool] = None
@@ -55,7 +56,7 @@ class PipeOcrBlueprint(PipeBlueprint):
         return PipeOcrBlueprintCore(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
-            output=base_blueprint.output_concept_string_or_concept_code,
+            output=base_blueprint.output,
             type=self.type,
             category=self.category,
             ocr_handle=OcrHandle.MISTRAL_OCR,

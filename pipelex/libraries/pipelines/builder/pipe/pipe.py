@@ -45,8 +45,7 @@ class PipeBlueprint(StructuredContent):
         definition: Natural language description of what the pipe does.
         inputs: Input concept specifications. should be an InputRequirementBlueprint
                Dictionary keys are input names in snake_case, values are concept specifications in PascalCase.
-        output_concept_string_or_concept_code: Output concept code in PascalCase format.
-                                              Aliased as 'output' in serialization.
+        output: Output concept code in PascalCase format.
 
     Validation Rules:
         1. Pipe type: Must be one of the AllowedPipeTypes enum values.
@@ -70,9 +69,7 @@ class PipeBlueprint(StructuredContent):
             "Dictionary keys are input names, values are concept specifications."
         )
     )
-    output_concept_string_or_concept_code: str = Field(
-        alias="output", description="Output concept code in PascalCase format. (is output_concept_string_or_concept_code)"
-    )
+    output: str = Field(description="Output concept code in PascalCase format")
 
     @field_validator("type", mode="after")
     def validate_pipe_type(cls, value: Any) -> Any:
@@ -82,7 +79,7 @@ class PipeBlueprint(StructuredContent):
             raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {allowed_types}")
         return value
 
-    @field_validator("output_concept_string_or_concept_code", mode="before")
+    @field_validator("output", mode="before")
     def validate_concept_string_or_concept_code(cls, output: str) -> str:
         ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=output)
         return output
@@ -108,7 +105,7 @@ class PipeBlueprint(StructuredContent):
         return PipeBlueprintCore(
             definition=self.definition,
             inputs=converted_inputs,
-            output=self.output_concept_string_or_concept_code,
+            output=self.output,
             type=self.type,
             category=self.category,
         )

@@ -48,7 +48,7 @@ class PipeJinja2Blueprint(PipeBlueprint, Jinja2Blueprint):
         return PipeJinja2BlueprintCore(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
-            output=base_blueprint.output_concept_string_or_concept_code,
+            output=base_blueprint.output,
             type=self.type,
             category=self.category,
             jinja2_name=self.jinja2_name,

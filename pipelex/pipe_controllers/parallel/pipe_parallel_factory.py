@@ -35,7 +35,7 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         if blueprint.combined_output:
             combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
                 domain=domain,
-                concept_string_or_concept_code=blueprint.output_concept_string_or_concept_code,
+                concept_string_or_concept_code=blueprint.output,
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             )
             combined_output = get_concept_provider().get_required_concept(
@@ -48,7 +48,7 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
 
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
-            concept_string_or_concept_code=blueprint.output_concept_string_or_concept_code,
+            concept_string_or_concept_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return PipeParallel(

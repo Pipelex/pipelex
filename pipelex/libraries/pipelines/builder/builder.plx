@@ -54,8 +54,8 @@ We have pipe controllers:
 - PipeCondition: A pipe that based on a specific condition, branches to a specific pipe. You have to explain what the expression of the condition is,
     and what the different pipes are that can be executed based on the condition. It needs to reference the pipes it will execute.
 - PipeBatch: A pipe that executes a batch of pipes in parallel. It needs to reference the pipe it will execute.
-- PipeImgGen: A pipe that uses an LLM to generate an image.
-- PipeOcr: A pipe that uses an LLM to extract text from an image.
+- PipeImgGen: A pipe that uses an LLM to generate an image. VERY IMPORTANT: IF YOU DECIDE TO CREATE A PIPEIMGEN, YOU ALSO HAVE TO CREATE A PIPELLM THAT WILL WRITE THE PROMPT, AND THAT NEEDS TO PRECEED THE PIPEIMGEN, based on the necessary elements.
+- PipeOcr: A pipe that uses an OCR technology to extract text from an image.
 
 Be very detailed, process by steps.
 
@@ -81,7 +81,7 @@ type = "PipeLLM"
 description = "From PlanDraftText (+ brief), extract ConceptSpecsText (codes, descriptions, structure hints) in TEXT."
 inputs = { plan_draft = "PlanDraftText", brief = "UserBrief" }
 output = "Text"
-llm = "llm_to_engineer"
+llm = "llm_to_write"
 prompt_template = """
 You will receive a plan for a Pipelex pipeline.
 Each pipeline will take inputs and output. Those inputs/output are represented as concepts.
@@ -161,8 +161,7 @@ The output should be the concept code of the output of the last step.
     and what the different pipes are that can be executed based on the condition. It needs to reference the pipes it will execute.
 The inputs of the PipeCondition should be all the necessary inputs in the below steps
 The output should be the concept code of the output of all the steps, except if the outputs are different, then its "Dynamic"
-- expression: Direct expression to evaluate (e.g., "task_result.status") OR
-- expression_template: Jinja2 template for complex conditions (use one or the other, not both)
+- expression: Direct expression to evaluate (e.g., "task_result.status")
 - pipe_map: Dictionary mapping condition results to pipe codes (e.g., {"completed": "success_pipe", "failed": "failure_pipe"})
 - default_pipe_code: Fallback pipe when no conditions match
 
@@ -176,8 +175,9 @@ The inputs of the PipeImgGen should be: {prompt: ImgGenPrompt}
 The output should be the concept code that refines Image.
 - img_gen_prompt: Static prompt for image generation (if using static prompt)
 - nb_output: Number of images to generate (default 1)
-IF YOU DECIDE TO CREATE A PIPEIMGEN, YOU ALSO HAVE TO CREATE A PIPELLM THAT GENERATES THE PROMPT, based on the necessary elements.
-The pipe code cannot be generate_photo or generate_image
+VERY IMPORTANT: IF YOU DECIDE TO CREATE A PIPEIMGEN, YOU ALSO HAVE TO CREATE A PIPELLM THAT WILL WRITE THE PROMPT, AND THAT NEEDS TO PRECEED THE PIPEIMGEN, based on the necessary elements.
+THERFORE, the OUTPUT OF THIS PIPELLM should be a VARIABLE NAMED "prompt" that will be used as input for the PipeImgGen.
+
 **PipeOcr**: A pipe that uses an LLM to extract text from an image.
 - (No essential features - uses defaults)
 
@@ -208,7 +208,6 @@ inputs = { concept_specs_text = "Text", brief = "UserBrief" }
 output = "concept.ConceptSpec"
 multiple_output = true
 llm = "llm_to_engineer"
-structuring_method = "preliminary_text"
 prompt_template = """
 Materialize ConceptSpec objects from the ConceptSpecsText.
 Do not change the information in the input. Just organize the information
@@ -227,7 +226,6 @@ inputs = { pipe_signatures_text = "Text", concept_specs = "concept.ConceptSpec",
 output = "pipe.PipeSignature"
 multiple_output = true
 llm = "llm_to_engineer"
-structuring_method = "preliminary_text"
 prompt_template = """
 Materialize PipeSignature objects from the PipeSignaturesText.
 - code MUST be snake_case

@@ -155,7 +155,7 @@ class PipeLLMBlueprint(PipeBlueprint):
         return PipeLLMBlueprintCore(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
-            output=base_blueprint.output_concept_string_or_concept_code,
+            output=base_blueprint.output,
             type=self.type,
             category=self.category,
             system_prompt_template=self.system_prompt_template,

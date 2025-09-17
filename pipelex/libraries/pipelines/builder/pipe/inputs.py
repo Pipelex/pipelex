@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint as InputRequirementBlueprintCore
@@ -30,7 +30,7 @@ class InputRequirementBlueprint(StructuredContent):
         ValidationError: When concept format is invalid or doesn't meet PascalCase requirements.
     """
 
-    concept: str
+    concept: str = Field(description="Concept code or concept string in PascalCase format")
     multiplicity: Optional[PipeOutputMultiplicity] = None
 
     @field_validator("concept", mode="before")

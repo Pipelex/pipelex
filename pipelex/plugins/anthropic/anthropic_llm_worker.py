@@ -1,8 +1,7 @@
 from typing import Any, Dict, Optional, Type
 
 import instructor
-from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock, BadRequestError
-from instructor.exceptions import InstructorRetryException
+from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock
 from typing_extensions import override
 
 from pipelex import log

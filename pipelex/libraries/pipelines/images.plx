@@ -13,34 +13,6 @@ definition = "Photo"
 refines = "Image"
 
 [pipe]
-
-#################################################################
-# Vision: PipeLLM taking images as input
-#################################################################
-
-[pipe.describe_image]
-type = "PipeLLM"
-definition = "Describe an image"
-inputs = { image = "Image" }
-output = "VisualDescription"
-system_prompt = "You are a very good observer."
-llm = "llm_to_describe_img"
-structuring_method = "preliminary_text"
-prompt_template = """
-Describe the provided image in great detail.
-"""
-
-[pipe.describe_photo]
-type = "PipeLLM"
-definition = "Describe a photo"
-inputs = { photo = "Photo" }
-output = "VisualDescription"
-system_prompt = "You are a very good observer."
-llm = "llm_to_describe_img"
-prompt_template = """
-Describe the provided photo and how it was shot: scene, lighting, camera, etc.
-"""
-
 #################################################################
 # Image generation: PipeImgGen generating images as output
 #################################################################

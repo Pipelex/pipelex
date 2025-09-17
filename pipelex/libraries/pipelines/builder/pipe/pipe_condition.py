@@ -78,7 +78,7 @@ class PipeConditionBlueprint(PipeBlueprint):
         return PipeConditionBlueprintCore(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
-            output=base_blueprint.output_concept_string_or_concept_code,
+            output=base_blueprint.output,
             type=self.type,
             category=self.category,
             expression_template=self.expression_template,

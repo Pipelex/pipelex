@@ -49,7 +49,7 @@ class PipeBatchBlueprint(PipeBlueprint):
         return PipeBatchBlueprintCore(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
-            output=base_blueprint.output_concept_string_or_concept_code,
+            output=base_blueprint.output,
             type=self.type,
             category=self.category,
             branch_pipe_code=self.branch_pipe_code,

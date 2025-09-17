@@ -164,7 +164,7 @@ def _convert_pipe_spec_to_blueprint(pipe_spec: PipeSpecBlueprintUnion) -> PipeBl
     """Convert a PipeSpecBlueprint to the corresponding PipeBlueprint by removing the_pipe_code."""
     # First try with by_alias=True to get proper field names
     pipe_data = pipe_spec.model_dump(exclude={"the_pipe_code"}, by_alias=True)
-    pipe_data["output"] = pipe_spec.output_concept_string_or_concept_code
+    pipe_data["output"] = pipe_spec.output
 
     # Map pipe types to their blueprint classes
     pipe_type_to_class: Dict[str, type] = {
