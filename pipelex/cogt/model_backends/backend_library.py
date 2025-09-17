@@ -31,31 +31,35 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def load(self):
         backends_library_path = get_config().cogt.inference_config.backends_library_path
         try:
-            backends_dict_from_toml = load_toml_from_path(path=backends_library_path)
-            try:
-                backends_dict = apply_to_strings_recursive(backends_dict_from_toml, substitute_vars)
-            except (VarNotFoundError, UnknownVarPrefixError) as exc:
-                raise InferenceBackendCredentialsError(f"Variable substitution failed in file '{backends_library_path}': {exc}") from exc
+            backends_dict = load_toml_from_path(path=backends_library_path)
         except (FileNotFoundError, InferenceBackendLibraryError) as exc:
             raise InferenceBackendLibraryError(f"Failed to load inference backend library from file '{backends_library_path}': {exc}") from exc
         for backend_name, backend_dict in backends_dict.items():
             # We'll split the read settings into standard fields and extra config
             standard_fields = InferenceBackendBlueprint.model_fields.keys()
             extra_config: Dict[str, Any] = {}
-            inference_backend_blueprint_dict = backend_dict.copy()
+            inference_backend_blueprint_dict_raw = backend_dict.copy()
+            if not inference_backend_blueprint_dict_raw.get("enabled", True):
+                continue
+            try:
+                inference_backend_blueprint_dict = apply_to_strings_recursive(inference_backend_blueprint_dict_raw, substitute_vars)
+            except (VarNotFoundError, UnknownVarPrefixError) as exc:
+                raise InferenceBackendCredentialsError(f"Variable substitution failed in file '{backends_library_path}': {exc}") from exc
+
             for key in backend_dict.keys():
                 if key not in standard_fields:
                     extra_config[key] = inference_backend_blueprint_dict.pop(key)
             backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
-            if not backend_blueprint.enabled:
-                continue
+            # if not backend_blueprint.enabled:
+            #     continue
+
             path_to_model_specs_toml = get_config().cogt.inference_config.model_specs_path(backend_name=backend_name)
             try:
-                model_specs_dict_from_toml = load_toml_from_path(
+                model_specs_dict_raw = load_toml_from_path(
                     path=path_to_model_specs_toml,
                 )
                 try:
-                    model_specs_dict = apply_to_strings_recursive(model_specs_dict_from_toml, substitute_vars)
+                    model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, substitute_vars)
                 except (VarNotFoundError, UnknownVarPrefixError) as exc:
                     raise InferenceModelSpecError(f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}") from exc
             except (FileNotFoundError, InferenceModelSpecError) as exc:

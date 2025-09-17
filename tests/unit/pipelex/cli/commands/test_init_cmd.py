@@ -17,7 +17,7 @@ class TestInitCmd:
         # Setup directories
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
-        (template_dir / "pipelex_template.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
 
         target_dir = tmp_path / ".pipelex"
         target_dir.mkdir()
@@ -34,7 +34,7 @@ class TestInitCmd:
         do_init_config(reset=False)
 
         # Verify
-        assert (target_dir / "pipelex_template.toml").exists()
+        assert (target_dir / "pipelex.toml").exists()
         mock_echo.assert_any_call(f"✅ Copied 1 files to {target_dir}:")
 
     def test_do_init_config_skips_existing_files(self, tmp_path: Path, mocker: MockerFixture) -> None:
@@ -42,12 +42,12 @@ class TestInitCmd:
         # Setup directories with existing file
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
-        (template_dir / "pipelex_template.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
         (template_dir / "new_file.toml").write_text("[new]\nconfig = 'value'")
 
         target_dir = tmp_path / ".pipelex"
         target_dir.mkdir()
-        (target_dir / "pipelex_template.toml").write_text("[tool.pipelex]\nversion = '0.9'")
+        (target_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '0.9'")
 
         # Mock config manager
         mock_config_manager = mocker.MagicMock()
@@ -61,7 +61,7 @@ class TestInitCmd:
         do_init_config(reset=False)
 
         # Verify existing file was not overwritten
-        content = (target_dir / "pipelex_template.toml").read_text()
+        content = (target_dir / "pipelex.toml").read_text()
         assert "version = '0.9'" in content
 
         # Verify new file was copied
@@ -77,11 +77,11 @@ class TestInitCmd:
         # Setup directories with existing file
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
-        (template_dir / "pipelex_template.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
 
         target_dir = tmp_path / ".pipelex"
         target_dir.mkdir()
-        (target_dir / "pipelex_template.toml").write_text("[tool.pipelex]\nversion = '0.9'")
+        (target_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '0.9'")
 
         # Mock config manager
         mock_config_manager = mocker.MagicMock()
@@ -95,7 +95,7 @@ class TestInitCmd:
         do_init_config(reset=True)
 
         # Verify file was overwritten
-        content = (target_dir / "pipelex_template.toml").read_text()
+        content = (target_dir / "pipelex.toml").read_text()
         assert "version = '1.0'" in content
 
         # Verify no skipped files message
@@ -108,7 +108,7 @@ class TestInitCmd:
         # Setup complex nested structure
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
-        (template_dir / "pipelex_template.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
 
         inference_dir = template_dir / "inference"
         inference_dir.mkdir()
@@ -133,7 +133,7 @@ class TestInitCmd:
         do_init_config(reset=False)
 
         # Verify all files and directories were created
-        assert (target_dir / "pipelex_template.toml").exists()
+        assert (target_dir / "pipelex.toml").exists()
         assert (target_dir / "inference").is_dir()
         assert (target_dir / "inference" / "backends.toml").exists()
         assert (target_dir / "inference" / "backends").is_dir()
@@ -148,7 +148,7 @@ class TestInitCmd:
         # Setup directories
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
-        (template_dir / "pipelex_template.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
 
         target_dir = tmp_path / ".pipelex"
         target_dir.mkdir()
@@ -172,7 +172,7 @@ class TestInitCmd:
         # Setup template directory only
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
-        (template_dir / "pipelex_template.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
 
         target_dir = tmp_path / ".pipelex"  # Don't create this
 
@@ -190,7 +190,7 @@ class TestInitCmd:
         # Verify directory was created and file was copied
         assert target_dir.exists()
         assert target_dir.is_dir()
-        assert (target_dir / "pipelex_template.toml").exists()
+        assert (target_dir / "pipelex.toml").exists()
 
         # Verify success message
         calls = [call.args[0] for call in mock_echo.call_args_list]

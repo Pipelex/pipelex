@@ -10,6 +10,6 @@ class TestConfigManager:
         pretty_print(project_name, title="project_name")
         assert project_name == "pipelex"
 
-    def test_load_pipelex_init_config(self):
+    def test_load_pipelex_template_config(self):
         hub = get_pipelex_hub()
-        hub.setup_config(config_cls=PipelexConfig, specific_config_path="pipelex/pipelex_template.toml")
+        hub.setup_config(config_cls=PipelexConfig, specific_config_path="pipelex/config_template/pipelex.toml")

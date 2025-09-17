@@ -16,7 +16,6 @@ from pipelex.tools.runtime_manager import runtime_manager
 CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
 CONFIG_TEMPLATE_SUBPATH = "config_template"
-CONFIG_TEMPLATE_NAME = "pipelex_template.toml"
 INFERENCE_CONFIG_SUBPATH = "inference"
 
 
@@ -42,10 +41,6 @@ class ConfigManager:
     @property
     def pipelex_root_config_path(self) -> str:
         return os.path.join(self.pipelex_root_dir, CONFIG_NAME)
-
-    @property
-    def pipelex_config_template_path(self) -> str:
-        return os.path.join(self.pipelex_root_dir, CONFIG_TEMPLATE_SUBPATH, CONFIG_TEMPLATE_NAME)
 
     @property
     def local_root_dir(self) -> str:
