@@ -24,6 +24,7 @@ For complete details, see the [Inference Backend Configuration](pages/configurat
 - Comprehensive model specifications with detailed cost categories
 - Unified plugin SDK registry for all backends
 - CI environment detection with automatic placeholder API keys for testing
+- Improved `pipelex init config` command to copy entire configuration template directory structure to `.pipelex/` with smart file handling (skips existing files, shows clear progress messages)
 - Added `FuncRegistryUtils` to register functions in a pipelex folder that have a specific signature.
 - Added `mistral-medium` and `mistral-medium-2508` to the Mistral backend configuration.
 - Added `gemini-2.5-flash` to the VertexAI backend configuration.
