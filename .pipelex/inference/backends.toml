@@ -44,3 +44,4 @@ gcp_credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
 [mistral]
 enabled = false
 api_key = "${MISTRAL_API_KEY}"
+

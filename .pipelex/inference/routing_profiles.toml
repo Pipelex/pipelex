@@ -82,3 +82,4 @@ default = "pipelex_inference"
 # - Exact names: "gpt-4o-mini"
 # - Wildcards: "claude-*" (matches all models starting with claude-)
 # - Partial wildcards: "*-sonnet" (matches all sonnet variants)
+
