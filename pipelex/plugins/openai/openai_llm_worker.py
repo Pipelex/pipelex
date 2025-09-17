@@ -116,6 +116,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.MISTRAL_8X7B
                     | LLMFamily.MISTRAL_LARGE
                     | LLMFamily.MISTRAL_SMALL
+                    | LLMFamily.MISTRAL_MEDIUM
                     | LLMFamily.MISTRAL_CODESTRAL
                     | LLMFamily.MINISTRAL
                     | LLMFamily.PIXTRAL
@@ -225,6 +226,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     | LLMFamily.MISTRAL_8X7B
                     | LLMFamily.MISTRAL_LARGE
                     | LLMFamily.MISTRAL_SMALL
+                    | LLMFamily.MISTRAL_MEDIUM
                     | LLMFamily.MISTRAL_CODESTRAL
                     | LLMFamily.MINISTRAL
                     | LLMFamily.PIXTRAL

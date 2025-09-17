@@ -1,5 +1,6 @@
 from typing import Literal, Optional
 
+from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
@@ -36,6 +37,7 @@ class PipeOcrBlueprint(PipeBlueprint):
 
     type: Literal["PipeOcr"] = "PipeOcr"
     category: Literal["PipeOperator"] = "PipeOperator"
+    ocr_handle: OcrHandle
     ocr_platform: Optional[OcrPlatform] = None
     page_images: Optional[bool] = None
     page_image_captions: Optional[bool] = None

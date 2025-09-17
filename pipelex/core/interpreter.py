@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Union
+from typing import Any, Dict, Mapping, Optional, Union, cast
 
 import toml
 from pydantic import BaseModel, model_validator
@@ -335,6 +335,7 @@ class PipelexInterpreter(BaseModel):
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
         lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
+        lines.append(f'ocr_handle = "{pipe.ocr_handle.value}"')
 
         return "\n".join(lines)
 
@@ -744,6 +745,9 @@ class PipelexInterpreter(BaseModel):
         # Add output
         result["output"] = pipe.output_concept_string_or_concept_code
 
+        # Add required fields
+        result["ocr_handle"] = pipe.ocr_handle
+
         # Add optional fields
         if pipe.ocr_platform:
             result["ocr_platform"] = pipe.ocr_platform
@@ -975,7 +979,7 @@ class PipelexInterpreter(BaseModel):
             if isinstance(value, dict):
                 # Nested dict (like InputRequirementBlueprint)
                 nested_parts: list[str] = []
-                nested_dict: Dict[str, Any] = value
+                nested_dict: Dict[str, Any] = cast(Dict[str, Any], value)
                 for nested_key, nested_value in nested_dict.items():
                     if isinstance(nested_value, str):
                         nested_parts.append(f'{nested_key} = "{PipelexInterpreter.escape_plx_string(nested_value)}"')
@@ -1001,7 +1005,7 @@ class PipelexInterpreter(BaseModel):
             for key, value in inputs_dict.items():
                 if isinstance(value, dict):
                     nested_parts: list[str] = []
-                    nested_dict: Dict[str, Any] = value
+                    nested_dict: Dict[str, Any] = cast(Dict[str, Any], value)
                     for nested_key, nested_value in nested_dict.items():
                         if isinstance(nested_value, str):
                             nested_parts.append(f'{nested_key} = "{PipelexInterpreter.escape_plx_string(nested_value)}"')

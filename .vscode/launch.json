@@ -16,15 +16,15 @@
             "justMyCode": false
         },
         {
-            "name": "Debug tests",
+            "name": "Debug test_pipe_ocr_pdf",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
             "args": [
                 "-s",
                 "-vv",
-                "-m inference",
-                "-k test_pipe_run"
+                "-m ocr",
+                "-k test_pipe_ocr_pdf"
             ],
             "console": "integratedTerminal"
         },

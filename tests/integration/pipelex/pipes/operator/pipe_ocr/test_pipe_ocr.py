@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 
 from pipelex import pretty_print
+from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
@@ -42,10 +43,14 @@ class TestPipeOCR:
     @pytest.mark.parametrize("image_url", PipeOcrTestCases.PIPE_OCR_IMAGE_TEST_CASES)
     async def test_pipe_ocr_image(
         self,
+        ocr_handle: OcrHandle,
         pipe_run_mode: PipeRunMode,
         image_url: str,
         setup: Any,
     ):
+        if ocr_handle == OcrHandle.BASIC_OCR:
+            pytest.skip("Basic OCR is not supported for image processing")
+
         pipe_ocr_blueprint = PipeOcrBlueprint(
             definition="OCR test for image processing",
             inputs={"page_scan": InputRequirementBlueprint(concept=NativeConceptEnum.IMAGE.value)},
@@ -54,6 +59,7 @@ class TestPipeOCR:
             page_image_captions=False,
             page_views=True,
             page_views_dpi=72,
+            ocr_handle=ocr_handle,
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
@@ -77,6 +83,7 @@ class TestPipeOCR:
     @pytest.mark.parametrize("pdf_url", PipeOcrTestCases.PIPE_OCR_PDF_TEST_CASES)
     async def test_pipe_ocr_pdf(
         self,
+        ocr_handle: OcrHandle,
         pipe_run_mode: PipeRunMode,
         pdf_url: str,
     ):
@@ -84,6 +91,7 @@ class TestPipeOCR:
             definition="OCR test for PDF processing",
             inputs={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept=NativeConceptEnum.PDF.value)},
             output=NativeConceptEnum.TEXT_AND_IMAGES.value,
+            ocr_handle=ocr_handle,
             page_images=True,
             page_image_captions=False,
             page_views=True,

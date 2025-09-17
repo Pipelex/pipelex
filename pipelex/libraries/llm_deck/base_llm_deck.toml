@@ -13,6 +13,8 @@ llm_external_handles = []
 gpt-4o-2024-11-20 = { llm_name = "gpt-4o", llm_version = "2024-11-20" }
 base-claude = "claude-4-sonnet"
 base-gpt = "gpt-5"
+base-gemini = "gemini-2.5-flash"
+base-mistral = "mistral-medium"
 
 best-gpt = "gpt-5"
 best-claude = "claude-4-1-opus"
@@ -47,6 +49,9 @@ llm_for_testing_gen_object = { llm_handle = "base_llm_for_object", temperature =
 ####################################################################################################
 # LLM Presets — Specific skills
 
+# Cheap llm
+llm_cheap = { llm_handle = "base-gemini", temperature = 0.1 }
+
 # Generation skills
 llm_for_factual_writing = { llm_handle = "base-gpt", temperature = 0.1 }
 llm_for_creative_writing = { llm_handle = "best-claude", temperature = 0.9 }
@@ -80,7 +85,6 @@ llm_to_extract_invoice = { llm_handle = "claude-3-7-sonnet", temperature = 0.1 }
 llm_to_extract_invoice_from_scan = { llm_handle = "best-claude", temperature = 0.5 }
 llm_to_extract_legal_terms = { llm_handle = "best-claude", temperature = 0.1 }
 llm_to_extract_tables = { llm_handle = "best-claude", temperature = 0.1 }
-
 
 ####################################################################################################
 # LLM Choices

@@ -14,6 +14,7 @@ class PluginSdkHandle(StrEnum):
     ANTHROPIC_SDK = "anthropic_sdk"
     BEDROCK_ANTHROPIC_SDK = "bedrock_anthropic_sdk"
     MISTRAL_SDK = "mistral_sdk"
+    BASIC_SDK = "basic_sdk"
     BEDROCK_SDK = "bedrock_sdk"
     PERPLEXITY_OPENAI_SDK = "perplexity_openai_sdk"
     VERTEXAI_OPENAI_SDK = "vertexai_openai_sdk"
@@ -50,6 +51,8 @@ class PluginSdkHandle(StrEnum):
         match ocr_platform:
             case OcrPlatform.MISTRAL:
                 return PluginSdkHandle.MISTRAL_SDK
+            case OcrPlatform.BASIC:
+                return PluginSdkHandle.BASIC_SDK
 
     @staticmethod
     def get_for_imgg_engine(imgg_platform: ImggPlatform) -> "PluginSdkHandle":
