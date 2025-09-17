@@ -18,3 +18,4 @@ page_output_text_file_name = "page_text.md"
 is_pipeline_tracking_enabled = false
 is_activity_tracking_enabled = false
 is_reporting_enabled = true
+

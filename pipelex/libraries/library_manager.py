@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from typing import ClassVar, List, Optional, Type
 
+from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -22,6 +23,7 @@ from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.exceptions import (
     ConceptLibraryError,
     LibraryError,
+    PipelexSetupError,
     PipeLibraryError,
 )
 from pipelex.libraries.library_config import LibraryConfig
@@ -31,6 +33,7 @@ from pipelex.tools.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.toml_utils import TOMLValidationError, validate_toml_file
 from pipelex.tools.runtime_manager import runtime_manager
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import StrEnum
 
 
@@ -206,7 +209,11 @@ class LibraryManager(LibraryManagerAbstract):
         return pipes
 
     @override
-    def load_libraries(self, library_dirs: Optional[List[Path]] = None, library_file_paths: Optional[List[Path]] = None) -> None:
+    def load_libraries(
+        self,
+        library_dirs: Optional[List[Path]] = None,
+        library_file_paths: Optional[List[Path]] = None,
+    ) -> None:
         dirs_to_use: List[Path] = self._get_pipeline_library_dirs()
         all_plx_paths: List[Path] = self._get_pipelex_plx_files_from_dirs(dirs_to_use)
 
@@ -229,7 +236,13 @@ class LibraryManager(LibraryManagerAbstract):
         # Parse all blueprints first
         blueprints: List[PipelexBundleBlueprint] = []
         for plx_file_path in all_plx_paths:
-            blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
+            try:
+                blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
+            except FileNotFoundError as exc:
+                raise PipelexSetupError(f"Could not find PLX blueprint at '{plx_file_path}'") from exc
+            except ValidationError as exc:
+                error_msg = format_pydantic_validation_error(exc)
+                raise PipelexSetupError(f"Could not load PLX blueprint from '{plx_file_path}' because of: {error_msg}") from exc
             blueprints.append(blueprint)
 
         # Load all domains first
