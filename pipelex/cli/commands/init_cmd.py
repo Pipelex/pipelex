@@ -31,7 +31,8 @@ def do_init_libraries(directory: str = ".", overwrite: bool = False) -> None:
 def do_init_config(reset: bool = False) -> None:
     """Initialize pipelex configuration in the current directory."""
     pipelex_template_path = os.path.join(config_manager.pipelex_root_dir, "pipelex_template.toml")
-    target_config_path = os.path.join(config_manager.local_root_dir, "pipelex.toml")
+    os.makedirs(config_manager.pipelex_config_dir, exist_ok=True)
+    target_config_path = config_manager.pipelex_specific_config_file_path
 
     if os.path.exists(target_config_path) and not reset:
         typer.echo("Warning: pipelex.toml already exists. Use --reset to force creation.")
