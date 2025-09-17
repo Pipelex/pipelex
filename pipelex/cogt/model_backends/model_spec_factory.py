@@ -9,7 +9,6 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.tools.config.config_model import ConfigModel
-from pipelex.types import StrEnum
 
 
 class InferenceModelSpecBlueprint(ConfigModel):
