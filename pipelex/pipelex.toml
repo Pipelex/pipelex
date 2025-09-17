@@ -1,0 +1,220 @@
+
+
+[pipelex]
+extra_env_files = []
+
+[pipelex.feature_config]
+# WIP/Experimental feature flags
+is_pipeline_tracking_enabled = true
+is_activity_tracking_enabled = true
+is_reporting_enabled = true
+
+[pipelex.reporting_config]
+is_log_costs_to_console = false
+is_generate_cost_report_file_enabled = true
+cost_report_dir_path = "reports"
+cost_report_base_name = "cost_report"
+cost_report_extension = "xlsx"
+cost_report_unit_scale = 1.0
+
+####################################################################################################
+# Log config
+####################################################################################################
+
+[pipelex.log_config]
+default_log_level = "INFO"
+
+is_console_logging_enabled = true
+
+json_logs_indent = 4
+presentation_line_width = 120
+silenced_problem_ids = ["azure_openai_no_stream_options"]
+caller_info_template = "file_line"
+is_caller_info_enabled = false
+
+log_mode = "rich"
+
+poor_loggers = []
+generic_poor_logger = "#poor-log"
+
+[pipelex.log_config.package_log_levels]
+# for logger names, the dots "." have been replaced by "-" to avoid toml parsing issues
+# TODO: use quotes to re-enable names with dots
+anthropic = "INFO"
+asyncio = "INFO"
+botocore = "INFO"
+botocore-credentials = "WARNING"
+google = "INFO"
+httpx = "WARNING"
+httpcore = "INFO"
+openai = "INFO"
+instructor = "INFO"
+urllib3-connectionpool = "INFO"
+urllib3-util-retry = "INFO"
+
+pipelex = "INFO"
+
+
+[pipelex.log_config.rich_log_config]
+is_show_time = false
+is_show_level = true
+is_link_path_enabled = true
+is_markup_enabled = false
+highlighter_name = "json"
+is_rich_tracebacks = true
+is_tracebacks_word_wrap = true
+is_tracebacks_show_locals = false
+tracebacks_suppress = []
+keywords_to_hilight = []
+
+[pipelex.aws_config]
+api_key_method = "env"
+
+####################################################################################################
+# Cogt inference config
+####################################################################################################
+
+[cogt]
+
+[cogt.inference_config]
+inference_config_path = ".pipelex/inference"
+
+[cogt.inference_manager_config]
+is_auto_setup_preset_llm = true
+is_auto_setup_preset_imgg = true
+is_auto_setup_preset_ocr = true
+
+[cogt.llm_config]
+default_max_images = 100
+
+[cogt.llm_config.instructor_config]
+is_openai_structured_output_enabled = false
+
+[cogt.llm_config.llm_job_config]
+max_retries = 1
+is_streaming_enabled = false
+
+####################################################################################################
+# Image generation config
+####################################################################################################
+
+[cogt.imgg_config]
+imgg_handles = ["fal-ai/flux-pro", "fal-ai/fast-lightning-sdxl"]
+default_imgg_handle = "fal-ai/flux-pro/v1.1-ultra"               # use "fal-ai/fast-lightning-sdxl" for SDXL Lightning cheap and fast
+
+[cogt.imgg_config.imgg_job_config]
+is_sync_mode = false
+
+[cogt.imgg_config.imgg_param_defaults]
+# quality and nb_steps cannot be set at the same time
+# nb_steps = 1  # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
+quality = "low"
+aspect_ratio = "square" # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
+guidance_scale = 3.5
+background = "auto"
+is_moderated = true
+safety_tolerance = 5
+is_raw = false
+output_format = "jpg"
+seed = "auto"
+
+[cogt.imgg_config.fal_config]
+flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
+sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
+
+####################################################################################################
+# OCR config
+####################################################################################################
+
+[cogt.ocr_config]
+ocr_handles = ["mistral/mistral-ocr-latest"]
+page_output_text_file_name = "page_text.md"
+default_page_views_dpi = 72
+
+####################################################################################################
+# Pipelex prompting config
+####################################################################################################
+
+[pipelex.prompting_config]
+default_prompting_style = { tag_style = "ticks" }
+
+[pipelex.prompting_config.prompting_styles]
+openai = { tag_style = "ticks" }
+anthropic = { tag_style = "xml" }
+mistral = { tag_style = "square_brackets" }
+gemini = { tag_style = "xml" }
+
+[pipelex.structure_config]
+is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
+
+
+####################################################################################################
+# Pipelex libraries config
+####################################################################################################
+
+[pipelex.library_config]
+
+[pipelex.generic_template_names]
+structure_from_preliminary_text_system = "structure_from_preliminary_text_system"
+structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
+
+####################################################################################################
+# Static validation config
+####################################################################################################
+
+[pipelex.static_validation_config]
+default_reaction = "raise"
+
+[pipelex.static_validation_config.reactions]
+# default_reaction is on raise
+# missing_input_variable = "log"
+# extraneous_input_variable = "log"
+# inadequate_input_concept = "log"
+
+####################################################################################################
+# History graph config
+####################################################################################################
+
+[pipelex.tracker_config]
+is_debug_mode = false
+is_include_text_preview = false
+is_include_interactivity = false
+nb_items_limit = "unlimited"
+theme = "base"
+layout = "dagre"                                     # "elk", "dagre", "fixed"
+sub_graph_colors = ["#e6f5ff", "#fff5f7", "#f0fff0"]
+wrapping_width = "auto"
+
+# TODO: adapt the length of the edges to different cases?
+pipe_edge_style = "---->"
+branch_edge_style = "-...-"
+aggregate_edge_style = "-...-"
+condition_edge_style = "-----"
+choice_edge_style = "-----"
+
+####################################################################################################
+# Pipelex run config
+####################################################################################################
+
+[pipelex.pipe_run_config]
+pipe_stack_limit = 20
+
+####################################################################################################
+# Dry run config
+####################################################################################################
+
+[pipelex.dry_run_config]
+apply_to_jinja2_rendering = false
+text_gen_truncate_length = 256
+nb_list_items = 3
+nb_ocr_pages = 4
+allowed_to_fail_pipes = [
+    "infinite_loop_1",
+    "build_blueprint",
+    "structure_blueprint",
+]
+image_urls = [
+    "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
+    "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
+]
+
