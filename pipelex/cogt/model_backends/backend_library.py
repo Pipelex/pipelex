@@ -4,7 +4,7 @@ from pydantic import Field, RootModel, ValidationError
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.cogt.exceptions import InferenceBackendLibraryError, InferenceModelSpecError
+from pipelex.cogt.exceptions import InferenceBackendCredentialsError, InferenceBackendLibraryError, InferenceModelSpecError
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -35,7 +35,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             try:
                 backends_dict = apply_to_strings_recursive(backends_dict_from_toml, substitute_vars)
             except (VarNotFoundError, UnknownVarPrefixError) as exc:
-                raise InferenceBackendLibraryError(f"Variable substitution failed in file '{backends_library_path}': {exc}") from exc
+                raise InferenceBackendCredentialsError(f"Variable substitution failed in file '{backends_library_path}': {exc}") from exc
         except (FileNotFoundError, InferenceBackendLibraryError) as exc:
             raise InferenceBackendLibraryError(f"Failed to load inference backend library from file '{backends_library_path}': {exc}") from exc
         for backend_name, backend_dict in backends_dict.items():

@@ -132,6 +132,10 @@ class OcrCapabilityError(CogtError):
     pass
 
 
+class RoutingProfileLibraryNotFoundError(CogtError):
+    pass
+
+
 class RoutingProfileLibraryError(CogtError):
     pass
 
@@ -141,6 +145,10 @@ class InferenceModelSpecError(CogtError):
 
 
 class InferenceBackendError(CogtError):
+    pass
+
+
+class InferenceBackendCredentialsError(CogtError):
     pass
 
 

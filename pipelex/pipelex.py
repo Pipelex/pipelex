@@ -17,6 +17,7 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
+from pipelex.cogt.exceptions import InferenceBackendCredentialsError, RoutingProfileLibraryNotFoundError
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
@@ -170,7 +171,21 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
         self.plugin_manager.setup()
-        self.models_manager.setup()
+        try:
+            self.models_manager.setup()
+        except RoutingProfileLibraryNotFoundError as routing_profile_library_exc:
+            raise PipelexSetupError(
+                "The routing library could not be found, please call `pipelex init config` to create it"
+            ) from routing_profile_library_exc
+        except InferenceBackendCredentialsError as credentials_exc:
+            if secrets_provider:
+                raise PipelexSetupError(
+                    f"Missing credentials for inference backend: {credentials_exc}, check that it's available from your secrets provider."
+                ) from credentials_exc
+            else:
+                raise PipelexSetupError(
+                    f"Missing credentials for inference backend: {credentials_exc}, add it to your environment variables or to your .env file."
+                ) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())

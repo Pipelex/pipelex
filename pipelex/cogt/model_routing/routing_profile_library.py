@@ -4,7 +4,7 @@ from pydantic import Field, RootModel, ValidationError
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.cogt.exceptions import RoutingProfileLibraryError
+from pipelex.cogt.exceptions import RoutingProfileLibraryError, RoutingProfileLibraryNotFoundError
 from pipelex.cogt.model_routing.routing_models import BackendMatchForModel
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_factory import (
@@ -44,8 +44,14 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
 
         try:
             catalog_dict = load_toml_from_path(path=routing_profile_library_path)
-        except (FileNotFoundError, TOMLValidationError) as exc:
-            raise RoutingProfileLibraryError(f"Failed to load routing profile library from file '{routing_profile_library_path}': {exc}") from exc
+        except FileNotFoundError as not_found_exc:
+            raise RoutingProfileLibraryNotFoundError(
+                f"Failed to load routing profile library from file '{routing_profile_library_path}': {not_found_exc}"
+            ) from not_found_exc
+        except TOMLValidationError as toml_validation_exc:
+            raise RoutingProfileLibraryError(
+                f"Failed to load routing profile library from file '{routing_profile_library_path}': {toml_validation_exc}"
+            ) from toml_validation_exc
 
         try:
             catalog_blueprint = RoutingProfileLibraryBlueprint.model_validate(catalog_dict)
