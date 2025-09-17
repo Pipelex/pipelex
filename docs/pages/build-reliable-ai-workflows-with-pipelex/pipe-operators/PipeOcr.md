@@ -53,6 +53,7 @@ inputs = { ocr_input = "ScannedDocument" }
 output = "Page"
 page_views = true
 page_views_dpi = 200
+ocr_handle = "mistral/mistral-ocr-latest"
 ```
 
 The output of the PipeOcr must be exactly the native `Page` concept.

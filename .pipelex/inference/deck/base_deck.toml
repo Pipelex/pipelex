@@ -1,5 +1,5 @@
 
-# LLM Deck base
+# Base model deck
 
 ####################################################################################################
 # Aliases
@@ -56,32 +56,31 @@ llm_for_creative_writing = { llm_handle = "claude-4-sonnet", temperature = 0.9 }
 # Reasoning skills
 llm_to_reason_short = { llm_handle = "base-claude", temperature = 0.5, max_tokens = 500 }
 llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
-llm_to_reason_on_diagram = { llm_handle = "best-claude", temperature = 0.5 }
+llm_to_reason_on_diagram = { llm_handle = "base-claude", temperature = 0.5 }
 
 # Search and answer skills
-llm_to_answer = { llm_handle = "best-claude", temperature = 0.1 }
-llm_to_retrieve = { llm_handle = "best-gemini", temperature = 0.1 }
+llm_to_answer = { llm_handle = "base-claude", temperature = 0.1 }
+llm_to_retrieve = { llm_handle = "base-gemini", temperature = 0.1 }
 llm_for_enrichment = { llm_handle = "gpt-4o", temperature = 0.1 }
-llm_to_enrich = { llm_handle = "best-claude", temperature = 0.1 }
+llm_to_enrich = { llm_handle = "base-claude", temperature = 0.1 }
 llm_for_question_and_excerpt_reformulation = { llm_handle = "gpt-4o", temperature = 0.9 }
 
 # Engineering skills
-llm_to_engineer = { llm_handle = "best-claude", temperature = 0.2 }
-llm_to_pipelex = { llm_handle = "best-claude", temperature = 0.2 }
-# llm_to_pipelex = { llm_handle = "gpt-5-mini", temperature = 0.2 }
+llm_to_engineer = { llm_handle = "base-claude", temperature = 0.2 }
+llm_to_pipelex = { llm_handle = "base-claude", temperature = 0.2 }
 
 # Image skills
-llm_to_write_imgg_prompt = { llm_handle = "best-claude", temperature = 0.2 }
-llm_to_describe_img = { llm_handle = "best-claude", temperature = 0.5 }
-llm_to_design_fashion = { llm_handle = "best-claude", temperature = 0.7 }
-llm_for_img_to_text = { llm_handle = "best-claude", temperature = 0.1 }
+llm_to_write_imgg_prompt = { llm_handle = "base-claude", temperature = 0.2 }
+llm_to_describe_img = { llm_handle = "base-claude", temperature = 0.5 }
+llm_to_design_fashion = { llm_handle = "base-claude", temperature = 0.7 }
+llm_for_img_to_text = { llm_handle = "base-claude", temperature = 0.1 }
 
 # Extraction skills
-llm_to_extract_diagram = { llm_handle = "best-claude", temperature = 0.5 }
-llm_to_extract_invoice = { llm_handle = "claude-3-7-sonnet", temperature = 0.1 }
-llm_to_extract_invoice_from_scan = { llm_handle = "best-claude", temperature = 0.5 }
-llm_to_extract_legal_terms = { llm_handle = "best-claude", temperature = 0.1 }
-llm_to_extract_tables = { llm_handle = "best-claude", temperature = 0.1 }
+llm_to_extract_diagram = { llm_handle = "base-claude", temperature = 0.5 }
+llm_to_extract_invoice = { llm_handle = "claude-4-sonnet", temperature = 0.1 }
+llm_to_extract_invoice_from_scan = { llm_handle = "base-claude", temperature = 0.5 }
+llm_to_extract_legal_terms = { llm_handle = "base-claude", temperature = 0.1 }
+llm_to_extract_tables = { llm_handle = "base-claude", temperature = 0.1 }
 
 ####################################################################################################
 # LLM Choices
@@ -90,4 +89,3 @@ llm_to_extract_tables = { llm_handle = "best-claude", temperature = 0.1 }
 [llm_choice_defaults]
 for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
-
