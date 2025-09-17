@@ -89,3 +89,4 @@ llm_to_extract_tables = { llm_handle = "base-claude", temperature = 0.1 }
 [llm_choice_defaults]
 for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
+

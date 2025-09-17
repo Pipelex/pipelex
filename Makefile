@@ -159,6 +159,14 @@ build: env
 	$(call PRINT_TITLE,"Building the wheels")
 	@uv build
 
+config-template:
+	$(call PRINT_TITLE,"Updating config template from .pipelex/")
+	@rm -rf pipelex/config_template/*
+	@cp -r .pipelex/* pipelex/config_template/
+
+cft: config-template
+	@echo "> done: cft = config-template"
+
 ##############################################################################################
 ############################      Cleaning                        ############################
 ##############################################################################################
