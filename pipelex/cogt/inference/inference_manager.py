@@ -105,16 +105,6 @@ class InferenceManager(InferenceManagerProtocol):
     # Manage IMGG Workers
     ####################################################################################################
 
-    @override
-    def setup_imgg_workers(self):
-        log.verbose("Setting up Imgg Workers...")
-        imgg_handles = get_config().cogt.imgg_config.imgg_handles
-        log.verbose(f"{len(imgg_handles)} Imgg handles found")
-        for imgg_handle in imgg_handles:
-            self._setup_one_imgg_worker(imgg_handle=imgg_handle)
-
-        log.debug("Done setting up Imgg Workers (async)")
-
     def _setup_one_imgg_worker(self, imgg_handle: str) -> ImggWorkerAbstract:
         imgg_engine = ImggEngineFactory.make_imgg_engine(imgg_handle=imgg_handle)
         log.verbose(imgg_engine.desc, title=f"Setting up ImgEngine for '{imgg_handle}'")
@@ -140,16 +130,6 @@ class InferenceManager(InferenceManagerProtocol):
     ####################################################################################################
     # Manage OCR Workers
     ####################################################################################################
-
-    @override
-    def setup_ocr_workers(self):
-        log.verbose("Setting up OCR Workers...")
-        ocr_handles = get_config().cogt.ocr_config.ocr_handles
-        log.verbose(f"{len(ocr_handles)} OCR handles found")
-        for ocr_handle in ocr_handles:
-            self._setup_one_ocr_worker(ocr_handle=ocr_handle)
-
-        log.debug("Done setting up OCR Workers (async)")
 
     def _setup_one_ocr_worker(self, ocr_handle: str) -> OcrWorkerAbstract:
         ocr_engine = OcrEngineFactory.make_ocr_engine(ocr_handle=ocr_handle)

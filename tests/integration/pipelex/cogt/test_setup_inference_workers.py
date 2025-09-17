@@ -2,6 +2,7 @@ import pytest
 
 from pipelex import log
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.config import get_config
 from pipelex.hub import get_inference_manager, get_models_manager
 
 
@@ -18,4 +19,22 @@ class TestSetupInferenceWorkers:
                 assert inference_model == llm_worker.inference_model
         log.debug("Done setting up LLM Workers (async)")
 
-        get_inference_manager().setup_imgg_workers()
+    def test_setup_imgg_workers(self):
+        inference_manager = get_inference_manager()
+        imgg_handles = get_config().cogt.imgg_config.imgg_handles
+        log.verbose(f"{len(imgg_handles)} Imgg handles found")
+        for imgg_handle in imgg_handles:
+            imgg_worker = inference_manager.get_imgg_worker(imgg_handle=imgg_handle)
+            assert imgg_worker is not None
+            assert imgg_worker.imgg_engine is not None
+        log.debug("Done setting up Imgg Workers (async)")
+
+    def test_setup_ocr_workers(self):
+        inference_manager = get_inference_manager()
+        ocr_handles = get_config().cogt.ocr_config.ocr_handles
+        log.verbose(f"{len(ocr_handles)} OCR handles found")
+        for ocr_handle in ocr_handles:
+            ocr_worker = inference_manager.get_ocr_worker(ocr_handle=ocr_handle)
+            assert ocr_worker is not None
+            assert ocr_worker.ocr_engine is not None
+        log.debug("Done setting up OCR Workers (async)")
