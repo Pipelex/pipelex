@@ -1,6 +1,6 @@
 # Library Configuration
 
-The Library Configuration manages how Pipelex organizes, loads, and handles libraries in your project. Libraries in Pipelex include pipelines, LLM integrations, LLM decks, and templates.
+The Library Configuration manages how Pipelex organizes, loads, and handles libraries in your project. Libraries in Pipelex include pipelines and templates.
 
 ## Directory Structure
 
@@ -16,8 +16,6 @@ pipelex_libraries/         # Exported library root
 ├── pipelines/             # Pipeline definitions
 │   ├── base_library/      # Base pipelines from Pipelex
 │   └── your_pipelines/    # Your custom pipelines
-├── llm_integrations/      # LLM integration configurations
-├── llm_deck/              # LLM model configurations
 └── templates/             # Template files
 ```
 
@@ -59,29 +57,23 @@ This will:
 When exporting libraries to your project:
 
 - Use `overwrite=True` to force update existing files
-- Preserve custom overrides in `llm_deck/overrides.toml`
 - Maintain directory structure and initialization files
 
 ## Validation
 
 The library manager performs several validation steps:
 
-1. **LLM Deck Validation**:
-
-    - Ensures LLM configurations are complete
-    - Validates model settings
-
-2. **Concept Library Validation**:
+1. **Concept Library Validation**:
 
     - Checks concept relationships
     - Validates concept definitions
 
-3. **Pipe Library Validation**:
+2. **Pipe Library Validation**:
 
     - Verifies pipe configurations
     - Checks domain relationships
 
-4. **Domain Library Validation**:
+3. **Domain Library Validation**:
 
     - Ensures domain completeness
     - Validates domain relationships
@@ -94,7 +86,6 @@ The library system includes specific error types:
 - `LibraryParsingError`: For PLX parsing issues
 - `ConceptLibraryError`: For concept-related issues
 - `PipeLibraryError`: For pipe-related issues
-- `LLMDeckNotFoundError`: For missing LLM configurations
 
 ## Best Practices
 
@@ -112,6 +103,5 @@ The library system includes specific error types:
 
 3. **Customization**:
 
-    - Use `overrides.toml` for local LLM settings
     - Keep custom pipelines separate from base library
     - Document domain-specific configurations

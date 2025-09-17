@@ -4,9 +4,9 @@ from typing_extensions import override
 
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams, LLMJobReport
-from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 
 class LLMJob(InferenceJobAbstract):
@@ -23,7 +23,7 @@ class LLMJob(InferenceJobAbstract):
     def validate_before_execution(self):
         self.llm_prompt.validate_before_execution()
 
-    def llm_job_before_start(self, llm_engine: LLMEngine):
+    def llm_job_before_start(self, inference_model: InferenceModelSpec):
         # Reset metadata
         self.job_metadata.started_at = datetime.now()
 
@@ -33,7 +33,9 @@ class LLMJob(InferenceJobAbstract):
         # Reset info
         self.job_report.llm_tokens_usage = LLMTokensUsage(
             job_metadata=self.job_metadata,
-            llm_engine=llm_engine,
+            inference_model_name=inference_model.name,
+            unit_costs=inference_model.costs,
+            inference_model_id=inference_model.model_id,
             nb_tokens_by_category={},
         )
 

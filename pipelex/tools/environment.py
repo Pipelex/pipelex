@@ -15,7 +15,7 @@ class EnvVarNotFoundError(ToolException):
 def get_required_env(key: str) -> str:
     value = os.getenv(key)
     if not value:
-        raise EnvVarNotFoundError(f"Missing '{key} 'in environment.")
+        raise EnvVarNotFoundError(f"Environment variable '{key}' is required but not set")
     return value
 
 

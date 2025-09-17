@@ -2,8 +2,8 @@ from typing import List, Optional
 
 from typing_extensions import override
 
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
+from pipelex.cogt.llm.llm_setting import LLMSettingChoices
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint

@@ -1,11 +1,25 @@
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCapabilityError, PromptImageFormatError
+from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, PromptImageFormatError
 from pipelex.cogt.image.prompt_image import PromptImageBytes
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.hub import get_plugin_manager, get_secrets_provider
+from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
-from pipelex.plugins.bedrock.bedrock_config import BedrockClientMethod
 from pipelex.plugins.bedrock.bedrock_message import BedrockContentItem, BedrockImage, BedrockMessage, BedrockSource, ImageFormat
+from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.types import StrEnum
+
+
+class BedrockFactoryError(CogtError):
+    pass
+
+
+class BedrockSdkVariant(StrEnum):
+    BOTO3 = "bedrock_boto3"
+    AIBOTO3 = "bedrock_aioboto3"
+
+
+class BedrockExtraField(StrEnum):
+    AWS_REGION = "aws_region"
 
 
 class BedrockFactory:
@@ -14,21 +28,31 @@ class BedrockFactory:
     #########################################################
 
     @classmethod
-    def make_bedrock_client(cls) -> BedrockClientProtocol:
-        bedrock_config = get_plugin_manager().plugin_configs.bedrock_config
-        aws_region = bedrock_config.configure(secrets_provider=get_secrets_provider())
-        client_method = bedrock_config.client_method
+    def make_bedrock_client(
+        cls,
+        plugin: Plugin,
+        backend: InferenceBackend,
+    ) -> BedrockClientProtocol:
+        try:
+            sdk_variant = BedrockSdkVariant(plugin.sdk)
+        except ValueError:
+            raise BedrockFactoryError(f"Plugin '{plugin}' is not supported by BedrockFactory")
+
         bedrock_async_client: BedrockClientProtocol
-        log.verbose(f"Using '{client_method}' for BedrockClient")
-        match client_method:
-            case BedrockClientMethod.AIBOTO3:
+        log.verbose(f"Using '{sdk_variant}' for BedrockClient")
+        match sdk_variant:
+            case BedrockSdkVariant.AIBOTO3:
                 from pipelex.plugins.bedrock.bedrock_client_aioboto3 import BedrockClientAioboto3
 
-                bedrock_async_client = BedrockClientAioboto3(aws_region=aws_region)
-            case BedrockClientMethod.BOTO3:
+                bedrock_async_client = BedrockClientAioboto3(
+                    aws_region=backend.extra_config[BedrockExtraField.AWS_REGION],
+                )
+            case BedrockSdkVariant.BOTO3:
                 from pipelex.plugins.bedrock.bedrock_client_boto3 import BedrockClientBoto3
 
-                bedrock_async_client = BedrockClientBoto3(aws_region=aws_region)
+                bedrock_async_client = BedrockClientBoto3(
+                    aws_region=backend.extra_config[BedrockExtraField.AWS_REGION],
+                )
 
         return bedrock_async_client
 

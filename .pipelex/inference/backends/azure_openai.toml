@@ -1,0 +1,69 @@
+default_sdk = "azure_openai"
+default_prompting_target = "openai"
+
+[gpt-4o]
+model_id = "gpt-4o-2024-11-20"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 10.0 }
+
+[gpt-4o-mini]
+model_id = "gpt-4o-mini-2024-07-18"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.6 }
+
+["gpt-4.1"]
+model_id = "gpt-4.1-2025-04-14"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+
+["gpt-4.1-mini"]
+model_id = "gpt-4.1-mini-2025-04-14"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 1.6 }
+
+["gpt-4.1-nano"]
+model_id = "gpt-4.1-nano-2025-04-14"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.4 }
+
+[o1-mini]
+model_id = "o1-mini-2024-09-12"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 3.0, output = 12.0 }
+
+[o1]
+model_id = "o1-2024-12-17"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 15.0, output = 60.0 }
+
+[o3-mini]
+model_id = "o3-mini-2025-01-31"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+
+[gpt-5-mini]
+model_id = "gpt-5-mini-2025-08-07"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 2.0 }
+
+[gpt-5-nano]
+model_id = "gpt-5-nano-2025-08-07"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.4 }
+
+[gpt-5-chat]
+model_id = "gpt-5-chat-2025-08-07"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+

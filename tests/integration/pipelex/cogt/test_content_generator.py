@@ -8,13 +8,13 @@ from pipelex.cogt.exceptions import LLMHandleNotFoundError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.hub import get_content_generator, get_llm_deck
+from pipelex.hub import get_content_generator, get_models_manager
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import ImageTestCases
 from tests.integration.pipelex.cogt.test_data import Employee
@@ -61,7 +61,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_llm_text_only(self, request: FixtureRequest):
-        llm_setting_main = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_text")
+        llm_setting_main = get_models_manager().get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_text")
 
         text: str = await get_content_generator().make_llm_text(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
@@ -75,7 +75,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_direct(self, request: FixtureRequest):
-        llm_setting_for_object = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
+        llm_setting_for_object = get_models_manager().get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
 
         person_direct: Employee = await get_content_generator().make_object_direct(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
@@ -90,7 +90,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_list_direct(self, request: FixtureRequest):
-        llm_setting_for_object = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
+        llm_setting_for_object = get_models_manager().get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
 
         person_list_direct: List[Employee] = await get_content_generator().make_object_list_direct(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore

@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 from pydantic import RootModel
 from rich import box
 from rich.table import Table
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -36,7 +36,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
                 raise PipeLibraryError(f"Missing dependency for pipe '{pipe.code}': {not_found_error}") from not_found_error
 
     @classmethod
-    def make_empty(cls):
+    def make_empty(cls) -> Self:
         return cls(root={})
 
     @override

@@ -1,9 +1,3 @@
-[cogt.llm_config.preferred_platforms]
-# These override the defaults set for any llm integration
-# Use at your convenience:
-# gpt-4o-mini = "azure_openai"
-# gpt-4o = "azure_openai"
-# claude-3-7-sonnet = "bedrock_anthropic"
 
 [cogt.imgg_config]
 default_imgg_handle = "fal-ai/fast-lightning-sdxl"

@@ -1,12 +1,59 @@
 # Changelog
 
-## [v0.9.6] - 2025-09-16
+## [v0.10.0] - 2025-09-17
+
+### Highlight: New Inference Backend Configuration System
+
+We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
+
+- **Get started in seconds** with [Pipelex Inference](pages/configuration/config-technical/inference-backend-config.md#pipelex-inference): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
+- **Flexible backend configuration**: Configure multiple inference backends (Azure OpenAI, AWS Bedrock, Vertex AI, etc.) through simple TOML files in `.pipelex/inference/`
+- **Smart model routing**: Automatically route models to the right backend using [routing profiles](pages/configuration/config-technical/inference-backend-config.md#routing-profiles) with pattern matching
+- **User-friendly aliases**: Define shortcuts like `best-claude` → `claude-4.1-opus` with optional fallback chains
+- **Cost-aware model specs**: Each model includes detailed pricing, capabilities, and constraints for better cost management
+
+For complete details, see the [Inference Backend Configuration](pages/configuration/config-technical/inference-backend-config.md) documentation.
 
 ### Added
 
+- New inference backend configuration system in `.pipelex/inference/` directory
+- Support for 10+ inference backends: OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Mistral, Vertex AI, XAI, BlackboxAI, Perplexity, Ollama, and **Pipelex Inference**
+- Model routing profiles with pattern matching (`*model*`, `model*`, `*model`)
+- Model aliases with waterfall fallback chains
+- Environment variable and secret substitution in TOML configs (`${VAR}` and `${secret:KEY}`)
+- Comprehensive model specifications with detailed cost categories
+- Unified plugin SDK registry for all backends
+- CI environment detection with automatic placeholder API keys for testing
+- Improved `pipelex init config` command to copy entire configuration template directory structure to `.pipelex/` with smart file handling (skips existing files, shows clear progress messages)
 - Added `FuncRegistryUtils` to register functions in a pipelex folder that have a specific signature.
-- Added `mistral-medium` and `mistral-medium-2508` to the LLM deck.
-- Added handle for `gemini-2.5-flash` to the LLM deck.
+- Added `mistral-medium` and `mistral-medium-2508` to the Mistral backend configuration.
+- Added `gemini-2.5-flash` to the VertexAI backend configuration.
+
+### Changed
+
+- LLM configuration moved from `pipelex_libraries/llm_deck/` to `.pipelex/inference/deck/`
+- LLM handles simplified to direct model names or user-defined aliases
+- Model deck completely redesigned with inference models, aliases, and presets
+- Plugin system refactored to use backend-specific TOML configuration
+- Token categories renamed to cost categories with expanded types
+
+### Fixed
+
+- Improved error messages for missing environment variables
+- Enhanced TOML configuration validation
+- More robust model routing and backend selection
+
+### Removed
+
+- Legacy LLM model library system (`llm_integrations/` directory)
+- Platform-specific configuration classes (AnthropicConfig, OpenAIConfig, etc.)
+- Deprecated LLM engine blueprint and factory classes
+- Old LLM platform and family enumerations
+
+### Security
+
+- Enhanced secret management with secure fallback patterns
+- Improved API key handling through centralized backend configuration
 
 ## [v0.9.5] - 2025-09-12
 

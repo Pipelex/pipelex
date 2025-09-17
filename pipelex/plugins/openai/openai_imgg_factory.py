@@ -53,3 +53,8 @@ class OpenAIImggFactory:
     def background_for_gpt_image_1(cls, background: Background) -> GptImage1BackgroundType:
         """This method only converts the Background string value as a Literal, as expected by the OpenAI API"""
         return background.value
+
+    @classmethod
+    def output_compression_for_gpt_image_1(cls) -> int:
+        """This method only converts the OutputCompression int value as a Literal, as expected by the OpenAI API"""
+        return 100

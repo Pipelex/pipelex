@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import openai
 from openai.types.chat import (
@@ -13,74 +13,60 @@ from openai.types.chat.chat_completion_content_part_image_param import ImageURL
 from openai.types.completion_usage import CompletionUsage
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMEngineParameterError, LLMPromptParameterError
+from pipelex.cogt.exceptions import CogtError, LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.hub import get_plugin_manager, get_secrets_provider
+from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
+from pipelex.types import StrEnum
+
+
+class OpenAIFactoryError(CogtError):
+    pass
+
+
+class OpenAISdkVariant(StrEnum):
+    AZURE_OPENAI = "azure_openai"
+    OPENAI = "openai"
+
+
+class AzureExtraField(StrEnum):
+    API_VERSION = "api_version"
 
 
 class OpenAIFactory:
     @classmethod
-    def make_openai_client(cls, llm_platform: LLMPlatform) -> openai.AsyncClient:
+    def make_openai_client(
+        cls,
+        plugin: Plugin,
+        backend: InferenceBackend,
+    ) -> openai.AsyncClient:
+        try:
+            sdk_variant = OpenAISdkVariant(plugin.sdk)
+        except ValueError:
+            raise OpenAIFactoryError(f"Plugin '{plugin}' is not supported by OpenAIFactory")
+
         the_client: openai.AsyncOpenAI
-        api_key: Optional[str] = None
-        match llm_platform:
-            case LLMPlatform.AZURE_OPENAI:
-                azure_openai_config = get_plugin_manager().plugin_configs.azure_openai_config
-                endpoint, api_version, api_key = azure_openai_config.configure(secrets_provider=get_secrets_provider())
-
-                log.verbose(f"Making AsyncAzureOpenAI client with endpoint: {endpoint}, api_version: {api_version}")
+        match sdk_variant:
+            case OpenAISdkVariant.AZURE_OPENAI:
+                log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
+                if backend.endpoint is None:
+                    raise OpenAIFactoryError("Azure OpenAI endpoint is not set")
                 the_client = openai.AsyncAzureOpenAI(
-                    azure_endpoint=endpoint,
-                    api_key=api_key,
-                    api_version=api_version,
+                    azure_endpoint=backend.endpoint,
+                    api_key=backend.api_key,
+                    api_version=backend.get_extra_config(AzureExtraField.API_VERSION),
                 )
-            case LLMPlatform.PERPLEXITY:
-                perplexity_config = get_plugin_manager().plugin_configs.perplexity_config
-                endpoint, api_key = perplexity_config.configure(secrets_provider=get_secrets_provider())
 
-                log.verbose(f"Making perplexity AsyncOpenAI client with endpoint: {endpoint}")
+            case OpenAISdkVariant.OPENAI:
+                log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=endpoint,
+                    api_key=backend.api_key,
+                    base_url=backend.endpoint,
                 )
-            case LLMPlatform.OPENAI:
-                openai_config = get_plugin_manager().plugin_configs.openai_config
-                api_key = openai_config.get_api_key(secrets_provider=get_secrets_provider())
-                the_client = openai.AsyncOpenAI(api_key=api_key)
-            case LLMPlatform.VERTEXAI:
-                vertexai_config = get_plugin_manager().plugin_configs.vertexai_config
-                endpoint, api_key = vertexai_config.configure(secrets_provider=get_secrets_provider())
-
-                log.verbose(f"Making vertex AsyncOpenAI client with endpoint: {endpoint}")
-                the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=endpoint,
-                )
-            case LLMPlatform.XAI:
-                xai_config = get_plugin_manager().plugin_configs.xai_config
-                endpoint, api_key = xai_config.configure(secrets_provider=get_secrets_provider())
-
-                log.verbose(f"Making Xai AsyncOpenAI client with endpoint: {endpoint}")
-                the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=endpoint,
-                )
-            case LLMPlatform.CUSTOM_LLM:
-                custom_endpoint_config = get_plugin_manager().plugin_configs.custom_endpoint_config
-                base_url, api_key = custom_endpoint_config.configure(secrets_provider=get_secrets_provider())
-
-                log.verbose(f"Making custom AsyncOpenAI client with base_url: {base_url}")
-                the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=base_url,
-                )
-            case LLMPlatform.ANTHROPIC | LLMPlatform.BEDROCK | LLMPlatform.BEDROCK_ANTHROPIC | LLMPlatform.MISTRAL:
-                raise LLMEngineParameterError(f"Platform '{llm_platform}' is not supported by this factory '{cls.__name__}'")
 
         return the_client
 
@@ -88,7 +74,7 @@ class OpenAIFactory:
     def make_simple_messages(
         cls,
         llm_job: LLMJob,
-        llm_engine: LLMEngine,
+        inference_model: InferenceModelSpec,
     ) -> List[ChatCompletionMessageParam]:
         """
         Makes a list of messages with a system message (if provided) and followed by a user message.
@@ -96,7 +82,7 @@ class OpenAIFactory:
         llm_prompt = llm_job.llm_prompt
         messages: List[ChatCompletionMessageParam] = []
         user_contents: List[ChatCompletionContentPartParam] = []
-        if llm_engine.llm_model.is_system_prompt_supported and (system_content := llm_prompt.system_text):
+        if inference_model.is_system_prompt_supported and (system_content := llm_prompt.system_text):
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
         # TODO: confirm that we can prompt without user_contents, for instance if we have only images,
         # otherwise consider using a default user_content

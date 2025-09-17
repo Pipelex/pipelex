@@ -7,7 +7,7 @@ from pipelex.cogt.imgg.imgg_engine import ImggEngine
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_job import ImggJob
 from pipelex.cogt.imgg.imgg_job_components import AspectRatio, OutputFormat, Quality
-from pipelex.hub import get_plugin_manager
+from pipelex.config import get_config
 
 
 class FalFactory:
@@ -17,12 +17,12 @@ class FalFactory:
 
     @classmethod
     def make_nb_steps_from_quality_for_flux_pro(cls, quality: Quality) -> int:
-        flux_map_quality_to_steps = get_plugin_manager().plugin_configs.fal_config.flux_map_quality_to_steps
+        flux_map_quality_to_steps = get_config().cogt.imgg_config.fal_config.flux_map_quality_to_steps
         return flux_map_quality_to_steps[quality.value]
 
     @classmethod
     def make_nb_steps_from_quality_for_sdxl_lightning(cls, quality: Quality) -> int:
-        sdxl_lightning_map_quality_to_steps = get_plugin_manager().plugin_configs.fal_config.sdxl_lightning_map_quality_to_steps
+        sdxl_lightning_map_quality_to_steps = get_config().cogt.imgg_config.fal_config.sdxl_lightning_map_quality_to_steps
         return sdxl_lightning_map_quality_to_steps[quality.value]
 
     @classmethod

@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 import toml
 
-from pipelex.tools.config.models import (
+from pipelex.tools.config.config_root import (
     CONFIG_BASE_OVERRIDES_AFTER_ENV,
     CONFIG_BASE_OVERRIDES_BEFORE_ENV,
 )
@@ -13,7 +13,10 @@ from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import failable_load_toml_from_path
 from pipelex.tools.runtime_manager import runtime_manager
 
+CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
+CONFIG_TEMPLATE_SUBPATH = "config_template"
+INFERENCE_CONFIG_SUBPATH = "inference"
 
 
 class ConfigException(Exception):
@@ -36,10 +39,22 @@ class ConfigManager:
         return os.path.dirname(os.path.dirname(current_dir))
 
     @property
+    def pipelex_root_config_path(self) -> str:
+        return os.path.join(self.pipelex_root_dir, CONFIG_NAME)
+
+    @property
     def local_root_dir(self) -> str:
         """Get the root directory of the project using pipelex.
         This is the directory from where the command is being run."""
         return os.path.abspath(os.getcwd())
+
+    @property
+    def pipelex_config_dir(self) -> str:
+        return os.path.join(self.local_root_dir, CONFIG_DIR_NAME)
+
+    @property
+    def pipelex_specific_config_file_path(self) -> str:
+        return os.path.join(self.pipelex_config_dir, CONFIG_NAME)
 
     def get_pipelex_config(self) -> Dict[str, Any]:
         """Get the pipelex configuration from pipelex.toml.
@@ -47,9 +62,11 @@ class ConfigManager:
         Returns:
             Dict[str, Any]: The configuration dictionary from pipelex.toml
         """
-        config_path = os.path.join(self.pipelex_root_dir, CONFIG_NAME)
+        config_path = self.pipelex_root_config_path
         config = failable_load_toml_from_path(config_path)
-        return config or {}
+        if not config:
+            raise ConfigException(f"Pipelex root config could not be found at {self.pipelex_specific_config_file_path}.")
+        return config
 
     def get_local_config(self) -> Dict[str, Any]:
         """Get the local pipelex configuration from pipelex.toml in the project root.

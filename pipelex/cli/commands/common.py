@@ -5,9 +5,6 @@ from typing import Final
 
 REQUIRED_PIPELEX_SUBDIRS: Final[list[str]] = [
     "pipelines",
-    "llm_deck",
-    "llm_integrations",
-    "plugins",
     "templates",
 ]
 

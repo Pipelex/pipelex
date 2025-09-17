@@ -1,0 +1,24 @@
+default_sdk = "openai"
+default_prompting_target = "gemini"
+
+["gemini-2.0-flash"]
+model_id = "google/gemini-2.0-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.1, output = 0.4 }
+
+["gemini-2.5-pro"]
+model_id = "google/gemini-2.5-pro"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.25, output = 10.0 }
+
+["gemini-2.5-flash"]
+model_id = "google/gemini-2.5-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.30, output = 2.50 }
+

@@ -4,13 +4,14 @@ import shortuuid
 from pydantic import Field, field_validator
 
 from pipelex.cogt.config_cogt import Cogt
-from pipelex.cogt.llm.llm_models.llm_prompting_target import LLMPromptingTarget
+from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.exceptions import PipelexConfigError, StaticValidationErrorType
 from pipelex.hub import get_required_config
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
 from pipelex.tools.aws.aws_config import AwsConfig
-from pipelex.tools.config.models import ConfigModel, ConfigRoot
+from pipelex.tools.config.config_model import ConfigModel
+from pipelex.tools.config.config_root import ConfigRoot
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.types import StrEnum
@@ -71,7 +72,7 @@ class PromptingConfig(ConfigModel):
     default_prompting_style: PromptingStyle
     prompting_styles: Dict[str, PromptingStyle]
 
-    def get_prompting_style(self, prompting_target: Optional[LLMPromptingTarget] = None) -> Optional[PromptingStyle]:
+    def get_prompting_style(self, prompting_target: Optional[PromptingTarget] = None) -> Optional[PromptingStyle]:
         if prompting_target:
             return self.prompting_styles.get(prompting_target, self.default_prompting_style)
         else:

@@ -32,11 +32,6 @@ Configuration for all Language Model interactions:
 [cogt.llm_config]
 default_max_images = 100  # Maximum number of images in prompts
 
-# Platform preferences for different LLMs
-[cogt.llm_config.preferred_platforms]
-gpt-4 = "openai"
-claude-3-opus = "anthropic"
-
 # Job configuration
 [cogt.llm_config.llm_job_config]
 is_streaming_enabled = false
@@ -164,7 +159,6 @@ is_auto_setup_preset_ocr = true
 
 [cogt.llm_config]
 default_max_images = 100
-preferred_platforms = { "gpt-4" = "openai", "claude-3-opus" = "anthropic" }
 
 [cogt.llm_config.llm_job_config]
 is_streaming_enabled = false

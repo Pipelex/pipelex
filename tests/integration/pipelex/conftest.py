@@ -1,16 +1,17 @@
+from typing import Optional
+
 import pytest
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
-from pipelex.cogt.llm.llm_models.llm_family import LLMCreator, LLMFamily
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.ocr.ocr_handle import OcrHandle
+from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
 @pytest.fixture(
     params=[
-        "llm_for_testing_gen_text",
-        "llm_for_testing_gen_object",
+        # "llm_for_testing_gen_text",
+        # "llm_for_testing_gen_object",
         "llm_for_creative_writing",
     ]
 )
@@ -38,6 +39,8 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "mistral-large",
         # "ministral-3b",
         # "ministral-8b",
+        "mistral-medium",
+        "mistral-medium-2508",
         # "pixtral-12b",
         # "pixtral-large",
         # "gemini-1-5-pro",
@@ -54,7 +57,23 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "pipelex/gpt-4o-mini",
         # "pipelex/claude-3.7-sonnet",
         # "pipelex/gemini-2.0-flash-vertex",
-        "pipelex/gemini-2.0-flash",
+        # "pipelex/gemini-2.0-flash",
+        # "best-claude",
+        # "llm_to_engineer",
+        # "gpt-5-nano",
+        # "gpt-4o-mini",
+        # "gpt-5-mini",
+        # "gpt-5-chat",
+        # "claude-4-sonnet",
+        # "claude-4.1-opus",
+        # "claude-3.5-sonnet",
+        # "claude-3.5-sonnet-v2"
+        # "claude-3.7-sonnet",
+        # "gemini-2.5-flash-lite",
+        # "gemini-2.5-flash",
+        # "gemini-2.5-pro",
+        # "grok-3",
+        # "grok-3-mini",
     ]
 )
 def llm_handle(request: pytest.FixtureRequest) -> str:
@@ -67,24 +86,22 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
         # "o1",
         # "o3-mini",
         # "gpt-4o",
-        "gpt-4o-mini",
+        # "gpt-4o-mini",
         # "gpt-5-mini",
         # "gpt-5-nano",
         # "gpt-5-chat",
         # "gpt-4-5-preview",
         # "claude-3-haiku",
-        # "claude-3-5-sonnet",
-        # "claude-3-7-sonnet",
-        # "claude-4-1-opus",
+        # "claude-3.5-sonnet",
+        # "claude-3.7-sonnet",
+        # "claude-4.1-opus",
         # "pixtral-12b",
         # "pixtral-large",
-        # "gemini-1-5-pro",
-        # "gemini-1-5-flash",
-        # "gemini-2-flash",
-        # "gemini-2-pro",
-        # "gemini-2-5-pro",
-        # "gemini-2-5-flash",
+        # "gemini-2.5-pro",
+        # "gemini-2.5-flash",
         # "mistral-small3.1",
+        "mistral-medium",
+        "mistral-medium-2508",
         # "qwen3:8b",
     ]
 )
@@ -95,70 +112,40 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        # LLMFamily.GPT_4,
-        # LLMFamily.GPT_4O,
-        LLMFamily.GPT_5,
-        # LLMFamily.GPT_4_5,
-        # LLMFamily.GPT_4_1,
-        # LLMFamily.O_SERIES,
-        # LLMFamily.CLAUDE_3_7,
-        # LLMFamily.CLAUDE_4,
-        # LLMFamily.CLAUDE_4_1,
-        # LLMFamily.PERPLEXITY_SEARCH,
-        # LLMFamily.PERPLEXITY_REASONING,
-        # LLMFamily.PERPLEXITY_RESEARCH,
-        # LLMFamily.PERPLEXITY_DEEPSEEK,
-        # LLMFamily.GEMINI,
-        # LLMFamily.GEMMA,
-        # LLMFamily.CUSTOM_BLACKBOXAI,
+        Plugin(sdk="openai", backend="openai"),
+        Plugin(sdk="azure_openai", backend="azure_openai"),
     ]
 )
-def llm_family(request: pytest.FixtureRequest) -> LLMFamily:
-    assert isinstance(request.param, LLMFamily)
+def plugin_for_openai(request: pytest.FixtureRequest) -> Plugin:
+    assert isinstance(request.param, Plugin)
     return request.param
 
 
 @pytest.fixture(
     params=[
-        # LLMCreator.ALIBABA,
-        # LLMCreator.AMAZON,
-        # LLMCreator.ANTHROPIC,
-        # LLMCreator.DEEPSEEK,
-        # LLMCreator.GOOGLE,
-        LLMCreator.OPENAI,
-        # LLMCreator.META,
-        # LLMCreator.MISTRAL,
-        # LLMCreator.PERPLEXITY,
+        Plugin(sdk="anthropic", backend="anthropic"),
+        Plugin(sdk="bedrock_anthropic", backend="bedrock_anthropic"),
     ]
 )
-def llm_creator(request: pytest.FixtureRequest) -> LLMCreator:
-    assert isinstance(request.param, LLMCreator)
-    return request.param
-
-
-# TODO: build llm_id/platform combos dynalically from config data
-@pytest.fixture(
-    params=[
-        # LLMPlatform.ANTHROPIC,
-        # LLMPlatform.AZURE_OPENAI,
-        # LLMPlatform.BEDROCK,
-        # LLMPlatform.BEDROCK_ANTHROPIC,
-        # LLMPlatform.MISTRAL,
-        LLMPlatform.OPENAI,
-        # LLMPlatform.PERPLEXITY,
-        # LLMPlatform.VERTEXAI,
-        # LLMPlatform.XAI,
-        # LLMPlatform.CUSTOM_LLM,
-    ]
-)
-def llm_platform(request: pytest.FixtureRequest) -> LLMPlatform:
-    assert isinstance(request.param, LLMPlatform)
+def plugin_for_anthropic(request: pytest.FixtureRequest) -> Plugin:
+    assert isinstance(request.param, Plugin)
     return request.param
 
 
 @pytest.fixture(
     params=[
-        # "gpt-5-mini-2025-08-07",
+        # None,
+        "https://inference.pipelex.com/v1",
+    ]
+)
+def openai_endpoint(request: pytest.FixtureRequest) -> Optional[str]:
+    assert isinstance(request.param, str) or request.param is None
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        "gpt-5-mini-2025-08-07",
         # "gpt-5-nano-2025-08-07",
         # "gpt-5-chat-2025-08-07",
         # "gpt-5-mini",
@@ -235,7 +222,7 @@ def imgg_handle(request: pytest.FixtureRequest) -> ImggHandle:
 @pytest.fixture(
     params=[
         OcrHandle.BASIC_OCR,
-        # OcrHandle.MISTRAL_OCR,
+        OcrHandle.MISTRAL_OCR,
     ]
 )
 def ocr_handle(request: pytest.FixtureRequest) -> OcrHandle:

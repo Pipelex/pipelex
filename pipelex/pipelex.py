@@ -17,9 +17,10 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
+from pipelex.cogt.exceptions import InferenceBackendCredentialsError, RoutingProfileLibraryNotFoundError
 from pipelex.cogt.inference.inference_manager import InferenceManager
-from pipelex.cogt.llm.llm_models.llm_model import LATEST_VERSION_NAME
-from pipelex.cogt.llm.llm_models.llm_model_library import LLMModelLibrary
+from pipelex.cogt.models.model_manager import ModelManager
+from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
@@ -45,7 +46,7 @@ from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
-from pipelex.tools.config.models import ConfigRoot
+from pipelex.tools.config.config_root import ConfigRoot
 from pipelex.tools.func_registry import func_registry
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
@@ -67,7 +68,7 @@ class Pipelex(metaclass=MetaSingleton):
         config_cls: Optional[Type[ConfigRoot]] = None,
         class_registry: Optional[ClassRegistryAbstract] = None,
         template_provider: Optional[TemplateLibrary] = None,
-        llm_model_provider: Optional[LLMModelLibrary] = None,
+        models_manager: Optional[ModelManagerAbstract] = None,
         inference_manager: Optional[InferenceManager] = None,
         pipeline_manager: Optional[PipelineManager] = None,
         pipeline_tracker: Optional[PipelineTracker] = None,
@@ -105,8 +106,10 @@ class Pipelex(metaclass=MetaSingleton):
         # cogt
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
-        self.llm_model_provider = llm_model_provider or LLMModelLibrary.make_empty(config_dir_path=config_dir_path)
-        self.pipelex_hub.set_llm_models_provider(self.llm_model_provider)
+
+        self.models_manager: ModelManagerAbstract = models_manager or ModelManager()
+        self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
+
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
@@ -167,7 +170,22 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
         self.pipelex_hub.set_storage_provider(storage_provider)
         # cogt
-        self.plugin_manager.setup(library_config=self.library_manager.library_config)
+        self.plugin_manager.setup()
+        try:
+            self.models_manager.setup()
+        except RoutingProfileLibraryNotFoundError as routing_profile_library_exc:
+            raise PipelexSetupError(
+                "The routing library could not be found, please call `pipelex init config` to create it"
+            ) from routing_profile_library_exc
+        except InferenceBackendCredentialsError as credentials_exc:
+            if secrets_provider:
+                raise PipelexSetupError(
+                    f"Missing credentials for inference backend: {credentials_exc}, check that it's available from your secrets provider."
+                ) from credentials_exc
+            else:
+                raise PipelexSetupError(
+                    f"Missing credentials for inference backend: {credentials_exc}, add it to your environment variables or to your .env file."
+                ) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())
@@ -187,16 +205,8 @@ class Pipelex(metaclass=MetaSingleton):
     def setup_libraries(self):
         try:
             self.template_provider.setup()
-            self.llm_model_provider.setup()
             self.library_manager.setup()
-            llm_deck = self.library_manager.load_deck()
-            for llm_model in self.llm_model_provider.get_all_llm_models():
-                if llm_model.version == LATEST_VERSION_NAME:
-                    llm_deck.add_llm_name_as_handle_with_defaults(
-                        llm_name=llm_model.llm_name,
-                    )
             self.library_manager.load_libraries()
-            self.pipelex_hub.set_llm_deck_provider(llm_deck_provider=llm_deck)
         except ValidationError as exc:
             error_msg = format_pydantic_validation_error(exc)
             raise PipelexSetupError(f"Could not setup libraries because of: {error_msg}") from exc
@@ -221,7 +231,6 @@ class Pipelex(metaclass=MetaSingleton):
         # cogt
         self.inference_manager.teardown()
         self.reporting_delegate.teardown()
-        self.llm_model_provider.teardown()
         self.plugin_manager.teardown()
 
         # tools

@@ -76,6 +76,9 @@ api_key_method = "env"
 
 [cogt]
 
+[cogt.inference_config]
+inference_config_path = ".pipelex/inference"
+
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
 is_auto_setup_preset_imgg = true
@@ -88,12 +91,8 @@ default_max_images = 100
 is_openai_structured_output_enabled = false
 
 [cogt.llm_config.llm_job_config]
-max_retries = 3
+max_retries = 1
 is_streaming_enabled = false
-
-[cogt.llm_config.preferred_platforms]
-# These overrride the defaults set for any llm handle
-# "gpt-4o-mini" = "openai"
 
 ####################################################################################################
 # Image generation config
@@ -101,7 +100,7 @@ is_streaming_enabled = false
 
 [cogt.imgg_config]
 imgg_handles = ["fal-ai/flux-pro", "fal-ai/fast-lightning-sdxl"]
-default_imgg_handle = "fal-ai/flux-pro/v1.1-ultra"  # use "fal-ai/fast-lightning-sdxl" for SDXL Lightning cheap and fast
+default_imgg_handle = "fal-ai/flux-pro/v1.1-ultra"               # use "fal-ai/fast-lightning-sdxl" for SDXL Lightning cheap and fast
 
 [cogt.imgg_config.imgg_job_config]
 is_sync_mode = false
@@ -110,7 +109,7 @@ is_sync_mode = false
 # quality and nb_steps cannot be set at the same time
 # nb_steps = 1  # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
 quality = "low"
-aspect_ratio = "square"  # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
+aspect_ratio = "square" # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
 guidance_scale = 3.5
 background = "auto"
 is_moderated = true
@@ -118,6 +117,10 @@ safety_tolerance = 5
 is_raw = false
 output_format = "jpg"
 seed = "auto"
+
+[cogt.imgg_config.fal_config]
+flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
+sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
 
 ####################################################################################################
 # OCR config
@@ -142,7 +145,7 @@ mistral = { tag_style = "square_brackets" }
 gemini = { tag_style = "xml" }
 
 [pipelex.structure_config]
-is_default_text_then_structure = false  # turn this to true to get better results: generates text before structuring
+is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
 
 
 ####################################################################################################
@@ -178,7 +181,7 @@ is_include_text_preview = false
 is_include_interactivity = false
 nb_items_limit = "unlimited"
 theme = "base"
-layout = "dagre"  # "elk", "dagre", "fixed"
+layout = "dagre"                                     # "elk", "dagre", "fixed"
 sub_graph_colors = ["#e6f5ff", "#fff5f7", "#f0fff0"]
 wrapping_width = "auto"
 
@@ -205,9 +208,13 @@ apply_to_jinja2_rendering = false
 text_gen_truncate_length = 256
 nb_list_items = 3
 nb_ocr_pages = 4
-allowed_to_fail_pipes = ["infinite_loop_1", "build_blueprint", "structure_blueprint"]
+allowed_to_fail_pipes = [
+    "infinite_loop_1",
+    "build_blueprint",
+    "structure_blueprint",
+]
 image_urls = [
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
-    ]
+]
 

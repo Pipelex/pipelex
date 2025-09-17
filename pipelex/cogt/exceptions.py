@@ -31,14 +31,6 @@ class LLMWorkerError(CogtError):
     pass
 
 
-class LLMEngineParameterError(CogtError):
-    pass
-
-
-class LLMSDKError(CogtError):
-    pass
-
-
 class LLMPresetNotFoundError(CogtError):
     pass
 
@@ -47,15 +39,11 @@ class LLMSettingsValidationError(CogtError):
     pass
 
 
-class LLMDeckValidatonError(CogtError):
+class ModelDeckValidatonError(CogtError):
     pass
 
 
 class LLMHandleNotFoundError(CogtError):
-    pass
-
-
-class LLMModelProviderError(CogtError):
     pass
 
 
@@ -141,4 +129,40 @@ class MissingPluginError(CogtError):
 
 
 class OcrCapabilityError(CogtError):
+    pass
+
+
+class RoutingProfileLibraryNotFoundError(CogtError):
+    pass
+
+
+class RoutingProfileLibraryError(CogtError):
+    pass
+
+
+class InferenceModelSpecError(CogtError):
+    pass
+
+
+class InferenceBackendError(CogtError):
+    pass
+
+
+class InferenceBackendCredentialsError(CogtError):
+    pass
+
+
+class InferenceBackendLibraryError(CogtError):
+    pass
+
+
+class RoutingProfileError(CogtError):
+    pass
+
+
+class ModelsManagerError(CogtError):
+    pass
+
+
+class ModelDeckNotFoundError(CogtError):
     pass

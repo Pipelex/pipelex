@@ -19,4 +19,4 @@ class TestImageGeneration:
         generated_image = await imgg_worker_async.gen_image(
             imgg_job=imgg_job,
         )
-        pretty_print(generated_image, title=f"Generated Image, topic={topic}")
+        pretty_print(generated_image, title=f"Generated Image, topic={topic}, imgg_handle={imgg_handle}")

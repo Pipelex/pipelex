@@ -16,15 +16,27 @@
             "justMyCode": false
         },
         {
-            "name": "Debug test_pipe_ocr_pdf",
+            "name": "Debug test without inference",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
             "args": [
                 "-s",
                 "-vv",
-                "-m ocr",
-                "-k test_pipe_ocr_pdf"
+                "-k test_pipe_llm_with_external_llm_handle"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug test inference",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vv",
+                "-m inference",
+                "-k test_simple_gen"
             ],
             "console": "integratedTerminal"
         },

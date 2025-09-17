@@ -113,7 +113,9 @@ def load_toml_from_path(path: str) -> Dict[str, Any]:
             with open(path, "w", encoding="utf-8") as file:
                 file.write(cleaned_content)
 
+        # Parse TOML first
         dict_from_toml = toml.loads(cleaned_content)
+
         return dict_from_toml
     except toml.TomlDecodeError as exc:
         raise toml.TomlDecodeError(f"TOML parsing error in file '{path}': {exc}", exc.doc, exc.pos) from exc
@@ -125,7 +127,7 @@ def failable_load_toml_from_path(path: str) -> Optional[Dict[str, Any]]:
         return None
     try:
         return load_toml_from_path(path)
-    except toml.TomlDecodeError as exc:
+    except (toml.TomlDecodeError, TOMLValidationError) as exc:
         print(f"Failed to parse TOML file '{path}': {exc}")
         return None
 

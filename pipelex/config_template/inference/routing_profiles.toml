@@ -1,0 +1,84 @@
+# Routing profile library - Routes models to their backends
+# ================================================
+# This file controls which backend serves which model.
+# Simply change the 'active' field to switch profiles,
+# or you can add your own custom profiles.
+# ================================================
+
+# Which profile to use (change this to switch routing)
+active = "all_pipelex"
+
+# We recommend using the "all_pipelex" profile to get a head start with all models.
+# The Pipelex Inference backend is currently not recommended for production use,
+# but it's great for development and testing.
+# To use the Pipelex Inference backend (all_pipelex profile):
+# 1. Join our Discord community to get your free API key (no credit card required):
+#    Visit https://go.pipelex.com/discord and request your key in the appropriate channel
+# 2. Set the environment variable: export PIPELEX_INFERENCE_API_KEY="your-api-key"
+# 3. The .pipelex/inference/backends.toml is already configured with api_key = "${PIPELEX_INFERENCE_API_KEY}"
+# which will get the key from the environment variable.
+
+# ============================================
+# Routing Profiles
+# ============================================
+
+[profiles.all_pipelex]
+description = "Use Pipelex Inference backend for all models"
+default = "pipelex_inference"
+
+[profiles.all_anthropic]
+description = "Use Anthropic backend for all its supported models"
+default = "anthropic"
+
+[profiles.all_azure_openai]
+description = "Use Azure OpenAI backend for all its supported models"
+default = "azure_openai"
+
+[profiles.to_test_various_backends]
+description = "Route models to various backends"
+
+[profiles.custom_routing]
+description = "Custom routing"
+default = "pipelex_inference"
+
+[profiles.custom_routing.routes]
+# Pattern matching: "model-pattern" = "backend-name"
+"gpt-*" = "pipelex_inference"
+"claude-*" = "pipelex_inference"
+"gemini-*" = "pipelex_inference"
+"grok-*" = "pipelex_inference"
+"*-sdxl" = "pipelex_inference"
+
+[profiles.to_test_various_backends.routes]
+"gpt-5-nano" = "pipelex_inference"
+"gpt-4o-mini" = "blackboxai"
+"gpt-5-mini" = "openai"
+"gpt-5-chat" = "azure_openai"
+
+"claude-4-sonnet" = "pipelex_inference"
+"claude-3.5-sonnet" = "bedrock"
+"claude-3.5-sonnet-v2" = "anthropic"
+"claude-3.7-sonnet" = "blackboxai"
+
+"gemini-2.5-flash-lite" = "pipelex_inference"
+"gemini-2.5-flash" = "blackboxai"
+"gemini-2.5-pro" = "vertexai"
+
+"grok-3" = "pipelex_inference"
+"grok-3-mini" = "xai"
+
+# ============================================
+# Custom Profiles
+# ============================================
+# Add your own profiles below following the same pattern:
+#
+# [profiles.your_profile_name]
+# description = "What this profile does"
+# default = "backend-name"  # Where to route models by default
+# [profiles.your_profile_name.routes]
+# "model-pattern" = "backend-name"  # Specific routing rules
+#
+# Pattern matching supports:
+# - Exact names: "gpt-4o-mini"
+# - Wildcards: "claude-*" (matches all models starting with claude-)
+# - Partial wildcards: "*-sonnet" (matches all sonnet variants)

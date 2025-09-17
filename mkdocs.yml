@@ -126,7 +126,7 @@ nav:
       - Optimize Cost & Quality: pages/build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md
       - LLM Structured Generation: pages/build-reliable-ai-workflows-with-pipelex/llm-structured-generation-config.md
       - LLM Prompting Style: pages/build-reliable-ai-workflows-with-pipelex/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
-      - LLM Providers & Models: pages/build-reliable-ai-workflows-with-pipelex/ai-plugins-for-multi-llm-workflows.md
+      - LLM Providers & Models: pages/configuration/config-technical/inference-backend-config.md
   - Configuration:
     - Overview: pages/configuration/index.md
     - Pipeline Validation Configuration:
@@ -140,6 +140,7 @@ nav:
     - Technical Configuration:
       - AWS: pages/configuration/config-technical/aws-config.md
       - Cogt: pages/configuration/config-technical/cogt-config.md
+      - Inference Backend: pages/configuration/config-technical/inference-backend-config.md
       - Library: pages/configuration/config-technical/library-config.md
       - Feature: pages/configuration/config-advanced/feature-config.md
   - Development:
@@ -157,10 +158,8 @@ nav:
       - Storage Provider: pages/advanced-customization/storage-provider-injection.md
       - Template Provider: pages/advanced-customization/template-provider-injection.md
       - Content Generator: pages/advanced-customization/content-generator-injection.md
-      - LLM Model Provider: pages/advanced-customization/llm-model-provider-injection.md
       - Pipe Router: pages/advanced-customization/pipe-router-injection.md
       - Plugin Manager: pages/advanced-customization/plugin-manager-injection.md
-      - Inference Manager: pages/advanced-customization/inference-manager-injection.md
     - License: license.md
     - Contributing: contributing.md
     - Code of Conduct: CODE_OF_CONDUCT.md

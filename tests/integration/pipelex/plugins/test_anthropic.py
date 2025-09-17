@@ -4,9 +4,10 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from pipelex.cogt.exceptions import LLMSDKError
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
+from pipelex.hub import get_models_manager
+from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError
 from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_anthropic_models
+from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
 # TODO: fix this: test works for Anthropic but not if you set peferred platform for Anthropic is Bedrock
@@ -20,13 +21,17 @@ class TestAnthropic:
     async def test_anthropic_list_models(
         self,
         pytestconfig: pytest.Config,
-        llm_platform_for_anthropic_sdk: LLMPlatform,
+        plugin_for_anthropic: Plugin,
     ):
         try:
-            anthropic_models_list = await anthropic_list_anthropic_models(llm_platform=llm_platform_for_anthropic_sdk)
+            backend = get_models_manager().get_required_inference_backend("anthropic")
+            anthropic_models_list = await anthropic_list_anthropic_models(
+                plugin=plugin_for_anthropic,
+                backend=backend,
+            )
         except AuthenticationError as auth_exc:
             pytest.fail(f"Authentication error for Anthropic: {auth_exc}")
-        except LLMSDKError as exc:
+        except AnthropicSDKUnsupportedError as exc:
             if "does not support listing models" in str(exc):
                 pytest.skip(f"Skipping: {exc}")
             else:

@@ -21,7 +21,7 @@ class TestLLMVision:
     async def test_gen_text_from_vision_by_url(self, llm_handle_for_vision: str, topic: str, image_uri: str):
         prompt_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
         llm_worker = get_llm_worker(llm_handle=llm_handle_for_vision)
-        log.info(f"LLM Worker: {llm_worker.desc}")
+        log.info(f"Using llm_worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
             user_images=[prompt_image],

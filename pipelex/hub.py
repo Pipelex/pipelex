@@ -8,11 +8,8 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 )
 from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
-from pipelex.cogt.llm.llm_models.llm_deck_abstract import LLMDeckAbstract
-from pipelex.cogt.llm.llm_models.llm_model_provider_abstract import (
-    LLMModelProviderAbstract,
-)
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
@@ -28,8 +25,8 @@ from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.config.config_root import ConfigRoot
 from pipelex.tools.config.manager import config_manager
-from pipelex.tools.config.models import ConfigRoot
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.templating.template_provider_abstract import TemplateProviderAbstract
@@ -52,8 +49,7 @@ class PipelexHub:
         self._class_registry: Optional[ClassRegistryAbstract] = None
         self._storage_provider: Optional[StorageProviderAbstract] = None
         # cogt
-        self._llm_models_provider: Optional[LLMModelProviderAbstract] = None
-        self._llm_deck_provider: Optional[LLMDeckAbstract] = None
+        self._models_manager: Optional[ModelManagerAbstract] = None
         self._plugin_manager: Optional[PluginManager] = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
@@ -129,11 +125,8 @@ class PipelexHub:
 
     # cogt
 
-    def set_llm_models_provider(self, llm_models_provider: LLMModelProviderAbstract):
-        self._llm_models_provider = llm_models_provider
-
-    def set_llm_deck_provider(self, llm_deck_provider: LLMDeckAbstract):
-        self._llm_deck_provider = llm_deck_provider
+    def set_models_manager(self, models_manager: ModelManagerAbstract):
+        self._models_manager = models_manager
 
     def set_plugin_manager(self, plugin_manager: PluginManager):
         self._plugin_manager = plugin_manager
@@ -217,18 +210,10 @@ class PipelexHub:
 
     # cogt
 
-    def get_required_llm_models_provider(self) -> LLMModelProviderAbstract:
-        if self._llm_models_provider is None:
-            raise RuntimeError("LLMModelProvider is not initialized")
-        return self._llm_models_provider
-
-    def get_optional_llm_models_provider(self) -> Optional[LLMModelProviderAbstract]:
-        return self._llm_models_provider
-
-    def get_required_llm_deck(self) -> LLMDeckAbstract:
-        if self._llm_deck_provider is None:
-            raise RuntimeError("LLMDeck is not initialized")
-        return self._llm_deck_provider
+    def get_required_models_manager(self) -> ModelManagerAbstract:
+        if self._models_manager is None:
+            raise RuntimeError("ModelsManager is not initialized")
+        return self._models_manager
 
     def get_plugin_manager(self) -> PluginManager:
         if self._plugin_manager is None:
@@ -341,12 +326,8 @@ def get_class_registry() -> ClassRegistryAbstract:
 # cogt
 
 
-def get_llm_models_provider() -> LLMModelProviderAbstract:
-    return get_pipelex_hub().get_required_llm_models_provider()
-
-
-def get_llm_deck() -> LLMDeckAbstract:
-    return get_pipelex_hub().get_required_llm_deck()
+def get_models_manager() -> ModelManagerAbstract:
+    return get_pipelex_hub().get_required_models_manager()
 
 
 def get_plugin_manager() -> PluginManager:

@@ -6,6 +6,47 @@ You can **find more powerful examples** in the [Cookbook Examples](../cookbook-e
 
 ---
 
+## Setting up API Keys
+
+Before you can make LLM calls with Pipelex, you need to configure API keys. You have two options:
+
+### Option 1: Use Pipelex Inference (Recommended for Getting Started)
+
+Get **free access** to all well-known commercial and open-source LLMs with a single API key:
+
+1. **Join our Discord community to get your free Pipelex Inference key** (no credit card required, limited time offer)
+   - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join
+   - Request your API key in the appropriate channel once you're in
+
+2. **Set up your environment**:
+   ```bash
+   # Create a .env file in your project root
+   echo "PIPELEX_INFERENCE_API_KEY=your-key-here" > .env
+   ```
+
+With Pipelex Inference, you get instant access to models from OpenAI, Anthropic, Google, Mistral, and more - all through a single API key!
+
+### Option 2: Use Your Own API Keys
+
+If you already have API keys from LLM providers, you can use them directly:
+
+```bash
+# Add to your .env file
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key
+GOOGLE_API_KEY=your-google-key
+# Or for Azure OpenAI
+AZURE_API_KEY=your-azure-key
+AZURE_API_BASE=your-azure-endpoint
+# Or for AWS Bedrock
+AWS_ACCESS_KEY_ID=your-aws-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret
+```
+
+For complete configuration details, see the [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) documentation.
+
+---
+
 ## Your first LLM call with Pipelex
 
 Let's start by running your very first LLM call using Pipelex.
@@ -87,12 +128,12 @@ llm = "llm_for_creative_writing"
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 
-# The llm deck above is defined in `pipelex_libraries/llm_deck/base_llm_deck.toml` as:
+# The llm deck above is defined in `.pipelex/inference/deck/base_deck.toml` as:
 # llm_for_creative_writing = { llm_handle = "best-claude", temperature = 0.9 }
 # it's a base preset that we provide. you can add your own presets, too.
 ```
 
-💡 We have a lot of [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/pipelex/libraries/llm_deck/base_llm_deck.toml).
+💡 We have a lot of [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/.pipelex/inference/deck/base_deck.toml).
 Make sure you have credentials for the underlying LLM provider (and added your API key to the `.env`) and select the one you want!
 
 Learn more about LLM presets, LLM handles and LLM deck in our [LLM Configuration Guide](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md)

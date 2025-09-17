@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Type
 
 from pydantic import Field, RootModel
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -44,7 +44,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         self.root = {}
 
     @classmethod
-    def make_empty(cls):
+    def make_empty(cls) -> Self:
         return cls(root={})
 
     @override

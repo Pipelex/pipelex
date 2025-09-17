@@ -1,0 +1,124 @@
+default_sdk = "openai"
+default_prompting_target = "openai"
+
+["gpt-3.5-turbo"]
+model_id = "gpt-3.5-turbo-1106"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.5, output = 1.5 }
+
+[gpt-4]
+model_id = "gpt-4"
+costs = { input = 30.0, output = 60.0 }
+
+[gpt-4-turbo]
+model_id = "gpt-4-turbo"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 10.0, output = 30.0 }
+
+[gpt-4o-2024-11-20]
+model_id = "gpt-4o-2024-11-20"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 10.0 }
+
+[gpt-4o]
+model_id = "gpt-4o"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 10.0 }
+
+[gpt-4o-mini-2024-07-18]
+model_id = "gpt-4o-mini-2024-07-18"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.6 }
+
+[gpt-4o-mini]
+model_id = "gpt-4o-mini"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.6 }
+
+["gpt-4.1"]
+model_id = "gpt-4.1"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+
+["gpt-4.1-mini"]
+model_id = "gpt-4.1-mini"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 1.6 }
+
+["gpt-4.1-nano"]
+model_id = "gpt-4.1-nano"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.4 }
+
+[o1-mini]
+model_id = "o1-mini"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 3.0, output = 12.0 }
+constraints = ["temperature_must_be_1"]
+
+[o1]
+model_id = "o1"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 15.0, output = 60.0 }
+constraints = ["temperature_must_be_1"]
+
+[o3-mini]
+model_id = "o3-mini"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+constraints = ["temperature_must_be_1"]
+
+[o3]
+model_id = "o3"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 10.0, output = 40.0 }
+constraints = ["temperature_must_be_1"]
+
+[o4-mini]
+model_id = "o4-mini"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+constraints = ["temperature_must_be_1"]
+
+[gpt-5]
+model_id = "gpt-5"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+constraints = ["temperature_must_be_1"]
+
+[gpt-5-mini]
+model_id = "gpt-5-mini"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 2.0 }
+constraints = ["temperature_must_be_1"]
+
+[gpt-5-nano]
+model_id = "gpt-5-nano"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.4 }
+constraints = ["temperature_must_be_1"]
+
+[gpt-5-chat]
+model_id = "gpt-5-chat-latest"
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 1.25, output = 10.0 }
+constraints = ["temperature_must_be_1"]
+
