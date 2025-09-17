@@ -1,11 +1,11 @@
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from mistralai import Mistral
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import OcrCapabilityError, SdkTypeError
-from pipelex.cogt.ocr.ocr_engine import OcrEngine
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.ocr.ocr_input import OcrInputError
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import OcrOutput
@@ -22,10 +22,15 @@ class MistralOcrWorker(OcrWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        ocr_engine: OcrEngine,
+        extra_config: Dict[str, Any],
+        inference_model: InferenceModelSpec,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        super().__init__(ocr_engine=ocr_engine, reporting_delegate=reporting_delegate)
+        super().__init__(
+            extra_config=extra_config,
+            inference_model=inference_model,
+            reporting_delegate=reporting_delegate,
+        )
 
         if not isinstance(sdk_instance, Mistral):
             raise SdkTypeError(f"Provided OCR sdk_instance for {self.__class__.__name__} is not of type Mistral: it's a '{type(sdk_instance)}'")
@@ -108,7 +113,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         image_url: str,
     ) -> OcrOutput:
         ocr_response = await self.mistral_client.ocr.process_async(
-            model=self.ocr_engine.ocr_model_name,
+            model=self.inference_model.model_id,
             document={
                 "type": "image_url",
                 "image_url": image_url,
@@ -129,7 +134,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         mime_type = file_type.mime
 
         ocr_response = await self.mistral_client.ocr.process_async(
-            model=self.ocr_engine.ocr_model_name,
+            model=self.inference_model.model_id,
             document={"type": "image_url", "image_url": f"data:{mime_type};base64,{b64.decode('utf-8')}"},
         )
         ocr_output = await MistralFactory.make_ocr_output_from_mistral_response(
@@ -143,7 +148,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         should_include_images: bool = False,
     ) -> OcrOutput:
         ocr_response = await self.mistral_client.ocr.process_async(
-            model=self.ocr_engine.ocr_model_name,
+            model=self.inference_model.model_id,
             document={
                 "type": "document_url",
                 "document_url": pdf_url,

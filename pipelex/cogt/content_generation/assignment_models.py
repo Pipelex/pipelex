@@ -12,7 +12,6 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.hub import get_class_registry
@@ -141,7 +140,7 @@ class Jinja2Assignment(BaseModel):
 
 class OcrAssignment(BaseModel):
     job_metadata: JobMetadata
-    ocr_handle: OcrHandle
+    ocr_handle: str
     ocr_input: OcrInput
     ocr_job_params: OcrJobParams
     ocr_job_config: OcrJobConfig

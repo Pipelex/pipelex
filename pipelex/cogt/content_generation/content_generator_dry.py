@@ -12,7 +12,6 @@ from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
@@ -204,7 +203,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         self,
         job_metadata: JobMetadata,
         ocr_input: OcrInput,
-        ocr_handle: OcrHandle,
+        ocr_handle: str,
         ocr_job_params: Optional[OcrJobParams] = None,
         ocr_job_config: Optional[OcrJobConfig] = None,
     ) -> OcrOutput:

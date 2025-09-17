@@ -335,7 +335,7 @@ class PipelexInterpreter(BaseModel):
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
         lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
-        lines.append(f'ocr_handle = "{pipe.ocr_handle.value}"')
+        lines.append(f'ocr_handle = "{pipe.ocr_handle}"')
 
         return "\n".join(lines)
 
@@ -749,8 +749,6 @@ class PipelexInterpreter(BaseModel):
         result["ocr_handle"] = pipe.ocr_handle
 
         # Add optional fields
-        if pipe.ocr_platform:
-            result["ocr_platform"] = pipe.ocr_platform
         if pipe.page_images:
             result["page_images"] = pipe.page_images
         if pipe.page_image_captions:

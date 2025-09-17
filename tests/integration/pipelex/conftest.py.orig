@@ -9,7 +9,7 @@ from pipelex.plugins.plugin_sdk_registry import Plugin
 =======
 from pipelex.cogt.llm.llm_models.llm_family import LLMCreator, LLMFamily
 from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
+
 >>>>>>> dev
 
 

@@ -92,3 +92,11 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.4, output = 2.0 }
 
+[mistral-ocr]
+model_type = "text_extractor"
+model_id = "mistral-ocr-latest"
+max_tokens = 131072
+inputs = ["pdf", "image"]
+outputs = ["pages"]
+costs = { input = 0.4, output = 2.0 }
+

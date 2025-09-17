@@ -15,7 +15,7 @@ from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 
 def get_worker_and_job(llm_preset_id: str, user_text: str) -> Tuple[LLMWorkerAbstract, LLMJob]:
-    llm_setting = get_models_manager().get_llm_deck().get_llm_setting(llm_setting_or_preset_id=llm_preset_id)
+    llm_setting = get_models_manager().get_model_deck().get_llm_setting(llm_setting_or_preset_id=llm_preset_id)
     pretty_print(llm_setting, title=llm_preset_id)
     pretty_print(user_text)
     llm_worker = get_llm_worker(llm_handle=llm_setting.llm_handle)

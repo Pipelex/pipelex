@@ -11,7 +11,6 @@ from pipelex.tools.misc.file_utils import find_files_in_dir
 
 
 class OcrConfig(ConfigModel):
-    ocr_handles: List[str]
     page_output_text_file_name: str
     default_page_views_dpi: int
 

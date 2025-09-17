@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import Field
 
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.usage.cost_category import CostsByCategoryDict
 from pipelex.tools.config.config_model import ConfigModel
@@ -12,6 +13,7 @@ class InferenceModelSpec(ConfigModel):
     backend_name: str
     name: str
     sdk: str
+    model_type: ModelType = Field(strict=False)
     model_id: str
     inputs: List[str] = Field(default_factory=list)
     outputs: List[str] = Field(default_factory=list)

@@ -15,11 +15,11 @@ class ModelManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_inference_model(self, llm_handle: str) -> InferenceModelSpec:
+    def get_inference_model(self, model_handle: str) -> InferenceModelSpec:
         pass
 
     @abstractmethod
-    def get_llm_deck(self) -> ModelDeck:
+    def get_model_deck(self) -> ModelDeck:
         pass
 
     @abstractmethod

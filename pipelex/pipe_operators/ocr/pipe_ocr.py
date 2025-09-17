@@ -6,7 +6,6 @@ from typing_extensions import Self, override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.config import StaticValidationReaction, get_config
@@ -41,7 +40,7 @@ PIPE_OCR_INPUT_NAME = "ocr_input"
 
 
 class PipeOcr(PipeOperator):
-    ocr_handle: OcrHandle
+    ocr_handle: str
     should_caption_images: bool
     should_include_images: bool
     should_include_page_views: bool

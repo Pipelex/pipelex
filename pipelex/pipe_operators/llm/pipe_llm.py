@@ -265,7 +265,7 @@ class PipeLLM(PipeOperator):
             llm_for_text_choice = self.llm_choices.for_text
             llm_for_object_choice = self.llm_choices.for_object
 
-        llm_deck = get_models_manager().get_llm_deck()
+        llm_deck = get_models_manager().get_model_deck()
 
         # Choice of main LLM for text first from this PipeLLM setting (self.llm_choices)
         # or from the llm_choice_overrides or fallback on the llm_choice_defaults
@@ -283,7 +283,7 @@ class PipeLLM(PipeOperator):
         llm_setting_for_object: LLMSetting = llm_deck.get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_object)
 
         if (not self.llm_prompt_spec.prompting_style) and (
-            inference_model := llm_deck.get_optional_inference_model(llm_handle=llm_setting_main.llm_handle)
+            inference_model := llm_deck.get_optional_inference_model(model_handle=llm_setting_main.llm_handle)
         ):
             # Note: the case where we don't get an inference model corresponds to the use of an external LLM Plugin
             # TODO: improve this by making it possible to get the inference model for external LLM Plugins

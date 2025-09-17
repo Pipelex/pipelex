@@ -11,7 +11,6 @@ api_key_method = "env"
 ####################################################################################################
 
 [cogt.ocr_config]
-ocr_handles = ["mistral/mistral-ocr-latest"]
 page_output_text_file_name = "page_text.md"
 
 [pipelex.feature_config]
@@ -19,4 +18,3 @@ page_output_text_file_name = "page_text.md"
 is_pipeline_tracking_enabled = false
 is_activity_tracking_enabled = false
 is_reporting_enabled = true
-

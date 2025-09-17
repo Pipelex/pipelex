@@ -5,14 +5,17 @@ from pydantic import BaseModel, Field, field_validator
 from pipelex.cogt.exceptions import InferenceModelSpecError
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.tools.config.config_model import ConfigModel
+from pipelex.types import StrEnum
 
 
 class InferenceModelSpecBlueprint(ConfigModel):
     enabled: bool = True
     sdk: Optional[str] = None
+    model_type: ModelType = Field(default=ModelType.LLM, strict=False)
     model_id: str
     inputs: List[str] = Field(default_factory=list)
     outputs: List[str] = Field(default_factory=list)
@@ -55,6 +58,7 @@ class InferenceModelSpecFactory(BaseModel):
             backend_name=backend_name,
             name=name,
             sdk=sdk,
+            model_type=blueprint.model_type,
             model_id=blueprint.model_id,
             inputs=blueprint.inputs,
             outputs=blueprint.outputs,

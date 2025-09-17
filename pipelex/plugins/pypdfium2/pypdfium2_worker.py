@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 
 from typing_extensions import override
 
-from pipelex.cogt.ocr.ocr_engine import OcrEngine
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.ocr.ocr_input import OcrInputError
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_output import OcrOutput, Page
@@ -16,10 +16,11 @@ class Pypdfium2Worker(OcrWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        ocr_engine: OcrEngine,
+        extra_config: Dict[str, Any],
+        inference_model: InferenceModelSpec,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        super().__init__(ocr_engine=ocr_engine, reporting_delegate=reporting_delegate)
+        super().__init__(extra_config=extra_config, inference_model=inference_model, reporting_delegate=reporting_delegate)
 
     @override
     async def _ocr_extract_pages(

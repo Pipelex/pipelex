@@ -353,7 +353,7 @@ def get_imgg_worker(
 def get_ocr_worker(
     ocr_handle: str,
 ) -> OcrWorkerAbstract:
-    return get_inference_manager().get_ocr_worker(ocr_handle=ocr_handle)
+    return get_inference_manager().get_ocr_worker(model_handle=ocr_handle)
 
 
 def get_report_delegate() -> ReportingProtocol:
