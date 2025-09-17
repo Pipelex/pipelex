@@ -36,7 +36,7 @@ class ConfigManager:
         development and installed modes.
         """
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        return os.path.dirname(os.path.dirname(current_dir))
+        return os.path.dirname(os.path.dirname(os.path.dirname((current_dir))))
 
     @property
     def pipelex_root_config_path(self) -> str:
@@ -62,10 +62,10 @@ class ConfigManager:
         Returns:
             Dict[str, Any]: The configuration dictionary from pipelex.toml
         """
-        config_path = self.pipelex_root_config_path
+        config_path = os.path.join(self.pipelex_root_dir, os.path.join(CONFIG_DIR_NAME, CONFIG_NAME))
         config = failable_load_toml_from_path(config_path)
         if not config:
-            raise ConfigException(f"Pipelex root config could not be found at {self.pipelex_specific_config_file_path}.")
+            raise ConfigException(f"Pipelex root config could not be found at {config_path}.")
         return config
 
     def get_local_config(self) -> Dict[str, Any]:
@@ -74,7 +74,7 @@ class ConfigManager:
         Returns:
             Dict[str, Any]: The configuration dictionary from the local pipelex.toml
         """
-        config_path = os.path.join(self.local_root_dir, CONFIG_NAME)
+        config_path = os.path.join(self.local_root_dir, os.path.join(CONFIG_DIR_NAME, CONFIG_NAME))
         config = failable_load_toml_from_path(config_path)
         return config or {}
 
