@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.10.1] - 2025-09-17
+
+### Changed
+
+- Enabled all backends, still required to pass all unit tests.
+- A few tweaks to the base model deck.
+
 ## [v0.10.0] - 2025-09-17
 
 ### Highlight: New Inference Backend Configuration System
