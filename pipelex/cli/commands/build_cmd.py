@@ -20,6 +20,7 @@ pipelex build pipe "Given an RDFP PDF, build a compliance matrix" -o ./built.plx
 pipelex build pipe "Given a invoice pdf, extract employee and articles" -o ./built.plx
 """
 
+
 @build_app.command("pipe")
 def build_pipe_cmd(
     brief: Annotated[
