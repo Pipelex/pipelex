@@ -11,6 +11,7 @@
 
 ### Changed
 
+- Updated .env.example file with slightly modified key names (more standard).
 - OCR system now uses InferenceModelSpec with unified model handles
 - Renamed `get_llm_deck()` to `get_model_deck()` and updated parameter names from `llm_handle` to `model_handle`
 - Simplified OCR worker factory using plugin SDK matching
