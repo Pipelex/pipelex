@@ -47,7 +47,7 @@ class ModelManager(ModelManagerAbstract):
         log.debug("LibraryManager deck TOML file formatting")
 
         # Validation of LLM deck paths
-        llm_deck_paths = get_config().cogt.inference_config.get_llm_deck_paths()
+        llm_deck_paths = get_config().cogt.inference_config.get_model_deck_paths()
         for llm_deck_path in llm_deck_paths:
             if os.path.exists(llm_deck_path):
                 try:
@@ -58,7 +58,7 @@ class ModelManager(ModelManagerAbstract):
 
     @classmethod
     def load_deck_blueprint(cls) -> ModelDeckBlueprint:
-        llm_deck_paths = get_config().cogt.inference_config.get_llm_deck_paths()
+        llm_deck_paths = get_config().cogt.inference_config.get_model_deck_paths()
         full_llm_deck_dict: Dict[str, Any] = {}
         if not llm_deck_paths:
             raise ModelDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")

@@ -47,13 +47,13 @@ The routing logic supports exact matches, as well as prefix, suffix, and "contai
 
 The **Model Deck** (`ModelDeck`) is the final, unified collection of all configured and available models in the system. It is constructed at runtime by the `ModelManager` and serves as the single source of truth for the rest of the application. The Model Deck contains:
 
--   **Inference Models**: A resolved map of model names (`llm_handle`) to their corresponding `InferenceModelSpec`.
+-   **Inference Models**: A resolved map of model names (`model_handle`) to their corresponding `InferenceModelSpec`.
 -   **Aliases**: User-friendly names that map to one or more model names, creating a fallback chain (e.g., `best-claude` -> `claude-3-opus-20240229`).
 -   **LLM Presets**: Pre-defined configurations (`LLMSetting`) for specific tasks, combining an `llm_handle` with parameters like `temperature` and `max_tokens` (e.g., `llm_to_reason`).
 -   **Default Choices**: Default model presets to use for text generation (`for_text`) and structured data extraction (`for_object`).
 
 - **Implementation**: `pipelex.cogt.models.model_deck.ModelDeck`
-- **Configuration**: Aliases, presets, and defaults are loaded from one or more `llm_deck.toml` files, specified by `cogt.inference_config.get_llm_deck_paths()`.
+- **Configuration**: Aliases, presets, and defaults are loaded from one or more `model_deck.toml` files, specified by `cogt.inference_config.get_model_deck_paths()`.
 
 ## How It All Works Together: The Loading Process
 
@@ -67,7 +67,7 @@ The entire system is orchestrated by the `ModelManager` during application start
     b. For each model, it consults the `active` `RoutingProfile` to determine which backend should be used.
     c. It retrieves the `InferenceModelSpec` for that model from the chosen backend.
     d. This resolved model spec is added to the `ModelDeck`'s list of `inference_models`.
-5.  **Load Deck Configuration**: The `ModelManager` reads the `llm_deck.toml` files and loads the `aliases`, `llm_presets`, and default choices into the `ModelDeck`.
-6.  **Finalization**: The `ModelDeck` is now fully constructed and ready to be used by the rest of Pipelex to get model specifications and settings via `get_models_manager().get_llm_deck()`.
+5.  **Load Deck Configuration**: The `ModelManager` reads the `base_deck.toml` and other model deck files from the `deck` directory and loads the `aliases`, `llm_presets`, and default choices into the `ModelDeck`.
+6.  **Finalization**: The `ModelDeck` is now fully constructed and ready to be used by the rest of Pipelex to get model specifications and settings via `get_models_manager().get_model_deck()`.
 
 This layered configuration system provides a powerful way to manage models from various providers, route them according to specific needs, and define reusable presets for common tasks, all through a set of clear and manageable TOML files.

@@ -57,9 +57,9 @@ class InferenceConfig(ConfigModel):
     def model_specs_path(self, backend_name: str) -> str:
         return f"{self.inference_config_path}/backends/{backend_name}.toml"
 
-    def get_llm_deck_paths(self) -> List[str]:
+    def get_model_deck_paths(self) -> List[str]:
         """Get all LLM deck TOML file paths sorted alphabetically."""
-        llm_deck_paths = [
+        model_deck_paths = [
             str(path)
             for path in find_files_in_dir(
                 dir_path=f"{self.inference_config_path}/deck",
@@ -67,8 +67,8 @@ class InferenceConfig(ConfigModel):
                 is_recursive=True,
             )
         ]
-        llm_deck_paths.sort()
-        return llm_deck_paths
+        model_deck_paths.sort()
+        return model_deck_paths
 
 
 class Cogt(ConfigModel):
