@@ -5,7 +5,6 @@ from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.environment import ENV_DUMMY_PLACEHOLDER_VALUE
 from pipelex.tools.exceptions import CredentialsError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
-from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.types import StrEnum
 
 
@@ -42,7 +41,7 @@ class VertexAIFactory(ConfigModel):
 
         gcp_credentials_file_path = extra_config.get(VertexAIExtraField.GCP_CREDENTIALS_FILE_PATH)
         if not gcp_credentials_file_path or gcp_credentials_file_path == ENV_DUMMY_PLACEHOLDER_VALUE:
-            raise VertexAIConfigError(f"GCP credentials file path is not properly set for VertexAI. Run mode: '{runtime_manager.run_mode}'")
+            raise VertexAIConfigError("GCP credentials file path is not properly set for VertexAI.")
 
         api_key = cls._make_api_key(gcp_credentials_file_path=gcp_credentials_file_path)
 
