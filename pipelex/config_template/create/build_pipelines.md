@@ -136,7 +136,7 @@ To blueprint:
   "output": "Page",  // Output is always Page concept
   "page_images": true,
   "page_views": true
-  "ocr_handle": "mistral/mistral-ocr-latest"
+  "ocr_model": "mistral-ocr"
 }
 ```
 

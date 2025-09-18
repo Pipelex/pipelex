@@ -287,10 +287,10 @@ class TestSerializePipeBlueprints:
 
     def test_serialize_ocr_pipe_basic(self):
         """Test serializing basic PipeOcr blueprint."""
-        pipe = PipeOcrBlueprint(type="PipeOcr", definition="Extract text from PDF", output="Page", ocr_handle="pypdfium2-extract-text")
+        pipe = PipeOcrBlueprint(type="PipeOcr", definition="Extract text from PDF", output="Page", ocr_model="pypdfium2-extract-text")
         result = PipelexInterpreter.serialize_ocr_pipe(pipe, "test_domain")
 
-        expected = {"type": "PipeOcr", "definition": "Extract text from PDF", "output": "Page", "ocr_handle": "pypdfium2-extract-text"}
+        expected = {"type": "PipeOcr", "definition": "Extract text from PDF", "output": "Page", "ocr_model": "pypdfium2-extract-text"}
         assert result == expected
 
     def test_serialize_sequence_pipe_basic(self):

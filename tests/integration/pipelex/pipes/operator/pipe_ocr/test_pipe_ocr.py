@@ -55,7 +55,7 @@ class TestPipeOCR:
             page_image_captions=False,
             page_views=True,
             page_views_dpi=72,
-            ocr_handle=ocr_handle_from_image,
+            ocr_model=ocr_handle_from_image,
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
@@ -87,7 +87,7 @@ class TestPipeOCR:
             definition="OCR test for PDF processing",
             inputs={PIPE_OCR_INPUT_NAME: InputRequirementBlueprint(concept=NativeConceptEnum.PDF.value)},
             output=NativeConceptEnum.TEXT_AND_IMAGES.value,
-            ocr_handle=ocr_handle,
+            ocr_model=ocr_handle,
             page_images=True,
             page_image_captions=False,
             page_views=True,
