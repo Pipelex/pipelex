@@ -178,14 +178,27 @@ class Pipelex(metaclass=MetaSingleton):
                 "The routing library could not be found, please call `pipelex init config` to create it"
             ) from routing_profile_library_exc
         except InferenceBackendCredentialsError as credentials_exc:
+            backend_name = credentials_exc.backend_name
+            var_name = credentials_exc.key_name
+            error_msg: str
             if secrets_provider:
-                raise PipelexSetupError(
-                    f"Missing credentials for inference backend: {credentials_exc}, check that it's available from your secrets provider."
-                ) from credentials_exc
+                error_msg = (
+                    f"Could not get credentials for inference backend {backend_name}:\n{credentials_exc},"
+                    f"\ncheck that secret '{var_name}' is available from your secrets provider."
+                )
             else:
-                raise PipelexSetupError(
-                    f"Missing credentials for inference backend: {credentials_exc}, add it to your environment variables or to your .env file."
-                ) from credentials_exc
+                error_msg = (
+                    f"Could not get credentials for inference backend {backend_name}:\n{credentials_exc},\n"
+                    f"you need to add '{var_name}' to your environment variables or to your .env file."
+                )
+            if credentials_exc.backend_name == "pipelex_inference":
+                error_msg += (
+                    "\nYou can check the project's README about getting a Pipelex Inference API key,\n\n"
+                    "or you can bring your own 'OPENAI_API_KEY', "
+                    "'AZURE_OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'MISTRAL_API_KEY' etc.\n"
+                    "--> choose which inference backends to enable in .pipelex/inference/backends.toml\n"
+                )
+            raise PipelexSetupError(error_msg) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
         self.class_registry.register_classes(PipelexRegistryModels.get_all_models())

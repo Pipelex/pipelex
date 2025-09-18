@@ -4,7 +4,12 @@ from pydantic import Field, RootModel, ValidationError
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.cogt.exceptions import InferenceBackendCredentialsError, InferenceBackendLibraryError, InferenceModelSpecError
+from pipelex.cogt.exceptions import (
+    InferenceBackendCredentialsError,
+    InferenceBackendCredentialsErrorType,
+    InferenceBackendLibraryError,
+    InferenceModelSpecError,
+)
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -13,7 +18,7 @@ from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.config import get_config
 from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path
-from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarNotFoundError, substitute_vars
+from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
 
 InferenceBackendLibraryRoot = Dict[str, InferenceBackend]
 
@@ -43,15 +48,35 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 continue
             try:
                 inference_backend_blueprint_dict = apply_to_strings_recursive(inference_backend_blueprint_dict_raw, substitute_vars)
-            except (VarNotFoundError, UnknownVarPrefixError) as exc:
-                raise InferenceBackendCredentialsError(f"Variable substitution failed in file '{backends_library_path}': {exc}") from exc
+            except VarFallbackPatternError as var_fallback_pattern_exc:
+                raise InferenceBackendCredentialsError(
+                    error_type=InferenceBackendCredentialsErrorType.VAR_FALLBACK_PATTERN,
+                    backend_name=backend_name,
+                    message=f"Variable substitution failed due to a pattern error in file '{backends_library_path}':\n{var_fallback_pattern_exc}",
+                    key_name="unknown",
+                ) from var_fallback_pattern_exc
+            except VarNotFoundError as var_not_found_exc:
+                raise InferenceBackendCredentialsError(
+                    error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
+                    backend_name=backend_name,
+                    message=f"Variable substitution failed due to a variable not found error in file '{backends_library_path}':\n{var_not_found_exc}",
+                    key_name=var_not_found_exc.var_name,
+                ) from var_not_found_exc
+            except UnknownVarPrefixError as unknown_var_prefix_exc:
+                raise InferenceBackendCredentialsError(
+                    error_type=InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX,
+                    backend_name=backend_name,
+                    message=(
+                        f"Variable substitution failed due to an unknown variable prefix error "
+                        f"in file '{backends_library_path}':\n{unknown_var_prefix_exc}"
+                    ),
+                    key_name=unknown_var_prefix_exc.var_name,
+                ) from unknown_var_prefix_exc
 
             for key in backend_dict.keys():
                 if key not in standard_fields:
                     extra_config[key] = inference_backend_blueprint_dict.pop(key)
             backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
-            # if not backend_blueprint.enabled:
-            #     continue
 
             path_to_model_specs_toml = get_config().cogt.inference_config.model_specs_path(backend_name=backend_name)
             try:

@@ -5,7 +5,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarNotFoundError, substitute_vars
+from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
 
 
 @pytest.fixture
@@ -139,7 +139,7 @@ class TestSubstituteVars:
         mock_secrets_provider.get_secret.side_effect = SecretNotFoundError("Secret not found")
         mocker.patch("pipelex.tools.secrets.secrets_utils.get_secrets_provider", return_value=mock_secrets_provider)
 
-        with pytest.raises(VarNotFoundError, match="Variable not found in any source"):
+        with pytest.raises(VarFallbackPatternError, match="Could not get variable from fallback pattern: env:MISSING_ENV\\|secret:MISSING_SECRET"):
             substitute_vars("Value: ${env:MISSING_ENV|secret:MISSING_SECRET}")
 
     def test_reverse_fallback_both_missing_raises_error(self, mocker: MockerFixture, mock_secrets_provider: Any) -> None:
@@ -149,7 +149,7 @@ class TestSubstituteVars:
         mock_secrets_provider.get_secret.side_effect = SecretNotFoundError("Secret not found")
         mocker.patch("pipelex.tools.secrets.secrets_utils.get_secrets_provider", return_value=mock_secrets_provider)
 
-        with pytest.raises(VarNotFoundError, match="Variable not found in any source"):
+        with pytest.raises(VarFallbackPatternError, match="Could not get variable from fallback pattern: secret:MISSING_SECRET\\|env:MISSING_ENV"):
             substitute_vars("Value: ${secret:MISSING_SECRET|env:MISSING_ENV}")
 
     def test_complex_variable_names(self, mocker: MockerFixture, mock_secrets_provider: Any) -> None:
