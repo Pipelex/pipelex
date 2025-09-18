@@ -15,7 +15,7 @@ from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.hub import get_content_generator, get_models_manager
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.cases import ImageTestCases
+from tests.cases import ImageTestCases, PDFTestCases
 from tests.integration.pipelex.cogt.test_data import Employee
 
 USER_TEXT_FOR_BASE = """
@@ -129,11 +129,24 @@ class TestContentGenerator:
 
     @pytest.mark.ocr
     @pytest.mark.inference
-    async def test_make_ocr_extract_pages(self, ocr_handle: str, request: FixtureRequest):
+    async def test_make_ocr_extract_pages_from_image(self, ocr_handle_from_image: str, request: FixtureRequest):
+        ocr_output = await get_content_generator().make_ocr_extract_pages(
+            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+            ocr_handle=ocr_handle_from_image,
+            ocr_input=OcrInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
+            ocr_job_params=OcrJobParams.make_default_ocr_job_params(),
+            ocr_job_config=OcrJobConfig(),
+        )
+        pretty_print(ocr_output, title="ocr_extract_pages")
+        assert isinstance(ocr_output, OcrOutput)
+
+    @pytest.mark.ocr
+    @pytest.mark.inference
+    async def test_make_ocr_extract_pages_from_pdf(self, ocr_handle: str, request: FixtureRequest):
         ocr_output = await get_content_generator().make_ocr_extract_pages(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
             ocr_handle=ocr_handle,
-            ocr_input=OcrInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
+            ocr_input=OcrInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
             ocr_job_params=OcrJobParams.make_default_ocr_job_params(),
             ocr_job_config=OcrJobConfig(),
         )
