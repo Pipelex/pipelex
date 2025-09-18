@@ -18,7 +18,6 @@ type = "PipeSequence"
 description = "Brief → PlanDraftText → (ConceptSpecsText, PipeSignaturesText) → PipeSignature[]."
 inputs = { brief = "UserBrief" }
 output = "PipelexBundleBlueprint"
-multiple_output = true
 steps = [
     { pipe = "draft_planning_text", result = "plan_draft" },
     { pipe = "parallel_draft_to_specs" },
@@ -50,17 +49,19 @@ Here is a description of the pipes:
 We have pipe controllers:
 - PipeLLM: A pipe that uses an LLM to generate a text, or a structured object. It is a vision LLM that can read images.
 - PipeSequence: A pipe that executes a sequence of pipes: It needs to reference the pipes it will execute.
-- PipeParallel: A pipe that executes a few pipes in parallel. It needs to reference the pipes it will execute.
+- PipeParallel: A pipe that executes a few pipes in parallel. It needs to reference the pipes it will execute. The results of each pipe will be in the working memory. The output MUST BE "Dynamic".
 - PipeCondition: A pipe that based on a specific condition, branches to a specific pipe. You have to explain what the expression of the condition is,
     and what the different pipes are that can be executed based on the condition. It needs to reference the pipes it will execute.
 - PipeBatch: A pipe that executes a batch of pipes in parallel. It needs to reference the pipe it will execute.
 - PipeImgGen: A pipe that uses an LLM to generate an image. VERY IMPORTANT: IF YOU DECIDE TO CREATE A PIPEIMGEN, YOU ALSO HAVE TO CREATE A PIPELLM THAT WILL WRITE THE PROMPT, AND THAT NEEDS TO PRECEED THE PIPEIMGEN, based on the necessary elements.
-- PipeOcr: A pipe that uses an OCR technology to extract text from an image.
+- PipeOcr: A pipe that uses an OCR technology to extract text from an image. VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE NAMED "ocr_input" and it must be either an image or a pdf or a concept which refines one of them. Usually there is no need to rename a variable or create a new concept, just call it ocr_input, and we'll use the basic PDF concept. Thats mean that in the sequence, the input should be ocr_input.
 
 Be very detailed, process by steps.
 
 Brief:
 @brief
+
+LIMIT TO 10 DIFFERENT PIPES FOR NOW
 """
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ type = "PipeLLM"
 description = "From PlanDraftText (+ brief), extract ConceptSpecsText (codes, descriptions, structure hints) in TEXT."
 inputs = { plan_draft = "PlanDraftText", brief = "UserBrief" }
 output = "Text"
-llm = "llm_to_write"
+llm = "llm_to_engineer"
 prompt_template = """
 You will receive a plan for a Pipelex pipeline.
 Each pipeline will take inputs and output. Those inputs/output are represented as concepts.
@@ -91,7 +92,6 @@ Return ConceptSpecsText capturing all concepts used in the plan:
 - Provide a short description per concept
 - Include structure hints as plain text (fields, types) IF IT IS needed.
 
-
 If you need structure for your concept, to isolate/extract some precise information, assign a structure:
 Here is how the structure as to be described:
 A dict with:
@@ -99,10 +99,6 @@ A dict with:
 - value: a dict with:
   - definition: the definition of the field, in natural language
   - type: the type of the field
-  - item_type: the type of the item of the field
-  - key_type: the type of the key of the field
-  - value_type: the type of the value of the field
-  - choices: the choices of the field
   - required: whether the field is required
   - default_value: the default value of the field
 
@@ -119,6 +115,8 @@ Plan:
 
 Brief:
 @brief
+
+Drafting structures is not mandatory, but when it is meant for extracting information, it is recommended to structure information.
 """
 
 [pipe.draft_to_pipesignatures_text]
@@ -154,6 +152,7 @@ The output should be the concept code of the output of the last step.
 **PipeParallel**: A pipe that executes a few pipes in parallel. It needs to reference the pipes it will execute.
 The inputs of the PipeParallel should be all the necessary inputs in the below steps
 The output should be the concept code of the output of the last step.
+The results of each pipe will be in the working memory.
 - parallels: List of pipes to execute in parallel
 - Each parallel format: {"pipe": "pipe_code", "result": "result_name"}
 
@@ -179,7 +178,8 @@ VERY IMPORTANT: IF YOU DECIDE TO CREATE A PIPEIMGEN, YOU ALSO HAVE TO CREATE A P
 THERFORE, the OUTPUT OF THIS PIPELLM should be a VARIABLE NAMED "prompt" that will be used as input for the PipeImgGen.
 
 **PipeOcr**: A pipe that uses an LLM to extract text from an image.
-- (No essential features - uses defaults)
+- The INPUTS of this pipe is only "ocr_input" and it must be either an image or a pdf or a concept which refines one of them.
+- Usually there is no need to rename a variable or create a new concept, just call it ocr_input, and we'll use the basic PDF concept. Thats mean that in the sequence, the input should be ocr_input.
 
 **PipeFunc**: A pipe that executes a custom Python function.
 - function_name: Name of the Python function to call
@@ -217,6 +217,8 @@ ConceptSpecs:
 
 Brief:
 @brief
+
+LIMIT MAX TO 2 fields for now
 """
 
 [pipe.materialize_pipe_signatures]
@@ -228,9 +230,9 @@ multiple_output = true
 llm = "llm_to_engineer"
 prompt_template = """
 Materialize PipeSignature objects from the PipeSignaturesText.
-- code MUST be snake_case
-- inputs must be a Dict[str, ConceptSpec] referencing the provided ConceptSpec objects
-- output must be a ConceptSpec from the provided set
+- pipe_code MUST be snake_case
+- inputs must be a Dict[str, ConceptSpec] referencing the provided ConceptSpec objects. If Its the concept itself, use the concept code in PascalCase.
+- output must be a ConceptSpec from the provided set. If Its the concept itself, use the concept code in PascalCase.
 - important_features must be a Dict containing the pipe-specific features mentioned in the text
 
 VERY IMPORTANT: A pipe has inputs, and an output. The inputs are a dict of keys in snake_case, corresponding to the variables names in the working memory, and the values are the concept codes in PascalCase.

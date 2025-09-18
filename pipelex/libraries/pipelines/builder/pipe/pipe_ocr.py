@@ -16,8 +16,11 @@ class PipeOcrBlueprint(PipeBlueprint):
     Supports various OCR platforms and output configurations including image detection,
     caption generation, and page rendering.
 
+    VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE NAMED "ocr_input" and it must be either an image or a pdf or a concept which refines one of them.
+
     Attributes:
         type: Fixed to "PipeOcr" for this pipe type.
+        ocr_handle: OCR handle to use for text extraction (e.g., Mistral, Tesseract).
         ocr_platform: OCR platform to use for text extraction (e.g., Mistral, Tesseract).
                      Defaults to Mistral or global configuration setting.
         page_images: Whether to include detected images in the OCR output. When enabled,

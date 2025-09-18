@@ -20,8 +20,7 @@ class ConceptSpec(StructuredContent):
     the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
     description: str = Field(description="Description of the concept, in natural language.")
     structure: str = Field(
-        description="A description of a dict with fieldnames as keys, and values being a "
-        "dict with: definition, type, item_type, key_type, value_type, choices, required, default_value"
+        description="A description of a dict with fieldnames as keys, and values being a dict with: definition, type, required, default_value"
     )
     refines: Optional[str] = Field(
         default=None,
@@ -42,35 +41,28 @@ class ConceptStructureBlueprint(StructuredContent):
         definition: Natural language description of the field's purpose and usage.
         type: The field's data type. When 'dict', both key_type and value_type must be specified.
               When None, choices must be provided (creating an enum field).
-        item_type: For 'list' type fields, specifies the type of items in the list.
-        key_type: For 'dict' type fields, specifies the type of dictionary keys. Required when type='dict'.
-        value_type: For 'dict' type fields, specifies the type of dictionary values. Required when type='dict'.
-        choices: List of valid string choices for enum fields. When provided, type must be None.
         required: Whether the field is mandatory. Defaults to True unless explicitly set to False.
         default_value: Default value for the field. Must match the specified type, and for choice
                       fields must be one of the valid choices. When provided, type must be specified
                       (unless choices are provided).
 
     Validation Rules:
-        1. Choice fields (enums): When type is None, choices must be provided and non-empty.
-        2. Dictionary fields: When type is 'dict', both key_type and value_type are required.
         3. Default values: When default_value is provided:
            - For typed fields: type must be specified and default_value must match that type
-           - For choice fields: default_value must be one of the valid choices
            - Type validation includes: text (str), integer (int), boolean (bool),
              number (int/float), list (list), dict (dict)
-        4. List fields: When type is 'list', item_type should specify the type of list items.
 
     Raises:
         ConceptStructureBlueprintError: When validation rules are violated.
     """
 
     definition: str
-    type: Optional[ConceptStructureBlueprintFieldType] = None
+    type: Optional[ConceptStructureBlueprintFieldType] = Field(default=None, description="The type of the field.")
     item_type: Optional[str] = None
-    key_type: Optional[str] = None
-    value_type: Optional[str] = None
-    choices: Optional[List[str]] = None
+    # key_type: Optional[str] = Field(default=None, description="When type is 'dict', key_type must not be empty.")
+    # value_type: Optional[str] = Field(default=None, description="When type is 'dict', value_type must not be empty.")
+    # choices: Optional[List[str]] = Field(default=None, description="If type is None, choices must not be empty and contain elements.
+    #  it is an enum field.")
     required: Optional[bool] = True
     default_value: Optional[Any] = None
 
@@ -80,39 +72,39 @@ class ConceptStructureBlueprint(StructuredContent):
     def validate_structure_blueprint(self) -> Self:
         """Validate the structure blueprint according to type rules."""
         # If type is None (array), choices must not be None
-        if self.type is None and not self.choices:
-            raise ConceptStructureBlueprintError(
-                f"When type is None (array), choices must not be empty. Actual type: {self.type}, choices: {self.choices}"
-            )
+        # if self.type is None and not self.choices:
+        #     raise ConceptStructureBlueprintError(
+        #         f"When type is None (array), choices must not be empty. Actual type: {self.type}, choices: {self.choices}"
+        #     )
 
-        # If type is "dict", key_type and value_type must not be empty
-        if self.type == ConceptStructureBlueprintFieldType.DICT:
-            if not self.key_type:
-                raise ConceptStructureBlueprintError(
-                    f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty. Actual key_type: {self.key_type}"
-                )
-            if not self.value_type:
-                raise ConceptStructureBlueprintError(
-                    f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty. Actual value_type: {self.value_type}"
-                )
+        # # If type is "dict", key_type and value_type must not be empty
+        # if self.type == ConceptStructureBlueprintFieldType.DICT:
+        #     if not self.key_type:
+        #         raise ConceptStructureBlueprintError(
+        #             f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty. Actual key_type: {self.key_type}"
+        #         )
+        #     if not self.value_type:
+        #         raise ConceptStructureBlueprintError(
+        #             f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty. Actual value_type: {self.value_type}"
+        #         )
 
         # Check when default_value is not None, type is not None (except for choice fields)
-        if self.default_value is not None and self.type is None and not self.choices:
-            raise ConceptStructureBlueprintError(
-                f"When default_value is not None, type must be specified (unless choices are provided). "
-                f"Actual type: {self.type}, default_value: {self.default_value}, choices: {self.choices}"
-            )
+        # if self.default_value is not None and self.type is None and not self.choices:
+        #     raise ConceptStructureBlueprintError(
+        #         f"When default_value is not None, type must be specified (unless choices are provided). "
+        #         f"Actual type: {self.type}, default_value: {self.default_value}, choices: {self.choices}"
+        #     )
 
         # Check default_value type is the same as type
         if self.default_value is not None and self.type is not None:
             self._validate_default_value_type()
 
         # Check default_value is valid for choice fields
-        if self.default_value is not None and self.type is None and self.choices:
-            if self.default_value not in self.choices:
-                raise ConceptStructureBlueprintError(
-                    f"default_value must be one of the valid choices. Got '{self.default_value}', valid choices: {self.choices}"
-                )
+        # if self.default_value is not None and self.type is None and self.choices:
+        #     if self.default_value not in self.choices:
+        #         raise ConceptStructureBlueprintError(
+        #             f"default_value must be one of the valid choices. Got '{self.default_value}', valid choices: {self.choices}"
+        #         )
 
         return self
 
@@ -137,9 +129,9 @@ class ConceptStructureBlueprint(StructuredContent):
             case ConceptStructureBlueprintFieldType.LIST:
                 if not isinstance(self.default_value, list):
                     self._raise_type_mismatch_error("list", type(self.default_value).__name__)
-            case ConceptStructureBlueprintFieldType.DICT:
-                if not isinstance(self.default_value, dict):
-                    self._raise_type_mismatch_error("dict", type(self.default_value).__name__)
+            # case ConceptStructureBlueprintFieldType.DICT:
+            #     if not isinstance(self.default_value, dict):
+            #         self._raise_type_mismatch_error("dict", type(self.default_value).__name__)
             case _:
                 raise ConceptStructureBlueprintError(f"Unknown type: {self.type} in structure blueprint with definition: {self.definition}")
 
@@ -155,9 +147,9 @@ class ConceptStructureBlueprint(StructuredContent):
             definition=self.definition,
             type=self.type,
             item_type=self.item_type,
-            key_type=self.key_type,
-            value_type=self.value_type,
-            choices=self.choices,
+            # key_type=self.key_type,
+            # value_type=self.value_type,
+            # choices=self.choices,
             required=self.required,
             default_value=self.default_value,
         )
@@ -346,9 +338,9 @@ async def create_concept_spec_blueprint(working_memory: WorkingMemory) -> Concep
             definition=structure_item.definition,
             type=structure_item.type,
             item_type=structure_item.item_type,
-            key_type=structure_item.key_type,
-            value_type=structure_item.value_type,
-            choices=structure_item.choices,
+            # key_type=structure_item.key_type,
+            # value_type=structure_item.value_type,
+            # choices=structure_item.choices,
             required=structure_item.required,
             default_value=structure_item.default_value,
         )

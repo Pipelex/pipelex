@@ -66,10 +66,10 @@ class PipeBlueprint(StructuredContent):
         description=(
             "Input concept specifications. Can be either: "
             "InputRequirementBlueprint with additional constraints"
-            "Dictionary keys are input names, values are concept specifications."
+            "Dictionary keys are input names, values are concept specifications. If Its the concept itself, use the concept code in PascalCase."
         )
     )
-    output: str = Field(description="Output concept code in PascalCase format")
+    output: str = Field(description="Output concept code in PascalCase format!! Very important")
 
     @field_validator("type", mode="after")
     def validate_pipe_type(cls, value: Any) -> Any:

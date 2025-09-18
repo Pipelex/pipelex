@@ -383,7 +383,7 @@ def test_validation_cmd(
                 "description": ConceptStructureBlueprint(
                     definition="Detailed task description", type=ConceptStructureBlueprintFieldType.TEXT, required=True
                 ),
-                "priority": ConceptStructureBlueprint(definition="Task priority level", choices=["low", "medium", "high", "urgent"], required=True),
+                # "priority": ConceptStructureBlueprint(definition="Task priority level", choices=["low", "medium", "high", "urgent"], required=True),
                 "estimated_hours": ConceptStructureBlueprint(
                     definition="Estimated hours to complete the task",
                     type=ConceptStructureBlueprintFieldType.NUMBER,
@@ -401,9 +401,9 @@ def test_validation_cmd(
                 "task_id": ConceptStructureBlueprint(
                     definition="Unique task identifier", type=ConceptStructureBlueprintFieldType.TEXT, required=True
                 ),
-                "status": ConceptStructureBlueprint(
-                    definition="Task completion status", choices=["pending", "in_progress", "completed", "failed"], required=True
-                ),
+                # "status": ConceptStructureBlueprint(
+                #     definition="Task completion status", choices=["pending", "in_progress", "completed", "failed"], required=True
+                # ),
             },
         )
 
@@ -413,20 +413,20 @@ def test_validation_cmd(
                 "task_id": ConceptStructureBlueprint(
                     definition="Unique task identifier", type=ConceptStructureBlueprintFieldType.TEXT, required=True
                 ),
-                "status": ConceptStructureBlueprint(
-                    definition="Task completion status", choices=["pending", "in_progress", "completed", "failed"], required=True
-                ),
+                # "status": ConceptStructureBlueprint(
+                #     definition="Task completion status", choices=["pending", "in_progress", "completed", "failed"], required=True
+                # ),
                 "completion_notes": ConceptStructureBlueprint(
                     definition="Notes about task completion", type=ConceptStructureBlueprintFieldType.TEXT, required=False
                 ),
-                "metadata": ConceptStructureBlueprint(
-                    definition="Additional task metadata",
-                    type=ConceptStructureBlueprintFieldType.DICT,
-                    key_type="text",
-                    value_type="text",
-                    required=False,
-                    default_value={},
-                ),
+                # "metadata": ConceptStructureBlueprint(
+                #     definition="Additional task metadata",
+                #     type=ConceptStructureBlueprintFieldType.DICT,
+                #     key_type="text",
+                #     value_type="text",
+                #     required=False,
+                #     default_value={},
+                # ),
             },
         )
 

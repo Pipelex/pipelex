@@ -1,15 +1,15 @@
-import time
 import asyncio
+import time
 from typing import Annotated, Optional
 
 import typer
 
 from pipelex import pretty_print
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.hub import get_report_delegate
 from pipelex.libraries.pipelines.builder.builder import PipelexBundleBlueprint
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
-from pipelex.hub import get_report_delegate
 
 build_app = typer.Typer(help="Build artifacts like pipelines", no_args_is_help=True)
 
@@ -54,7 +54,7 @@ def build_pipe_cmd(
             typer.echo(typer.style(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN))
         elif output_path == "":
             typer.echo(typer.style("\n⚠️  Pipeline not saved to file (--output='' specified)", fg=typer.colors.YELLOW))
-            
+
     start_time = time.time()
     asyncio.run(run_pipeline())
     end_time = time.time()

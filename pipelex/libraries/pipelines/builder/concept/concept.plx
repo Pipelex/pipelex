@@ -40,10 +40,10 @@ inputs = { concept_spec = "ConceptSpec" }
 output = "ConceptStructureSpecBlueprint"
 multiple_output = true
 llm = "llm_to_engineer"
+structuring_method = "preliminary_text"
 prompt_template = """
 Create a ConceptStructureSpecBlueprint from the ConceptSpec.
 Please focus only on the structure.
-The field "choices" is for Literal values or enums. When it is provided, the field "type" must be None. But the choices array cannot be empty.
 
 The field "definition" IS NOT a structure. It is a general definition of the concept.
 If the field "structure" is empty, return an empty list.

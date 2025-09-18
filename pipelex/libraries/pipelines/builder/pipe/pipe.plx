@@ -182,6 +182,7 @@ output = "PipeOcrSpecBlueprint"
 prompt_template = """
 Return a PipeOcrSpecBlueprint for this signature.
 
+VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE NAMED "ocr_input" and it must be either an image or a pdf or a concept which refines one of them.
 Signature:
 @pipe_signature
 
@@ -335,6 +336,7 @@ llm = "llm_to_engineer"
 prompt_template = """
 Fix this failing PipeOcr blueprint.
 
+VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE NAMED "ocr_input" and it must be either an image or a pdf or a concept which refines one of them.
 Failing pipe:
 @failed_pipe.pipe
 
