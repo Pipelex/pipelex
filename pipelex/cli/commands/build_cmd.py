@@ -14,9 +14,11 @@ from pipelex.pipeline.execute import execute_pipeline
 build_app = typer.Typer(help="Build artifacts like pipelines", no_args_is_help=True)
 
 """
-Examples:
-pipelex build pipe "Take a photo as input, and render the opposite of the photo"
+Today's example:
 pipelex build pipe "Given a scanned invoice, extract employee and articles"
+
+Other ideas:
+pipelex build pipe "Take a photo as input, and render the opposite of the photo"
 pipelex build pipe "Given an RDFP PDF, build a compliance matrix"
 """
 
