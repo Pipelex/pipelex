@@ -13,6 +13,12 @@ from pipelex.pipeline.execute import execute_pipeline
 
 build_app = typer.Typer(help="Build artifacts like pipelines", no_args_is_help=True)
 
+"""
+Exmaples:
+pipelex build pipe "Take a photo as input, and render the opposite of the photo" -o ./built.plx
+pipelex build pipe "Given an RDFP PDF, build a compliance matrix" -o ./built.plx
+pipelex build pipe "Given a invoice pdf, extract employee and articles" -o ./built.plx
+"""
 
 @build_app.command("pipe")
 def build_pipe_cmd(
