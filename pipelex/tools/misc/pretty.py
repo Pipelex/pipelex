@@ -32,7 +32,7 @@ def pretty_print_md(
     subtitle: Optional[TextType] = None,
     border_style: Optional[StyleType] = None,
 ):
-    md_content = Markdown("\n" + content)
+    md_content = Markdown(content)
     PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, border_style=border_style)
 
 
