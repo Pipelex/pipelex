@@ -146,18 +146,18 @@ class StructureGenerator:
             case ConceptStructureBlueprintFieldType.DATE:
                 self.imports.add("from datetime import datetime")
                 return "datetime"
-            case ConceptStructureBlueprintFieldType.LIST:
-                item_type = field_blueprint.item_type or "Any"
-                # Recursively handle item types if they're FieldType enums
-                try:
-                    item_type_enum = ConceptStructureBlueprintFieldType(item_type)
-                    # Create a temporary blueprint for the item type
-                    temp_blueprint = ConceptStructureBlueprint(definition="temp", type=item_type_enum)
-                    item_type = self._get_python_type_from_blueprint(temp_blueprint)
-                except ValueError:
-                    # Keep as string if not a known FieldType
-                    pass
-                return f"List[{item_type}]"
+                # case ConceptStructureBlueprintFieldType.LIST:
+                #     item_type = field_blueprint.item_type or "Any"
+                #     # Recursively handle item types if they're FieldType enums
+                #     try:
+                #         item_type_enum = ConceptStructureBlueprintFieldType(item_type)
+                #         # Create a temporary blueprint for the item type
+                #         temp_blueprint = ConceptStructureBlueprint(definition="temp", type=item_type_enum)
+                #         item_type = self._get_python_type_from_blueprint(temp_blueprint)
+                #     except ValueError:
+                #         # Keep as string if not a known FieldType
+                #         pass
+                #     return f"List[{item_type}]"
             # case ConceptStructureBlueprintFieldType.DICT:
             #     key_type = field_blueprint.key_type or "str"
             #     value_type = field_blueprint.value_type or "Any"
@@ -262,20 +262,20 @@ class StructureGenerator:
             case ConceptStructureBlueprintFieldType.DATE:
                 self.imports.add("from datetime import datetime")
                 return "datetime"
-            case ConceptStructureBlueprintFieldType.LIST:
-                item_type = field_def.get("item_type", "Any")
-                # Check if item_type is an enum reference
-                if isinstance(item_type, str) and item_type in self.enum_definitions:
-                    return f"List[{item_type}]"
-                # Recursively handle item types
-                if isinstance(item_type, str):
-                    try:
-                        item_type_enum = ConceptStructureBlueprintFieldType(item_type)
-                        item_type = self._get_python_type(item_type_enum, {})
-                    except ValueError:
-                        # Keep as string if not a known FieldType
-                        pass
-                return f"List[{item_type}]"
+            # case ConceptStructureBlueprintFieldType.LIST:
+            #     item_type = field_def.get("item_type", "Any")
+            #     # Check if item_type is an enum reference
+            #     if isinstance(item_type, str) and item_type in self.enum_definitions:
+            #         return f"List[{item_type}]"
+            #     # Recursively handle item types
+            #     if isinstance(item_type, str):
+            #         try:
+            #             item_type_enum = ConceptStructureBlueprintFieldType(item_type)
+            #             item_type = self._get_python_type(item_type_enum, {})
+            #         except ValueError:
+            #             # Keep as string if not a known FieldType
+            #             pass
+            #     return f"List[{item_type}]"
             # case ConceptStructureBlueprintFieldType.DICT:
             #     key_type = field_def.get("key_type", "str")
             #     value_type = field_def.get("value_type", "Any")

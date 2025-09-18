@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, Optional, Union, cast
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
@@ -39,8 +39,7 @@ class ConceptStructureBlueprint(StructuredContent):
     Attributes:
         the_field_name: Field name. Must be snake_case.
         definition: Natural language description of the field's purpose and usage.
-        type: The field's data type. When 'dict', both key_type and value_type must be specified.
-              When None, choices must be provided (creating an enum field).
+        type: The field's data type.
         required: Whether the field is mandatory. Defaults to True unless explicitly set to False.
         default_value: Default value for the field. Must match the specified type, and for choice
                       fields must be one of the valid choices. When provided, type must be specified
@@ -50,7 +49,7 @@ class ConceptStructureBlueprint(StructuredContent):
         3. Default values: When default_value is provided:
            - For typed fields: type must be specified and default_value must match that type
            - Type validation includes: text (str), integer (int), boolean (bool),
-             number (int/float), list (list), dict (dict)
+             number (int/float), dict (dict)
 
     Raises:
         ConceptStructureBlueprintError: When validation rules are violated.
@@ -126,9 +125,9 @@ class ConceptStructureBlueprint(StructuredContent):
             case ConceptStructureBlueprintFieldType.NUMBER:
                 if not isinstance(self.default_value, (int, float)):
                     self._raise_type_mismatch_error("number (int or float)", type(self.default_value).__name__)
-            case ConceptStructureBlueprintFieldType.LIST:
-                if not isinstance(self.default_value, list):
-                    self._raise_type_mismatch_error("list", type(self.default_value).__name__)
+            # case ConceptStructureBlueprintFieldType.LIST:
+            #     if not isinstance(self.default_value, list):
+            #         self._raise_type_mismatch_error("list", type(self.default_value).__name__)
             # case ConceptStructureBlueprintFieldType.DICT:
             #     if not isinstance(self.default_value, dict):
             #         self._raise_type_mismatch_error("dict", type(self.default_value).__name__)

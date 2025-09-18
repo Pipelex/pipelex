@@ -390,9 +390,9 @@ def test_validation_cmd(
                     required=False,
                     default_value=1.0,
                 ),
-                "tags": ConceptStructureBlueprint(
-                    definition="List of task tags", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False, default_value=[]
-                ),
+                # "tags": ConceptStructureBlueprint(
+                #     definition="List of task tags", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False, default_value=[]
+                # ),
             },
         )
         analyzed_task_concept = ConceptBlueprint(

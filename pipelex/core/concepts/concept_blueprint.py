@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from typing_extensions import Self
@@ -22,7 +22,7 @@ class ConceptStructureBlueprintError(Exception):
 
 class ConceptStructureBlueprintFieldType(StrEnum):
     TEXT = "text"
-    LIST = "list"
+    # LIST = "list"
     # DICT = "dict"
     INTEGER = "integer"
     BOOLEAN = "boolean"
@@ -100,9 +100,9 @@ class ConceptStructureBlueprint(BaseModel):
             case ConceptStructureBlueprintFieldType.NUMBER:
                 if not isinstance(self.default_value, (int, float)):
                     self._raise_type_mismatch_error("number (int or float)", type(self.default_value).__name__)
-            case ConceptStructureBlueprintFieldType.LIST:
-                if not isinstance(self.default_value, list):
-                    self._raise_type_mismatch_error("list", type(self.default_value).__name__)
+            # case ConceptStructureBlueprintFieldType.LIST:
+            #     if not isinstance(self.default_value, list):
+            #         self._raise_type_mismatch_error("list", type(self.default_value).__name__)
             # case ConceptStructureBlueprintFieldType.DICT:
             #     if not isinstance(self.default_value, dict):
             #         self._raise_type_mismatch_error("dict", type(self.default_value).__name__)

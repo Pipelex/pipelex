@@ -106,12 +106,12 @@ class TestInlineStructureConcepts:
         """Test inline structure with complex field types."""
         inline_structure: Dict[str, Union[str, ConceptStructureBlueprint]] = {
             "title": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.TEXT, definition="Document title"),
-            "tags": ConceptStructureBlueprint(
-                type=ConceptStructureBlueprintFieldType.LIST,
-                item_type=ConceptStructureBlueprintFieldType.TEXT,
-                definition="List of tags",
-                required=False,
-            ),
+            # "tags": ConceptStructureBlueprint(
+            #     type=ConceptStructureBlueprintFieldType.LIST,
+            #     item_type=ConceptStructureBlueprintFieldType.TEXT,
+            #     definition="List of tags",
+            #     required=False,
+            # ),
             # "metadata": ConceptStructureBlueprint(
             #     type=ConceptStructureBlueprintFieldType.DICT,
             #     key_type=ConceptStructureBlueprintFieldType.TEXT,
