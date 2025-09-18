@@ -6,7 +6,7 @@
 # ================================================
 
 # Which profile to use (change this to switch routing)
-active = "custom_routing"
+active = "all_pipelex"
 
 # We recommend using the "all_pipelex" profile to get a head start with all models.
 # The Pipelex Inference backend is currently not recommended for production use,
@@ -45,7 +45,7 @@ default = "pipelex_inference"
 # Pattern matching: "model-pattern" = "backend-name"
 "gpt-*" = "pipelex_inference"
 "claude-*" = "pipelex_inference"
-"gemini-*" = "vertexai"
+"gemini-*" = "pipelex_inference"
 "grok-*" = "pipelex_inference"
 "*-sdxl" = "pipelex_inference"
 
@@ -66,7 +66,6 @@ default = "pipelex_inference"
 
 "grok-3" = "pipelex_inference"
 "grok-3-mini" = "xai"
-
 
 # ============================================
 # Custom Profiles
