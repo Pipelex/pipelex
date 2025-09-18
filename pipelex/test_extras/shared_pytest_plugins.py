@@ -9,7 +9,10 @@ from pipelex.tools.runtime_manager import RunMode, runtime_manager
 
 @pytest.fixture(scope="session", autouse=True)
 def set_run_mode():
-    runtime_manager.set_run_mode(run_mode=RunMode.UNIT_TEST)
+    if is_env_set("GITHUB_ACTIONS") or is_env_set("CI"):
+        runtime_manager.set_run_mode(run_mode=RunMode.CI_TEST)
+    else:
+        runtime_manager.set_run_mode(run_mode=RunMode.UNIT_TEST)
 
 
 def pytest_addoption(parser: Parser):

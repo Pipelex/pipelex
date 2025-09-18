@@ -18,6 +18,7 @@ from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.config import get_config
 from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
 
 InferenceBackendLibraryRoot = Dict[str, InferenceBackend]
@@ -45,6 +46,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             extra_config: Dict[str, Any] = {}
             inference_backend_blueprint_dict_raw = backend_dict.copy()
             if not inference_backend_blueprint_dict_raw.get("enabled", True):
+                continue
+            if runtime_manager.is_gha_testing and backend_name == "vertexai":
                 continue
             try:
                 inference_backend_blueprint_dict = apply_to_strings_recursive(inference_backend_blueprint_dict_raw, substitute_vars)

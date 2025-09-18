@@ -11,6 +11,7 @@ RUN_MODE_ENV_VAR_KEY = "RUN_MODE"
 class RunMode(StrEnum):
     NORMAL = "normal"
     UNIT_TEST = "unit_test"
+    CI_TEST = "ci_test"
 
     @classmethod
     def get_from_env_var(cls) -> "RunMode":
@@ -83,7 +84,23 @@ class RuntimeManager(BaseModel):
 
     @property
     def is_unit_testing(self) -> bool:
-        return self.run_mode == RunMode.UNIT_TEST
+        match self.run_mode:
+            case RunMode.NORMAL:
+                return False
+            case RunMode.UNIT_TEST:
+                return True
+            case RunMode.CI_TEST:
+                return True
+
+    @property
+    def is_gha_testing(self) -> bool:
+        match self.run_mode:
+            case RunMode.NORMAL:
+                return False
+            case RunMode.UNIT_TEST:
+                return False
+            case RunMode.CI_TEST:
+                return True
 
     @property
     def should_check_intermediate_configs(self) -> bool:
