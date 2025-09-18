@@ -197,7 +197,7 @@ choice_edge_style = "-----"
 ####################################################################################################
 
 [pipelex.pipe_run_config]
-pipe_stack_limit = 20
+pipe_stack_limit = 30
 
 ####################################################################################################
 # Dry run config
@@ -217,4 +217,3 @@ image_urls = [
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
 ]
-
