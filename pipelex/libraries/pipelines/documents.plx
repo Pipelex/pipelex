@@ -17,7 +17,7 @@ inputs = { ocr_input = "PDF" }
 output = "Page"
 page_images = true
 page_views = false
-ocr_handle = "mistral/mistral-ocr-latest"
+ocr_model = "mistral-ocr"
 
 [pipe.ocr_page_contents_and_views_from_pdf]
 type = "PipeOcr"
@@ -26,5 +26,5 @@ inputs = { ocr_input = "PDF" }
 output = "Page"
 page_images = true
 page_views = true
-ocr_handle = "mistral/mistral-ocr-latest"
+ocr_model = "mistral-ocr"
 

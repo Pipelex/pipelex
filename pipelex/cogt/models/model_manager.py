@@ -22,13 +22,13 @@ class ModelManager(ModelManagerAbstract):
     def __init__(self) -> None:
         self.routing_profile_library = RoutingProfileLibrary.make_empty()
         self.inference_backend_library = InferenceBackendLibrary.make_empty()
-        self.llm_deck: Optional[ModelDeck] = None
+        self.model_deck: Optional[ModelDeck] = None
 
     @override
-    def get_llm_deck(self) -> ModelDeck:
-        if self.llm_deck is None:
-            raise RuntimeError("LLM deck is not initialized")
-        return self.llm_deck
+    def get_model_deck(self) -> ModelDeck:
+        if self.model_deck is None:
+            raise RuntimeError("Model deck is not initialized")
+        return self.model_deck
 
     @override
     def teardown(self) -> None:
@@ -39,8 +39,8 @@ class ModelManager(ModelManagerAbstract):
     def setup(self) -> None:
         self.routing_profile_library.load()
         self.inference_backend_library.load()
-        llm_deck_blueprint = self.load_deck_blueprint()
-        self.llm_deck = self.build_deck(llm_deck_blueprint=llm_deck_blueprint)
+        deck_blueprint = self.load_deck_blueprint()
+        self.model_deck = self.build_deck(model_deck_blueprint=deck_blueprint)
 
     @classmethod
     def _validate_toml_files(cls) -> None:
@@ -77,9 +77,9 @@ class ModelManager(ModelManagerAbstract):
         llm_deck_blueprint = ModelDeckBlueprint.model_validate(full_llm_deck_dict)
         return llm_deck_blueprint
 
-    def build_deck(self, llm_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
+    def build_deck(self, model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
-        llm_handles: Dict[str, InferenceModelSpec] = {}
+        model_handles: Dict[str, InferenceModelSpec] = {}
 
         for model_name, available_backends in all_models_and_possible_backends.items():
             backend_match_for_model = self.routing_profile_library.get_backend_match_for_model_from_active_routing_profile(
@@ -127,22 +127,22 @@ class ModelManager(ModelManagerAbstract):
                                 f"Model spec '{model_name}' not found in any of the available backends '{available_backends}' "
                                 f"which was set as default in routing profile '{backend_match_for_model.routing_profile_name}'"
                             )
-            llm_handles[model_name] = model_spec
+            model_handles[model_name] = model_spec
 
-        llm_deck = ModelDeck(
-            inference_models=llm_handles,
-            aliases=llm_deck_blueprint.aliases,
-            llm_presets=llm_deck_blueprint.llm_presets,
-            llm_choice_defaults=llm_deck_blueprint.llm_choice_defaults,
-            llm_choice_overrides=llm_deck_blueprint.llm_choice_overrides,
+        model_deck = ModelDeck(
+            inference_models=model_handles,
+            aliases=model_deck_blueprint.aliases,
+            llm_presets=model_deck_blueprint.llm_presets,
+            llm_choice_defaults=model_deck_blueprint.llm_choice_defaults,
+            llm_choice_overrides=model_deck_blueprint.llm_choice_overrides,
         )
-        return llm_deck
+        return model_deck
 
     @override
-    def get_inference_model(self, llm_handle: str) -> InferenceModelSpec:
-        if self.llm_deck is None:
-            raise RuntimeError("LLM deck is not initialized")
-        return self.llm_deck.get_required_inference_model(llm_handle=llm_handle)
+    def get_inference_model(self, model_handle: str) -> InferenceModelSpec:
+        if self.model_deck is None:
+            raise RuntimeError("Model deck is not initialized")
+        return self.model_deck.get_required_inference_model(model_handle=model_handle)
 
     @override
     def get_required_inference_backend(self, backend_name: str) -> InferenceBackend:

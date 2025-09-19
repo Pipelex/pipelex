@@ -1,0 +1,9 @@
+
+[pypdfium2-extract-text]
+model_type = "text_extractor"
+sdk = "pypdfium2"
+model_id = "extract-text"
+inputs = ["pdf"]
+outputs = ["pages"]
+costs = {}
+

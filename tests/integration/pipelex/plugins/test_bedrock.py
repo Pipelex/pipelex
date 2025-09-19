@@ -7,6 +7,8 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
+from pipelex.tools.environment import any_is_placeholder_env, is_env_set
+
 warnings.filterwarnings(
     "ignore",
     message=r".*datetime\.datetime\.utcnow\(\).*",
@@ -14,6 +16,8 @@ warnings.filterwarnings(
 )
 # Apply pytest-level filter to ensure the warning is suppressed during test collection and execution
 pytestmark = pytest.mark.filterwarnings("ignore:.*datetime\\.datetime\\.utcnow\\(\\).*:DeprecationWarning")
+
+REQUIRED_ENV_VARS = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"]
 
 
 # make t VERBOSE=2 TEST=TestBedrock
@@ -27,6 +31,10 @@ class TestBedrock:
         bedrock_provider: str,
         bedrock_region_name: str,
     ):
+        if not is_env_set(REQUIRED_ENV_VARS):
+            pytest.skip(f"Some key(s) missing amongst {REQUIRED_ENV_VARS}")
+        if any_is_placeholder_env(REQUIRED_ENV_VARS):
+            pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         client = boto3.client("bedrock", region_name=bedrock_region_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         response: Dict[str, Any] = client.list_foundation_models(byProvider=bedrock_provider)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         bedrock_models_list: List[Dict[str, Any]] = response["modelSummaries"]  # pyright: ignore[reportUnknownVariableType]
@@ -59,6 +67,10 @@ class TestBedrock:
         pytestconfig: pytest.Config,
         bedrock_region_name: str,
     ):
+        if not is_env_set(REQUIRED_ENV_VARS):
+            pytest.skip(f"Some key(s) missing amongst {REQUIRED_ENV_VARS}")
+        if any_is_placeholder_env(REQUIRED_ENV_VARS):
+            pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         client = boto3.client("bedrock", region_name=bedrock_region_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         response: Dict[str, Any] = client.list_inference_profiles()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         inference_profiles_list: List[Dict[str, Any]] = response["inferenceProfileSummaries"]  # pyright: ignore[reportUnknownVariableType]

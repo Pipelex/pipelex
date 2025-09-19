@@ -7,18 +7,31 @@ from typing_extensions import Self
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.exceptions import PipelexConfigurationError, PipelexFileError, PipelexUnknownPipeError
+from pipelex.core.exceptions import (
+    PipelexConfigurationError,
+    PipelexUnknownPipeError,
+)
 from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
-from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
-from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import (
+    PipeConditionBlueprint,
+)
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import (
+    PipeParallelBlueprint,
+)
+from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import (
+    PipeSequenceBlueprint,
+)
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
-from pipelex.tools.misc.toml_utils import clean_trailing_whitespace, validate_toml_content, validate_toml_file
+from pipelex.tools.misc.toml_utils import (
+    clean_trailing_whitespace,
+    validate_toml_content,
+    validate_toml_file,
+)
 
 
 class PLXDecodeError(toml.TomlDecodeError):
@@ -63,23 +76,19 @@ class PipelexInterpreter(BaseModel):
             validate_toml_content(content=self.file_content, file_path=str(self.file_path))
         return self
 
-    def get_file_content(self) -> str:
+    def _read_and_reformat(self) -> str:
         """Load PLX content from file_path or use file_content directly."""
         if self.file_path:
-            try:
-                with open(self.file_path, "r", encoding="utf-8") as file:
-                    file_content = file.read()
+            with open(self.file_path, "r", encoding="utf-8") as file:
+                file_content = file.read()
 
-                # Clean trailing whitespace and write back if needed
-                cleaned_content = clean_trailing_whitespace(file_content)
-                if file_content != cleaned_content:
-                    with open(self.file_path, "w", encoding="utf-8") as file:
-                        file.write(cleaned_content)
-                    return cleaned_content
-                return file_content
-
-            except Exception as exc:
-                raise PipelexFileError(f"Failed to read PLX file '{self.file_path}': {exc}") from exc
+            # Clean trailing whitespace and write back if needed
+            cleaned_content = clean_trailing_whitespace(file_content)
+            if file_content != cleaned_content:
+                with open(self.file_path, "w", encoding="utf-8") as file:
+                    file.write(cleaned_content)
+                return cleaned_content
+            return file_content
         elif self.file_content is None:
             raise PipelexConfigurationError("file_content must be provided if file_path is not provided")
         return self.file_content
@@ -128,7 +137,7 @@ class PipelexInterpreter(BaseModel):
 
     def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
         """Make a PipelexBundleBlueprint from the file_path or file_content"""
-        file_content = self.get_file_content()
+        file_content = self._read_and_reformat()
         plx_data = self._parse_plx_content(file_content)
         return PipelexBundleBlueprint.model_validate(plx_data)
 
@@ -335,7 +344,7 @@ class PipelexInterpreter(BaseModel):
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
         lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output)}"')
-        lines.append(f'ocr_handle = "{pipe.ocr_handle.value}"')
+        lines.append(f'ocr_model = "{pipe.ocr_model}"')
 
         return "\n".join(lines)
 
@@ -534,7 +543,9 @@ class PipelexInterpreter(BaseModel):
             return field_value
 
     @staticmethod
-    def serialize_concept_structure(structure: Union[str, Dict[str, Any]]) -> Union[str, Dict[str, Any]]:
+    def serialize_concept_structure(
+        structure: Union[str, Dict[str, Any]],
+    ) -> Union[str, Dict[str, Any]]:
         """Serialize concept structure field."""
         if isinstance(structure, str):
             return structure
@@ -545,7 +556,9 @@ class PipelexInterpreter(BaseModel):
             return result
 
     @staticmethod
-    def serialize_single_concept(concept_blueprint: Union[ConceptBlueprint, str]) -> Union[str, Dict[str, Any]]:
+    def serialize_single_concept(
+        concept_blueprint: Union[ConceptBlueprint, str],
+    ) -> Union[str, Dict[str, Any]]:
         """Serialize a single concept blueprint."""
         if isinstance(concept_blueprint, str):
             return concept_blueprint
@@ -560,7 +573,10 @@ class PipelexInterpreter(BaseModel):
             return concept_data
         elif concept_blueprint.refines is not None:
             # Concept with refines
-            concept_data = {"definition": concept_blueprint.definition, "refines": concept_blueprint.refines}
+            concept_data = {
+                "definition": concept_blueprint.definition,
+                "refines": concept_blueprint.refines,
+            }
             return concept_data
         else:
             # Simple concept with just definition
@@ -746,11 +762,9 @@ class PipelexInterpreter(BaseModel):
         result["output"] = pipe.output
 
         # Add required fields
-        result["ocr_handle"] = pipe.ocr_handle
+        result["ocr_model"] = pipe.ocr_model
 
         # Add optional fields
-        if pipe.ocr_platform:
-            result["ocr_platform"] = pipe.ocr_platform
         if pipe.page_images:
             result["page_images"] = pipe.page_images
         if pipe.page_image_captions:
@@ -950,7 +964,9 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def serialize_input_requirement(input_req: InputRequirementBlueprint) -> Dict[str, Any]:
+    def serialize_input_requirement(
+        input_req: InputRequirementBlueprint,
+    ) -> Dict[str, Any]:
         """Serialize a single InputRequirementBlueprint to PLX format."""
         result: Dict[str, Any] = {"concept": input_req.concept}
         if input_req.multiplicity is not None:
@@ -958,7 +974,9 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def serialize_inputs(inputs: Mapping[str, Union[str, InputRequirementBlueprint]]) -> Dict[str, Any]:
+    def serialize_inputs(
+        inputs: Mapping[str, Union[str, InputRequirementBlueprint]],
+    ) -> Dict[str, Any]:
         """Convert InputRequirementBlueprint objects to proper PLX format for serialization."""
         result: Dict[str, Any] = {}
         for key, value in inputs.items():
@@ -970,7 +988,9 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def inputs_to_plx_string(inputs: Mapping[str, Union[str, InputRequirementBlueprint]]) -> str:
+    def inputs_to_plx_string(
+        inputs: Mapping[str, Union[str, InputRequirementBlueprint]],
+    ) -> str:
         """Convert inputs dictionary to PLX string format."""
         inputs_dict = PipelexInterpreter.serialize_inputs(inputs)
         inputs_parts: list[str] = []
@@ -997,7 +1017,10 @@ class PipelexInterpreter(BaseModel):
         return f"{{ {', '.join(inputs_parts)} }}"
 
     @staticmethod
-    def add_inputs_to_lines_if_exist(lines: list[str], pipe_inputs: Optional[Mapping[str, Union[str, InputRequirementBlueprint]]]) -> None:
+    def add_inputs_to_lines_if_exist(
+        lines: list[str],
+        pipe_inputs: Optional[Mapping[str, Union[str, InputRequirementBlueprint]]],
+    ) -> None:
         """Add inputs line to PLX lines if inputs exist."""
         if pipe_inputs:
             inputs_dict = PipelexInterpreter.serialize_inputs(pipe_inputs)

@@ -1,6 +1,7 @@
 from typing import Optional
 
 from pipelex.tools.exceptions import FatalError, RootException
+from pipelex.types import StrEnum
 
 
 class CogtError(RootException):
@@ -148,8 +149,24 @@ class InferenceBackendError(CogtError):
     pass
 
 
+class InferenceBackendCredentialsErrorType(StrEnum):
+    VAR_NOT_FOUND = "var_not_found"
+    UNKNOWN_VAR_PREFIX = "unknown_var_prefix"
+    VAR_FALLBACK_PATTERN = "var_fallback_pattern"
+
+
 class InferenceBackendCredentialsError(CogtError):
-    pass
+    def __init__(
+        self,
+        error_type: InferenceBackendCredentialsErrorType,
+        backend_name: str,
+        message: str,
+        key_name: str,
+    ):
+        self.error_type = error_type
+        self.backend_name = backend_name
+        self.key_name = key_name
+        super().__init__(message)
 
 
 class InferenceBackendLibraryError(CogtError):

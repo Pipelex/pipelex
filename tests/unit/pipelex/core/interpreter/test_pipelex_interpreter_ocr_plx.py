@@ -1,6 +1,5 @@
 import pytest
 
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
@@ -18,13 +17,13 @@ class TestPipelexInterpreterOcrPLX:
                     type="PipeOcr",
                     definition="Extract text from document",
                     output="Page",
-                    ocr_handle=OcrHandle.BASIC_OCR,
+                    ocr_model="pypdfium2-extract-text",
                 ),
                 """[pipe.extract_text]
 type = "PipeOcr"
 definition = "Extract text from document"
 output = "Page"
-ocr_handle = "basic/pypdfium2\"""",
+ocr_model = "pypdfium2-extract-text\"""",
             ),
             # OCR pipe with inputs
             (
@@ -34,14 +33,14 @@ ocr_handle = "basic/pypdfium2\"""",
                     definition="Extract text from PDF",
                     inputs={"ocr_input": "PDF"},
                     output="Page",
-                    ocr_handle=OcrHandle.BASIC_OCR,
+                    ocr_model="pypdfium2-extract-text",
                 ),
                 """[pipe.extract_with_input]
 type = "PipeOcr"
 definition = "Extract text from PDF"
 inputs = { ocr_input = "PDF" }
 output = "Page"
-ocr_handle = "basic/pypdfium2\"""",
+ocr_model = "pypdfium2-extract-text\"""",
             ),
         ],
     )

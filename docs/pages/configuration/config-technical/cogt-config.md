@@ -109,7 +109,6 @@ Configuration for Optical Character Recognition:
 
 ```toml
 [cogt.ocr_config]
-ocr_handles = ["mistral/mistral-ocr-latest"]
 page_output_text_file_name = "page_text.md"
 default_page_views_dpi = 72
 ```
@@ -187,6 +186,5 @@ output_format = "jpg"
 seed = "auto"
 
 [cogt.ocr_config]
-ocr_handles = ["mistral/mistral-ocr-latest"]
 page_output_text_file_name = "page_text.md"
 ```

@@ -8,13 +8,21 @@ from pipelex.types import StrEnum
 
 
 class VarNotFoundError(ToolException):
+    def __init__(self, var_name: str, message: str):
+        self.var_name = var_name
+        super().__init__(message)
+
+
+class VarFallbackPatternError(ToolException):
     pass
 
 
 class UnknownVarPrefixError(ToolException):
     """Raised when an unknown variable prefix is used in variable substitution."""
 
-    pass
+    def __init__(self, var_name: str, message: str):
+        self.var_name = var_name
+        super().__init__(message)
 
 
 class VarPrefix(StrEnum):
@@ -58,7 +66,10 @@ def substitute_vars(content: str) -> str:
             try:
                 prefix = VarPrefix(prefix_str)
             except ValueError:
-                raise UnknownVarPrefixError(f"Unknown variable prefix: '{prefix_str}'")
+                raise UnknownVarPrefixError(
+                    var_name=var_name,
+                    message=f"Unknown variable prefix: '{prefix_str}'",
+                )
 
             match prefix:
                 case VarPrefix.ENV:
@@ -87,7 +98,10 @@ def _handle_fallback_pattern(var_spec: str) -> str:
             try:
                 prefix = VarPrefix(prefix_str)
             except ValueError:
-                raise UnknownVarPrefixError(f"Unknown variable prefix: '{prefix_str}'")
+                raise UnknownVarPrefixError(
+                    var_name=var_name,
+                    message=f"Unknown variable prefix: '{prefix_str}'",
+                )
 
             match prefix:
                 case VarPrefix.ENV:
@@ -106,7 +120,9 @@ def _handle_fallback_pattern(var_spec: str) -> str:
             except SecretNotFoundError:
                 continue  # Try next option
 
-    raise VarNotFoundError(f"Variable not found in any source: {var_spec}")
+    raise VarFallbackPatternError(
+        message=f"Could not get variable from fallback pattern: {var_spec}",
+    )
 
 
 def _get_env_var(var_name: str) -> str:
@@ -114,7 +130,7 @@ def _get_env_var(var_name: str) -> str:
     try:
         return get_required_env(var_name)
     except EnvVarNotFoundError as exc:
-        raise VarNotFoundError(f"Could not get variable '{var_name}': {str(exc)}") from exc
+        raise VarNotFoundError(message=f"Could not get variable '{var_name}': {str(exc)}", var_name=var_name) from exc
 
 
 def _get_secret(secret_name: str) -> str:
@@ -122,4 +138,4 @@ def _get_secret(secret_name: str) -> str:
     try:
         return get_secrets_provider().get_secret(secret_id=secret_name)
     except SecretNotFoundError as exc:
-        raise VarNotFoundError(f"Could not get variable '{secret_name}': {str(exc)}") from exc
+        raise VarNotFoundError(message=f"Could not get variable '{secret_name}': {str(exc)}", var_name=secret_name) from exc

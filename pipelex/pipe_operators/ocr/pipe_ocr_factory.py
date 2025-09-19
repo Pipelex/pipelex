@@ -39,7 +39,7 @@ class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
             inputs=PipeInputSpecFactory.make_from_blueprint(
                 domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
             ),
-            ocr_handle=blueprint.ocr_handle,
+            ocr_handle=blueprint.ocr_model,
             should_include_images=blueprint.page_images or False,
             should_caption_images=blueprint.page_image_captions or False,
             should_include_page_views=blueprint.page_views or False,

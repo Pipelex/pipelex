@@ -2,6 +2,7 @@ from typing import Any, Dict, Tuple
 
 from pipelex.cogt.exceptions import CogtError, MissingDependencyError
 from pipelex.tools.config.config_model import ConfigModel
+from pipelex.tools.environment import ENV_DUMMY_PLACEHOLDER_VALUE
 from pipelex.tools.exceptions import CredentialsError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
 from pipelex.types import StrEnum
@@ -39,8 +40,8 @@ class VertexAIFactory(ConfigModel):
         endpoint = cls._make_endpoint(gcp_project_id=gcp_project_id, gcp_location=gcp_location)
 
         gcp_credentials_file_path = extra_config.get(VertexAIExtraField.GCP_CREDENTIALS_FILE_PATH)
-        if not gcp_credentials_file_path:
-            raise VertexAIConfigError("GCP credentials file path is not set in VertexAI config")
+        if not gcp_credentials_file_path or gcp_credentials_file_path == ENV_DUMMY_PLACEHOLDER_VALUE:
+            raise VertexAIConfigError("GCP credentials file path is not properly set for VertexAI.")
 
         api_key = cls._make_api_key(gcp_credentials_file_path=gcp_credentials_file_path)
 
@@ -70,7 +71,9 @@ class VertexAIFactory(ConfigModel):
         try:
             credentials_dict: Dict[str, Any] = load_json_dict_from_path(path=gcp_credentials_file_path)
         except FileNotFoundError as exc:
-            raise VertexAICredentialsError(f"File not found: {gcp_credentials_file_path}") from exc
+            raise VertexAICredentialsError(
+                f"Could not get VertexAI credentials from GCP credentials file: File not found: {gcp_credentials_file_path}"
+            ) from exc
 
         credentials = Credentials.from_service_account_info(  # pyright: ignore[reportUnknownMemberType]
             credentials_dict, scopes=["https://www.googleapis.com/auth/cloud-platform"]

@@ -36,7 +36,7 @@ enabled = true
 aws_region = "${AWS_REGION}"
 
 [vertexai]
-enabled = true
+enabled = false
 gcp_project_id = "${GCP_PROJECT_ID}"
 gcp_location = "${GCP_LOCATION}"
 gcp_credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
@@ -44,4 +44,7 @@ gcp_credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
 [mistral]
 enabled = true
 api_key = "${MISTRAL_API_KEY}"
+
+[internal] # software-only backend, runs internally, without AI
+enabled = true
 
