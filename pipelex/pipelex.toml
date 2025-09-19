@@ -212,6 +212,7 @@ allowed_to_fail_pipes = [
     "fix_failing_pipes_once", # Loop but its normal
     "validate_pipelex_bundle_blueprint", # Loop but its normal
     "handle_validation_result", # Complex case of a sub pipe needed a ListContent because its batching on, but the dry_run cannot know.
+    "pipe_builder", # because of the 'fix_failing_pipes_once', 'validate_pipelex_bundle_blueprint', 'handle_validation_result'
 ]
 image_urls = [
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
