@@ -3,8 +3,6 @@ from typing import Literal, Optional
 from pydantic import Field
 from typing_extensions import override
 
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
-from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint as PipeOcrBlueprintCore
 
@@ -44,8 +42,7 @@ class PipeOcrBlueprint(PipeBlueprint):
 
     type: Literal["PipeOcr"] = "PipeOcr"
     category: Literal["PipeOperator"] = "PipeOperator"
-    ocr_handle: OcrHandle
-    ocr_platform: Optional[OcrPlatform] = None
+    ocr_model: str
     page_images: Optional[bool] = None
     page_image_captions: Optional[bool] = None
     page_views: Optional[bool] = None
@@ -62,7 +59,7 @@ class PipeOcrBlueprint(PipeBlueprint):
             output=base_blueprint.output,
             type=self.type,
             category=self.category,
-            ocr_handle=OcrHandle.MISTRAL_OCR,
+            ocr_model=self.ocr_model,
         )
 
 
