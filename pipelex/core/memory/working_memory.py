@@ -228,7 +228,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
             if stuff_content is not None and wanted_type is not None and not isinstance(stuff_content, wanted_type):
                 raise WorkingMemoryTypeError(
                     variable_name=name,
-                    message=f"Content at '{name}' is of type {type(stuff_content).__name__}, it should be {wanted_type.__name__}",
+                    message=f"Content at '{name}' is of type '{type(stuff_content).__name__}', it should be '{wanted_type.__name__}'",
                 )
 
             return stuff_content
@@ -238,7 +238,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
             if wanted_type is not None and not isinstance(content, wanted_type):
                 raise WorkingMemoryTypeError(
                     variable_name=name,
-                    message=f"Content of '{name}' is of type {type(content).__name__}, it should be {wanted_type.__name__}",
+                    message=f"Content of '{name}' is of type '{type(content).__name__}', it should be '{wanted_type.__name__}'",
                 )
 
             return content

@@ -70,7 +70,7 @@ class LLMWorkerFactory:
                     sdk_instance=sdk_instance,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,
-                    structure_method=StructureMethod.INSTRUCTOR_VERTEX_JSON,
+                    structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
             case "mistral":

@@ -11,41 +11,6 @@ from pipelex.tools.typing.validation_utils import has_more_than_one_among_attrib
 
 
 class PipeImgGenBlueprint(PipeBlueprint):
-    """Blueprint for image generation pipe operations in the Pipelex framework.
-
-    PipeImgGen enables AI-powered image generation using various models like DALL-E or
-    diffusion models. Supports static and dynamic prompts with configurable generation
-    parameters.
-
-    Attributes:
-        type: Fixed to "PipeImgGen" for this pipe type.
-        img_gen_prompt: Static text prompt for image generation. Use this or dynamic input.
-        imgg_handle: Image generation model handle (e.g., 'dall-e-3'). Defaults to global config.
-        aspect_ratio: Desired image aspect ratio (e.g., '16:9', '1:1').
-        quality: Generated image quality setting (e.g., 'standard', 'hd').
-        nb_steps: Number of diffusion steps for diffusion models. More steps increase detail
-                 but take longer. Must be > 0.
-        guidance_scale: Prompt adherence strength. Higher values mean closer adherence to prompt.
-                       Must be > 0.
-        is_moderated: Whether to apply content moderation to generated images.
-        safety_tolerance: Content moderation tolerance level. Must be between 1 and 6.
-        is_raw: Whether to return raw image data instead of processed format.
-        seed: Random seed for reproducibility. Use integer value or 'auto' for random seed.
-        nb_output: Number of images to generate. Defaults to single image. Must be >= 1.
-        img_gen_prompt_var_name: Variable name for dynamic prompt generation from inputs. Will default to "prompt"
-
-    Validation Rules:
-        1. Quality and nb_steps are mutually exclusive (cannot specify both).
-        2. nb_steps must be greater than 0 when specified.
-        3. guidance_scale must be greater than 0 when specified.
-        4. safety_tolerance must be between 1 and 6 inclusive.
-        5. nb_output must be at least 1 when specified.
-
-    Raises:
-        PipeDefinitionError: When validation rules are violated or mutually exclusive
-                            fields are set simultaneously.
-    """
-
     type: Literal["PipeImgGen"] = "PipeImgGen"
     category: Literal["PipeOperator"] = "PipeOperator"
     img_gen_prompt: Optional[str] = None

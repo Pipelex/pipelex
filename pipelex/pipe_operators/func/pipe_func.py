@@ -109,7 +109,7 @@ class PipeFunc(PipeOperator):
                 raise DryRunError(f"Function '{self.function_name}' has no return type annotation")
             else:
                 if not issubclass(return_type, StuffContent):
-                    raise ValueError(f"Function '{self.function_name}' return type {return_type} is not a subclass of StuffContent")
+                    raise DryRunError(f"Function '{self.function_name}' return type {return_type} is not a subclass of StuffContent")
 
                 requirement = TypedNamedInputRequirement(
                     variable_name="mock_output",

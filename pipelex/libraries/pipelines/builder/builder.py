@@ -11,7 +11,6 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import (
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint as ConceptBlueprintCore
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent
 from pipelex.hub import get_library_manager
 from pipelex.libraries.pipelines.builder.concept.concept import ConceptBlueprint, ConceptSpec, ConceptSpecBlueprint
@@ -222,10 +221,16 @@ class DryRunStatus(StrEnum):
     FAILURE = "FAILURE"
 
 
+class ValidateDryRunError(Exception):
+    """Raised when validating the dry run of a pipelex bundle blueprint."""
+
+    pass
+
+
 class PipeFailure(StructuredContent):
     """Details of a single pipe failure during dry run."""
 
-    pipe: PipeAbstract = Field(description="The failing pipe object")
+    pipe: PipeSpecBlueprintUnion = Field(description="The failing pipe spec blueprint with pipe code")
     error_message: str = Field(description="The error message for this pipe")
 
 
@@ -238,30 +243,46 @@ class DryRunResult(StructuredContent):
 
 async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFailure]:
     """Validate a pipelex bundle blueprint and return list of failing pipes."""
-    pipelex_bundle_blueprint = cast(
-        PipelexBundleBlueprintCore, working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleBlueprint)
-    )
+    pipelex_bundle_blueprint = working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleBlueprint)
+    pipelex_bundle_blueprint_core = pipelex_bundle_blueprint.to_core_blueprint()
 
     library_manager = get_library_manager()
-    pipes = library_manager.load_from_blueprint(blueprint=pipelex_bundle_blueprint)
+    pipes = library_manager.load_from_blueprint(blueprint=pipelex_bundle_blueprint_core)
     dry_run_result = await dry_run_pipes(pipes=pipes, error_on_failure=False)
+    library_manager.remove_from_blueprint(blueprint=pipelex_bundle_blueprint_core)
 
-    library_manager.remove_from_blueprint(blueprint=pipelex_bundle_blueprint)
-
-    pipes_by_code = {pipe.code: pipe for pipe in pipes}
-
-    # Collect ALL failing pipes with their actual pipe objects
     failed_pipes: List[PipeFailure] = []
     for pipe_code, dry_run_output in dry_run_result.items():
         if dry_run_output.status == DryRunStatus.FAILURE:
-            pipe_object = pipes_by_code.get(pipe_code)
-            if pipe_object:
-                failed_pipes.append(
-                    PipeFailure(
-                        pipe=pipe_object,
-                        error_message=dry_run_output.error_message or "",
+            if pipelex_bundle_blueprint.pipe and pipe_code in pipelex_bundle_blueprint.pipe:
+                pipe_blueprint = pipelex_bundle_blueprint.pipe[pipe_code]
+
+                pipe_spec_data = pipe_blueprint.model_dump()
+                pipe_spec_data["the_pipe_code"] = pipe_code
+
+                pipe_type_to_spec_class = {
+                    "PipeFunc": PipeFuncSpecBlueprint,
+                    "PipeImgGen": PipeImgGenSpecBlueprint,
+                    "PipeJinja2": PipeJinja2SpecBlueprint,
+                    "PipeLLM": PipeLLMSpecBlueprint,
+                    "PipeOcr": PipeOcrSpecBlueprint,
+                    "PipeBatch": PipeBatchSpecBlueprint,
+                    "PipeCondition": PipeConditionSpecBlueprint,
+                    "PipeParallel": PipeParallelSpecBlueprint,
+                    "PipeSequence": PipeSequenceSpecBlueprint,
+                }
+
+                spec_class = pipe_type_to_spec_class.get(pipe_blueprint.type)
+                if spec_class:
+                    pipe_spec_blueprint = spec_class(**pipe_spec_data)
+                    failed_pipes.append(
+                        PipeFailure(
+                            pipe=pipe_spec_blueprint,
+                            error_message=dry_run_output.error_message or "",
+                        )
                     )
-                )
+                else:
+                    raise ValidateDryRunError(f"Unknown pipe type: {pipe_blueprint.type}")
 
     return ListContent[PipeFailure](items=failed_pipes)
 

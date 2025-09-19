@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.10.3] - 2025-09-19
+
+### Added
+
+- New pipe builder pipeline to generate Pipes based on a brief in natural language: use the cli `pipelex build pipe "Your task"` to build the pipe.
+- Added a badge on the `README.md` to display the number of tests.
+
 ## [v0.10.2] - 2025-09-18
 
 ### Added

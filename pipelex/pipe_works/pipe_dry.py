@@ -19,6 +19,12 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import StrEnum
 
 
+class DryRunError(Exception):
+    """Raised when a dry run fails due to missing inputs or other validation issues."""
+
+    pass
+
+
 class DryRunStatus(StrEnum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
@@ -63,7 +69,7 @@ async def dry_run_pipe(pipe: PipeAbstract, error_on_failure: bool = False) -> Dr
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
 
 
-async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True, error_on_failure: bool = False) -> Dict[str, DryRunOutput]:
+async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True, error_on_failure: bool = True) -> Dict[str, DryRunOutput]:
     """
     Dry run pipes with optional parallelization.
 
@@ -113,7 +119,7 @@ async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True,
     if unexpected_failures:
         unexpected_failures_details = "\n".join([f"'{pipe_code}': {results[pipe_code]}" for pipe_code in unexpected_failures])
         if error_on_failure:
-            raise Exception(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
+            raise DryRunError(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
         else:
             log.error(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
             return results
