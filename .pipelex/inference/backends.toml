@@ -23,7 +23,7 @@ api_key = "${ANTHROPIC_API_KEY}"
 claude_4_tokens_limit = 8192
 
 [ollama]
-enabled = false
+enabled = true
 endpoint = "http://localhost:11434/v1"
 
 [xai]

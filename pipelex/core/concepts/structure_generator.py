@@ -91,12 +91,12 @@ class StructureGenerator:
             Generated field code
         """
         # Determine Python type
-        # if field_blueprint.choices:
-        #     # Inline choices - use Literal type
-        #     python_type = f"Literal[{', '.join(repr(c) for c in field_blueprint.choices)}]"
-        # else:
-        # Handle complex types
-        python_type = self._get_python_type_from_blueprint(field_blueprint)
+        if field_blueprint.choices:
+            # Inline choices - use Literal type
+            python_type = f"Literal[{', '.join(repr(c) for c in field_blueprint.choices)}]"
+        else:
+            # Handle complex types
+            python_type = self._get_python_type_from_blueprint(field_blueprint)
 
         # Make optional if not required
         if not field_blueprint.required:

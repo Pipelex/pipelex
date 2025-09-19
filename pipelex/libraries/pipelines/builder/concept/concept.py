@@ -125,12 +125,6 @@ class ConceptStructureBlueprint(StructuredContent):
             case ConceptStructureBlueprintFieldType.NUMBER:
                 if not isinstance(self.default_value, (int, float)):
                     self._raise_type_mismatch_error("number (int or float)", type(self.default_value).__name__)
-            # case ConceptStructureBlueprintFieldType.LIST:
-            #     if not isinstance(self.default_value, list):
-            #         self._raise_type_mismatch_error("list", type(self.default_value).__name__)
-            # case ConceptStructureBlueprintFieldType.DICT:
-            #     if not isinstance(self.default_value, dict):
-            #         self._raise_type_mismatch_error("dict", type(self.default_value).__name__)
             case _:
                 raise ConceptStructureBlueprintError(f"Unknown type: {self.type} in structure blueprint with definition: {self.definition}")
 

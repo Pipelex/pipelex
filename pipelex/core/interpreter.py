@@ -528,14 +528,14 @@ class PipelexInterpreter(BaseModel):
             }
             if field_value.type is not None:
                 field_data["type"] = field_value.type
-            # if field_value.item_type is not None:
-            #     field_data["item_type"] = field_value.item_type
-            # if field_value.key_type is not None:
-            #     field_data["key_type"] = field_value.key_type
-            # if field_value.value_type is not None:
-            #     field_data["value_type"] = field_value.value_type
-            # if field_value.choices:
-            #     field_data["choices"] = field_value.choices
+            if field_value.item_type is not None:
+                field_data["item_type"] = field_value.item_type
+            if field_value.key_type is not None:
+                field_data["key_type"] = field_value.key_type
+            if field_value.value_type is not None:
+                field_data["value_type"] = field_value.value_type
+            if field_value.choices:
+                field_data["choices"] = field_value.choices
             if field_value.default_value is not None:
                 field_data["default_value"] = field_value.default_value
             return field_data

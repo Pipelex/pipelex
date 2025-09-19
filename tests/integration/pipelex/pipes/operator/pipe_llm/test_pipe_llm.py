@@ -23,7 +23,7 @@ from tests.integration.pipelex.test_data import PipeTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeLLM:
-    async def test_pipe_llmmmm(
+    async def test_pipe_llm(
         self,
         pipe_run_mode: PipeRunMode,
     ):
