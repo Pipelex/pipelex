@@ -43,6 +43,7 @@ class TestImageInputs:
                 or article.title == "2037 AI-Lympics Paris"
                 or article.title == "2037 AI-Lympics"
                 or article.title == "2037 AI-LYMPICS PARIS"
+                or article.title == "2037 AI-LYMPICS"
             )
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
@@ -83,6 +84,7 @@ class TestImageInputs:
                 or article.title == "2037 AI-Lympics PARIS"
                 or article.title == "2037 AI-Lympics"
                 or article.title == "2037 AI-LYMPICS PARIS"
+                or article.title == "2037 AI-LYMPICS"
             )
             assert article.description == "This is the description of the page blablabla"
         assert pipe_output is not None
