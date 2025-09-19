@@ -1,10 +1,7 @@
-"""Simple integration test for PipeParallel controller."""
-
 from typing import cast
 
 import pytest
 from pytest import FixtureRequest
-
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
@@ -163,7 +160,6 @@ class TestPipeParallelSimple:
             pipe_code="parallel_text_analyzer",
             blueprint=pipe_parallel_blueprint,
         )
-
         # Create test data - shorter text
         input_text_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),

@@ -249,8 +249,6 @@ class PipeLLM(PipeOperator):
                     concept_string=ConceptFactory.construct_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code)
                 )
 
-        # self.llm_prompt_spec.output = output_concept
-
         multiplicity_resolution = output_multiplicity_to_apply(
             base_multiplicity=self.output_multiplicity,
             override_multiplicity=pipe_run_params.output_multiplicity,
