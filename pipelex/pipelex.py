@@ -250,13 +250,11 @@ class Pipelex(metaclass=MetaSingleton):
         self.class_registry.teardown()
         func_registry.teardown()
 
-        project_name = get_config().project_name
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_config().project_name} (except config & logs)")
         self.pipelex_hub.reset_config()
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:
             del MetaSingleton.instances[self.__class__]
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} config reset done for {project_name}")
 
     # TODO: add kwargs to make() so that subclasses can employ specific parameters
     @classmethod
