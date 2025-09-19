@@ -55,7 +55,6 @@ class TestPipeConditionExpression:
 
         # Log output and generate report
         pretty_print(pipe_output, title=f"PipeCondition routing test - {category}")
-        get_report_delegate().generate_report()
 
         # Basic assertions
         assert pipe_output is not None

@@ -120,7 +120,6 @@ class TestPipeSequenceWithInputMemory:
 
         # Log output and generate report
         pretty_print(pipe_output, title="Pipe output for optimize_tweet_sequence")
-        get_report_delegate().generate_report()
 
         # Verify the optimized tweet is different from the draft
         assert optimized_tweet.text != SAMPLE_DRAFT_TWEET

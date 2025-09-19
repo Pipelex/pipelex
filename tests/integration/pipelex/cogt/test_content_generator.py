@@ -166,4 +166,4 @@ class TestContentGenerator:
             )
         error = excinfo.value
         pretty_print(f"Caught expected error: {error}")
-        assert str(error).startswith("LLM Engine blueprint for llm_handle 'bad_handle_to_test_failure' not found")
+        assert str(error).startswith("Model handle 'bad_handle_to_test_failure' not found")

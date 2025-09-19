@@ -30,6 +30,6 @@ Extract the date and title of the article.
 
 Also, add this as the description of the article:
 
-@page.text_and_images.text.text
+$page.text_and_images.text.text
 """
 

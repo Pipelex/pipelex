@@ -42,7 +42,6 @@ class TestPipeRunningVariants:
             working_memory=working_memory,
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
-        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
@@ -65,7 +64,6 @@ class TestPipeRunningVariants:
             working_memory=WorkingMemoryFactory.make_empty(),
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
-        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
@@ -97,7 +95,6 @@ class TestPipeRunningVariants:
             working_memory=WorkingMemoryFactory.make_empty(),
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
-        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
@@ -135,4 +132,3 @@ class TestPipeRunningVariants:
             )
         pretty_print(exc.value, title="exception")
         assert expected_error_message in str(exc.value)
-        get_report_delegate().generate_report()

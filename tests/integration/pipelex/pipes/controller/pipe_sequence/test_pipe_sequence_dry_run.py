@@ -63,7 +63,6 @@ class TestPipeSequenceDryRun:
 
         # Log output for debugging
         pretty_print(pipe_output, title="Discord Newsletter Dry Run Output")
-        get_report_delegate().generate_report()
 
         # Basic assertions
         assert pipe_output is not None

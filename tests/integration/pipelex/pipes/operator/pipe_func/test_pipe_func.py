@@ -79,7 +79,6 @@ if __name__ == "__main__":
         log.verbose(pipe_func_output, title="pipe_func_output")
         wrapped_text = pipe_func_output.main_stuff_as_text
         pretty_print(wrapped_text, title="wrapped_text")
-        get_report_delegate().generate_report()
 
         # Verify the output contains wrapped lines
         assert pipe_func_output is not None

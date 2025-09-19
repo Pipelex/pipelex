@@ -24,7 +24,6 @@ class TestLLMReport:
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)
-        get_report_delegate().generate_report()
 
     def _get_async_worker_and_job(self, llm_preset_id: str, prompt_text: str):
         llm_setting = get_models_manager().get_model_deck().get_llm_setting(llm_setting_or_preset_id=llm_preset_id)
@@ -59,4 +58,3 @@ class TestLLMReport:
         generated_texts = await asyncio.gather(*tasks)
         pretty_print(generated_texts)
 
-        get_report_delegate().generate_report()

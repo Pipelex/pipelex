@@ -60,7 +60,6 @@ class TestPipeParallelDocumentAnalysis:
 
         # Log output and generate report
         pretty_print(pipe_output, title="PipeParallel document analysis test")
-        get_report_delegate().generate_report()
 
         # Basic assertions
         assert pipe_output is not None
