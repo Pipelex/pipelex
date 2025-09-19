@@ -461,3 +461,30 @@ v: validate
 
 li: lock install
 	@echo "> done: lock install"
+
+
+##########################################################################################
+### TEST BADGE
+##########################################################################################
+
+.PHONY: test-count
+## Print the number of collected pytest tests (just the integer)
+test-count:
+	@COUNT=$$(pytest --collect-only --disable-warnings -q | awk 'NF' | wc -l | tr -d ' '); \
+	echo $$COUNT
+
+.PHONY: check-test-badge
+## Compare current test count vs .badges/tests.json -> .message; fail if mismatch
+check-test-badge:
+	@if [ ! -f .badges/tests.json ]; then \
+		echo "Missing .badges/tests.json (create it with the expected count)"; exit 1; \
+	fi
+	@EXPECTED=$$(python -c 'import json;print(int(json.load(open(".badges/tests.json"))["message"]))'); \
+	ACTUAL=$$( $(MAKE) -s test-count ); \
+	if [ "$$EXPECTED" != "$$ACTUAL" ]; then \
+		echo "❌ Test count mismatch: badge=$$EXPECTED, actual=$$ACTUAL"; \
+		exit 1; \
+	else \
+		echo "✅ Test count matches: $$ACTUAL"; \
+	fi
+

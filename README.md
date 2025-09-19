@@ -16,9 +16,9 @@ Stop reinventing AI workflows from scratch. With Pipelex, your proven methods be
   </div>
   <br/>
 
-  ![tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Pipelex/pipelex/feature/pipe-builder/.badges/tests.json)
   <p align="center">
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
+    <a href="https://github.com/Pipelex/pipelex/actions/workflows/check-test-count-badge.yml"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Pipelex/pipelex/feature/pipe-builder/.badges/tests.json" alt="Tests"></a>
     <img src="https://img.shields.io/pypi/v/pipelex?logo=pypi&logoColor=white&color=blue&style=flat-square"
      alt="PyPI – latest release">
     <br/>
