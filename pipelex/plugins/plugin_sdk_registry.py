@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field, RootModel
 
 from pipelex.cogt.imgg.imgg_platform import ImggPlatform
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.ocr.ocr_platform import OcrPlatform
 
 
 class Plugin(BaseModel):
@@ -14,14 +13,6 @@ class Plugin(BaseModel):
     @property
     def sdk_handle(self) -> str:
         return f"{self.sdk}@{self.backend}"
-
-    @classmethod
-    def make_for_ocr_engine(cls, ocr_platform: OcrPlatform) -> "Plugin":
-        match ocr_platform:
-            case OcrPlatform.MISTRAL:
-                return Plugin(sdk="mistral", backend="mistral")
-            case OcrPlatform.BASIC:
-                return Plugin(sdk="basic", backend="none")
 
     @classmethod
     def make_for_imgg_engine(cls, imgg_platform: ImggPlatform) -> "Plugin":

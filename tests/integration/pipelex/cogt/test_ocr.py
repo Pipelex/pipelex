@@ -1,7 +1,6 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobParams
 from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
@@ -16,8 +15,8 @@ from tests.cases import ImageTestCases, PDFTestCases
 @pytest.mark.asyncio(loop_scope="class")
 class TestOcr:
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
-    async def test_ocr_pdf_path(self, file_path: str):
-        ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
+    async def test_ocr_pdf_path(self, ocr_handle: str, file_path: str):
+        ocr_worker = get_ocr_worker(ocr_handle=ocr_handle)
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(pdf_uri=file_path),
         )
@@ -27,8 +26,8 @@ class TestOcr:
         assert ocr_output.pages
 
     @pytest.mark.parametrize("url", PDFTestCases.DOCUMENT_URLS)
-    async def test_ocr_pdf_url(self, url: str):
-        ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
+    async def test_ocr_pdf_url(self, ocr_handle: str, url: str):
+        ocr_worker = get_ocr_worker(ocr_handle=ocr_handle)
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(pdf_uri=url),
         )
@@ -37,8 +36,8 @@ class TestOcr:
         assert ocr_output.pages
 
     @pytest.mark.parametrize("file_path", ImageTestCases.IMAGE_FILE_PATHS)
-    async def test_ocr_image_file(self, file_path: str):
-        ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
+    async def test_ocr_image_file(self, ocr_handle_from_image: str, file_path: str):
+        ocr_worker = get_ocr_worker(ocr_handle=ocr_handle_from_image)
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(image_uri=file_path),
         )
@@ -47,8 +46,8 @@ class TestOcr:
         assert ocr_output.pages
 
     @pytest.mark.parametrize("url", ImageTestCases.IMAGE_URLS)
-    async def test_ocr_image_url(self, url: str):
-        ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
+    async def test_ocr_image_url(self, ocr_handle_from_image: str, url: str):
+        ocr_worker = get_ocr_worker(ocr_handle=ocr_handle_from_image)
         ocr_job = OcrJobFactory.make_ocr_job(
             ocr_input=OcrInput(image_uri=url),
         )
@@ -57,8 +56,8 @@ class TestOcr:
         assert ocr_output.pages
 
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
-    async def test_ocr_image_save(self, file_path: str):
-        ocr_worker = get_ocr_worker(ocr_handle=OcrHandle.MISTRAL_OCR)
+    async def test_ocr_image_save(self, ocr_handle_from_image: str, file_path: str):
+        ocr_worker = get_ocr_worker(ocr_handle=ocr_handle_from_image)
         ocr_job_params = OcrJobParams(
             should_include_images=True,
             should_caption_images=False,

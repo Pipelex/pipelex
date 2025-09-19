@@ -10,13 +10,12 @@ from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 from pipelex.hub import get_content_generator, get_models_manager
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.cases import ImageTestCases
+from tests.cases import ImageTestCases, PDFTestCases
 from tests.integration.pipelex.cogt.test_data import Employee
 
 USER_TEXT_FOR_BASE = """
@@ -61,7 +60,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_llm_text_only(self, request: FixtureRequest):
-        llm_setting_main = get_models_manager().get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_text")
+        llm_setting_main = get_models_manager().get_model_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_text")
 
         text: str = await get_content_generator().make_llm_text(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
@@ -75,7 +74,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_direct(self, request: FixtureRequest):
-        llm_setting_for_object = get_models_manager().get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
+        llm_setting_for_object = get_models_manager().get_model_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
 
         person_direct: Employee = await get_content_generator().make_object_direct(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
@@ -90,7 +89,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_list_direct(self, request: FixtureRequest):
-        llm_setting_for_object = get_models_manager().get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
+        llm_setting_for_object = get_models_manager().get_model_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
 
         person_list_direct: List[Employee] = await get_content_generator().make_object_list_direct(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
@@ -130,11 +129,24 @@ class TestContentGenerator:
 
     @pytest.mark.ocr
     @pytest.mark.inference
-    async def test_make_ocr_extract_pages(self, request: FixtureRequest):
+    async def test_make_ocr_extract_pages_from_image(self, ocr_handle_from_image: str, request: FixtureRequest):
         ocr_output = await get_content_generator().make_ocr_extract_pages(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
-            ocr_handle=OcrHandle.MISTRAL_OCR,
+            ocr_handle=ocr_handle_from_image,
             ocr_input=OcrInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
+            ocr_job_params=OcrJobParams.make_default_ocr_job_params(),
+            ocr_job_config=OcrJobConfig(),
+        )
+        pretty_print(ocr_output, title="ocr_extract_pages")
+        assert isinstance(ocr_output, OcrOutput)
+
+    @pytest.mark.ocr
+    @pytest.mark.inference
+    async def test_make_ocr_extract_pages_from_pdf(self, ocr_handle: str, request: FixtureRequest):
+        ocr_output = await get_content_generator().make_ocr_extract_pages(
+            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+            ocr_handle=ocr_handle,
+            ocr_input=OcrInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
             ocr_job_params=OcrJobParams.make_default_ocr_job_params(),
             ocr_job_config=OcrJobConfig(),
         )

@@ -7,6 +7,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.usage.cost_category import CostCategory
 
@@ -20,6 +21,7 @@ class TestModelDeckGetOptionalInferenceModel:
             backend_name="test_backend",
             name=name,
             sdk="test_sdk",
+            model_type=ModelType.LLM,
             model_id=f"test_model_{name}",
             costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
             max_tokens=1000,
@@ -65,7 +67,7 @@ class TestModelDeckGetOptionalInferenceModel:
 
         # Assert
         assert result is None
-        mock_log.warning.assert_called_once_with("Skipping LLM handle 'nonexistent-model' because it's not found in deck")
+        mock_log.warning.assert_called_once_with("Skipping model handle 'nonexistent-model' because it's not found in deck")
 
     def test_simple_string_alias_resolution_success(self, mocker: MockerFixture):
         """Test successful resolution of a simple string alias."""
@@ -94,7 +96,7 @@ class TestModelDeckGetOptionalInferenceModel:
         assert result is None
         mock_log.debug.assert_called_once_with("Redirection for 'best-gpt': nonexistent-model")
         # The final warning is about the original alias, not the target
-        mock_log.warning.assert_called_with("Skipping LLM handle 'best-gpt' because it's not found in deck")
+        mock_log.warning.assert_called_with("Skipping model handle 'best-gpt' because it's not found in deck")
 
     def test_list_alias_resolution_first_success(self, mocker: MockerFixture):
         """Test list alias resolution where first model in list exists."""
@@ -186,7 +188,7 @@ class TestModelDeckGetOptionalInferenceModel:
         assert result is None
         # Empty list evaluates to False, so no debug log is called
         mock_log.debug.assert_not_called()
-        mock_log.warning.assert_called_once_with("Skipping LLM handle 'empty-alias' because it's not found in deck")
+        mock_log.warning.assert_called_once_with("Skipping model handle 'empty-alias' because it's not found in deck")
 
     def test_circular_alias_prevention(self, mocker: MockerFixture):
         """Test that circular aliases don't cause infinite loops."""
@@ -267,7 +269,7 @@ class TestModelDeckGetOptionalInferenceModel:
 
         # Assert
         assert result is None
-        mock_log.warning.assert_called_once_with(f"Skipping LLM handle '{llm_handle}' because it's not found in deck")
+        mock_log.warning.assert_called_once_with(f"Skipping model handle '{llm_handle}' because it's not found in deck")
 
     def test_logging_behavior(self, mocker: MockerFixture):
         """Test that logging is called with correct messages."""
@@ -283,4 +285,4 @@ class TestModelDeckGetOptionalInferenceModel:
         mock_log.debug.assert_called_with("Redirection for 'test-alias': target-model")
 
         # The final warning is about the original alias, not the target
-        mock_log.warning.assert_called_with("Skipping LLM handle 'test-alias' because it's not found in deck")
+        mock_log.warning.assert_called_with("Skipping model handle 'test-alias' because it's not found in deck")

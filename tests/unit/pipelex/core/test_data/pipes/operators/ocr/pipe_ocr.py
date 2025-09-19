@@ -1,6 +1,5 @@
 """PipeOcr test cases."""
 
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
@@ -14,7 +13,7 @@ definition = "Domain with OCR pipe"
 type = "PipeOcr"
 definition = "Extract text from document"
 output = "Page"
-ocr_handle = "basic/pypdfium2"
+ocr_model = "pypdfium2-extract-text"
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -24,7 +23,7 @@ ocr_handle = "basic/pypdfium2"
                 type="PipeOcr",
                 definition="Extract text from document",
                 output=NativeConceptEnum.PAGE.value,
-                ocr_handle=OcrHandle.BASIC_OCR,
+                ocr_model="pypdfium2-extract-text",
             ),
         },
     ),

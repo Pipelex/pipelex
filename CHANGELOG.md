@@ -1,5 +1,33 @@
 # Changelog
 
+## [v0.10.2] - 2025-09-18
+
+### Added
+
+- Unified OCR system using model handles instead of separate OcrHandle enum
+- ModelType enum supporting LLM and TEXT_EXTRACTOR types  
+- Enhanced error handling in library loading with better validation messages
+- Config template management with `config-template` and `cft` Makefile targets to update templates from the `.pipelex/` directory
+
+### Changed
+
+- ⚠️ Breaking changes:
+  - Renamed `ocr_handle` to `ocr_model` in `PipeOcr` blueprint, so you'll need to update your PLX code accordingly
+  - Updated .env.example file with slightly modified key names (more standard).
+- OCR system now uses InferenceModelSpec with unified model handles
+- Renamed `get_llm_deck()` to `get_model_deck()` and updated parameter names from `llm_handle` to `model_handle`
+- Simplified OCR worker factory using plugin SDK matching
+- Enhanced plugin system compatibility with InferenceModelSpec
+- Improved error messages throughout system
+- Improved management of placeholder environment variables for unit tests
+
+### Removed
+
+- Legacy OCR classes: OcrHandle, OcrPlatform, OcrEngine, OcrEngineFactory
+- Obsolete configuration fields and setup methods
+- PipelexFileError exception class
+
+
 ## [v0.10.1] - 2025-09-17
 
 ### Changed

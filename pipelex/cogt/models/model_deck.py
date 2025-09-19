@@ -60,7 +60,7 @@ class ModelDeck(ConfigModel):
     @classmethod
     def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]
         for llm_preset_id, llm_setting in deck.llm_presets.items():
-            inference_model = deck.get_required_inference_model(llm_handle=llm_setting.llm_handle)
+            inference_model = deck.get_required_inference_model(model_handle=llm_setting.llm_handle)
             try:
                 cls._validate_llm_setting(llm_setting=llm_setting, inference_model=inference_model)
             except ConfigValidationError as exc:
@@ -120,25 +120,25 @@ class ModelDeck(ConfigModel):
             self.check_llm_setting(llm_setting_or_preset_id=llm_setting)
         return
 
-    def get_optional_inference_model(self, llm_handle: str) -> Optional[InferenceModelSpec]:
-        if inference_model := self.inference_models.get(llm_handle):
+    def get_optional_inference_model(self, model_handle: str) -> Optional[InferenceModelSpec]:
+        if inference_model := self.inference_models.get(model_handle):
             return inference_model
-        elif redirection := self.aliases.get(llm_handle):
-            log.debug(f"Redirection for '{llm_handle}': {redirection}")
+        elif redirection := self.aliases.get(model_handle):
+            log.debug(f"Redirection for '{model_handle}': {redirection}")
             if isinstance(redirection, str):
                 alias_list = [redirection]
             else:
                 alias_list = redirection
             for alias in alias_list:
-                if inference_model := self.get_optional_inference_model(llm_handle=alias):
+                if inference_model := self.get_optional_inference_model(model_handle=alias):
                     return inference_model
-        log.warning(f"Skipping LLM handle '{llm_handle}' because it's not found in deck")
+        log.warning(f"Skipping model handle '{model_handle}' because it's not found in deck")
         return None
 
-    def get_required_inference_model(self, llm_handle: str) -> InferenceModelSpec:
-        inference_model = self.get_optional_inference_model(llm_handle=llm_handle)
+    def get_required_inference_model(self, model_handle: str) -> InferenceModelSpec:
+        inference_model = self.get_optional_inference_model(model_handle=model_handle)
         if inference_model is None:
-            raise LLMHandleNotFoundError(f"LLM handle '{llm_handle}' not found in deck")
-        if llm_handle not in self.inference_models:
-            log.dev(f"LLM handle '{llm_handle}' is an alias which resolves to '{inference_model.name}'")
+            raise LLMHandleNotFoundError(f"Model handle '{model_handle}' not found in deck")
+        if model_handle not in self.inference_models:
+            log.dev(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
         return inference_model

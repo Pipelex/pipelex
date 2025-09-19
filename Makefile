@@ -51,6 +51,9 @@ make lint                     - lint with ruff check
 make pyright                  - Check types with pyright
 make mypy                     - Check types with mypy
 
+make config-template          - Update config template from .pipelex/
+make cft                      - Shorthand -> config-template
+
 make cleanenv                 - Remove virtual env and lock files
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanlibraries           - Remove pipelex_libraries
@@ -105,7 +108,8 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy
+	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy \
+	config-template cft
 
 all help:
 	@echo "$$HELP"
@@ -158,6 +162,14 @@ validate: env
 build: env
 	$(call PRINT_TITLE,"Building the wheels")
 	@uv build
+
+config-template:
+	$(call PRINT_TITLE,"Updating config template from .pipelex/")
+	@rm -rf pipelex/config_template/*
+	@cp -r .pipelex/* pipelex/config_template/
+
+cft: config-template
+	@echo "> done: cft = config-template"
 
 ##############################################################################################
 ############################      Cleaning                        ############################

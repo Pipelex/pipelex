@@ -127,7 +127,6 @@ sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
 ####################################################################################################
 
 [cogt.ocr_config]
-ocr_handles = ["mistral/mistral-ocr-latest"]
 page_output_text_file_name = "page_text.md"
 default_page_views_dpi = 72
 

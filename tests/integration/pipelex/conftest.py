@@ -4,7 +4,6 @@ import pytest
 
 from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
 from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
@@ -221,10 +220,20 @@ def imgg_handle(request: pytest.FixtureRequest) -> ImggHandle:
 
 @pytest.fixture(
     params=[
-        OcrHandle.BASIC_OCR,
-        OcrHandle.MISTRAL_OCR,
+        "pypdfium2-extract-text",
+        "mistral-ocr",
     ]
 )
-def ocr_handle(request: pytest.FixtureRequest) -> OcrHandle:
-    assert isinstance(request.param, OcrHandle)
+def ocr_handle(request: pytest.FixtureRequest) -> str:
+    assert isinstance(request.param, str)
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        "mistral-ocr",
+    ]
+)
+def ocr_handle_from_image(request: pytest.FixtureRequest) -> str:
+    assert isinstance(request.param, str)
     return request.param
