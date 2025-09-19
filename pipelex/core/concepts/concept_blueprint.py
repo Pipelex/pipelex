@@ -1,6 +1,6 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from pipelex.core.concepts.concept_native import NativeConceptEnum, is_native_concept
@@ -22,8 +22,8 @@ class ConceptStructureBlueprintError(Exception):
 
 class ConceptStructureBlueprintFieldType(StrEnum):
     TEXT = "text"
-    # LIST = "list"
-    # DICT = "dict"
+    LIST = "list"
+    DICT = "dict"
     INTEGER = "integer"
     BOOLEAN = "boolean"
     NUMBER = "number"
@@ -34,10 +34,10 @@ class ConceptStructureBlueprint(BaseModel):
     definition: str
     type: Optional[ConceptStructureBlueprintFieldType] = None
     item_type: Optional[str] = None
-    # key_type: Optional[str] = None
-    # value_type: Optional[str] = None
-    # choices: Optional[List[str]] = None
-    required: Optional[bool] = True
+    key_type: Optional[str] = None
+    value_type: Optional[str] = None
+    choices: Optional[List[str]] = Field(default_factory=list)
+    required: Optional[bool] = Field(default=True)
     default_value: Optional[Any] = None
 
     # TODO: date translator for default_value
@@ -46,39 +46,39 @@ class ConceptStructureBlueprint(BaseModel):
     def validate_structure_blueprint(self) -> Self:
         """Validate the structure blueprint according to type rules."""
         # If type is None (array), choices must not be None
-        # if self.type is None and not self.choices:
-        #     raise ConceptStructureBlueprintError(
-        #         f"When type is None (array), choices must not be empty. Actual type: {self.type}, choices: {self.choices}"
-        #     )
+        if self.type is None and not self.choices:
+            raise ConceptStructureBlueprintError(
+                f"When type is None (array), choices must not be empty. Actual type: {self.type}, choices: {self.choices}"
+            )
 
         # If type is "dict", key_type and value_type must not be empty
-        # if self.type == ConceptStructureBlueprintFieldType.DICT:
-        #     if not self.key_type:
-        #         raise ConceptStructureBlueprintError(
-        #             f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty. Actual key_type: {self.key_type}"
-        #         )
-        #     if not self.value_type:
-        #         raise ConceptStructureBlueprintError(
-        #             f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty. Actual value_type: {self.value_type}"
-        #         )
+        if self.type == ConceptStructureBlueprintFieldType.DICT:
+            if not self.key_type:
+                raise ConceptStructureBlueprintError(
+                    f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty. Actual key_type: {self.key_type}"
+                )
+            if not self.value_type:
+                raise ConceptStructureBlueprintError(
+                    f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty. Actual value_type: {self.value_type}"
+                )
 
         # Check when default_value is not None, type is not None (except for choice fields)
-        # if self.default_value is not None and self.type is None and not self.choices:
-        #     raise ConceptStructureBlueprintError(
-        #         f"When default_value is not None, type must be specified (unless choices are provided). "
-        #         f"Actual type: {self.type}, default_value: {self.default_value}, choices: {self.choices}"
-        #     )
+        if self.default_value is not None and self.type is None and not self.choices:
+            raise ConceptStructureBlueprintError(
+                f"When default_value is not None, type must be specified (unless choices are provided). "
+                f"Actual type: {self.type}, default_value: {self.default_value}, choices: {self.choices}"
+            )
 
         # Check default_value type is the same as type
         if self.default_value is not None and self.type is not None:
             self._validate_default_value_type()
 
         # Check default_value is valid for choice fields
-        # if self.default_value is not None and self.type is None and self.choices:
-        #     if self.default_value not in self.choices:
-        #         raise ConceptStructureBlueprintError(
-        #             f"default_value must be one of the valid choices. Got '{self.default_value}', valid choices: {self.choices}"
-        #         )
+        if self.default_value is not None and self.type is None and self.choices:
+            if self.default_value not in self.choices:
+                raise ConceptStructureBlueprintError(
+                    f"default_value must be one of the valid choices. Got '{self.default_value}', valid choices: {self.choices}"
+                )
 
         return self
 
@@ -100,12 +100,12 @@ class ConceptStructureBlueprint(BaseModel):
             case ConceptStructureBlueprintFieldType.NUMBER:
                 if not isinstance(self.default_value, (int, float)):
                     self._raise_type_mismatch_error("number (int or float)", type(self.default_value).__name__)
-            # case ConceptStructureBlueprintFieldType.LIST:
-            #     if not isinstance(self.default_value, list):
-            #         self._raise_type_mismatch_error("list", type(self.default_value).__name__)
-            # case ConceptStructureBlueprintFieldType.DICT:
-            #     if not isinstance(self.default_value, dict):
-            #         self._raise_type_mismatch_error("dict", type(self.default_value).__name__)
+            case ConceptStructureBlueprintFieldType.LIST:
+                if not isinstance(self.default_value, list):
+                    self._raise_type_mismatch_error("list", type(self.default_value).__name__)
+            case ConceptStructureBlueprintFieldType.DICT:
+                if not isinstance(self.default_value, dict):
+                    self._raise_type_mismatch_error("dict", type(self.default_value).__name__)
             case _:
                 raise ConceptStructureBlueprintError(f"Unknown type: {self.type} in structure blueprint with definition: {self.definition}")
 

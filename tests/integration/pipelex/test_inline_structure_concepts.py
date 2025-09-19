@@ -106,20 +106,20 @@ class TestInlineStructureConcepts:
         """Test inline structure with complex field types."""
         inline_structure: Dict[str, Union[str, ConceptStructureBlueprint]] = {
             "title": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.TEXT, definition="Document title"),
-            # "tags": ConceptStructureBlueprint(
-            #     type=ConceptStructureBlueprintFieldType.LIST,
-            #     item_type=ConceptStructureBlueprintFieldType.TEXT,
-            #     definition="List of tags",
-            #     required=False,
-            # ),
-            # "metadata": ConceptStructureBlueprint(
-            #     type=ConceptStructureBlueprintFieldType.DICT,
-            #     key_type=ConceptStructureBlueprintFieldType.TEXT,
-            #     value_type=ConceptStructureBlueprintFieldType.TEXT,
-            #     definition="Metadata dictionary",
-            #     required=False,
-            # ),
-            # "priority": ConceptStructureBlueprint(choices=["low", "medium", "high"], definition="Priority level", required=False),
+            "tags": ConceptStructureBlueprint(
+                type=ConceptStructureBlueprintFieldType.LIST,
+                item_type=ConceptStructureBlueprintFieldType.TEXT,
+                definition="List of tags",
+                required=False,
+            ),
+            "metadata": ConceptStructureBlueprint(
+                type=ConceptStructureBlueprintFieldType.DICT,
+                key_type=ConceptStructureBlueprintFieldType.TEXT,
+                value_type=ConceptStructureBlueprintFieldType.TEXT,
+                definition="Metadata dictionary",
+                required=False,
+            ),
+            "priority": ConceptStructureBlueprint(choices=["low", "medium", "high"], definition="Priority level", required=False),
             "page_count": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.INTEGER, definition="Number of pages", required=False),
             "is_active": ConceptStructureBlueprint(
                 type=ConceptStructureBlueprintFieldType.BOOLEAN, definition="Whether document is active", required=False

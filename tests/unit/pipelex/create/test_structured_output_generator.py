@@ -40,48 +40,47 @@ class TestStructureGenerator:
         )
         assert result == expected_result
 
-    # def test_complex_types_generation(self):
-    #     """Test generation with complex types like lists and dicts."""
-    #     structure_blueprint = {
-    #         "tags": ConceptStructureBlueprint(
-    #             definition="List of tags", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False
-    #         ),
-    #         "metadata": ConceptStructureBlueprint(
-    #             definition="Metadata dictionary", type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="text", required=False
-    #         ),
-    #         "scores": ConceptStructureBlueprint(
-    #             definition="List of scores", type=ConceptStructureBlueprintFieldType.LIST, item_type="number", required=True
-    #         ),
-    #     }
+    def test_complex_types_generation(self):
+        """Test generation with complex types like lists and dicts."""
+        structure_blueprint = {
+            "tags": ConceptStructureBlueprint(
+                definition="List of tags", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False
+            ),
+            "metadata": ConceptStructureBlueprint(
+                definition="Metadata dictionary", type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="text", required=False
+            ),
+            "scores": ConceptStructureBlueprint(
+                definition="List of scores", type=ConceptStructureBlueprintFieldType.LIST, item_type="number", required=True
+            ),
+        }
 
-    #     result = StructureGenerator().generate_from_structure_blueprint("ComplexModel", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("ComplexModel", structure_blueprint)
 
-    #     pretty_print(structure_blueprint, title="Source Blueprint")
-    #     pretty_print(result, title="Generated Result")
+        pretty_print(structure_blueprint, title="Source Blueprint")
+        pretty_print(result, title="Generated Result")
 
-    #     # Check the complete generated structure
-    #     expected_result = (
-    #         "from enum import Enum\n"
-    #         "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
-    #         "from pydantic import Field\n"
-    #         "from typing import Optional, List, Dict, Any, Literal\n"
-    #         "\n\n"
-    #         "class ComplexModel(StructuredContent):\n"
-    #         '    """Generated ComplexModel class"""\n'
-    #         "\n"
-    #         '    tags: Optional[List[str]] = Field(default=None, description="List of tags")\n'
-    #         '    metadata: Optional[Dict[str, str]] = Field(default=None, description="Metadata dictionary")\n'
-    #         '    scores: List[float] = Field(..., description="List of scores")\n'
-    #     )
-    #     assert result == expected_result
+        # Check the complete generated structure
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class ComplexModel(StructuredContent):\n"
+            '    """Generated ComplexModel class"""\n'
+            "\n"
+            '    tags: Optional[List[str]] = Field(default=None, description="List of tags")\n'
+            '    metadata: Optional[Dict[str, str]] = Field(default=None, description="Metadata dictionary")\n'
+            '    scores: List[float] = Field(..., description="List of scores")\n'
+        )
+        assert result == expected_result
 
     def test_choices_generation(self):
         """Test generation with inline choices (Literal type)."""
         structure_blueprint = {
             "name": ConceptStructureBlueprint(definition="Product name", type=ConceptStructureBlueprintFieldType.TEXT, required=False),
-            # "category": ConceptStructureBlueprint(definition="Product category", choices=["electronics", "clothing", "food", "books"],
-            # required=True),
-            # "size": ConceptStructureBlueprint(definition="Size of the product", choices=["XS", "S", "M", "L", "XL"], required=False),
+            "category": ConceptStructureBlueprint(definition="Product category", choices=["electronics", "clothing", "food", "books"], required=True),
+            "size": ConceptStructureBlueprint(definition="Size of the product", choices=["XS", "S", "M", "L", "XL"], required=False),
         }
 
         result = StructureGenerator().generate_from_structure_blueprint("Product", structure_blueprint)
@@ -187,12 +186,12 @@ class TestStructureGenerator:
             "number_field": ConceptStructureBlueprint(definition="Number field", type=ConceptStructureBlueprintFieldType.NUMBER, required=False),
             "integer_field": ConceptStructureBlueprint(definition="Integer field", type=ConceptStructureBlueprintFieldType.INTEGER, required=False),
             "boolean_field": ConceptStructureBlueprint(definition="Boolean field", type=ConceptStructureBlueprintFieldType.BOOLEAN, required=False),
-            # "list_field": ConceptStructureBlueprint(
-            #     definition="List field", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False
-            # ),
-            # "dict_field": ConceptStructureBlueprint(
-            #     definition="Dict field", type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="integer", required=False
-            # ),
+            "list_field": ConceptStructureBlueprint(
+                definition="List field", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False
+            ),
+            "dict_field": ConceptStructureBlueprint(
+                definition="Dict field", type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="integer", required=False
+            ),
         }
 
         result = StructureGenerator().generate_from_structure_blueprint("TypeMappingTest", structure_blueprint)
@@ -281,105 +280,105 @@ class TestStructureGenerator:
         )
         assert result == expected_result
 
-    # def test_nested_list_types(self):
-    #     """Test nested list types with different item types."""
-    #     structure_blueprint = {
-    #         "text_list": ConceptStructureBlueprint(
-    #             definition="List of text items", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False
-    #         ),
-    #         "number_list": ConceptStructureBlueprint(
-    #             definition="List of numbers", type=ConceptStructureBlueprintFieldType.LIST, item_type="number", required=True
-    #         ),
-    #         "integer_list": ConceptStructureBlueprint(
-    #             definition="List of integers", type=ConceptStructureBlueprintFieldType.LIST, item_type="integer", required=False
-    #         ),
-    #     }
+    def test_nested_list_types(self):
+        """Test nested list types with different item types."""
+        structure_blueprint = {
+            "text_list": ConceptStructureBlueprint(
+                definition="List of text items", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False
+            ),
+            "number_list": ConceptStructureBlueprint(
+                definition="List of numbers", type=ConceptStructureBlueprintFieldType.LIST, item_type="number", required=True
+            ),
+            "integer_list": ConceptStructureBlueprint(
+                definition="List of integers", type=ConceptStructureBlueprintFieldType.LIST, item_type="integer", required=False
+            ),
+        }
 
-    #     result = StructureGenerator().generate_from_structure_blueprint("ListTypesModel", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("ListTypesModel", structure_blueprint)
 
-    #     pretty_print(structure_blueprint, title="Source Blueprint")
-    #     pretty_print(result, title="Generated Result")
+        pretty_print(structure_blueprint, title="Source Blueprint")
+        pretty_print(result, title="Generated Result")
 
-    #     # Check the complete generated structure with nested list types
-    #     expected_result = (
-    #         "from enum import Enum\n"
-    #         "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
-    #         "from pydantic import Field\n"
-    #         "from typing import Optional, List, Dict, Any, Literal\n"
-    #         "\n\n"
-    #         "class ListTypesModel(StructuredContent):\n"
-    #         '    """Generated ListTypesModel class"""\n'
-    #         "\n"
-    #         '    text_list: Optional[List[str]] = Field(default=None, description="List of text items")\n'
-    #         '    number_list: List[float] = Field(..., description="List of numbers")\n'
-    #         '    integer_list: Optional[List[int]] = Field(default=None, description="List of integers")\n'
-    #     )
-    #     assert result == expected_result
+        # Check the complete generated structure with nested list types
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class ListTypesModel(StructuredContent):\n"
+            '    """Generated ListTypesModel class"""\n'
+            "\n"
+            '    text_list: Optional[List[str]] = Field(default=None, description="List of text items")\n'
+            '    number_list: List[float] = Field(..., description="List of numbers")\n'
+            '    integer_list: Optional[List[int]] = Field(default=None, description="List of integers")\n'
+        )
+        assert result == expected_result
 
-    # def test_nested_dict_types(self):
-    #     """Test nested dict types with different key/value combinations."""
-    #     structure_blueprint = {
-    #         "string_to_string": ConceptStructureBlueprint(
-    #             definition="String to string mapping",
-    #             type=ConceptStructureBlueprintFieldType.DICT,
-    #             key_type="text",
-    #             value_type="text",
-    #             required=False,
-    #         ),
-    #         "string_to_number": ConceptStructureBlueprint(
-    #             definition="String to number mapping",
-    #             type=ConceptStructureBlueprintFieldType.DICT,
-    #             key_type="text",
-    #             value_type="number",
-    #             required=True,
-    #         ),
-    #         "string_to_integer": ConceptStructureBlueprint(
-    #             definition="String to integer mapping",
-    #             type=ConceptStructureBlueprintFieldType.DICT,
-    #             key_type="text",
-    #             value_type="integer",
-    #             required=False,
-    #         ),
-    #     }
+    def test_nested_dict_types(self):
+        """Test nested dict types with different key/value combinations."""
+        structure_blueprint = {
+            "string_to_string": ConceptStructureBlueprint(
+                definition="String to string mapping",
+                type=ConceptStructureBlueprintFieldType.DICT,
+                key_type="text",
+                value_type="text",
+                required=False,
+            ),
+            "string_to_number": ConceptStructureBlueprint(
+                definition="String to number mapping",
+                type=ConceptStructureBlueprintFieldType.DICT,
+                key_type="text",
+                value_type="number",
+                required=True,
+            ),
+            "string_to_integer": ConceptStructureBlueprint(
+                definition="String to integer mapping",
+                type=ConceptStructureBlueprintFieldType.DICT,
+                key_type="text",
+                value_type="integer",
+                required=False,
+            ),
+        }
 
-    #     result = StructureGenerator().generate_from_structure_blueprint("DictTypesModel", structure_blueprint)
+        result = StructureGenerator().generate_from_structure_blueprint("DictTypesModel", structure_blueprint)
 
-    #     pretty_print(structure_blueprint, title="Source Blueprint")
-    #     pretty_print(result, title="Generated Result")
+        pretty_print(structure_blueprint, title="Source Blueprint")
+        pretty_print(result, title="Generated Result")
 
-    #     # Check the complete generated structure with nested dict types
-    #     expected_result = (
-    #         "from enum import Enum\n"
-    #         "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
-    #         "from pydantic import Field\n"
-    #         "from typing import Optional, List, Dict, Any, Literal\n"
-    #         "\n\n"
-    #         "class DictTypesModel(StructuredContent):\n"
-    #         '    """Generated DictTypesModel class"""\n'
-    #         "\n"
-    #         '    string_to_string: Optional[Dict[str, str]] = Field(default=None, description="String to string mapping")\n'
-    #         '    string_to_number: Dict[str, float] = Field(..., description="String to number mapping")\n'
-    #         '    string_to_integer: Optional[Dict[str, int]] = Field(default=None, description="String to integer mapping")\n'
-    #     )
-    #     assert result == expected_result
+        # Check the complete generated structure with nested dict types
+        expected_result = (
+            "from enum import Enum\n"
+            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pydantic import Field\n"
+            "from typing import Optional, List, Dict, Any, Literal\n"
+            "\n\n"
+            "class DictTypesModel(StructuredContent):\n"
+            '    """Generated DictTypesModel class"""\n'
+            "\n"
+            '    string_to_string: Optional[Dict[str, str]] = Field(default=None, description="String to string mapping")\n'
+            '    string_to_number: Dict[str, float] = Field(..., description="String to number mapping")\n'
+            '    string_to_integer: Optional[Dict[str, int]] = Field(default=None, description="String to integer mapping")\n'
+        )
+        assert result == expected_result
 
     def test_mixed_complexity_structure(self):
         """Test a structure with mixed complexity - simple and complex types together."""
         structure_blueprint = {
             "id": ConceptStructureBlueprint(definition="Unique identifier", type=ConceptStructureBlueprintFieldType.INTEGER, required=True),
             "name": ConceptStructureBlueprint(definition="Display name", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
-            # "tags": ConceptStructureBlueprint(
-            #     definition="Associated tags", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False
-            # ),
-            # "metadata": ConceptStructureBlueprint(
-            #     definition="Additional metadata", type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="text", required=False
-            # ),
+            "tags": ConceptStructureBlueprint(
+                definition="Associated tags", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False
+            ),
+            "metadata": ConceptStructureBlueprint(
+                definition="Additional metadata", type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="text", required=False
+            ),
             "active": ConceptStructureBlueprint(
                 definition="Whether item is active", type=ConceptStructureBlueprintFieldType.BOOLEAN, required=False, default_value=True
             ),
-            # "priority": ConceptStructureBlueprint(
-            #     definition="Priority level", choices=["low", "medium", "high", "urgent"], required=False, default_value="medium"
-            # ),
+            "priority": ConceptStructureBlueprint(
+                definition="Priority level", choices=["low", "medium", "high", "urgent"], required=False, default_value="medium"
+            ),
         }
 
         result = StructureGenerator().generate_from_structure_blueprint("ComplexItem", structure_blueprint)
