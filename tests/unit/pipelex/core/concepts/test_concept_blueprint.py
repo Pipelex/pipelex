@@ -25,8 +25,7 @@ class TestConceptStructureBlueprintValidation:
         assert int_blueprint.default_value == 42
 
         # Valid boolean field with default
-        bool_blueprint = ConceptStructureBlueprint(definition="A boolean field", type=ConceptStructureBlueprintFieldType.BOOLEAN,
-    default_value=True)
+        bool_blueprint = ConceptStructureBlueprint(definition="A boolean field", type=ConceptStructureBlueprintFieldType.BOOLEAN, default_value=True)
         assert bool_blueprint.default_value is True
 
         # Valid number field with int default
@@ -100,8 +99,7 @@ class TestConceptStructureBlueprintValidation:
     def test_default_value_without_type_but_with_choices_allowed(self):
         """Test that default_value with choices but no type is allowed (choice fields)."""
         # This should work - choice fields can have default_value without explicit type
-        choice_blueprint = ConceptStructureBlueprint(definition="A choice field",
-        choices=["option1", "option2", "option3"], default_value="option2")
+        choice_blueprint = ConceptStructureBlueprint(definition="A choice field", choices=["option1", "option2", "option3"], default_value="option2")
         assert choice_blueprint.default_value == "option2"
         assert choice_blueprint.type is None
         assert choice_blueprint.choices == ["option1", "option2", "option3"]
