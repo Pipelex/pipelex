@@ -234,7 +234,7 @@ ConceptSpecs:
 Brief:
 @brief
 
-LIMIT MAX TO 2 fields for now
+LIMIT TO A MAXIMUM OF 5 fields for now
 """
 
 [pipe.materialize_pipe_signatures]

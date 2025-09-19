@@ -182,20 +182,21 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "0.67.0"
+version = "0.68.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "distro" },
+    { name = "docstring-parser" },
     { name = "httpx" },
     { name = "jiter" },
     { name = "pydantic" },
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/09/08/ee91464cd821e6fca52d9a23be44815c95edd3c1cf1e844b2c5e85f0d57f/anthropic-0.67.0.tar.gz", hash = "sha256:d1531b210ea300c73423141d29bcee20fcd24ef9f426f6437c0a5d93fc98fb8e", size = 441639, upload-time = "2025-09-10T14:47:18.137Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/46/da44bf087ddaf3f7dbe4808c00c7cde466fe68c4fc9fbebdfc231f4ea205/anthropic-0.68.0.tar.gz", hash = "sha256:507e9b5f627d1b249128ff15b21855e718fa4ed8dabc787d0e68860a4b32a7a8", size = 471584, upload-time = "2025-09-17T15:20:19.509Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/9d/9adbda372710918cc8271d089a2ceae4d977a125f90bc3c4b456bca4f281/anthropic-0.67.0-py3-none-any.whl", hash = "sha256:f80a81ec1132c514215f33d25edeeab1c4691ad5361b391ebb70d528b0605b55", size = 317126, upload-time = "2025-09-10T14:47:16.351Z" },
+    { url = "https://files.pythonhosted.org/packages/60/32/2d7553184b05bdbec61dd600014a55b9028408aee6128b25cb6f20e3002c/anthropic-0.68.0-py3-none-any.whl", hash = "sha256:ac579ea5eca22a7165b1042e6af57c4bf556e51afae3ca80e24768d4756b78c0", size = 325199, upload-time = "2025-09-17T15:20:17.452Z" },
 ]
 
 [[package]]
@@ -288,16 +289,16 @@ wheels = [
 
 [[package]]
 name = "boto3-stubs"
-version = "1.40.32"
+version = "1.40.33"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore-stubs" },
     { name = "types-s3transfer" },
     { name = "typing-extensions", marker = "python_full_version < '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/48/16/f957ff2ba28b06a1347626383f1af0ece6ed9443f4e842a44fa8ee9d3c0b/boto3_stubs-1.40.32.tar.gz", hash = "sha256:2bb49056435ebd6c349cf94f5b0cca6f23582031b6c0b8875b9c007cb64ecae9", size = 100820, upload-time = "2025-09-16T19:42:39.055Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6c/9a/79689aab277396c8d3b8392a63d74e0720d36c824f94a294f8a8ac1384e9/boto3_stubs-1.40.33.tar.gz", hash = "sha256:aaebac70e09d8c962378045a3c40a37769733df21aabd34211b4cf3d5041e0bc", size = 100833, upload-time = "2025-09-17T19:47:18.388Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/a3/7eaf7306213c10acc27c68282e6245c221a9fe2adaa6c64456f05130463b/boto3_stubs-1.40.32-py3-none-any.whl", hash = "sha256:73a94c13038326c3743d640d800166ea0d7d8236003f0a7161d1bfc3f96c2f7a", size = 69687, upload-time = "2025-09-16T19:42:20.764Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/9b/79402dceace5ac0f59849197ad2bcc744ff33c0fee47489cac47ef20642e/boto3_stubs-1.40.33-py3-none-any.whl", hash = "sha256:a42518ad8dca7e5cb57299255fbbd2a7707b5b741fded7d69cc2067c2d67a478", size = 69688, upload-time = "2025-09-17T19:47:10.638Z" },
 ]
 
 [[package]]
@@ -316,14 +317,14 @@ wheels = [
 
 [[package]]
 name = "botocore-stubs"
-version = "1.40.32"
+version = "1.40.33"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "types-awscrt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dd/d5/3e13e9689c37d5a2a139e429907659e12dc2792801cc8421389077d9f02a/botocore_stubs-1.40.32.tar.gz", hash = "sha256:87abbabf3cfc0c4b263b8fe97a5c635a74e5b9076e93fff0b4e17f8e4cf3f056", size = 42754, upload-time = "2025-09-16T20:26:06.813Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/94/16f8e1f41feaa38f1350aa5a4c60c5724b6c8524ca0e6c28523bf5070e74/botocore_stubs-1.40.33.tar.gz", hash = "sha256:89c51ae0b28d9d79fde8c497cf908ddf872ce027d2737d4d4ba473fde9cdaa82", size = 42742, upload-time = "2025-09-17T20:25:56.388Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/c9/40768e07708e571bbe329d8e3198b705d1e329d67089ec4f0f1e97b1a4f0/botocore_stubs-1.40.32-py3-none-any.whl", hash = "sha256:40052b0574034e95f916d2b77e68e51ab9a43a2985ad6bc9c53b69f5bc0aed0a", size = 66844, upload-time = "2025-09-16T20:26:05.077Z" },
+    { url = "https://files.pythonhosted.org/packages/af/7b/6d8fe12a955b16094460e89ea7c4e063f131f4b3bd461b96bcd625d0c79e/botocore_stubs-1.40.33-py3-none-any.whl", hash = "sha256:ad21fee32cbdc7ad4730f29baf88424c7086bf88a745f8e43660ca3e9a7e5f89", size = 66843, upload-time = "2025-09-17T20:25:54.052Z" },
 ]
 
 [[package]]
@@ -1720,7 +1721,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "1.107.3"
+version = "1.108.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1732,9 +1733,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e3/24/7fb5749bcf66b52209e3ece05cb4eaeae2102e95f8ae77589e8afaf70ba8/openai-1.107.3.tar.gz", hash = "sha256:69bb8032b05c5f00f7660e422f70f9aabc94793b9a30c5f899360ed21e46314f", size = 564194, upload-time = "2025-09-15T20:09:20.159Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/3c/3ea4c40c62d5f4b11690de13de35554d0d49b5e5780669fad5e83562d635/openai-1.108.0.tar.gz", hash = "sha256:e859c64e4202d7f5956f19280eee92bb281f211c41cdd5be9e63bf51a024ff72", size = 564659, upload-time = "2025-09-17T22:03:23.075Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/1d/58ad0084451f64a9193de48c0afd63047682ffdedb6ae1d494a203e03fd5/openai-1.107.3-py3-none-any.whl", hash = "sha256:4ca54a847235ac04c6320da70fdc06b62d71439de9ec0aa40d5690c3064d4025", size = 947600, upload-time = "2025-09-15T20:09:18.219Z" },
+    { url = "https://files.pythonhosted.org/packages/af/dc/0a007b7c5a079e13d66eecc5d521bbc67b53c135e2a3131160ef76b5db1f/openai-1.108.0-py3-none-any.whl", hash = "sha256:31f2e58230e2703f13ddbb50c285f39dacf7fca64ab19882fd8a7a0b2bccd781", size = 948114, upload-time = "2025-09-17T22:03:20.972Z" },
 ]
 
 [[package]]
@@ -2971,15 +2972,15 @@ wheels = [
 
 [[package]]
 name = "types-networkx"
-version = "3.5.0.20250914"
+version = "3.5.0.20250918"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cc/8e/8f6ec9f4b63d61bfdc9775aa2580b7aa9d78a8fa6f5f9cac14de6ed5d59e/types_networkx-3.5.0.20250914.tar.gz", hash = "sha256:ba3e97132ab02e873494e393402b0947434146f23b57c80543aae1e76fa739b8", size = 71374, upload-time = "2025-09-14T02:56:55.879Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/88/f758a96247da3f2a1de3a655b725471828762ae28c9591a4b27c518c8866/types_networkx-3.5.0.20250918.tar.gz", hash = "sha256:346cc347fc7670b5db29af9d4ba5fa077507ad7100ed7a02707f74fbf317be3c", size = 71507, upload-time = "2025-09-18T02:50:44.561Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/82/55/9be4b551a758636380dab60f685d56372d64f27aba05abe3253af178ad60/types_networkx-3.5.0.20250914-py3-none-any.whl", hash = "sha256:35706c368f80eb115b8c8ed2a777ca1d714b2e57b792e908cd4e69422a9d484a", size = 159101, upload-time = "2025-09-14T02:56:54.698Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/82/e48e099e41d8b5515dc2ee98f6336bc2c330e1d63018c3c6582271f1c3f1/types_networkx-3.5.0.20250918-py3-none-any.whl", hash = "sha256:c7d3951e747333a65c0fb3011461e2de990c7ed5b49f4292ffc0d3febc8e2536", size = 159162, upload-time = "2025-09-18T02:50:42.974Z" },
 ]
 
 [[package]]
