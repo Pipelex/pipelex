@@ -3,15 +3,14 @@ name: Manual trigger tests check
 on:
   pull_request:
     branches:
-      - main
-      - dev
-      - "release/v[0-9]+.[0-9]+.[0-9]+"
-  workflow_dispatch:
+      - manual-trigger-tests-check
+      # - main
+      # - dev
+      # - "release/v[0-9]+.[0-9]+.[0-9]+"
+  # workflow_dispatch:
 
 jobs:
   manual-trigger-tests:
-    if: |
-      github.event_name == 'workflow_dispatch' || !(github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.head.ref, 'release/v'))
     runs-on: ubuntu-latest
     environment:
       name: manual-trigger-tests-check
@@ -20,18 +19,10 @@ jobs:
       - name: Initialize check
         run: |
           echo "Initializing manual trigger tests check..."
-          echo "PR Base: ${{ github.event.pull_request.base.ref }}"
-          echo "PR Head: ${{ github.event.pull_request.head.ref }}"
 
-  # This job runs automatically for release PRs to main, otherwise waits for manual approval
   matrix-test:
     name: Manual trigger tests check
-    # Conditional dependency: only depend on manual-trigger-tests if it's needed
     needs: [manual-trigger-tests]
-    if: |
-      always() && 
-      (needs.manual-trigger-tests.result == 'success' || 
-       needs.manual-trigger-tests.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
