@@ -16,6 +16,7 @@ Stop reinventing AI workflows from scratch. With Pipelex, your proven methods be
   </div>
   <br/>
 
+  ![tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Pipelex/pipelex/feature/pipe-builder/.badges/tests.json)
   <p align="center">
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
     <img src="https://img.shields.io/pypi/v/pipelex?logo=pypi&logoColor=white&color=blue&style=flat-square"
