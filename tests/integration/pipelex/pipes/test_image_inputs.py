@@ -1,7 +1,6 @@
 import pytest
 from pytest import FixtureRequest
 
-from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -10,7 +9,7 @@ from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import ImageContent, PageContent, TextAndImagesContent, TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipe_router, get_report_delegate
+from pipelex.hub import get_pipe_router
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import ImageTestCases
 from tests.test_pipelines.misc_tests.test_structures import Article
@@ -39,7 +38,12 @@ class TestImageInputs:
         )
         if pipe_run_mode != PipeRunMode.DRY:
             article = pipe_output.main_stuff_as(content_type=Article)
-            assert (article.title == "2037 AI-Lympics PARIS" or article.title == "2037 AI-Lympics Paris" or article.title == "2037 AI-Lympics" or article.title == "2037 AI-LYMPICS PARIS")
+            assert (
+                article.title == "2037 AI-Lympics PARIS"
+                or article.title == "2037 AI-Lympics Paris"
+                or article.title == "2037 AI-Lympics"
+                or article.title == "2037 AI-LYMPICS PARIS"
+            )
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
@@ -74,7 +78,12 @@ class TestImageInputs:
 
         if pipe_run_mode != PipeRunMode.DRY:
             article = pipe_output.main_stuff_as(content_type=Article)
-            assert (article.title == "2037 AI-Lympics Paris" or article.title == "2037 AI-Lympics PARIS" or article.title == "2037 AI-Lympics" or article.title == "2037 AI-LYMPICS PARIS")
+            assert (
+                article.title == "2037 AI-Lympics Paris"
+                or article.title == "2037 AI-Lympics PARIS"
+                or article.title == "2037 AI-Lympics"
+                or article.title == "2037 AI-LYMPICS PARIS"
+            )
             assert article.description == "This is the description of the page blablabla"
         assert pipe_output is not None
         assert pipe_output.working_memory is not None

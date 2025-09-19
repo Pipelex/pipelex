@@ -2,6 +2,7 @@ from typing import cast
 
 import pytest
 from pytest import FixtureRequest
+
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain

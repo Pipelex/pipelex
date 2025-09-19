@@ -11,7 +11,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.hub import get_library_manager, get_pipe_router, get_report_delegate
+from pipelex.hub import get_library_manager, get_pipe_router
 from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import PipeTestCases

@@ -57,4 +57,3 @@ class TestLLMReport:
                 tasks.append(task)
         generated_texts = await asyncio.gather(*tasks)
         pretty_print(generated_texts)
-

@@ -7,7 +7,7 @@ import pipelex.pipelex
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
-from pipelex.hub import get_concept_provider
+from pipelex.hub import get_concept_provider, get_report_delegate
 from tests.cases.registry import Fruit
 
 pytest_plugins = [
@@ -32,6 +32,7 @@ def reset_pipelex_config_fixture():
         pytest.exit(f"Critical Pipelex setup error: {exc}")
     yield
     # Code to run after each test
+    get_report_delegate().generate_report()
     Console().print("[magenta]pipelex teardown[/magenta]")
     pipelex_instance.teardown()
 

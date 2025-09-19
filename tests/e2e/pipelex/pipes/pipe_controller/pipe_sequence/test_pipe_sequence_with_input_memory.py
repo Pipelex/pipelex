@@ -3,7 +3,6 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.hub import get_report_delegate
 from pipelex.pipeline.execute import execute_pipeline
 from tests.test_pipelines.test_tweet import OptimizedTweet
 
