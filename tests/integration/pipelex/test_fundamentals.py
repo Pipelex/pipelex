@@ -18,7 +18,7 @@ class TestFundamentals:
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_dry_run_all_pipes(self):
-        results = await dry_run_pipes(pipes=get_pipe_provider().get_pipes(), error_on_failure=False)
+        results = await dry_run_pipes(pipes=get_pipe_provider().get_pipes(), raise_on_failure=False)
 
         # Check if there were any failures
 

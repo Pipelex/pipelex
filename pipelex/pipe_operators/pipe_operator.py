@@ -41,8 +41,7 @@ class PipeOperator(PipeAbstract):
                     indent_level = len(pipe_run_params.pipe_stack) - 1
                     indent = "   " * indent_level
                     label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name} → [green]{self.code}[/green]"
-                    output = self.output.code
-                    log.info(f"{label} → [red]{output}[/red]")
+                    log.info(f"{label} → [red]{self.output.code}[/red]")
                 pipe_output = await self._run_operator_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
@@ -58,8 +57,7 @@ class PipeOperator(PipeAbstract):
                 indent_level = len(pipe_run_params.pipe_stack) - 1
                 indent = "   " * indent_level
                 label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name}: [green]{self.code}[/green]"
-                output = self.output.code
-                log.info(f"{label} → [red]{output}[/red]")
+                log.info(f"{label} → [red]{self.output.code}[/red]")
                 pipe_output = await self._dry_run_operator_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,

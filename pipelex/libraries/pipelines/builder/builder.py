@@ -248,7 +248,7 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
 
     library_manager = get_library_manager()
     pipes = library_manager.load_from_blueprint(blueprint=pipelex_bundle_blueprint_core)
-    dry_run_result = await dry_run_pipes(pipes=pipes, error_on_failure=False)
+    dry_run_result = await dry_run_pipes(pipes=pipes, raise_on_failure=False)
     library_manager.remove_from_blueprint(blueprint=pipelex_bundle_blueprint_core)
 
     failed_pipes: List[PipeFailure] = []

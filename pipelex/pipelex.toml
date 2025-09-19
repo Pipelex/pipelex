@@ -208,9 +208,10 @@ text_gen_truncate_length = 256
 nb_list_items = 3
 nb_ocr_pages = 4
 allowed_to_fail_pipes = [
-    "infinite_loop_1",
-    "build_blueprint",
-    "structure_blueprint",
+    "infinite_loop_1", # Loop but only for testing purposes
+    "fix_failing_pipes_once", # Loop but its normal
+    "validate_pipelex_bundle_blueprint", # Loop but its normal
+    "handle_validation_result", # Complex case of a sub pipe needed a ListContent because its batching on, but the dry_run cannot know.
 ]
 image_urls = [
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",

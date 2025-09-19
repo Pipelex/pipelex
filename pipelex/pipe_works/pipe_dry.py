@@ -38,7 +38,7 @@ class DryRunOutput(BaseModel):
     warning_message: Optional[str] = None
 
 
-async def dry_run_pipe(pipe: PipeAbstract, error_on_failure: bool = False) -> DryRunOutput:
+async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> DryRunOutput:
     """
     Dry run a single pipe directly without parallelization.
     """
@@ -54,22 +54,21 @@ async def dry_run_pipe(pipe: PipeAbstract, error_on_failure: bool = False) -> Dr
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
     except Exception as exc:
-        if error_on_failure:
+        if pipe.code in allowed_to_fail_pipes:
+            warning_message = f"Allowed to fail dry run for pipe '{pipe.code}': {exc}"
+            log.warning(warning_message)
+            return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.WARNING, warning_message=warning_message)
+        elif raise_on_failure:
             raise exc
         else:
             error_message = f"Dry run failed for pipe '{pipe.code}': {exc}"
-            if pipe.code in allowed_to_fail_pipes:
-                warning_message = f"Allowed to fail dry run for pipe '{pipe.code}': {error_message}"
-                log.warning(warning_message)
-                return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.WARNING, warning_message=warning_message)
-            else:
-                log.error(error_message)
+            log.error(error_message)
             return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
-    log.debug(f"✓ Pipe {pipe.code} dry run completed successfully")
+    log.info(f"Pipe '{pipe.code}' dry run completed successfully")
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
 
 
-async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True, error_on_failure: bool = True) -> Dict[str, DryRunOutput]:
+async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True, raise_on_failure: bool = True) -> Dict[str, DryRunOutput]:
     """
     Dry run pipes with optional parallelization.
 
@@ -96,7 +95,7 @@ async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True,
             """Parallel execution using ThreadPoolExecutor"""
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            return loop.run_until_complete(dry_run_pipe(pipe, error_on_failure=error_on_failure))
+            return loop.run_until_complete(dry_run_pipe(pipe, raise_on_failure=raise_on_failure))
 
         with ThreadPoolExecutor() as executor:
             futures = [asyncio.get_running_loop().run_in_executor(executor, functools.partial(run_pipe_in_thread, pipe)) for pipe in pipes]
@@ -105,7 +104,7 @@ async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True,
                 results[output.pipe_code] = output
     else:
         for pipe in pipes:
-            results[pipe.code] = await dry_run_pipe(pipe, error_on_failure=error_on_failure)
+            results[pipe.code] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
 
     successful_pipes = [pipe_code for pipe_code, status in results.items() if status.status == DryRunStatus.SUCCESS]
     failed_pipes = [pipe_code for pipe_code, status in results.items() if status.status != DryRunStatus.SUCCESS]
@@ -118,7 +117,7 @@ async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True,
     )
     if unexpected_failures:
         unexpected_failures_details = "\n".join([f"'{pipe_code}': {results[pipe_code]}" for pipe_code in unexpected_failures])
-        if error_on_failure:
+        if raise_on_failure:
             raise DryRunError(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
         else:
             log.error(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
