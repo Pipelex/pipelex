@@ -4,8 +4,14 @@ from pydantic import ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint as ConceptBlueprintCore
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprintError, ConceptStructureBlueprintError, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.concept_blueprint import (
+    ConceptBlueprintError,
+    ConceptStructureBlueprintError,
+)
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint as ConceptStructureBlueprintCore
+from pipelex.core.concepts.concept_blueprint import (
+    ConceptStructureBlueprintFieldType as ConceptStructureBlueprintFieldTypeCore,
+)
 from pipelex.core.concepts.concept_native import NativeConceptEnum, is_native_concept
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptStringOrConceptCodeError
 from pipelex.core.domains.domain import SpecialDomain
@@ -14,6 +20,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.tools.misc.string_utils import is_pascal_case
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
+from pipelex.types import StrEnum
 
 
 class ConceptSpec(StructuredContent):
@@ -27,6 +34,14 @@ class ConceptSpec(StructuredContent):
         description="The native concept this concept extends (Text, Image, PDF, TextAndImages, Number, Page) "
         "in PascalCase format. Cannot be used together with 'structure'.",
     )
+
+
+class ConceptStructureBlueprintFieldType(StrEnum):
+    TEXT = "text"
+    INTEGER = "integer"
+    BOOLEAN = "boolean"
+    NUMBER = "number"
+    DATE = "date"
 
 
 class ConceptStructureBlueprint(StructuredContent):
@@ -99,9 +114,16 @@ class ConceptStructureBlueprint(StructuredContent):
 
     def to_core_blueprint(self) -> ConceptStructureBlueprintCore:
         """Convert this ConceptStructureBlueprint to the core ConceptStructureBlueprint."""
+        # Convert the type enum value - self.type is already a ConceptStructureBlueprintFieldType enum
+        # We need to get the corresponding value in the core enum
+        core_type = None
+        if self.type is not None:
+            # Get the string value and use it to get the core enum value
+            core_type = ConceptStructureBlueprintFieldTypeCore(self.type.value)
+
         return ConceptStructureBlueprintCore(
             definition=self.definition,
-            type=self.type,
+            type=core_type,
             required=self.required,
             default_value=self.default_value,
         )

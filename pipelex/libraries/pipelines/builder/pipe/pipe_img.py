@@ -94,7 +94,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
             is_raw=self.is_raw,
             seed=self.seed,
             nb_output=self.nb_output,
-            img_gen_prompt_var_name=self.img_gen_prompt_var_name,
+            img_gen_prompt_var_name=None,  # Core expects None, builder uses "prompt" as default
         )
 
 

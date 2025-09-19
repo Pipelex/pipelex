@@ -15,7 +15,7 @@ DryRunResult = "A result of a dry run of a pipelex bundle blueprint."
 
 [pipe.pipe_builder]
 type = "PipeSequence"
-description = "Brief → PlanDraftText → (ConceptSpecsText, PipeSignaturesText) → PipeSignature[]."
+description = "This pipe is going to be the entry point for the builder. It will take a UserBrief and return a PipelexBundleBlueprint."
 inputs = { brief = "UserBrief" }
 output = "PipelexBundleBlueprint"
 steps = [
