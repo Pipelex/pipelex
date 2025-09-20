@@ -237,3 +237,23 @@ def ocr_handle(request: pytest.FixtureRequest) -> str:
 def ocr_handle_from_image(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
     return request.param
+
+
+@pytest.fixture(
+    params=[
+        "base_ocr_mistral",
+    ]
+)
+def ocr_choice_for_pdf(request: pytest.FixtureRequest) -> str:
+    assert isinstance(request.param, str)
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        "base_ocr_mistral",
+    ]
+)
+def ocr_choice_for_image(request: pytest.FixtureRequest) -> str:
+    assert isinstance(request.param, str)
+    return request.param

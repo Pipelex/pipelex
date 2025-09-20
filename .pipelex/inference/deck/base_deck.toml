@@ -30,7 +30,7 @@ llm_for_large_codebase = ["gemini-2.5-pro", "claude-4-sonnet", "gpt-5"]
 # LLM Presets
 ####################################################################################################
 
-[llm_presets]
+[llm.presets]
 
 ####################################################################################################
 # LLM Presets — General purpose
@@ -86,7 +86,18 @@ llm_to_extract_tables = { llm_handle = "base-claude", temperature = 0.1 }
 # LLM Choices
 ####################################################################################################
 
-[llm_choice_defaults]
+[llm.choice_defaults]
 for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
+
+####################################################################################################
+# OCR Presets
+####################################################################################################
+
+[ocr]
+choice_default = "base_ocr_mistral"
+
+[ocr.presets]
+base_ocr_mistral = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
+base_ocr_pypdfium2 = { ocr_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
 

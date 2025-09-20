@@ -36,6 +36,10 @@ class LLMPresetNotFoundError(CogtError):
     pass
 
 
+class OcrPresetNotFoundError(CogtError):
+    pass
+
+
 class LLMSettingsValidationError(CogtError):
     pass
 

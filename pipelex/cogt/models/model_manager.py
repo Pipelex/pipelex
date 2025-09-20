@@ -132,9 +132,11 @@ class ModelManager(ModelManagerAbstract):
         model_deck = ModelDeck(
             inference_models=model_handles,
             aliases=model_deck_blueprint.aliases,
-            llm_presets=model_deck_blueprint.llm_presets,
-            llm_choice_defaults=model_deck_blueprint.llm_choice_defaults,
-            llm_choice_overrides=model_deck_blueprint.llm_choice_overrides,
+            llm_presets=model_deck_blueprint.llm.presets,
+            llm_choice_defaults=model_deck_blueprint.llm.choice_defaults,
+            llm_choice_overrides=model_deck_blueprint.llm.choice_overrides,
+            ocr_presets=model_deck_blueprint.ocr.presets,
+            ocr_choice_default=model_deck_blueprint.ocr.choice_default,
         )
         return model_deck
 

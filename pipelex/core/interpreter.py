@@ -344,7 +344,7 @@ class PipelexInterpreter(BaseModel):
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
         lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output_concept_string_or_concept_code)}"')
-        lines.append(f'ocr_model = "{pipe.ocr_model}"')
+        lines.append(f'ocr = "{pipe.ocr}"')
 
         return "\n".join(lines)
 
@@ -762,7 +762,7 @@ class PipelexInterpreter(BaseModel):
         result["output"] = pipe.output_concept_string_or_concept_code
 
         # Add required fields
-        result["ocr_model"] = pipe.ocr_model
+        result["ocr"] = pipe.ocr
 
         # Add optional fields
         if pipe.page_images:

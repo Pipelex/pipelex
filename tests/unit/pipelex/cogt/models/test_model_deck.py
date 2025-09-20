@@ -42,6 +42,8 @@ class TestModelDeckGetOptionalInferenceModel:
                 for_text=LLMSetting(llm_handle="default_text", temperature=0.7, max_tokens=1000),
                 for_object=LLMSetting(llm_handle="default_object", temperature=0.1, max_tokens=1000),
             ),
+            ocr_presets={},
+            ocr_choice_default="base_ocr_mistral",
         )
 
     def test_direct_model_lookup_success(self):

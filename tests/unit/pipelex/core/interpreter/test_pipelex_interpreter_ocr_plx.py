@@ -17,13 +17,13 @@ class TestPipelexInterpreterOcrPLX:
                     type="PipeOcr",
                     definition="Extract text from document",
                     output="Page",
-                    ocr_model="pypdfium2-extract-text",
+                    ocr="base_ocr_pypdfium2",
                 ),
                 """[pipe.extract_text]
 type = "PipeOcr"
 definition = "Extract text from document"
 output = "Page"
-ocr_model = "pypdfium2-extract-text\"""",
+ocr = "base_ocr_pypdfium2\"""",
             ),
             # OCR pipe with inputs
             (
@@ -33,14 +33,14 @@ ocr_model = "pypdfium2-extract-text\"""",
                     definition="Extract text from PDF",
                     inputs={"ocr_input": "PDF"},
                     output="Page",
-                    ocr_model="pypdfium2-extract-text",
+                    ocr="base_ocr_pypdfium2",
                 ),
                 """[pipe.extract_with_input]
 type = "PipeOcr"
 definition = "Extract text from PDF"
 inputs = { ocr_input = "PDF" }
 output = "Page"
-ocr_model = "pypdfium2-extract-text\"""",
+ocr = "base_ocr_pypdfium2\"""",
             ),
         ],
     )

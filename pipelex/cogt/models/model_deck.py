@@ -4,10 +4,17 @@ from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMHandleNotFoundError, LLMPresetNotFoundError, LLMSettingsValidationError, ModelDeckValidatonError
+from pipelex.cogt.exceptions import (
+    LLMHandleNotFoundError,
+    LLMPresetNotFoundError,
+    LLMSettingsValidationError,
+    ModelDeckValidatonError,
+    OcrPresetNotFoundError,
+)
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults, LLMSettingOrPresetId
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
 from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.exceptions import ConfigValidationError
 
@@ -16,14 +23,25 @@ LLM_PRESET_DISABLED = "disabled"
 Waterfall = Union[str, List[str]]
 
 
-class ModelDeckBlueprint(ConfigModel):
-    aliases: Dict[str, Waterfall] = Field(default_factory=dict)
-    llm_presets: Dict[str, LLMSetting] = Field(default_factory=dict)
-    llm_choice_defaults: LLMSettingChoicesDefaults
-    llm_choice_overrides: LLMSettingChoices = LLMSettingChoices(
+class LLMDeckBlueprint(ConfigModel):
+    presets: Dict[str, LLMSetting] = Field(default_factory=dict)
+    choice_defaults: LLMSettingChoicesDefaults
+    choice_overrides: LLMSettingChoices = LLMSettingChoices(
         for_text=None,
         for_object=None,
     )
+
+
+class OCRDeckBlueprint(ConfigModel):
+    presets: Dict[str, OcrSetting] = Field(default_factory=dict)
+    choice_default: OcrChoice
+
+
+class ModelDeckBlueprint(ConfigModel):
+    aliases: Dict[str, Waterfall] = Field(default_factory=dict)
+
+    llm: LLMDeckBlueprint
+    ocr: OCRDeckBlueprint
 
 
 class ModelDeck(ConfigModel):
@@ -36,6 +54,9 @@ class ModelDeck(ConfigModel):
         for_text=None,
         for_object=None,
     )
+
+    ocr_presets: Dict[str, OcrSetting] = Field(default_factory=dict)
+    ocr_choice_default: OcrChoice
 
     def check_llm_setting(self, llm_setting_or_preset_id: LLMSettingOrPresetId, is_disabled_allowed: bool = False):
         if isinstance(llm_setting_or_preset_id, LLMSetting):
@@ -56,6 +77,16 @@ class ModelDeck(ConfigModel):
             if not the_llm_preset:
                 raise LLMPresetNotFoundError(f"LLM preset '{llm_setting_or_preset_id}' not found in deck")
             return the_llm_preset
+
+    def get_ocr_setting(self, ocr_choice: OcrChoice) -> OcrSetting:
+        if isinstance(ocr_choice, OcrSetting):
+            return ocr_choice
+        else:
+            # it's a preset id
+            the_ocr_preset = self.ocr_presets.get(ocr_choice)
+            if not the_ocr_preset:
+                raise OcrPresetNotFoundError(f"OCR preset '{ocr_choice}' not found in deck")
+            return the_ocr_preset
 
     @classmethod
     def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]
