@@ -40,7 +40,15 @@ class OcrPresetNotFoundError(CogtError):
     pass
 
 
+class ImgGenPresetNotFoundError(CogtError):
+    pass
+
+
 class LLMSettingsValidationError(CogtError):
+    pass
+
+
+class ImgGenSettingsValidationError(CogtError):
     pass
 
 

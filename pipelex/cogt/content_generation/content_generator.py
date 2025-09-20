@@ -18,7 +18,6 @@ from pipelex.cogt.content_generation.jinja2_generate import jinja2_gen_text
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
 from pipelex.cogt.content_generation.ocr_generate import ocr_gen_extract_pages
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
 from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -198,7 +197,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_single_image(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
+        imgg_handle: str,
         imgg_prompt: ImggPrompt,
         imgg_job_params: Optional[ImggJobParams] = None,
         imgg_job_config: Optional[ImggJobConfig] = None,
@@ -221,7 +220,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_image_list(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
+        imgg_handle: str,
         imgg_prompt: ImggPrompt,
         nb_images: int,
         imgg_job_params: Optional[ImggJobParams] = None,

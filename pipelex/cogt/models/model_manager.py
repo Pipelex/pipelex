@@ -137,6 +137,8 @@ class ModelManager(ModelManagerAbstract):
             llm_choice_overrides=model_deck_blueprint.llm.choice_overrides,
             ocr_presets=model_deck_blueprint.ocr.presets,
             ocr_choice_default=model_deck_blueprint.ocr.choice_default,
+            img_gen_presets=model_deck_blueprint.img_gen.presets,
+            img_gen_choice_default=model_deck_blueprint.img_gen.choice_default,
         )
         return model_deck
 

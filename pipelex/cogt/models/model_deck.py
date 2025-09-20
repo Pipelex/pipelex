@@ -5,12 +5,14 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.exceptions import (
+    ImgGenPresetNotFoundError,
     LLMHandleNotFoundError,
     LLMPresetNotFoundError,
     LLMSettingsValidationError,
     ModelDeckValidatonError,
     OcrPresetNotFoundError,
 )
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -37,11 +39,17 @@ class OCRDeckBlueprint(ConfigModel):
     choice_default: OcrChoice
 
 
+class ImgGenDeckBlueprint(ConfigModel):
+    presets: Dict[str, ImgGenSetting] = Field(default_factory=dict)
+    choice_default: ImgGenChoice
+
+
 class ModelDeckBlueprint(ConfigModel):
     aliases: Dict[str, Waterfall] = Field(default_factory=dict)
 
     llm: LLMDeckBlueprint
     ocr: OCRDeckBlueprint
+    img_gen: ImgGenDeckBlueprint
 
 
 class ModelDeck(ConfigModel):
@@ -57,6 +65,9 @@ class ModelDeck(ConfigModel):
 
     ocr_presets: Dict[str, OcrSetting] = Field(default_factory=dict)
     ocr_choice_default: OcrChoice
+
+    img_gen_presets: Dict[str, ImgGenSetting] = Field(default_factory=dict)
+    img_gen_choice_default: ImgGenChoice
 
     def check_llm_setting(self, llm_setting_or_preset_id: LLMChoice, is_disabled_allowed: bool = False):
         if isinstance(llm_setting_or_preset_id, LLMSetting):
@@ -87,6 +98,24 @@ class ModelDeck(ConfigModel):
             if not the_ocr_preset:
                 raise OcrPresetNotFoundError(f"OCR preset '{ocr_choice}' not found in deck")
             return the_ocr_preset
+
+    def check_img_gen_setting(self, img_gen_setting_or_preset_id: ImgGenChoice):
+        if isinstance(img_gen_setting_or_preset_id, ImgGenSetting):
+            return
+        preset_id: str = img_gen_setting_or_preset_id
+        if preset_id in self.img_gen_presets:
+            return
+        raise ImgGenPresetNotFoundError(f"img_gen preset id '{preset_id}' not found in deck")
+
+    def get_img_gen_setting(self, img_gen_choice: ImgGenChoice) -> ImgGenSetting:
+        if isinstance(img_gen_choice, ImgGenSetting):
+            return img_gen_choice
+        else:
+            # it's a preset id
+            the_img_gen_preset = self.img_gen_presets.get(img_gen_choice)
+            if not the_img_gen_preset:
+                raise ImgGenPresetNotFoundError(f"Image generation preset '{img_gen_choice}' not found in deck")
+            return the_img_gen_preset
 
     @classmethod
     def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]

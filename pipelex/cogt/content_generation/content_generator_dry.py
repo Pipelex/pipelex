@@ -6,7 +6,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
 from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -139,7 +138,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_single_image(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
+        imgg_handle: str,
         imgg_prompt: ImggPrompt,
         imgg_job_params: Optional[ImggJobParams] = None,
         imgg_job_config: Optional[ImggJobConfig] = None,
@@ -160,7 +159,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_image_list(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
+        imgg_handle: str,
         imgg_prompt: ImggPrompt,
         nb_images: int,
         imgg_job_params: Optional[ImggJobParams] = None,

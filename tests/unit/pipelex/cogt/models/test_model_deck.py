@@ -44,6 +44,8 @@ class TestModelDeckGetOptionalInferenceModel:
             ),
             ocr_presets={},
             ocr_choice_default="base_ocr_mistral",
+            img_gen_presets={},
+            img_gen_choice_default="base_img_gen",
         )
 
     def test_direct_model_lookup_success(self):

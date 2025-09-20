@@ -6,9 +6,9 @@ from typing_extensions import Self, override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImggJobParams, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImggJobParams, OutputFormat, Quality
 from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
@@ -29,7 +29,7 @@ from pipelex.exceptions import (
     UnexpectedPipeDefinitionError,
     WorkingMemoryStuffNotFoundError,
 )
-from pipelex.hub import get_concept_provider, get_content_generator
+from pipelex.hub import get_concept_provider, get_content_generator, get_model_deck
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -54,20 +54,26 @@ DEFAULT_PROMPT_VAR_NAME = "prompt"
 
 class PipeImgGen(PipeOperator):
     imgg_prompt: Optional[str] = None
-    # TODO: wrap this up in imgg llm_presets like for llm
-    imgg_handle: Optional[ImggHandle] = None
-    aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
+    img_gen_prompt_var_name: Optional[str] = None
+
+    # New ImgGenChoice pattern (like LLM)
+    img_gen: Optional[ImgGenChoice] = None
+
+    # Legacy individual settings (for backwards compatibility)
+    imgg_handle: Optional[str] = None
+    quality: Optional[Quality] = Field(default=None, strict=False)
     nb_steps: Optional[int] = Field(default=None, gt=0)
     guidance_scale: Optional[float] = Field(default=None, gt=0)
     is_moderated: Optional[bool] = None
-    background: Optional[Background] = None
-    quality: Optional[Quality] = Field(default=None, strict=False)
     safety_tolerance: Optional[int] = Field(default=None, ge=1, le=6)
+
+    # One-time settings (not in ImgGenSetting)
+    aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
     is_raw: Optional[bool] = None
     seed: Optional[Union[int, Literal["auto"]]] = None
+    background: Optional[Background] = Field(default=None, strict=False)
+    output_format: Optional[OutputFormat] = Field(default=None, strict=False)
     output_multiplicity: PipeOutputMultiplicity
-
-    img_gen_prompt_var_name: Optional[str] = None
 
     @field_validator("img_gen_prompt_var_name")
     @classmethod
@@ -215,7 +221,28 @@ class PipeImgGen(PipeOperator):
 
         imgg_config = get_config().cogt.imgg_config
         imgg_param_defaults = imgg_config.imgg_param_defaults
+        model_deck = get_model_deck()
 
+        # Get ImgGenSetting either from img_gen choice or legacy settings
+        img_gen_setting: ImgGenSetting
+        if self.img_gen is not None:
+            # New pattern: use img_gen choice (preset or inline setting)
+            img_gen_setting = model_deck.get_img_gen_setting(self.img_gen)
+        elif self.imgg_handle is not None or self.quality is not None or self.nb_steps is not None:
+            # Legacy pattern: create ImgGenSetting from individual settings
+            img_gen_setting = ImgGenSetting(
+                img_gen_handle=self.imgg_handle or imgg_config.default_imgg_handle,
+                quality=self.quality,
+                nb_steps=self.nb_steps,
+                guidance_scale=self.guidance_scale or imgg_param_defaults.guidance_scale,
+                is_moderated=self.is_moderated if self.is_moderated is not None else imgg_param_defaults.is_moderated,
+                safety_tolerance=self.safety_tolerance or imgg_param_defaults.safety_tolerance,
+            )
+        else:
+            # Use default from model deck
+            img_gen_setting = model_deck.get_img_gen_setting(model_deck.img_gen_choice_default)
+
+        # Process one-time settings
         seed_setting = self.seed or imgg_param_defaults.seed
         seed: Optional[int]
         if isinstance(seed_setting, str) and seed_setting == "auto":
@@ -223,20 +250,21 @@ class PipeImgGen(PipeOperator):
         else:
             seed = seed_setting
 
-        # TODO: refacto this as a model update
+        # Build ImggJobParams from ImgGenSetting + one-time settings
         imgg_job_params = ImggJobParams(
             aspect_ratio=self.aspect_ratio or imgg_param_defaults.aspect_ratio,
             background=self.background or imgg_param_defaults.background,
-            quality=self.quality or imgg_param_defaults.quality,
-            nb_steps=self.nb_steps or imgg_param_defaults.nb_steps,
-            guidance_scale=self.guidance_scale or imgg_param_defaults.guidance_scale,
-            is_moderated=self.is_moderated or imgg_param_defaults.is_moderated,
-            safety_tolerance=self.safety_tolerance or imgg_param_defaults.safety_tolerance,
-            is_raw=self.is_raw or imgg_param_defaults.is_raw,
-            output_format=imgg_param_defaults.output_format,
+            quality=img_gen_setting.quality,
+            nb_steps=img_gen_setting.nb_steps,
+            guidance_scale=img_gen_setting.guidance_scale,
+            is_moderated=img_gen_setting.is_moderated,
+            safety_tolerance=img_gen_setting.safety_tolerance,
+            is_raw=self.is_raw if self.is_raw is not None else imgg_param_defaults.is_raw,
+            output_format=self.output_format or imgg_param_defaults.output_format,
             seed=seed,
         )
-        imgg_handle = self.imgg_handle or imgg_config.default_imgg_handle
+        # Get the image generation handle
+        imgg_handle = img_gen_setting.img_gen_handle
         log.debug(f"Using imgg handle: {imgg_handle}")
 
         the_content: StuffContent

@@ -4,7 +4,6 @@ from pipelex import log
 from pipelex.cogt.exceptions import ImggGeneratedTypeError, ImggParameterError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
-from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
 from pipelex.cogt.img_gen.img_gen_job import ImggJob
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat, Quality
 from pipelex.config import get_config
@@ -86,7 +85,7 @@ class FalFactory:
         args_dict: Dict[str, Any]
         num_inference_steps: Optional[int]
         match fal_application:
-            case ImggHandle.FLUX_1_PRO_LEGACY | ImggHandle.FLUX_1_1_PRO:
+            case "fal-ai/flux-pro" | "fal-ai/flux-pro/v1.1":
                 num_inference_steps = params.nb_steps
                 if not num_inference_steps and (quality := params.quality):
                     num_inference_steps = cls.make_nb_steps_from_quality_for_flux_pro(quality=quality)
@@ -103,7 +102,7 @@ class FalFactory:
                     "output_format": cls.make_output_format_for_flux(params.output_format),
                     "sync_mode": imgg_job.job_config.is_sync_mode,
                 }
-            case ImggHandle.FLUX_1_1_ULTRA:
+            case "fal-ai/flux-pro/v1.1-ultra":
                 args_dict = {
                     "prompt": imgg_job.imgg_prompt.positive_text,
                     "aspect_ratio": cls.make_aspect_ratio_for_flux_1_1_ultra(params.aspect_ratio),
@@ -115,7 +114,7 @@ class FalFactory:
                     "output_format": cls.make_output_format_for_flux(params.output_format),
                     "sync_mode": imgg_job.job_config.is_sync_mode,
                 }
-            case ImggHandle.SDXL_LIGHTNING:
+            case "fal-ai/fast-lightning-sdxl":
                 num_inference_steps = params.nb_steps
                 if not num_inference_steps and (quality := params.quality):
                     num_inference_steps = cls.make_nb_steps_from_quality_for_sdxl_lightning(quality=quality)

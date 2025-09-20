@@ -26,6 +26,11 @@ base_llm_for_object = "gpt-4o-mini"
 llm_to_engineer = ["claude-4.1-opus", "gemini-2.5-pro"]
 llm_for_large_codebase = ["gemini-2.5-pro", "claude-4-sonnet", "gpt-5"]
 
+# Image generation aliases
+base-imgg = "fal-ai/flux-pro/v1.1"
+best-imgg = "fal-ai/flux-pro/v1.1-ultra"
+fast-imgg = "fal-ai/fast-lightning-sdxl"
+
 ####################################################################################################
 # LLM Presets
 ####################################################################################################
@@ -100,4 +105,24 @@ choice_default = "base_ocr_mistral"
 [ocr.presets]
 base_ocr_mistral = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
 base_ocr_pypdfium2 = { ocr_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+
+####################################################################################################
+# Image Generation Presets
+####################################################################################################
+
+[img_gen]
+choice_default = "base_img_gen"
+
+[img_gen.presets]
+# General purpose
+base_img_gen = { img_gen_handle = "base-imgg", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
+fast_img_gen = { img_gen_handle = "fast-imgg", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
+high_quality_img_gen = { img_gen_handle = "best-imgg", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
+
+# Specific skills
+img_gen_for_art = { img_gen_handle = "best-imgg", quality = "high", guidance_scale = 9.0, is_moderated = false, safety_tolerance = 5 }
+img_gen_for_diagram = { img_gen_handle = "base-imgg", quality = "medium", guidance_scale = 7.0, is_moderated = true, safety_tolerance = 2 }
+img_gen_for_mockup = { img_gen_handle = "base-imgg", quality = "medium", guidance_scale = 6.5, is_moderated = true, safety_tolerance = 3 }
+img_gen_for_product = { img_gen_handle = "best-imgg", quality = "high", guidance_scale = 8.5, is_moderated = true, safety_tolerance = 2 }
+img_gen_for_testing = { img_gen_handle = "fast-imgg", nb_steps = 4, guidance_scale = 4.0, is_moderated = true, safety_tolerance = 4 }
 

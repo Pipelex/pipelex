@@ -2,7 +2,6 @@ from typing import Optional
 
 import pytest
 
-from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.plugins.plugin_sdk_registry import Plugin
 
@@ -206,15 +205,15 @@ def llm_job_params(request: pytest.FixtureRequest) -> LLMJobParams:
 
 @pytest.fixture(
     params=[
-        # ImggHandle.FLUX_1_PRO_LEGACY,
-        # ImggHandle.FLUX_1_1_PRO,
-        # ImggHandle.FLUX_1_1_ULTRA,
-        ImggHandle.SDXL_LIGHTNING,
-        # ImggHandle.OPENAI_GPT_IMAGE_1,
+        # "fal-ai/flux-pro",
+        # "fal-ai/flux-pro/v1.1",
+        # "fal-ai/flux-pro/v1.1-ultra",
+        "fal-ai/fast-lightning-sdxl",
+        # "openai/gpt-image-1",
     ]
 )
-def imgg_handle(request: pytest.FixtureRequest) -> ImggHandle:
-    assert isinstance(request.param, ImggHandle)
+def imgg_handle(request: pytest.FixtureRequest) -> str:
+    assert isinstance(request.param, str)
     return request.param
 
 

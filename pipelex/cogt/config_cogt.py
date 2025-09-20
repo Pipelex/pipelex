@@ -1,8 +1,5 @@
 from typing import List
 
-from pydantic import Field
-
-from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
 from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams, ImggJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.plugins.fal.fal_config import FalConfig
@@ -16,7 +13,7 @@ class OcrConfig(ConfigModel):
 
 
 class ImggConfig(ConfigModel):
-    default_imgg_handle: ImggHandle = Field(strict=False)
+    default_imgg_handle: str
     imgg_job_config: ImggJobConfig
     imgg_param_defaults: ImggJobParamsDefaults
     imgg_handles: List[str]

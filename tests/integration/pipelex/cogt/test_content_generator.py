@@ -6,7 +6,6 @@ from pytest import FixtureRequest
 from pipelex import pretty_print
 from pipelex.cogt.exceptions import LLMHandleNotFoundError
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
 from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -107,7 +106,7 @@ class TestContentGenerator:
     async def test_make_image(self, request: FixtureRequest):
         image: GeneratedImage = await get_content_generator().make_single_image(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
-            imgg_handle=ImggHandle.SDXL_LIGHTNING,
+            imgg_handle="fal-ai/fast-lightning-sdxl",
             imgg_prompt=ImggPrompt(
                 positive_text="A dog with sunglasses coding on a laptop",
             ),

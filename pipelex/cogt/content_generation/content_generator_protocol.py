@@ -2,7 +2,6 @@ from functools import wraps
 from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional, ParamSpec, Protocol, Type, TypeVar
 
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
 from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -91,7 +90,7 @@ class ContentGeneratorProtocol(Protocol):
     async def make_single_image(
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
+        imgg_handle: str,
         imgg_prompt: ImggPrompt,
         imgg_job_params: Optional[ImggJobParams] = None,
         imgg_job_config: Optional[ImggJobConfig] = None,
@@ -100,7 +99,7 @@ class ContentGeneratorProtocol(Protocol):
     async def make_image_list(
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
+        imgg_handle: str,
         imgg_prompt: ImggPrompt,
         nb_images: int,
         imgg_job_params: Optional[ImggJobParams] = None,
