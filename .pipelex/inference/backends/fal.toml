@@ -1,0 +1,26 @@
+default_sdk = "fal"
+default_prompting_target = "fal"
+
+["fal-ai/flux-pro"]
+model_id = "fal-ai/flux-pro"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.05, output = 0.0 }
+
+["fal-ai/flux-pro/v1.1"]
+model_id = "fal-ai/flux-pro/v1.1"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.05, output = 0.0 }
+
+["fal-ai/flux-pro/v1.1-ultra"]
+model_id = "fal-ai/flux-pro/v1.1-ultra"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.06, output = 0.0 }
+
+["fal-ai/fast-lightning-sdxl"]
+model_id = "fal-ai/fast-lightning-sdxl"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.0003, output = 0.0 }

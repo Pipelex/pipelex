@@ -29,7 +29,7 @@ class TestPipeImgg:
             definition="Image generation test",
             img_gen_prompt=image_desc,
             imgg_handle=imgg_handle,
-            output=NativeConceptEnum.IMAGE.value,
+            output=NativeConceptEnum.IMAGE,
             nb_output=1,
         )
 

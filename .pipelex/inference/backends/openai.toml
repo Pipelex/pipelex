@@ -122,3 +122,9 @@ outputs = ["text"]
 costs = { input = 1.25, output = 10.0 }
 constraints = ["temperature_must_be_1"]
 
+["openai/gpt-image-1"]
+model_id = "dall-e-3"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.04, output = 0.0 }
+
