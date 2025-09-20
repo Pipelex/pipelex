@@ -3,7 +3,8 @@ from pytest import FixtureRequest, Parser
 from rich import print
 
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
-from pipelex.tools.environment import ENV_DUMMY_PLACEHOLDER_VALUE, is_env_set, set_env
+from pipelex.tools.environment import is_env_set, set_env
+from pipelex.tools.misc.placeholder import make_placeholder_value
 from pipelex.tools.runtime_manager import RunMode, runtime_manager
 
 
@@ -38,36 +39,37 @@ def _setup_env_var_placeholders():
     remain skipped via pytest markers.
     """
 
-    # Define placeholder values for all inference-related env vars
-    env_var_placeholders = {
-        "PIPELEX_API_TOKEN": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "PIPELEX_API_BASE_URL": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "PIPELEX_INFERENCE_API_KEY": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "OPENAI_API_KEY": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "AWS_ACCESS_KEY_ID": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "AWS_SECRET_ACCESS_KEY": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "AWS_REGION": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "AZURE_API_BASE": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "AZURE_API_KEY": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "AZURE_API_VERSION": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "GCP_PROJECT_ID": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "GCP_LOCATION": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "GCP_CREDENTIALS_FILE_PATH": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "ANTHROPIC_API_KEY": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "MISTRAL_API_KEY": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "PERPLEXITY_API_KEY": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "PERPLEXITY_API_ENDPOINT": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "XAI_API_KEY": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "XAI_API_ENDPOINT": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "FAL_API_KEY": ENV_DUMMY_PLACEHOLDER_VALUE,
-        "BLACKBOX_API_KEY": ENV_DUMMY_PLACEHOLDER_VALUE,
-    }
+    # Define list of inference-related env vars that need placeholders
+    env_var_names = [
+        "PIPELEX_API_TOKEN",
+        "PIPELEX_API_BASE_URL",
+        "PIPELEX_INFERENCE_API_KEY",
+        "OPENAI_API_KEY",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_REGION",
+        "AZURE_API_BASE",
+        "AZURE_API_KEY",
+        "AZURE_API_VERSION",
+        "GCP_PROJECT_ID",
+        "GCP_LOCATION",
+        "GCP_CREDENTIALS_FILE_PATH",
+        "ANTHROPIC_API_KEY",
+        "MISTRAL_API_KEY",
+        "PERPLEXITY_API_KEY",
+        "PERPLEXITY_API_ENDPOINT",
+        "XAI_API_KEY",
+        "XAI_API_ENDPOINT",
+        "FAL_API_KEY",
+        "BLACKBOX_API_KEY",
+    ]
 
     # Set placeholders for env vars who's presence is required for the code to run properly
     # even if their value is not used in the test
     substitutions_counter = 0
-    for key, placeholder_value in env_var_placeholders.items():
-        if not is_env_set(key):
+    for key in env_var_names:
+        if not is_env_set([key]):
+            placeholder_value = make_placeholder_value(key)
             set_env(key, placeholder_value)
             substitutions_counter += 1
 

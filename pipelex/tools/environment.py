@@ -4,8 +4,7 @@ from typing import Iterable, Optional
 from dotenv import load_dotenv
 
 from pipelex.tools.exceptions import ToolException
-
-ENV_DUMMY_PLACEHOLDER_VALUE = "env-dummy-placeholder"
+from pipelex.tools.misc.placeholder import value_is_placeholder
 
 load_dotenv(dotenv_path=".env", override=True)
 
@@ -35,7 +34,8 @@ def is_env_set(keys: Iterable[str]) -> bool:
 
 def any_is_placeholder_env(keys: Iterable[str]) -> bool:
     for each_key in keys:
-        if os.getenv(each_key) == ENV_DUMMY_PLACEHOLDER_VALUE:
+        env_value = os.getenv(each_key)
+        if value_is_placeholder(env_value):
             return True
     return False
 

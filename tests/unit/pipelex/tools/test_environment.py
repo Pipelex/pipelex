@@ -4,7 +4,6 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.tools.environment import (
-    ENV_DUMMY_PLACEHOLDER_VALUE,
     EnvVarNotFoundError,
     any_is_placeholder_env,
     get_optional_env,
@@ -12,6 +11,7 @@ from pipelex.tools.environment import (
     is_env_set,
     set_env,
 )
+from pipelex.tools.misc.placeholder import PLACEHOLDER_PREFIX, make_placeholder_value
 
 
 class TestEnvironment:
@@ -90,7 +90,7 @@ class TestEnvironment:
         assert result is True
 
     def test_any_is_placeholder_env_has_placeholder(self, mocker: MockerFixture):
-        mocker.patch.dict(os.environ, {"VAR1": "real_value", "VAR2": ENV_DUMMY_PLACEHOLDER_VALUE, "VAR3": "another_value"})
+        mocker.patch.dict(os.environ, {"VAR1": "real_value", "VAR2": make_placeholder_value("VAR2"), "VAR3": "another_value"})
         result = any_is_placeholder_env(["VAR1", "VAR2", "VAR3"])
         assert result is True
 
@@ -100,7 +100,14 @@ class TestEnvironment:
         assert result is False
 
     def test_any_is_placeholder_env_all_placeholders(self, mocker: MockerFixture):
-        mocker.patch.dict(os.environ, {"VAR1": ENV_DUMMY_PLACEHOLDER_VALUE, "VAR2": ENV_DUMMY_PLACEHOLDER_VALUE, "VAR3": ENV_DUMMY_PLACEHOLDER_VALUE})
+        mocker.patch.dict(
+            os.environ,
+            {
+                "VAR1": make_placeholder_value("VAR1"),
+                "VAR2": make_placeholder_value("VAR2"),
+                "VAR3": make_placeholder_value("VAR3"),
+            },
+        )
         result = any_is_placeholder_env(["VAR1", "VAR2", "VAR3"])
         assert result is True
 
@@ -115,7 +122,7 @@ class TestEnvironment:
         assert result is False
 
     def test_any_is_placeholder_env_single_placeholder(self, mocker: MockerFixture):
-        mocker.patch.dict(os.environ, {"PLACEHOLDER_VAR": ENV_DUMMY_PLACEHOLDER_VALUE})
+        mocker.patch.dict(os.environ, {"PLACEHOLDER_VAR": make_placeholder_value("PLACEHOLDER_VAR")})
         result = any_is_placeholder_env(["PLACEHOLDER_VAR"])
         assert result is True
 
@@ -124,8 +131,25 @@ class TestEnvironment:
         result = any_is_placeholder_env(["NORMAL_VAR"])
         assert result is False
 
-    def test_env_dummy_placeholder_value_constant(self):
-        assert ENV_DUMMY_PLACEHOLDER_VALUE == "env-dummy-placeholder"
+    def test_any_is_placeholder_env_prefix_at_start_only(self, mocker: MockerFixture):
+        """Test that only values starting with the prefix are considered placeholders."""
+        mocker.patch.dict(
+            os.environ,
+            {
+                "VAR1": f"not-{PLACEHOLDER_PREFIX}-suffix",
+                "VAR2": make_placeholder_value("VAR2"),
+            },
+        )
+        result = any_is_placeholder_env(["VAR1"])
+        assert result is False
+        result = any_is_placeholder_env(["VAR2"])
+        assert result is True
+
+    def test_any_is_placeholder_env_exact_prefix_match(self, mocker: MockerFixture):
+        """Test that exact prefix match (without suffix) is also considered a placeholder."""
+        mocker.patch.dict(os.environ, {"EXACT_PREFIX": PLACEHOLDER_PREFIX})
+        result = any_is_placeholder_env(["EXACT_PREFIX"])
+        assert result is True
 
     def test_env_var_not_found_error_inheritance(self):
         error = EnvVarNotFoundError("test message")
