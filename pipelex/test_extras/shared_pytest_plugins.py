@@ -40,7 +40,7 @@ def _setup_env_var_placeholders():
     """
 
     # Define list of inference-related env vars that need placeholders
-    env_var_names = [
+    env_var_keys = [
         "PIPELEX_API_TOKEN",
         "PIPELEX_API_BASE_URL",
         "PIPELEX_INFERENCE_API_KEY",
@@ -67,7 +67,7 @@ def _setup_env_var_placeholders():
     # Set placeholders for env vars who's presence is required for the code to run properly
     # even if their value is not used in the test
     substitutions_counter = 0
-    for key in env_var_names:
+    for key in env_var_keys:
         if not is_env_set([key]):
             placeholder_value = make_placeholder_value(key)
             set_env(key, placeholder_value)

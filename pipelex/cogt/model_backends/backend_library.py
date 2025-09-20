@@ -62,7 +62,10 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 raise InferenceBackendCredentialsError(
                     error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
                     backend_name=backend_name,
-                    message=f"Variable substitution failed due to a variable not found error in file '{backends_library_path}':\n{var_not_found_exc}",
+                    message=(
+                        f"Variable substitution failed due to a variable not found error in file '{backends_library_path}':\n"
+                        f"{var_not_found_exc}\nRun mode: '{runtime_manager.run_mode}'"
+                    ),
                     key_name=var_not_found_exc.var_name,
                 ) from var_not_found_exc
             except UnknownVarPrefixError as unknown_var_prefix_exc:
