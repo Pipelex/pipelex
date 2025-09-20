@@ -43,25 +43,3 @@ def any_is_placeholder_env(keys: Iterable[str]) -> bool:
 def set_env(key: str, value: str) -> None:
     os.environ[key] = value
     return None
-
-
-def get_rooted_path(root: str, path: Optional[str] = None) -> str:
-    if path is None:
-        path = ""
-    if path.startswith(root):
-        return path
-    elif os.path.isabs(path):
-        return path
-    else:
-        joined = os.path.join(root, path)
-        # remove edning "/" if any
-        if joined.endswith("/"):
-            joined = joined[:-1]
-        return joined
-
-
-def get_env_rooted_path(root_env: str, path: Optional[str] = None) -> str:
-    root = os.getenv(root_env)
-    if root is None:
-        root = ""
-    return get_rooted_path(root, path)
