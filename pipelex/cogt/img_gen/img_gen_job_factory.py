@@ -1,8 +1,8 @@
 from typing import Optional
 
-from pipelex.cogt.imgg.imgg_job import ImggJob
-from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams, ImggJobReport
-from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_job import ImggJob
+from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams, ImggJobReport
+from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 

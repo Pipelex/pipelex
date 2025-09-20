@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, RootModel
 
-from pipelex.cogt.imgg.imgg_platform import ImggPlatform
+from pipelex.cogt.img_gen.img_gen_platform import ImggPlatform
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 

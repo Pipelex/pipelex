@@ -7,10 +7,10 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import ImggGenerationError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_engine import ImggEngine
-from pipelex.cogt.imgg.imgg_job import ImggJob
-from pipelex.cogt.imgg.imgg_job_components import Quality
-from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
+from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
+from pipelex.cogt.img_gen.img_gen_job import ImggJob
+from pipelex.cogt.img_gen.img_gen_job_components import Quality
+from pipelex.cogt.img_gen.img_gen_worker_abstract import ImggWorkerAbstract
 from pipelex.plugins.openai.openai_imgg_factory import OpenAIImggFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file

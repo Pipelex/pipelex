@@ -6,8 +6,8 @@ from pytest import FixtureRequest
 from pipelex import pretty_print
 from pipelex.cogt.exceptions import LLMHandleNotFoundError
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
+from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.ocr.ocr_input import OcrInput

@@ -2,9 +2,9 @@ from functools import wraps
 from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional, ParamSpec, Protocol, Type, TypeVar
 
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams
-from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
+from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams
+from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting

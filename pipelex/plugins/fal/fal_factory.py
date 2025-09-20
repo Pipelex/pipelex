@@ -3,10 +3,10 @@ from typing import Any, Dict, List, Optional
 from pipelex import log
 from pipelex.cogt.exceptions import ImggGeneratedTypeError, ImggParameterError
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_engine import ImggEngine
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job import ImggJob
-from pipelex.cogt.imgg.imgg_job_components import AspectRatio, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
+from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
+from pipelex.cogt.img_gen.img_gen_job import ImggJob
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat, Quality
 from pipelex.config import get_config
 
 

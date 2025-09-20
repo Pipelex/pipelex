@@ -1,9 +1,9 @@
 from typing import Optional
 
 from pipelex.cogt.exceptions import CogtError, MissingDependencyError
-from pipelex.cogt.imgg.imgg_engine import ImggEngine
-from pipelex.cogt.imgg.imgg_platform import ImggPlatform
-from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
+from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
+from pipelex.cogt.img_gen.img_gen_platform import ImggPlatform
+from pipelex.cogt.img_gen.img_gen_worker_abstract import ImggWorkerAbstract
 from pipelex.hub import get_models_manager, get_plugin_manager, get_secret
 from pipelex.plugins.openai.openai_imgg_worker import OpenAIImggWorker
 from pipelex.plugins.plugin_sdk_registry import Plugin

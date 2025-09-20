@@ -2,7 +2,7 @@ from typing import Optional
 
 import pytest
 
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
+from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.plugins.plugin_sdk_registry import Plugin
 

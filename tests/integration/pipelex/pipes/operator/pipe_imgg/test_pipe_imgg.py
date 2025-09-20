@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
+from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory

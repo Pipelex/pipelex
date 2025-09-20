@@ -6,9 +6,9 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_engine import ImggEngine
-from pipelex.cogt.imgg.imgg_job import ImggJob
-from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
+from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
+from pipelex.cogt.img_gen.img_gen_job import ImggJob
+from pipelex.cogt.img_gen.img_gen_worker_abstract import ImggWorkerAbstract
 from pipelex.plugins.fal.fal_factory import FalFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 

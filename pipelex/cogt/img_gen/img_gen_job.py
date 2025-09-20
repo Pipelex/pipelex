@@ -2,9 +2,9 @@ from datetime import datetime
 
 from typing_extensions import override
 
-from pipelex.cogt.imgg.imgg_engine import ImggEngine
-from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams, ImggJobReport
-from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
+from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams, ImggJobReport
+from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 
 

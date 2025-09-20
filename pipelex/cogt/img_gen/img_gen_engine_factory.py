@@ -1,6 +1,6 @@
 from pipelex.cogt.exceptions import CogtError
-from pipelex.cogt.imgg.imgg_engine import ImggEngine
-from pipelex.cogt.imgg.imgg_platform import ImggPlatform
+from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
+from pipelex.cogt.img_gen.img_gen_platform import ImggPlatform
 
 
 class ImggEngineFactoryError(CogtError):

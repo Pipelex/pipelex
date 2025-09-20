@@ -2,8 +2,8 @@ from typing import List
 
 from pydantic import Field
 
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams, ImggJobParamsDefaults
+from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
+from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams, ImggJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.plugins.fal.fal_config import FalConfig
 from pipelex.tools.config.config_model import ConfigModel

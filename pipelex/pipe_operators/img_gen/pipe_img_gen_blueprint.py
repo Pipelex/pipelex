@@ -3,8 +3,8 @@ from typing import Literal, Optional, Union
 from pydantic import Field, model_validator
 from typing_extensions import Self
 
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Quality
+from pipelex.cogt.img_gen.img_gen_handle import ImggHandle
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Quality
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists

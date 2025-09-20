@@ -1,7 +1,7 @@
 from typing import Literal
 
 from pipelex.cogt.exceptions import ImggParameterError
-from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat, Quality
 
 GptImage1SizeType = Literal["1024x1024", "1536x1024", "1024x1536"]
 GptImage1OutputFormatType = Literal["png", "jpeg", "webp"]

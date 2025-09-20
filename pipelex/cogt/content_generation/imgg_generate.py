@@ -3,7 +3,7 @@ from typing import List, Union
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import ImggAssignment
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_job_factory import ImggJobFactory
+from pipelex.cogt.img_gen.img_gen_job_factory import ImggJobFactory
 from pipelex.hub import get_imgg_worker
 
 

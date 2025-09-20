@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.cogt.imgg.imgg_job_factory import ImggJobFactory
+from pipelex.cogt.img_gen.img_gen_job_factory import ImggJobFactory
 from pipelex.hub import get_imgg_worker
 from tests.integration.pipelex.test_data import IMGGTestCases
 

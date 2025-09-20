@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from pipelex.cogt.imgg.imgg_platform import ImggPlatform
+from pipelex.cogt.img_gen.img_gen_platform import ImggPlatform
 
 
 class ImggEngine(BaseModel):
