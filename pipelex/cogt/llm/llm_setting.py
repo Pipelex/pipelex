@@ -52,17 +52,17 @@ class LLMSetting(ConfigModel):
         )
 
 
-LLMSettingOrPresetId = Union[LLMSetting, str]
+LLMChoice = Union[LLMSetting, str]
 
 
 class LLMSettingChoicesDefaults(ConfigModel):
-    for_text: LLMSettingOrPresetId
-    for_object: LLMSettingOrPresetId
+    for_text: LLMChoice
+    for_object: LLMChoice
 
 
 class LLMSettingChoices(ConfigModel):
-    for_text: Optional[LLMSettingOrPresetId]
-    for_object: Optional[LLMSettingOrPresetId]
+    for_text: Optional[LLMChoice]
+    for_object: Optional[LLMChoice]
 
     def list_used_presets(self) -> Set[str]:
         return set(
@@ -79,8 +79,8 @@ class LLMSettingChoices(ConfigModel):
     @classmethod
     def make_completed_with_defaults(
         cls,
-        for_text: Optional[LLMSettingOrPresetId] = None,
-        for_object: Optional[LLMSettingOrPresetId] = None,
+        for_text: Optional[LLMChoice] = None,
+        for_object: Optional[LLMChoice] = None,
     ) -> Self:
         return cls(
             for_text=for_text,

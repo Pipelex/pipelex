@@ -10,7 +10,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
-from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
+from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_setting_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -259,8 +259,8 @@ class PipeLLM(PipeOperator):
         fixed_nb_output = multiplicity_resolution.specific_output_count
 
         # Collect what LLM settings we have for this particular PipeLLM
-        llm_for_text_choice: Optional[LLMSettingOrPresetId] = None
-        llm_for_object_choice: Optional[LLMSettingOrPresetId] = None
+        llm_for_text_choice: Optional[LLMChoice] = None
+        llm_for_object_choice: Optional[LLMChoice] = None
         if self.llm_choices:
             llm_for_text_choice = self.llm_choices.for_text
             llm_for_object_choice = self.llm_choices.for_object
@@ -269,7 +269,7 @@ class PipeLLM(PipeOperator):
 
         # Choice of main LLM for text first from this PipeLLM setting (self.llm_choices)
         # or from the llm_choice_overrides or fallback on the llm_choice_defaults
-        llm_setting_or_preset_id_for_text: LLMSettingOrPresetId = (
+        llm_setting_or_preset_id_for_text: LLMChoice = (
             llm_for_text_choice or model_deck.llm_choice_overrides.for_text or model_deck.llm_choice_defaults.for_text
         )
         llm_setting_main: LLMSetting = model_deck.get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_text)
@@ -277,7 +277,7 @@ class PipeLLM(PipeOperator):
         # Choice of main LLM for object from this PipeLLM setting (self.llm_choices)
         # OR FROM THE llm_for_text_choice (if any)
         # then fallback on the llm_choice_overrides or llm_choice_defaults
-        llm_setting_or_preset_id_for_object: LLMSettingOrPresetId = (
+        llm_setting_or_preset_id_for_object: LLMChoice = (
             llm_for_object_choice or llm_for_text_choice or model_deck.llm_choice_overrides.for_object or model_deck.llm_choice_defaults.for_object
         )
         llm_setting_for_object: LLMSetting = model_deck.get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_object)

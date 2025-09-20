@@ -1,9 +1,9 @@
 from pipelex.cogt.exceptions import LLMPresetNotFoundError
-from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingOrPresetId
+from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting
 from pipelex.hub import get_models_manager
 
 
-def check_llm_setting_with_deck(llm_setting_or_preset_id: LLMSettingOrPresetId):
+def check_llm_setting_with_deck(llm_setting_or_preset_id: LLMChoice):
     if isinstance(llm_setting_or_preset_id, LLMSetting):
         return
     preset_id: str = llm_setting_or_preset_id

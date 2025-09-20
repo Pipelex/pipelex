@@ -11,7 +11,7 @@ from pipelex.cogt.exceptions import (
     ModelDeckValidatonError,
     OcrPresetNotFoundError,
 )
-from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults, LLMSettingOrPresetId
+from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
@@ -58,7 +58,7 @@ class ModelDeck(ConfigModel):
     ocr_presets: Dict[str, OcrSetting] = Field(default_factory=dict)
     ocr_choice_default: OcrChoice
 
-    def check_llm_setting(self, llm_setting_or_preset_id: LLMSettingOrPresetId, is_disabled_allowed: bool = False):
+    def check_llm_setting(self, llm_setting_or_preset_id: LLMChoice, is_disabled_allowed: bool = False):
         if isinstance(llm_setting_or_preset_id, LLMSetting):
             return
         preset_id: str = llm_setting_or_preset_id
@@ -68,7 +68,7 @@ class ModelDeck(ConfigModel):
             return
         raise LLMPresetNotFoundError(f"llm preset id '{preset_id}' not found in deck")
 
-    def get_llm_setting(self, llm_setting_or_preset_id: LLMSettingOrPresetId) -> LLMSetting:
+    def get_llm_setting(self, llm_setting_or_preset_id: LLMChoice) -> LLMSetting:
         if isinstance(llm_setting_or_preset_id, LLMSetting):
             return llm_setting_or_preset_id
         else:

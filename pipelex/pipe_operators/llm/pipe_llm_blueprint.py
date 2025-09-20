@@ -3,7 +3,7 @@ from typing import Literal, Optional
 from pydantic import field_validator, model_validator
 from typing_extensions import Self
 
-from pipelex.cogt.llm.llm_setting import LLMSettingOrPresetId
+from pipelex.cogt.llm.llm_setting import LLMChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
@@ -27,8 +27,8 @@ class PipeLLMBlueprint(PipeBlueprint):
     prompt_name: Optional[str] = None
     prompt: Optional[str] = None
 
-    llm: Optional[LLMSettingOrPresetId] = None
-    llm_to_structure: Optional[LLMSettingOrPresetId] = None
+    llm: Optional[LLMChoice] = None
+    llm_to_structure: Optional[LLMChoice] = None
 
     structuring_method: Optional[StructuringMethod] = None
     prompt_template_to_structure: Optional[str] = None
