@@ -1,5 +1,5 @@
 import os
-from typing import Iterable, Optional
+from typing import List, Optional
 
 from dotenv import load_dotenv
 
@@ -25,14 +25,18 @@ def get_optional_env(key: str) -> Optional[str]:
     return value
 
 
-def is_env_set(keys: Iterable[str]) -> bool:
+def is_env_var_set(key: str) -> bool:
+    return os.getenv(key) is not None
+
+
+def all_env_vars_are_set(keys: List[str]) -> bool:
     for each_key in keys:
-        if os.getenv(each_key) is None:
+        if not is_env_var_set(each_key):
             return False
     return True
 
 
-def any_is_placeholder_env(keys: Iterable[str]) -> bool:
+def any_env_var_is_placeholder(keys: List[str]) -> bool:
     for each_key in keys:
         env_value = os.getenv(each_key)
         if value_is_placeholder(env_value):

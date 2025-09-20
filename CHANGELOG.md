@@ -12,13 +12,13 @@
  - Renamed `get_llm_deck_paths()` method to `get_model_deck_paths()`
  - Renamed `is_gha_testing` property to `is_ci_testing` in RuntimeManager
  - Updated environment variable handling to use new placeholder utility functions
- - Refactored `is_env_set()` function to only accept iterables, removing single string support
- - Modified `any_is_placeholder_env()` to use new placeholder detection logic
+ - Refactored `all_env_vars_are_set()` function to only accept a list of keys, single string support now uses `is_env_var_set()`
+ - Modified `any_env_var_is_placeholder()` to use new placeholder detection logic
  - Updated test environment setup to use dynamic placeholder generation instead of hardcoded values
  - Restructured test classes and methods in environment tests
 
 ### Fixed
- - Fixed logic error in `any_is_placeholder_env()` function - now correctly returns False when no placeholders are found
+ - Fixed logic error in `any_env_var_is_placeholder()` function - now correctly returns False when no placeholders are found
 
 ### Removed
  - Removed `ENV_DUMMY_PLACEHOLDER_VALUE` constant

@@ -3,14 +3,14 @@ from pytest import FixtureRequest, Parser
 from rich import print
 
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
-from pipelex.tools.environment import is_env_set, set_env
+from pipelex.tools.environment import is_env_var_set, set_env
 from pipelex.tools.misc.placeholder import make_placeholder_value
 from pipelex.tools.runtime_manager import RunMode, runtime_manager
 
 
 @pytest.fixture(scope="session", autouse=True)
 def set_run_mode():
-    if is_env_set("GITHUB_ACTIONS") or is_env_set("CI"):
+    if is_env_var_set(key="GITHUB_ACTIONS") or is_env_var_set(key="CI"):
         runtime_manager.set_run_mode(run_mode=RunMode.CI_TEST)
     else:
         runtime_manager.set_run_mode(run_mode=RunMode.UNIT_TEST)
@@ -68,7 +68,7 @@ def _setup_env_var_placeholders():
     # even if their value is not used in the test
     substitutions_counter = 0
     for key in env_var_keys:
-        if not is_env_set([key]):
+        if not is_env_var_set(key=key):
             placeholder_value = make_placeholder_value(key)
             set_env(key, placeholder_value)
             substitutions_counter += 1
