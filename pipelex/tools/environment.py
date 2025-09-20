@@ -26,22 +26,18 @@ def get_optional_env(key: str) -> Optional[str]:
     return value
 
 
-def is_env_set(key: str | Iterable[str]) -> bool:
-    if isinstance(key, str):
-        return os.getenv(key) is not None
-    for each_key in key:
+def is_env_set(keys: Iterable[str]) -> bool:
+    for each_key in keys:
         if os.getenv(each_key) is None:
             return False
     return True
 
 
-def any_is_placeholder_env(key: str | Iterable[str]) -> bool:
-    if isinstance(key, str):
-        return os.getenv(key) == ENV_DUMMY_PLACEHOLDER_VALUE
-    for each_key in key:
+def any_is_placeholder_env(keys: Iterable[str]) -> bool:
+    for each_key in keys:
         if os.getenv(each_key) == ENV_DUMMY_PLACEHOLDER_VALUE:
             return True
-    return True
+    return False
 
 
 def set_env(key: str, value: str) -> None:

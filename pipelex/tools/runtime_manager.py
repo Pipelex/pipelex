@@ -93,7 +93,7 @@ class RuntimeManager(BaseModel):
                 return True
 
     @property
-    def is_gha_testing(self) -> bool:
+    def is_ci_testing(self) -> bool:
         match self.run_mode:
             case RunMode.NORMAL:
                 return False

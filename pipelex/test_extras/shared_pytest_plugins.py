@@ -78,7 +78,6 @@ def _setup_env_var_placeholders():
 @pytest.fixture(scope="session", autouse=True)
 def setup_ci_environment():
     """Set up CI environment variables and configuration before any tests run."""
-    # Check if we're running in CI (GitHub Actions or generic CI environment)
-    if runtime_manager.is_unit_testing:
+    if runtime_manager.is_ci_testing:
         _setup_env_var_placeholders()
     yield

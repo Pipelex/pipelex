@@ -47,7 +47,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             inference_backend_blueprint_dict_raw = backend_dict.copy()
             if not inference_backend_blueprint_dict_raw.get("enabled", True):
                 continue
-            if runtime_manager.is_gha_testing and backend_name == "vertexai":
+            if runtime_manager.is_ci_testing and backend_name == "vertexai":
                 continue
             try:
                 inference_backend_blueprint_dict = apply_to_strings_recursive(inference_backend_blueprint_dict_raw, substitute_vars)
