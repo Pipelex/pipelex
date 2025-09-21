@@ -21,18 +21,16 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
 @pytest.fixture(
     params=[
         # "o1",
-        "gpt-4o",
+        # "gpt-4o",
         # "gpt-4o-mini",
         # "gpt-4-5-preview",
         # "o1-mini",
         # "o3-mini",
         # "gpt-5-mini", # TODO: fix this
         # "gpt-5-nano", # TODO: fix this
-        # "best-gpt",
         # "claude-3-haiku",
         # "claude-3-5-sonnet",
         # "claude-3-7-sonnet",
-        # "best-claude",
         # "mistral-large",
         # "ministral-3b",
         # "ministral-8b",
@@ -55,7 +53,6 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "pipelex/claude-3.7-sonnet",
         # "pipelex/gemini-2.0-flash-vertex",
         # "pipelex/gemini-2.0-flash",
-        # "best-claude",
         # "llm_to_engineer",
         # "gpt-5-nano",
         # "gpt-4o-mini",
@@ -71,6 +68,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gemini-2.5-pro",
         # "grok-3",
         # "grok-3-mini",
+        "base-claude",
     ]
 )
 def llm_handle(request: pytest.FixtureRequest) -> str:
