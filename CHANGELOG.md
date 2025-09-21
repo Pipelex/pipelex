@@ -1,24 +1,20 @@
 # Changelog
 
-## Unreleased • new pipe builder
+## Unreleased
+
+### Highlights
+
+- **New pipe builder** pipeline to generate Pipes based on a brief in natural language: use the cli `pipelex build pipe "Your task"` to build the pipe.
+- **Full refactoring of OCR and Image Generation** to use the same patterns as `LLM` workers and pipes.
 
 ### Added
 
-- New pipe builder pipeline to generate Pipes based on a brief in natural language: use the cli `pipelex build pipe "Your task"` to build the pipe.
-- Added a badge on the `README.md` to display the number of tests.
-
-## Unreleased • refactor
-
-#### Highlight: full refactoring of OCR and Image Generation
-
-- Both `Ocr` and `ImgGen` workers and pipes now use the same patterns as `LLM` workers and pipes.
-
-### Added
+ - Added a badge on the `README.md` to display the number of tests.
  - Added new placeholder utility module with `make_placeholder_value()` and `value_is_placeholder()` functions
  - Added comprehensive test suite for placeholder functionality
  - Added new test cases for environment variable functions
 
-### Changed
+### Changed 
  - Renamed `llm_deck` terminology to `model_deck` throughout codebase and documentation
  - Renamed `get_llm_deck_paths()` method to `get_model_deck_paths()`
  - Renamed `is_gha_testing` property to `is_ci_testing` in RuntimeManager
