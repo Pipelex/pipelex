@@ -1,5 +1,7 @@
-default_sdk = "azure_openai"
-default_prompting_target = "openai"
+[defaults]
+model_type = "llm"
+sdk = "azure_openai"
+prompting_target = "openai"
 
 [gpt-4o]
 model_id = "gpt-4o-2024-11-20"

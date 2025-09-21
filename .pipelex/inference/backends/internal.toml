@@ -1,4 +1,4 @@
-# software-only backend, runs internally, without AI
+# Software-only backend, runs internally, without API, without AI
 
 [pypdfium2-extract-text]
 model_type = "text_extractor"

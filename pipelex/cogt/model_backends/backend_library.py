@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, cast
 
 from pydantic import Field, RootModel, ValidationError
 from typing_extensions import Self
@@ -95,18 +95,24 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     raise InferenceModelSpecError(f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}") from exc
             except (FileNotFoundError, InferenceModelSpecError) as exc:
                 raise InferenceBackendLibraryError(f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}") from exc
-            default_sdk: Optional[str] = model_specs_dict.pop("default_sdk", None)
-            default_prompting_target: Optional[PromptingTarget] = model_specs_dict.pop("default_prompting_target", None)
+            defaults_dict: Dict[str, Any] = model_specs_dict.pop("defaults", {})
             backend_model_specs: Dict[str, InferenceModelSpec] = {}
-            for model_spec_name, model_spec_dict in model_specs_dict.items():
+            for model_spec_name, value in model_specs_dict.items():
+                if not isinstance(value, dict):
+                    raise InferenceModelSpecError(
+                        f"Model spec '{model_spec_name}' for backend '{backend_name}' at path '{path_to_model_specs_toml}' is not a dictionary"
+                    )
+                model_spec_dict: Dict[str, Any] = cast(Dict[str, Any], value)
                 try:
-                    model_spec_blueprint = InferenceModelSpecBlueprint.model_validate(model_spec_dict)
+                    # Start from the defaults
+                    model_spec_blueprint_dict = defaults_dict.copy()
+                    # Override with the attributes from the model spec dict
+                    model_spec_blueprint_dict.update(model_spec_dict)
+                    model_spec_blueprint = InferenceModelSpecBlueprint.model_validate(model_spec_blueprint_dict)
                     model_spec = InferenceModelSpecFactory.make_inference_model_spec(
                         backend_name=backend_name,
                         name=model_spec_name,
                         blueprint=model_spec_blueprint,
-                        default_prompting_target=default_prompting_target,
-                        fallback_sdk=default_sdk,
                     )
                     backend_model_specs[model_spec_name] = model_spec
                 except (InferenceModelSpecError, ValidationError) as exc:

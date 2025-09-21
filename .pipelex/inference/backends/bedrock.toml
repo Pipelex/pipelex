@@ -1,5 +1,7 @@
-default_sdk = "bedrock_aioboto3"
-default_prompting_target = "anthropic"
+[defaults]
+model_type = "llm"
+sdk = "bedrock_aioboto3"
+prompting_target = "anthropic"
 
 [bedrock-mistral-large]
 model_id = "mistral.mistral-large-2407-v1:0"

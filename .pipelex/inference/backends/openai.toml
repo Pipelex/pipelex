@@ -1,5 +1,7 @@
-default_sdk = "openai"
-default_prompting_target = "openai"
+[defaults]
+model_type = "llm"
+sdk = "openai"
+prompting_target = "openai"
 
 ["gpt-3.5-turbo"]
 model_id = "gpt-3.5-turbo-1106"
@@ -123,6 +125,7 @@ costs = { input = 1.25, output = 10.0 }
 constraints = ["temperature_must_be_1"]
 
 [gpt-image-1]
+model_type = "img_gen"
 model_id = "gpt-image-1"
 inputs = ["text"]
 outputs = ["image"]

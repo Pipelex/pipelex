@@ -1,5 +1,7 @@
-default_sdk = "anthropic"
-default_prompting_target = "anthropic"
+[defaults]
+model_type = "llm"
+sdk = "anthropic"
+prompting_target = "anthropic"
 
 [claude-3-haiku]
 model_id = "claude-3-haiku-20240307"

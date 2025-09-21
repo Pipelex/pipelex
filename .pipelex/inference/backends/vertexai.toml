@@ -1,5 +1,7 @@
-default_sdk = "openai"
-default_prompting_target = "gemini"
+[defaults]
+model_type = "llm"
+sdk = "openai"
+prompting_target = "gemini"
 
 ["gemini-2.0-flash"]
 model_id = "google/gemini-2.0-flash"
@@ -21,4 +23,3 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 0.30, output = 2.50 }
-
