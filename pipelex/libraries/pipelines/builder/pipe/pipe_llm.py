@@ -29,16 +29,6 @@ class LLMSetting(StructuredContent):
         elif isinstance(value, int):  # pyright: ignore[reportUnnecessaryIsInstance]
             return value
 
-    @model_validator(mode="after")
-    def validate_temperature(self) -> Self:
-        if self.llm_handle.startswith("gemini") and self.temperature > 1:
-            error_msg = (
-                f"Gemini LLMs such as '{self.llm_handle}' support temperatures up to 2 but we normalize between 0 and 1, "
-                f"so you can't set a temperature of {self.temperature}"
-            )
-            raise LLMSettingsValidationError(error_msg)
-        return self
-
 
 LLMSettingOrPresetId = Union[LLMSetting, str]
 

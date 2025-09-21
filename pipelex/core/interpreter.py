@@ -344,7 +344,7 @@ class PipelexInterpreter(BaseModel):
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
         lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output)}"')
-        lines.append(f'ocr_model = "{pipe.ocr}"')
+        lines.append(f'ocr = "{pipe.ocr}"')
 
         return "\n".join(lines)
 

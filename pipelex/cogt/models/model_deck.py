@@ -93,19 +93,13 @@ class ModelDeck(ConfigModel):
         if isinstance(ocr_choice, OcrSetting):
             return ocr_choice
         else:
-            # it's a preset id
-            the_ocr_preset = self.ocr_presets.get(ocr_choice)
-            if not the_ocr_preset:
+            # it's a string, so either an ocr preset id or an ocr handle
+            if ocr_preset := self.ocr_presets.get(ocr_choice):
+                return ocr_preset
+            elif self.get_optional_inference_model(model_handle=ocr_choice):
+                return OcrSetting(ocr_handle=ocr_choice)
+            else:
                 raise OcrPresetNotFoundError(f"OCR preset '{ocr_choice}' not found in deck")
-            return the_ocr_preset
-
-    def check_img_gen_setting(self, img_gen_setting_or_preset_id: ImgGenChoice):
-        if isinstance(img_gen_setting_or_preset_id, ImgGenSetting):
-            return
-        preset_id: str = img_gen_setting_or_preset_id
-        if preset_id in self.img_gen_presets:
-            return
-        raise ImgGenPresetNotFoundError(f"img_gen preset id '{preset_id}' not found in deck")
 
     def get_img_gen_setting(self, img_gen_choice: ImgGenChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):

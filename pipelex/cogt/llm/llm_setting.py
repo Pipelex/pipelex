@@ -28,16 +28,6 @@ class LLMSetting(ConfigModel):
         else:
             raise ConfigValidationError(f'Invalid max_tokens shoubd be an int or "auto" but it is a {type(value)}: {value}')
 
-    @model_validator(mode="after")
-    def validate_temperature(self) -> Self:
-        if self.llm_handle.startswith("gemini") and self.temperature > 1:
-            error_msg = (
-                f"Gemini LLMs such as '{self.llm_handle}' support temperatures up to 2 but we normalize between 0 and 1, "
-                f"so you can't set a temperature of {self.temperature}"
-            )
-            raise LLMSettingsValidationError(error_msg)
-        return self
-
     def make_llm_job_params(self) -> LLMJobParams:
         return LLMJobParams(
             temperature=self.temperature,

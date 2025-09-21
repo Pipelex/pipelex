@@ -63,17 +63,6 @@ class PipeImgGenBlueprint(PipeBlueprint):
     background: Optional[Background] = Field(default=None, strict=False)
     output_format: Optional[OutputFormat] = Field(default=None, strict=False)
 
-    @model_validator(mode="after")
-    def validate_imgg_prompt_and_imgg_prompt_stuff_name(self) -> Self:
-        if excess_attributes_list := has_more_than_one_among_attributes_from_lists(
-            self,
-            [
-                ["quality", "nb_steps"],
-            ],
-        ):
-            raise PipeDefinitionError(f"PipeImgGenBlueprint should have no more than one of {excess_attributes_list} among them")
-        return self
-
     @override
     def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeImgGenBlueprintCore:
         """Convert this PipeImgGenBlueprint to the core PipeImgGenBlueprint."""

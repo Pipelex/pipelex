@@ -36,6 +36,7 @@ default = "pipelex_inference"
 "*-sdxl" = "fal"
 "flux-*" = "fal"
 "gpt-image-1" = "openai"
+"mistral-ocr" = "mistral"
 
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"
@@ -95,4 +96,3 @@ default = "pipelex_inference"
 # - Exact names: "gpt-4o-mini"
 # - Wildcards: "claude-*" (matches all models starting with claude-)
 # - Partial wildcards: "*-sonnet" (matches all sonnet variants)
-
