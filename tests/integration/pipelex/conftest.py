@@ -212,7 +212,7 @@ def llm_job_params(request: pytest.FixtureRequest) -> LLMJobParams:
         "gpt-image-1",
     ]
 )
-def imgg_handle(request: pytest.FixtureRequest) -> str:
+def img_gen_handle(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
     return request.param
 

@@ -192,7 +192,7 @@ class IMGGTestCases:
 Woman typing on a laptop. On the laptop screen you see python code to generate code to write a prompt for an AI model.
 """
 
-    IMAGE_DESC: ClassVar[List[Tuple[str, str]]] = [  # topic, imgg_prompt_text
+    IMAGE_DESC: ClassVar[List[Tuple[str, str]]] = [  # topic, img_gen_prompt_text
         # (IMGG_PROMPT_1, IMGG_PROMPT_1),
         # (IMGG_PROMPT_2, IMGG_PROMPT_2),
         # (IMGG_PROMPT_3, IMGG_PROMPT_3),

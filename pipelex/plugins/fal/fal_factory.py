@@ -73,10 +73,10 @@ class FalFactory:
     def make_fal_arguments(
         cls,
         fal_application: str,
-        imgg_job: ImgGenJob,
+        img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> Dict[str, Any]:
-        params = imgg_job.job_params
+        params = img_gen_job.job_params
         args_dict: Dict[str, Any]
         num_inference_steps: Optional[int]
         match fal_application:
@@ -88,7 +88,7 @@ class FalFactory:
                     num_inference_steps = cls.make_nb_steps_from_quality_for_flux_pro(quality=params.quality)
 
                 args_dict = {
-                    "prompt": imgg_job.img_gen_prompt.positive_text,
+                    "prompt": img_gen_job.img_gen_prompt.positive_text,
                     "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": params.guidance_scale,
@@ -97,11 +97,11 @@ class FalFactory:
                     "safety_tolerance": params.safety_tolerance,
                     "seed": params.seed,
                     "output_format": cls.make_output_format_for_flux(params.output_format),
-                    "sync_mode": imgg_job.job_config.is_sync_mode,
+                    "sync_mode": img_gen_job.job_config.is_sync_mode,
                 }
             case "fal-ai/flux-pro/v1.1-ultra":
                 args_dict = {
-                    "prompt": imgg_job.img_gen_prompt.positive_text,
+                    "prompt": img_gen_job.img_gen_prompt.positive_text,
                     "aspect_ratio": cls.make_aspect_ratio_for_flux_1_1_ultra(params.aspect_ratio),
                     "num_images": nb_images,
                     "enable_safety_checker": params.is_moderated,
@@ -109,7 +109,7 @@ class FalFactory:
                     "raw": params.is_raw,
                     "seed": params.seed,
                     "output_format": cls.make_output_format_for_flux(params.output_format),
-                    "sync_mode": imgg_job.job_config.is_sync_mode,
+                    "sync_mode": img_gen_job.job_config.is_sync_mode,
                 }
             case "fal-ai/fast-lightning-sdxl":
                 num_inference_steps = params.nb_steps
@@ -120,13 +120,13 @@ class FalFactory:
                     log.warning(f"Number of inference steps {num_inference_steps}' for SDXL Lightning must be one of {acceptable_steps}")
                     num_inference_steps = 8
                 args_dict = {
-                    "prompt": imgg_job.img_gen_prompt.positive_text,
+                    "prompt": img_gen_job.img_gen_prompt.positive_text,
                     "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
                     "num_inference_steps": num_inference_steps,
                     "num_images": nb_images,
                     "seed": params.seed,
                     "output_format": cls.make_output_format_for_flux(params.output_format),
-                    "sync_mode": imgg_job.job_config.is_sync_mode,
+                    "sync_mode": img_gen_job.job_config.is_sync_mode,
                 }
             case _:
                 raise ImgGenParameterError(f"Invalid fal application: '{fal_application}'")

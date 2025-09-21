@@ -105,7 +105,7 @@ Always fix any issues reported by these tools before proceeding.
    ```
    Note: Matches names starting with the provided string.
 
-**Important**: Never run `make ti`, `make test-inference`, `make to`, `make test-ocr`, `make tg`, or `make test-imgg` - these use costly inference.
+**Important**: Never run `make ti`, `make test-inference`, `make to`, `make test-ocr`, `make tg`, or `make test-img-gen` - these use costly inference.
 
 ## Pipelines
 

@@ -70,7 +70,7 @@ llm_to_engineer = { llm_handle = "base-claude", temperature = 0.2 }
 llm_to_pipelex = { llm_handle = "base-claude", temperature = 0.2 }
 
 # Image skills
-llm_to_write_imgg_prompt = { llm_handle = "base-claude", temperature = 0.2 }
+llm_to_write_img_gen_prompt = { llm_handle = "base-claude", temperature = 0.2 }
 llm_to_describe_img = { llm_handle = "base-claude", temperature = 0.5 }
 llm_to_design_fashion = { llm_handle = "base-claude", temperature = 0.7 }
 llm_for_img_to_text = { llm_handle = "base-claude", temperature = 0.1 }

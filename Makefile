@@ -79,8 +79,8 @@ make ti                       - Shorthand -> test-inference
 make tip                      - Shorthand -> test-inference-with-prints (parallelized inference tests)
 make test-ocr                 - Run unit tests only for ocr (with prints)
 make to                       - Shorthand -> test-ocr
-make test-imgg                - Run unit tests only for imgg (with prints)
-make test-g					  - Shorthand -> test-imgg
+make test-img-gen                - Run unit tests only for imgg (with prints)
+make test-g					  - Shorthand -> test-img-gen
 
 make check-unused-imports     - Check for unused imports without fixing
 make fix-unused-imports       - Fix unused imports with ruff
@@ -104,7 +104,7 @@ export HELP
 	format lint pyright mypy \
 	cleanderived cleanenv cleanlibraries cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
-	test-imgg tg test-ocr to codex-tests gha-tests \
+	test-img-gen tg test-ocr to codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
@@ -323,7 +323,7 @@ test-ocr: env
 to: test-ocr
 	@echo "> done: to = test-ocr"
 
-test-imgg: env
+test-img-gen: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
 		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "imgg" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -331,8 +331,8 @@ test-imgg: env
 		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "imgg" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
 
-tg: test-imgg
-	@echo "> done: tg = test-imgg"
+tg: test-img-gen
+	@echo "> done: tg = test-img-gen"
 
 test-pipelex-api: env
 	$(call PRINT_TITLE,"Unit testing")

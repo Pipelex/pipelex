@@ -38,7 +38,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
                 )
             ),
             output_multiplicity=blueprint.nb_output or 1,
-            imgg_prompt=blueprint.img_gen_prompt,
+            img_gen_prompt=blueprint.img_gen_prompt,
             img_gen_prompt_var_name=blueprint.img_gen_prompt_var_name,
             img_gen=blueprint.img_gen,
             aspect_ratio=blueprint.aspect_ratio,

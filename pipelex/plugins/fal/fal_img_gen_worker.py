@@ -35,7 +35,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         fal_application = self.inference_model.model_id
         arguments = FalFactory.make_fal_arguments(
             fal_application=fal_application,
-            imgg_job=img_gen_job,
+            img_gen_job=img_gen_job,
             nb_images=1,
         )
         log.verbose(arguments, title=f"Fal arguments, application={fal_application}")
@@ -68,7 +68,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         application = self.inference_model.model_id
         arguments = FalFactory.make_fal_arguments(
             fal_application=application,
-            imgg_job=img_gen_job,
+            img_gen_job=img_gen_job,
             nb_images=nb_images,
         )
         handler = await self.fal_async_client.submit(

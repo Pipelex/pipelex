@@ -9,7 +9,7 @@ The Cogt configuration manages all cognitive tools in Pipelex, including LLM (La
 # Main Cogt configuration sections
 [cogt.inference_manager_config]
 [cogt.llm_config]
-[cogt.imgg_config]
+[cogt.img_gen_config]
 [cogt.ocr_config]
 ```
 
@@ -55,11 +55,11 @@ When configuring LLM jobs, you can set:
 Configuration for image generation capabilities:
 
 ```toml
-[cogt.imgg_config.imgg_job_config]
+[cogt.img_gen_config.img_gen_job_config]
 is_sync_mode = false
 
 # Default parameters for image generation
-[cogt.imgg_config.imgg_param_defaults]
+[cogt.img_gen_config.img_gen_param_defaults]
 aspect_ratio = "square"  # Options: square, landscape_4_3, landscape_3_2, landscape_16_9, landscape_21_9,
                          # portrait_3_4, portrait_2_3, portrait_9_16, portrait_9_21
 background = "auto"     # Options: transparent, opaque, auto
@@ -162,10 +162,10 @@ max_retries = 3
 [cogt.llm_config.instructor_config]
 is_openai_structured_output_enabled = false
 
-[cogt.imgg_config.imgg_job_config]
+[cogt.img_gen_config.img_gen_job_config]
 is_sync_mode = false
 
-[cogt.imgg_config.imgg_param_defaults]
+[cogt.img_gen_config.img_gen_param_defaults]
 aspect_ratio = "square"
 background = "auto"
 quality = "low"

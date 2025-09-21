@@ -23,4 +23,4 @@ class TestSetupInferenceWorkers:
                 case ModelType.TEXT_EXTRACTOR:
                     _ = inference_manager.get_ocr_worker(model_handle=model_handle)
                 case ModelType.IMG_GEN:
-                    _ = inference_manager.get_imgg_worker(imgg_handle=model_handle)
+                    _ = inference_manager.get_img_gen_worker(img_gen_handle=model_handle)

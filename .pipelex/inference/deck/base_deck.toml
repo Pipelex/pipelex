@@ -27,9 +27,9 @@ llm_to_engineer = ["claude-4.1-opus", "gemini-2.5-pro"]
 llm_for_large_codebase = ["gemini-2.5-pro", "claude-4-sonnet", "gpt-5"]
 
 # Image generation aliases
-base-imgg = "flux-pro/v1.1"
-best-imgg = "flux-pro/v1.1-ultra"
-fast-imgg = "fast-lightning-sdxl"
+base-img-gen = "flux-pro/v1.1"
+best-img-gen = "flux-pro/v1.1-ultra"
+fast-img-gen = "fast-lightning-sdxl"
 
 ####################################################################################################
 # LLM Presets
@@ -75,7 +75,7 @@ llm_to_engineer = { llm_handle = "base-claude", temperature = 0.2 }
 llm_to_pipelex = { llm_handle = "base-claude", temperature = 0.2 }
 
 # Image skills
-llm_to_write_imgg_prompt = { llm_handle = "base-claude", temperature = 0.2 }
+llm_to_write_img_gen_prompt = { llm_handle = "base-claude", temperature = 0.2 }
 llm_to_describe_img = { llm_handle = "base-claude", temperature = 0.5 }
 llm_to_design_fashion = { llm_handle = "base-claude", temperature = 0.7 }
 llm_for_img_to_text = { llm_handle = "base-claude", temperature = 0.1 }
@@ -115,14 +115,14 @@ choice_default = "base_img_gen"
 
 [img_gen.presets]
 # General purpose
-base_img_gen = { img_gen_handle = "base-imgg", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
-fast_img_gen = { img_gen_handle = "fast-imgg", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
-high_quality_img_gen = { img_gen_handle = "best-imgg", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
+base_img_gen = { img_gen_handle = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
+fast_img_gen = { img_gen_handle = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
+high_quality_img_gen = { img_gen_handle = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
 
 # Specific skills
-img_gen_for_art = { img_gen_handle = "best-imgg", quality = "high", guidance_scale = 9.0, is_moderated = false, safety_tolerance = 5 }
-img_gen_for_diagram = { img_gen_handle = "base-imgg", quality = "medium", guidance_scale = 7.0, is_moderated = true, safety_tolerance = 2 }
-img_gen_for_mockup = { img_gen_handle = "base-imgg", quality = "medium", guidance_scale = 6.5, is_moderated = true, safety_tolerance = 3 }
-img_gen_for_product = { img_gen_handle = "best-imgg", quality = "high", guidance_scale = 8.5, is_moderated = true, safety_tolerance = 2 }
-img_gen_for_testing = { img_gen_handle = "fast-imgg", nb_steps = 4, guidance_scale = 4.0, is_moderated = true, safety_tolerance = 4 }
+img_gen_for_art = { img_gen_handle = "best-img-gen", quality = "high", guidance_scale = 9.0, is_moderated = false, safety_tolerance = 5 }
+img_gen_for_diagram = { img_gen_handle = "base-img-gen", quality = "medium", guidance_scale = 7.0, is_moderated = true, safety_tolerance = 2 }
+img_gen_for_mockup = { img_gen_handle = "base-img-gen", quality = "medium", guidance_scale = 6.5, is_moderated = true, safety_tolerance = 3 }
+img_gen_for_product = { img_gen_handle = "best-img-gen", quality = "high", guidance_scale = 8.5, is_moderated = true, safety_tolerance = 2 }
+img_gen_for_testing = { img_gen_handle = "fast-img-gen", nb_steps = 4, guidance_scale = 4.0, is_moderated = true, safety_tolerance = 4 }
 

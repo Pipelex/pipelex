@@ -138,10 +138,10 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_single_image(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        imgg_handle: str,
-        imgg_prompt: ImgGenPrompt,
-        imgg_job_params: Optional[ImgGenJobParams] = None,
-        imgg_job_config: Optional[ImgGenJobConfig] = None,
+        img_gen_handle: str,
+        img_gen_prompt: ImgGenPrompt,
+        img_gen_job_params: Optional[ImgGenJobParams] = None,
+        img_gen_job_config: Optional[ImgGenJobConfig] = None,
     ) -> GeneratedImage:
         func_name = "make_single_image"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -159,11 +159,11 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_image_list(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        imgg_handle: str,
-        imgg_prompt: ImgGenPrompt,
+        img_gen_handle: str,
+        img_gen_prompt: ImgGenPrompt,
         nb_images: int,
-        imgg_job_params: Optional[ImgGenJobParams] = None,
-        imgg_job_config: Optional[ImgGenJobConfig] = None,
+        img_gen_job_params: Optional[ImgGenJobParams] = None,
+        img_gen_job_config: Optional[ImgGenJobConfig] = None,
     ) -> List[GeneratedImage]:
         func_name = "make_image_list"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")

@@ -98,10 +98,10 @@ is_streaming_enabled = false
 # Image generation config
 ####################################################################################################
 
-[cogt.imgg_config.imgg_job_config]
+[cogt.img_gen_config.img_gen_job_config]
 is_sync_mode = false
 
-[cogt.imgg_config.imgg_param_defaults]
+[cogt.img_gen_config.img_gen_param_defaults]
 nb_steps = 1            # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
 quality = "low"
 aspect_ratio = "square" # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
@@ -113,7 +113,7 @@ is_raw = false
 output_format = "jpg"
 seed = "auto"
 
-[cogt.imgg_config.fal_config]
+[cogt.img_gen_config.fal_config]
 flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
 sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
 

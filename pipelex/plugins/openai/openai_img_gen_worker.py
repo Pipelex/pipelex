@@ -16,7 +16,7 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_path
 
-TEMP_OUTPUTS_DIR = "temp/imgg_by_gpt_image"
+TEMP_OUTPUTS_DIR = "temp/img_gen_by_gpt_image"
 
 
 class OpenAIImgGenWorker(ImgGenWorkerAbstract):

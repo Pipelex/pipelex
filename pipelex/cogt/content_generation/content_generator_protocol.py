@@ -90,20 +90,20 @@ class ContentGeneratorProtocol(Protocol):
     async def make_single_image(
         self,
         job_metadata: JobMetadata,
-        imgg_handle: str,
-        imgg_prompt: ImgGenPrompt,
-        imgg_job_params: Optional[ImgGenJobParams] = None,
-        imgg_job_config: Optional[ImgGenJobConfig] = None,
+        img_gen_handle: str,
+        img_gen_prompt: ImgGenPrompt,
+        img_gen_job_params: Optional[ImgGenJobParams] = None,
+        img_gen_job_config: Optional[ImgGenJobConfig] = None,
     ) -> GeneratedImage: ...
 
     async def make_image_list(
         self,
         job_metadata: JobMetadata,
-        imgg_handle: str,
-        imgg_prompt: ImgGenPrompt,
+        img_gen_handle: str,
+        img_gen_prompt: ImgGenPrompt,
         nb_images: int,
-        imgg_job_params: Optional[ImgGenJobParams] = None,
-        imgg_job_config: Optional[ImgGenJobConfig] = None,
+        img_gen_job_params: Optional[ImgGenJobParams] = None,
+        img_gen_job_config: Optional[ImgGenJobConfig] = None,
     ) -> List[GeneratedImage]: ...
 
     async def make_jinja2_text(

@@ -349,10 +349,10 @@ def get_llm_worker(
     return get_inference_manager().get_llm_worker(llm_handle=llm_handle)
 
 
-def get_imgg_worker(
-    imgg_handle: str,
+def get_img_gen_worker(
+    img_gen_handle: str,
 ) -> ImgGenWorkerAbstract:
-    return get_inference_manager().get_imgg_worker(imgg_handle=imgg_handle)
+    return get_inference_manager().get_img_gen_worker(img_gen_handle=img_gen_handle)
 
 
 def get_ocr_worker(

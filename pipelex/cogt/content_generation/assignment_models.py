@@ -120,12 +120,12 @@ class TextThenObjectAssignment(BaseModel):
     llm_assignment_factory_to_object: LLMAssignmentFactory
 
 
-class ImggAssignment(BaseModel):
+class ImgGenAssignment(BaseModel):
     job_metadata: JobMetadata
-    imgg_handle: str
-    imgg_prompt: ImgGenPrompt
-    imgg_job_params: ImgGenJobParams
-    imgg_job_config: ImgGenJobConfig
+    img_gen_handle: str
+    img_gen_prompt: ImgGenPrompt
+    img_gen_job_params: ImgGenJobParams
+    img_gen_job_config: ImgGenJobConfig
     nb_images: int
 
 

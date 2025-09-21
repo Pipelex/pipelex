@@ -30,7 +30,7 @@ class InferenceManagerProtocol(Protocol):
     # IMG Generation Workers
     ####################################################################################################
 
-    def get_imgg_worker(self, imgg_handle: str) -> ImgGenWorkerAbstract: ...
+    def get_img_gen_worker(self, img_gen_handle: str) -> ImgGenWorkerAbstract: ...
 
     ####################################################################################################
     # OCR Workers

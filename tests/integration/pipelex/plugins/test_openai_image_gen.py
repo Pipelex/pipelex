@@ -40,7 +40,7 @@ class TestImggByOpenAIGpt:
             if not image_base64:
                 raise ImgGenGenerationError("No base64 image data received from OpenAI")
 
-            folder_path = f"{TEST_OUTPUTS_DIR}/imgg_by_gpt_image"
+            folder_path = f"{TEST_OUTPUTS_DIR}/img_gen_by_gpt_image"
             ensure_path(folder_path)
             filename = f"{topic}_{image_index}"
             img_path = get_incremental_file_path(

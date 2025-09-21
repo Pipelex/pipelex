@@ -47,16 +47,16 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         self._check_can_perform_job(img_gen_job=img_gen_job)
 
         # metadata
-        img_gen_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
+        img_gen_job.job_metadata.unit_job_id = UnitJobId.IMG_GEN_TEXT_TO_IMAGE
 
         # Prepare job
-        img_gen_job.imgg_job_before_start()
+        img_gen_job.img_gen_job_before_start()
 
         # Execute job
         result = await self._gen_image(img_gen_job=img_gen_job)
 
         # Report job
-        img_gen_job.imgg_job_after_complete()
+        img_gen_job.img_gen_job_after_complete()
         if self.reporting_delegate:
             self.reporting_delegate.report_inference_job(inference_job=img_gen_job)
 
@@ -83,16 +83,16 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         self._check_can_perform_job(img_gen_job=img_gen_job)
 
         # metadata
-        img_gen_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
+        img_gen_job.job_metadata.unit_job_id = UnitJobId.IMG_GEN_TEXT_TO_IMAGE
 
         # Prepare job
-        img_gen_job.imgg_job_before_start()
+        img_gen_job.img_gen_job_before_start()
 
         # Execute job
         result = await self._gen_image_list(img_gen_job=img_gen_job, nb_images=nb_images)
 
         # Report job
-        img_gen_job.imgg_job_after_complete()
+        img_gen_job.img_gen_job_after_complete()
         if self.reporting_delegate:
             self.reporting_delegate.report_inference_job(inference_job=img_gen_job)
 

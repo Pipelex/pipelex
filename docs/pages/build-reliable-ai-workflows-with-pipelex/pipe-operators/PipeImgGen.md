@@ -7,7 +7,7 @@ The `PipeImgGen` operator is used to generate images from a text prompt using a 
 `PipeImgGen` takes a text prompt and a set of parameters, then calls an underlying image generation service (like DALL-E 3 or Stable Diffusion) to create one or more images.
 
 The prompt can be provided in two ways:
-1.  As a static string directly in the pipe's PLX definition using the `imgg_prompt` parameter.
+1.  As a static string directly in the pipe's PLX definition using the `img_gen_prompt` parameter.
 2.  As a dynamic input by connecting a concept that is or refines `native.Text`.
 
 The pipe can be configured to generate a single image or a list of images.
@@ -24,7 +24,7 @@ The pipe can be configured to generate a single image or a list of images.
 | `definition`           | string          | A description of the image generation operation.                                                                           | Yes      |
 | `inputs`                | dictionary      | The input concept(s) for the image generation operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
 | `output`                | string          | The output concept produced by the image generation operation.                                                | Yes      |
-| `imgg_prompt`        | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |
+| `img_gen_prompt`        | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |
 | `nb_output`             | integer         | The number of images to generate. If omitted, a single image is generated.                                                    | No       |
 | `img_gen`           | string          | The handle for the image generation model to use (e.g., `"gpt-image-1"`). Defaults to the model specified in the global config.    | No       |
 | `aspect_ratio`          | string          | The desired aspect ratio of the image (e.g., `"16:9"`, `"1:1"`).                                                              | No       |

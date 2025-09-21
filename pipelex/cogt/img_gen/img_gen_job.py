@@ -17,12 +17,12 @@ class ImgGenJob(InferenceJobAbstract):
     def validate_before_execution(self):
         self.img_gen_prompt.validate_before_execution()
 
-    def imgg_job_before_start(self):
+    def img_gen_job_before_start(self):
         # Reset metadata
         self.job_metadata.started_at = datetime.now()
 
         # Reset outputs
         self.job_report = ImgGenJobReport()
 
-    def imgg_job_after_complete(self):
+    def img_gen_job_after_complete(self):
         self.job_metadata.completed_at = datetime.now()

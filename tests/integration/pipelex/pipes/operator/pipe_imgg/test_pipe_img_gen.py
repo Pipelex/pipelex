@@ -21,11 +21,11 @@ class TestPipeImgGen:
     async def test_pipe_img_gen(
         self,
         pipe_run_mode: PipeRunMode,
-        imgg_handle: str,
+        img_gen_handle: str,
         topic: str,
         image_desc: str,
     ):
-        pipe_imgg_blueprint = PipeImgGenBlueprint(
+        pipe_img_gen_blueprint = PipeImgGenBlueprint(
             definition="Image generation test",
             img_gen_prompt=image_desc,
             output=NativeConceptEnum.IMAGE,
@@ -36,12 +36,12 @@ class TestPipeImgGen:
             pipe=PipeImgGenFactory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_img_gen",
-                blueprint=pipe_imgg_blueprint,
+                blueprint=pipe_img_gen_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
-        pipe_imgg_output: PipeImgGenOutput = await get_pipe_router().run_pipe_job(
+        pipe_img_gen_output: PipeImgGenOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,
         )
-        image_urls = pipe_imgg_output.image_urls[0]
+        image_urls = pipe_img_gen_output.image_urls[0]
         pretty_print(image_urls, title=topic)
