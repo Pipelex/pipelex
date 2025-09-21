@@ -4,7 +4,7 @@ The `PipeImgGen` operator is used to generate images from a text prompt using a 
 
 ## How it works
 
-`PipeImgGen` takes a text prompt and a set of parameters, then calls an underlying image generation service (like DALL-E 3 or Stable Diffusion) to create one or more images.
+`PipeImgGen` takes a text prompt and a set of parameters, then calls an underlying image generation service (like GPT Image or Flux) to create one or more images.
 
 The prompt can be provided in two ways:
 1.  As a static string directly in the pipe's PLX definition using the `img_gen_prompt` parameter.
@@ -15,6 +15,22 @@ The pipe can be configured to generate a single image or a list of images.
 ## Configuration
 
 `PipeImgGen` is configured in your pipeline's `.plx` file.
+
+### Image Generation Models and Backend System
+
+PipeImgGen uses the unified inference backend system to manage image generation models. This means you can:
+
+- Use different image generation providers (OpenAI GPT Image, FAL models like Flux, etc.)
+- Configure image generation models through the same backend system as LLMs and OCR models
+- Use image generation presets for consistent configurations across your pipelines
+- Route image generation requests to different backends based on your routing profile
+
+Common image generation model handles:
+- `base-img-gen`: Base image generation model (alias for flux-pro/v1.1)
+- `best-img-gen`: Best quality image generation model (alias for flux-pro/v1.1-ultra)  
+- `fast-img-gen`: Fast image generation model (alias for fast-lightning-sdxl)
+
+Image generation presets are defined in your model deck configuration and can include parameters like `quality`, `guidance_scale`, and `safety_tolerance`.
 
 ### PLX Parameters
 
@@ -44,7 +60,7 @@ type = "PipeImgGen"
 definition = "Generate a futuristic car image"
 output = "Image"
 img_gen_prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
-img_gen = "gpt-image-1"
+img_gen = "base_img_gen"
 aspect_ratio = "16:9"
 quality = "hd"
 ```
@@ -63,7 +79,7 @@ definition = "Generate three logo variations from a prompt"
 inputs = { prompt = "images.ImgGenPrompt" }
 output = "Image"
 nb_output = 3
-img_gen = "gpt-image-1"
+img_gen = "base_img_gen"
 aspect_ratio = "1:1"
 ```
 

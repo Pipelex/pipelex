@@ -1,15 +1,15 @@
 # Inference Backend Configuration
 
-The Inference Backend Configuration System manages how Pipelex handles LLM providers, model routing, and inference settings. This system provides a flexible and scalable way to configure multiple inference backends and route models to the appropriate providers.
+The Inference Backend Configuration System manages how Pipelex handles AI model providers, model routing, and inference settings across LLMs, OCR, and image generation. This unified system provides a flexible and scalable way to configure multiple inference backends and route different types of AI models to the appropriate providers.
 
 ## Overview
 
 The inference backend system is built around four key concepts:
 
-1. **Inference Backends**: Providers of LLM services (OpenAI, Anthropic, Google Vertex AI, etc.)
-2. **Model Specs**: Detailed information about specific models available through backends
-3. **Routing Profiles**: Rules for selecting which backend should handle specific models
-4. **Model Deck**: Unified collection of configured models, aliases, and presets
+1. **Inference Backends**: Providers of AI services (OpenAI, Anthropic, Google Vertex AI, FAL, etc.) for LLMs, OCR, and image generation
+2. **Model Specs**: Detailed information about specific models available through backends (text generation, text extraction, image generation)
+3. **Routing Profiles**: Rules for selecting which backend should handle specific models across all AI capabilities
+4. **Model Deck**: Unified collection of configured models, aliases, and presets for LLMs, OCR, and image generation
 
 ## Directory Structure
 
@@ -21,11 +21,13 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
     ├── backends.toml           # Backend provider configurations
     ├── routing_profiles.toml   # Model routing rules
     ├── backends/               # Individual backend model specifications
-    │   ├── openai.toml
-    │   ├── anthropic.toml
-    │   ├── bedrock.toml
-    │   ├── mistral.toml
-    │   ├── vertexai.toml
+    │   ├── openai.toml         # OpenAI models (LLMs, image generation)
+    │   ├── anthropic.toml      # Anthropic models (LLMs)
+    │   ├── bedrock.toml        # AWS Bedrock models (LLMs)
+    │   ├── mistral.toml        # Mistral models (LLMs, OCR)
+    │   ├── vertexai.toml       # Google Vertex AI models (LLMs)
+    │   ├── fal.toml            # FAL models (image generation)
+    │   ├── internal.toml       # Internal/local models (OCR)
     │   └── ...
     └── deck/                   # Model deck configurations
         ├── base_deck.toml      # Core aliases and presets
@@ -38,9 +40,10 @@ Pipelex Inference is a unified inference backend that provides access to all maj
 
 ### Benefits
 
-- **Single API Key**: Access OpenAI, Anthropic, Google, Mistral, and more with one key
+- **Single API Key**: Access OpenAI, Anthropic, Google, Mistral, FAL, and more with one key
 - **Simplified Configuration**: No need to manage multiple provider credentials
-- **Automatic Routing**: Models are automatically routed to their respective providers
+- **Automatic Routing**: All AI models (LLMs, OCR, image generation) are automatically routed to their respective providers
+- **Unified Interface**: Same configuration system for text generation, OCR, and image generation
 
 ### Setup
 
@@ -71,7 +74,7 @@ llm = { llm_handle = "claude-4-sonnet", temperature = 0.7 }
 
 ## Inference Backends
 
-Backends represent LLM service providers. Each backend is configured with its endpoint and authentication details.
+Backends represent AI service providers that can offer LLMs, OCR models, or image generation models. Each backend is configured with its endpoint and authentication details.
 
 ### Backend Configuration
 
@@ -86,11 +89,17 @@ api_key = "${OPENAI_API_KEY}"
 enabled = true
 api_key = "${ANTHROPIC_API_KEY}"
 
-[azure_openai]
+[mistral]
 enabled = true
-endpoint = "${AZURE_API_BASE}"
-api_key = "${AZURE_API_KEY}"
-api_version = "${AZURE_API_VERSION}"
+api_key = "${MISTRAL_API_KEY}"
+
+[fal]
+enabled = true
+api_key = "${FAL_KEY}"
+
+[internal]
+enabled = true
+# No API key needed for internal/local processing
 ```
 
 ### Model Specifications
@@ -99,22 +108,26 @@ Each backend has its own model specification file in `.pipelex/inference/backend
 
 ```toml
 # openai.toml
-[models.gpt-4o-mini]
-model_id = "gpt-4o-mini"
-sdk = "openai"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 0.00015, output = 0.0006 }
-max_tokens = 128000
-max_prompt_images = 100
+default_sdk = "openai"
+default_prompting_target = "openai"
 
-[models.gpt-4-turbo]
-model_id = "gpt-4-turbo"
-sdk = "openai"
+[gpt-4o-mini]
+model_id = "gpt-4o-mini"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
-costs = { input = 0.01, output = 0.03 }
-max_tokens = 128000
+costs = { input = 0.15, output = 0.6 }
+
+[gpt-4-turbo]
+model_id = "gpt-4-turbo"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 10.0, output = 30.0 }
+
+[gpt-image-1]
+model_id = "gpt-image-1"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.04, output = 0.0 }
 ```
 
 ## Routing Profiles
@@ -138,6 +151,8 @@ default = "openai"
 "gemini-*" = "vertexai"
 "mistral-*" = "mistral"
 "gpt-*" = "openai"
+"gpt-image-*" = "openai"
+"flux-*" = "fal"
 ```
 
 The routing system supports:
@@ -147,7 +162,7 @@ The routing system supports:
 
 ## Model Deck
 
-The Model Deck is the unified configuration hub for all LLM-related settings.
+The Model Deck is the unified configuration hub for all AI model-related settings, including LLMs, OCR models, and image generation models.
 
 ### Aliases
 
@@ -155,10 +170,20 @@ Define user-friendly names that map to model names in `.pipelex/inference/deck/b
 
 ```toml
 [aliases]
-best-claude = "claude-4.1-opus"
-best-gemini = "gemini-2.5-pro"
-best-mistral = "mistral-large"
+# LLM aliases
+base-claude = "claude-4-sonnet"
 base-gpt = "gpt-5"
+base-gemini = "gemini-2.5-flash"
+base-mistral = "mistral-medium"
+
+# OCR aliases
+best-ocr = "mistral-ocr"
+local-ocr = "pypdfium2-extract-text"
+
+# Image generation aliases
+base-img-gen = "flux-pro/v1.1"
+best-img-gen = "flux-pro/v1.1-ultra"
+fast-img-gen = "fast-lightning-sdxl"
 
 # Aliases can also define fallback chains
 llm_to_engineer = ["claude-4.1-opus", "gemini-2.5-pro"]
@@ -169,25 +194,53 @@ llm_to_engineer = ["claude-4.1-opus", "gemini-2.5-pro"]
 Presets combine model selection with optimized parameters for specific tasks:
 
 ```toml
-[llm_presets]
+[llm.presets]
 # General purpose presets
-cheap_llm_for_text = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
-cheap_llm_for_object = { llm_handle = "gpt-4o-mini", temperature = 0.5 }
+cheap_llm_for_text = { llm_handle = "cheap_llm_for_text", temperature = 0.5 }
+cheap_llm_for_object = { llm_handle = "cheap_llm_for_object", temperature = 0.5 }
 
 # Task-specific presets
 llm_for_creative_writing = { llm_handle = "claude-4-sonnet", temperature = 0.9 }
-llm_to_extract = { llm_handle = "claude-4-sonnet", temperature = 0.1 }
-llm_to_reason = { llm_handle = "o4-mini", temperature = 1, max_tokens = "auto" }
+llm_to_extract_invoice = { llm_handle = "claude-4-sonnet", temperature = 0.1 }
+llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
+
+### OCR Presets
+
+OCR presets combine OCR model selection with optimized parameters:
+
+```toml
+[ocr.presets]
+# General purpose OCR
+base_ocr_mistral = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
+base_ocr_pypdfium2 = { ocr_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+```
+
+### Image Generation Presets
+
+Image generation presets combine model selection with generation parameters:
+
+```toml
+[img_gen.presets]
+# General purpose image generation
+base_img_gen = { img_gen_handle = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
+fast_img_gen = { img_gen_handle = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
+high_quality_img_gen = { img_gen_handle = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
 ```
 
 ### Default Choices
 
-Set default models for different types of generation:
+Set default models for different types of AI operations:
 
 ```toml
-[llm_choice_defaults]
+[llm.choice_defaults]
 for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
+
+[ocr]
+choice_default = "base_ocr_mistral"
+
+[img_gen]
+choice_default = "base_img_gen"
 ```
 
 ## Customization
@@ -198,12 +251,20 @@ Use `.pipelex/inference/deck/overrides.toml` for project-specific customizations
 
 ```toml
 # Override specific presets
-[llm_presets]
-llm_to_extract = { llm_handle = "gpt-4o-mini", temperature = 0.2 }
+[llm.presets]
+llm_to_extract_invoice = { llm_handle = "gpt-4o-mini", temperature = 0.2 }
+
+[ocr.presets]
+my_custom_ocr = { ocr_handle = "mistral-ocr", max_nb_images = 5 }
+
+[img_gen.presets]
+my_custom_img_gen = { img_gen_handle = "flux-dev", quality = "medium" }
 
 # Add custom aliases
 [aliases]
-my_custom_model = "claude-3-sonnet"
+my_custom_llm = "claude-3-sonnet"
+my_custom_ocr = "pypdfium2-extract-text"
+my_custom_img_gen = "base-img-gen"
 ```
 
 ### Adding New Backends
@@ -219,11 +280,11 @@ To add a new backend:
 The system loads configurations in this order:
 
 1. **Load Backends**: Read `backends.toml` to get enabled backends
-2. **Load Model Specs**: For each backend, load model specifications
+2. **Load Model Specs**: For each backend, load model specifications (LLMs, OCR models, image generation models)
 3. **Load Routing Profiles**: Read routing rules and identify active profile
 4. **Build Model Deck**: 
-   - Apply routing rules to determine backend for each model
-   - Load aliases and presets from deck files
+   - Apply routing rules to determine backend for each model across all AI capabilities
+   - Load aliases and presets from deck files for LLMs, OCR, and image generation
    - Apply overrides
 5. **Finalization**: Validate complete configuration
 

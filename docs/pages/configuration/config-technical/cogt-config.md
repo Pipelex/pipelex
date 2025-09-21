@@ -107,7 +107,25 @@ Configuration for Optical Character Recognition:
 [cogt.ocr_config]
 page_output_text_file_name = "page_text.md"
 default_page_views_dpi = 72
-```
+
+## Unified Backend Integration
+
+All cognitive tools (LLMs, OCR, and Image Generation) now use the same unified inference backend system:
+
+### Benefits of Unified System
+
+- **Consistent Configuration**: Same configuration patterns across all AI capabilities
+- **Unified Routing**: All models routed through the same routing profiles
+- **Shared Presets**: Presets for LLMs, OCR, and image generation in the same deck
+- **Single API Management**: Manage all AI provider credentials in one place
+
+### Backend Integration Details
+
+- **LLM Models**: `model_type = "llm"` for text generation and structured outputs
+- **OCR Models**: `model_type = "text_extractor"` for document processing
+- **Image Generation Models**: `model_type = "img_gen"` for image creation
+
+All model types support the same routing, aliasing, and preset systems.
 
 ## Validation Rules
 
