@@ -23,9 +23,6 @@ class InferenceModelSpec(ConfigModel):
     prompting_target: Optional[PromptingTarget] = Field(default=None, strict=False)
     constraints: List[ModelConstraints] = Field(default_factory=list)
 
-    # TODO: investigate if this is needed
-    is_system_prompt_supported: bool = True
-
     @property
     def tag(self) -> str:
         return f"[{self.sdk}@{self.backend_name}]({self.model_id})"

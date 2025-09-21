@@ -74,7 +74,6 @@ class OpenAIFactory:
     def make_simple_messages(
         cls,
         llm_job: LLMJob,
-        inference_model: InferenceModelSpec,
     ) -> List[ChatCompletionMessageParam]:
         """
         Makes a list of messages with a system message (if provided) and followed by a user message.
@@ -82,7 +81,7 @@ class OpenAIFactory:
         llm_prompt = llm_job.llm_prompt
         messages: List[ChatCompletionMessageParam] = []
         user_contents: List[ChatCompletionContentPartParam] = []
-        if inference_model.is_system_prompt_supported and (system_content := llm_prompt.system_text):
+        if system_content := llm_prompt.system_text:
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
         # TODO: confirm that we can prompt without user_contents, for instance if we have only images,
         # otherwise consider using a default user_content

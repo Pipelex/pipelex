@@ -54,10 +54,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         self,
         llm_job: LLMJob,
     ) -> str:
-        messages = OpenAIFactory.make_simple_messages(
-            llm_job=llm_job,
-            inference_model=self.inference_model,
-        )
+        messages = OpenAIFactory.make_simple_messages(llm_job=llm_job)
 
         try:
             temperature = llm_job.job_params.temperature
@@ -98,10 +95,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: Type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        messages = OpenAIFactory.make_simple_messages(
-            llm_job=llm_job,
-            inference_model=self.inference_model,
-        )
+        messages = OpenAIFactory.make_simple_messages(llm_job=llm_job)
         try:
             temperature = llm_job.job_params.temperature
             if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
