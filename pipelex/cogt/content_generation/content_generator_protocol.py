@@ -2,8 +2,8 @@ from functools import wraps
 from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional, ParamSpec, Protocol, Type, TypeVar
 
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams
-from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -91,19 +91,19 @@ class ContentGeneratorProtocol(Protocol):
         self,
         job_metadata: JobMetadata,
         imgg_handle: str,
-        imgg_prompt: ImggPrompt,
-        imgg_job_params: Optional[ImggJobParams] = None,
-        imgg_job_config: Optional[ImggJobConfig] = None,
+        imgg_prompt: ImgGenPrompt,
+        imgg_job_params: Optional[ImgGenJobParams] = None,
+        imgg_job_config: Optional[ImgGenJobConfig] = None,
     ) -> GeneratedImage: ...
 
     async def make_image_list(
         self,
         job_metadata: JobMetadata,
         imgg_handle: str,
-        imgg_prompt: ImggPrompt,
+        imgg_prompt: ImgGenPrompt,
         nb_images: int,
-        imgg_job_params: Optional[ImggJobParams] = None,
-        imgg_job_config: Optional[ImggJobConfig] = None,
+        imgg_job_params: Optional[ImgGenJobParams] = None,
+        imgg_job_config: Optional[ImgGenJobConfig] = None,
     ) -> List[GeneratedImage]: ...
 
     async def make_jinja2_text(

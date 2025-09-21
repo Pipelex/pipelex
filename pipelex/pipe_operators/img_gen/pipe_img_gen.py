@@ -6,8 +6,8 @@ from typing_extensions import Self, override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImggJobParams, OutputFormat, Quality
-from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -219,8 +219,8 @@ class PipeImgGen(PipeOperator):
         else:
             raise UnexpectedPipeDefinitionError("You must provide an image gen prompt either as attribute of the pipe or as a single text input")
 
-        imgg_config = get_config().cogt.imgg_config
-        imgg_param_defaults = imgg_config.imgg_param_defaults
+        imgg_config = get_config().cogt.img_gen_config
+        imgg_param_defaults = imgg_config.img_gen_param_defaults
         model_deck = get_model_deck()
 
         # Get ImgGenSetting either from img_gen choice or legacy settings
@@ -251,7 +251,7 @@ class PipeImgGen(PipeOperator):
             seed = seed_setting
 
         # Build ImggJobParams from ImgGenSetting + one-time settings
-        imgg_job_params = ImggJobParams(
+        imgg_job_params = ImgGenJobParams(
             aspect_ratio=self.aspect_ratio or imgg_param_defaults.aspect_ratio,
             background=self.background or imgg_param_defaults.background,
             quality=img_gen_setting.quality,
@@ -288,12 +288,12 @@ class PipeImgGen(PipeOperator):
             generated_image_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
                 imgg_handle=imgg_handle,
-                imgg_prompt=ImggPrompt(
+                imgg_prompt=ImgGenPrompt(
                     positive_text=imgg_prompt_text,
                 ),
                 nb_images=nb_images,
                 imgg_job_params=imgg_job_params,
-                imgg_job_config=imgg_config.imgg_job_config,
+                imgg_job_config=imgg_config.img_gen_job_config,
             )
             image_content_items: List[StuffContent] = []
             for generated_image in generated_image_list:
@@ -312,11 +312,11 @@ class PipeImgGen(PipeOperator):
             generated_image = await content_generator.make_single_image(
                 job_metadata=job_metadata,
                 imgg_handle=imgg_handle,
-                imgg_prompt=ImggPrompt(
+                imgg_prompt=ImgGenPrompt(
                     positive_text=imgg_prompt_text,
                 ),
                 imgg_job_params=imgg_job_params,
-                imgg_job_config=imgg_config.imgg_job_config,
+                imgg_job_config=imgg_config.img_gen_job_config,
             )
 
             generated_image_url = generated_image.url

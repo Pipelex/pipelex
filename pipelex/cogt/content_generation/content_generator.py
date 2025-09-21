@@ -18,8 +18,8 @@ from pipelex.cogt.content_generation.jinja2_generate import jinja2_gen_text
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
 from pipelex.cogt.content_generation.ocr_generate import ocr_gen_extract_pages
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams
-from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
@@ -198,17 +198,17 @@ class ContentGenerator(ContentGeneratorProtocol):
         self,
         job_metadata: JobMetadata,
         imgg_handle: str,
-        imgg_prompt: ImggPrompt,
-        imgg_job_params: Optional[ImggJobParams] = None,
-        imgg_job_config: Optional[ImggJobConfig] = None,
+        imgg_prompt: ImgGenPrompt,
+        imgg_job_params: Optional[ImgGenJobParams] = None,
+        imgg_job_config: Optional[ImgGenJobConfig] = None,
     ) -> GeneratedImage:
-        imgg_config = get_config().cogt.imgg_config
+        imgg_config = get_config().cogt.img_gen_config
         imgg_assignment = ImggAssignment(
             job_metadata=job_metadata,
             imgg_handle=imgg_handle,
             imgg_prompt=imgg_prompt,
-            imgg_job_params=imgg_job_params or imgg_config.make_default_imgg_job_params(),
-            imgg_job_config=imgg_job_config or imgg_config.imgg_job_config,
+            imgg_job_params=imgg_job_params or imgg_config.make_default_img_gen_job_params(),
+            imgg_job_config=imgg_job_config or imgg_config.img_gen_job_config,
             nb_images=1,
         )
         generated_image = await imgg_gen_single_image(imgg_assignment=imgg_assignment)
@@ -221,18 +221,18 @@ class ContentGenerator(ContentGeneratorProtocol):
         self,
         job_metadata: JobMetadata,
         imgg_handle: str,
-        imgg_prompt: ImggPrompt,
+        imgg_prompt: ImgGenPrompt,
         nb_images: int,
-        imgg_job_params: Optional[ImggJobParams] = None,
-        imgg_job_config: Optional[ImggJobConfig] = None,
+        imgg_job_params: Optional[ImgGenJobParams] = None,
+        imgg_job_config: Optional[ImgGenJobConfig] = None,
     ) -> List[GeneratedImage]:
-        imgg_config = get_config().cogt.imgg_config
+        imgg_config = get_config().cogt.img_gen_config
         imgg_assignment = ImggAssignment(
             job_metadata=job_metadata,
             imgg_handle=imgg_handle,
             imgg_prompt=imgg_prompt,
-            imgg_job_params=imgg_job_params or imgg_config.make_default_imgg_job_params(),
-            imgg_job_config=imgg_job_config or imgg_config.imgg_job_config,
+            imgg_job_params=imgg_job_params or imgg_config.make_default_img_gen_job_params(),
+            imgg_job_config=imgg_job_config or imgg_config.img_gen_job_config,
             nb_images=nb_images,
         )
         generated_image_list = await imgg_gen_image_list(imgg_assignment=imgg_assignment)

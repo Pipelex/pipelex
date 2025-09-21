@@ -108,19 +108,19 @@ class PromptImageFormatError(CogtError):
     pass
 
 
-class ImggPromptError(CogtError):
+class ImgGenPromptError(CogtError):
     pass
 
 
-class ImggParameterError(CogtError):
+class ImgGenParameterError(CogtError):
     pass
 
 
-class ImggGenerationError(CogtError):
+class ImgGenGenerationError(CogtError):
     pass
 
 
-class ImggGeneratedTypeError(ImggGenerationError):
+class ImgGenGeneratedTypeError(ImgGenGenerationError):
     pass
 
 

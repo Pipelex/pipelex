@@ -4,8 +4,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceManagerWorkerSetupError
-from pipelex.cogt.img_gen.img_gen_worker_abstract import ImggWorkerAbstract
-from pipelex.cogt.img_gen.img_gen_worker_factory import ImggWorkerFactory
+from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.cogt.img_gen.img_gen_worker_factory import ImgGenWorkerFactory
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
@@ -19,15 +19,15 @@ from pipelex.hub import get_models_manager, get_report_delegate
 
 class InferenceManager(InferenceManagerProtocol):
     def __init__(self):
-        self.imgg_worker_factory = ImggWorkerFactory()
+        self.imgg_worker_factory = ImgGenWorkerFactory()
         self.ocr_worker_factory = OcrWorkerFactory()
         self.llm_workers: Dict[str, LLMWorkerAbstract] = {}
-        self.imgg_workers: Dict[str, ImggWorkerAbstract] = {}
+        self.imgg_workers: Dict[str, ImgGenWorkerAbstract] = {}
         self.ocr_workers: Dict[str, OcrWorkerAbstract] = {}
 
     @override
     def teardown(self):
-        self.imgg_worker_factory = ImggWorkerFactory()
+        self.imgg_worker_factory = ImgGenWorkerFactory()
         self.ocr_worker_factory = OcrWorkerFactory()
         for llm_worker in self.llm_workers.values():
             llm_worker.teardown()
@@ -103,10 +103,10 @@ class InferenceManager(InferenceManagerProtocol):
     # Manage IMGG Workers
     ####################################################################################################
 
-    def _setup_one_imgg_worker(self, imgg_handle: str) -> ImggWorkerAbstract:
+    def _setup_one_imgg_worker(self, imgg_handle: str) -> ImgGenWorkerAbstract:
         inference_model = get_models_manager().get_inference_model(model_handle=imgg_handle)
         log.verbose(f"Setting up Image Generation Worker for '{imgg_handle}'")
-        imgg_worker = self.imgg_worker_factory.make_imgg_worker(
+        imgg_worker = self.imgg_worker_factory.make_img_gen_worker(
             inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
         )
@@ -114,7 +114,7 @@ class InferenceManager(InferenceManagerProtocol):
         return imgg_worker
 
     @override
-    def get_imgg_worker(self, imgg_handle: str) -> ImggWorkerAbstract:
+    def get_imgg_worker(self, imgg_handle: str) -> ImgGenWorkerAbstract:
         imgg_worker = self.imgg_workers.get(imgg_handle)
         if imgg_worker is None:
             if not get_config().cogt.inference_manager_config.is_auto_setup_preset_imgg:

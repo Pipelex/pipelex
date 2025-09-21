@@ -1,6 +1,6 @@
 # Cognitive Tools (Cogt) Configuration
 
-The Cogt configuration manages all cognitive tools in Pipelex, including LLM (Language Models), IMGG (Image Generation), and OCR (Optical Character Recognition) capabilities.
+The Cogt configuration manages all cognitive tools in Pipelex, including LLM (Language Models), Image Generation, and OCR (Optical Character Recognition) capabilities.
 
 ## Overview
 
@@ -50,7 +50,7 @@ When configuring LLM jobs, you can set:
 - `max_tokens` (optional int): Maximum tokens in response
 - `seed` (optional int): For reproducible outputs
 
-## Image Generation (IMGG) Configuration
+## Image Generation Configuration
 
 Configuration for image generation capabilities:
 

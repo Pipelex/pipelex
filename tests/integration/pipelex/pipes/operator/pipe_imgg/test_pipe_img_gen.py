@@ -16,7 +16,7 @@ from tests.integration.pipelex.test_data import IMGGTestCases
 @pytest.mark.imgg
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipeImgg:
+class TestPipeImgGen:
     @pytest.mark.parametrize("topic, image_desc", IMGGTestCases.IMAGE_DESC)
     async def test_pipe_img_gen(
         self,

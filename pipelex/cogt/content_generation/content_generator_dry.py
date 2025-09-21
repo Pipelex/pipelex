@@ -6,8 +6,8 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams
-from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -139,9 +139,9 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         self,
         job_metadata: JobMetadata,
         imgg_handle: str,
-        imgg_prompt: ImggPrompt,
-        imgg_job_params: Optional[ImggJobParams] = None,
-        imgg_job_config: Optional[ImggJobConfig] = None,
+        imgg_prompt: ImgGenPrompt,
+        imgg_job_params: Optional[ImgGenJobParams] = None,
+        imgg_job_config: Optional[ImgGenJobConfig] = None,
     ) -> GeneratedImage:
         func_name = "make_single_image"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -160,10 +160,10 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         self,
         job_metadata: JobMetadata,
         imgg_handle: str,
-        imgg_prompt: ImggPrompt,
+        imgg_prompt: ImgGenPrompt,
         nb_images: int,
-        imgg_job_params: Optional[ImggJobParams] = None,
-        imgg_job_config: Optional[ImggJobConfig] = None,
+        imgg_job_params: Optional[ImgGenJobParams] = None,
+        imgg_job_config: Optional[ImgGenJobConfig] = None,
     ) -> List[GeneratedImage]:
         func_name = "make_image_list"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")

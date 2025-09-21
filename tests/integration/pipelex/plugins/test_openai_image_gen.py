@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.cogt.exceptions import ImggGenerationError
+from pipelex.cogt.exceptions import ImgGenGenerationError
 from pipelex.hub import get_models_manager
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin
@@ -33,12 +33,12 @@ class TestImggByOpenAIGpt:
             n=2,
         )
         if not result.data:
-            raise ImggGenerationError("No result from OpenAI")
+            raise ImgGenGenerationError("No result from OpenAI")
 
         for image_index, image_data in enumerate(result.data):
             image_base64 = image_data.b64_json
             if not image_base64:
-                raise ImggGenerationError("No base64 image data received from OpenAI")
+                raise ImgGenGenerationError("No base64 image data received from OpenAI")
 
             folder_path = f"{TEST_OUTPUTS_DIR}/imgg_by_gpt_image"
             ensure_path(folder_path)

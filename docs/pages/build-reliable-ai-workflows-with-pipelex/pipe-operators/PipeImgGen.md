@@ -26,7 +26,7 @@ The pipe can be configured to generate a single image or a list of images.
 | `output`                | string          | The output concept produced by the image generation operation.                                                | Yes      |
 | `imgg_prompt`        | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |
 | `nb_output`             | integer         | The number of images to generate. If omitted, a single image is generated.                                                    | No       |
-| `imgg_handle`           | string          | The handle for the image generation model to use (e.g., `"dall-e-3"`). Defaults to the model specified in the global config.    | No       |
+| `img_gen`           | string          | The handle for the image generation model to use (e.g., `"gpt-image-1"`). Defaults to the model specified in the global config.    | No       |
 | `aspect_ratio`          | string          | The desired aspect ratio of the image (e.g., `"16:9"`, `"1:1"`).                                                              | No       |
 | `quality`               | string          | The quality of the generated image (e.g., `"standard"`, `"hd"`).                                                              | No       |
 | `seed`                  | integer or "auto" | A seed for the random number generator to ensure reproducibility. `"auto"` uses a random seed.                                | No       |
@@ -44,7 +44,7 @@ type = "PipeImgGen"
 definition = "Generate a futuristic car image"
 output = "Image"
 img_gen_prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
-imgg_handle = "dall-e-3"
+img_gen = "gpt-image-1"
 aspect_ratio = "16:9"
 quality = "hd"
 ```
@@ -63,7 +63,7 @@ definition = "Generate three logo variations from a prompt"
 inputs = { prompt = "images.ImgGenPrompt" }
 output = "Image"
 nb_output = 3
-imgg_handle = "stable-diffusion"
+img_gen = "gpt-image-1"
 aspect_ratio = "1:1"
 ```
 

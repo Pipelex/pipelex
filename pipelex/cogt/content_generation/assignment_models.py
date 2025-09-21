@@ -5,8 +5,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMAssignmentError
-from pipelex.cogt.img_gen.img_gen_job_components import ImggJobConfig, ImggJobParams
-from pipelex.cogt.img_gen.img_gen_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
@@ -123,9 +123,9 @@ class TextThenObjectAssignment(BaseModel):
 class ImggAssignment(BaseModel):
     job_metadata: JobMetadata
     imgg_handle: str
-    imgg_prompt: ImggPrompt
-    imgg_job_params: ImggJobParams
-    imgg_job_config: ImggJobConfig
+    imgg_prompt: ImgGenPrompt
+    imgg_job_params: ImgGenJobParams
+    imgg_job_config: ImgGenJobConfig
     nb_images: int
 
 

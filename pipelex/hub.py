@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
-from pipelex.cogt.img_gen.img_gen_worker_abstract import ImggWorkerAbstract
+from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.models.model_deck import ModelDeck
@@ -351,7 +351,7 @@ def get_llm_worker(
 
 def get_imgg_worker(
     imgg_handle: str,
-) -> ImggWorkerAbstract:
+) -> ImgGenWorkerAbstract:
     return get_inference_manager().get_imgg_worker(imgg_handle=imgg_handle)
 
 

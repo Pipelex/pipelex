@@ -25,8 +25,8 @@ class ActivityHandlerForResultFiles:
         self.result_dir_path = result_dir_path
         self.images_dir_path = os.path.join(result_dir_path, "images")
         ensure_path(self.images_dir_path)
-        imgg_config = get_config().cogt.imgg_config
-        imgg_param_defaults = imgg_config.imgg_param_defaults
+        imgg_config = get_config().cogt.img_gen_config
+        imgg_param_defaults = imgg_config.img_gen_param_defaults
         self.image_output_format = imgg_param_defaults.output_format
         self.already_handled_stuff: Set[str] = set()
 
