@@ -22,7 +22,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
 @pytest.fixture(
     params=[
         # "o1",
-        # "gpt-4o",
+        "gpt-4o",
         # "gpt-4o-mini",
         # "gpt-4-5-preview",
         # "o1-mini",
@@ -37,8 +37,8 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "mistral-large",
         # "ministral-3b",
         # "ministral-8b",
-        "mistral-medium",
-        "mistral-medium-2508",
+        # "mistral-medium",
+        # "mistral-medium-2508",
         # "pixtral-12b",
         # "pixtral-large",
         # "gemini-1-5-pro",
@@ -205,11 +205,11 @@ def llm_job_params(request: pytest.FixtureRequest) -> LLMJobParams:
 
 @pytest.fixture(
     params=[
-        # "fal-ai/flux-pro",
-        # "fal-ai/flux-pro/v1.1",
-        # "fal-ai/flux-pro/v1.1-ultra",
-        "fal-ai/fast-lightning-sdxl",
-        # "openai/gpt-image-1",
+        # "flux-pro",
+        "flux-pro/v1.1",
+        # "flux-pro/v1.1-ultra",
+        "fast-lightning-sdxl",
+        "gpt-image-1",
     ]
 )
 def imgg_handle(request: pytest.FixtureRequest) -> str:

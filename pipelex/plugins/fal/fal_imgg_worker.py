@@ -6,9 +6,9 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
 from pipelex.cogt.img_gen.img_gen_job import ImggJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImggWorkerAbstract
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.fal.fal_factory import FalFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -17,10 +17,10 @@ class FalImggWorker(ImggWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        imgg_engine: ImggEngine,
+        inference_model: InferenceModelSpec,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        super().__init__(imgg_engine=imgg_engine, reporting_delegate=reporting_delegate)
+        super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
         if not isinstance(sdk_instance, AsyncClient):
             raise SdkTypeError(f"Provided Imgg sdk_instance is not of type fal_client.AsyncClient: it's a '{type(sdk_instance)}'")
@@ -32,15 +32,15 @@ class FalImggWorker(ImggWorkerAbstract):
         self,
         imgg_job: ImggJob,
     ) -> GeneratedImage:
-        application = FalFactory.make_fal_application(imgg_engine=self.imgg_engine)
+        fal_application = self.inference_model.model_id
         arguments = FalFactory.make_fal_arguments(
-            fal_application=application,
+            fal_application=fal_application,
             imgg_job=imgg_job,
             nb_images=1,
         )
-        log.verbose(arguments, title=f"Fal arguments, application={application}")
+        log.verbose(arguments, title=f"Fal arguments, application={fal_application}")
         handler = await self.fal_async_client.submit(
-            application=application,
+            application=fal_application,
             arguments=arguments,
         )
 
@@ -65,7 +65,7 @@ class FalImggWorker(ImggWorkerAbstract):
         imgg_job: ImggJob,
         nb_images: int,
     ) -> List[GeneratedImage]:
-        application = FalFactory.make_fal_application(imgg_engine=self.imgg_engine)
+        application = self.inference_model.model_id
         arguments = FalFactory.make_fal_arguments(
             fal_application=application,
             imgg_job=imgg_job,

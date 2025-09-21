@@ -98,16 +98,11 @@ is_streaming_enabled = false
 # Image generation config
 ####################################################################################################
 
-[cogt.imgg_config]
-imgg_handles = ["fal-ai/flux-pro", "fal-ai/fast-lightning-sdxl"]
-default_imgg_handle = "fal-ai/flux-pro/v1.1-ultra"               # use "fal-ai/fast-lightning-sdxl" for SDXL Lightning cheap and fast
-
 [cogt.imgg_config.imgg_job_config]
 is_sync_mode = false
 
 [cogt.imgg_config.imgg_param_defaults]
-# quality and nb_steps cannot be set at the same time
-# nb_steps = 1  # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
+nb_steps = 1            # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
 quality = "low"
 aspect_ratio = "square" # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
 guidance_scale = 3.5

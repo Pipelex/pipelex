@@ -6,3 +6,4 @@ class PromptingTarget(StrEnum):
     ANTHROPIC = "anthropic"
     MISTRAL = "mistral"
     GEMINI = "gemini"
+    FAL = "fal"

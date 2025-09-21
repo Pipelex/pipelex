@@ -28,7 +28,6 @@ class TestPipeImgg:
         pipe_imgg_blueprint = PipeImgGenBlueprint(
             definition="Image generation test",
             img_gen_prompt=image_desc,
-            imgg_handle=imgg_handle,
             output=NativeConceptEnum.IMAGE,
             nb_output=1,
         )

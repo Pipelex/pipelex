@@ -228,10 +228,10 @@ class PipeImgGen(PipeOperator):
         if self.img_gen is not None:
             # New pattern: use img_gen choice (preset or inline setting)
             img_gen_setting = model_deck.get_img_gen_setting(self.img_gen)
-        elif self.imgg_handle is not None or self.quality is not None or self.nb_steps is not None:
+        elif self.imgg_handle is not None:
             # Legacy pattern: create ImgGenSetting from individual settings
             img_gen_setting = ImgGenSetting(
-                img_gen_handle=self.imgg_handle or imgg_config.default_imgg_handle,
+                img_gen_handle=self.imgg_handle,
                 quality=self.quality,
                 nb_steps=self.nb_steps,
                 guidance_scale=self.guidance_scale or imgg_param_defaults.guidance_scale,

@@ -55,10 +55,6 @@ When configuring LLM jobs, you can set:
 Configuration for image generation capabilities:
 
 ```toml
-[cogt.imgg_config]
-default_imgg_handle = "fal-ai/flux-pro"
-imgg_handles = ["fal-ai/flux-pro", "fal-ai/fast-lightning-sdxl"]
-
 [cogt.imgg_config.imgg_job_config]
 is_sync_mode = false
 
@@ -165,10 +161,6 @@ max_retries = 3
 
 [cogt.llm_config.instructor_config]
 is_openai_structured_output_enabled = false
-
-[cogt.imgg_config]
-default_imgg_handle = "fal-ai/flux-pro/v1.1-ultra"
-imgg_handles = ["fal-ai/flux-pro", "fal-ai/fast-lightning-sdxl"]
 
 [cogt.imgg_config.imgg_job_config]
 is_sync_mode = false

@@ -27,9 +27,9 @@ llm_to_engineer = ["claude-4.1-opus", "gemini-2.5-pro"]
 llm_for_large_codebase = ["gemini-2.5-pro", "claude-4-sonnet", "gpt-5"]
 
 # Image generation aliases
-base-imgg = "fal-ai/flux-pro/v1.1"
-best-imgg = "fal-ai/flux-pro/v1.1-ultra"
-fast-imgg = "fal-ai/fast-lightning-sdxl"
+base-imgg = "flux-pro/v1.1"
+best-imgg = "flux-pro/v1.1-ultra"
+fast-imgg = "fast-lightning-sdxl"
 
 ####################################################################################################
 # LLM Presets

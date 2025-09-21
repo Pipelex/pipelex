@@ -5,9 +5,9 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
 from pipelex.cogt.img_gen.img_gen_job import ImggJob
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -15,11 +15,11 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 class ImggWorkerAbstract(InferenceWorkerAbstract):
     def __init__(
         self,
-        imgg_engine: ImggEngine,
+        inference_model: InferenceModelSpec,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
         InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
-        self.imgg_engine = imgg_engine
+        self.inference_model = inference_model
 
     #########################################################
     # Instance methods
@@ -28,7 +28,7 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
     @property
     @override
     def desc(self) -> str:
-        return f"Img Worker using:\n{self.imgg_engine.desc}"
+        return f"ImgGen-Worker:{self.inference_model.tag}"
 
     def _check_can_perform_job(self, imgg_job: ImggJob):
         # This can be overridden by subclasses for specific checks
@@ -38,7 +38,7 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
         self,
         imgg_job: ImggJob,
     ) -> GeneratedImage:
-        log.debug(f"Image gen worker gen_image:\n{self.imgg_engine.desc}")
+        log.debug(f"Image gen worker gen_image using {self.desc}")
 
         # Verify that the job is valid
         imgg_job.validate_before_execution()
@@ -50,7 +50,7 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
         imgg_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
 
         # Prepare job
-        imgg_job.imgg_job_before_start(imgg_engine=self.imgg_engine)
+        imgg_job.imgg_job_before_start()
 
         # Execute job
         result = await self._gen_image(imgg_job=imgg_job)
@@ -74,7 +74,7 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
         imgg_job: ImggJob,
         nb_images: int,
     ) -> List[GeneratedImage]:
-        log.debug(f"Image gen worker gen_image_list:\n{self.imgg_engine.desc}")
+        log.debug(f"Image gen worker gen_image_list using {self.desc}")
 
         # Verify that the job is valid
         imgg_job.validate_before_execution()
@@ -86,7 +86,7 @@ class ImggWorkerAbstract(InferenceWorkerAbstract):
         imgg_job.job_metadata.unit_job_id = UnitJobId.IMGG_TEXT_TO_IMAGE
 
         # Prepare job
-        imgg_job.imgg_job_before_start(imgg_engine=self.imgg_engine)
+        imgg_job.imgg_job_before_start()
 
         # Execute job
         result = await self._gen_image_list(imgg_job=imgg_job, nb_images=nb_images)

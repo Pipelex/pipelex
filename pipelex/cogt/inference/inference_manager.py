@@ -4,7 +4,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceManagerWorkerSetupError
-from pipelex.cogt.img_gen.img_gen_engine_factory import ImggEngineFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImggWorkerAbstract
 from pipelex.cogt.img_gen.img_gen_worker_factory import ImggWorkerFactory
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
@@ -105,10 +104,10 @@ class InferenceManager(InferenceManagerProtocol):
     ####################################################################################################
 
     def _setup_one_imgg_worker(self, imgg_handle: str) -> ImggWorkerAbstract:
-        imgg_engine = ImggEngineFactory.make_imgg_engine(imgg_handle=imgg_handle)
-        log.verbose(imgg_engine.desc, title=f"Setting up ImgEngine for '{imgg_handle}'")
+        inference_model = get_models_manager().get_inference_model(model_handle=imgg_handle)
+        log.verbose(f"Setting up Image Generation Worker for '{imgg_handle}'")
         imgg_worker = self.imgg_worker_factory.make_imgg_worker(
-            imgg_engine=imgg_engine,
+            inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
         )
         self.imgg_workers[imgg_handle] = imgg_worker

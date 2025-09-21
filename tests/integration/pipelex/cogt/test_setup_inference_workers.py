@@ -22,13 +22,5 @@ class TestSetupInferenceWorkers:
                         assert inference_model == llm_worker.inference_model
                 case ModelType.TEXT_EXTRACTOR:
                     _ = inference_manager.get_ocr_worker(model_handle=model_handle)
-
-    def test_setup_imgg_workers(self):
-        inference_manager = get_inference_manager()
-        imgg_handles = get_config().cogt.imgg_config.imgg_handles
-        log.verbose(f"{len(imgg_handles)} Imgg handles found")
-        for imgg_handle in imgg_handles:
-            imgg_worker = inference_manager.get_imgg_worker(imgg_handle=imgg_handle)
-            assert imgg_worker is not None
-            assert imgg_worker.imgg_engine is not None
-        log.debug("Done setting up Imgg Workers (async)")
+                case ModelType.IMG_GEN:
+                    _ = inference_manager.get_imgg_worker(imgg_handle=model_handle)

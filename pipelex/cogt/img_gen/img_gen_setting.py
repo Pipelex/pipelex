@@ -12,9 +12,9 @@ class ImgGenSetting(ConfigModel):
     img_gen_handle: str
     quality: Optional[Quality] = Field(default=None, strict=False)
     nb_steps: Optional[int] = Field(default=None, gt=0)
-    guidance_scale: float = Field(..., gt=0)
-    is_moderated: bool
-    safety_tolerance: int = Field(..., ge=1, le=6)
+    guidance_scale: Optional[float] = Field(default=None, gt=0)
+    is_moderated: bool = False
+    safety_tolerance: Optional[int] = Field(default=None, ge=1, le=6)
 
     @model_validator(mode="after")
     def validate_quality_or_nb_steps(self) -> Self:

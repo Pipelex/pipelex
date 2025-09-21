@@ -106,7 +106,7 @@ class TestContentGenerator:
     async def test_make_image(self, request: FixtureRequest):
         image: GeneratedImage = await get_content_generator().make_single_image(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
-            imgg_handle="fal-ai/fast-lightning-sdxl",
+            imgg_handle="fast-lightning-sdxl",
             imgg_prompt=ImggPrompt(
                 positive_text="A dog with sunglasses coding on a laptop",
             ),

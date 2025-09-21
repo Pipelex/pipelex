@@ -7,10 +7,10 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import ImggGenerationError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
 from pipelex.cogt.img_gen.img_gen_job import ImggJob
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImggWorkerAbstract
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.openai_imgg_factory import OpenAIImggFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
@@ -23,10 +23,10 @@ class OpenAIImggWorker(ImggWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        imgg_engine: ImggEngine,
+        inference_model: InferenceModelSpec,
         reporting_delegate: Optional[ReportingProtocol] = None,
     ):
-        super().__init__(imgg_engine=imgg_engine, reporting_delegate=reporting_delegate)
+        super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
         if not isinstance(sdk_instance, openai.AsyncOpenAI):
             raise SdkTypeError(f"Provided Imgg sdk_instance is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'")
@@ -56,7 +56,7 @@ class OpenAIImggWorker(ImggWorkerAbstract):
         output_compression = OpenAIImggFactory.output_compression_for_gpt_image_1()
         result = await self.openai_client.images.generate(
             prompt=imgg_job.imgg_prompt.positive_text,
-            model=self.imgg_engine.imgg_model_name,
+            model=self.inference_model.model_id,
             moderation=moderation,
             background=background,
             quality=quality,

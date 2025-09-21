@@ -79,14 +79,13 @@ class ModelManager(ModelManagerAbstract):
 
     def build_deck(self, model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
-        model_handles: Dict[str, InferenceModelSpec] = {}
+        inference_models: Dict[str, InferenceModelSpec] = {}
 
         for model_name, available_backends in all_models_and_possible_backends.items():
             backend_match_for_model = self.routing_profile_library.get_backend_match_for_model_from_active_routing_profile(
                 model_name=model_name,
             )
             if backend_match_for_model is None:
-                # raise ModelsManagerError(f"No backend match found for model '{model_name}'")
                 log.verbose(f"No backend match found for model '{model_name}'")
                 continue
             matched_backend_name = backend_match_for_model.backend_name
@@ -115,6 +114,7 @@ class ModelManager(ModelManagerAbstract):
                         # TODO: enable to set the order or priority of the available backends
                         for available_backend in available_backends:
                             if available_backend == matched_backend_name:
+                                # we've already checked the matched_backend_name and it didn't have the model spec, that's why we're here
                                 continue
                             backend = self.inference_backend_library.get_inference_backend(backend_name=available_backend)
                             if backend is None:
@@ -127,10 +127,10 @@ class ModelManager(ModelManagerAbstract):
                                 f"Model spec '{model_name}' not found in any of the available backends '{available_backends}' "
                                 f"which was set as default in routing profile '{backend_match_for_model.routing_profile_name}'"
                             )
-            model_handles[model_name] = model_spec
+            inference_models[model_name] = model_spec
 
         model_deck = ModelDeck(
-            inference_models=model_handles,
+            inference_models=inference_models,
             aliases=model_deck_blueprint.aliases,
             llm_presets=model_deck_blueprint.llm.presets,
             llm_choice_defaults=model_deck_blueprint.llm.choice_defaults,

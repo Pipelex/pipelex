@@ -13,10 +13,8 @@ class OcrConfig(ConfigModel):
 
 
 class ImggConfig(ConfigModel):
-    default_imgg_handle: str
     imgg_job_config: ImggJobConfig
     imgg_param_defaults: ImggJobParamsDefaults
-    imgg_handles: List[str]
     fal_config: FalConfig
 
     def make_default_imgg_job_params(self) -> ImggJobParams:

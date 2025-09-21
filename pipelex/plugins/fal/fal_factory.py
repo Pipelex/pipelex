@@ -3,16 +3,16 @@ from typing import Any, Dict, List, Optional
 from pipelex import log
 from pipelex.cogt.exceptions import ImggGeneratedTypeError, ImggParameterError
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_engine import ImggEngine
 from pipelex.cogt.img_gen.img_gen_job import ImggJob
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat, Quality
 from pipelex.config import get_config
 
 
 class FalFactory:
-    @staticmethod
-    def make_fal_application(imgg_engine: ImggEngine) -> str:
-        return f"{imgg_engine.imgg_platform}/{imgg_engine.imgg_model_name}"
+    # This method is no longer needed since we pass model_handle directly
+    # @staticmethod
+    # def make_fal_application(imgg_engine: ImggEngine) -> str:
+    #     return f"{imgg_engine.imgg_platform}/{imgg_engine.imgg_model_name}"
 
     @classmethod
     def make_nb_steps_from_quality_for_flux_pro(cls, quality: Quality) -> int:
@@ -87,8 +87,10 @@ class FalFactory:
         match fal_application:
             case "fal-ai/flux-pro" | "fal-ai/flux-pro/v1.1":
                 num_inference_steps = params.nb_steps
-                if not num_inference_steps and (quality := params.quality):
-                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux_pro(quality=quality)
+                if not num_inference_steps:
+                    if not params.quality:
+                        raise ImggParameterError(f"Either nb_steps or quality must be set for image generation with '{fal_application}'")
+                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux_pro(quality=params.quality)
 
                 args_dict = {
                     "prompt": imgg_job.imgg_prompt.positive_text,

@@ -10,7 +10,7 @@ from pipelex.tools.config.config_root import (
     CONFIG_BASE_OVERRIDES_BEFORE_ENV,
 )
 from pipelex.tools.misc.json_utils import deep_update
-from pipelex.tools.misc.toml_utils import failable_load_toml_from_path
+from pipelex.tools.misc.toml_utils import failable_load_toml_from_path, load_toml_from_path
 from pipelex.tools.runtime_manager import runtime_manager
 
 CONFIG_DIR_NAME = ".pipelex"
@@ -63,9 +63,7 @@ class ConfigManager:
             Dict[str, Any]: The configuration dictionary from pipelex.toml
         """
         config_path = self.pipelex_root_config_path
-        config = failable_load_toml_from_path(config_path)
-        if not config:
-            raise ConfigException(f"Pipelex root config could not be found at {self.pipelex_specific_config_file_path}.")
+        config = load_toml_from_path(config_path)
         return config
 
     def get_local_config(self) -> Dict[str, Any]:
