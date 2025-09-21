@@ -9,6 +9,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat, Quality
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
+from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
@@ -87,6 +88,12 @@ class PipeImgGen(PipeOperator):
     def validate_inputs(self) -> Self:
         self._validate_inputs()
         return self
+
+    @override
+    def validate_with_libraries(self):
+        self._validate_inputs()
+        if self.img_gen:
+            check_img_gen_choice_with_deck(img_gen_choice=self.img_gen)
 
     @override
     def validate_output(self):

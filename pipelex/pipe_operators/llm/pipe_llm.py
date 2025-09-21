@@ -11,7 +11,7 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices
-from pipelex.cogt.models.model_deck_check import check_llm_setting_with_deck
+from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
@@ -90,8 +90,8 @@ class PipeLLM(PipeOperator):
         if self.system_prompt_to_structure:
             get_template(template_name=self.system_prompt_to_structure)
         if self.llm_choices:
-            for llm_setting in self.llm_choices.list_used_presets():
-                check_llm_setting_with_deck(llm_choice=llm_setting)
+            for llm_choice in self.llm_choices.list_choices():
+                check_llm_choice_with_deck(llm_choice=llm_choice)
 
     @override
     def validate_output(self):

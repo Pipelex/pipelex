@@ -6,6 +6,7 @@ from typing_extensions import Self, override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.cogt.models.model_deck_check import check_ocr_choice_with_deck
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
@@ -56,6 +57,12 @@ class PipeOcr(PipeOperator):
     def validate_inputs(self) -> Self:
         self._validate_inputs()
         return self
+
+    @override
+    def validate_with_libraries(self):
+        self._validate_inputs()
+        if self.ocr_choice:
+            check_ocr_choice_with_deck(ocr_choice=self.ocr_choice)
 
     @override
     def required_variables(self) -> Set[str]:

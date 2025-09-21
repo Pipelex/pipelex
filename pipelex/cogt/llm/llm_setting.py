@@ -54,15 +54,15 @@ class LLMSettingChoices(ConfigModel):
     for_text: Optional[LLMChoice]
     for_object: Optional[LLMChoice]
 
-    def list_used_presets(self) -> Set[str]:
+    def list_choices(self) -> Set[str]:
         return set(
             [
-                setting
-                for setting in [
+                choice
+                for choice in [
                     self.for_text,
                     self.for_object,
                 ]
-                if isinstance(setting, str)
+                if isinstance(choice, str)
             ]
         )
 

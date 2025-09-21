@@ -5,12 +5,12 @@ from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.exceptions import (
-    ImgGenPresetNotFoundError,
+    ImgGenChoiceNotFoundError,
+    LLMChoiceNotFoundError,
     LLMHandleNotFoundError,
-    LLMPresetNotFoundError,
     LLMSettingsValidationError,
     ModelDeckValidatonError,
-    OcrPresetNotFoundError,
+    OcrChoiceNotFoundError,
 )
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
@@ -77,7 +77,7 @@ class ModelDeck(ConfigModel):
             return
         if preset_id == LLM_PRESET_DISABLED and is_disabled_allowed:
             return
-        raise LLMPresetNotFoundError(f"llm preset id '{preset_id}' not found in deck")
+        raise LLMChoiceNotFoundError(f"llm preset id '{preset_id}' not found in deck")
 
     def get_llm_setting(self, llm_choice: LLMChoice) -> LLMSetting:
         if isinstance(llm_choice, LLMSetting):
@@ -86,10 +86,10 @@ class ModelDeck(ConfigModel):
             # it's a string, so either an llm preset id or an llm handle
             if llm_preset := self.llm_presets.get(llm_choice):
                 return llm_preset
-            elif self.get_optional_inference_model(model_handle=llm_choice):
+            elif self.is_handle_defined(model_handle=llm_choice):
                 return LLMSetting(llm_handle=llm_choice, temperature=0.7, max_tokens=None)
             else:
-                raise LLMPresetNotFoundError(f"LLM choice '{llm_choice}' not found in deck")
+                raise LLMChoiceNotFoundError(f"LLM choice '{llm_choice}' not found in deck")
 
     def get_ocr_setting(self, ocr_choice: OcrChoice) -> OcrSetting:
         if isinstance(ocr_choice, OcrSetting):
@@ -98,10 +98,10 @@ class ModelDeck(ConfigModel):
             # it's a string, so either an ocr preset id or an ocr handle
             if ocr_preset := self.ocr_presets.get(ocr_choice):
                 return ocr_preset
-            elif self.get_optional_inference_model(model_handle=ocr_choice):
+            elif self.is_handle_defined(model_handle=ocr_choice):
                 return OcrSetting(ocr_handle=ocr_choice)
             else:
-                raise OcrPresetNotFoundError(f"OCR choice '{ocr_choice}' not found in deck")
+                raise OcrChoiceNotFoundError(f"OCR choice '{ocr_choice}' not found in deck")
 
     def get_img_gen_setting(self, img_gen_choice: ImgGenChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):
@@ -110,10 +110,10 @@ class ModelDeck(ConfigModel):
             # it's a string, so either an img gen preset id or an img gen handle
             if img_gen_preset := self.img_gen_presets.get(img_gen_choice):
                 return img_gen_preset
-            elif self.get_optional_inference_model(model_handle=img_gen_choice):
+            elif self.is_handle_defined(model_handle=img_gen_choice):
                 return ImgGenSetting(img_gen_handle=img_gen_choice)
             else:
-                raise ImgGenPresetNotFoundError(f"Image generation choice '{img_gen_choice}' not found in deck")
+                raise ImgGenChoiceNotFoundError(f"Image generation choice '{img_gen_choice}' not found in deck")
 
     @classmethod
     def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]
@@ -174,7 +174,7 @@ class ModelDeck(ConfigModel):
         return self
 
     def _validate_llm_choices(self, llm_choices: LLMSettingChoices):
-        for llm_setting in llm_choices.list_used_presets():
+        for llm_setting in llm_choices.list_choices():
             self.check_llm_setting(llm_setting_or_preset_id=llm_setting)
         return
 
@@ -192,6 +192,9 @@ class ModelDeck(ConfigModel):
                     return inference_model
         log.warning(f"Skipping model handle '{model_handle}' because it's not found in deck")
         return None
+
+    def is_handle_defined(self, model_handle: str) -> bool:
+        return model_handle in self.inference_models or model_handle in self.aliases
 
     def get_required_inference_model(self, model_handle: str) -> InferenceModelSpec:
         inference_model = self.get_optional_inference_model(model_handle=model_handle)

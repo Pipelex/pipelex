@@ -32,15 +32,15 @@ class LLMWorkerError(CogtError):
     pass
 
 
-class LLMPresetNotFoundError(CogtError):
+class LLMChoiceNotFoundError(CogtError):
     pass
 
 
-class OcrPresetNotFoundError(CogtError):
+class OcrChoiceNotFoundError(CogtError):
     pass
 
 
-class ImgGenPresetNotFoundError(CogtError):
+class ImgGenChoiceNotFoundError(CogtError):
     pass
 
 
