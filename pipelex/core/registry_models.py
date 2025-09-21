@@ -16,7 +16,6 @@ from pipelex.core.stuffs.stuff_content import (
     TextAndImagesContent,
     TextContent,
 )
-from pipelex.libraries.pipelines.meta.pipeline_draft import PipelexBundleBlueprint, PipelineDraft
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -83,8 +82,6 @@ class PipelexRegistryModels(RegistryModels):
         PDFContent,
         TextAndImagesContent,
         PageContent,
-        PipelexBundleBlueprint,
-        PipelineDraft,
     ]
 
     EXPERIMENTAL: ClassVar[List[ModelType]] = [

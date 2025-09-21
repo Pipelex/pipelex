@@ -78,6 +78,14 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     def get_pipes_dict(self) -> Dict[str, PipeAbstract]:
         return self.root
 
+    def remove_pipes_by_codes(self, pipe_codes: List[str]) -> None:
+        # TODO: We should create a separate library, that copies the original one, and then removes the pipes from it
+        # Then run the dry run + validation to see if removing those pipe has not broken any other pipe.
+        # If validated, it should update the real library.
+        for pipe_code in pipe_codes:
+            if pipe_code in self.root:
+                del self.root[pipe_code]
+
     @override
     def teardown(self) -> None:
         self.root = {}

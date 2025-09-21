@@ -53,6 +53,7 @@ DEFAULT_PROMPT_VAR_NAME = "prompt"
 
 
 class PipeImgGen(PipeOperator):
+    type: Literal["PipeImgGen"] = "PipeImgGen"
     img_gen_prompt: Optional[str] = None
     img_gen_prompt_var_name: Optional[str] = None
 
@@ -100,7 +101,7 @@ class PipeImgGen(PipeOperator):
             )
 
     @override
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         needed_inputs = PipeInputSpecFactory.make_empty()
         if self.img_gen_prompt:
             needed_inputs.add_requirement(

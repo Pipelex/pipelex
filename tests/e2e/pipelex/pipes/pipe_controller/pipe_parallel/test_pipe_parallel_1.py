@@ -10,7 +10,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipe_router, get_report_delegate
+from pipelex.hub import get_pipe_router
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.test_pipelines.pipe_controllers.pipe_parallel.pipe_parallel import ContentAnalysis, DocumentInput, LengthAnalysis
 
@@ -60,7 +60,6 @@ class TestPipeParallelDocumentAnalysis:
 
         # Log output and generate report
         pretty_print(pipe_output, title="PipeParallel document analysis test")
-        get_report_delegate().generate_report()
 
         # Basic assertions
         assert pipe_output is not None

@@ -32,7 +32,7 @@ class ConceptStructureBlueprintFieldType(StrEnum):
 
 class ConceptStructureBlueprint(BaseModel):
     definition: str
-    type: ConceptStructureBlueprintFieldType | None = None
+    type: Optional[ConceptStructureBlueprintFieldType] = None
     item_type: Optional[str] = None
     key_type: Optional[str] = None
     value_type: Optional[str] = None
@@ -116,14 +116,11 @@ class ConceptStructureBlueprint(BaseModel):
         )
 
 
-ConceptStructureBlueprintType = Union[str, ConceptStructureBlueprint]
-
-
 class ConceptBlueprint(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     definition: str
-    structure: Optional[Union[str, Dict[str, ConceptStructureBlueprintType]]] = None
+    structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = None
     # TODO: restore possibility of multiple refiles
     refines: Optional[str] = None
 

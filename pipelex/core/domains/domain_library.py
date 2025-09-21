@@ -29,6 +29,10 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
         else:
             self.root[domain_code] = domain
 
+    def remove_domain_by_code(self, domain_code: str) -> None:
+        if domain_code in self.root:
+            del self.root[domain_code]
+
     @override
     def get_domain(self, domain: str) -> Optional[Domain]:
         return self.root.get(domain)

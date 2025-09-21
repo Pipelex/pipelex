@@ -1,11 +1,11 @@
 """Tests for structured output generator."""
 
-from typing import Dict
+from typing import Dict, Union
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType, ConceptStructureBlueprintType
+from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.create.structured_output_generator import StructureGenerator
+from pipelex.core.concepts.structure_generator import StructureGenerator
 
 
 class TestStructureGenerator:
@@ -407,9 +407,9 @@ class TestStructureGenerator:
 
     def test_mixed_structure_blueprint_normalization(self):
         """Test that mixed structure blueprints (strings and ConceptStructureBlueprint objects) are properly normalized."""
-        # Create a mixed structure blueprint similar to what would come from PLX parsing
-        mixed_structure_blueprint: Dict[str, ConceptStructureBlueprintType] = {
-            "name": "The name of the person",
+        # Create a mixed structure blueprint similar to what would come from TOML parsing
+        mixed_structure_blueprint: Dict[str, Union[str, ConceptStructureBlueprint]] = {
+            "name": "The name of the person",  # Simple string definition
             "age": ConceptStructureBlueprint(definition="The age of the person", type=ConceptStructureBlueprintFieldType.NUMBER, required=True),
             "birthdate": ConceptStructureBlueprint(
                 definition="The birthdate of the person", type=ConceptStructureBlueprintFieldType.DATE, required=True

@@ -9,6 +9,7 @@ from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 class PipeParallelBlueprint(PipeBlueprint):
     type: Literal["PipeParallel"] = "PipeParallel"
+    category: Literal["PipeController"] = "PipeController"
     parallels: List[SubPipeBlueprint]
     add_each_output: bool = True
     combined_output: Optional[str] = None

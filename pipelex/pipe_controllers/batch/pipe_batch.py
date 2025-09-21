@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Coroutine, List, Optional, Set, cast
+from typing import Any, Coroutine, List, Literal, Optional, Set, cast
 
 import shortuuid
 from pydantic import model_validator
@@ -25,7 +25,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeBatch(PipeController):
-    """Runs a PipeSequence in parallel for each item in a list."""
+    type: Literal["PipeBatch"] = "PipeBatch"
 
     branch_pipe_code: str
     batch_params: Optional[BatchParams] = None
@@ -68,7 +68,7 @@ class PipeBatch(PipeController):
         return required_variables
 
     @override
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         return self.inputs
 
     async def _run_batch_pipe(

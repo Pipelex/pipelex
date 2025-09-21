@@ -2,6 +2,7 @@ from typing import Any, Optional, Type
 
 import instructor
 import openai
+from instructor.exceptions import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError
 from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
@@ -108,15 +109,20 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             if ModelConstraints.TEMPERATURE_MUST_BE_1 in self.inference_model.constraints and temperature != 1:
                 log.warning(f"OpenAI model {self.inference_model.desc} used with a temperature of {temperature}, but it must be 1 for this model")
                 temperature = 1
-            result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-                model=self.inference_model.model_id,
-                temperature=temperature,
-                max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-                seed=llm_job.job_params.seed,
-                messages=messages,
-                response_model=schema,
-                max_retries=llm_job.job_config.max_retries,
-            )
+            try:
+                result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
+                    model=self.inference_model.model_id,
+                    temperature=temperature,
+                    max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
+                    seed=llm_job.job_params.seed,
+                    messages=messages,
+                    response_model=schema,
+                    max_retries=llm_job.job_config.max_retries,
+                )
+            except InstructorRetryException as exc:
+                raise LLMCompletionError(
+                    f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"
+                ) from exc
         except NotFoundError as exc:
             raise LLMCompletionError(f"OpenAI model or deployment '{self.inference_model.model_id}' not found: {exc}") from exc
         except BadRequestError as bad_request_error:

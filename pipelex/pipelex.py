@@ -9,7 +9,6 @@ from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
 from kajson.singleton import MetaSingleton
 from pydantic import ValidationError
-from rich import print
 from typing_extensions import Self
 
 from pipelex import log
@@ -251,13 +250,11 @@ class Pipelex(metaclass=MetaSingleton):
         self.class_registry.teardown()
         func_registry.teardown()
 
-        project_name = get_config().project_name
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_config().project_name} (except config & logs)")
         self.pipelex_hub.reset_config()
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:
             del MetaSingleton.instances[self.__class__]
-        print(f"{PACKAGE_NAME} version {PACKAGE_VERSION} config reset done for {project_name}")
 
     # TODO: add kwargs to make() so that subclasses can employ specific parameters
     @classmethod
@@ -311,7 +308,6 @@ class Pipelex(metaclass=MetaSingleton):
         pipelex_instance = cls(config_dir_path=config_dir_path)
         pipelex_instance.setup()
         pipelex_instance.setup_libraries()
-        log.info(f"Pipelex {PACKAGE_VERSION} initialized.")
         return pipelex_instance
 
     @classmethod

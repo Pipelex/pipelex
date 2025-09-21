@@ -1,5 +1,3 @@
-"""Simple integration test for PipeParallel controller."""
-
 from typing import cast
 
 import pytest
@@ -163,7 +161,6 @@ class TestPipeParallelSimple:
             pipe_code="parallel_text_analyzer",
             blueprint=pipe_parallel_blueprint,
         )
-
         # Create test data - shorter text
         input_text_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),

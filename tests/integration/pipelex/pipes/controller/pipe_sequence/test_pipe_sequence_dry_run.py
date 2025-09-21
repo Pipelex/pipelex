@@ -13,7 +13,7 @@ from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipe_router, get_report_delegate
+from pipelex.hub import get_pipe_router
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.json_utils import load_json_list_from_path
 from tests.test_pipelines.discord_newsletter import ChannelSummary, DiscordChannelUpdate
@@ -63,7 +63,6 @@ class TestPipeSequenceDryRun:
 
         # Log output for debugging
         pretty_print(pipe_output, title="Discord Newsletter Dry Run Output")
-        get_report_delegate().generate_report()
 
         # Basic assertions
         assert pipe_output is not None

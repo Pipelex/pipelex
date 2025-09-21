@@ -324,7 +324,7 @@ class PipelineTracker(PipelineTrackerProtocol):
 
     def _print_mermaid_flowchart_code_and_url(self, title: Optional[str] = None, subtitle: Optional[str] = None):
         if not self.nx_graph.nodes:
-            log.info("No nodes in the pipeline tracker")
+            log.debug("No nodes in the pipeline tracker")
             return
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")
@@ -338,7 +338,7 @@ class PipelineTracker(PipelineTrackerProtocol):
 
     def _print_mermaid_flowchart_url(self, title: Optional[str] = None, subtitle: Optional[str] = None) -> Optional[str]:
         if not self.nx_graph.nodes:
-            log.info("No nodes in the pipeline tracker")
+            log.debug("No nodes in the pipeline tracker")
             return None
         if self.start_node is None:
             raise JobHistoryError("Start node is not set")

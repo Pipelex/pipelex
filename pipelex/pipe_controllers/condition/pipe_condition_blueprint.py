@@ -13,6 +13,7 @@ class PipeConditionPipeMapBlueprint(RootModel[PipeConditionPipeMapRoot]):
 
 class PipeConditionBlueprint(PipeBlueprint):
     type: Literal["PipeCondition"] = "PipeCondition"
+    category: Literal["PipeController"] = "PipeController"
     expression_template: Optional[str] = None
     expression: Optional[str] = None
     pipe_map: PipeConditionPipeMapBlueprint = Field(default_factory=PipeConditionPipeMapBlueprint)

@@ -2,6 +2,7 @@ import shutil
 from typing import Any, ClassVar, List, Optional, Union
 
 from rich import print as rich_print
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.pretty import Pretty
 from rich.style import StyleType
@@ -23,6 +24,16 @@ def pretty_print(
     border_style: Optional[StyleType] = None,
 ):
     PrettyPrinter.pretty_print(content=content, title=title, subtitle=subtitle, border_style=border_style)
+
+
+def pretty_print_md(
+    content: str,
+    title: Optional[TextType] = None,
+    subtitle: Optional[TextType] = None,
+    border_style: Optional[StyleType] = None,
+):
+    md_content = Markdown(content)
+    PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, border_style=border_style)
 
 
 class PrettyPrintMode(StrEnum):
@@ -69,6 +80,8 @@ class PrettyPrinter:
             if subtitle:
                 rich_print(f"\n[dim]{subtitle}[/]")
             return
+        elif isinstance(content, Markdown):
+            print("\n")
         else:
             content = Pretty(content)
         panel = Panel(

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Set, Type
+from typing import Any, List, Optional, Set, Type
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -16,6 +16,8 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class PipeAbstract(ABC, BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
+    category: Any
+    type: Any
     code: str
     domain: str
     definition: Optional[str] = None
@@ -58,9 +60,16 @@ class PipeAbstract(ABC, BaseModel):
         pass
 
     @abstractmethod
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         """
-        Return the inputs that are needed for the pipe to run. (Mostly the inputs of the pipe themselves)
+        Return the inputs that are needed for the pipe to run.
+
+        Args:
+            visited_pipes: Set of pipe codes currently being processed to prevent infinite recursion.
+                          If None, starts recursion detection with an empty set.
+
+        Returns:
+            PipeInputSpec containing all needed inputs for this pipe
         """
         pass
 
@@ -87,6 +96,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        print_intermediate_outputs: Optional[bool] = False,
     ) -> PipeOutput:
         pass
 

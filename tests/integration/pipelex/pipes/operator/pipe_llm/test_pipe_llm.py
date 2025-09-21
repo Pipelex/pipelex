@@ -10,9 +10,9 @@ from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBluepri
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.hub import get_pipe_router, get_report_delegate
+from pipelex.hub import get_pipe_provider, get_pipe_router
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLMOutput
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from tests.integration.pipelex.test_data import PipeTestCases
@@ -32,14 +32,18 @@ class TestPipeLLM:
             output=NativeConceptEnum.TEXT.value,
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             prompt=PipeTestCases.USER_PROMPT,
+            structuring_method=StructuringMethod.PRELIMINARY_TEXT,
         )
+        pipe = PipeLLMFactory.make_from_blueprint(
+            domain="documents",
+            pipe_code="adhoc_for_test_pipe_llm",
+            blueprint=pipe_llm_blueprint,
+        )
+        pipe_provider = get_pipe_provider()
+        pipe_provider.add_new_pipe(pipe)
 
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeLLMFactory.make_from_blueprint(
-                domain="generic",
-                pipe_code="adhoc_for_test_pipe_llm",
-                blueprint=pipe_llm_blueprint,
-            ),
+            pipe=pipe,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
         pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
@@ -49,7 +53,6 @@ class TestPipeLLM:
         log.verbose(pipe_llm_output, title="stuff")
         llm_generated_text = pipe_llm_output.main_stuff_as_text
         pretty_print(llm_generated_text, title="llm_generated_text")
-        get_report_delegate().generate_report()
 
     @pytest.mark.llm
     @pytest.mark.inference
@@ -89,6 +92,4 @@ class TestPipeLLM:
             )
 
             log.verbose(pipe_llm_output, title="stuff")
-            llm_generated_text = pipe_llm_output.main_stuff_as_text
-            pretty_print(llm_generated_text, title="llm_generated_text")
-            get_report_delegate().generate_report()
+            _ = pipe_llm_output.main_stuff_as_text

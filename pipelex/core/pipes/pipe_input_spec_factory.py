@@ -8,8 +8,6 @@ from pipelex.hub import get_concept_provider
 
 
 class PipeInputSpecFactory:
-    """Factory for creating PipeInputSpec instances with dependencies."""
-
     @classmethod
     def make_empty(cls) -> PipeInputSpec:
         return PipeInputSpec(root={})

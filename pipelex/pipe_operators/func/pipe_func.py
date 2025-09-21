@@ -1,4 +1,4 @@
-from typing import List, Optional, Set, cast, get_type_hints
+from typing import List, Literal, Optional, Set, cast, get_type_hints
 
 from typing_extensions import override
 
@@ -22,6 +22,7 @@ class PipeFuncOutput(PipeOutput):
 
 
 class PipeFunc(PipeOperator):
+    type: Literal["PipeFunc"] = "PipeFunc"
     function_name: str
 
     @override
@@ -29,7 +30,7 @@ class PipeFunc(PipeOperator):
         return set()
 
     @override
-    def needed_inputs(self) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         return self.inputs
 
     @override
@@ -50,7 +51,7 @@ class PipeFunc(PipeOperator):
         if not callable(function):
             raise ValueError(f"Function '{self.function_name}' is not callable")
 
-        func_output_object = function(working_memory=working_memory)
+        func_output_object = await function(working_memory=working_memory)
         the_content: StuffContent
         if isinstance(func_output_object, StuffContent):
             the_content = func_output_object
@@ -108,7 +109,7 @@ class PipeFunc(PipeOperator):
                 raise DryRunError(f"Function '{self.function_name}' has no return type annotation")
             else:
                 if not issubclass(return_type, StuffContent):
-                    raise ValueError(f"Function '{self.function_name}' return type {return_type} is not a subclass of StuffContent")
+                    raise DryRunError(f"Function '{self.function_name}' return type {return_type} is not a subclass of StuffContent")
 
                 requirement = TypedNamedInputRequirement(
                     variable_name="mock_output",

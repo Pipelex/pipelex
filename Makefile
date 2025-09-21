@@ -109,7 +109,8 @@ export HELP
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy \
-	config-template cft
+	config-template cft \
+	test-count check-test-badge
 
 all help:
 	@echo "$$HELP"
@@ -461,3 +462,25 @@ v: validate
 
 li: lock install
 	@echo "> done: lock install"
+
+
+##########################################################################################
+### TEST BADGE
+##########################################################################################
+
+## Print the number of collected pytest tests (just the integer)
+test-count: env
+	@COUNT=$$($(VENV_PYTEST) --collect-only --disable-warnings -q | awk 'NF' | wc -l | tr -d ' '); \
+	echo $$COUNT
+
+## Compare current test count vs .badges/tests.json -> .message; fail if mismatch
+check-test-badge: env
+	@EXPECTED=$$($(VENV_PYTHON) -c 'import json;print(int(json.load(open(".badges/tests.json"))["message"]))'); \
+	ACTUAL=$$($(VENV_PYTEST) --collect-only --disable-warnings -q | awk 'NF' | wc -l | tr -d ' '); \
+	if [ "$$EXPECTED" != "$$ACTUAL" ]; then \
+		echo "❌ Test count mismatch: badge=$$EXPECTED, actual=$$ACTUAL"; \
+		exit 1; \
+	else \
+		echo "✅ Test count matches: $$ACTUAL"; \
+	fi
+	

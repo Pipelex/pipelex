@@ -8,7 +8,7 @@ from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipe_router, get_report_delegate
+from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.func.pipe_func import PipeFuncOutput
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
@@ -79,7 +79,6 @@ if __name__ == "__main__":
         log.verbose(pipe_func_output, title="pipe_func_output")
         wrapped_text = pipe_func_output.main_stuff_as_text
         pretty_print(wrapped_text, title="wrapped_text")
-        get_report_delegate().generate_report()
 
         # Verify the output contains wrapped lines
         assert pipe_func_output is not None

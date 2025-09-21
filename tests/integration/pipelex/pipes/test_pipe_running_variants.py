@@ -11,7 +11,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.hub import get_library_manager, get_pipe_router, get_report_delegate
+from pipelex.hub import get_library_manager, get_pipe_router
 from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import PipeTestCases
@@ -42,7 +42,6 @@ class TestPipeRunningVariants:
             working_memory=working_memory,
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
-        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
@@ -65,7 +64,6 @@ class TestPipeRunningVariants:
             working_memory=WorkingMemoryFactory.make_empty(),
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
-        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
@@ -97,7 +95,6 @@ class TestPipeRunningVariants:
             working_memory=WorkingMemoryFactory.make_empty(),
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
-        get_report_delegate().generate_report()
 
         # Save stuff context
         result_dir_path, _ = pipe_result_handler
@@ -135,4 +132,3 @@ class TestPipeRunningVariants:
             )
         pretty_print(exc.value, title="exception")
         assert expected_error_message in str(exc.value)
-        get_report_delegate().generate_report()

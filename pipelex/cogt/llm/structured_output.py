@@ -18,4 +18,4 @@ class StructureMethod(StrEnum):
             case StructureMethod.INSTRUCTOR_MISTRAL_TOOLS:
                 return InstructorMode.MISTRAL_TOOLS
             case StructureMethod.INSTRUCTOR_VERTEX_JSON:
-                return InstructorMode.JSON
+                return InstructorMode.ANTHROPIC_JSON

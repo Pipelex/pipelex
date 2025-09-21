@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
@@ -8,12 +8,11 @@ from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptStructureBlueprint,
     ConceptStructureBlueprintFieldType,
-    ConceptStructureBlueprintType,
 )
 from pipelex.core.concepts.concept_native import NativeConceptEnumData, is_native_concept
+from pipelex.core.concepts.structure_generator import StructureGenerator
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import TextContent
-from pipelex.create.structured_output_generator import StructureGenerator
 from pipelex.exceptions import ConceptFactoryError, StructureClassError
 
 
@@ -26,7 +25,7 @@ class DomainAndConceptCode(BaseModel):
 
 class ConceptFactory:
     @classmethod
-    def normalize_structure_blueprint(cls, structure_dict: Dict[str, ConceptStructureBlueprintType]) -> Dict[str, ConceptStructureBlueprint]:
+    def normalize_structure_blueprint(cls, structure_dict: Dict[str, Union[str, ConceptStructureBlueprint]]) -> Dict[str, ConceptStructureBlueprint]:
         """Convert a mixed structure dictionary to a proper ConceptStructureBlueprint dictionary.
 
         Args:

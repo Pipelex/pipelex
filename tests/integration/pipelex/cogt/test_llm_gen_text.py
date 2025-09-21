@@ -10,7 +10,7 @@ from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
-from pipelex.hub import get_llm_worker, get_models_manager, get_report_delegate
+from pipelex.hub import get_llm_worker, get_models_manager
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 
@@ -42,7 +42,6 @@ class TestLLMGenText:
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)
-        get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("topic, prompt_text", LLMTestCases.SINGLE_TEXT)
     async def test_gen_text_using_llm_preset(self, llm_preset_id: str, topic: str, prompt_text: str):

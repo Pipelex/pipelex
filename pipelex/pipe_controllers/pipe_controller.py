@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Optional
+from typing import Literal, Optional
 
 from typing_extensions import override
 
@@ -9,9 +9,18 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.types import StrEnum
+
+
+class SpecificPipeCodesEnum(StrEnum):
+    CONTINUE = "continue"
+    # TODO: Implement the break pipe: It should enable to leave the current sequence.
+    # BREAK = "break"
 
 
 class PipeController(PipeAbstract):
+    category: Literal["PipeController"] = "PipeController"
+
     @override
     async def run_pipe(
         self,
@@ -19,6 +28,7 @@ class PipeController(PipeAbstract):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
+        print_intermediate_outputs: Optional[bool] = False,
     ) -> PipeOutput:
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
@@ -32,9 +42,10 @@ class PipeController(PipeAbstract):
             case PipeRunMode.LIVE:
                 indent_level = len(pipe_run_params.pipe_stack) - 1
                 indent = "   " * indent_level
-                label = f"{indent}{self.class_name}: {self.code}".ljust(80)
-                output = self.output.code
-                log.info(f"{label} → {output}")
+                label = (
+                    f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} Running [blue]{self.class_name}[/blue] → [green]{self.code}[/green]"
+                )
+                log.info(f"{label} → [red]{self.output.code}[/red]")
                 pipe_output = await self._run_controller_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
@@ -42,12 +53,11 @@ class PipeController(PipeAbstract):
                     output_name=output_name,
                 )
             case PipeRunMode.DRY:
-                name = f"Dry {self.class_name}"
+                name = f"Dry running [blue]{self.class_name}[/blue]"
                 indent_level = len(pipe_run_params.pipe_stack) - 1
                 indent = "   " * indent_level
-                label = f"{indent}{name}: {self.code}".ljust(80)
-                output = self.output.code
-                log.info(f"{label} → {output}")
+                label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name}: [green]{self.code}[/green]"
+                log.info(f"{label} → [red]{self.output.code}[/red]")
                 pipe_output = await self._dry_run_controller_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,

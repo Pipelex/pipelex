@@ -100,6 +100,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_setting=llm_setting_for_object,
             llm_prompt_factory=llm_prompt_factory_for_object or LLMPromptTemplate.for_structure_from_preliminary_text(),
         )
+
         workflow_arg = TextThenObjectAssignment(
             object_class_name=object_class.__name__,
             llm_assignment_for_text=llm_assignment_for_text,

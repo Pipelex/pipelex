@@ -1,6 +1,6 @@
 """Integration tests for inline structure definitions in concepts."""
 
-from typing import Dict
+from typing import Dict, Union
 
 import pytest
 
@@ -8,7 +8,6 @@ from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptStructureBlueprint,
     ConceptStructureBlueprintFieldType,
-    ConceptStructureBlueprintType,
 )
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.stuffs.stuff_content import StructuredContent
@@ -22,7 +21,7 @@ class TestInlineStructureConcepts:
     def test_inline_structure_definition_creation(self):
         """Test that concepts with inline structure definitions are created correctly."""
         # Define inline structure with mixed syntax
-        inline_structure: Dict[str, ConceptStructureBlueprintType] = {
+        inline_structure: Dict[str, Union[str, ConceptStructureBlueprint]] = {
             "dominant_feature": ConceptStructureBlueprint(
                 type=ConceptStructureBlueprintFieldType.TEXT, definition="The most important feature", required=False
             ),
@@ -105,7 +104,7 @@ class TestInlineStructureConcepts:
 
     def test_inline_structure_with_complex_types(self):
         """Test inline structure with complex field types."""
-        inline_structure: Dict[str, ConceptStructureBlueprintType] = {
+        inline_structure: Dict[str, Union[str, ConceptStructureBlueprint]] = {
             "title": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.TEXT, definition="Document title"),
             "tags": ConceptStructureBlueprint(
                 type=ConceptStructureBlueprintFieldType.LIST,
@@ -175,7 +174,7 @@ not a registered subclass of StuffContent",
     def test_multiple_inline_structures_do_not_conflict(self):
         """Test that multiple inline structures with same field names don't conflict."""
         # First structure
-        structure1: Dict[str, ConceptStructureBlueprintType] = {
+        structure1: Dict[str, Union[str, ConceptStructureBlueprint]] = {
             "name": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.TEXT, definition="Person name"),
             "age": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.INTEGER, definition="Person age", required=False),
         }
@@ -186,7 +185,7 @@ not a registered subclass of StuffContent",
         )
 
         # Second structure with same field names but different context
-        structure2: Dict[str, ConceptStructureBlueprintType] = {
+        structure2: Dict[str, Union[str, ConceptStructureBlueprint]] = {
             "name": "Product name",
             "age": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.INTEGER, definition="Product age in days", required=False),
         }

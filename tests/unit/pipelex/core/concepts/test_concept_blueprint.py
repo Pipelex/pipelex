@@ -42,19 +42,19 @@ class TestConceptStructureBlueprintValidation:
         )
         assert list_blueprint.default_value == ["item1", "item2"]
 
-        # Valid dict field with default
-        dict_blueprint = ConceptStructureBlueprint(
-            definition="A dict field",
-            type=ConceptStructureBlueprintFieldType.DICT,
-            key_type="text",
-            value_type="text",
-            default_value={"key": "value"},
-        )
-        assert dict_blueprint.default_value == {"key": "value"}
+    # Valid dict field with default
+    dict_blueprint = ConceptStructureBlueprint(
+        definition="A dict field",
+        type=ConceptStructureBlueprintFieldType.DICT,
+        key_type="text",
+        value_type="text",
+        default_value={"key": "value"},
+    )
+    assert dict_blueprint.default_value == {"key": "value"}
 
-        # Valid choice field with default
-        choice_blueprint = ConceptStructureBlueprint(definition="A choice field", choices=["low", "medium", "high"], default_value="medium")
-        assert choice_blueprint.default_value == "medium"
+    # Valid choice field with default
+    choice_blueprint = ConceptStructureBlueprint(definition="A choice field", choices=["low", "medium", "high"], default_value="medium")
+    assert choice_blueprint.default_value == "medium"
 
     def test_default_value_type_mismatch(self):
         """Test that default_value type mismatches are caught."""

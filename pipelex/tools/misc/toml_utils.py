@@ -232,7 +232,7 @@ def _create_ordered_inline_table(data: Mapping[str, Any]) -> Any:
     inline_table_obj = inline_table()
 
     # Define the preferred order for concept structure fields
-    field_order = ["type", "definition", "required", "choices", "item_type", "key_type", "value_type"]
+    field_order = ["type", "definition", "required"]
 
     # Add fields in preferred order first
     for field in field_order:

@@ -34,3 +34,7 @@ class LibraryManagerAbstract(ABC):
     @abstractmethod
     def load_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[PipeAbstract]:
         pass
+
+    @abstractmethod
+    def remove_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
+        pass

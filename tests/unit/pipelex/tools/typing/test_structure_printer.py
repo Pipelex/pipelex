@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from pytest import FixtureRequest
 
 from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent, TextContent
-from pipelex.tools.typing.type_inspector import get_type_structure
+from pipelex.tools.typing.structure_printer import StructurePrinter
 from pipelex.types import StrEnum
 
 
@@ -121,23 +121,22 @@ class GanttChart(StructuredContent):
     milestones: Optional[List[Milestone]] = None
 
 
-class TestTypeInspector:
+class TestStructurePrinter:
     """Tests for the type inspector functionality"""
 
     def test_simple_text_content(self, request: FixtureRequest):
         """Test structure of simple text content"""
-        result = get_type_structure(SimpleTextContent)
+        result = StructurePrinter().get_type_structure(SimpleTextContent)
         expected = [
             "class SimpleTextContent(TextContent):",
             '    """A simple text content class"""',
-            "    # Inherits from TextContent",
             "    # No additional fields",
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
     def test_simple_structured_content(self, request: FixtureRequest):
         """Test structure of simple structured content"""
-        result = get_type_structure(SimpleStructuredContent)
+        result = StructurePrinter().get_type_structure(SimpleStructuredContent)
         expected = [
             "class SimpleStructuredContent(StructuredContent):",
             '    """A simple structured content with primitive types"""',
@@ -149,7 +148,7 @@ class TestTypeInspector:
 
     def test_enum_content(self, request: FixtureRequest):
         """Test structure of content with enum"""
-        result = get_type_structure(DocumentTypeContent)
+        result = StructurePrinter().get_type_structure(DocumentTypeContent)
         expected = [
             "class DocumentTypeContent(StructuredContent):",
             '    """Content with enum type"""',
@@ -163,7 +162,7 @@ class TestTypeInspector:
 
     def test_nested_content(self, request: FixtureRequest):
         """Test structure of nested content"""
-        result = get_type_structure(PersonContent)
+        result = StructurePrinter().get_type_structure(PersonContent)
         expected = [
             "class PersonContent(StructuredContent):",
             '    """Complex nested content with various types"""',
@@ -195,7 +194,7 @@ class TestTypeInspector:
 
     def test_list_content(self, request: FixtureRequest):
         """Test structure of list content"""
-        result = get_type_structure(ComplexListContent)
+        result = StructurePrinter().get_type_structure(ComplexListContent)
         expected = [
             "class ComplexListContent(ListContent[PersonContent]):",
             '    """List content with complex items"""',
@@ -239,7 +238,7 @@ class TestTypeInspector:
         class Employee(Person):
             job: str = Field(description="Job title, must be lowercase")
 
-        result = get_type_structure(Employee)
+        result = StructurePrinter().get_type_structure(Employee)
         expected = [
             "class Employee(Person):",
             "    job: str  # Job title, must be lowercase",
@@ -264,7 +263,7 @@ class TestTypeInspector:
             description: str = Field(description="Detailed description of what needs to be done")
             is_completed: bool = Field(False, description="Whether the task is completed")
 
-        result = get_type_structure(TaskContent)
+        result = StructurePrinter().get_type_structure(TaskContent)
         expected = [
             "class TaskContent(StructuredContent):",
             '    """A task content model that represents a single task.',
@@ -280,7 +279,7 @@ class TestTypeInspector:
 
     def test_literal_field_content(self, request: FixtureRequest):
         """Test structure of content with Literal field"""
-        result = get_type_structure(MusicCategoryContent)
+        result = StructurePrinter().get_type_structure(MusicCategoryContent)
         expected = [
             "class MusicCategoryContent(StructuredContent):",
             '    """A content class with a Literal field for music genres."""',
@@ -305,7 +304,7 @@ class TestTypeInspector:
     def test_gantt_chart_content(self, request: FixtureRequest):
         """Test structure of Gantt chart content with datetime validators"""
 
-        result = get_type_structure(GanttChart, base_class=StructuredContent)
+        result = StructurePrinter().get_type_structure(GanttChart, base_class=StructuredContent)
         expected = [
             "class GanttChart(StructuredContent):",
             "    tasks: Optional[List[GanttTaskDetails]] = None",

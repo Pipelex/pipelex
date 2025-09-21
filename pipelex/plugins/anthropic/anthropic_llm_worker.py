@@ -21,6 +21,24 @@ class AnthropicExtraField(StrEnum):
     CLAUDE_4_TOKENS_LIMIT = "claude_4_tokens_limit"
 
 
+class AnthropicLLMWorkerError(Exception):
+    """Base exception for Anthropic LLM Worker errors."""
+
+    pass
+
+
+class AnthropicBadRequestError(AnthropicLLMWorkerError):
+    """Raised when Anthropic API returns a BadRequestError."""
+
+    pass
+
+
+class AnthropicInstructorError(AnthropicLLMWorkerError):
+    """Raised when Instructor encounters an error with Anthropic."""
+
+    pass
+
+
 class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,

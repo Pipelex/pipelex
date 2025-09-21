@@ -168,7 +168,7 @@ class WorkingMemoryFactory(BaseModel):
                 __use_examples__ = True
                 __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
-            return MockFactory.build()  # type: ignore
+            return MockFactory.build(factory_use_construct=True)  # type: ignore
         else:
             # Fallback to text content
             return TextContent(text=f"DRY RUN: Mock content for '{requirement.variable_name}' ({requirement.concept.code})")

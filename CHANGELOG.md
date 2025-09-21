@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased • new pipe builder
+
+### Added
+
+- New pipe builder pipeline to generate Pipes based on a brief in natural language: use the cli `pipelex build pipe "Your task"` to build the pipe.
+- Added a badge on the `README.md` to display the number of tests.
+
 ## Unreleased • refactor
 
 #### Highlight: full refactoring of OCR and Image Generation
@@ -186,9 +193,18 @@ For complete details, see the [Inference Backend Configuration](pages/configurat
 
 - Fixed the `structuring_method` behavior in the `PipeLLM` pipe: Putting it to `preliminary_text`, the `PipeLLM` will always generate text before generating the structure -> Reliability increased by a lot.
 
+### Fixed
+
+- Fixed a bug in the `needed_inputs` method of the `PipeSequence` pipe.
+
 ### Changed
 
+- `dry_run_pipe` now returns a `DryRunOutput` object instead of a `str` with additional information.
 - Updated `cocode` dependency from version `v0.0.10` to `v0.0.15`.
+
+### Added
+
+- Added the `FuncRegistryUtils` class to register functions in the library.
 
 ## [v0.8.1] - 2025-08-27
 

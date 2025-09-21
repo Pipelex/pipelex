@@ -1,12 +1,17 @@
 from typing import Any, Dict, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import StrEnum
+
+
+class AllowedPipeCategories(StrEnum):
+    PIPE_OPERATOR = "PipeOperator"
+    PIPE_CONTROLLER = "PipeController"
 
 
 class AllowedPipeTypes(StrEnum):
@@ -24,16 +29,11 @@ class AllowedPipeTypes(StrEnum):
 
 
 class PipeBlueprint(BaseModel):
-    """Simple data container for pipe blueprint information.
-
-    The 'type' field uses Any to avoid type override conflicts but is validated
-    at runtime to ensure only valid pipe type values are allowed.
-    """
-
+    category: Any
     type: Any  # TODO: Find a better way to handle this.
     definition: Optional[str] = None
     inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
-    output_concept_string_or_concept_code: str = Field(alias="output")
+    output: str
 
     @field_validator("type", mode="after")
     def validate_pipe_type(cls, value: Any) -> Any:
@@ -43,7 +43,15 @@ class PipeBlueprint(BaseModel):
             raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {allowed_types}")
         return value
 
-    @field_validator("output_concept_string_or_concept_code", mode="before")
+    @field_validator("category", mode="after")
+    def validate_pipe_category(cls, value: Any) -> Any:
+        """Validate that the pipe category is one of the allowed values."""
+        allowed_categories = [_category.value for _category in AllowedPipeCategories]
+        if value not in allowed_categories:
+            raise PipeBlueprintError(f"Invalid pipe category '{value}'. Must be one of: {allowed_categories}")
+        return value
+
+    @field_validator("output", mode="before")
     def validate_concept_string_or_concept_code(cls, output: str) -> str:
         ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=output)
         return output

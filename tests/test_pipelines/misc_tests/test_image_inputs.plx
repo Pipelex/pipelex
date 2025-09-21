@@ -14,7 +14,7 @@ system_prompt = """
 You are an expert at describing page contents.
 """
 prompt_template = """
-Extract the text and the date of the article in the image.
+Extract the full text (all the text that represents a "title") and the date of the article in the image.
 """
 
 [pipe.describe_page]
@@ -30,6 +30,6 @@ Extract the date and title of the article.
 
 Also, add this as the description of the article:
 
-@page.text_and_images.text.text
+$page.text_and_images.text.text
 """
 

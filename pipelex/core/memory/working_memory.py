@@ -149,7 +149,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
             self.remove_main_stuff()
             self.add_new_stuff(name=name, stuff=stuff, aliases=[MAIN_STUFF_NAME])
             log.verbose(f"Setting new main stuff {name}: {stuff.concept.code} = '{stuff.short_desc}'")
-            log.verbose(stuff.content.rendered_plain())
         else:
             self.remove_alias_to_main_stuff()
             self.set_stuff(name=MAIN_STUFF_NAME, stuff=stuff)
@@ -209,6 +208,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     @override
     def get_typed_object_or_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
         # TODO: Add unit tests for this method
+        # TODO: Refactor this method. In the python paradigm, we should not have those ".", but arrays with field names.
         if "." in name:
             parts = name.split(".", 1)  # Split only at the first dot
             base_name = parts[0]
@@ -228,7 +228,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
             if stuff_content is not None and wanted_type is not None and not isinstance(stuff_content, wanted_type):
                 raise WorkingMemoryTypeError(
                     variable_name=name,
-                    message=f"Content at '{name}' is of type {type(stuff_content).__name__}, it should be {wanted_type.__name__}",
+                    message=f"Content at '{name}' is of type '{type(stuff_content).__name__}', it should be '{wanted_type.__name__}'",
                 )
 
             return stuff_content
@@ -238,7 +238,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
             if wanted_type is not None and not isinstance(content, wanted_type):
                 raise WorkingMemoryTypeError(
                     variable_name=name,
-                    message=f"Content of '{name}' is of type {type(content).__name__}, it should be {wanted_type.__name__}",
+                    message=f"Content of '{name}' is of type '{type(content).__name__}', it should be '{wanted_type.__name__}'",
                 )
 
             return content

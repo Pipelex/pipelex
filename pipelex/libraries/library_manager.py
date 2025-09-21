@@ -165,8 +165,22 @@ class LibraryManager(LibraryManagerAbstract):
 
         return pipes
 
+    @override
+    def remove_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
+        if blueprint.pipe is not None:
+            self.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
+
+        # Remove concepts (they may depend on domain)
+        if blueprint.concept is not None:
+            concept_codes_to_remove = [
+                ConceptFactory.construct_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
+                for concept_code in blueprint.concept.keys()
+            ]
+            self.concept_library.remove_concepts_by_codes(concept_codes=concept_codes_to_remove)
+
+        self.domain_library.remove_domain_by_code(domain_code=blueprint.domain)
+
     def _load_domain_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> Domain:
-        """Create a Domain from blueprint."""
         return DomainFactory.make_from_blueprint(
             blueprint=DomainBlueprint(
                 code=blueprint.domain,
@@ -178,7 +192,6 @@ class LibraryManager(LibraryManagerAbstract):
         )
 
     def _load_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[Concept]:
-        """Create Concepts from blueprint."""
         concepts: List[Concept] = []
 
         if blueprint.concept is not None:
@@ -195,7 +208,6 @@ class LibraryManager(LibraryManagerAbstract):
         return concepts
 
     def _load_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[PipeAbstract]:
-        """Create Pipes from blueprint."""
         pipes: List[PipeAbstract] = []
         if blueprint.pipe is not None:
             for pipe_name, pipe_blueprint in blueprint.pipe.items():

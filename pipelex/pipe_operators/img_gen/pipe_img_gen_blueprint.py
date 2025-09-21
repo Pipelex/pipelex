@@ -1,6 +1,6 @@
 from typing import Literal, Optional, Union
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat, Quality
@@ -12,6 +12,7 @@ from pipelex.tools.typing.validation_utils import has_more_than_one_among_attrib
 
 class PipeImgGenBlueprint(PipeBlueprint):
     type: Literal["PipeImgGen"] = "PipeImgGen"
+    category: Literal["PipeOperator"] = "PipeOperator"
     img_gen_prompt: Optional[str] = None
     img_gen_prompt_var_name: Optional[str] = None
 
