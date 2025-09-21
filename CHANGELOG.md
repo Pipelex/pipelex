@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## Unreleased • refactor
+
+#### Highlight: full refactoring of OCR and Image Generation
+
+- Both `Ocr` and `ImgGen` workers and pipes now use the same patterns as `LLM` workers and pipes.
 
 ### Added
  - Added new placeholder utility module with `make_placeholder_value()` and `value_is_placeholder()` functions
