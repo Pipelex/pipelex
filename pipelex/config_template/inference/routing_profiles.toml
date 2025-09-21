@@ -6,8 +6,7 @@
 # ================================================
 
 # Which profile to use (change this to switch routing)
-# active = "all_pipelex"
-active = "custom_routing"
+active = "all_pipelex"
 
 # We recommend using the "all_pipelex" profile to get a head start with all models.
 # The Pipelex Inference backend is currently not recommended for production use,
@@ -24,7 +23,7 @@ active = "custom_routing"
 # ============================================
 
 [profiles.all_pipelex]
-description = "Use Pipelex Inference backend for all its supportedmodels"
+description = "Use Pipelex Inference backend for all its supported models"
 default = "pipelex_inference"
 
 [profiles.all_pipelex.routes]
