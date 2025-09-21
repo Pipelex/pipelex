@@ -79,15 +79,17 @@ class ModelDeck(ConfigModel):
             return
         raise LLMPresetNotFoundError(f"llm preset id '{preset_id}' not found in deck")
 
-    def get_llm_setting(self, llm_setting_or_preset_id: LLMChoice) -> LLMSetting:
-        if isinstance(llm_setting_or_preset_id, LLMSetting):
-            return llm_setting_or_preset_id
+    def get_llm_setting(self, llm_choice: LLMChoice) -> LLMSetting:
+        if isinstance(llm_choice, LLMSetting):
+            return llm_choice
         else:
-            # it's a preset id
-            the_llm_preset = self.llm_presets.get(llm_setting_or_preset_id)
-            if not the_llm_preset:
-                raise LLMPresetNotFoundError(f"LLM preset '{llm_setting_or_preset_id}' not found in deck")
-            return the_llm_preset
+            # it's a string, so either an llm preset id or an llm handle
+            if llm_preset := self.llm_presets.get(llm_choice):
+                return llm_preset
+            elif self.get_optional_inference_model(model_handle=llm_choice):
+                return LLMSetting(llm_handle=llm_choice, temperature=0.7, max_tokens=None)
+            else:
+                raise LLMPresetNotFoundError(f"LLM choice '{llm_choice}' not found in deck")
 
     def get_ocr_setting(self, ocr_choice: OcrChoice) -> OcrSetting:
         if isinstance(ocr_choice, OcrSetting):
@@ -99,17 +101,19 @@ class ModelDeck(ConfigModel):
             elif self.get_optional_inference_model(model_handle=ocr_choice):
                 return OcrSetting(ocr_handle=ocr_choice)
             else:
-                raise OcrPresetNotFoundError(f"OCR preset '{ocr_choice}' not found in deck")
+                raise OcrPresetNotFoundError(f"OCR choice '{ocr_choice}' not found in deck")
 
     def get_img_gen_setting(self, img_gen_choice: ImgGenChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):
             return img_gen_choice
         else:
-            # it's a preset id
-            the_img_gen_preset = self.img_gen_presets.get(img_gen_choice)
-            if not the_img_gen_preset:
-                raise ImgGenPresetNotFoundError(f"Image generation preset '{img_gen_choice}' not found in deck")
-            return the_img_gen_preset
+            # it's a string, so either an img gen preset id or an img gen handle
+            if img_gen_preset := self.img_gen_presets.get(img_gen_choice):
+                return img_gen_preset
+            elif self.get_optional_inference_model(model_handle=img_gen_choice):
+                return ImgGenSetting(img_gen_handle=img_gen_choice)
+            else:
+                raise ImgGenPresetNotFoundError(f"Image generation choice '{img_gen_choice}' not found in deck")
 
     @classmethod
     def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]

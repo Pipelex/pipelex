@@ -91,7 +91,7 @@ class PipeLLM(PipeOperator):
             get_template(template_name=self.system_prompt_to_structure)
         if self.llm_choices:
             for llm_setting in self.llm_choices.list_used_presets():
-                check_llm_setting_with_deck(llm_setting_or_preset_id=llm_setting)
+                check_llm_setting_with_deck(llm_choice=llm_setting)
 
     @override
     def validate_output(self):
@@ -271,7 +271,7 @@ class PipeLLM(PipeOperator):
         llm_setting_or_preset_id_for_text: LLMChoice = (
             llm_for_text_choice or model_deck.llm_choice_overrides.for_text or model_deck.llm_choice_defaults.for_text
         )
-        llm_setting_main: LLMSetting = model_deck.get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_text)
+        llm_setting_main: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_text)
 
         # Choice of main LLM for object from this PipeLLM setting (self.llm_choices)
         # OR FROM THE llm_for_text_choice (if any)
@@ -279,7 +279,7 @@ class PipeLLM(PipeOperator):
         llm_setting_or_preset_id_for_object: LLMChoice = (
             llm_for_object_choice or llm_for_text_choice or model_deck.llm_choice_overrides.for_object or model_deck.llm_choice_defaults.for_object
         )
-        llm_setting_for_object: LLMSetting = model_deck.get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_object)
+        llm_setting_for_object: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_object)
 
         if (not self.llm_prompt_spec.prompting_style) and (
             inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.llm_handle)

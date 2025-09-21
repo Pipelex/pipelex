@@ -3,11 +3,12 @@ from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting
 from pipelex.hub import get_models_manager
 
 
-def check_llm_setting_with_deck(llm_setting_or_preset_id: LLMChoice):
-    if isinstance(llm_setting_or_preset_id, LLMSetting):
+def check_llm_setting_with_deck(llm_choice: LLMChoice):
+    if isinstance(llm_choice, LLMSetting):
         return
-    preset_id: str = llm_setting_or_preset_id
     llm_deck = get_models_manager().get_model_deck()
-    if preset_id in llm_deck.llm_presets:
+    if llm_choice in llm_deck.llm_presets:
         return
-    raise LLMPresetNotFoundError(f"llm preset id '{preset_id}' not found in deck")
+    elif llm_deck.get_optional_inference_model(model_handle=llm_choice):
+        return
+    raise LLMPresetNotFoundError(f"LLM choice '{llm_choice}' not found in deck")
