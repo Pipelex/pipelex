@@ -12,7 +12,7 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.hub import get_content_generator, get_models_manager
+from pipelex.hub import get_content_generator, get_model_deck, get_models_manager
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import ImageTestCases, PDFTestCases
 from tests.integration.pipelex.cogt.test_data import Employee
@@ -59,7 +59,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_llm_text_only(self, request: FixtureRequest):
-        llm_setting_main = get_models_manager().get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_text")
+        llm_setting_main = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_text")
 
         text: str = await get_content_generator().make_llm_text(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
@@ -73,7 +73,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_direct(self, request: FixtureRequest):
-        llm_setting_for_object = get_models_manager().get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
+        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
 
         person_direct: Employee = await get_content_generator().make_object_direct(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
@@ -88,7 +88,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_list_direct(self, request: FixtureRequest):
-        llm_setting_for_object = get_models_manager().get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
+        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
 
         person_list_direct: List[Employee] = await get_content_generator().make_object_list_direct(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore

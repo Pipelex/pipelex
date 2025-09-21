@@ -68,6 +68,6 @@ The entire system is orchestrated by the `ModelManager` during application start
     c. It retrieves the `InferenceModelSpec` for that model from the chosen backend.
     d. This resolved model spec is added to the `ModelDeck`'s list of `inference_models`.
 5.  **Load Deck Configuration**: The `ModelManager` reads the `base_deck.toml` and other model deck files from the `deck` directory and loads the `aliases`, `llm_presets`, and default choices into the `ModelDeck`.
-6.  **Finalization**: The `ModelDeck` is now fully constructed and ready to be used by the rest of Pipelex to get model specifications and settings via `get_models_manager().get_model_deck()`.
+6.  **Finalization**: The `ModelDeck` is now fully constructed and ready to be used by the rest of Pipelex to get model specifications and settings via `get_model_deck()`.
 
 This layered configuration system provides a powerful way to manage models from various providers, route them according to specific needs, and define reusable presets for common tasks, all through a set of clear and manageable TOML files.

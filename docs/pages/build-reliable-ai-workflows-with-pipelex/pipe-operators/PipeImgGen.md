@@ -26,7 +26,7 @@ The pipe can be configured to generate a single image or a list of images.
 | `output`                | string          | The output concept produced by the image generation operation.                                                | Yes      |
 | `img_gen_prompt`        | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |
 | `nb_output`             | integer         | The number of images to generate. If omitted, a single image is generated.                                                    | No       |
-| `img_gen`           | string          | The handle for the image generation model to use (e.g., `"gpt-image-1"`). Defaults to the model specified in the global config.    | No       |
+| `img_gen`           | string          | The choice of image generation model handle preset or setting to use (e.g., `"gpt-image-1"`). Defaults to the model specified in the global config.    | No       |
 | `aspect_ratio`          | string          | The desired aspect ratio of the image (e.g., `"16:9"`, `"1:1"`).                                                              | No       |
 | `quality`               | string          | The quality of the generated image (e.g., `"standard"`, `"hd"`).                                                              | No       |
 | `seed`                  | integer or "auto" | A seed for the random number generator to ensure reproducibility. `"auto"` uses a random seed.                                | No       |

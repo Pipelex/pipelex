@@ -4,17 +4,13 @@ from pipelex import log
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.config import get_config
-from pipelex.hub import get_inference_manager, get_models_manager
+from pipelex.hub import get_inference_manager, get_model_deck, get_models_manager
 
 
-@pytest.mark.gha_disabled
-@pytest.mark.codex_disabled
 class TestSetupInferenceWorkers:
     def test_setup_inference_workers(self):
         inference_manager = get_inference_manager()
-        inference_models = get_models_manager().get_model_deck().inference_models
-        log.verbose(f"{len(inference_models)} LLM engine_cards found")
-        for model_handle, inference_model in inference_models.items():
+        for model_handle, inference_model in get_model_deck().inference_models.items():
             match inference_model.model_type:
                 case ModelType.LLM:
                     llm_worker = inference_manager.get_llm_worker(llm_handle=model_handle)
