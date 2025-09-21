@@ -34,7 +34,7 @@ class LLMConfig(ConfigModel):
 
 class InferenceManagerConfig(ConfigModel):
     is_auto_setup_preset_llm: bool
-    is_auto_setup_preset_imgg: bool
+    is_auto_setup_preset_img_gen: bool
     is_auto_setup_preset_ocr: bool
 
 

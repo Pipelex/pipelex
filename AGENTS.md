@@ -95,7 +95,7 @@ Always fix any issues reported by these tools before proceeding.
    ```bash
    make tp
    ```
-   Runs tests with markers: `(dry_runnable or not (inference or llm or imgg or ocr)) and not (needs_output or pipelex_api)`
+   Runs tests with markers: `(dry_runnable or not (inference or llm or img_gen or ocr)) and not (needs_output or pipelex_api)`
 
 2. **Specific Tests**:
    ```bash
@@ -756,7 +756,7 @@ These rules apply when writing unit tests.
 
 Apply the appropriate markers:
 - "llm: uses an LLM to generate text or objects"
-- "imgg: uses an image generation AI"
+- "img_gen: uses an image generation AI"
 - "inference: uses either an LLM or an image generation AI"
 - "gha_disabled: will not be able to run properly on GitHub Actions"
 

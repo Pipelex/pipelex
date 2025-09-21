@@ -81,7 +81,7 @@ inference_config_path = ".pipelex/inference"
 
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
-is_auto_setup_preset_imgg = true
+is_auto_setup_preset_img_gen = true
 is_auto_setup_preset_ocr = true
 
 [cogt.llm_config]

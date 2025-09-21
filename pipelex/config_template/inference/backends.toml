@@ -45,5 +45,10 @@ gcp_credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
 enabled = false
 api_key = "${MISTRAL_API_KEY}"
 
+[fal]
+enabled = true
+api_key = "${FAL_API_KEY}"
+
 [internal] # software-only backend, runs internally, without AI
 enabled = true
+

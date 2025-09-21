@@ -18,7 +18,6 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
     return request.param
 
 
-# TODO: make it efficient to also test multiple platforms like openai/azure and mistral/anthropic/bedrock
 @pytest.fixture(
     params=[
         # "o1",

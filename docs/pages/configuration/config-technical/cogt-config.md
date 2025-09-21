@@ -20,7 +20,7 @@ Controls automatic setup of various cognitive tools:
 ```toml
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
-is_auto_setup_preset_imgg = true
+is_auto_setup_preset_img_gen = true
 is_auto_setup_preset_ocr = true
 ```
 
@@ -73,7 +73,7 @@ output_format = "jpg"  # Options: png, jpg, webp
 seed = "auto"          # "auto" or specific integer
 ```
 
-### IMGG Job Parameters
+### ImageGen Job Parameters
 
 Image generation jobs support these parameters:
 
@@ -117,7 +117,7 @@ default_page_views_dpi = 72
 - Max retries must be between 1 and 10
 - Seeds must be non-negative
 
-### IMGG Configuration
+### ImageGen Configuration
 - Guidance scale must be positive
 - Safety tolerance must be between 1 and 6
 - Number of steps must be positive
@@ -131,7 +131,7 @@ default_page_views_dpi = 72
     - Use streaming for better user experience
     - Set appropriate retry limits based on your use case
 
-2. **IMGG Settings**:
+2. **ImageGen Settings**:
 
     - Enable moderation for production use
     - Use appropriate aspect ratios for your use case
@@ -149,7 +149,7 @@ default_page_views_dpi = 72
 [cogt]
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
-is_auto_setup_preset_imgg = true
+is_auto_setup_preset_img_gen = true
 is_auto_setup_preset_ocr = true
 
 [cogt.llm_config]

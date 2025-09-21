@@ -265,7 +265,7 @@ class PipeImgGen(PipeOperator):
         )
         # Get the image generation handle
         img_gen_handle = img_gen_setting.img_gen_handle
-        log.debug(f"Using imgg handle: {img_gen_handle}")
+        log.debug(f"Using img_gen handle: {img_gen_handle}")
 
         the_content: StuffContent
         image_urls: List[str] = []

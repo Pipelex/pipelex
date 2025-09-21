@@ -185,16 +185,16 @@ class PipeOcrTestCases:
     PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS
 
 
-class IMGGTestCases:
-    IMGG_PROMPT_1 = "woman wearing marino cargo pants"
-    IMGG_PROMPT_2 = "wide legged denim pants with hippy addition"
-    IMGG_PROMPT_3 = """
+class ImageGenTestCases:
+    IMG_GEN_PROMPT_1 = "woman wearing marino cargo pants"
+    IMG_GEN_PROMPT_2 = "wide legged denim pants with hippy addition"
+    IMG_GEN_PROMPT_3 = """
 Woman typing on a laptop. On the laptop screen you see python code to generate code to write a prompt for an AI model.
 """
 
     IMAGE_DESC: ClassVar[List[Tuple[str, str]]] = [  # topic, img_gen_prompt_text
-        # (IMGG_PROMPT_1, IMGG_PROMPT_1),
-        # (IMGG_PROMPT_2, IMGG_PROMPT_2),
-        # (IMGG_PROMPT_3, IMGG_PROMPT_3),
-        ("coding girl", "a girl with a dragon tatoo, coding in python"),
+        # (IMG_GEN_PROMPT_1, IMG_GEN_PROMPT_1),
+        # (IMG_GEN_PROMPT_2, IMG_GEN_PROMPT_2),
+        # (IMG_GEN_PROMPT_3, IMG_GEN_PROMPT_3),
+        ("coding girl with dragon tatoo", "a girl with a dragon tatoo, coding in python"),
     ]

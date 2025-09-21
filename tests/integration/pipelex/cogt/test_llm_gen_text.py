@@ -33,7 +33,7 @@ def get_worker_and_job(llm_preset_id: str, user_text: str) -> Tuple[LLMWorkerAbs
 class TestLLMGenText:
     @pytest.mark.parametrize("topic, prompt_text", LLMTestCases.SINGLE_TEXT)
     async def test_gen_text_using_handle(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str):
-        pretty_print(prompt_text, title=topic)
+        pretty_print(prompt_text, title=f"Generating text about '{topic}' using '{llm_handle}'")
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
             user_text=prompt_text,

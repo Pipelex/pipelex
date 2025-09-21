@@ -100,7 +100,7 @@ class InferenceManager(InferenceManagerProtocol):
         self.llm_workers[llm_handle] = llm_worker_class(reporting_delegate=get_report_delegate())
 
     ####################################################################################################
-    # Manage IMGG Workers
+    # Manage ImageGen Workers
     ####################################################################################################
 
     def _setup_one_img_gen_worker(self, img_gen_handle: str) -> ImgGenWorkerAbstract:
@@ -117,9 +117,9 @@ class InferenceManager(InferenceManagerProtocol):
     def get_img_gen_worker(self, img_gen_handle: str) -> ImgGenWorkerAbstract:
         img_gen_worker = self.img_gen_workers.get(img_gen_handle)
         if img_gen_worker is None:
-            if not get_config().cogt.inference_manager_config.is_auto_setup_preset_imgg:
+            if not get_config().cogt.inference_manager_config.is_auto_setup_preset_img_gen:
                 raise InferenceManagerWorkerSetupError(
-                    f"Found no Imgg worker for '{img_gen_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_imgg"
+                    f"Found no Imgg worker for '{img_gen_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_img_gen"
                 )
 
             img_gen_worker = self._setup_one_img_gen_worker(img_gen_handle=img_gen_handle)

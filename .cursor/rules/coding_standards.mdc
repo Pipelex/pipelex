@@ -99,7 +99,7 @@ Always fix any issues reported by these tools before proceeding.
    ```bash
    make tp
    ```
-   Runs tests with markers: `(dry_runnable or not (inference or llm or imgg or ocr)) and not (needs_output or pipelex_api)`
+   Runs tests with markers: `(dry_runnable or not (inference or llm or img_gen or ocr)) and not (needs_output or pipelex_api)`
 
 2. **Specific Tests**:
    ```bash
