@@ -1,5 +1,5 @@
 [pipelex_inference]
-enabled = false
+enabled = true
 endpoint = "https://inference.pipelex.com/v1"
 api_key = "${PIPELEX_INFERENCE_API_KEY}"
 
@@ -13,15 +13,15 @@ api_version = "${AZURE_API_VERSION}"
 enabled = true
 aws_region = "${AWS_REGION}"
 
+[google]
+enabled = true
+api_key = "${GOOGLE_API_KEY}"
+
 [vertexai]
 enabled = false
 gcp_project_id = "${GCP_PROJECT_ID}"
 gcp_location = "${GCP_LOCATION}"
 gcp_credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
-
-[google]
-enabled = true
-api_key = "${GOOGLE_API_KEY}"
 
 [openai]
 enabled = true
@@ -56,4 +56,3 @@ api_key = "${FAL_API_KEY}"
 
 [internal] # software-only backend, runs internally, without AI
 enabled = true
-

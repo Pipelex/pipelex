@@ -175,3 +175,4 @@ model_id = "blackboxai/meta-llama/llama-3.3-70b-instruct:free"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 0.00, output = 0.00 }
+

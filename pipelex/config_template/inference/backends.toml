@@ -12,6 +12,10 @@ api_version = "${AZURE_API_VERSION}"
 enabled = false
 aws_region = "${AWS_REGION}"
 
+[google]
+enabled = false
+api_key = "${GOOGLE_API_KEY}"
+
 [vertexai]
 enabled = false
 gcp_project_id = "${GCP_PROJECT_ID}"

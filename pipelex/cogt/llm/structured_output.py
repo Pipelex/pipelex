@@ -1,4 +1,4 @@
-from instructor.mode import Mode as InstructorMode
+from instructor import Mode as InstructorMode
 
 from pipelex.types import StrEnum
 

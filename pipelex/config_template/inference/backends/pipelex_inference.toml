@@ -127,3 +127,4 @@ costs = { input = 0.3, output = 0.5 }
 
 # We are still working in giving you acces to OCR and image generation models
 # and to the best models from Mistral through the Pipelex Inference backend.
+
