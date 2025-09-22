@@ -122,22 +122,8 @@ outputs = ["text"]
 costs = { input = 0.3, output = 0.5 }
 
 ################################################################################
-# IMAGE GENERATION MODELS
+# OCR and IMAGE GENERATION MODELS
 ################################################################################
 
-# --- Flux image generation models ---------------------------------------------
-[fast-lightning-sdxl]
-model_type = "img_gen"
-model_id = "pipelex/fast-lightning-sdxl"
-inputs = ["text"]
-outputs = ["images"]
-costs = { input = 0.01, output = 0.01 }
-
-# --- OpenAI image generation models --------------------------------------------
-[gpt-image-1]
-model_type = "img_gen"
-model_id = "pipelex/gpt-image-1"
-inputs = ["text"]
-outputs = ["images"]
-costs = { input = 5, output = 0.01 }
-
+# We are still working in giving you acces to OCR and image generation models
+# and to the best models from Mistral through the Pipelex Inference backend.
