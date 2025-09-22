@@ -38,12 +38,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "mistral-medium-2508",
         # "pixtral-12b",
         # "pixtral-large",
-        # "gemini-1-5-pro",
-        # "gemini-1-5-flash",
-        # "gemini-2-flash",
-        # "gemini-2-pro",
-        # "gemini-2-5-flash",
-        # "gemini-2-5-pro",
+        "gemini-2.5-pro",
         # "bedrock-mistral-large",
         # "bedrock-claude-3-7-sonnet",
         # "bedrock-meta-llama-3-3-70b-instruct",
@@ -68,7 +63,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gemini-2.5-pro",
         # "grok-3",
         # "grok-3-mini",
-        "base-claude",
+        # "base-claude",
     ]
 )
 def llm_handle(request: pytest.FixtureRequest) -> str:

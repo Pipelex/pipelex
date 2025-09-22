@@ -50,12 +50,6 @@ inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.10, output = 4.40 }
 
-["gpt-4.5-preview"]
-model_id = "blackboxai/openai/gpt-4.5-preview"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 75.00, output = 150.00 }
-
 # --- Claude LLMs --------------------------------------------------------------
 ["claude-3.5-haiku"]
 model_id = "blackboxai/anthropic/claude-3.5-haiku"
@@ -181,4 +175,3 @@ model_id = "blackboxai/meta-llama/llama-3.3-70b-instruct:free"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 0.00, output = 0.00 }
-

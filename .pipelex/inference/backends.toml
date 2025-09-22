@@ -18,6 +18,10 @@ gcp_project_id = "${GCP_PROJECT_ID}"
 gcp_location = "${GCP_LOCATION}"
 gcp_credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
 
+[google]
+enabled = true
+api_key = "${GOOGLE_API_KEY}"
+
 [openai]
 enabled = true
 api_key = "${OPENAI_API_KEY}"
@@ -51,3 +55,4 @@ api_key = "${FAL_API_KEY}"
 
 [internal] # software-only backend, runs internally, without AI
 enabled = true
+
