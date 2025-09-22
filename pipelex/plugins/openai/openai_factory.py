@@ -17,7 +17,6 @@ from pipelex.cogt.exceptions import CogtError, LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
-from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64

@@ -4,7 +4,7 @@ Test data for PipeImgGenBlueprint conversion tests.
 
 from typing import ClassVar, List, Tuple
 
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
 from pipelex.core.pipes.pipe_input_spec_blueprint import (
     InputRequirementBlueprint as InputRequirementBlueprintCore,
 )

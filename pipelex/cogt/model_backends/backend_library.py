@@ -14,7 +14,6 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
-from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.config import get_config
 from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path

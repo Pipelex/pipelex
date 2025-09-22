@@ -1,5 +1,3 @@
-from typing import Optional
-
 from google import genai
 
 from pipelex.cogt.model_backends.backend import InferenceBackend

@@ -1,9 +1,8 @@
 from typing import Literal, Optional, Set, Union
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator
 from typing_extensions import Self
 
-from pipelex.cogt.exceptions import LLMSettingsValidationError
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.tools.config.config_model import ConfigModel

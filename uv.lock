@@ -1060,6 +1060,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/2e/9b/008fb5f9f376007f0ef25b0c6c5777d3c4cfe37065fcc32de995f3e53e40/instructor-1.9.2-py3-none-any.whl", hash = "sha256:0f0503baade2d0b7ec40a4711de3cd49b25702a746b3bc18e3d375510dabe049", size = 96633, upload-time = "2025-07-07T21:17:29.301Z" },
 ]
 
+[package.optional-dependencies]
+google-genai = [
+    { name = "google-genai" },
+    { name = "jsonref" },
+]
+
 [[package]]
 name = "jinja2"
 version = "3.1.6"
@@ -1166,6 +1172,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b5/49/e582e50b0c54c1b47e714241c4a4767bf28758bf90212248aea8e1ce8516/jsonpath-python-1.0.6.tar.gz", hash = "sha256:dd5be4a72d8a2995c3f583cf82bf3cd1a9544cfdabf2d22595b67aff07349666", size = 18121, upload-time = "2022-03-14T02:35:01.877Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/16/8a/d63959f4eff03893a00e6e63592e3a9f15b9266ed8e0275ab77f8c7dbc94/jsonpath_python-1.0.6-py3-none-any.whl", hash = "sha256:1e3b78df579f5efc23565293612decee04214609208a2335884b3ee3f786b575", size = 7552, upload-time = "2022-03-14T02:34:59.754Z" },
+]
+
+[[package]]
+name = "jsonref"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/0d/c1f3277e90ccdb50d33ed5ba1ec5b3f0a242ed8c1b1a85d3afeb68464dca/jsonref-1.1.0.tar.gz", hash = "sha256:32fe8e1d85af0fdefbebce950af85590b22b60f9e95443176adbde4e1ecea552", size = 8814, upload-time = "2023-01-16T16:10:04.455Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/ec/e1db9922bceb168197a558a2b8c03a7963f1afe93517ddd3cf99f202f996/jsonref-1.1.0-py3-none-any.whl", hash = "sha256:590dc7773df6c21cbf948b5dac07a72a251db28b0238ceecce0a2abfa8ec30a9", size = 9425, upload-time = "2023-01-16T16:10:02.255Z" },
 ]
 
 [[package]]
@@ -2040,6 +2055,7 @@ google = [
 ]
 google-genai = [
     { name = "google-genai" },
+    { name = "instructor", extra = ["google-genai"] },
 ]
 mistralai = [
     { name = "mistralai" },
@@ -2060,6 +2076,7 @@ requires-dist = [
     { name = "google-genai", marker = "extra == 'google-genai'" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "instructor", specifier = ">=1.8.3,<1.10.0" },
+    { name = "instructor", extras = ["google-genai"], marker = "extra == 'google-genai'" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
     { name = "kajson", specifier = "==0.3.0" },

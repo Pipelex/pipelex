@@ -1,12 +1,19 @@
+import asyncio
 from typing import Any, List, Optional, Type, Union
 
 import instructor
 from google import genai
 from google.genai import types
-from instructor.mode import Mode as InstructorMode
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import LLMCompletionError
+from pipelex.cogt.image.prompt_image import (
+    PromptImage,
+    PromptImageBytes,
+    PromptImagePath,
+    PromptImageUrl,
+)
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
@@ -14,7 +21,14 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+
+class GoogleLLMWorkerError(Exception):
+    """Base exception for Google LLM Worker errors."""
+
+    pass
 
 
 class GoogleLLMWorker(LLMWorkerInternalAbstract):
@@ -30,7 +44,8 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
-        self.client: genai.Client = sdk_instance
+        genai_client: genai.Client = sdk_instance
+        self.genai_async_client = genai_client.aio
         if structure_method:
             instructor_mode = structure_method.as_instructor_mode()
             log.debug(f"Google structure mode: {structure_method} --> {instructor_mode}")
@@ -38,46 +53,136 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         else:
             self.instructor_for_objects = instructor.from_genai(client=sdk_instance)
 
+    async def _prepare_image_part(self, prompt_image: PromptImage) -> types.Part:
+        """Convert a PromptImage to Google genai Part format."""
+        image_bytes: bytes
+        mime_type: str
+
+        if isinstance(prompt_image, PromptImageBytes):
+            # Decode base64 to bytes
+            import base64
+
+            image_bytes = base64.b64decode(prompt_image.base_64)
+            file_type = prompt_image.get_file_type()
+            # Use the mime type from FileType object
+            mime_type = file_type.mime
+        elif isinstance(prompt_image, PromptImagePath):
+            # Load image from path as base64 and decode
+            import base64
+
+            base64_bytes = await load_binary_as_base64_async(prompt_image.file_path)
+            image_bytes = base64.b64decode(base64_bytes)
+            file_type = prompt_image.get_file_type()
+            # Use the mime type from FileType object
+            mime_type = file_type.mime
+        elif isinstance(prompt_image, PromptImageUrl):
+            # Download image from URL
+            import aiohttp
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(prompt_image.url) as response:
+                    image_bytes = await response.read()
+            # Detect mime type from bytes
+            from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
+
+            file_type = detect_file_type_from_bytes(image_bytes)
+            # Use the mime type from FileType object
+            mime_type = file_type.mime
+        else:
+            raise GoogleLLMWorkerError(f"Unsupported PromptImage type: '{type(prompt_image).__name__}'")
+
+        # Create Google Part from bytes
+        return types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+
+    async def _prepare_contents(self, llm_prompt: LLMPrompt) -> Any:  # Returns ContentListUnion compatible type
+        """Prepare contents for Google genai API."""
+        # If only text, return as string
+        if llm_prompt.user_text and not llm_prompt.user_images:
+            return llm_prompt.user_text
+
+        # Build list of parts for multimodal content
+        parts: List[Union[str, types.Part]] = []
+
+        # Add text content if present
+        if llm_prompt.user_text:
+            parts.append(llm_prompt.user_text)
+
+        # Add image parts if present
+        if llm_prompt.user_images:
+            # Prepare all images in parallel
+            image_tasks = [self._prepare_image_part(image) for image in llm_prompt.user_images]
+            image_parts = await asyncio.gather(*image_tasks)
+            parts.extend(image_parts)
+
+        # Return the parts list, which is compatible with generate_content
+        return parts
+
+    def _extract_token_usage(self, usage_metadata: Optional[types.GenerateContentResponseUsageMetadata]) -> NbTokensByCategoryDict:
+        """Extract token usage from Google's usage metadata."""
+        if not usage_metadata:
+            return {}
+
+        nb_tokens_by_category: NbTokensByCategoryDict = {}
+
+        # Add input tokens
+        if usage_metadata.prompt_token_count:
+            nb_tokens_by_category[TokenCategory.INPUT] = usage_metadata.prompt_token_count
+
+        # Add output tokens
+        if usage_metadata.candidates_token_count:
+            nb_tokens_by_category[TokenCategory.OUTPUT] = usage_metadata.candidates_token_count
+
+        # Add cached tokens if available
+        if usage_metadata.cached_content_token_count:
+            nb_tokens_by_category[TokenCategory.INPUT_CACHED] = usage_metadata.cached_content_token_count
+
+        return nb_tokens_by_category
+
     @override
     async def _gen_text(
         self,
         llm_job: LLMJob,
     ) -> str:
         """Generate text using Google Gemini API."""
-        contents = self._prepare_contents(llm_job.llm_prompt)
+        # Prepare contents (text and images)
+        contents = await self._prepare_contents(llm_job.llm_prompt)
 
-        # Use the async client
-        aclient = self.client.aio
-
-        # Get temperature and max_tokens from job_params
-        temperature = llm_job.job_params.temperature
-        max_tokens = llm_job.job_params.max_tokens
-
-        config = types.GenerateContentConfig(
-            temperature=float(temperature),
-            max_output_tokens=max_tokens if max_tokens is not None else None,
+        # Build generation config
+        generation_config = types.GenerateContentConfig(
+            temperature=llm_job.job_params.temperature,
+            max_output_tokens=llm_job.job_params.max_tokens,
+            candidate_count=1,  # Generate one candidate
         )
 
-        response = await aclient.models.generate_content(
+        # Add system instruction if present (as part of config)
+        if llm_job.llm_prompt.system_text:
+            generation_config.system_instruction = llm_job.llm_prompt.system_text
+
+        # Generate content using async client
+        response = await self.genai_async_client.models.generate_content(
             model=self.inference_model.model_id,
             contents=contents,
-            config=config,
+            config=generation_config,
         )
 
-        # Track usage if available
-        if response.usage_metadata:
-            prompt_tokens = response.usage_metadata.prompt_token_count or 0
-            output_tokens = response.usage_metadata.candidates_token_count or 0
+        # Extract text from response
+        if not response.candidates:
+            raise LLMCompletionError(f"No candidates returned from model: {self.inference_model.desc}")
 
-            if llm_tokens_usage := llm_job.job_report.llm_tokens_usage:
-                nb_tokens_by_category: NbTokensByCategoryDict = {
-                    TokenCategory.INPUT: prompt_tokens,
-                    TokenCategory.OUTPUT: output_tokens,
-                }
-                llm_tokens_usage.nb_tokens_by_category = nb_tokens_by_category
+        candidate = response.candidates[0]
+        if not candidate.content or not candidate.content.parts:
+            raise LLMCompletionError(f"No content parts in response from model: {self.inference_model.desc}")
 
-        # Return the generated text
-        return response.text or ""
+        # Extract text from the first part
+        text_content = candidate.content.parts[0].text
+        if not text_content:
+            raise LLMCompletionError(f"No text content in response from model: {self.inference_model.desc}")
+
+        # Track token usage if available
+        if llm_job.job_report.llm_tokens_usage and response.usage_metadata:
+            llm_job.job_report.llm_tokens_usage.nb_tokens_by_category = self._extract_token_usage(response.usage_metadata)
+
+        return text_content
 
     @override
     async def _gen_object(
@@ -85,75 +190,59 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: Type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        """Generate structured output using Google Gemini API."""
-        # For structured output, we'll add instructions to output JSON
-        original_prompt = llm_job.llm_prompt.user_text or ""
+        """Generate structured output using Google Gemini API with instructor."""
+        # Prepare contents (text and images)
+        contents = await self._prepare_contents(llm_job.llm_prompt)
 
-        # Add JSON schema instructions to the prompt
-        schema_json = schema.model_json_schema()
-        json_instruction = (
-            f"\n\nPlease respond with a valid JSON object that matches this schema:\n"
-            f"{schema_json}\n\n"
-            "Respond ONLY with the JSON object, no additional text."
-        )
-
-        # Create a modified prompt
-        modified_prompt = LLMPrompt(
-            system_text=llm_job.llm_prompt.system_text,
-            user_text=original_prompt + json_instruction,
-            user_images=llm_job.llm_prompt.user_images,
-        )
-
-        # Create a modified job with the new prompt
-        modified_job = LLMJob(
-            llm_prompt=modified_prompt,
-            job_params=llm_job.job_params,
-            job_config=llm_job.job_config,
-            job_metadata=llm_job.job_metadata,
-            job_report=llm_job.job_report,
-        )
-
-        # Generate text response
-        text_response = await self._gen_text(modified_job)
-
-        # Parse the JSON response
-        import json
-        import re
-
-        try:
-            # Try to parse the entire response as JSON
-            data = json.loads(text_response)
-            return schema.model_validate(data)
-        except (json.JSONDecodeError, ValueError):
-            # If parsing fails, try to extract JSON from the response
-            json_match = re.search(r"\{.*\}", text_response, re.DOTALL)
-            if json_match:
-                try:
-                    data = json.loads(json_match.group())
-                    return schema.model_validate(data)
-                except (json.JSONDecodeError, ValueError) as e:
-                    log.error(f"Failed to parse structured output: {e}")
-                    log.error(f"Response was: {text_response}")
-                    raise ValueError(f"Failed to parse structured output from Gemini: {e}")
-            else:
-                log.error(f"No JSON found in response: {text_response}")
-                raise ValueError("No valid JSON found in Gemini response")
-
-    def _prepare_contents(self, llm_prompt: LLMPrompt) -> str:
-        """Prepare contents for Google Gemini API."""
-        contents: List[str] = []
+        # Build messages list for instructor
+        messages: List[Any] = []
 
         # Add system message if present
-        if llm_prompt.system_text:
-            contents.append(f"System: {llm_prompt.system_text}")
+        if llm_job.llm_prompt.system_text:
+            messages.append({"role": "system", "content": llm_job.llm_prompt.system_text})
 
-        # Add user message
-        if llm_prompt.user_text:
-            contents.append(llm_prompt.user_text)
-
-        # For now, we concatenate messages as a single string
-        # The Google SDK accepts either a string or a list of content parts
-        if len(contents) == 1:
-            return contents[0]
+        # Add user message with contents
+        # For instructor with Google, we format the content differently
+        if len(contents) == 1 and isinstance(contents[0], str):
+            # Simple text message
+            messages.append({"role": "user", "content": contents[0]})
         else:
-            return "\n\n".join(contents)
+            # Multi-part message (text + images)
+            user_content: List[Any] = []
+            for content in contents:
+                if isinstance(content, str):
+                    user_content.append({"type": "text", "text": content})
+                else:
+                    # Pass Part objects directly - instructor will handle them
+                    user_content.append(content)
+
+            messages.append({"role": "user", "content": user_content})
+
+        # Use instructor to generate structured output
+        result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
+            messages=messages,
+            response_model=schema,
+            max_retries=llm_job.job_config.max_retries,
+            model=self.inference_model.model_id,
+            temperature=llm_job.job_params.temperature,
+            max_tokens=llm_job.job_params.max_tokens,
+        )
+        if not isinstance(result_object, schema):
+            raise GoogleLLMWorkerError(f"Google Gemini API returned an object that is not of type {schema}: {result_object}")
+
+        # Track token usage if available from completion
+        if llm_job.job_report.llm_tokens_usage:
+            # Instructor may provide usage information in the completion object
+            if hasattr(completion, "usage_metadata"):
+                llm_job.job_report.llm_tokens_usage.nb_tokens_by_category = self._extract_token_usage(completion.usage_metadata)
+            elif hasattr(completion, "usage"):
+                # Fallback to standard usage format
+                usage = completion.usage
+                nb_tokens: NbTokensByCategoryDict = {}
+                if hasattr(usage, "prompt_tokens"):
+                    nb_tokens[TokenCategory.INPUT] = usage.prompt_tokens
+                if hasattr(usage, "completion_tokens"):
+                    nb_tokens[TokenCategory.OUTPUT] = usage.completion_tokens
+                llm_job.job_report.llm_tokens_usage.nb_tokens_by_category = nb_tokens
+
+        return result_object
