@@ -1,9 +1,10 @@
 import asyncio
-from typing import Any, List, Optional, Type, Union
+from typing import Any, List, Optional, Type, Union, cast
 
 import instructor
 from google import genai
 from google.genai import types
+from openai.types.chat import ChatCompletionMessageParam
 from typing_extensions import override
 
 from pipelex import log
@@ -112,43 +113,14 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
 
         # Build generation config
         generation_config = types.GenerateContentConfig(
+            system_instruction=llm_job.llm_prompt.system_text,
             temperature=llm_job.job_params.temperature,
             max_output_tokens=llm_job.job_params.max_tokens,
             candidate_count=1,
         )
 
-        # Add system instruction if present (as part of config)
-        if llm_job.llm_prompt.system_text:
-            generation_config.system_instruction = llm_job.llm_prompt.system_text
-
-        # # Build messages list for instructor
-        # messages: List[Any] = []
-
-        # # Add system message if present
-        # if llm_job.llm_prompt.system_text:
-        #     messages.append({"role": "system", "content": llm_job.llm_prompt.system_text})
-
-        # # Add user message with contents
-        # # For instructor with Google, we format the content differently
-        # if len(contents) == 1 and isinstance(contents[0], str):
-        #     # Simple text message
-        #     messages.append({"role": "user", "content": contents[0]})
-        # else:
-        #     # Multi-part message (text + images)
-        #     user_content: List[Any] = []
-        #     for content in contents:
-        #         if isinstance(content, str):
-        #             user_content.append({"type": "text", "text": content})
-        #         else:
-        #             # Pass Part objects directly - instructor will handle them
-        #             user_content.append(content)
-
-        # messages.append({"role": "user", "content": user_content})
-
-        # Use instructor to generate structured output
         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-            # result_object = await self.instructor_for_objects.chat.completions.create(
-            messages=[contents],
+            messages=[cast(ChatCompletionMessageParam, contents)],
             response_model=schema,
             max_retries=llm_job.job_config.max_retries,
             model=self.inference_model.model_id,
