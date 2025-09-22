@@ -23,13 +23,44 @@ from tests.integration.pipelex.test_data import PipeTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeLLM:
-    async def test_pipe_llm(
+    async def test_pipe_llm_simple(
         self,
         pipe_run_mode: PipeRunMode,
     ):
         pipe_llm_blueprint = PipeLLMBlueprint(
             definition="LLM test for basic text generation",
-            output=NativeConceptEnum.TEXT.value,
+            output=NativeConceptEnum.TEXT,
+            system_prompt=PipeTestCases.SYSTEM_PROMPT,
+            prompt=PipeTestCases.USER_PROMPT,
+            structuring_method=StructuringMethod.PRELIMINARY_TEXT,
+        )
+        pipe = PipeLLMFactory.make_from_blueprint(
+            domain="documents",
+            pipe_code="adhoc_for_test_pipe_llm",
+            blueprint=pipe_llm_blueprint,
+        )
+        pipe_provider = get_pipe_provider()
+        pipe_provider.add_new_pipe(pipe)
+
+        pipe_job = PipeJobFactory.make_pipe_job(
+            pipe=pipe,
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+        )
+        pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
+            pipe_job=pipe_job,
+        )
+
+        log.verbose(pipe_llm_output, title="stuff")
+        llm_generated_text = pipe_llm_output.main_stuff_as_text
+        pretty_print(llm_generated_text, title="llm_generated_text")
+
+    async def test_pipe_llm_structured(
+        self,
+        pipe_run_mode: PipeRunMode,
+    ):
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            definition="LLM test for basic text generation",
+            output=NativeConceptEnum.TEXT,
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             prompt=PipeTestCases.USER_PROMPT,
             structuring_method=StructuringMethod.PRELIMINARY_TEXT,
@@ -72,7 +103,7 @@ class TestPipeLLM:
             pipe_llm_blueprint = PipeLLMBlueprint(
                 definition="LLM test for image processing with attributes",
                 inputs={stuff_name: InputRequirementBlueprint(concept=stuff.concept.concept_string)},
-                output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+                output=NativeConceptEnum.TEXT,
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,
             )
