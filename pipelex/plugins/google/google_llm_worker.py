@@ -1,7 +1,9 @@
 from typing import Any, List, Optional, Type, Union
 
+import instructor
 from google import genai
 from google.genai import types
+from instructor.mode import Mode as InstructorMode
 from typing_extensions import override
 
 from pipelex import log
@@ -29,6 +31,12 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             reporting_delegate=reporting_delegate,
         )
         self.client: genai.Client = sdk_instance
+        if structure_method:
+            instructor_mode = structure_method.as_instructor_mode()
+            log.debug(f"Google structure mode: {structure_method} --> {instructor_mode}")
+            self.instructor_for_objects = instructor.from_genai(client=sdk_instance, mode=instructor_mode)
+        else:
+            self.instructor_for_objects = instructor.from_genai(client=sdk_instance)
 
     @override
     async def _gen_text(

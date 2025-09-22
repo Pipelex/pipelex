@@ -144,7 +144,7 @@ class LLMWorkerFactory:
                 llm_worker = GoogleLLMWorker(
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
-                    structure_method=StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED,  # Google can use similar structure method
+                    structure_method=StructureMethod.INSTRUCTOR_GENAI_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
             case _:
