@@ -7,7 +7,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from pipelex.tools.environment import any_is_placeholder_env, is_env_set
+from pipelex.tools.environment import all_env_vars_are_set, any_env_var_is_placeholder
 
 warnings.filterwarnings(
     "ignore",
@@ -31,9 +31,9 @@ class TestBedrock:
         bedrock_provider: str,
         bedrock_region_name: str,
     ):
-        if not is_env_set(REQUIRED_ENV_VARS):
+        if not all_env_vars_are_set(keys=REQUIRED_ENV_VARS):
             pytest.skip(f"Some key(s) missing amongst {REQUIRED_ENV_VARS}")
-        if any_is_placeholder_env(REQUIRED_ENV_VARS):
+        if any_env_var_is_placeholder(REQUIRED_ENV_VARS):
             pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         client = boto3.client("bedrock", region_name=bedrock_region_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         response: Dict[str, Any] = client.list_foundation_models(byProvider=bedrock_provider)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
@@ -67,9 +67,9 @@ class TestBedrock:
         pytestconfig: pytest.Config,
         bedrock_region_name: str,
     ):
-        if not is_env_set(REQUIRED_ENV_VARS):
+        if not all_env_vars_are_set(keys=REQUIRED_ENV_VARS):
             pytest.skip(f"Some key(s) missing amongst {REQUIRED_ENV_VARS}")
-        if any_is_placeholder_env(REQUIRED_ENV_VARS):
+        if any_env_var_is_placeholder(REQUIRED_ENV_VARS):
             pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         client = boto3.client("bedrock", region_name=bedrock_region_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         response: Dict[str, Any] = client.list_inference_profiles()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]

@@ -36,20 +36,20 @@ class Background(StrEnum):
     AUTO = "auto"
 
 
-class ImggJobParams(BaseModel):
+class ImgGenJobParams(BaseModel):
     aspect_ratio: AspectRatio = Field(strict=False)
     background: Background = Field(strict=False)
     quality: Optional[Quality] = Field(default=None, strict=False)
     nb_steps: Optional[int] = Field(default=None, gt=0)
-    guidance_scale: float = Field(..., gt=0)
-    is_moderated: bool
-    safety_tolerance: int = Field(..., ge=1, le=6)
+    guidance_scale: Optional[float] = Field(default=None, gt=0)
+    is_moderated: bool = False
+    safety_tolerance: Optional[int] = Field(default=None, ge=1, le=6)
     is_raw: bool
     output_format: OutputFormat = Field(strict=False)
     seed: Optional[int] = Field(None, ge=0)
 
 
-class ImggJobParamsDefaults(ConfigModel):
+class ImgGenJobParamsDefaults(ConfigModel):
     aspect_ratio: AspectRatio = Field(strict=False)
     background: Background = Field(strict=False)
     quality: Optional[Quality] = Field(default=None, strict=False)
@@ -61,13 +61,13 @@ class ImggJobParamsDefaults(ConfigModel):
     output_format: OutputFormat = Field(strict=False)
     seed: Union[int, Literal["auto"]]
 
-    def make_imgg_job_params(self) -> ImggJobParams:
+    def make_img_gen_job_params(self) -> ImgGenJobParams:
         seed: Optional[int]
         if isinstance(self.seed, str) and self.seed == "auto":
             seed = None
         else:
             seed = self.seed
-        return ImggJobParams(
+        return ImgGenJobParams(
             aspect_ratio=self.aspect_ratio,
             background=self.background,
             quality=self.quality,
@@ -81,7 +81,7 @@ class ImggJobParamsDefaults(ConfigModel):
         )
 
 
-class ImggJobConfig(ConfigModel):
+class ImgGenJobConfig(ConfigModel):
     is_sync_mode: bool
 
 
@@ -90,5 +90,5 @@ class ImggJobConfig(ConfigModel):
 ########################################################################
 
 
-class ImggJobReport(ConfigModel):
+class ImgGenJobReport(ConfigModel):
     pass

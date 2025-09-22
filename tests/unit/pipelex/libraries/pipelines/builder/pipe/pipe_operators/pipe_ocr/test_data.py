@@ -21,7 +21,7 @@ class PipeOcrTestCases:
             definition="Extract text from image",
             inputs={"ocr_input": InputRequirementBlueprint(concept="Image")},
             output="ExtractedText",
-            ocr_model="mistral-pixtral",
+            ocr="mistral-pixtral",
         ),
         "ocr_extractor",
         "test_domain",
@@ -31,7 +31,7 @@ class PipeOcrTestCases:
             output="ExtractedText",
             type="PipeOcr",
             category="PipeOperator",
-            ocr_model="mistral-pixtral",
+            ocr="mistral-pixtral",
         ),
     )
 
@@ -41,7 +41,7 @@ class PipeOcrTestCases:
             definition="OCR with page options",
             inputs={"ocr_input": InputRequirementBlueprint(concept="PDF")},
             output="PageContent",
-            ocr_model="tesseract",
+            ocr="tesseract",
             page_images=True,
             page_image_captions=True,
             page_views=True,
@@ -55,7 +55,7 @@ class PipeOcrTestCases:
             output="PageContent",
             type="PipeOcr",
             category="PipeOperator",
-            ocr_model="tesseract",
+            ocr="tesseract",
         ),
     )
 

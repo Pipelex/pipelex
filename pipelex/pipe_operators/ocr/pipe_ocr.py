@@ -6,8 +6,10 @@ from typing_extensions import Self, override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.cogt.models.model_deck_check import check_ocr_choice_with_deck
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
+from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -26,6 +28,7 @@ from pipelex.exceptions import (
 from pipelex.hub import (
     get_concept_provider,
     get_content_generator,
+    get_model_deck,
 )
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -41,7 +44,7 @@ PIPE_OCR_INPUT_NAME = "ocr_input"
 
 class PipeOcr(PipeOperator):
     type: Literal["PipeOcr"] = "PipeOcr"
-    ocr_handle: str
+    ocr_choice: Optional[OcrChoice]
     should_caption_images: bool
     should_include_images: bool
     should_include_page_views: bool
@@ -54,6 +57,12 @@ class PipeOcr(PipeOperator):
     def validate_inputs(self) -> Self:
         self._validate_inputs()
         return self
+
+    @override
+    def validate_with_libraries(self):
+        self._validate_inputs()
+        if self.ocr_choice:
+            check_ocr_choice_with_deck(ocr_choice=self.ocr_choice)
 
     @override
     def required_variables(self) -> Set[str]:
@@ -166,11 +175,16 @@ class PipeOcr(PipeOperator):
         else:
             raise PipeDefinitionError("PipeOcr should have a non-None image_stuff_name or pdf_stuff_name")
 
+        ocr_choice: OcrChoice = self.ocr_choice or get_model_deck().ocr_choice_default
+        ocr_setting: OcrSetting = get_model_deck().get_ocr_setting(ocr_choice=ocr_choice)
+
         ocr_job_params = OcrJobParams(
             should_include_images=self.should_include_images,
             should_caption_images=self.should_caption_images,
             should_include_page_views=self.should_include_page_views,
             page_views_dpi=self.page_views_dpi,
+            max_nb_images=ocr_setting.max_nb_images,
+            image_min_size=ocr_setting.image_min_size,
         )
         ocr_input = OcrInput(
             image_uri=image_uri,
@@ -178,7 +192,7 @@ class PipeOcr(PipeOperator):
         )
         ocr_output = await content_generator.make_ocr_extract_pages(
             ocr_input=ocr_input,
-            ocr_handle=self.ocr_handle,
+            ocr_handle=ocr_setting.ocr_handle,
             job_metadata=job_metadata,
             ocr_job_params=ocr_job_params,
             ocr_job_config=OcrJobConfig(),

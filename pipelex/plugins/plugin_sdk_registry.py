@@ -2,7 +2,6 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, RootModel
 
-from pipelex.cogt.imgg.imgg_platform import ImggPlatform
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 
@@ -13,14 +12,6 @@ class Plugin(BaseModel):
     @property
     def sdk_handle(self) -> str:
         return f"{self.sdk}@{self.backend}"
-
-    @classmethod
-    def make_for_imgg_engine(cls, imgg_platform: ImggPlatform) -> "Plugin":
-        match imgg_platform:
-            case ImggPlatform.FAL_AI:
-                return Plugin(sdk="fal", backend="fal")
-            case ImggPlatform.OPENAI:
-                return Plugin(sdk="openai", backend="openai")
 
     @classmethod
     def make_for_inference_model(cls, inference_model: InferenceModelSpec) -> "Plugin":

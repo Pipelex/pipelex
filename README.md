@@ -62,7 +62,7 @@ Stop reinventing AI workflows from scratch. With Pipelex, your proven methods be
 
 Pipelex makes it easy for developers to define and run repeatable AI workflows. At its core is a clear, declarative pipeline language specifically crafted for knowledge-processing tasks.
 
-Build **pipelines** from modular pipes that snap together. Each pipe can use a different language model (LLM) or software to process knowledge. Pipes consistently deliver **structured, predictable outputs** at each stage.
+Build **pipelines** from modular pipes that snap together. Each pipe can use different AI models - language models (LLMs) for text generation, OCR models for document processing, or image generation models for creating visuals. Pipes consistently deliver **structured, predictable outputs** at each stage.
 
 Pipelex uses its own syntax PLX, based on TOML, making workflows readable and shareable. Business professionals, developers, and AI coding agents can all understand and modify the same pipeline definitions.
 
@@ -125,10 +125,10 @@ uv pip install pipelex
 
 The package supports the following additional features:
 
-- `anthropic`: Anthropic/Claude support+
-- `google`: Google models (Vertex) support
-- `mistralai`: Mistral AI support√
-- `bedrock`: AWS Bedrock support
+- `anthropic`: Anthropic/Claude support for text generation
+- `google`: Google models (Vertex) support for text generation
+- `mistralai`: Mistral AI support for text generation and OCR
+- `bedrock`: AWS Bedrock support for text generation
 - `fal`: Image generation with Black Forest Labs "FAL" service
 
 Install all extras:
@@ -140,7 +140,7 @@ pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
 
 Using `poetry`:
 ```bash
-poetry add "pipelex[anthropic,google,mistralai,bedrock,fal]"
+poetry add "pipelex[anthropic,google,mistralai,bedrock,fal,pypdfium2]"
 ```
 
 Using `uv`:

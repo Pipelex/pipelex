@@ -24,7 +24,7 @@ These rules apply when writing unit tests.
 
 Apply the appropriate markers:
 - "llm: uses an LLM to generate text or objects"
-- "imgg: uses an image generation AI"
+- "img_gen: uses an image generation AI"
 - "inference: uses either an LLM or an image generation AI"
 - "gha_disabled: will not be able to run properly on GitHub Actions"
 

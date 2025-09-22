@@ -6,9 +6,10 @@ from typing_extensions import Self, override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, ImggJobParams, Quality
-from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
+from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
@@ -29,7 +30,7 @@ from pipelex.exceptions import (
     UnexpectedPipeDefinitionError,
     WorkingMemoryStuffNotFoundError,
 )
-from pipelex.hub import get_concept_provider, get_content_generator
+from pipelex.hub import get_concept_provider, get_content_generator, get_model_deck
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -54,21 +55,27 @@ DEFAULT_PROMPT_VAR_NAME = "prompt"
 
 class PipeImgGen(PipeOperator):
     type: Literal["PipeImgGen"] = "PipeImgGen"
-    imgg_prompt: Optional[str] = None
-    # TODO: wrap this up in imgg llm_presets like for llm
-    imgg_handle: Optional[ImggHandle] = None
-    aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
+    img_gen_prompt: Optional[str] = None
+    img_gen_prompt_var_name: Optional[str] = None
+
+    # New ImgGenChoice pattern (like LLM)
+    img_gen: Optional[ImgGenChoice] = None
+
+    # Legacy individual settings (for backwards compatibility)
+    img_gen_handle: Optional[str] = None
+    quality: Optional[Quality] = Field(default=None, strict=False)
     nb_steps: Optional[int] = Field(default=None, gt=0)
     guidance_scale: Optional[float] = Field(default=None, gt=0)
     is_moderated: Optional[bool] = None
-    background: Optional[Background] = None
-    quality: Optional[Quality] = Field(default=None, strict=False)
     safety_tolerance: Optional[int] = Field(default=None, ge=1, le=6)
+
+    # One-time settings (not in ImgGenSetting)
+    aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
     is_raw: Optional[bool] = None
     seed: Optional[Union[int, Literal["auto"]]] = None
+    background: Optional[Background] = Field(default=None, strict=False)
+    output_format: Optional[OutputFormat] = Field(default=None, strict=False)
     output_multiplicity: PipeOutputMultiplicity
-
-    img_gen_prompt_var_name: Optional[str] = None
 
     @field_validator("img_gen_prompt_var_name")
     @classmethod
@@ -81,6 +88,12 @@ class PipeImgGen(PipeOperator):
     def validate_inputs(self) -> Self:
         self._validate_inputs()
         return self
+
+    @override
+    def validate_with_libraries(self):
+        self._validate_inputs()
+        if self.img_gen:
+            check_img_gen_choice_with_deck(img_gen_choice=self.img_gen)
 
     @override
     def validate_output(self):
@@ -97,9 +110,9 @@ class PipeImgGen(PipeOperator):
     @override
     def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
         needed_inputs = PipeInputSpecFactory.make_empty()
-        if self.imgg_prompt:
+        if self.img_gen_prompt:
             needed_inputs.add_requirement(
-                variable_name="imgg_prompt",
+                variable_name="img_gen_prompt",
                 concept=ConceptFactory.make_native_concept(
                     native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT],
                 ),
@@ -121,10 +134,10 @@ class PipeImgGen(PipeOperator):
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
-        # check that we have either an imgg_prompt passed as attribute or as a single text input
-        if self.imgg_prompt:
+        # check that we have either an img_gen_prompt passed as attribute or as a single text input
+        if self.img_gen_prompt:
             if self.inputs.items:
-                raise PipeDefinitionError("img_gen_prompt_var_name must be None if imgg_prompt is provided")
+                raise PipeDefinitionError("img_gen_prompt_var_name must be None if img_gen_prompt is provided")
             else:
                 # we're good with the prompt provided as attribute
                 return
@@ -204,41 +217,63 @@ class PipeImgGen(PipeOperator):
         applied_output_multiplicity = multiplicity_resolution.resolved_multiplicity
 
         log.debug("Getting image generation prompt from context")
-        if self.imgg_prompt:
-            imgg_prompt_text = self.imgg_prompt
+        if self.img_gen_prompt:
+            img_gen_prompt_text = self.img_gen_prompt
         elif stuff_name := self.img_gen_prompt_var_name:
             try:
-                imgg_prompt_text = working_memory.get_stuff_as_str(stuff_name)
+                img_gen_prompt_text = working_memory.get_stuff_as_str(stuff_name)
             except WorkingMemoryStuffNotFoundError as exc:
                 raise PipeInputError(f"Could not find a valid user image named '{stuff_name}' in the working_memory: {exc}") from exc
         else:
             raise UnexpectedPipeDefinitionError("You must provide an image gen prompt either as attribute of the pipe or as a single text input")
 
-        imgg_config = get_config().cogt.imgg_config
-        imgg_param_defaults = imgg_config.imgg_param_defaults
+        img_gen_config = get_config().cogt.img_gen_config
+        img_gen_param_defaults = img_gen_config.img_gen_param_defaults
+        model_deck = get_model_deck()
 
-        seed_setting = self.seed or imgg_param_defaults.seed
+        # Get ImgGenSetting either from img_gen choice or legacy settings
+        img_gen_setting: ImgGenSetting
+        if self.img_gen is not None:
+            # New pattern: use img_gen choice (preset or inline setting)
+            img_gen_setting = model_deck.get_img_gen_setting(self.img_gen)
+        elif self.img_gen_handle is not None:
+            # Legacy pattern: create ImgGenSetting from individual settings
+            img_gen_setting = ImgGenSetting(
+                img_gen_handle=self.img_gen_handle,
+                quality=self.quality,
+                nb_steps=self.nb_steps,
+                guidance_scale=self.guidance_scale or img_gen_param_defaults.guidance_scale,
+                is_moderated=self.is_moderated if self.is_moderated is not None else img_gen_param_defaults.is_moderated,
+                safety_tolerance=self.safety_tolerance or img_gen_param_defaults.safety_tolerance,
+            )
+        else:
+            # Use default from model deck
+            img_gen_setting = model_deck.get_img_gen_setting(model_deck.img_gen_choice_default)
+
+        # Process one-time settings
+        seed_setting = self.seed or img_gen_param_defaults.seed
         seed: Optional[int]
         if isinstance(seed_setting, str) and seed_setting == "auto":
             seed = None
         else:
             seed = seed_setting
 
-        # TODO: refacto this as a model update
-        imgg_job_params = ImggJobParams(
-            aspect_ratio=self.aspect_ratio or imgg_param_defaults.aspect_ratio,
-            background=self.background or imgg_param_defaults.background,
-            quality=self.quality or imgg_param_defaults.quality,
-            nb_steps=self.nb_steps or imgg_param_defaults.nb_steps,
-            guidance_scale=self.guidance_scale or imgg_param_defaults.guidance_scale,
-            is_moderated=self.is_moderated or imgg_param_defaults.is_moderated,
-            safety_tolerance=self.safety_tolerance or imgg_param_defaults.safety_tolerance,
-            is_raw=self.is_raw or imgg_param_defaults.is_raw,
-            output_format=imgg_param_defaults.output_format,
+        # Build ImggJobParams from ImgGenSetting + one-time settings
+        img_gen_job_params = ImgGenJobParams(
+            aspect_ratio=self.aspect_ratio or img_gen_param_defaults.aspect_ratio,
+            background=self.background or img_gen_param_defaults.background,
+            quality=img_gen_setting.quality,
+            nb_steps=img_gen_setting.nb_steps,
+            guidance_scale=img_gen_setting.guidance_scale,
+            is_moderated=img_gen_setting.is_moderated,
+            safety_tolerance=img_gen_setting.safety_tolerance,
+            is_raw=self.is_raw if self.is_raw is not None else img_gen_param_defaults.is_raw,
+            output_format=self.output_format or img_gen_param_defaults.output_format,
             seed=seed,
         )
-        imgg_handle = self.imgg_handle or imgg_config.default_imgg_handle
-        log.debug(f"Using imgg handle: {imgg_handle}")
+        # Get the image generation handle
+        img_gen_handle = img_gen_setting.img_gen_handle
+        log.debug(f"Using img_gen handle: {img_gen_handle}")
 
         the_content: StuffContent
         image_urls: List[str] = []
@@ -260,20 +295,20 @@ class PipeImgGen(PipeOperator):
         if nb_images > 1:
             generated_image_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
-                imgg_handle=imgg_handle,
-                imgg_prompt=ImggPrompt(
-                    positive_text=imgg_prompt_text,
+                img_gen_handle=img_gen_handle,
+                img_gen_prompt=ImgGenPrompt(
+                    positive_text=img_gen_prompt_text,
                 ),
                 nb_images=nb_images,
-                imgg_job_params=imgg_job_params,
-                imgg_job_config=imgg_config.imgg_job_config,
+                img_gen_job_params=img_gen_job_params,
+                img_gen_job_config=img_gen_config.img_gen_job_config,
             )
             image_content_items: List[StuffContent] = []
             for generated_image in generated_image_list:
                 image_content_items.append(
                     ImageContent(
                         url=generated_image.url,
-                        source_prompt=imgg_prompt_text,
+                        source_prompt=img_gen_prompt_text,
                     )
                 )
                 image_urls.append(generated_image.url)
@@ -284,12 +319,12 @@ class PipeImgGen(PipeOperator):
         else:
             generated_image = await content_generator.make_single_image(
                 job_metadata=job_metadata,
-                imgg_handle=imgg_handle,
-                imgg_prompt=ImggPrompt(
-                    positive_text=imgg_prompt_text,
+                img_gen_handle=img_gen_handle,
+                img_gen_prompt=ImgGenPrompt(
+                    positive_text=img_gen_prompt_text,
                 ),
-                imgg_job_params=imgg_job_params,
-                imgg_job_config=imgg_config.imgg_job_config,
+                img_gen_job_params=img_gen_job_params,
+                img_gen_job_config=img_gen_config.img_gen_job_config,
             )
 
             generated_image_url = generated_image.url
@@ -297,7 +332,7 @@ class PipeImgGen(PipeOperator):
 
             the_content = ImageContent(
                 url=generated_image_url,
-                source_prompt=imgg_prompt_text,
+                source_prompt=img_gen_prompt_text,
             )
             log.verbose(the_content, title="Single image content")
 

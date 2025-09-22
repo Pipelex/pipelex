@@ -4,10 +4,10 @@ The `PipeImgGen` operator is used to generate images from a text prompt using a 
 
 ## How it works
 
-`PipeImgGen` takes a text prompt and a set of parameters, then calls an underlying image generation service (like DALL-E 3 or Stable Diffusion) to create one or more images.
+`PipeImgGen` takes a text prompt and a set of parameters, then calls an underlying image generation service (like GPT Image or Flux) to create one or more images.
 
 The prompt can be provided in two ways:
-1.  As a static string directly in the pipe's PLX definition using the `imgg_prompt` parameter.
+1.  As a static string directly in the pipe's PLX definition using the `img_gen_prompt` parameter.
 2.  As a dynamic input by connecting a concept that is or refines `native.Text`.
 
 The pipe can be configured to generate a single image or a list of images.
@@ -15,6 +15,22 @@ The pipe can be configured to generate a single image or a list of images.
 ## Configuration
 
 `PipeImgGen` is configured in your pipeline's `.plx` file.
+
+### Image Generation Models and Backend System
+
+PipeImgGen uses the unified inference backend system to manage image generation models. This means you can:
+
+- Use different image generation providers (OpenAI GPT Image, FAL models like Flux, etc.)
+- Configure image generation models through the same backend system as LLMs and OCR models
+- Use image generation presets for consistent configurations across your pipelines
+- Route image generation requests to different backends based on your routing profile
+
+Common image generation model handles:
+- `base-img-gen`: Base image generation model (alias for flux-pro/v1.1)
+- `best-img-gen`: Best quality image generation model (alias for flux-pro/v1.1-ultra)  
+- `fast-img-gen`: Fast image generation model (alias for fast-lightning-sdxl)
+
+Image generation presets are defined in your model deck configuration and can include parameters like `quality`, `guidance_scale`, and `safety_tolerance`.
 
 ### PLX Parameters
 
@@ -24,9 +40,9 @@ The pipe can be configured to generate a single image or a list of images.
 | `definition`           | string          | A description of the image generation operation.                                                                           | Yes      |
 | `inputs`                | dictionary      | The input concept(s) for the image generation operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
 | `output`                | string          | The output concept produced by the image generation operation.                                                | Yes      |
-| `imgg_prompt`        | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |
+| `img_gen_prompt`        | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |
 | `nb_output`             | integer         | The number of images to generate. If omitted, a single image is generated.                                                    | No       |
-| `imgg_handle`           | string          | The handle for the image generation model to use (e.g., `"dall-e-3"`). Defaults to the model specified in the global config.    | No       |
+| `img_gen`           | string          | The choice of image generation model handle preset or setting to use (e.g., `"gpt-image-1"`). Defaults to the model specified in the global config.    | No       |
 | `aspect_ratio`          | string          | The desired aspect ratio of the image (e.g., `"16:9"`, `"1:1"`).                                                              | No       |
 | `quality`               | string          | The quality of the generated image (e.g., `"standard"`, `"hd"`).                                                              | No       |
 | `seed`                  | integer or "auto" | A seed for the random number generator to ensure reproducibility. `"auto"` uses a random seed.                                | No       |
@@ -44,7 +60,7 @@ type = "PipeImgGen"
 definition = "Generate a futuristic car image"
 output = "Image"
 img_gen_prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
-imgg_handle = "dall-e-3"
+img_gen = "base_img_gen"
 aspect_ratio = "16:9"
 quality = "hd"
 ```
@@ -63,7 +79,7 @@ definition = "Generate three logo variations from a prompt"
 inputs = { prompt = "images.ImgGenPrompt" }
 output = "Image"
 nb_output = 3
-imgg_handle = "stable-diffusion"
+img_gen = "base_img_gen"
 aspect_ratio = "1:1"
 ```
 

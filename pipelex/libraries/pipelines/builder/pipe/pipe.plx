@@ -323,7 +323,7 @@ Error message:
 Please provide only the corrected PipeImgGenSpecBlueprint. Common ImgGen pipe issues to fix:
 - Missing or incorrect prompt input (should be text concept)
 - Wrong img_gen_prompt_var_name (should be None or "prompt")
-- Invalid imgg_handle configuration
+- Invalid img_gen choice
 - Missing required inputs for dynamic prompt generation
 """
 

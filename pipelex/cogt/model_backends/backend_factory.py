@@ -26,7 +26,6 @@ class InferenceBackendFactory:
     ) -> InferenceBackend:
         endpoint = blueprint.endpoint
         api_key = blueprint.api_key
-        # api_version = blueprint.api_version
         # Deal with special authentication for some backends
         match name:
             case "vertexai":

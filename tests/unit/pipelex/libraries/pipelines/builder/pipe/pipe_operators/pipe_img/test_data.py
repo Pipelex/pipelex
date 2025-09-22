@@ -4,8 +4,7 @@ Test data for PipeImgGenBlueprint conversion tests.
 
 from typing import ClassVar, List, Tuple
 
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Quality
 from pipelex.core.pipes.pipe_input_spec_blueprint import (
     InputRequirementBlueprint as InputRequirementBlueprintCore,
 )
@@ -36,16 +35,13 @@ class PipeImgGenTestCases:
             type="PipeImgGen",
             category="PipeOperator",
             img_gen_prompt="A beautiful sunset over mountains",
-            imgg_handle=None,
+            img_gen=None,
             aspect_ratio=None,
-            quality=None,
-            nb_steps=None,
-            guidance_scale=None,
-            is_moderated=None,
-            safety_tolerance=None,
+            background=None,
+            output_format=None,
+            nb_output=None,
             is_raw=None,
             seed=None,
-            nb_output=None,
             img_gen_prompt_var_name=None,
         ),
     )
@@ -56,9 +52,8 @@ class PipeImgGenTestCases:
             definition="Generate image with options",
             inputs={"description": InputRequirementBlueprint(concept="Text")},
             output="Image",
-            imgg_handle=ImggHandle.FLUX_1_PRO_LEGACY,
+            img_gen="gpt-image-1",
             aspect_ratio=AspectRatio.SQUARE,
-            quality=Quality.HIGH,
             seed=42,
             nb_output=3,
         ),
@@ -71,13 +66,10 @@ class PipeImgGenTestCases:
             type="PipeImgGen",
             category="PipeOperator",
             img_gen_prompt=None,
-            imgg_handle=ImggHandle.FLUX_1_PRO_LEGACY,
+            img_gen="gpt-image-1",
             aspect_ratio=AspectRatio.SQUARE,
-            quality=Quality.HIGH,
-            nb_steps=None,
-            guidance_scale=None,
-            is_moderated=None,
-            safety_tolerance=None,
+            background=None,
+            output_format=None,
             is_raw=None,
             seed=42,
             nb_output=3,

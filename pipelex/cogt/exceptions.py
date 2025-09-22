@@ -32,11 +32,23 @@ class LLMWorkerError(CogtError):
     pass
 
 
-class LLMPresetNotFoundError(CogtError):
+class LLMChoiceNotFoundError(CogtError):
+    pass
+
+
+class OcrChoiceNotFoundError(CogtError):
+    pass
+
+
+class ImgGenChoiceNotFoundError(CogtError):
     pass
 
 
 class LLMSettingsValidationError(CogtError):
+    pass
+
+
+class ImgGenSettingsValidationError(CogtError):
     pass
 
 
@@ -96,19 +108,19 @@ class PromptImageFormatError(CogtError):
     pass
 
 
-class ImggPromptError(CogtError):
+class ImgGenPromptError(CogtError):
     pass
 
 
-class ImggParameterError(CogtError):
+class ImgGenParameterError(CogtError):
     pass
 
 
-class ImggGenerationError(CogtError):
+class ImgGenGenerationError(CogtError):
     pass
 
 
-class ImggGeneratedTypeError(ImggGenerationError):
+class ImgGenGeneratedTypeError(ImgGenGenerationError):
     pass
 
 

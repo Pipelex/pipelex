@@ -2,7 +2,7 @@ from typing import Dict
 
 from pydantic import field_validator
 
-from pipelex.cogt.imgg.imgg_job_components import Quality
+from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.exceptions import ConfigValidationError
 

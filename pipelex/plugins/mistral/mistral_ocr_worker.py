@@ -44,13 +44,13 @@ class MistralOcrWorker(OcrWorkerAbstract):
     ) -> OcrOutput:
         # TODO: report usage
         if image_uri := ocr_job.ocr_input.image_uri:
-            ocr_output = await self.make_ocr_output_from_image(
+            ocr_output = await self._make_ocr_output_from_image(
                 image_uri=image_uri,
                 should_caption_image=ocr_job.job_params.should_caption_images,
             )
 
         elif pdf_uri := ocr_job.ocr_input.pdf_uri:
-            ocr_output = await self.make_ocr_output_from_pdf(
+            ocr_output = await self._make_ocr_output_from_pdf(
                 pdf_uri=pdf_uri,
                 should_include_images=ocr_job.job_params.should_include_images,
                 should_caption_images=ocr_job.job_params.should_caption_images,
@@ -60,7 +60,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
             raise OcrInputError("No image nor PDF URI provided in OcrJob")
         return ocr_output
 
-    async def make_ocr_output_from_image(
+    async def _make_ocr_output_from_image(
         self,
         image_uri: str,
         should_caption_image: bool = False,
@@ -78,7 +78,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
                 image_path=image_path,
             )
 
-    async def make_ocr_output_from_pdf(
+    async def _make_ocr_output_from_pdf(
         self,
         pdf_uri: str,
         should_include_images: bool,

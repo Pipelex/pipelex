@@ -1,0 +1,54 @@
+################################################################################
+# FAL Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for FAL (Fast AI Labs) models.
+# It contains model definitions for various image generation models
+# accessible through the FAL API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["flux-pro/v1.1"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "img_gen"
+sdk = "fal"
+prompting_target = "fal"
+
+################################################################################
+# IMAGE GENERATION MODELS
+################################################################################
+
+# --- Flux Pro Series ----------------------------------------------------------
+[flux-pro]
+model_id = "fal-ai/flux-pro"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.05, output = 0.0 }
+
+["flux-pro/v1.1"]
+model_id = "fal-ai/flux-pro/v1.1"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.05, output = 0.0 }
+
+["flux-pro/v1.1-ultra"]
+model_id = "fal-ai/flux-pro/v1.1-ultra"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.06, output = 0.0 }
+
+# --- SDXL models --------------------------------------------------------------
+[fast-lightning-sdxl]
+model_id = "fal-ai/fast-lightning-sdxl"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.0003, output = 0.0 }
+

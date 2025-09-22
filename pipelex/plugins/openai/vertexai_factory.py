@@ -2,9 +2,9 @@ from typing import Any, Dict, Tuple
 
 from pipelex.cogt.exceptions import CogtError, MissingDependencyError
 from pipelex.tools.config.config_model import ConfigModel
-from pipelex.tools.environment import ENV_DUMMY_PLACEHOLDER_VALUE
 from pipelex.tools.exceptions import CredentialsError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
+from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.types import StrEnum
 
 
@@ -40,7 +40,7 @@ class VertexAIFactory(ConfigModel):
         endpoint = cls._make_endpoint(gcp_project_id=gcp_project_id, gcp_location=gcp_location)
 
         gcp_credentials_file_path = extra_config.get(VertexAIExtraField.GCP_CREDENTIALS_FILE_PATH)
-        if not gcp_credentials_file_path or gcp_credentials_file_path == ENV_DUMMY_PLACEHOLDER_VALUE:
+        if not gcp_credentials_file_path or value_is_placeholder(gcp_credentials_file_path):
             raise VertexAIConfigError("GCP credentials file path is not properly set for VertexAI.")
 
         api_key = cls._make_api_key(gcp_credentials_file_path=gcp_credentials_file_path)

@@ -47,46 +47,45 @@ class ModelManager(ModelManagerAbstract):
         log.debug("LibraryManager deck TOML file formatting")
 
         # Validation of LLM deck paths
-        llm_deck_paths = get_config().cogt.inference_config.get_llm_deck_paths()
-        for llm_deck_path in llm_deck_paths:
-            if os.path.exists(llm_deck_path):
+        deck_paths = get_config().cogt.inference_config.get_model_deck_paths()
+        for deck_path in deck_paths:
+            if os.path.exists(deck_path):
                 try:
-                    validate_toml_file(llm_deck_path)
+                    validate_toml_file(deck_path)
                 except TOMLValidationError as exc:
-                    log.error(f"TOML formatting issues in LLM deck file '{llm_deck_path}': {exc}")
-                    raise LibraryError(f"TOML validation failed for LLM deck file '{llm_deck_path}': {exc}") from exc
+                    log.error(f"TOML formatting issues in LLM deck file '{deck_path}': {exc}")
+                    raise LibraryError(f"TOML validation failed for LLM deck file '{deck_path}': {exc}") from exc
 
     @classmethod
     def load_deck_blueprint(cls) -> ModelDeckBlueprint:
-        llm_deck_paths = get_config().cogt.inference_config.get_llm_deck_paths()
-        full_llm_deck_dict: Dict[str, Any] = {}
-        if not llm_deck_paths:
+        deck_paths = get_config().cogt.inference_config.get_model_deck_paths()
+        full_deck_dict: Dict[str, Any] = {}
+        if not deck_paths:
             raise ModelDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
 
-        for llm_deck_path in llm_deck_paths:
-            if not os.path.exists(llm_deck_path):
-                raise ModelDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
+        for deck_path in deck_paths:
+            if not os.path.exists(deck_path):
+                raise ModelDeckNotFoundError(f"LLM deck path `{deck_path}` not found. Please run `pipelex init-libraries` to create it.")
             try:
-                llm_deck_dict = load_toml_from_path(path=llm_deck_path)
-                log.debug(f"Loaded LLM deck from {llm_deck_path}")
-                deep_update(full_llm_deck_dict, llm_deck_dict)
+                deck_dict = load_toml_from_path(path=deck_path)
+                log.debug(f"Loaded LLM deck from {deck_path}")
+                deep_update(full_deck_dict, deck_dict)
             except Exception as exc:
-                log.error(f"Failed to load LLM deck file '{llm_deck_path}': {exc}")
+                log.error(f"Failed to load LLM deck file '{deck_path}': {exc}")
                 raise
 
-        llm_deck_blueprint = ModelDeckBlueprint.model_validate(full_llm_deck_dict)
-        return llm_deck_blueprint
+        model_deck_blueprint = ModelDeckBlueprint.model_validate(full_deck_dict)
+        return model_deck_blueprint
 
     def build_deck(self, model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
-        model_handles: Dict[str, InferenceModelSpec] = {}
+        inference_models: Dict[str, InferenceModelSpec] = {}
 
         for model_name, available_backends in all_models_and_possible_backends.items():
             backend_match_for_model = self.routing_profile_library.get_backend_match_for_model_from_active_routing_profile(
                 model_name=model_name,
             )
             if backend_match_for_model is None:
-                # raise ModelsManagerError(f"No backend match found for model '{model_name}'")
                 log.verbose(f"No backend match found for model '{model_name}'")
                 continue
             matched_backend_name = backend_match_for_model.backend_name
@@ -115,6 +114,7 @@ class ModelManager(ModelManagerAbstract):
                         # TODO: enable to set the order or priority of the available backends
                         for available_backend in available_backends:
                             if available_backend == matched_backend_name:
+                                # we've already checked the matched_backend_name and it didn't have the model spec, that's why we're here
                                 continue
                             backend = self.inference_backend_library.get_inference_backend(backend_name=available_backend)
                             if backend is None:
@@ -127,14 +127,18 @@ class ModelManager(ModelManagerAbstract):
                                 f"Model spec '{model_name}' not found in any of the available backends '{available_backends}' "
                                 f"which was set as default in routing profile '{backend_match_for_model.routing_profile_name}'"
                             )
-            model_handles[model_name] = model_spec
+            inference_models[model_name] = model_spec
 
         model_deck = ModelDeck(
-            inference_models=model_handles,
+            inference_models=inference_models,
             aliases=model_deck_blueprint.aliases,
-            llm_presets=model_deck_blueprint.llm_presets,
-            llm_choice_defaults=model_deck_blueprint.llm_choice_defaults,
-            llm_choice_overrides=model_deck_blueprint.llm_choice_overrides,
+            llm_presets=model_deck_blueprint.llm.presets,
+            llm_choice_defaults=model_deck_blueprint.llm.choice_defaults,
+            llm_choice_overrides=model_deck_blueprint.llm.choice_overrides,
+            ocr_presets=model_deck_blueprint.ocr.presets,
+            ocr_choice_default=model_deck_blueprint.ocr.choice_default,
+            img_gen_presets=model_deck_blueprint.img_gen.presets,
+            img_gen_choice_default=model_deck_blueprint.img_gen.choice_default,
         )
         return model_deck
 

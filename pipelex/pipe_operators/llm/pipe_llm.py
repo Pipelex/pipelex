@@ -10,8 +10,8 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
-from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingOrPresetId
-from pipelex.cogt.models.model_deck_check import check_llm_setting_with_deck
+from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices
+from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
@@ -39,7 +39,7 @@ from pipelex.hub import (
     get_class_registry,
     get_concept_provider,
     get_content_generator,
-    get_models_manager,
+    get_model_deck,
     get_optional_pipe,
     get_required_concept,
     get_required_domain,
@@ -90,8 +90,8 @@ class PipeLLM(PipeOperator):
         if self.system_prompt_to_structure:
             get_template(template_name=self.system_prompt_to_structure)
         if self.llm_choices:
-            for llm_setting in self.llm_choices.list_used_presets():
-                check_llm_setting_with_deck(llm_setting_or_preset_id=llm_setting)
+            for llm_choice in self.llm_choices.list_choices():
+                check_llm_choice_with_deck(llm_choice=llm_choice)
 
     @override
     def validate_output(self):
@@ -258,31 +258,31 @@ class PipeLLM(PipeOperator):
         fixed_nb_output = multiplicity_resolution.specific_output_count
 
         # Collect what LLM settings we have for this particular PipeLLM
-        llm_for_text_choice: Optional[LLMSettingOrPresetId] = None
-        llm_for_object_choice: Optional[LLMSettingOrPresetId] = None
+        llm_for_text_choice: Optional[LLMChoice] = None
+        llm_for_object_choice: Optional[LLMChoice] = None
         if self.llm_choices:
             llm_for_text_choice = self.llm_choices.for_text
             llm_for_object_choice = self.llm_choices.for_object
 
-        llm_deck = get_models_manager().get_model_deck()
+        model_deck = get_model_deck()
 
         # Choice of main LLM for text first from this PipeLLM setting (self.llm_choices)
         # or from the llm_choice_overrides or fallback on the llm_choice_defaults
-        llm_setting_or_preset_id_for_text: LLMSettingOrPresetId = (
-            llm_for_text_choice or llm_deck.llm_choice_overrides.for_text or llm_deck.llm_choice_defaults.for_text
+        llm_setting_or_preset_id_for_text: LLMChoice = (
+            llm_for_text_choice or model_deck.llm_choice_overrides.for_text or model_deck.llm_choice_defaults.for_text
         )
-        llm_setting_main: LLMSetting = llm_deck.get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_text)
+        llm_setting_main: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_text)
 
         # Choice of main LLM for object from this PipeLLM setting (self.llm_choices)
         # OR FROM THE llm_for_text_choice (if any)
         # then fallback on the llm_choice_overrides or llm_choice_defaults
-        llm_setting_or_preset_id_for_object: LLMSettingOrPresetId = (
-            llm_for_object_choice or llm_for_text_choice or llm_deck.llm_choice_overrides.for_object or llm_deck.llm_choice_defaults.for_object
+        llm_setting_or_preset_id_for_object: LLMChoice = (
+            llm_for_object_choice or llm_for_text_choice or model_deck.llm_choice_overrides.for_object or model_deck.llm_choice_defaults.for_object
         )
-        llm_setting_for_object: LLMSetting = llm_deck.get_llm_setting(llm_setting_or_preset_id=llm_setting_or_preset_id_for_object)
+        llm_setting_for_object: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_object)
 
         if (not self.llm_prompt_spec.prompting_style) and (
-            inference_model := llm_deck.get_optional_inference_model(model_handle=llm_setting_main.llm_handle)
+            inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.llm_handle)
         ):
             # Note: the case where we don't get an inference model corresponds to the use of an external LLM Plugin
             # TODO: improve this by making it possible to get the inference model for external LLM Plugins

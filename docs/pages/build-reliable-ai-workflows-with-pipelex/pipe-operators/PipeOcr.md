@@ -21,6 +21,21 @@ The `PageContent` object has the following structure:
 
 `PipeOcr` is configured in your pipeline's `.plx` file.
 
+### OCR Models and Backend System
+
+PipeOcr uses the unified inference backend system to manage OCR models. This means you can:
+
+- Use different OCR providers (Mistral OCR, local PDF extraction via internal backend, etc.)
+- Configure OCR models through the same backend system as LLMs and image generation models
+- Use OCR presets for consistent configurations across your pipelines
+- Route OCR requests to different backends based on your routing profile
+
+Common OCR model handles:
+- `mistral-ocr`: Mistral's OCR model for high-quality text and image extraction
+- `pypdfium2-extract-text`: Local PDF text extraction (no API calls required)
+
+OCR presets are defined in your model deck configuration and can include parameters like `max_nb_images` and `image_min_size`.
+
 ### PLX Parameters
 
 | Parameter                   | Type    | Description                                                                                                                              | Required |
@@ -33,6 +48,7 @@ The `PageContent` object has the following structure:
 | `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
 | `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `150`.                                 | No       |
 | `page_image_captions`       | boolean | If `true`, the OCR service may attempt to generate captions for the images found. *Note: This feature depends on the OCR provider.*        | No       |
+| `ocr`                       | string  | The OCR model handle, preset, or setting to use (e.g., `"mistral-ocr"`, `"base_ocr_mistral"`). Defaults to the model specified in the global config. | No       |
 
 ### Example: Processing a PDF
 
@@ -53,7 +69,6 @@ inputs = { ocr_input = "ScannedDocument" }
 output = "Page"
 page_views = true
 page_views_dpi = 200
-ocr_model = "mistral-ocr"
 ```
 
 The output of the PipeOcr must be exactly the native `Page` concept.

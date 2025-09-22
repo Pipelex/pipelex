@@ -1,7 +1,7 @@
 from typing import Literal
 
-from pipelex.cogt.exceptions import ImggParameterError
-from pipelex.cogt.imgg.imgg_job_components import AspectRatio, Background, OutputFormat, Quality
+from pipelex.cogt.exceptions import ImgGenParameterError
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat, Quality
 
 GptImage1SizeType = Literal["1024x1024", "1536x1024", "1024x1536"]
 GptImage1OutputFormatType = Literal["png", "jpeg", "webp"]
@@ -10,7 +10,7 @@ GptImage1QualityType = Literal["low", "medium", "high"]
 GptImage1BackgroundType = Literal["transparent", "opaque", "auto"]
 
 
-class OpenAIImggFactory:
+class OpenAIImgGenFactory:
     @classmethod
     def image_size_for_gpt_image_1(cls, aspect_ratio: AspectRatio) -> GptImage1SizeType:
         match aspect_ratio:
@@ -28,7 +28,7 @@ class OpenAIImggFactory:
                 | AspectRatio.PORTRAIT_9_16
                 | AspectRatio.PORTRAIT_9_21
             ):
-                raise ImggParameterError(f"Aspect ratio '{aspect_ratio}' is not supported by GPT Image 1 model")
+                raise ImgGenParameterError(f"Aspect ratio '{aspect_ratio}' is not supported by GPT Image 1 model")
 
     @classmethod
     def output_format_for_gpt_image_1(cls, output_format: OutputFormat) -> GptImage1OutputFormatType:

@@ -1,9 +1,6 @@
 from typing import List
 
-from pydantic import Field
-
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams, ImggJobParamsDefaults
+from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.plugins.fal.fal_config import FalConfig
 from pipelex.tools.config.config_model import ConfigModel
@@ -15,15 +12,13 @@ class OcrConfig(ConfigModel):
     default_page_views_dpi: int
 
 
-class ImggConfig(ConfigModel):
-    default_imgg_handle: ImggHandle = Field(strict=False)
-    imgg_job_config: ImggJobConfig
-    imgg_param_defaults: ImggJobParamsDefaults
-    imgg_handles: List[str]
+class ImgGenConfig(ConfigModel):
+    img_gen_job_config: ImgGenJobConfig
+    img_gen_param_defaults: ImgGenJobParamsDefaults
     fal_config: FalConfig
 
-    def make_default_imgg_job_params(self) -> ImggJobParams:
-        return self.imgg_param_defaults.make_imgg_job_params()
+    def make_default_img_gen_job_params(self) -> ImgGenJobParams:
+        return self.img_gen_param_defaults.make_img_gen_job_params()
 
 
 class InstructorConfig(ConfigModel):
@@ -39,7 +34,7 @@ class LLMConfig(ConfigModel):
 
 class InferenceManagerConfig(ConfigModel):
     is_auto_setup_preset_llm: bool
-    is_auto_setup_preset_imgg: bool
+    is_auto_setup_preset_img_gen: bool
     is_auto_setup_preset_ocr: bool
 
 
@@ -57,9 +52,9 @@ class InferenceConfig(ConfigModel):
     def model_specs_path(self, backend_name: str) -> str:
         return f"{self.inference_config_path}/backends/{backend_name}.toml"
 
-    def get_llm_deck_paths(self) -> List[str]:
+    def get_model_deck_paths(self) -> List[str]:
         """Get all LLM deck TOML file paths sorted alphabetically."""
-        llm_deck_paths = [
+        model_deck_paths = [
             str(path)
             for path in find_files_in_dir(
                 dir_path=f"{self.inference_config_path}/deck",
@@ -67,13 +62,13 @@ class InferenceConfig(ConfigModel):
                 is_recursive=True,
             )
         ]
-        llm_deck_paths.sort()
-        return llm_deck_paths
+        model_deck_paths.sort()
+        return model_deck_paths
 
 
 class Cogt(ConfigModel):
     inference_config: InferenceConfig
     inference_manager_config: InferenceManagerConfig
     llm_config: LLMConfig
-    imgg_config: ImggConfig
+    img_gen_config: ImgGenConfig
     ocr_config: OcrConfig

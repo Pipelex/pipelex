@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.cogt.imgg.imgg_job_components import AspectRatio
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 

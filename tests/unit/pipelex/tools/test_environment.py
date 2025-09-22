@@ -5,15 +5,17 @@ from pytest_mock import MockerFixture
 
 from pipelex.tools.environment import (
     EnvVarNotFoundError,
-    get_env_rooted_path,
+    all_env_vars_are_set,
+    any_env_var_is_placeholder,
     get_optional_env,
     get_required_env,
-    get_rooted_path,
+    is_env_var_set,
     set_env,
 )
+from pipelex.tools.misc.placeholder import PLACEHOLDER_PREFIX, make_placeholder_value
 
 
-class TestGetRequiredEnv:
+class TestEnvironment:
     def test_get_required_env_success(self, mocker: MockerFixture):
         mocker.patch.dict(os.environ, {"TEST_VAR": "test_value"})
         result = get_required_env("TEST_VAR")
@@ -29,8 +31,6 @@ class TestGetRequiredEnv:
         with pytest.raises(EnvVarNotFoundError, match="Environment variable 'EMPTY_VAR' is required but not set"):
             get_required_env("EMPTY_VAR")
 
-
-class TestGetOptionalEnv:
     def test_get_optional_env_success(self, mocker: MockerFixture):
         mocker.patch.dict(os.environ, {"TEST_VAR": "test_value"})
         result = get_optional_env("TEST_VAR")
@@ -46,8 +46,6 @@ class TestGetOptionalEnv:
         result = get_optional_env("EMPTY_VAR")
         assert result == ""
 
-
-class TestSetEnv:
     def test_set_env_success(self):
         set_env("TEST_SET_VAR", "new_value")
         assert os.environ["TEST_SET_VAR"] == "new_value"
@@ -57,73 +55,103 @@ class TestSetEnv:
         set_env("EXISTING_VAR", "new_value")
         assert os.environ["EXISTING_VAR"] == "new_value"
 
+    def test_all_env_vars_are_set_all_keys_present(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {"VAR1": "value1", "VAR2": "value2", "VAR3": "value3"})
+        result = all_env_vars_are_set(keys=["VAR1", "VAR2", "VAR3"])
+        assert result is True
 
-class TestGetRootedPath:
-    def test_get_rooted_path_none_path(self):
-        result = get_rooted_path("/root")
-        assert result == "/root"
+    def test_all_env_vars_are_set_some_keys_missing(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {"VAR1": "value1"}, clear=True)
+        result = all_env_vars_are_set(keys=["VAR1", "VAR2", "VAR3"])
+        assert result is False
 
-    def test_get_rooted_path_empty_path(self):
-        result = get_rooted_path("/root", "")
-        assert result == "/root"
-
-    def test_get_rooted_path_already_starts_with_root(self):
-        result = get_rooted_path("/root", "/root/subdir")
-        assert result == "/root/subdir"
-
-    def test_get_rooted_path_absolute_path_different_root(self):
-        result = get_rooted_path("/root", "/other/absolute/path")
-        assert result == "/other/absolute/path"
-
-    def test_get_rooted_path_relative_path(self):
-        result = get_rooted_path("/root", "relative/path")
-        assert result == "/root/relative/path"
-
-    def test_get_rooted_path_removes_trailing_slash(self):
-        result = get_rooted_path("/root", "subdir/")
-        assert result == "/root/subdir"
-
-    def test_get_rooted_path_keeps_root_without_trailing_slash(self):
-        result = get_rooted_path("/root/", "")
-        assert result == "/root"
-
-    def test_get_rooted_path_absolute_check(self, mocker: MockerFixture):
-        mock_isabs = mocker.patch("os.path.isabs", return_value=True)
-        result = get_rooted_path("/root", "fake/absolute")
-        assert result == "fake/absolute"
-        mock_isabs.assert_called_once_with("fake/absolute")
-
-    def test_get_rooted_path_join_called(self, mocker: MockerFixture):
-        mock_join = mocker.patch("os.path.join", return_value="/root/relative")
-        mocker.patch("os.path.isabs", return_value=False)
-        result = get_rooted_path("/root", "relative")
-        assert result == "/root/relative"
-        mock_join.assert_called_once_with("/root", "relative")
-
-
-class TestGetEnvRootedPath:
-    def test_get_env_rooted_path_with_env_var(self, mocker: MockerFixture):
-        mocker.patch.dict(os.environ, {"ROOT_ENV": "/env/root"})
-        result = get_env_rooted_path("ROOT_ENV", "subdir")
-        assert result == "/env/root/subdir"
-
-    def test_get_env_rooted_path_missing_env_var(self, mocker: MockerFixture):
+    def test_all_env_vars_are_set_all_keys_missing(self, mocker: MockerFixture):
         mocker.patch.dict(os.environ, {}, clear=True)
-        result = get_env_rooted_path("MISSING_ROOT_ENV", "subdir")
-        assert result == "subdir"
+        result = all_env_vars_are_set(keys=["VAR1", "VAR2", "VAR3"])
+        assert result is False
 
-    def test_get_env_rooted_path_empty_env_var(self, mocker: MockerFixture):
-        mocker.patch.dict(os.environ, {"EMPTY_ROOT_ENV": ""})
-        result = get_env_rooted_path("EMPTY_ROOT_ENV", "subdir")
-        assert result == "subdir"
+    def test_all_env_vars_are_set_empty_iterable(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {}, clear=True)
+        result = all_env_vars_are_set(keys=[])
+        assert result is True
 
-    def test_get_env_rooted_path_none_path(self, mocker: MockerFixture):
-        mocker.patch.dict(os.environ, {"ROOT_ENV": "/env/root"})
-        result = get_env_rooted_path("ROOT_ENV")
-        assert result == "/env/root"
+    def test_all_env_vars_are_set_single_key_present(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {"SINGLE_VAR": "value"})
+        result = is_env_var_set(key="SINGLE_VAR")
+        assert result is True
 
+    def test_all_env_vars_are_set_single_key_missing(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {}, clear=True)
+        result = is_env_var_set(key="MISSING_VAR")
+        assert result is False
 
-class TestEnvVarNotFoundError:
+    def test_all_env_vars_are_set_empty_string_value_counts_as_set(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {"EMPTY_VAR": ""})
+        result = is_env_var_set(key="EMPTY_VAR")
+        assert result is True
+
+    def test_any_env_var_is_placeholder_has_placeholder(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {"VAR1": "real_value", "VAR2": make_placeholder_value("VAR2"), "VAR3": "another_value"})
+        result = any_env_var_is_placeholder(["VAR1", "VAR2", "VAR3"])
+        assert result is True
+
+    def test_any_env_var_is_placeholder_no_placeholders(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {"VAR1": "real_value", "VAR2": "another_value", "VAR3": "third_value"})
+        result = any_env_var_is_placeholder(["VAR1", "VAR2", "VAR3"])
+        assert result is False
+
+    def test_any_env_var_is_placeholder_all_placeholders(self, mocker: MockerFixture):
+        mocker.patch.dict(
+            os.environ,
+            {
+                "VAR1": make_placeholder_value("VAR1"),
+                "VAR2": make_placeholder_value("VAR2"),
+                "VAR3": make_placeholder_value("VAR3"),
+            },
+        )
+        result = any_env_var_is_placeholder(["VAR1", "VAR2", "VAR3"])
+        assert result is True
+
+    def test_any_env_var_is_placeholder_missing_vars_no_placeholder(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {"VAR1": "real_value"}, clear=True)
+        result = any_env_var_is_placeholder(["VAR1", "MISSING_VAR"])
+        assert result is False
+
+    def test_any_env_var_is_placeholder_empty_iterable(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {})
+        result = any_env_var_is_placeholder([])
+        assert result is False
+
+    def test_any_env_var_is_placeholder_single_placeholder(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {"PLACEHOLDER_VAR": make_placeholder_value("PLACEHOLDER_VAR")})
+        result = any_env_var_is_placeholder(["PLACEHOLDER_VAR"])
+        assert result is True
+
+    def test_any_env_var_is_placeholder_single_non_placeholder(self, mocker: MockerFixture):
+        mocker.patch.dict(os.environ, {"NORMAL_VAR": "normal_value"})
+        result = any_env_var_is_placeholder(["NORMAL_VAR"])
+        assert result is False
+
+    def test_any_env_var_is_placeholder_prefix_at_start_only(self, mocker: MockerFixture):
+        """Test that only values starting with the prefix are considered placeholders."""
+        mocker.patch.dict(
+            os.environ,
+            {
+                "VAR1": f"not-{PLACEHOLDER_PREFIX}-suffix",
+                "VAR2": make_placeholder_value("VAR2"),
+            },
+        )
+        result = any_env_var_is_placeholder(["VAR1"])
+        assert result is False
+        result = any_env_var_is_placeholder(["VAR2"])
+        assert result is True
+
+    def test_any_env_var_is_placeholder_exact_prefix_match(self, mocker: MockerFixture):
+        """Test that exact prefix match (without suffix) is also considered a placeholder."""
+        mocker.patch.dict(os.environ, {"EXACT_PREFIX": PLACEHOLDER_PREFIX})
+        result = any_env_var_is_placeholder(["EXACT_PREFIX"])
+        assert result is True
+
     def test_env_var_not_found_error_inheritance(self):
         error = EnvVarNotFoundError("test message")
         assert isinstance(error, Exception)

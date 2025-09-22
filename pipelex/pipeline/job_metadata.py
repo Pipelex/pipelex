@@ -10,7 +10,7 @@ from pipelex.types import StrEnum
 class JobCategory(StrEnum):
     MOCK_JOB = "mock_job"
     LLM_JOB = "llm_job"
-    IMGG_JOB = "imgg_job"
+    IMG_GEN_JOB = "img_gen_job"
     PROMPTING_JOB = "prompting_job"
     JINJA2_JOB = "jinja2_job"
     OCR_JOB = "ocr_job"
@@ -19,7 +19,7 @@ class JobCategory(StrEnum):
 class UnitJobId(StrEnum):
     LLM_GEN_TEXT = "llm_gen_text"
     LLM_GEN_OBJECT = "llm_gen_object"
-    IMGG_TEXT_TO_IMAGE = "imgg_text_to_image"
+    IMG_GEN_TEXT_TO_IMAGE = "img_gen_text_to_image"
     OCR_EXTRACT_PAGES = "ocr_extract_pages"
 
 

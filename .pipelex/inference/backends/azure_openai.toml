@@ -1,6 +1,32 @@
-default_sdk = "azure_openai"
-default_prompting_target = "openai"
+################################################################################
+# Azure OpenAI Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Azure OpenAI models.
+# It contains model definitions for OpenAI models deployed on Azure
+# accessible through the Azure OpenAI API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["gpt-4.1"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
 
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "azure_openai"
+prompting_target = "openai"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- GPT-4o Series ------------------------------------------------------------
 [gpt-4o]
 model_id = "gpt-4o-2024-11-20"
 inputs = ["text", "images"]
@@ -13,6 +39,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 
+# --- GPT-4.1 Series -----------------------------------------------------------
 ["gpt-4.1"]
 model_id = "gpt-4.1-2025-04-14"
 inputs = ["text", "images"]
@@ -31,6 +58,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.4 }
 
+# --- o Series ----------------------------------------------------------------
 [o1-mini]
 model_id = "o1-mini-2024-09-12"
 inputs = ["text"]
@@ -49,6 +77,7 @@ inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
 
+# --- GPT-5 Series -------------------------------------------------------------
 [gpt-5-mini]
 model_id = "gpt-5-mini-2025-08-07"
 inputs = ["text", "images"]

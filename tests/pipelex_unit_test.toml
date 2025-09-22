@@ -1,7 +1,4 @@
 
-[cogt.imgg_config]
-default_imgg_handle = "fal-ai/fast-lightning-sdxl"
-
 [pipelex.feature_config]
 is_reporting_enabled = true
 

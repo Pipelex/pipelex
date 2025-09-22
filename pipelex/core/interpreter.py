@@ -344,7 +344,7 @@ class PipelexInterpreter(BaseModel):
         PipelexInterpreter.add_inputs_to_lines_if_exist(lines, pipe.inputs)
 
         lines.append(f'output = "{PipelexInterpreter.escape_plx_string(pipe.output)}"')
-        lines.append(f'ocr_model = "{pipe.ocr_model}"')
+        lines.append(f'ocr = "{pipe.ocr}"')
 
         return "\n".join(lines)
 
@@ -382,20 +382,8 @@ class PipelexInterpreter(BaseModel):
         # Add optional fields
         if pipe.img_gen_prompt:
             lines.append(f'img_gen_prompt = "{PipelexInterpreter.escape_plx_string(pipe.img_gen_prompt)}"')
-        if pipe.imgg_handle:
-            lines.append(f'imgg_handle = "{PipelexInterpreter.escape_plx_string(pipe.imgg_handle)}"')
         if pipe.aspect_ratio:
             lines.append(f'aspect_ratio = "{pipe.aspect_ratio}"')
-        if pipe.quality:
-            lines.append(f'quality = "{pipe.quality}"')
-        if pipe.nb_steps:
-            lines.append(f"nb_steps = {pipe.nb_steps}")
-        if pipe.guidance_scale:
-            lines.append(f"guidance_scale = {pipe.guidance_scale}")
-        if pipe.is_moderated is not None:
-            lines.append(f"is_moderated = {str(pipe.is_moderated).lower()}")
-        if pipe.safety_tolerance:
-            lines.append(f'safety_tolerance = "{pipe.safety_tolerance}"')
         if pipe.is_raw is not None:
             lines.append(f"is_raw = {str(pipe.is_raw).lower()}")
         if pipe.seed:
@@ -724,20 +712,8 @@ class PipelexInterpreter(BaseModel):
         # Add optional fields only if they have values
         if pipe.img_gen_prompt:
             result["img_gen_prompt"] = pipe.img_gen_prompt
-        if pipe.imgg_handle:
-            result["imgg_handle"] = pipe.imgg_handle
         if pipe.aspect_ratio:
             result["aspect_ratio"] = pipe.aspect_ratio
-        if pipe.quality:
-            result["quality"] = pipe.quality
-        if pipe.nb_steps:
-            result["nb_steps"] = pipe.nb_steps
-        if pipe.guidance_scale:
-            result["guidance_scale"] = pipe.guidance_scale
-        if pipe.is_moderated is not None:
-            result["is_moderated"] = pipe.is_moderated
-        if pipe.safety_tolerance:
-            result["safety_tolerance"] = pipe.safety_tolerance
         if pipe.is_raw is not None:
             result["is_raw"] = pipe.is_raw
         if pipe.seed:
@@ -762,7 +738,7 @@ class PipelexInterpreter(BaseModel):
         result["output"] = pipe.output
 
         # Add required fields
-        result["ocr_model"] = pipe.ocr_model
+        result["ocr"] = pipe.ocr
 
         # Add optional fields
         if pipe.page_images:

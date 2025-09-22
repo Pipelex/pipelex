@@ -4,9 +4,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceManagerWorkerSetupError
-from pipelex.cogt.imgg.imgg_engine_factory import ImggEngineFactory
-from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
-from pipelex.cogt.imgg.imgg_worker_factory import ImggWorkerFactory
+from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.cogt.img_gen.img_gen_worker_factory import ImgGenWorkerFactory
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
@@ -20,22 +19,22 @@ from pipelex.hub import get_models_manager, get_report_delegate
 
 class InferenceManager(InferenceManagerProtocol):
     def __init__(self):
-        self.imgg_worker_factory = ImggWorkerFactory()
+        self.img_gen_worker_factory = ImgGenWorkerFactory()
         self.ocr_worker_factory = OcrWorkerFactory()
         self.llm_workers: Dict[str, LLMWorkerAbstract] = {}
-        self.imgg_workers: Dict[str, ImggWorkerAbstract] = {}
+        self.img_gen_workers: Dict[str, ImgGenWorkerAbstract] = {}
         self.ocr_workers: Dict[str, OcrWorkerAbstract] = {}
 
     @override
     def teardown(self):
-        self.imgg_worker_factory = ImggWorkerFactory()
+        self.img_gen_worker_factory = ImgGenWorkerFactory()
         self.ocr_worker_factory = OcrWorkerFactory()
         for llm_worker in self.llm_workers.values():
             llm_worker.teardown()
         self.llm_workers = {}
-        for imgg_worker in self.imgg_workers.values():
-            imgg_worker.teardown()
-        self.imgg_workers = {}
+        for img_gen_worker in self.img_gen_workers.values():
+            img_gen_worker.teardown()
+        self.img_gen_workers = {}
         for ocr_worker in self.ocr_workers.values():
             ocr_worker.teardown()
         self.ocr_workers = {}
@@ -47,9 +46,9 @@ class InferenceManager(InferenceManagerProtocol):
             log.debug(f"  {handle}:")
             log.debug(llm_worker.desc)
         log.debug("Image Workers:")
-        for handle, imgg_worker_async in self.imgg_workers.items():
+        for handle, img_gen_worker_async in self.img_gen_workers.items():
             log.debug(f"  {handle}:")
-            log.debug(imgg_worker_async.desc)
+            log.debug(img_gen_worker_async.desc)
         log.debug("OCR Workers:")
         for handle, ocr_worker_async in self.ocr_workers.items():
             log.debug(f"  {handle}:")
@@ -101,30 +100,30 @@ class InferenceManager(InferenceManagerProtocol):
         self.llm_workers[llm_handle] = llm_worker_class(reporting_delegate=get_report_delegate())
 
     ####################################################################################################
-    # Manage IMGG Workers
+    # Manage ImageGen Workers
     ####################################################################################################
 
-    def _setup_one_imgg_worker(self, imgg_handle: str) -> ImggWorkerAbstract:
-        imgg_engine = ImggEngineFactory.make_imgg_engine(imgg_handle=imgg_handle)
-        log.verbose(imgg_engine.desc, title=f"Setting up ImgEngine for '{imgg_handle}'")
-        imgg_worker = self.imgg_worker_factory.make_imgg_worker(
-            imgg_engine=imgg_engine,
+    def _setup_one_img_gen_worker(self, img_gen_handle: str) -> ImgGenWorkerAbstract:
+        inference_model = get_models_manager().get_inference_model(model_handle=img_gen_handle)
+        log.verbose(f"Setting up Image Generation Worker for '{img_gen_handle}'")
+        img_gen_worker = self.img_gen_worker_factory.make_img_gen_worker(
+            inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
         )
-        self.imgg_workers[imgg_handle] = imgg_worker
-        return imgg_worker
+        self.img_gen_workers[img_gen_handle] = img_gen_worker
+        return img_gen_worker
 
     @override
-    def get_imgg_worker(self, imgg_handle: str) -> ImggWorkerAbstract:
-        imgg_worker = self.imgg_workers.get(imgg_handle)
-        if imgg_worker is None:
-            if not get_config().cogt.inference_manager_config.is_auto_setup_preset_imgg:
+    def get_img_gen_worker(self, img_gen_handle: str) -> ImgGenWorkerAbstract:
+        img_gen_worker = self.img_gen_workers.get(img_gen_handle)
+        if img_gen_worker is None:
+            if not get_config().cogt.inference_manager_config.is_auto_setup_preset_img_gen:
                 raise InferenceManagerWorkerSetupError(
-                    f"Found no Imgg worker for '{imgg_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_imgg"
+                    f"Found no Imgg worker for '{img_gen_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_img_gen"
                 )
 
-            imgg_worker = self._setup_one_imgg_worker(imgg_handle=imgg_handle)
-        return imgg_worker
+            img_gen_worker = self._setup_one_img_gen_worker(img_gen_handle=img_gen_handle)
+        return img_gen_worker
 
     ####################################################################################################
     # Manage OCR Workers

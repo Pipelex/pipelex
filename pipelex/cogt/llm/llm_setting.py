@@ -28,16 +28,6 @@ class LLMSetting(ConfigModel):
         else:
             raise ConfigValidationError(f'Invalid max_tokens shoubd be an int or "auto" but it is a {type(value)}: {value}')
 
-    @model_validator(mode="after")
-    def validate_temperature(self) -> Self:
-        if self.llm_handle.startswith("gemini") and self.temperature > 1:
-            error_msg = (
-                f"Gemini LLMs such as '{self.llm_handle}' support temperatures up to 2 but we normalize between 0 and 1, "
-                f"so you can't set a temperature of {self.temperature}"
-            )
-            raise LLMSettingsValidationError(error_msg)
-        return self
-
     def make_llm_job_params(self) -> LLMJobParams:
         return LLMJobParams(
             temperature=self.temperature,
@@ -52,35 +42,35 @@ class LLMSetting(ConfigModel):
         )
 
 
-LLMSettingOrPresetId = Union[LLMSetting, str]
+LLMChoice = Union[LLMSetting, str]
 
 
 class LLMSettingChoicesDefaults(ConfigModel):
-    for_text: LLMSettingOrPresetId
-    for_object: LLMSettingOrPresetId
+    for_text: LLMChoice
+    for_object: LLMChoice
 
 
 class LLMSettingChoices(ConfigModel):
-    for_text: Optional[LLMSettingOrPresetId]
-    for_object: Optional[LLMSettingOrPresetId]
+    for_text: Optional[LLMChoice]
+    for_object: Optional[LLMChoice]
 
-    def list_used_presets(self) -> Set[str]:
+    def list_choices(self) -> Set[str]:
         return set(
             [
-                setting
-                for setting in [
+                choice
+                for choice in [
                     self.for_text,
                     self.for_object,
                 ]
-                if isinstance(setting, str)
+                if isinstance(choice, str)
             ]
         )
 
     @classmethod
     def make_completed_with_defaults(
         cls,
-        for_text: Optional[LLMSettingOrPresetId] = None,
-        for_object: Optional[LLMSettingOrPresetId] = None,
+        for_text: Optional[LLMChoice] = None,
+        for_object: Optional[LLMChoice] = None,
     ) -> Self:
         return cls(
             for_text=for_text,

@@ -4,11 +4,11 @@ from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.exceptions import LLMSettingsValidationError
+from pipelex.cogt.llm.llm_setting import LLMChoice as LLMSettingOrPresetIdCore
 from pipelex.cogt.llm.llm_setting import LLMSetting as LLMSettingCore
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import LLMSettingOrPresetId as LLMSettingOrPresetIdCore
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint as PipeLLMBlueprintCore
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
@@ -28,16 +28,6 @@ class LLMSetting(StructuredContent):
             return None
         elif isinstance(value, int):  # pyright: ignore[reportUnnecessaryIsInstance]
             return value
-
-    @model_validator(mode="after")
-    def validate_temperature(self) -> Self:
-        if self.llm_handle.startswith("gemini") and self.temperature > 1:
-            error_msg = (
-                f"Gemini LLMs such as '{self.llm_handle}' support temperatures up to 2 but we normalize between 0 and 1, "
-                f"so you can't set a temperature of {self.temperature}"
-            )
-            raise LLMSettingsValidationError(error_msg)
-        return self
 
 
 LLMSettingOrPresetId = Union[LLMSetting, str]

@@ -1,7 +1,38 @@
-default_sdk = "openai"
-default_prompting_target = "anthropic"
+################################################################################
+# Pipelex Inference Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for the Pipelex Inference backend.
+# It contains model definitions for various LLM and image generation models
+# accessible through the Pipelex unified inference API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["gpt-4.1"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
 
-# OpenAI Models
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "openai"
+prompting_target = "anthropic"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- OpenAI LLMs --------------------------------------------------------------
+[gpt-4o]
+model_id = "pipelex/gpt-4o"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.75, output = 11.00 }
+
 [gpt-4o-mini]
 model_id = "pipelex/gpt-4o-mini"
 inputs = ["text", "images"]
@@ -44,13 +75,7 @@ inputs = ["text", "images"]
 outputs = ["text"]
 costs = { input = 1.25, output = 10.00 }
 
-[gpt-image-1]
-model_id = "pipelex/gpt-image-1"
-inputs = ["text"]
-outputs = ["images"]
-costs = { input = 5, output = 0.01 }
-
-# Anthropic Models
+# --- Claude LLMs --------------------------------------------------------------
 ["claude-4-sonnet"]
 model_id = "pipelex/claude-4-sonnet"
 inputs = ["text", "images"]
@@ -63,7 +88,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 15, output = 75 }
 
-# Google Models using Google API
+# --- Gemini LLMs --------------------------------------------------------------
 ["gemini-2.0-flash"]
 model_id = "gemini/gemini-2.0-flash"
 inputs = ["text", "images"]
@@ -82,7 +107,8 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.10, output = 0.40 }
 
-# XAI Models
+# --- XAI LLMs --------------------------------------------------------------
+
 [grok-3]
 model_id = "grok-3"
 inputs = ["text"]
@@ -95,10 +121,9 @@ inputs = ["text"]
 outputs = ["text"]
 costs = { input = 0.3, output = 0.5 }
 
-# Flux Models
-[fast-lightning-sdxl]
-model_id = "pipelex/fast-lightning-sdxl"
-inputs = ["text"]
-outputs = ["images"]
-costs = { input = 0.01, output = 0.01 }
+################################################################################
+# OCR and IMAGE GENERATION MODELS
+################################################################################
 
+# We are still working in giving you acces to OCR and image generation models
+# and to the best models from Mistral through the Pipelex Inference backend.

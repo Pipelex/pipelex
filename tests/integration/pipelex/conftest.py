@@ -2,7 +2,6 @@ from typing import Optional
 
 import pytest
 
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.plugins.plugin_sdk_registry import Plugin
 
@@ -19,7 +18,6 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
     return request.param
 
 
-# TODO: make it efficient to also test multiple platforms like openai/azure and mistral/anthropic/bedrock
 @pytest.fixture(
     params=[
         # "o1",
@@ -30,16 +28,14 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "o3-mini",
         # "gpt-5-mini", # TODO: fix this
         # "gpt-5-nano", # TODO: fix this
-        # "best-gpt",
         # "claude-3-haiku",
         # "claude-3-5-sonnet",
         # "claude-3-7-sonnet",
-        # "best-claude",
         # "mistral-large",
         # "ministral-3b",
         # "ministral-8b",
-        "mistral-medium",
-        "mistral-medium-2508",
+        # "mistral-medium",
+        # "mistral-medium-2508",
         # "pixtral-12b",
         # "pixtral-large",
         # "gemini-1-5-pro",
@@ -57,7 +53,6 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "pipelex/claude-3.7-sonnet",
         # "pipelex/gemini-2.0-flash-vertex",
         # "pipelex/gemini-2.0-flash",
-        # "best-claude",
         # "llm_to_engineer",
         # "gpt-5-nano",
         # "gpt-4o-mini",
@@ -73,6 +68,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gemini-2.5-pro",
         # "grok-3",
         # "grok-3-mini",
+        "base-claude",
     ]
 )
 def llm_handle(request: pytest.FixtureRequest) -> str:
@@ -206,15 +202,15 @@ def llm_job_params(request: pytest.FixtureRequest) -> LLMJobParams:
 
 @pytest.fixture(
     params=[
-        # ImggHandle.FLUX_1_PRO_LEGACY,
-        # ImggHandle.FLUX_1_1_PRO,
-        # ImggHandle.FLUX_1_1_ULTRA,
-        ImggHandle.SDXL_LIGHTNING,
-        # ImggHandle.OPENAI_GPT_IMAGE_1,
+        # "flux-pro",
+        "flux-pro/v1.1",
+        # "flux-pro/v1.1-ultra",
+        "fast-lightning-sdxl",
+        "gpt-image-1",
     ]
 )
-def imgg_handle(request: pytest.FixtureRequest) -> ImggHandle:
-    assert isinstance(request.param, ImggHandle)
+def img_gen_handle(request: pytest.FixtureRequest) -> str:
+    assert isinstance(request.param, str)
     return request.param
 
 
@@ -235,5 +231,25 @@ def ocr_handle(request: pytest.FixtureRequest) -> str:
     ]
 )
 def ocr_handle_from_image(request: pytest.FixtureRequest) -> str:
+    assert isinstance(request.param, str)
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        "base_ocr_mistral",
+    ]
+)
+def ocr_choice_for_pdf(request: pytest.FixtureRequest) -> str:
+    assert isinstance(request.param, str)
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        "base_ocr_mistral",
+    ]
+)
+def ocr_choice_for_image(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
     return request.param

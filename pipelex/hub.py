@@ -6,9 +6,10 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
-from pipelex.cogt.imgg.imgg_worker_abstract import ImggWorkerAbstract
+from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.core.concepts.concept import Concept
@@ -330,6 +331,10 @@ def get_models_manager() -> ModelManagerAbstract:
     return get_pipelex_hub().get_required_models_manager()
 
 
+def get_model_deck() -> ModelDeck:
+    return get_models_manager().get_model_deck()
+
+
 def get_plugin_manager() -> PluginManager:
     return get_pipelex_hub().get_plugin_manager()
 
@@ -344,10 +349,10 @@ def get_llm_worker(
     return get_inference_manager().get_llm_worker(llm_handle=llm_handle)
 
 
-def get_imgg_worker(
-    imgg_handle: str,
-) -> ImggWorkerAbstract:
-    return get_inference_manager().get_imgg_worker(imgg_handle=imgg_handle)
+def get_img_gen_worker(
+    img_gen_handle: str,
+) -> ImgGenWorkerAbstract:
+    return get_inference_manager().get_img_gen_worker(img_gen_handle=img_gen_handle)
 
 
 def get_ocr_worker(

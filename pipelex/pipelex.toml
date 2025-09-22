@@ -81,7 +81,7 @@ inference_config_path = ".pipelex/inference"
 
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
-is_auto_setup_preset_imgg = true
+is_auto_setup_preset_img_gen = true
 is_auto_setup_preset_ocr = true
 
 [cogt.llm_config]
@@ -98,16 +98,11 @@ is_streaming_enabled = false
 # Image generation config
 ####################################################################################################
 
-[cogt.imgg_config]
-imgg_handles = ["fal-ai/flux-pro", "fal-ai/fast-lightning-sdxl"]
-default_imgg_handle = "fal-ai/flux-pro/v1.1-ultra"               # use "fal-ai/fast-lightning-sdxl" for SDXL Lightning cheap and fast
-
-[cogt.imgg_config.imgg_job_config]
+[cogt.img_gen_config.img_gen_job_config]
 is_sync_mode = false
 
-[cogt.imgg_config.imgg_param_defaults]
-# quality and nb_steps cannot be set at the same time
-# nb_steps = 1  # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
+[cogt.img_gen_config.img_gen_param_defaults]
+nb_steps = 1            # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
 quality = "low"
 aspect_ratio = "square" # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
 guidance_scale = 3.5
@@ -118,7 +113,7 @@ is_raw = false
 output_format = "jpg"
 seed = "auto"
 
-[cogt.imgg_config.fal_config]
+[cogt.img_gen_config.fal_config]
 flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
 sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
 
