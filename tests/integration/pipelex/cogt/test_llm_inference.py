@@ -14,7 +14,7 @@ from tests.integration.pipelex.cogt.test_data import LLMTestConstants, LLMVision
 @pytest.mark.asyncio(loop_scope="class")
 class TestLLMInference:
     async def test_simple_gen_text_from_text(self, llm_job_params: LLMJobParams, llm_handle: str):
-        log.info(f"Testing llm_handle '{llm_handle}'")
+        log.info(f"test_simple_gen_text_from_text: Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
@@ -27,7 +27,7 @@ class TestLLMInference:
         pretty_print(generated_text)
 
     async def test_simple_gen_object_from_text(self, llm_job_params: LLMJobParams, llm_handle: str):
-        log.info(f"Testing llm_handle '{llm_handle}'")
+        log.info(f"test_simple_gen_object_from_text: Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
@@ -43,6 +43,7 @@ class TestLLMInference:
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
     async def test_gen_text_from_image(self, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
+        log.info(f"test_gen_text_from_image: Testing llm_handle '{llm_handle}'")
         prompt_image = PromptImagePath(file_path=image_path)
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(

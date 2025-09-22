@@ -6,7 +6,8 @@
 # ================================================
 
 # Which profile to use (change this to switch routing)
-active = "all_pipelex"
+# active = "all_pipelex"
+active = "all_gemini"
 
 # We recommend using the "all_pipelex" profile to get a head start with all models.
 # The Pipelex Inference backend is currently not recommended for production use,
@@ -40,6 +41,10 @@ default = "pipelex_inference"
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"
 default = "anthropic"
+
+[profiles.all_gemini]
+description = "Use Google GenAI backend for all its supported models"
+default = "google"
 
 [profiles.all_azure_openai]
 description = "Use Azure OpenAI backend for all its supported models"

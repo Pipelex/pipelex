@@ -1,4 +1,5 @@
 [pipelex_inference]
+enabled = false
 endpoint = "https://inference.pipelex.com/v1"
 api_key = "${PIPELEX_INFERENCE_API_KEY}"
 
