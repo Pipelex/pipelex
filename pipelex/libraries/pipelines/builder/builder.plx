@@ -119,11 +119,18 @@ A dict with:
 You can have multiple fields if needed, but each field should represent a single value.
 
 Otherwise, there are native concepts that you can use:
-If the concept you want to create is JUST a text, assign "Text" to the refines field, and no structure field.
-If the concept you want to create is JUST an image, assign "Image" to the refines field, and no structure field.
-If the concept you want to create is JUST a PDF, assign "PDF" to the refines field, and no structure field.
-If the concept you want to create is JUST a Number, assign "Number" to the refines field, and no structure field.
+If the concept you want to create is JUST a text, assign "Text" to the 'refines' field, and no structure field.
+If the concept you want to create is JUST an image, assign "Image" to the 'refines' field, and no structure field.
+If the concept you want to create is JUST a PDF, assign "PDF" to the 'refines' field, and no structure field.
+If the concept you want to create is JUST a Number, assign "Number" to the 'refines' field, and no structure field.
 
+DO NOT redefine native concepts:
+- Text
+- Image
+- PDF
+- Number
+- Page
+If you need one of these, you will later on use them, but you should NOT REDEFINE THEM.
 Plan:
 @plan_draft
 
@@ -260,6 +267,8 @@ VERY IMPORTANT: A pipe has inputs, and an output. The inputs are a dict of keys 
 The output is a concept code in PascalCase.
 The field "result" is corresponding to the name of the result of the pipe. It will be used in the inputs of the next pipes.
 It is important that they link each other in the right way.
+
+The output concept should be a concepts should be in PascalCase
 
 PipeSignatures:
 @pipe_signatures_text

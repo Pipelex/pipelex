@@ -247,6 +247,8 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
     pipelex_bundle_blueprint_core = pipelex_bundle_blueprint.to_core_blueprint()
 
     library_manager = get_library_manager()
+    from pipelex import pretty_print
+    pretty_print(pipelex_bundle_blueprint_core)
     pipes = library_manager.load_from_blueprint(blueprint=pipelex_bundle_blueprint_core)
     dry_run_result = await dry_run_pipes(pipes=pipes, raise_on_failure=False)
     library_manager.remove_from_blueprint(blueprint=pipelex_bundle_blueprint_core)

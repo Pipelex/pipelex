@@ -21,7 +21,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
     Attributes:
         type: Fixed to "PipeImgGen" for this pipe type.
         img_gen_prompt: Static text prompt for image generation. Use this or dynamic input.
-        img_gegn: Image generation choice (e.g., 'gpt-image-1'). Defaults to global config.
+        img_gen: Image generation choice (e.g., 'gpt-image-1'). Defaults to global config.
         aspect_ratio: Desired image aspect ratio (e.g., '16:9', '1:1').
         quality: Generated image quality setting (e.g., 'standard', 'hd').
         nb_steps: Number of diffusion steps for diffusion models. More steps increase detail

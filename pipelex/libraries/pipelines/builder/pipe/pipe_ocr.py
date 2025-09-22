@@ -18,7 +18,7 @@ class PipeOcrBlueprint(PipeBlueprint):
 
     Attributes:
         type: Fixed to "PipeOcr" for this pipe type.
-        ocr_model: Needs to be "mistral-ocr".
+        ocr: Needs to be "mistral-ocr".
         page_images: Whether to include detected images in the OCR output. When enabled,
                     extracts and returns embedded images found in documents.
         page_image_captions: Whether to generate captions for detected images using AI.
