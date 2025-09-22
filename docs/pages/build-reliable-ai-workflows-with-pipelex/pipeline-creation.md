@@ -16,7 +16,7 @@ The pipeline creation system creates a fully working pipeline that has been both
 Generate a complete pipeline blueprint from requirements:
 
 ```bash
-pipelex build blueprint "BRIEF IN NATURAL" [OPTIONS]
+pipelex build blueprint "BRIEF IN NATURAL LANGUAGE" [OPTIONS]
 ```
 
 **Example:**
@@ -28,7 +28,7 @@ pipelex build blueprint "Take a photo as input, and render the opposite of the p
 
 **Options:**
 - `--output, -o`: Output path for generated files
-- `--config-folder-path, -c`: Path to libraries folder
+- `--config, -c`: Path to libraries folder
 
 ## Complete Workflow
 
