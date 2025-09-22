@@ -3,7 +3,7 @@ from typing import Any, List, Optional, Type, Union
 
 import instructor
 from google import genai
-from google.genai import types
+from google.genai import types as genai_types
 from typing_extensions import override
 
 from pipelex import log
@@ -22,7 +22,7 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
+from pipelex.tools.misc.base_64_utils import load_binary_async
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -37,60 +37,34 @@ class GoogleFactory:
         return genai.Client(api_key=backend.api_key)
 
     @classmethod
-    async def prepare_image_part(cls, prompt_image: PromptImage) -> types.Part:
+    async def prepare_image_part(cls, prompt_image: PromptImage) -> genai_types.Part:
         """Convert a PromptImage to Google genai Part format."""
         image_bytes: bytes
         mime_type: str
 
         if isinstance(prompt_image, PromptImageBytes):
-            # Decode base64 to bytes
-            import base64
-
-            image_bytes = base64.b64decode(prompt_image.base_64)
-            file_type = prompt_image.get_file_type()
-            # Use the mime type from FileType object
-            mime_type = file_type.mime
+            image_bytes = prompt_image.get_decoded_bytes()
+            mime_type = prompt_image.get_mime_type()
+            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
         elif isinstance(prompt_image, PromptImagePath):
-            # Load image from path as base64 and decode
-            import base64
-
-            base64_bytes = await load_binary_as_base64_async(prompt_image.file_path)
-            image_bytes = base64.b64decode(base64_bytes)
-            file_type = prompt_image.get_file_type()
-            # Use the mime type from FileType object
-            mime_type = file_type.mime
+            image_bytes = await load_binary_async(prompt_image.file_path)
+            mime_type = prompt_image.get_mime_type()
+            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
         elif isinstance(prompt_image, PromptImageUrl):
-            # Download image from URL
-            import aiohttp
-
-            async with aiohttp.ClientSession() as session:
-                async with session.get(prompt_image.url) as response:
-                    image_bytes = await response.read()
-            # Detect mime type from bytes
-            from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
-
-            file_type = detect_file_type_from_bytes(image_bytes)
-            # Use the mime type from FileType object
-            mime_type = file_type.mime
+            return genai_types.Part.from_uri(file_uri=prompt_image.url)
         else:
             raise GoogleFactoryError(f"Unsupported PromptImage type: '{type(prompt_image).__name__}'")
 
-        # Create Google Part from bytes
-        return types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-
     @classmethod
-    async def prepare_contents(cls, llm_prompt: LLMPrompt) -> Any:  # Returns ContentListUnion compatible type
+    async def prepare_user_contents(cls, llm_prompt: LLMPrompt) -> genai_types.ContentListUnion:
         """Prepare contents for Google genai API."""
-        # If only text, return as string
-        if llm_prompt.user_text and not llm_prompt.user_images:
-            return llm_prompt.user_text
 
         # Build list of parts for multimodal content
-        parts: List[Union[str, types.Part]] = []
+        parts: List[genai_types.Part] = []
 
         # Add text content if present
         if llm_prompt.user_text:
-            parts.append(llm_prompt.user_text)
+            parts.append(genai_types.Part.from_text(text=llm_prompt.user_text))
 
         # Add image parts if present
         if llm_prompt.user_images:
@@ -99,11 +73,10 @@ class GoogleFactory:
             image_parts = await asyncio.gather(*image_tasks)
             parts.extend(image_parts)
 
-        # Return the parts list, which is compatible with generate_content
-        return parts
+        return genai_types.Content(parts=parts, role="user")
 
     @classmethod
-    def extract_token_usage(cls, usage_metadata: Optional[types.GenerateContentResponseUsageMetadata]) -> NbTokensByCategoryDict:
+    def extract_token_usage(cls, usage_metadata: Optional[genai_types.GenerateContentResponseUsageMetadata]) -> NbTokensByCategoryDict:
         """Extract token usage from Google's usage metadata."""
         if not usage_metadata:
             return {}

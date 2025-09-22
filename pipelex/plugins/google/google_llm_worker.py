@@ -50,9 +50,9 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         if structure_method:
             instructor_mode = structure_method.as_instructor_mode()
             log.debug(f"Google structure mode: {structure_method} --> {instructor_mode}")
-            self.instructor_for_objects = instructor.from_genai(client=sdk_instance, mode=instructor_mode)
+            self.instructor_for_objects = instructor.from_genai(client=sdk_instance, mode=instructor_mode, use_async=True)
         else:
-            self.instructor_for_objects = instructor.from_genai(client=sdk_instance)
+            self.instructor_for_objects = instructor.from_genai(client=sdk_instance, use_async=True)
 
     @override
     async def _gen_text(
@@ -61,7 +61,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
     ) -> str:
         """Generate text using Google Gemini API."""
         # Prepare contents (text and images)
-        contents = await GoogleFactory.prepare_contents(llm_job.llm_prompt)
+        contents = await GoogleFactory.prepare_user_contents(llm_job.llm_prompt)
 
         # Build generation config
         generation_config = types.GenerateContentConfig(
@@ -108,40 +108,51 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
     ) -> BaseModelTypeVar:
         """Generate structured output using Google Gemini API with instructor."""
         # Prepare contents (text and images)
-        contents = await GoogleFactory.prepare_contents(llm_job.llm_prompt)
+        contents = await GoogleFactory.prepare_user_contents(llm_job.llm_prompt)
 
-        # Build messages list for instructor
-        messages: List[Any] = []
+        # Build generation config
+        generation_config = types.GenerateContentConfig(
+            temperature=llm_job.job_params.temperature,
+            max_output_tokens=llm_job.job_params.max_tokens,
+            candidate_count=1,
+        )
 
-        # Add system message if present
+        # Add system instruction if present (as part of config)
         if llm_job.llm_prompt.system_text:
-            messages.append({"role": "system", "content": llm_job.llm_prompt.system_text})
+            generation_config.system_instruction = llm_job.llm_prompt.system_text
 
-        # Add user message with contents
-        # For instructor with Google, we format the content differently
-        if len(contents) == 1 and isinstance(contents[0], str):
-            # Simple text message
-            messages.append({"role": "user", "content": contents[0]})
-        else:
-            # Multi-part message (text + images)
-            user_content: List[Any] = []
-            for content in contents:
-                if isinstance(content, str):
-                    user_content.append({"type": "text", "text": content})
-                else:
-                    # Pass Part objects directly - instructor will handle them
-                    user_content.append(content)
+        # # Build messages list for instructor
+        # messages: List[Any] = []
 
-            messages.append({"role": "user", "content": user_content})
+        # # Add system message if present
+        # if llm_job.llm_prompt.system_text:
+        #     messages.append({"role": "system", "content": llm_job.llm_prompt.system_text})
+
+        # # Add user message with contents
+        # # For instructor with Google, we format the content differently
+        # if len(contents) == 1 and isinstance(contents[0], str):
+        #     # Simple text message
+        #     messages.append({"role": "user", "content": contents[0]})
+        # else:
+        #     # Multi-part message (text + images)
+        #     user_content: List[Any] = []
+        #     for content in contents:
+        #         if isinstance(content, str):
+        #             user_content.append({"type": "text", "text": content})
+        #         else:
+        #             # Pass Part objects directly - instructor will handle them
+        #             user_content.append(content)
+
+        # messages.append({"role": "user", "content": user_content})
 
         # Use instructor to generate structured output
         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-            messages=messages,
+            # result_object = await self.instructor_for_objects.chat.completions.create(
+            messages=[contents],
             response_model=schema,
             max_retries=llm_job.job_config.max_retries,
             model=self.inference_model.model_id,
-            temperature=llm_job.job_params.temperature,
-            max_tokens=llm_job.job_params.max_tokens,
+            generation_config=generation_config,
         )
         if not isinstance(result_object, schema):
             raise GoogleLLMWorkerError(f"Google Gemini API returned an object that is not of type {schema}: {result_object}")

@@ -1,3 +1,4 @@
+import base64
 from abc import ABC
 from typing import Union
 
@@ -9,12 +10,12 @@ from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_ba
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 
-class PromptImageTypedBytes(CustomBaseModel):
+class PromptImageTypedBase64(CustomBaseModel):
     base_64: bytes
     file_type: FileType
 
 
-PromptImageTypedBytesOrUrl = Union[PromptImageTypedBytes, str]
+PromptImageTypedBase64OrUrl = Union[PromptImageTypedBase64, str]
 
 
 class PromptImage(BaseModel, ABC):
@@ -26,6 +27,9 @@ class PromptImagePath(PromptImage):
 
     def get_file_type(self) -> FileType:
         return detect_file_type_from_path(self.file_path)
+
+    def get_mime_type(self) -> str:
+        return self.get_file_type().mime
 
     @override
     def __str__(self) -> str:
@@ -51,6 +55,12 @@ class PromptImageBytes(PromptImage):
     def get_file_type(self) -> FileType:
         return detect_file_type_from_base64(self.base_64)
 
+    def get_mime_type(self) -> str:
+        return self.get_file_type().mime
+
+    def get_decoded_bytes(self) -> bytes:
+        return base64.b64decode(self.base_64)
+
     @override
     def __str__(self) -> str:
         base_64_str = str(self.base_64)
@@ -65,5 +75,5 @@ class PromptImageBytes(PromptImage):
     def __format__(self, format_spec: str) -> str:
         return self.__str__()
 
-    def make_prompt_image_typed_bytes(self) -> PromptImageTypedBytes:
-        return PromptImageTypedBytes(base_64=self.base_64, file_type=self.get_file_type())
+    def make_prompt_image_typed_bytes(self) -> PromptImageTypedBase64:
+        return PromptImageTypedBase64(base_64=self.base_64, file_type=self.get_file_type())
