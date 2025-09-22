@@ -1,6 +1,6 @@
 from pipelex import log
 from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, PromptImageFormatError
-from pipelex.cogt.image.prompt_image import PromptImageBytes
+from pipelex.cogt.image.prompt_image import PromptImageBase64
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
@@ -71,7 +71,7 @@ class BedrockFactory:
         if user_images := llm_job.llm_prompt.user_images:
             raise LLMCapabilityError("BedrockFactory does not support images. Skipping images.")
             for user_image in user_images:
-                if isinstance(user_image, PromptImageBytes):
+                if isinstance(user_image, PromptImageBase64):
                     image_bytes = user_image.image_bytes
                     image = BedrockImage(
                         format=ImageFormat.JPEG,

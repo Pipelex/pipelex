@@ -10,10 +10,12 @@ from pipelex import log
 from pipelex.cogt.exceptions import CogtError, LLMCompletionError
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
-    PromptImageBytes,
+    PromptImageBase64,
+    PromptImageBinary,
     PromptImagePath,
     PromptImageUrl,
 )
+from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
@@ -42,7 +44,7 @@ class GoogleFactory:
         image_bytes: bytes
         mime_type: str
 
-        if isinstance(prompt_image, PromptImageBytes):
+        if isinstance(prompt_image, PromptImageBase64):
             image_bytes = prompt_image.get_decoded_bytes()
             mime_type = prompt_image.get_mime_type()
             return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
@@ -51,7 +53,10 @@ class GoogleFactory:
             mime_type = prompt_image.get_mime_type()
             return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
         elif isinstance(prompt_image, PromptImageUrl):
-            return genai_types.Part.from_uri(file_uri=prompt_image.url)
+            prompt_image_binary = await PromptImageFactory.make_promptimagebinary_from_url_async(prompt_image)
+            image_bytes = prompt_image_binary.binary
+            mime_type = prompt_image_binary.get_mime_type()
+            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
         else:
             raise GoogleFactoryError(f"Unsupported PromptImage type: '{type(prompt_image).__name__}'")
 

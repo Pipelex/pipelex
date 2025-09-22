@@ -11,7 +11,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
-    PromptImageBytes,
+    PromptImageBase64,
     PromptImagePath,
     PromptImageUrl,
 )

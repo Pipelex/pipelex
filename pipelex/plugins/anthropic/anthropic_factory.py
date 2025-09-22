@@ -15,10 +15,10 @@ from pipelex import log
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
-    PromptImageBytes,
+    PromptImageBase64,
     PromptImagePath,
     PromptImageTypedBase64,
-    PromptImageTypedBase64OrUrl,
+    PromptImageTypedUrlOrBase64,
     PromptImageUrl,
 )
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
@@ -121,7 +121,7 @@ class AnthropicFactory:
     @staticmethod
     def openai_typed_user_message(
         user_content_txt: str,
-        prepped_user_images: Optional[List[PromptImageTypedBase64OrUrl]] = None,
+        prepped_user_images: Optional[List[PromptImageTypedUrlOrBase64]] = None,
     ) -> ChatCompletionMessageParam:
         text_block_param: TextBlockParam = {"type": "text", "text": user_content_txt}
         message: MessageParam
@@ -171,12 +171,12 @@ class AnthropicFactory:
     async def _prep_image_for_anthropic(
         cls,
         prompt_image: PromptImage,
-    ) -> PromptImageTypedBase64OrUrl:
-        typed_bytes_or_url: PromptImageTypedBase64OrUrl
-        if isinstance(prompt_image, PromptImageBytes):
-            typed_bytes_or_url = prompt_image.make_prompt_image_typed_bytes()
+    ) -> PromptImageTypedUrlOrBase64:
+        typed_bytes_or_url: PromptImageTypedUrlOrBase64
+        if isinstance(prompt_image, PromptImageBase64):
+            typed_bytes_or_url = prompt_image.make_prompt_image_typed_base64()
         elif isinstance(prompt_image, PromptImageUrl):
-            image_bytes = await PromptImageFactory().make_promptimagebytes_from_url_async(prompt_image)
+            image_bytes = await PromptImageFactory.make_promptimagebase64_from_url_async(prompt_image)
             file_type = detect_file_type_from_base64(image_bytes.base_64)
             typed_bytes_or_url = PromptImageTypedBase64(base_64=image_bytes.base_64, file_type=file_type)
         elif isinstance(prompt_image, PromptImagePath):
@@ -200,7 +200,7 @@ class AnthropicFactory:
         if system_content := llm_prompt.system_text:
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
 
-        prepped_user_images: Optional[List[PromptImageTypedBase64OrUrl]]
+        prepped_user_images: Optional[List[PromptImageTypedUrlOrBase64]]
         if llm_prompt.user_images:
             tasks_to_prep_images = [cls._prep_image_for_anthropic(prompt_image) for prompt_image in llm_prompt.user_images]
             prepped_user_images = await asyncio.gather(*tasks_to_prep_images)

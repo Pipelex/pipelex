@@ -63,23 +63,16 @@ class LLMVisionTestCases:
         ("AI Lympics PNG", PATH_IMG_PNG_1),
         ("AI Lympics JPEG", PATH_IMG_JPEG_1),
         ("Gantt Chart", PATH_IMG_GANTT_1),
+        ("Eiffel Tower", PATH_IMG_JPEG_3),
     ]
     IMAGE_PATH_PAIRS: ClassVar[List[Tuple[str, Tuple[str, str]]]] = [  # topic, image_pair
         ("AI Lympics PNG", (PATH_IMG_PNG_1, PATH_IMG_PNG_2)),
     ]
 
-    IMAGES_MIXED_SOURCES: ClassVar[List[Tuple[str, str]]] = [  # topic, image_uri
+    IMAGE_URLS: ClassVar[List[Tuple[str, str]]] = [  # topic, image_uri
         (
             "Alan Turing",
             URL_WIKIPEDIA_ALAN_TURING,
-        ),
-        (
-            "AI Lympics",
-            PATH_IMG_PNG_1,
-        ),
-        (
-            "Eiffel Tower",
-            PATH_IMG_JPEG_3,
         ),
         (
             "Gantt chart",
