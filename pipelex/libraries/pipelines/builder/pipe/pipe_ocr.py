@@ -18,7 +18,7 @@ class PipeOcrBlueprint(PipeBlueprint):
 
     Attributes:
         type: Fixed to "PipeOcr" for this pipe type.
-        ocr: Needs to be "mistral-ocr".
+        ocr: Needs to be "base_ocr_mistral".
         page_images: Whether to include detected images in the OCR output. When enabled,
                     extracts and returns embedded images found in documents.
         page_image_captions: Whether to generate captions for detected images using AI.
@@ -30,7 +30,7 @@ class PipeOcrBlueprint(PipeBlueprint):
                        Defaults to configuration setting.
 
     Validation Rules:
-        1. OCR model must be "mistral-ocr".
+        1. OCR model must be "base_ocr_mistral".
         2. Boolean flags (page_images, page_image_captions, page_views) are optional.
         3. page_views_dpi should be a positive integer when specified.
 
@@ -40,7 +40,7 @@ class PipeOcrBlueprint(PipeBlueprint):
 
     type: Literal["PipeOcr"] = "PipeOcr"
     category: Literal["PipeOperator"] = "PipeOperator"
-    ocr: str = "mistral-ocr"
+    ocr: str = "base_ocr_mistral"
     page_images: Optional[bool] = None
     page_image_captions: Optional[bool] = None
     page_views: Optional[bool] = None

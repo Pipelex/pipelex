@@ -201,10 +201,11 @@ async def compile_in_pipelex_bundle_blueprint(working_memory: WorkingMemory) -> 
     # Get pipe blueprints as ListContent directly and cast for typing
     # We can't use get_stuff_as_list with Union types, so we get the raw content
     pipe_spec_blueprints = cast(ListContent[PipeSpecBlueprintUnion], working_memory.get_stuff(name="pipe_spec_blueprints").content)
+    domain_information = working_memory.get_stuff(name="domain_information").content
 
     return PipelexBundleBlueprint(
-        domain="builder",
-        definition="Builder pipeline library",
+        domain=domain_information.domain,
+        definition=domain_information.definition,
         concept={
             concept_spec_blueprint.the_concept_code: ConceptBlueprint(**concept_spec_blueprint.model_dump(exclude={"the_concept_code"}))
             for concept_spec_blueprint in concept_blueprints.items
