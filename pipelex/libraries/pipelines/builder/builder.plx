@@ -49,8 +49,8 @@ Brief:
 @brief
 
 For example, if the pipe is about generating a compliance matrix out of a RFP, the domain would be "rfp_compliance_matrix"...
-It hsould be not more than 4 words, in snake_case.
-add a defintion as well.
+It should be not more than 4 words, in snake_case.
+For the definition, i would like to see a short description of what the bundle would represent.
 """
 
 # ────────────────────────────────────────────────────────────────────────────────
