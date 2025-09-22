@@ -166,8 +166,7 @@ build: env
 
 config-template:
 	$(call PRINT_TITLE,"Updating config template from .pipelex/")
-	@rm -rf pipelex/config_template/*
-	@cp -r .pipelex/* pipelex/config_template/
+	@rsync -av --exclude='inference/backends.toml' --delete .pipelex/ pipelex/config_template/
 
 cft: config-template
 	@echo "> done: cft = config-template"

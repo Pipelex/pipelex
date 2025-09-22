@@ -1,6 +1,32 @@
-default_sdk = "openai"
-default_prompting_target = "anthropic"
+################################################################################
+# XAI Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for XAI (formerly Twitter AI) models.
+# It contains model definitions for Grok language models
+# accessible through the XAI API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["grok-3"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
 
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "openai"
+prompting_target = "anthropic"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- Grok 3 Series ------------------------------------------------------------
 [grok-3]
 model_id = "grok-3"
 inputs = ["text"]
