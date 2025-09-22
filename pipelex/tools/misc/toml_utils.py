@@ -289,6 +289,7 @@ def dict_to_toml(data: Mapping[str, Any]) -> str:
 
                     # Handle the structure field specially
                     for field_key, field_value in item_value.items():
+                        # THIS IS CUSTOM CODE FOR THE CONCEPT STRUCUTRE FIELD. It should be generic
                         if field_key == "structure" and isinstance(field_value, Mapping):
                             # Structure should be its own table [section.item.structure]
                             structure_table = table()
