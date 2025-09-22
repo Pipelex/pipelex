@@ -5,7 +5,6 @@ from typing import Annotated, List
 
 import typer
 
-from pipelex import log
 from pipelex.exceptions import PipelexCLIError
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.tools.config.manager import config_manager
@@ -87,7 +86,6 @@ def init_libraries_cmd(
     directory: Annotated[str, typer.Argument(help="Directory where to create the pipelex_libraries folder")] = ".",
     overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
 ) -> None:
-    log.info(f"Pipelex {PACKAGE_VERSION} initialized.")
     do_init_libraries(directory=directory, overwrite=overwrite)
 
 
@@ -95,5 +93,4 @@ def init_libraries_cmd(
 def init_config_cmd(
     reset: Annotated[bool, typer.Option("--reset", "-r", help="Warning: If set, existing files will be overwritten.")] = False,
 ) -> None:
-    log.info(f"Pipelex {PACKAGE_VERSION} initialized.")
     do_init_config(reset=reset)
