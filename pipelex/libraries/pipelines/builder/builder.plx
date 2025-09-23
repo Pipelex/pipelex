@@ -27,10 +27,10 @@ output = "PipelexBundleSpec"
 steps = [
     { pipe = "draft_planning_text", result = "plan_draft" },
     { pipe = "parallel_draft_to_specs" },
-    { pipe = "materialize_concept_specs", result = "concept_specs" },
+    { pipe = "materialize_concept_spec_drafts", result = "concept_spec_drafts" },
     { pipe = "materialize_pipe_signatures", result = "pipe_signatures" },
     { pipe = "pipe_builder_domain_information", result = "domain_information" },
-    { pipe = "build_concept_spec", batch_over = "concept_specs", batch_as = "concept_spec", result = "concept_specs" },
+    { pipe = "build_concept_spec", batch_over = "concept_spec_drafts", batch_as = "concept_spec_draft", result = "concept_specs" },
     { pipe = "create_pipes_from_signatures", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_specs" },
     { pipe = "compile_in_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
     { pipe = "validate_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
@@ -101,11 +101,11 @@ LIMIT TO 10 DIFFERENT PIPES FOR NOW
 # ────────────────────────────────────────────────────────────────────────────────
 [pipe.parallel_draft_to_specs]
 type = "PipeParallel"
-description = "Generate ConceptSpecsText and PipeSignaturesText in parallel from plan draft."
+description = "Generate ConceptSpecDraftsText and PipeSignaturesText in parallel from plan draft."
 inputs = { plan_draft = "PlanDraftText", brief = "UserBrief" }
 output = "Dynamic"
 parallels = [
-    { pipe = "draft_to_conceptspecs_text",   result = "concept_specs_text" },
+    { pipe = "draft_to_conceptspecs_text",   result = "concept_spec_drafts_text" },
     { pipe = "draft_to_pipesignatures_text", result = "pipe_signatures_text" },
 ]
 
@@ -254,11 +254,11 @@ No more than 10 PipeSignatures
 # STAGE 3 — materialize: TEXT → real objects (ConceptSpec[], PipeSignature[])
 # ────────────────────────────────────────────────────────────────────────────────
 
-[pipe.materialize_concept_specs]
+[pipe.materialize_concept_spec_drafts]
 type = "PipeLLM"
 description = "Turn ConceptSpecsText into ConceptSpec objects."
-inputs = { concept_specs_text = "Text", brief = "UserBrief" }
-output = "concept.ConceptSpec"
+inputs = { concept_spec_drafts_text = "Text", brief = "UserBrief" }
+output = "concept.ConceptSpecDraft"
 multiple_output = true
 llm = "llm_to_engineer"
 prompt_template = """
@@ -266,7 +266,7 @@ Materialize ConceptSpec objects from the ConceptSpecsText.
 Do not change the information in the input. Just organize the information
 
 ConceptSpecs:
-@concept_specs_text
+@concept_spec_drafts_text
 
 Brief:
 @brief
@@ -277,14 +277,14 @@ LIMIT TO A MAXIMUM OF 5 fields for now
 [pipe.materialize_pipe_signatures]
 type = "PipeLLM"
 description = "Turn PipeSignaturesText into PipeSignature objects that reference the ConceptSpec objects."
-inputs = { pipe_signatures_text = "Text", concept_specs = "concept.ConceptSpec", brief = "UserBrief" }
+inputs = { pipe_signatures_text = "Text", concept_spec_drafts = "concept.ConceptSpecDraft", brief = "UserBrief" }
 output = "pipe.PipeSignature"
 multiple_output = true
 llm = "llm_to_engineer"
 prompt_template = """
 Materialize PipeSignature objects from the PipeSignaturesText.
 - pipe_code MUST be snake_case
-- inputs must be a Dict[str, ConceptSpec] referencing the provided ConceptSpec objects. If Its the concept itself, use the concept code in PascalCase.
+- inputs must be a Dict[str, ConceptSpecDraft] referencing the provided ConceptSpecDraft objects. If Its the concept itself, use the concept code in PascalCase.
 - output must be a ConceptSpec from the provided set. If Its the concept itself, use the concept code in PascalCase.
 - important_features must be a Dict containing the pipe-specific features mentioned in the text
 
@@ -303,8 +303,8 @@ THIS PIPELLM SHOULD NAME THE RESULT OF ITS PIPE "prompt".
 PipeSignatures:
 @pipe_signatures_text
 
-ConceptSpecs:
-@concept_specs
+ConceptSpecDrafts:
+@concept_spec_drafts
 
 Brief:
 @brief
@@ -315,7 +315,7 @@ No more than 10 PipeSignatures
 [pipe.compile_in_pipelex_bundle_spec]
 type = "PipeFunc"
 description = "Compile the pipelex bundle spec."
-inputs = { pipe_spec = "PipeSpec", concept_specs = "ConceptSpec" }
+inputs = { pipe_specs = "PipeSpec", concept_specs = "ConceptSpec" }
 output = "PipelexBundleSpec"
 function_name = "compile_in_pipelex_bundle_spec"
 

@@ -49,51 +49,53 @@ async def read_file_content(working_memory: WorkingMemory) -> ListContent[Codeba
     return ListContent[CodebaseFileContent](items=codebase_files)
 """
 
-    INVALID_FUNCTIONS = """
-# Not async - should be rejected
+    VALID_SYNC_FUNCTION = """
+# Sync function - should be accepted
 def sync_function(working_memory: WorkingMemory) -> StructuredContent:
-    '''This should not be registered - not async.'''
+    '''This should be registered - sync functions are now eligible.'''
     pass
+"""
 
+    INVALID_FUNCTIONS = """
 # Wrong parameter name - should be rejected
-async def invalid_function_wrong_param_name(other_param: WorkingMemory) -> StructuredContent:
+def invalid_function_wrong_param_name(other_param: WorkingMemory) -> StructuredContent:
     '''This should not be registered - wrong parameter name.'''
     pass
 
 # Wrong parameter type - should be rejected
-async def invalid_function_wrong_param_type(working_memory: str) -> StructuredContent:
+def invalid_function_wrong_param_type(working_memory: str) -> StructuredContent:
     '''This should not be registered - wrong parameter type.'''
     pass
 
 # Wrong return type - should be rejected
-async def invalid_function_wrong_return_type(working_memory: WorkingMemory) -> str:
+def invalid_function_wrong_return_type(working_memory: WorkingMemory) -> str:
     '''This should not be registered - wrong return type.'''
     return "test"
 
 # Too many parameters - should be rejected
-async def invalid_function_too_many_params(working_memory: WorkingMemory, extra_param: str) -> StructuredContent:
+def invalid_function_too_many_params(working_memory: WorkingMemory, extra_param: str) -> StructuredContent:
     '''This should not be registered - too many parameters.'''
     pass
 
 # No parameters - should be rejected
-async def invalid_function_no_params() -> StructuredContent:
+def invalid_function_no_params() -> StructuredContent:
     '''This should not be registered - no parameters.'''
     pass
 
 # Missing type hints - should be rejected
-async def invalid_function_no_type_hints(working_memory):
+def invalid_function_no_type_hints(working_memory):
     '''This should not be registered - missing type hints.'''
     pass
 """
 
     TEST_CASES: ClassVar[List[Tuple[str, str, List[str], List[str]]]] = [
         ("valid_async_function", VALID_ASYNC_FUNCTION, ["read_file_content"], []),
+        ("valid_sync_function", VALID_SYNC_FUNCTION, ["sync_function"], []),
         (
             "invalid_functions",
             INVALID_FUNCTIONS,
             [],
             [
-                "sync_function",
                 "invalid_function_wrong_param_name",
                 "invalid_function_wrong_param_type",
                 "invalid_function_wrong_return_type",
@@ -119,7 +121,7 @@ class TestFuncRegistryUtils:
         expected_registered: List[str],
         expected_not_registered: List[str],
     ):
-        """Test that only eligible async functions are registered."""
+        """Test that only eligible functions are registered (both sync and async are now eligible)."""
 
         # Create a temporary directory and file with test functions
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -221,16 +223,16 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
         from pipelex.core.stuffs.stuff_content import TextContent
 
         # Valid async function
-        async def valid_function(working_memory: WorkingMemory) -> TextContent:
+        async def valid_async_function(working_memory: WorkingMemory) -> TextContent:
             return TextContent(text="test")
 
-        # Invalid sync function
-        def invalid_sync_function(working_memory: WorkingMemory) -> TextContent:
+        # Valid sync function
+        def valid_sync_function(working_memory: WorkingMemory) -> TextContent:
             return TextContent(text="test")
 
         # Test eligibility
-        assert func_registry.is_eligible_function(valid_function), "Valid async function should be eligible"
-        assert not func_registry.is_eligible_function(invalid_sync_function), "Sync function should not be eligible"
+        assert func_registry.is_eligible_function(valid_async_function), "Valid async function should be eligible"
+        assert func_registry.is_eligible_function(valid_sync_function), "Valid sync function should be eligible"
 
     def test_register_function_checks_eligibility(self):
         """Test that register_function checks eligibility before registering."""
@@ -245,33 +247,38 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
         async def valid_async_function(working_memory: WorkingMemory) -> TextContent:
             return TextContent(text="valid")
 
-        # Invalid sync function
-        def invalid_sync_function(working_memory: WorkingMemory) -> TextContent:
-            return TextContent(text="invalid")
+        # Valid sync function
+        def valid_sync_function(working_memory: WorkingMemory) -> TextContent:
+            return TextContent(text="valid")
 
         # Try to register both functions
         func_registry.register_function(valid_async_function)
-        func_registry.register_function(invalid_sync_function)
+        func_registry.register_function(valid_sync_function)
 
-        # Only the valid function should be registered (invalid function silently skipped)
+        # Both functions should be registered
         assert func_registry.has_function("valid_async_function"), "Valid async function should be registered"
-        assert not func_registry.has_function("invalid_sync_function"), "Invalid sync function should NOT be registered"
+        assert func_registry.has_function("valid_sync_function"), "Valid sync function should be registered"
 
         # Test register_functions method as well
         func_registry.teardown()
 
-        async def another_valid_function(working_memory: WorkingMemory) -> TextContent:
-            return TextContent(text="another_valid")
+        async def another_valid_async_function(working_memory: WorkingMemory) -> TextContent:
+            return TextContent(text="another_valid_async")
 
-        def another_invalid_function(working_memory: WorkingMemory) -> TextContent:
-            return TextContent(text="another_invalid")
+        def another_valid_sync_function(working_memory: WorkingMemory) -> TextContent:
+            return TextContent(text="another_valid_sync")
+
+        # Invalid function (wrong parameter name)
+        def invalid_function(other_param: WorkingMemory) -> TextContent:
+            return TextContent(text="invalid")
 
         # Register multiple functions at once - invalid functions should be silently skipped
-        func_registry.register_functions([another_invalid_function, another_valid_function])
+        func_registry.register_functions([invalid_function, another_valid_async_function, another_valid_sync_function])
 
-        # Only valid function should be registered, invalid function silently skipped
-        assert func_registry.has_function("another_valid_function"), "Valid async function should be registered"
-        assert not func_registry.has_function("another_invalid_function"), "Invalid sync function should NOT be registered"
+        # Valid functions should be registered, invalid function silently skipped
+        assert func_registry.has_function("another_valid_async_function"), "Valid async function should be registered"
+        assert func_registry.has_function("another_valid_sync_function"), "Valid sync function should be registered"
+        assert not func_registry.has_function("invalid_function"), "Invalid function should NOT be registered"
 
 
 if __name__ == "__main__":

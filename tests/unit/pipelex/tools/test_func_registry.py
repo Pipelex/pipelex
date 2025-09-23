@@ -17,33 +17,34 @@ def another_function(x: int):
     return x * 2
 
 
-# Valid async function for testing
+# Valid function for testing
+def valid_function(working_memory: WorkingMemory) -> TextContent:
+    return TextContent(text="test")
+
+
+# Valid async function for testing (should also be eligible)
 async def valid_async_function(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text="test")
 
 
 # Invalid functions for testing eligibility
-def sync_function(working_memory: WorkingMemory) -> TextContent:
+def wrong_param_name(other_param: WorkingMemory) -> TextContent:
     return TextContent(text="test")
 
 
-async def wrong_param_name(other_param: WorkingMemory) -> TextContent:
+def wrong_param_type(working_memory: str) -> TextContent:  # type: ignore
     return TextContent(text="test")
 
 
-async def wrong_param_type(working_memory: str) -> TextContent:  # type: ignore
-    return TextContent(text="test")
-
-
-async def wrong_return_type(working_memory: WorkingMemory) -> str:
+def wrong_return_type(working_memory: WorkingMemory) -> str:
     return "test"
 
 
-async def too_many_params(working_memory: WorkingMemory, extra: str) -> TextContent:
+def too_many_params(working_memory: WorkingMemory, extra: str) -> TextContent:
     return TextContent(text="test")
 
 
-async def no_params() -> TextContent:
+def no_params() -> TextContent:
     return TextContent(text="test")
 
 
@@ -57,9 +58,9 @@ TestParams = Tuple[str, Callable[..., Any], bool]
 # Test data
 TEST_CASES: List[TestParams] = [
     # Valid cases
+    ("valid_function", valid_function, True),
     ("valid_async_function", valid_async_function, True),
     # Invalid cases
-    ("sync_function", sync_function, False),
     ("wrong_param_name", wrong_param_name, False),
     ("wrong_param_type", wrong_param_type, False),
     ("wrong_return_type", wrong_return_type, False),
@@ -102,26 +103,26 @@ class TestFuncRegistry:
 
     def test_register_function_with_custom_name(self, registry: FuncRegistry):
         """Test registering a function with a custom name."""
-        registry.register_function(valid_async_function, name="custom_name")
-        assert registry.get_function("custom_name") is valid_async_function
-        assert registry.get_function("valid_async_function") is None
+        registry.register_function(valid_function, name="custom_name")
+        assert registry.get_function("custom_name") is valid_function
+        assert registry.get_function("valid_function") is None
 
     def test_get_required_function_not_found(self, registry: FuncRegistry):
         with pytest.raises(FuncRegistryError, match="not found in registry"):
             registry.get_required_function("non_existent_function")
 
     def test_unregister_function(self, registry: FuncRegistry):
-        registry.register_function(valid_async_function)
-        assert registry.has_function("valid_async_function")
-        registry.unregister_function(valid_async_function)
-        assert not registry.has_function("valid_async_function")
+        registry.register_function(valid_function)
+        assert registry.has_function("valid_function")
+        registry.unregister_function(valid_function)
+        assert not registry.has_function("valid_function")
 
     def test_unregister_function_not_found(self, registry: FuncRegistry):
         with pytest.raises(FuncRegistryError, match="not found in registry"):
             registry.unregister_function(sample_function)
 
     def test_unregister_function_by_name(self, registry: FuncRegistry):
-        registry.register_function(valid_async_function, name="custom")
+        registry.register_function(valid_function, name="custom")
         registry.unregister_function_by_name("custom")
         assert not registry.has_function("custom")
 
@@ -150,21 +151,21 @@ class TestFuncRegistry:
         assert len(registry.root) == 0
 
     def test_register_existing_function_with_warning(self, registry: FuncRegistry, caplog: LogCaptureFixture):
-        registry.register_function(valid_async_function)
+        registry.register_function(valid_function)
         with caplog.at_level("DEBUG"):
-            registry.register_function(valid_async_function)
+            registry.register_function(valid_function)
         assert "already exists in registry" in caplog.text
 
     def test_teardown(self, registry: FuncRegistry):
-        registry.register_function(valid_async_function)
-        assert registry.has_function("valid_async_function")
+        registry.register_function(valid_function)
+        assert registry.has_function("valid_function")
         registry.teardown()
-        assert not registry.has_function("valid_async_function")
+        assert not registry.has_function("valid_function")
 
     def test_get_required_function_with_signature(self, registry: FuncRegistry):
-        registry.register_function(valid_async_function)
-        func = registry.get_required_function_with_signature("valid_async_function", valid_async_function)
-        assert func is valid_async_function
+        registry.register_function(valid_function)
+        func = registry.get_required_function_with_signature("valid_function", valid_function)
+        assert func is valid_function
 
     def test_get_required_function_with_signature_not_found(self, registry: FuncRegistry):
         with pytest.raises(FuncRegistryError, match="not found in registry"):
@@ -182,7 +183,7 @@ class TestFuncRegistry:
 
         # Test that the custom logger is being used by triggering a log message
         with caplog.at_level("DEBUG", logger="custom_test_logger"):
-            registry.register_function(valid_async_function)
+            registry.register_function(valid_function)
 
         # Verify the log message was captured by our custom logger
         assert len(caplog.records) > 0

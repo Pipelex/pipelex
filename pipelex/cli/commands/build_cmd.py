@@ -33,12 +33,8 @@ def build_pipe_cmd(
         Optional[str],
         typer.Option("--output", "-o", help="Path to save the generated PLX file (use --output='' to skip saving)"),
     ] = "./generated_pipeline.plx",
-    config_path: Annotated[
-        Optional[str],
-        typer.Option("--config", "-c", help="Path to the config folder for Pipelex.make()"),
-    ] = "pipelex_libraries",
 ) -> None:
-    Pipelex.make(relative_config_folder_path=config_path, from_file=False)
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
     typer.echo("=" * 70)
     typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
     typer.echo("")

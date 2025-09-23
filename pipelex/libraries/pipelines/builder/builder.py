@@ -191,10 +191,7 @@ async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipel
             concept_spec.the_concept_code: ConceptSpec(**concept_spec.model_dump(exclude={"the_concept_code"}))
             for concept_spec in concept_specs.items
         },
-        pipe={
-            pipe_spec.the_pipe_code: _convert_pipe_spec_to_blueprint(pipe_spec)
-            for pipe_spec in pipe_specs.items
-        },
+        pipe={pipe_spec.the_pipe_code: _convert_pipe_spec_to_blueprint(pipe_spec) for pipe_spec in pipe_specs.items},
     )
 
 

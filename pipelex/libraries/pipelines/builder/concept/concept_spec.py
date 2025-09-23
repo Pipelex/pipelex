@@ -109,9 +109,10 @@ class ConceptStructureSpec(StructuredContent):
             default_value=self.default_value,
         )
 
+
 class ConceptSpecDraft(StructuredContent):
     the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
-    description: str = Field(description="Description of the concept, in natural language.")
+    definition: str = Field(description="Description of the concept, in natural language.")
     structure: str = Field(
         description="A description of a dict with fieldnames as keys, and values being a dict with: definition, type, required, default_value"
     )
@@ -279,7 +280,7 @@ class ConceptSpec(StructuredContent):
 async def create_concept_spec(working_memory: WorkingMemory) -> ConceptSpec:
     """Create a ConceptSpec manually from ConceptSpec and ConceptStructureSpecBlueprint."""
     # Get the inputs from working memory
-    concept_spec = working_memory.get_stuff_as(name="concept_spec", content_type=ConceptSpec)
+    concept_spec_draft = working_memory.get_stuff_as(name="concept_spec_draft", content_type=ConceptSpecDraft)
     concept_spec_structures_stuff = working_memory.get_stuff_as_list(name="concept_spec_structures", item_type=ConceptStructureSpec)
 
     structure_dict: Dict[str, Union[str, ConceptStructureSpec]] = {}
@@ -294,10 +295,10 @@ async def create_concept_spec(working_memory: WorkingMemory) -> ConceptSpec:
         structure_dict[structure_item.the_field_name] = structure_spec
 
     concept_spec_spec = ConceptSpec(
-        the_concept_code=concept_spec.the_concept_code,
-        definition=concept_spec.definition,
+        the_concept_code=concept_spec_draft.the_concept_code,
+        definition=concept_spec_draft.definition,
         structure=structure_dict,
-        refines=concept_spec.refines,
+        refines=concept_spec_draft.refines,
     )
 
     return concept_spec_spec
