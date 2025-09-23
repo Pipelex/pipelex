@@ -1,13 +1,10 @@
 from typing import Literal, Optional, Union
 
-from pydantic import Field, field_validator, model_validator
-from typing_extensions import Self
+from pydantic import Field
 
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.exceptions import PipeDefinitionError
-from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
 
 
 class PipeImgGenBlueprint(PipeBlueprint):

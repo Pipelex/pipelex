@@ -20,7 +20,7 @@ from openai.types.chat import (
 )
 
 from pipelex.cogt.exceptions import PromptImageFormatError
-from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
+from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
@@ -74,7 +74,7 @@ class MistralFactory:
             image_bytes = load_binary_as_base64(prompt_image.file_path).decode("utf-8")
             file_type = detect_file_type_from_path(prompt_image.file_path)
             return ImageURLChunk(image_url=f"data:{file_type.mime};base64,{image_bytes}")
-        elif isinstance(prompt_image, PromptImageBytes):
+        elif isinstance(prompt_image, PromptImageBase64):
             image_bytes = prompt_image.base_64.decode("utf-8")
             file_type = detect_file_type_from_base64(prompt_image.base_64)
             return ImageURLChunk(image_url=f"data:{file_type.mime};base64,{image_bytes}")

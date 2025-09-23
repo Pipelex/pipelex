@@ -5,7 +5,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.hub import get_llm_worker, get_model_deck, get_models_manager, get_report_delegate
+from pipelex.hub import get_llm_worker, get_model_deck, get_report_delegate
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 

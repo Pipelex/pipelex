@@ -15,10 +15,10 @@ from pipelex import log
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
-    PromptImageBytes,
+    PromptImageBase64,
     PromptImagePath,
-    PromptImageTypedBytes,
-    PromptImageTypedBytesOrUrl,
+    PromptImageTypedBase64,
+    PromptImageTypedUrlOrBase64,
     PromptImageUrl,
 )
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
@@ -87,7 +87,7 @@ class AnthropicFactory:
             # images_block_params: List[ImageBlockParam] = []
             for prepped_image in prepped_user_images:
                 image_block_param: ImageBlockParam
-                if isinstance(prepped_image, PromptImageTypedBytes):
+                if isinstance(prepped_image, PromptImageTypedBase64):
                     mime = prepped_image.file_type.mime
                     image_block_param = {
                         "type": "image",
@@ -121,7 +121,7 @@ class AnthropicFactory:
     @staticmethod
     def openai_typed_user_message(
         user_content_txt: str,
-        prepped_user_images: Optional[List[PromptImageTypedBytesOrUrl]] = None,
+        prepped_user_images: Optional[List[PromptImageTypedUrlOrBase64]] = None,
     ) -> ChatCompletionMessageParam:
         text_block_param: TextBlockParam = {"type": "text", "text": user_content_txt}
         message: MessageParam
@@ -130,7 +130,7 @@ class AnthropicFactory:
             images_block_params: List[ImageBlockParam] = []
             for prepped_image in prepped_user_images:
                 image_block_param_in_loop: ImageBlockParam
-                if isinstance(prepped_image, PromptImageTypedBytes):
+                if isinstance(prepped_image, PromptImageTypedBase64):
                     mime = prepped_image.file_type.mime
                     image_block_param_in_loop = {
                         "type": "image",
@@ -171,17 +171,17 @@ class AnthropicFactory:
     async def _prep_image_for_anthropic(
         cls,
         prompt_image: PromptImage,
-    ) -> PromptImageTypedBytesOrUrl:
-        typed_bytes_or_url: PromptImageTypedBytesOrUrl
-        if isinstance(prompt_image, PromptImageBytes):
-            typed_bytes_or_url = prompt_image.make_prompt_image_typed_bytes()
+    ) -> PromptImageTypedUrlOrBase64:
+        typed_bytes_or_url: PromptImageTypedUrlOrBase64
+        if isinstance(prompt_image, PromptImageBase64):
+            typed_bytes_or_url = prompt_image.make_prompt_image_typed_base64()
         elif isinstance(prompt_image, PromptImageUrl):
-            image_bytes = await PromptImageFactory().make_promptimagebytes_from_url_async(prompt_image)
+            image_bytes = await PromptImageFactory.make_promptimagebase64_from_url_async(prompt_image)
             file_type = detect_file_type_from_base64(image_bytes.base_64)
-            typed_bytes_or_url = PromptImageTypedBytes(base_64=image_bytes.base_64, file_type=file_type)
+            typed_bytes_or_url = PromptImageTypedBase64(base_64=image_bytes.base_64, file_type=file_type)
         elif isinstance(prompt_image, PromptImagePath):
             b64 = await load_binary_as_base64_async(prompt_image.file_path)
-            typed_bytes_or_url = PromptImageTypedBytes(base_64=b64, file_type=prompt_image.get_file_type())
+            typed_bytes_or_url = PromptImageTypedBase64(base_64=b64, file_type=prompt_image.get_file_type())
         else:
             raise AnthropicFactoryError(f"Unsupported PromptImage type: '{type(prompt_image).__name__}'")
         return typed_bytes_or_url
@@ -200,7 +200,7 @@ class AnthropicFactory:
         if system_content := llm_prompt.system_text:
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
 
-        prepped_user_images: Optional[List[PromptImageTypedBytesOrUrl]]
+        prepped_user_images: Optional[List[PromptImageTypedUrlOrBase64]]
         if llm_prompt.user_images:
             tasks_to_prep_images = [cls._prep_image_for_anthropic(prompt_image) for prompt_image in llm_prompt.user_images]
             prepped_user_images = await asyncio.gather(*tasks_to_prep_images)

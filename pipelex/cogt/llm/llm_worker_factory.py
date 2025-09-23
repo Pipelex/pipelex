@@ -123,6 +123,30 @@ class LLMWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
+            case "google":
+                try:
+                    import google.genai  # noqa: F401
+                except ImportError as exc:
+                    raise MissingDependencyError(
+                        "google-genai",
+                        "google",
+                        ("The google-genai SDK is required to use Google Gemini API directly. You can install it with 'pip install google-genai'."),
+                    ) from exc
+
+                from pipelex.plugins.google.google_factory import GoogleFactory
+                from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker
+
+                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=GoogleFactory.make_google_client(backend=backend),
+                )
+
+                llm_worker = GoogleLLMWorker(
+                    sdk_instance=sdk_instance,
+                    inference_model=inference_model,
+                    structure_method=StructureMethod.INSTRUCTOR_GENAI_STRUCTURED_OUTPUTS,
+                    reporting_delegate=reporting_delegate,
+                )
             case _:
                 raise NotImplementedError(f"Plugin '{plugin}' is not supported")
         return llm_worker

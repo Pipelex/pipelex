@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import LLMAssignmentError
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
@@ -77,7 +76,6 @@ class LLMAssignment(BaseModel):
 
     @property
     def llm_handle(self) -> str:
-        log.dev(f"Using llm_setting {self.llm_setting}")
         return self.llm_setting.llm_handle
 
     @property

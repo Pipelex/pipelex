@@ -3,7 +3,6 @@ from typing import Literal, Optional, Union
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self, override
 
-from pipelex.cogt.exceptions import LLMSettingsValidationError
 from pipelex.cogt.llm.llm_setting import LLMChoice as LLMSettingOrPresetIdCore
 from pipelex.cogt.llm.llm_setting import LLMSetting as LLMSettingCore
 from pipelex.core.stuffs.stuff_content import StructuredContent

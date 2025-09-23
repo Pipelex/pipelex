@@ -1,4 +1,5 @@
 [pipelex_inference]
+enabled = true
 endpoint = "https://inference.pipelex.com/v1"
 api_key = "${PIPELEX_INFERENCE_API_KEY}"
 
@@ -11,6 +12,10 @@ api_version = "${AZURE_API_VERSION}"
 [bedrock]
 enabled = true
 aws_region = "${AWS_REGION}"
+
+[google]
+enabled = true
+api_key = "${GOOGLE_API_KEY}"
 
 [vertexai]
 enabled = false

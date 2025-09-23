@@ -1,10 +1,6 @@
-import pytest
-
-from pipelex import log
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.config import get_config
-from pipelex.hub import get_inference_manager, get_model_deck, get_models_manager
+from pipelex.hub import get_inference_manager, get_model_deck
 
 
 class TestSetupInferenceWorkers:

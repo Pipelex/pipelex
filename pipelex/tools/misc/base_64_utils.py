@@ -17,6 +17,12 @@ async def load_binary_as_base64_async(path: str) -> bytes:
         return base64.b64encode(data_bytes)
 
 
+async def load_binary_async(path: str) -> bytes:
+    async with aiofiles.open(path, "rb") as fp:  # type: ignore[reportUnknownMemberType]
+        data_bytes = await fp.read()
+        return data_bytes
+
+
 def encode_to_base64(data_bytes: bytes) -> bytes:
     b64 = base64.b64encode(data_bytes)
     return b64

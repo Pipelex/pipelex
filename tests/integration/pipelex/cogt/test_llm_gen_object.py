@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from pipelex import pretty_print
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.hub import get_llm_worker, get_model_deck, get_models_manager
+from pipelex.hub import get_llm_worker, get_model_deck
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 
