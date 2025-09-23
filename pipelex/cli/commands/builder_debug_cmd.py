@@ -1,14 +1,16 @@
 import asyncio
-from typing import Annotated, Any, List
+from typing import Any, List
 
 import typer
 
 from pipelex import log, pretty_print
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
 from pipelex.core.stuffs.stuff_content import ListContent
-from pipelex.hub import get_report_delegate
-from pipelex.libraries.pipelines.builder.builder import PipelexBundleSpec
+from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.hub import get_concept_provider, get_report_delegate
+from pipelex.libraries.pipelines.builder.builder import DomainInformation, PipelexBundleSpec
 from pipelex.libraries.pipelines.builder.concept.concept_spec import (
     ConceptSpec,
     ConceptStructureSpec,
@@ -89,18 +91,9 @@ def _get_example_pipe_signatures() -> list[PipeSignature]:
 
 
 @builder_debug_app.command("build-concepts")
-def build_concepts_cmd(
-    relative_config_folder_path: Annotated[
-        str,
-        typer.Option(
-            "--config-folder-path",
-            "-c",
-            help="Relative path to the config folder path (libraries)",
-        ),
-    ] = "./pipelex_libraries",
-) -> None:
+def build_concepts_cmd() -> None:
     """Run the build_concept_blueprint step with hardcoded example data."""
-    Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
 
     log.info("Starting build_concept_blueprint step...")
 
@@ -129,18 +122,9 @@ def build_concepts_cmd(
 
 
 @builder_debug_app.command("create-pipes")
-def create_pipes_cmd(
-    relative_config_folder_path: Annotated[
-        str,
-        typer.Option(
-            "--config-folder-path",
-            "-c",
-            help="Relative path to the config folder path (libraries)",
-        ),
-    ] = "./pipelex_libraries",
-) -> None:
+def create_pipes_cmd() -> None:
     """Run the create_pipes_from_signatures step with hardcoded example data."""
-    Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
 
     log.info("Starting create_pipes_from_signatures step...")
 
@@ -190,18 +174,9 @@ def create_pipes_cmd(
 
 
 @builder_debug_app.command("full-pipeline")
-def full_pipeline_cmd(
-    relative_config_folder_path: Annotated[
-        str,
-        typer.Option(
-            "--config-folder-path",
-            "-c",
-            help="Relative path to the config folder path (libraries)",
-        ),
-    ] = "./pipelex_libraries",
-) -> None:
+def full_pipeline_cmd() -> None:
     """Run both build_concept_blueprint and create_pipes_from_signatures steps in sequence."""
-    Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
 
     log.info("Starting full intermediate pipeline test...")
 
@@ -270,7 +245,7 @@ def full_pipeline_cmd(
 @builder_debug_app.command("parallel-draft-to-specs")
 def parallel_draft_to_specs_cmd() -> None:
     """Run the parallel_draft_to_specs step with hardcoded photo opposite brief and plan draft."""
-    Pipelex.make(relative_config_folder_path="pipelex/libraries", from_file=False)
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
 
     log.info("Starting parallel_draft_to_specs step...")
 
@@ -350,20 +325,161 @@ key feature, imagining the opposite, and then generating a new image that embodi
     log.info("parallel_draft_to_specs step completed successfully!")
 
 
+@builder_debug_app.command("test-compile")
+def test_compile_cmd() -> None:
+    """Test the compile_in_pipelex_bundle_spec pipe with example data."""
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
+
+    log.info("Testing compile_in_pipelex_bundle_spec pipe...")
+
+    def _get_example_domain_information():
+        return DomainInformation(domain="photo_opposite", definition="A pipeline that takes a photo and generates its visual opposite")
+
+    def _get_example_concept_specs_for_compile():
+        """Get example concept specs for photo opposite pipeline."""
+        return [
+            ConceptSpec(
+                the_concept_code="PhotoAnalysis",
+                definition="Detailed analysis of a photo's visual characteristics including colors, composition, objects, lighting, and mood",
+                structure={
+                    "dominant_color": ConceptStructureSpec(
+                        the_field_name="dominant_color",
+                        definition="The primary color present in the image",
+                        type=ConceptStructureSpecFieldType.TEXT,
+                        required=True,
+                    ),
+                    "lighting_condition": ConceptStructureSpec(
+                        the_field_name="lighting_condition",
+                        definition="The lighting characteristics of the photo",
+                        type=ConceptStructureSpecFieldType.TEXT,
+                        required=True,
+                    ),
+                    "mood": ConceptStructureSpec(
+                        the_field_name="mood",
+                        definition="The emotional tone or atmosphere conveyed by the image",
+                        type=ConceptStructureSpecFieldType.TEXT,
+                        required=True,
+                    ),
+                },
+            ),
+            ConceptSpec(
+                the_concept_code="OppositeDescription",
+                definition="Conceptual framework describing what the opposite of a photo should be",
+                structure={
+                    "opposite_color": ConceptStructureSpec(
+                        the_field_name="opposite_color",
+                        definition="The color that represents the opposite of the original dominant color",
+                        type=ConceptStructureSpecFieldType.TEXT,
+                        required=True,
+                    ),
+                    "opposite_mood": ConceptStructureSpec(
+                        the_field_name="opposite_mood",
+                        definition="The emotional tone that contrasts with the original mood",
+                        type=ConceptStructureSpecFieldType.TEXT,
+                        required=True,
+                    ),
+                },
+            ),
+        ]
+
+    def _get_example_pipe_specs_for_compile():
+        """Get example pipe specs for photo opposite pipeline."""
+        from pipelex.libraries.pipelines.builder.pipe.pipe_img_spec import PipeImgGenSpec
+
+        return [
+            PipeLLMSpec(
+                the_pipe_code="analyze_photo",
+                type="PipeLLM",
+                definition="Analyzes the input photo to identify key visual elements",
+                inputs={"photo": "Image"},
+                output="PhotoAnalysis",
+                prompt_template="Analyze this image in detail. Identify dominant colors, lighting, mood, and composition. Image: @photo",
+            ),
+            PipeLLMSpec(
+                the_pipe_code="generate_opposite_concept",
+                type="PipeLLM",
+                definition="Determines what the conceptual opposite should be by inverting key visual characteristics",
+                inputs={"photo_analysis": "PhotoAnalysis"},
+                output="OppositeDescription",
+                prompt_template="Based on this photo analysis, create a description of its visual opposite: @photo_analysis",
+            ),
+            PipeImgGenSpec(
+                the_pipe_code="generate_opposite_image",
+                type="PipeImgGen",
+                definition="Generates the final opposite image using the crafted prompt",
+                inputs={"prompt": "String"},
+                output="Image",
+                img_gen_prompt_var_name="prompt",
+            ),
+            PipeSequenceSpec(
+                the_pipe_code="main_pipeline_photo_opposite_renderer",
+                type="PipeSequence",
+                definition="Main pipeline that takes a photo and generates its visual opposite",
+                inputs={"photo": "Image"},
+                output="Image",
+                steps=[
+                    SubPipeSpec(the_pipe_code="analyze_photo", result="photo_analysis"),
+                    SubPipeSpec(the_pipe_code="generate_opposite_concept", result="opposite_concept"),
+                    SubPipeSpec(the_pipe_code="generate_opposite_image", result="opposite_image"),
+                ],
+            ),
+        ]
+
+    async def run_compile_test() -> None:
+        domain_info = _get_example_domain_information()
+        concept_specs = _get_example_concept_specs_for_compile()
+        pipe_specs = _get_example_pipe_specs_for_compile()
+
+        log.info(f"Testing with {len(concept_specs)} concept specs and {len(pipe_specs)} pipe specs")
+
+        # Create Stuff objects using StuffFactory
+        domain_info_stuff = StuffFactory.make_stuff(
+            concept=get_concept_provider().get_required_concept(concept_string="builder.DomainInformation"),
+            content=domain_info,
+            name="domain_information",
+        )
+
+        concept_specs_stuff = StuffFactory.make_stuff(
+            concept=get_concept_provider().get_required_concept(concept_string="concept.ConceptSpec"),
+            content=ListContent(items=concept_specs),
+            name="concept_specs",
+        )
+
+        pipe_specs_stuff = StuffFactory.make_stuff(
+            concept=get_concept_provider().get_required_concept(concept_string="pipe.PipeSpec"),
+            content=ListContent(items=pipe_specs),
+            name="pipe_specs",
+        )
+
+        # Create WorkingMemory using WorkingMemoryFactory
+        working_memory = WorkingMemoryFactory.make_from_multiple_stuffs(stuff_list=[domain_info_stuff, concept_specs_stuff, pipe_specs_stuff])
+
+        # Import the function directly and call it
+        from pipelex.libraries.pipelines.builder.builder import compile_in_pipelex_bundle_spec
+
+        result = await compile_in_pipelex_bundle_spec(working_memory=working_memory)
+
+        log.info("Successfully compiled PipelexBundleSpec")
+        pretty_print(result, title="Compile Result")
+
+        # The result is directly a PipelexBundleSpec
+        bundle_spec = result
+        log.info(f"Bundle domain: {bundle_spec.domain}")
+        log.info(f"Bundle concepts: {list(bundle_spec.concept.keys()) if bundle_spec.concept else []}")
+        log.info(f"Bundle pipes: {list(bundle_spec.pipe.keys()) if bundle_spec.pipe else []}")
+
+    asyncio.run(run_compile_test())
+
+    # Display cost report
+    get_report_delegate().generate_report()
+    log.info("compile_in_pipelex_bundle_spec test completed successfully!")
+
+
 @builder_debug_app.command("test-validation")
 # Example usage: pipelex builder-debug test-validation
-def test_validation_cmd(
-    relative_config_folder_path: Annotated[
-        str,
-        typer.Option(
-            "--config-folder-path",
-            "-c",
-            help="Relative path to the config folder path (libraries)",
-        ),
-    ] = "./pipelex_libraries",
-) -> None:
+def test_validation_cmd() -> None:
     """Test the validate_pipelex_bundle_blueprint pipe with a real PipelexBundleBlueprint instance."""
-    Pipelex.make(relative_config_folder_path="pipelex/libraries", from_file=False)
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
 
     log.info("Creating a real PipelexBundleBlueprint instance for testing...")
 

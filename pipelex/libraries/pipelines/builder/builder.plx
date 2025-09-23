@@ -7,13 +7,7 @@ PlanDraftText = "Natural-language pipeline plan text describing sequences, input
 PipelexBundleSpec = "A Pipelex bundle spec."
 PipeFailure = "Details of a single pipe failure during dry run."
 DryRunResult = "A result of a dry run of a pipelex bundle spec."
-
-[concept.DomainInformation]
-definition = "A domain information object."
-
-[concept.DomainInformation.structure]
-domain = { type = "text", definition = "The domain of the bundle."}
-definition = { type = "text", definition = "The definition of the bundle."}
+DomainInformation = "A domain information object."
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Main
