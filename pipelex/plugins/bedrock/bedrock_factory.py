@@ -1,10 +1,9 @@
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, PromptImageFormatError
-from pipelex.cogt.image.prompt_image import PromptImageBase64
+from pipelex.cogt.exceptions import CogtError, LLMCapabilityError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
-from pipelex.plugins.bedrock.bedrock_message import BedrockContentItem, BedrockImage, BedrockMessage, BedrockSource, ImageFormat
+from pipelex.plugins.bedrock.bedrock_message import BedrockContentItem, BedrockMessage
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.types import StrEnum
 
