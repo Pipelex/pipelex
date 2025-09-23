@@ -13,13 +13,13 @@ class PipeImgGenTestCases:
         PipeImgGenSpec(
             the_pipe_code="img_generator",
             definition="Generate an image",
-            inputs={},
+            inputs=None,
             output="GeneratedImage",
             img_gen_prompt="A beautiful sunset over mountains",
         ),
         PipeImgGenBlueprint(
             definition="Generate an image",
-            inputs={},
+            inputs=None,
             output="GeneratedImage",
             type="PipeImgGen",
             category="PipeOperator",
