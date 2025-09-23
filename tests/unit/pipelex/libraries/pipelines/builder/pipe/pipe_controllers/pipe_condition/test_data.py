@@ -1,7 +1,3 @@
-"""
-Test data for PipeConditionBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -11,8 +7,6 @@ from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeCond
 
 
 class PipeConditionTestCases:
-    """Test cases for PipeConditionBlueprint conversion."""
-
     SIMPLE_CONDITION = (
         "simple_condition",
         PipeConditionSpec(

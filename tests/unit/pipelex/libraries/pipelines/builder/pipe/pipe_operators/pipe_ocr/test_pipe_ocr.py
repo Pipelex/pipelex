@@ -1,7 +1,3 @@
-"""
-Test suite for PipeOcrBlueprint.to_core_blueprint conversion method.
-"""
-
 import pytest
 
 from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_spec import PipeOcrSpec
@@ -11,20 +7,16 @@ from .test_data import PipeOcrTestCases
 
 
 class TestPipeOcrBlueprintConversion:
-    """Test PipeOcrBlueprint.to_core_blueprint conversion."""
-
     @pytest.mark.parametrize(
-        "test_name,pipe_blueprint,pipe_code,domain,expected_core",
+        "test_name,pipe_spec,domain,expected_blueprint",
         PipeOcrTestCases.TEST_CASES,
     )
-    def test_pipe_ocr_to_core(
+    def test_pipe_ocr_spec_to_blueprint(
         self,
         test_name: str,
-        pipe_blueprint: PipeOcrSpec,
-        pipe_code: str,
+        pipe_spec: PipeOcrSpec,
         domain: str,
-        expected_core: PipeOcrBlueprint,
+        expected_blueprint: PipeOcrBlueprint,
     ):
-        """Test converting various pipe ocr blueprints to core blueprints."""
-        result = pipe_blueprint.to_core_blueprint(pipe_code=pipe_code, domain=domain)
-        assert result == expected_core
+        result = pipe_spec.to_blueprint(pipe_code=pipe_spec.the_pipe_code, domain=domain)
+        assert result == expected_blueprint

@@ -1,7 +1,3 @@
-"""
-Test data for PipeSequenceBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -13,8 +9,6 @@ from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
 class PipeSequenceTestCases:
-    """Test cases for PipeSequenceBlueprint conversion."""
-
     SIMPLE_SEQUENCE = (
         "simple_sequence",
         PipeSequenceSpec(
@@ -23,9 +17,9 @@ class PipeSequenceTestCases:
             inputs={"input_data": InputRequirementSpec(concept="Text")},
             output="ProcessedData",
             steps=[
-                SubPipeSpec(pipe="step1", result="result1"),
-                SubPipeSpec(pipe="step2", result="result2"),
-                SubPipeSpec(pipe="step3", result="final_result"),
+                SubPipeSpec(the_pipe_code="step1", result="result1"),
+                SubPipeSpec(the_pipe_code="step2", result="result2"),
+                SubPipeSpec(the_pipe_code="step3", result="final_result"),
             ],
         ),
         "test_domain",
@@ -51,9 +45,9 @@ class PipeSequenceTestCases:
             inputs={"items": InputRequirementSpec(concept="ItemList")},
             output="ProcessedItems",
             steps=[
-                SubPipeSpec(pipe="prepare", result="prepared_items"),
+                SubPipeSpec(the_pipe_code="prepare", result="prepared_items"),
                 SubPipeSpec(
-                    pipe="process_item",
+                    the_pipe_code="process_item",
                     result="processed_items",
                     batch_over="prepared_items",
                     batch_as="current_item",

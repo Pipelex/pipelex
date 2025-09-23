@@ -1,7 +1,3 @@
-"""
-Test suite for PipeJinja2Blueprint.to_core_blueprint conversion method.
-"""
-
 import pytest
 
 from pipelex.libraries.pipelines.builder.pipe.pipe_jinja2_spec import PipeJinja2Spec
@@ -11,20 +7,16 @@ from .test_data import PipeJinja2TestCases
 
 
 class TestPipeJinja2BlueprintConversion:
-    """Test PipeJinja2Blueprint.to_core_blueprint conversion."""
-
     @pytest.mark.parametrize(
-        "test_name,pipe_blueprint,pipe_code,domain,expected_core",
+        "test_name,pipe_spec,domain,expected_blueprint",
         PipeJinja2TestCases.TEST_CASES,
     )
-    def test_pipe_jinja2_to_core(
+    def test_pipe_jinja2_spec_to_blueprint(
         self,
         test_name: str,
-        pipe_blueprint: PipeJinja2Spec,
-        pipe_code: str,
+        pipe_spec: PipeJinja2Spec,
         domain: str,
-        expected_core: PipeJinja2Blueprint,
+        expected_blueprint: PipeJinja2Blueprint,
     ):
-        """Test converting various pipe jinja2 blueprints to core blueprints."""
-        result = pipe_blueprint.to_core_blueprint(pipe_code=pipe_code, domain=domain)
-        assert result == expected_core
+        result = pipe_spec.to_blueprint(pipe_code=pipe_spec.the_pipe_code, domain=domain)
+        assert result == expected_blueprint

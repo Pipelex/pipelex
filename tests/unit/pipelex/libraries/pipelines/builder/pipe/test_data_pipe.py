@@ -1,7 +1,3 @@
-"""
-Test data for base PipeBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -11,8 +7,6 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
 
 
 class PipeBlueprintTestCases:
-    """Test cases for base PipeBlueprint conversion."""
-
     SIMPLE_PIPE = (
         "simple_pipe",
         PipeSpec(

@@ -42,8 +42,8 @@ class PipeBatchSpec(PipeSpec):
     input_item_name: Optional[str] = None
 
     @override
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeBatchBlueprint:
-        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+    def to_blueprint(self, pipe_code: str, domain: str) -> PipeBatchBlueprint:
+        base_blueprint = super().to_blueprint(pipe_code, domain)
         return PipeBatchBlueprint(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,

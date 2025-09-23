@@ -46,8 +46,8 @@ class PipeOcrSpec(PipeSpec):
     page_views_dpi: Optional[int] = None
 
     @override
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeOcrBlueprint:
-        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+    def to_blueprint(self, pipe_code: str, domain: str) -> PipeOcrBlueprint:
+        base_blueprint = super().to_blueprint(pipe_code, domain)
 
         return PipeOcrBlueprint(
             definition=base_blueprint.definition,

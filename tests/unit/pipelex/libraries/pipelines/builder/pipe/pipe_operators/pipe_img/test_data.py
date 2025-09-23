@@ -1,7 +1,3 @@
-"""
-Test data for PipeImgGenBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
@@ -12,8 +8,6 @@ from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlue
 
 
 class PipeImgGenTestCases:
-    """Test cases for PipeImgGenBlueprint conversion."""
-
     SIMPLE_IMG_GEN = (
         "simple_img_gen",
         PipeImgGenSpec(

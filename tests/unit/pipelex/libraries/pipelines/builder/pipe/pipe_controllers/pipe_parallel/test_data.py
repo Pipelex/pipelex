@@ -1,7 +1,3 @@
-"""
-Test data for PipeParallelBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -13,8 +9,6 @@ from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
 class PipeParallelTestCases:
-    """Test cases for PipeParallelBlueprint conversion."""
-
     SIMPLE_PARALLEL = (
         "simple_parallel",
         PipeParallelSpec(
@@ -23,9 +17,9 @@ class PipeParallelTestCases:
             inputs={"data": InputRequirementSpec(concept="Data")},
             output="Results",
             parallels=[
-                SubPipeSpec(pipe="analyze_data", result="analysis"),
-                SubPipeSpec(pipe="transform_data", result="transformed"),
-                SubPipeSpec(pipe="validate_data", result="validation"),
+                SubPipeSpec(the_pipe_code="analyze_data", result="analysis"),
+                SubPipeSpec(the_pipe_code="transform_data", result="transformed"),
+                SubPipeSpec(the_pipe_code="validate_data", result="validation"),
             ],
         ),
         "test_domain",
@@ -53,8 +47,8 @@ class PipeParallelTestCases:
             inputs={"input": InputRequirementSpec(concept="Input")},
             output="CombinedResult",
             parallels=[
-                SubPipeSpec(pipe="pipe1", result="result1"),
-                SubPipeSpec(pipe="pipe2", result="result2"),
+                SubPipeSpec(the_pipe_code="pipe1", result="result1"),
+                SubPipeSpec(the_pipe_code="pipe2", result="result2"),
             ],
             add_each_output=False,
             combined_output="MergedData",

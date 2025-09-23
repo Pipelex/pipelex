@@ -1,5 +1,5 @@
 """
-Test suite for base PipeBlueprint.to_core_blueprint conversion method.
+Test suite for base PipeBlueprint.to_blueprint conversion method.
 """
 
 import pytest
@@ -11,7 +11,7 @@ from .test_data_pipe import PipeBlueprintTestCases
 
 
 class TestPipeBlueprintConversion:
-    """Test base PipeBlueprint.to_core_blueprint conversion."""
+    """Test base PipeBlueprint.to_blueprint conversion."""
 
     @pytest.mark.parametrize(
         "test_name,pipe_blueprint,pipe_code,domain,expected_core",
@@ -26,5 +26,5 @@ class TestPipeBlueprintConversion:
         expected_core: PipeBlueprint,
     ):
         """Test converting various pipe blueprints to core blueprints."""
-        result = pipe_blueprint.to_core_blueprint(pipe_code=pipe_code, domain=domain)
+        result = pipe_blueprint.to_blueprint(pipe_code=pipe_code, domain=domain)
         assert result == expected_core

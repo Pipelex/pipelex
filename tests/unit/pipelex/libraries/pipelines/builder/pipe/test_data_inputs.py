@@ -1,7 +1,3 @@
-"""
-Test data for InputRequirementBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -9,8 +5,6 @@ from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequiremen
 
 
 class InputRequirementTestCases:
-    """Test cases for InputRequirementBlueprint conversion."""
-
     SIMPLE_TEXT_INPUT = (
         "simple_text_input",
         InputRequirementSpec(concept="Text"),

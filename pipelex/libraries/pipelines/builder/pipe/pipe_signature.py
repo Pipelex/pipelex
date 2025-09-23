@@ -85,13 +85,13 @@ class PipeSpec(StructuredContent):
             raise PipeBlueprintError(f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case.")
         return pipe_code
 
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeBlueprint:
+    def to_blueprint(self, pipe_code: str, domain: str) -> PipeBlueprint:
         converted_inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
         if self.inputs:
             converted_inputs = {}
             for input_name, input_spec in self.inputs.items():
                 if isinstance(input_spec, InputRequirementSpec):
-                    converted_inputs[input_name] = input_spec.to_core_input_requirement(domain)
+                    converted_inputs[input_name] = input_spec.to_blueprint()
                 else:
                     converted_inputs[input_name] = InputRequirementBlueprint(concept=input_spec)
 

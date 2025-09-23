@@ -21,7 +21,7 @@ from pipelex.libraries.pipelines.builder.concept.concept_spec import (
 
 
 class ConceptBlueprintTestCases:
-    """Test cases for ConceptBlueprint.to_core_blueprint conversion."""
+    """Test cases for ConceptBlueprint.to_blueprint conversion."""
 
     SIMPLE_CONCEPT = (
         "simple_concept",

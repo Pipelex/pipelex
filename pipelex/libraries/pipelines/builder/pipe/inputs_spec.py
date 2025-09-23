@@ -36,5 +36,5 @@ class InputRequirementSpec(StructuredContent):
         ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=concept_string)
         return concept_string
 
-    def to_core_input_requirement(self, domain: str) -> InputRequirementBlueprint:
+    def to_blueprint(self) -> InputRequirementBlueprint:
         return InputRequirementBlueprint(concept=self.concept, multiplicity=self.multiplicity)

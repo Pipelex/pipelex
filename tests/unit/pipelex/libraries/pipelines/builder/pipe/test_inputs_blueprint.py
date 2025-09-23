@@ -1,7 +1,3 @@
-"""
-Test suite for InputRequirementBlueprint.to_core_input_requirement conversion method.
-"""
-
 import pytest
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -11,15 +7,12 @@ from .test_data_inputs import InputRequirementTestCases
 
 
 class TestInputRequirementBlueprintConversion:
-    """Test InputRequirementBlueprint.to_core_input_requirement conversion."""
-
     @pytest.mark.parametrize(
-        "test_name,input_blueprint,domain,expected_core",
+        "test_name,input_spec,domain,expected_blueprint",
         InputRequirementTestCases.TEST_CASES,
     )
-    def test_input_requirement_to_core(
-        self, test_name: str, input_blueprint: InputRequirementSpec, domain: str, expected_core: InputRequirementBlueprint
+    def test_input_requirement_spec_to_blueprint(
+        self, test_name: str, input_spec: InputRequirementSpec, domain: str, expected_blueprint: InputRequirementBlueprint
     ):
-        """Test converting various input requirement blueprints to core blueprints."""
-        result = input_blueprint.to_core_input_requirement(domain=domain)
-        assert result == expected_core
+        result = input_spec.to_blueprint()
+        assert result == expected_blueprint

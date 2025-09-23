@@ -443,8 +443,8 @@ def test_validation_cmd(
             inputs={"task_description": "Text", "user_profile": "UserProfile"},
             output="AnalyzedTask",
             steps=[
-                SubPipeSpec(pipe="analyze_task", result="analyzed_task"),
-                SubPipeSpec(pipe="generate_task_result", result="task_result"),
+                SubPipeSpec(the_pipe_code="analyze_task", result="analyzed_task"),
+                SubPipeSpec(the_pipe_code="generate_task_result", result="task_result"),
             ],
         )
 
@@ -522,7 +522,7 @@ def test_validation_cmd(
         blueprint = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleSpec)
         pretty_print(blueprint, title="Pipelex Bundle Blueprint")
 
-        plx_content = PipelexInterpreter.make_plx_content(blueprint=blueprint.to_core_blueprint())
+        plx_content = PipelexInterpreter.make_plx_content(blueprint=blueprint.to_blueprint())
         pretty_print(plx_content, title="PLX Content")
 
         with open(".built.plx", "w") as f:

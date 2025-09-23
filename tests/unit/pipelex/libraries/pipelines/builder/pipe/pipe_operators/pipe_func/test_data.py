@@ -1,7 +1,3 @@
-"""
-Test data for PipeFuncBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -11,8 +7,6 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 
 
 class PipeFuncTestCases:
-    """Test cases for PipeFuncBlueprint conversion."""
-
     SIMPLE_FUNC = (
         "simple_func",
         PipeFuncSpec(

@@ -24,8 +24,8 @@ class PipeFuncSpec(PipeSpec):
     function_name: str = Field(description="The name of the function to call.")
 
     @override
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeFuncBlueprint:
-        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+    def to_blueprint(self, pipe_code: str, domain: str) -> PipeFuncBlueprint:
+        base_blueprint = super().to_blueprint(pipe_code, domain)
         return PipeFuncBlueprint(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,

@@ -110,7 +110,6 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def is_eligible_function(self, func: Callable[..., Any]) -> bool:
         """
         Checks if a function matches the criteria for PipeFunc registration:
-        - Must be an async function
         - Exactly 1 parameter named "working_memory" with type WorkingMemory
         - Return type that is a subclass of StuffContent
         """
@@ -118,10 +117,6 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
             # Import here to avoid circular imports
             from pipelex.core.memory.working_memory import WorkingMemory
             from pipelex.core.stuffs.stuff_content import StuffContent
-
-            # Check if function is async
-            if not inspect.iscoroutinefunction(func):
-                return False
 
             # Get function signature
             sig = inspect.signature(func)

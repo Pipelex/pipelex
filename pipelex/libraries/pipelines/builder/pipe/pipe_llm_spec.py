@@ -118,8 +118,8 @@ class PipeLLMSpec(PipeSpec):
         return self
 
     @override
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeLLMBlueprint:
-        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+    def to_blueprint(self, pipe_code: str, domain: str) -> PipeLLMBlueprint:
+        base_blueprint = super().to_blueprint(pipe_code, domain)
         llm: Optional[LLMChoice] = None
         if isinstance(self.llm, LLMSettingSpec):
             llm = LLMSetting(llm_handle=self.llm.llm_handle, temperature=self.llm.temperature, max_tokens=self.llm.max_tokens)

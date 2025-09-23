@@ -1,7 +1,3 @@
-"""
-Test data for PipeLLMBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -12,8 +8,6 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, Stru
 
 
 class PipeLLMTestCases:
-    """Test cases for PipeLLMBlueprint conversion."""
-
     SIMPLE_LLM = (
         "simple_llm",
         PipeLLMSpec(

@@ -111,7 +111,7 @@ class PipelexBundleSpec(StructuredContent):
         DomainBlueprint.validate_domain_code(code=domain)
         return domain
 
-    def to_core_blueprint(self) -> PipelexBundleBlueprint:
+    def to_blueprint(self) -> PipelexBundleBlueprint:
         """Convert this PipelexBundleSpec to the core PipelexBundleBlueprint."""
         concept: Optional[Dict[str, Union[ConceptBlueprint, str]]] = None
 
@@ -119,7 +119,7 @@ class PipelexBundleSpec(StructuredContent):
             concept = {}
             for concept_code, concept_blueprint in self.concept.items():
                 if isinstance(concept_blueprint, ConceptSpec):
-                    concept[concept_code] = concept_blueprint.to_core_blueprint()
+                    concept[concept_code] = concept_blueprint.to_blueprint()
                 else:
                     concept[concept_code] = ConceptBlueprint(definition=concept_code, structure=concept_blueprint)
 
@@ -127,7 +127,7 @@ class PipelexBundleSpec(StructuredContent):
         if self.pipe:
             pipe = {}
             for pipe_code, pipe_blueprint in self.pipe.items():
-                pipe[pipe_code] = pipe_blueprint.to_core_blueprint(pipe_code, self.domain)
+                pipe[pipe_code] = pipe_blueprint.to_blueprint(pipe_code, self.domain)
 
         return PipelexBundleBlueprint(
             domain=self.domain,
@@ -226,7 +226,7 @@ class DryRunResult(StructuredContent):
 async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFailure]:
     """Validate a pipelex bundle blueprint and return list of failing pipes."""
     pipelex_bundle_blueprint = working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleSpec)
-    pipelex_bundle_blueprint_core = pipelex_bundle_blueprint.to_core_blueprint()
+    pipelex_bundle_blueprint_core = pipelex_bundle_blueprint.to_blueprint()
 
     library_manager = get_library_manager()
     from pipelex import pretty_print

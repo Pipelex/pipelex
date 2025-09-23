@@ -1,7 +1,3 @@
-"""
-Test data for PipeJinja2Blueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -13,8 +9,6 @@ from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle,
 
 
 class PipeJinja2TestCases:
-    """Test cases for PipeJinja2Blueprint conversion."""
-
     SIMPLE_JINJA2 = (
         "simple_jinja2",
         PipeJinja2Spec(

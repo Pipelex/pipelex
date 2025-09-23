@@ -17,7 +17,7 @@ class SubPipeSpec(StructuredContent):
     cardinality control and batch processing configuration.
 
     Attributes:
-        pipe: The pipe code to execute. Must reference an existing pipe in the pipeline.
+        the_pipe_code: The pipe code to execute. Must reference an existing pipe in the pipeline.
         result: Optional name to assign to the pipe's output in the context.
                If not specified, output is added directly to context.
         nb_output: Fixed number of outputs to generate. Mutually exclusive with
@@ -39,7 +39,7 @@ class SubPipeSpec(StructuredContent):
 
     model_config = ConfigDict(extra="forbid")
 
-    pipe: str
+    the_pipe_code: str
     result: Optional[str] = None
     nb_output: Optional[int] = None
     multiple_output: Optional[bool] = None
@@ -58,17 +58,16 @@ class SubPipeSpec(StructuredContent):
         batch_as_is_specified = self.batch_as is not None and self.batch_as != ""
 
         if batch_over_is_specified and not batch_as_is_specified:
-            raise PipeDefinitionError(f"In pipe '{self.pipe}': When 'batch_over' is specified, 'batch_as' must also be provided")
+            raise PipeDefinitionError(f"In pipe '{self.the_pipe_code}': When 'batch_over' is specified, 'batch_as' must also be provided")
 
         if batch_as_is_specified and not batch_over_is_specified:
-            raise PipeDefinitionError(f"In pipe '{self.pipe}': When 'batch_as' is specified, 'batch_over' must also be provided")
+            raise PipeDefinitionError(f"In pipe '{self.the_pipe_code}': When 'batch_as' is specified, 'batch_over' must also be provided")
 
         return self
 
-    def to_core_sub_pipe(self) -> SubPipeBlueprint:
-        """Convert this SubPipeBlueprint to the core SubPipe."""
+    def to_blueprint(self) -> SubPipeBlueprint:
         return SubPipeBlueprint(
-            pipe=self.pipe,
+            pipe=self.the_pipe_code,
             result=self.result,
             nb_output=self.nb_output,
             multiple_output=self.multiple_output,

@@ -1,7 +1,3 @@
-"""
-Test data for PipeOcrBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -11,8 +7,6 @@ from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
 
 class PipeOcrTestCases:
-    """Test cases for PipeOcrBlueprint conversion."""
-
     SIMPLE_OCR = (
         "simple_ocr",
         PipeOcrSpec(

@@ -1,7 +1,3 @@
-"""
-Test data for SubPipeBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.libraries.pipelines.builder.pipe.sub_pipe_spec import SubPipeSpec
@@ -9,29 +5,27 @@ from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
 class SubPipeTestCases:
-    """Test cases for SubPipeBlueprint conversion."""
-
     SIMPLE_SUB_PIPE = (
         "simple_sub_pipe",
-        SubPipeSpec(pipe="process_data", result="processed_data"),
+        SubPipeSpec(the_pipe_code="process_data", result="processed_data"),
         SubPipeBlueprint(pipe="process_data", result="processed_data"),
     )
 
     SUB_PIPE_WITH_MULTIPLE_OUTPUT = (
         "sub_pipe_with_multiple_output",
-        SubPipeSpec(pipe="generate_items", result="items", multiple_output=True),
+        SubPipeSpec(the_pipe_code="generate_items", result="items", multiple_output=True),
         SubPipeBlueprint(pipe="generate_items", result="items", multiple_output=True),
     )
 
     SUB_PIPE_WITH_FIXED_OUTPUT = (
         "sub_pipe_with_fixed_output",
-        SubPipeSpec(pipe="generate_ideas", result="ideas", nb_output=3),
+        SubPipeSpec(the_pipe_code="generate_ideas", result="ideas", nb_output=3),
         SubPipeBlueprint(pipe="generate_ideas", result="ideas", nb_output=3),
     )
 
     SUB_PIPE_WITH_BATCH = (
         "sub_pipe_with_batch",
-        SubPipeSpec(pipe="process_item", result="processed_items", batch_over="input_list", batch_as="current_item"),
+        SubPipeSpec(the_pipe_code="process_item", result="processed_items", batch_over="input_list", batch_as="current_item"),
         SubPipeBlueprint(pipe="process_item", result="processed_items", batch_over="input_list", batch_as="current_item"),
     )
 

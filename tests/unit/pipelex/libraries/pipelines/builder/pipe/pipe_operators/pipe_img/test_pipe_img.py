@@ -1,7 +1,3 @@
-"""
-Test suite for PipeImgGenBlueprint.to_core_blueprint conversion method.
-"""
-
 import pytest
 
 from pipelex.libraries.pipelines.builder.pipe.pipe_img_spec import PipeImgGenSpec
@@ -11,20 +7,16 @@ from .test_data import PipeImgGenTestCases
 
 
 class TestPipeImgGenBlueprintConversion:
-    """Test PipeImgGenBlueprint.to_core_blueprint conversion."""
-
     @pytest.mark.parametrize(
-        "test_name,pipe_blueprint,pipe_code,domain,expected_core",
+        "test_name,pipe_spec,domain,expected_blueprint",
         PipeImgGenTestCases.TEST_CASES,
     )
-    def test_pipe_img_gen_to_core(
+    def test_pipe_img_gen_spec_to_blueprint(
         self,
         test_name: str,
-        pipe_blueprint: PipeImgGenSpec,
-        pipe_code: str,
+        pipe_spec: PipeImgGenSpec,
         domain: str,
-        expected_core: PipeImgGenBlueprint,
+        expected_blueprint: PipeImgGenBlueprint,
     ):
-        """Test converting various pipe img gen blueprints to core blueprints."""
-        result = pipe_blueprint.to_core_blueprint(pipe_code=pipe_code, domain=domain)
-        assert result == expected_core
+        result = pipe_spec.to_blueprint(pipe_code=pipe_spec.the_pipe_code, domain=domain)
+        assert result == expected_blueprint

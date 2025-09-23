@@ -1,7 +1,3 @@
-"""
-Test suite for PipeFuncBlueprint.to_core_blueprint conversion method.
-"""
-
 import pytest
 
 from pipelex.libraries.pipelines.builder.pipe.pipe_func_spec import PipeFuncSpec
@@ -11,20 +7,16 @@ from .test_data import PipeFuncTestCases
 
 
 class TestPipeFuncBlueprintConversion:
-    """Test PipeFuncBlueprint.to_core_blueprint conversion."""
-
     @pytest.mark.parametrize(
-        "test_name,pipe_blueprint,pipe_code,domain,expected_core",
+        "test_name,pipe_spec,domain,expected_blueprint",
         PipeFuncTestCases.TEST_CASES,
     )
-    def test_pipe_func_to_core(
+    def test_pipe_func_spec_to_blueprint(
         self,
         test_name: str,
-        pipe_blueprint: PipeFuncSpec,
-        pipe_code: str,
+        pipe_spec: PipeFuncSpec,
         domain: str,
-        expected_core: PipeFuncBlueprint,
+        expected_blueprint: PipeFuncBlueprint,
     ):
-        """Test converting various pipe func blueprints to core blueprints."""
-        result = pipe_blueprint.to_core_blueprint(pipe_code=pipe_code, domain=domain)
-        assert result == expected_core
+        result = pipe_spec.to_blueprint(pipe_code=pipe_spec.the_pipe_code, domain=domain)
+        assert result == expected_blueprint

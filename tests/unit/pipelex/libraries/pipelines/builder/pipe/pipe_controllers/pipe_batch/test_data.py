@@ -1,7 +1,3 @@
-"""
-Test data for PipeBatchBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -11,8 +7,6 @@ from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBluepri
 
 
 class PipeBatchTestCases:
-    """Test cases for PipeBatchBlueprint conversion."""
-
     SIMPLE_BATCH = (
         "simple_batch",
         PipeBatchSpec(

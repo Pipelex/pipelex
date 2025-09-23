@@ -93,7 +93,7 @@ class ConceptStructureSpec(StructuredContent):
             f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
         )
 
-    def to_core_blueprint(self) -> ConceptStructureBlueprint:
+    def to_blueprint(self) -> ConceptStructureBlueprint:
         """Convert this ConceptStructureBlueprint to the core ConceptStructureBlueprint."""
         # Convert the type enum value - self.type is already a ConceptStructureBlueprintFieldType enum
         # We need to get the corresponding value in the core enum
@@ -250,7 +250,7 @@ class ConceptSpec(StructuredContent):
                 )
         return values
 
-    def to_core_blueprint(self) -> ConceptBlueprint:
+    def to_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""
         converted_structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = None
         if self.structure:
@@ -259,7 +259,7 @@ class ConceptSpec(StructuredContent):
                 converted_structure = self.structure
             else:
                 for field_name, field_spec in cast(Dict[str, ConceptStructureSpec], self.structure).items():
-                    converted_structure[field_name] = field_spec.to_core_blueprint()
+                    converted_structure[field_name] = field_spec.to_blueprint()
 
         return ConceptBlueprint(definition=self.definition, structure=converted_structure, refines=self.refines)
 

@@ -64,9 +64,9 @@ class PipeImgGenSpec(PipeSpec):
     output_format: Optional[OutputFormat] = Field(default=None, strict=False)
 
     @override
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeImgGenBlueprint:
+    def to_blueprint(self, pipe_code: str, domain: str) -> PipeImgGenBlueprint:
         """Convert this PipeImgGenBlueprint to the core PipeImgGenBlueprint."""
-        base_blueprint = super().to_core_blueprint(pipe_code, domain)
+        base_blueprint = super().to_blueprint(pipe_code, domain)
         return PipeImgGenBlueprint(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
