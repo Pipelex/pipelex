@@ -68,17 +68,7 @@ class BedrockFactory:
         message = BedrockMessage(role="user", content=[])
         if user_text := llm_job.llm_prompt.user_text:
             message.content.append(BedrockContentItem(text=user_text))
-        if user_images := llm_job.llm_prompt.user_images:
+        if llm_job.llm_prompt.user_images:
             raise LLMCapabilityError("BedrockFactory does not support images. Skipping images.")
-            for user_image in user_images:
-                if isinstance(user_image, PromptImageBase64):
-                    image_bytes = user_image.image_bytes
-                    image = BedrockImage(
-                        format=ImageFormat.JPEG,
-                        source=BedrockSource(bytes=image_bytes),
-                    )
-                    message.content.append(BedrockContentItem(image=image))
-                else:
-                    raise PromptImageFormatError("Only PromptImageBytes is supported for BedrockFactory.")
 
         return message
