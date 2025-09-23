@@ -4,10 +4,8 @@ Test suite for PipeSequenceBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_builder import PipeSequenceBlueprint
-from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import (
-    PipeSequenceBlueprint as PipeSequenceBlueprintCore,
-)
+from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 
 from .test_data import PipeSequenceTestCases
 
@@ -22,10 +20,10 @@ class TestPipeSequenceBlueprintConversion:
     def test_pipe_sequence_to_core(
         self,
         test_name: str,
-        pipe_blueprint: PipeSequenceBlueprint,
+        pipe_blueprint: PipeSequenceSpec,
         pipe_code: str,
         domain: str,
-        expected_core: PipeSequenceBlueprintCore,
+        expected_core: PipeSequenceBlueprint,
     ):
         """Test converting various pipe sequence blueprints to core blueprints."""
         result = pipe_blueprint.to_core_blueprint(pipe_code=pipe_code, domain=domain)

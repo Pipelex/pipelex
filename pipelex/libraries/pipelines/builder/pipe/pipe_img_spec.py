@@ -5,18 +5,19 @@ from typing_extensions import override
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice
-from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeBlueprint
-from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint as PipeImgGenBlueprintCore
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
+from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
 
-class PipeImgGenBlueprint(PipeBlueprint):
-    """Blueprint for image generation pipe operations in the Pipelex framework.
+class PipeImgGenSpec(PipeSpec):
+    """Specs for image generation pipe operations in the Pipelex framework.
 
     PipeImgGen enables AI-powered image generation using various models like DALL-E or
     diffusion models. Supports static and dynamic prompts with configurable generation
     parameters.
 
     Attributes:
+        the_pipe_code: Pipe code. Must be snake_case.
         type: Fixed to "PipeImgGen" for this pipe type.
         img_gen_prompt: Static text prompt for image generation. Use this or dynamic input.
         img_gen: Image generation choice (e.g., 'gpt-image-1'). Defaults to global config.
@@ -47,6 +48,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
 
     type: Literal["PipeImgGen"] = "PipeImgGen"
     category: Literal["PipeOperator"] = "PipeOperator"
+    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     img_gen_prompt: Optional[str] = None
     img_gen_prompt_var_name: Optional[str] = None
 
@@ -62,10 +64,10 @@ class PipeImgGenBlueprint(PipeBlueprint):
     output_format: Optional[OutputFormat] = Field(default=None, strict=False)
 
     @override
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeImgGenBlueprintCore:
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeImgGenBlueprint:
         """Convert this PipeImgGenBlueprint to the core PipeImgGenBlueprint."""
         base_blueprint = super().to_core_blueprint(pipe_code, domain)
-        return PipeImgGenBlueprintCore(
+        return PipeImgGenBlueprint(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
@@ -81,7 +83,3 @@ class PipeImgGenBlueprint(PipeBlueprint):
             nb_output=self.nb_output,
             img_gen_prompt_var_name=None,  # Core expects None, builder uses "prompt" as default
         )
-
-
-class PipeImgGenSpecBlueprint(PipeImgGenBlueprint):
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")

@@ -3,12 +3,12 @@ from typing import Literal, Optional
 from pydantic import Field
 from typing_extensions import override
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeBlueprint
-from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint as PipeOcrBlueprintCore
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
+from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
 
-class PipeOcrBlueprint(PipeBlueprint):
-    """Blueprint for OCR (Optical Character Recognition) pipe operations in the Pipelex framework.
+class PipeOcrSpec(PipeSpec):
+    """Spec for OCR (Optical Character Recognition) pipe operations in the Pipelex framework.
 
     PipeOcr enables text extraction from images and documents using OCR technology.
     Supports various OCR platforms and output configurations including image detection,
@@ -17,6 +17,7 @@ class PipeOcrBlueprint(PipeBlueprint):
     VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE NAMED "ocr_input" and it must be either an image or a pdf or a concept which refines one of them.
 
     Attributes:
+        the_pipe_code: Pipe code. Must be snake_case.
         type: Fixed to "PipeOcr" for this pipe type.
         ocr: Needs to be "base_ocr_mistral".
         page_images: Whether to include detected images in the OCR output. When enabled,
@@ -33,13 +34,11 @@ class PipeOcrBlueprint(PipeBlueprint):
         1. OCR model must be "base_ocr_mistral".
         2. Boolean flags (page_images, page_image_captions, page_views) are optional.
         3. page_views_dpi should be a positive integer when specified.
-
-    Raises:
-        ValidationError: When invalid OCR platform or DPI values are provided.
     """
 
     type: Literal["PipeOcr"] = "PipeOcr"
     category: Literal["PipeOperator"] = "PipeOperator"
+    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     ocr: str = "base_ocr_mistral"
     page_images: Optional[bool] = None
     page_image_captions: Optional[bool] = None
@@ -47,11 +46,10 @@ class PipeOcrBlueprint(PipeBlueprint):
     page_views_dpi: Optional[int] = None
 
     @override
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeOcrBlueprintCore:
-        """Convert this PipeOcrBlueprint to the core PipeOcrBlueprint."""
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeOcrBlueprint:
         base_blueprint = super().to_core_blueprint(pipe_code, domain)
 
-        return PipeOcrBlueprintCore(
+        return PipeOcrBlueprint(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
@@ -59,7 +57,3 @@ class PipeOcrBlueprint(PipeBlueprint):
             category=self.category,
             ocr=self.ocr,
         )
-
-
-class PipeOcrSpecBlueprint(PipeOcrBlueprint):
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")

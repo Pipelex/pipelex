@@ -7,8 +7,8 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input import TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.exceptions import DryRunError

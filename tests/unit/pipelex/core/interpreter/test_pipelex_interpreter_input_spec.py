@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 
 
 class TestPipelexInterpreterInputSpec:

@@ -4,8 +4,8 @@ Test suite for SubPipeBlueprint.to_core_sub_pipe conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.sub_pipe_builder import SubPipeBlueprint
-from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint as SubPipeBlueprintCore
+from pipelex.libraries.pipelines.builder.pipe.sub_pipe_spec import SubPipeSpec
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 from .test_data_sub_pipe import SubPipeTestCases
 
@@ -17,7 +17,7 @@ class TestSubPipeBlueprintConversion:
         "test_name,sub_pipe_blueprint,expected_core",
         SubPipeTestCases.TEST_CASES,
     )
-    def test_sub_pipe_to_core(self, test_name: str, sub_pipe_blueprint: SubPipeBlueprint, expected_core: SubPipeBlueprintCore):
+    def test_sub_pipe_to_core(self, test_name: str, sub_pipe_blueprint: SubPipeSpec, expected_core: SubPipeBlueprint):
         """Test converting various sub-pipe blueprints to core blueprints."""
         result = sub_pipe_blueprint.to_core_sub_pipe()
         assert result == expected_core

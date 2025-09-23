@@ -4,10 +4,8 @@ Test suite for PipeParallelBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_builder import PipeParallelBlueprint
-from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import (
-    PipeParallelBlueprint as PipeParallelBlueprintCore,
-)
+from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipeParallelSpec
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 
 from .test_data import PipeParallelTestCases
 
@@ -22,10 +20,10 @@ class TestPipeParallelBlueprintConversion:
     def test_pipe_parallel_to_core(
         self,
         test_name: str,
-        pipe_blueprint: PipeParallelBlueprint,
+        pipe_blueprint: PipeParallelSpec,
         pipe_code: str,
         domain: str,
-        expected_core: PipeParallelBlueprintCore,
+        expected_core: PipeParallelBlueprint,
     ):
         """Test converting various pipe parallel blueprints to core blueprints."""
         result = pipe_blueprint.to_core_blueprint(pipe_code=pipe_code, domain=domain)

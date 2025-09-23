@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
 from pipelex.core.stuffs.stuff_content import ListContent

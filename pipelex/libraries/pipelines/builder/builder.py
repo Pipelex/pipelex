@@ -2,34 +2,38 @@ from typing import Annotated, Dict, List, Optional, Union, cast
 
 from pydantic import ConfigDict, Field, field_validator
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import (
-    PipeBlueprintUnion as PipeBlueprintUnionCore,
-)
-from pipelex.core.bundles.pipelex_bundle_blueprint import (
-    PipelexBundleBlueprint as PipelexBundleBlueprintCore,
-)
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint as ConceptBlueprintCore
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent
 from pipelex.hub import get_library_manager
-from pipelex.libraries.pipelines.builder.concept.concept_builder import ConceptBlueprint, ConceptSpec, ConceptSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_batch_builder import PipeBatchBlueprint, PipeBatchSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_condition_builder import PipeConditionBlueprint, PipeConditionSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_func_builder import PipeFuncBlueprint, PipeFuncSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_img_builder import PipeImgGenBlueprint, PipeImgGenSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_jinja2_builder import PipeJinja2Blueprint, PipeJinja2SpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_llm_builder import PipeLLMBlueprint, PipeLLMSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_builder import PipeOcrBlueprint, PipeOcrSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_builder import PipeParallelBlueprint, PipeParallelSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_builder import PipeSequenceBlueprint, PipeSequenceSpecBlueprint
+from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_batch_spec import PipeBatchSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_condition_spec import PipeConditionSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_func_spec import PipeFuncSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_img_spec import PipeImgGenSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_jinja2_spec import PipeJinja2Spec
+from pipelex.libraries.pipelines.builder.pipe.pipe_llm_spec import PipeLLMSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_spec import PipeOcrSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipeParallelSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSignature
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
+from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
+from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 from pipelex.pipe_works.pipe_dry import dry_run_pipes
 from pipelex.types import StrEnum
 
 
-class PipelexBundleBlueprintDraft(StructuredContent):
-    """Complete blueprint of a pipeline library TOML file."""
+class PipelexBundleSpecDraft(StructuredContent):
+    """Complete spec of a pipeline library TOML file."""
 
     domain: str = Field(description="The domain of the pipeline library.")
     definition: str = Field(description="The definition of the pipeline library.")
@@ -39,44 +43,26 @@ class PipelexBundleBlueprintDraft(StructuredContent):
     pipe: Dict[str, PipeSignature] = Field(default_factory=dict, description="The pipes of the pipeline library.")
 
 
-PipeSpecBlueprintUnion = Annotated[
+PipeSpecUnion = Annotated[
     Union[
         # Pipe operators
-        PipeFuncSpecBlueprint,
-        PipeImgGenSpecBlueprint,
-        PipeJinja2SpecBlueprint,
-        PipeLLMSpecBlueprint,
-        PipeOcrSpecBlueprint,
+        PipeFuncSpec,
+        PipeImgGenSpec,
+        PipeJinja2Spec,
+        PipeLLMSpec,
+        PipeOcrSpec,
         # Pipe controllers
-        PipeBatchSpecBlueprint,
-        PipeConditionSpecBlueprint,
-        PipeParallelSpecBlueprint,
-        PipeSequenceSpecBlueprint,
+        PipeBatchSpec,
+        PipeConditionSpec,
+        PipeParallelSpec,
+        PipeSequenceSpec,
     ],
     Field(discriminator="type"),
 ]
 
 
-PipeBlueprintUnion = Annotated[
-    Union[
-        # Pipe operators
-        PipeFuncBlueprint,
-        PipeImgGenBlueprint,
-        PipeJinja2Blueprint,
-        PipeLLMBlueprint,
-        PipeOcrBlueprint,
-        # Pipe controllers
-        PipeBatchBlueprint,
-        PipeConditionBlueprint,
-        PipeParallelBlueprint,
-        PipeSequenceBlueprint,
-    ],
-    Field(discriminator="type"),
-]
-
-
-class PipelexBundleBlueprint(StructuredContent):
-    """Complete blueprint of a Pipelex bundle TOML definition.
+class PipelexBundleSpec(StructuredContent):
+    """Complete spec of a Pipelex bundle TOML definition.
 
     Represents the top-level structure of a Pipelex bundle, which defines a domain
     with its concepts, pipes, and configuration. Bundles are the primary unit of
@@ -96,7 +82,7 @@ class PipelexBundleBlueprint(StructuredContent):
                 codes in PascalCase format, values are ConceptBlueprint instances or
                 string references to existing concepts.
         pipe: Dictionary of pipe definitions for data transformation. Keys are pipe
-             codes in snake_case format, values are specific pipe blueprint types
+             codes in snake_case format, values are specific pipe spec types
              (PipeLLM, PipeImgGen, PipeSequence, etc.).
 
     Validation Rules:
@@ -105,10 +91,6 @@ class PipelexBundleBlueprint(StructuredContent):
         3. Pipe keys must be in snake_case format.
         4. Extra fields are forbidden (strict mode).
         5. Pipe types must match their blueprint discriminator.
-
-    Raises:
-        ValidationError: When domain, concept, or pipe naming conventions are violated.
-        PipeDefinitionError: When pipe definitions are invalid.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -119,9 +101,9 @@ class PipelexBundleBlueprint(StructuredContent):
     system_prompt_to_structure: Optional[str] = None
     prompt_template_to_structure: Optional[str] = None
 
-    concept: Optional[Dict[str, Union[ConceptBlueprint, str]]] = Field(default_factory=dict)
+    concept: Optional[Dict[str, Union[ConceptSpec, str]]] = Field(default_factory=dict)
 
-    pipe: Optional[Dict[str, PipeBlueprintUnion]] = Field(default_factory=dict)
+    pipe: Optional[Dict[str, PipeSpecUnion]] = Field(default_factory=dict)
 
     @field_validator("domain", mode="before")
     @classmethod
@@ -129,26 +111,25 @@ class PipelexBundleBlueprint(StructuredContent):
         DomainBlueprint.validate_domain_code(code=domain)
         return domain
 
-    def to_core_blueprint(self) -> PipelexBundleBlueprintCore:
-        """Convert this PipelexBundleBlueprint to the core PipelexBundleBlueprint."""
-        concept: Optional[Dict[str, Union[ConceptBlueprintCore, str]]] = None
+    def to_core_blueprint(self) -> PipelexBundleBlueprint:
+        """Convert this PipelexBundleSpec to the core PipelexBundleBlueprint."""
+        concept: Optional[Dict[str, Union[ConceptBlueprint, str]]] = None
 
         if self.concept:
             concept = {}
             for concept_code, concept_blueprint in self.concept.items():
-                if isinstance(concept_blueprint, ConceptBlueprint):
+                if isinstance(concept_blueprint, ConceptSpec):
                     concept[concept_code] = concept_blueprint.to_core_blueprint()
                 else:
-                    concept[concept_code] = ConceptBlueprintCore(definition=concept_code, structure=concept_blueprint)
+                    concept[concept_code] = ConceptBlueprint(definition=concept_code, structure=concept_blueprint)
 
-        pipe: Optional[Dict[str, PipeBlueprintUnionCore]] = None
+        pipe: Optional[Dict[str, PipeBlueprintUnion]] = None
         if self.pipe:
             pipe = {}
             for pipe_code, pipe_blueprint in self.pipe.items():
-                pipe_blueprint_typed: PipeBlueprintUnion = pipe_blueprint
-                pipe[pipe_code] = pipe_blueprint_typed.to_core_blueprint(pipe_code, self.domain)
+                pipe[pipe_code] = pipe_blueprint.to_core_blueprint(pipe_code, self.domain)
 
-        return PipelexBundleBlueprintCore(
+        return PipelexBundleBlueprint(
             domain=self.domain,
             definition=self.definition,
             prompt_template_to_structure=self.prompt_template_to_structure,
@@ -159,7 +140,7 @@ class PipelexBundleBlueprint(StructuredContent):
         )
 
 
-def _convert_pipe_spec_to_blueprint(pipe_spec: PipeSpecBlueprintUnion) -> PipeBlueprintUnion:
+def _convert_pipe_spec_to_blueprint(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
     """Convert a PipeSpecBlueprint to the corresponding PipeBlueprint by removing the_pipe_code."""
     # First try with by_alias=True to get proper field names
     pipe_data = pipe_spec.model_dump(exclude={"the_pipe_code"}, by_alias=True)
@@ -181,33 +162,33 @@ def _convert_pipe_spec_to_blueprint(pipe_spec: PipeSpecBlueprintUnion) -> PipeBl
     pipe_class = pipe_type_to_class.get(pipe_spec.type)
     if pipe_class is None:
         raise ValueError(f"Unknown pipe type: {pipe_spec.type}")
-    return cast(PipeBlueprintUnion, pipe_class(**pipe_data))
+    return cast(PipeSpecUnion, pipe_class(**pipe_data))
 
 
-async def compile_in_pipelex_bundle_blueprint(working_memory: WorkingMemory) -> PipelexBundleBlueprint:
-    """Construct a PipelexBundleBlueprint from working memory containing concept and pipe blueprints.
+async def compile_in_pipelex_bundle_blueprint(working_memory: WorkingMemory) -> PipelexBundleSpec:
+    """Construct a PipelexBundleSpec from working memory containing concept and pipe blueprints.
 
     Args:
         working_memory: WorkingMemory containing concept_blueprints and pipe_blueprints stuffs.
 
     Returns:
-        PipelexBundleBlueprint: The constructed pipeline blueprint.
+        PipelexBundleSpec: The constructed pipeline spec.
     """
     concept_blueprints = working_memory.get_stuff_as_list(
         name="concept_spec_blueprints",
-        item_type=ConceptSpecBlueprint,
+        item_type=ConceptSpec,
     )
 
     # Get pipe blueprints as ListContent directly and cast for typing
     # We can't use get_stuff_as_list with Union types, so we get the raw content
-    pipe_spec_blueprints = cast(ListContent[PipeSpecBlueprintUnion], working_memory.get_stuff(name="pipe_spec_blueprints").content)
+    pipe_spec_blueprints = cast(ListContent[PipeSpecUnion], working_memory.get_stuff(name="pipe_spec_blueprints").content)
     domain_information = working_memory.get_stuff(name="domain_information").content
 
-    return PipelexBundleBlueprint(
+    return PipelexBundleSpec(
         domain=domain_information.domain,  # type: ignore
         definition=domain_information.definition,  # type: ignore
         concept={
-            concept_spec_blueprint.the_concept_code: ConceptBlueprint(**concept_spec_blueprint.model_dump(exclude={"the_concept_code"}))
+            concept_spec_blueprint.the_concept_code: ConceptSpec(**concept_spec_blueprint.model_dump(exclude={"the_concept_code"}))
             for concept_spec_blueprint in concept_blueprints.items
         },
         pipe={
@@ -231,7 +212,7 @@ class ValidateDryRunError(Exception):
 class PipeFailure(StructuredContent):
     """Details of a single pipe failure during dry run."""
 
-    pipe: PipeSpecBlueprintUnion = Field(description="The failing pipe spec blueprint with pipe code")
+    pipe: PipeSpecUnion = Field(description="The failing pipe spec blueprint with pipe code")
     error_message: str = Field(description="The error message for this pipe")
 
 
@@ -244,7 +225,7 @@ class DryRunResult(StructuredContent):
 
 async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFailure]:
     """Validate a pipelex bundle blueprint and return list of failing pipes."""
-    pipelex_bundle_blueprint = working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleBlueprint)
+    pipelex_bundle_blueprint = working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleSpec)
     pipelex_bundle_blueprint_core = pipelex_bundle_blueprint.to_core_blueprint()
 
     library_manager = get_library_manager()
@@ -265,15 +246,15 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
                 pipe_spec_data["the_pipe_code"] = pipe_code
 
                 pipe_type_to_spec_class = {
-                    "PipeFunc": PipeFuncSpecBlueprint,
-                    "PipeImgGen": PipeImgGenSpecBlueprint,
-                    "PipeJinja2": PipeJinja2SpecBlueprint,
-                    "PipeLLM": PipeLLMSpecBlueprint,
-                    "PipeOcr": PipeOcrSpecBlueprint,
-                    "PipeBatch": PipeBatchSpecBlueprint,
-                    "PipeCondition": PipeConditionSpecBlueprint,
-                    "PipeParallel": PipeParallelSpecBlueprint,
-                    "PipeSequence": PipeSequenceSpecBlueprint,
+                    "PipeFunc": PipeFuncSpec,
+                    "PipeImgGen": PipeImgGenSpec,
+                    "PipeJinja2": PipeJinja2Spec,
+                    "PipeLLM": PipeLLMSpec,
+                    "PipeOcr": PipeOcrSpec,
+                    "PipeBatch": PipeBatchSpec,
+                    "PipeCondition": PipeConditionSpec,
+                    "PipeParallel": PipeParallelSpec,
+                    "PipeSequence": PipeSequenceSpec,
                 }
 
                 spec_class = pipe_type_to_spec_class.get(pipe_blueprint.type)
@@ -291,10 +272,10 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
     return ListContent[PipeFailure](items=failed_pipes)
 
 
-async def reconstruct_bundle_with_all_fixes(working_memory: WorkingMemory) -> PipelexBundleBlueprint:
+async def reconstruct_bundle_with_all_fixes(working_memory: WorkingMemory) -> PipelexBundleSpec:
     """Reconstruct the bundle blueprint with all the fixed pipes."""
-    pipelex_bundle_blueprint = working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleBlueprint)
-    fixed_pipes_list = cast(ListContent[PipeSpecBlueprintUnion], working_memory.get_stuff(name="fixed_pipes").content)
+    pipelex_bundle_blueprint = working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleSpec)
+    fixed_pipes_list = cast(ListContent[PipeSpecUnion], working_memory.get_stuff(name="fixed_pipes").content)
 
     if not pipelex_bundle_blueprint.pipe:
         raise ValueError("No pipes section found in bundle blueprint")

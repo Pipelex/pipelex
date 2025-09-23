@@ -4,7 +4,7 @@ from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint

@@ -4,16 +4,12 @@ Test data for PipeParallelBlueprint conversion tests.
 
 from typing import ClassVar, List, Tuple
 
-from pipelex.core.pipes.pipe_input_spec_blueprint import (
-    InputRequirementBlueprint as InputRequirementBlueprintCore,
-)
-from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_builder import PipeParallelBlueprint
-from pipelex.libraries.pipelines.builder.pipe.sub_pipe_builder import SubPipeBlueprint
-from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import (
-    PipeParallelBlueprint as PipeParallelBlueprintCore,
-)
-from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint as SubPipeBlueprintCore
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipeParallelSpec
+from pipelex.libraries.pipelines.builder.pipe.sub_pipe_spec import SubPipeSpec
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
 class PipeParallelTestCases:
@@ -21,28 +17,28 @@ class PipeParallelTestCases:
 
     SIMPLE_PARALLEL = (
         "simple_parallel",
+        PipeParallelSpec(
+            the_pipe_code="parallel_processor",
+            definition="Run pipes in parallel",
+            inputs={"data": InputRequirementSpec(concept="Data")},
+            output="Results",
+            parallels=[
+                SubPipeSpec(pipe="analyze_data", result="analysis"),
+                SubPipeSpec(pipe="transform_data", result="transformed"),
+                SubPipeSpec(pipe="validate_data", result="validation"),
+            ],
+        ),
+        "test_domain",
         PipeParallelBlueprint(
             definition="Run pipes in parallel",
             inputs={"data": InputRequirementBlueprint(concept="Data")},
             output="Results",
+            type="PipeParallel",
+            category="PipeController",
             parallels=[
                 SubPipeBlueprint(pipe="analyze_data", result="analysis"),
                 SubPipeBlueprint(pipe="transform_data", result="transformed"),
                 SubPipeBlueprint(pipe="validate_data", result="validation"),
-            ],
-        ),
-        "parallel_processor",
-        "test_domain",
-        PipeParallelBlueprintCore(
-            definition="Run pipes in parallel",
-            inputs={"data": InputRequirementBlueprintCore(concept="Data")},
-            output="Results",
-            type="PipeParallel",
-            category="PipeController",
-            parallels=[
-                SubPipeBlueprintCore(pipe="analyze_data", result="analysis"),
-                SubPipeBlueprintCore(pipe="transform_data", result="transformed"),
-                SubPipeBlueprintCore(pipe="validate_data", result="validation"),
             ],
             add_each_output=True,
             combined_output=None,
@@ -51,10 +47,25 @@ class PipeParallelTestCases:
 
     PARALLEL_WITH_COMBINED = (
         "parallel_with_combined",
+        PipeParallelSpec(
+            the_pipe_code="combined_parallel",
+            definition="Parallel with combined output",
+            inputs={"input": InputRequirementSpec(concept="Input")},
+            output="CombinedResult",
+            parallels=[
+                SubPipeSpec(pipe="pipe1", result="result1"),
+                SubPipeSpec(pipe="pipe2", result="result2"),
+            ],
+            add_each_output=False,
+            combined_output="MergedData",
+        ),
+        "test_domain",
         PipeParallelBlueprint(
             definition="Parallel with combined output",
             inputs={"input": InputRequirementBlueprint(concept="Input")},
             output="CombinedResult",
+            type="PipeParallel",
+            category="PipeController",
             parallels=[
                 SubPipeBlueprint(pipe="pipe1", result="result1"),
                 SubPipeBlueprint(pipe="pipe2", result="result2"),
@@ -62,24 +73,9 @@ class PipeParallelTestCases:
             add_each_output=False,
             combined_output="MergedData",
         ),
-        "combined_parallel",
-        "test_domain",
-        PipeParallelBlueprintCore(
-            definition="Parallel with combined output",
-            inputs={"input": InputRequirementBlueprintCore(concept="Input")},
-            output="CombinedResult",
-            type="PipeParallel",
-            category="PipeController",
-            parallels=[
-                SubPipeBlueprintCore(pipe="pipe1", result="result1"),
-                SubPipeBlueprintCore(pipe="pipe2", result="result2"),
-            ],
-            add_each_output=False,
-            combined_output="MergedData",
-        ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeParallelBlueprint, str, str, PipeParallelBlueprintCore]]] = [
+    TEST_CASES: ClassVar[List[Tuple[str, PipeParallelSpec, str, PipeParallelBlueprint]]] = [
         SIMPLE_PARALLEL,
         PARALLEL_WITH_COMBINED,
     ]

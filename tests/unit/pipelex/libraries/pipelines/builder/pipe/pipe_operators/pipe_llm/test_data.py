@@ -2,10 +2,13 @@
 Test data for PipeLLMBlueprint conversion tests.
 """
 
-from typing import Any, ClassVar, Dict, List, Tuple
+from typing import ClassVar, List, Tuple
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_llm_builder import LLMSetting, PipeLLMBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
+from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_llm_spec import LLMSettingSpec, PipeLLMSpec
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 
 
 class PipeLLMTestCases:
@@ -13,147 +16,156 @@ class PipeLLMTestCases:
 
     SIMPLE_LLM = (
         "simple_llm",
-        PipeLLMBlueprint(
+        PipeLLMSpec(
+            the_pipe_code="test_pipe",
             definition="Generate text",
-            inputs={"topic": "Text"},
+            inputs={"topic": InputRequirementSpec(concept="Text")},
             output="Text",
             prompt_template="Write about $topic",
         ),
-        "test_pipe",
         "test_domain",
-        {
-            "type": "PipeLLM",
-            "definition": "Generate text",
-            "output": "Text",
-            "prompt_template": "Write about $topic",
-            "inputs_count": 1,
-        },
+        PipeLLMBlueprint(
+            type="PipeLLM",
+            definition="Generate text",
+            inputs={"topic": InputRequirementBlueprint(concept="Text")},
+            output="Text",
+            prompt_template="Write about $topic",
+        ),
     )
 
     LLM_NO_INPUTS = (
         "llm_no_inputs",
-        PipeLLMBlueprint(
+        PipeLLMSpec(
+            the_pipe_code="generate_pipe",
             definition="Generate without inputs",
             inputs={},
             output="Text",
             prompt_template="Generate something interesting",
         ),
-        "generate_pipe",
         "test_domain",
-        {
-            "type": "PipeLLM",
-            "definition": "Generate without inputs",
-            "output": "Text",
-            "prompt_template": "Generate something interesting",
-            "inputs_count": 0,
-        },
+        PipeLLMBlueprint(
+            type="PipeLLM",
+            definition="Generate without inputs",
+            output="Text",
+            prompt_template="Generate something interesting",
+        ),
     )
 
     LLM_WITH_PRESET = (
         "llm_with_preset",
-        PipeLLMBlueprint(
+        PipeLLMSpec(
+            the_pipe_code="generate",
             definition="Generate with preset",
             inputs={},
             output="Text",
             prompt_template="Generate text",
             llm="llm_to_reason",
         ),
-        "generate",
         "test_domain",
-        {
-            "type": "PipeLLM",
-            "llm": "llm_to_reason",
-            "llm_type": "str",
-        },
+        PipeLLMBlueprint(
+            type="PipeLLM",
+            llm="llm_to_reason",
+            output="Text",
+            prompt_template="Generate text",
+        ),
     )
 
     LLM_WITH_SETTINGS = (
         "llm_with_settings",
-        PipeLLMBlueprint(
+        PipeLLMSpec(
+            the_pipe_code="generate",
             definition="Generate with settings",
             inputs={},
             output="Text",
             prompt_template="Generate text",
-            llm=LLMSetting(
+            llm=LLMSettingSpec(
                 llm_handle="gpt-4o-mini",
                 temperature=0.7,
                 max_tokens=None,  # "auto" is handled at conversion to core
             ),
         ),
-        "generate",
         "test_domain",
-        {
-            "type": "PipeLLM",
-            "llm_type": "object",
-            "llm_handle": "gpt-4o-mini",
-            "llm_temperature": 0.7,
-            # max_tokens is None in builder, becomes "auto" in core conversion
-        },
+        PipeLLMBlueprint(
+            type="PipeLLM",
+            llm=LLMSetting(
+                llm_handle="gpt-4o-mini",
+                temperature=0.7,
+                max_tokens=None,  # "auto" is handled at conversion to core
+            ),
+            output="Text",
+            prompt_template="Generate text",
+        ),
     )
 
     LLM_WITH_SYSTEM_PROMPT = (
         "llm_with_system_prompt",
-        PipeLLMBlueprint(
+        PipeLLMSpec(
+            the_pipe_code="analyze",
             definition="Generate with system prompt",
             inputs={"data": "Data"},
             output="Analysis",
             system_prompt="You are a data analyst",
             prompt_template="Analyze: @data",
         ),
-        "analyze",
         "test_domain",
-        {
-            "type": "PipeLLM",
-            "system_prompt": "You are a data analyst",
-            "prompt_template": "Analyze: @data",
-        },
+        PipeLLMBlueprint(
+            type="PipeLLM",
+            system_prompt="You are a data analyst",
+            prompt_template="Analyze: @data",
+            output="Analysis",
+        ),
     )
 
     LLM_WITH_MULTIPLE_OUTPUT = (
         "llm_with_multiple_output",
-        PipeLLMBlueprint(
+        PipeLLMSpec(
+            the_pipe_code="generate_items",
             definition="Generate multiple items",
             inputs={},
             output="Item",
             prompt_template="Generate items",
             multiple_output=True,
         ),
-        "generate_items",
         "test_domain",
-        {
-            "type": "PipeLLM",
-            "multiple_output": True,
-            "nb_output": None,
-        },
+        PipeLLMBlueprint(
+            type="PipeLLM",
+            multiple_output=True,
+            nb_output=None,
+            output="Item",
+            prompt_template="Generate items",
+        ),
     )
 
     LLM_WITH_FIXED_OUTPUT = (
         "llm_with_fixed_output",
-        PipeLLMBlueprint(
+        PipeLLMSpec(
+            the_pipe_code="generate_items",
             definition="Generate exactly 5 items",
             inputs={},
             output="Item",
             prompt_template="Generate items",
             nb_output=5,
         ),
-        "generate_five",
         "test_domain",
-        {
-            "type": "PipeLLM",
-            "nb_output": 5,
-            "multiple_output": None,
-        },
+        PipeLLMBlueprint(
+            type="PipeLLM",
+            nb_output=5,
+            multiple_output=None,
+            output="Item",
+            prompt_template="Generate items",
+        ),
     )
 
     LLM_WITH_STRUCTURING = (
         "llm_with_structuring",
-        PipeLLMBlueprint(
+        PipeLLMSpec(
+            the_pipe_code="test_pipe",
             definition="Extract structured data",
             inputs={},
             output="PersonInfo",
             prompt_template="Extract person info",
             llm="llm_to_extract",
-            llm_to_structure=LLMSetting(
+            llm_to_structure=LLMSettingSpec(
                 llm_handle="claude-3-sonnet",
                 temperature=0.1,
                 max_tokens=None,  # "auto" is handled at conversion to core
@@ -162,18 +174,23 @@ class PipeLLMTestCases:
             prompt_template_to_structure="Structure the output",
             system_prompt_to_structure="You are a data structurer",
         ),
-        "extract",
         "test_domain",
-        {
-            "type": "PipeLLM",
-            "structuring_method": "preliminary_text",
-            "prompt_template_to_structure": "Structure the output",
-            "system_prompt_to_structure": "You are a data structurer",
-            "llm_to_structure_type": "object",
-        },
+        PipeLLMBlueprint(
+            type="PipeLLM",
+            structuring_method=StructuringMethod.PRELIMINARY_TEXT,
+            prompt_template_to_structure="Structure the output",
+            system_prompt_to_structure="You are a data structurer",
+            llm_to_structure=LLMSetting(
+                llm_handle="claude-3-sonnet",
+                temperature=0.1,
+                max_tokens=None,  # "auto" is handled at conversion to core
+            ),
+            output="PersonInfo",
+            prompt_template="Extract person info",
+        ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeLLMBlueprint, str, str, Dict[str, Any]]]] = [
+    TEST_CASES: ClassVar[List[Tuple[str, PipeLLMSpec, str, PipeLLMBlueprint]]] = [
         SIMPLE_LLM,
         LLM_NO_INPUTS,
         LLM_WITH_PRESET,

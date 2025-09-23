@@ -10,7 +10,7 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_input import PipeInputSpec, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import StuffContent, TextContent

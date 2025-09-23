@@ -4,12 +4,10 @@ Test data for PipeOcrBlueprint conversion tests.
 
 from typing import ClassVar, List, Tuple
 
-from pipelex.core.pipes.pipe_input_spec_blueprint import (
-    InputRequirementBlueprint as InputRequirementBlueprintCore,
-)
-from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_builder import PipeOcrBlueprint
-from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint as PipeOcrBlueprintCore
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_spec import PipeOcrSpec
+from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
 
 class PipeOcrTestCases:
@@ -17,17 +15,17 @@ class PipeOcrTestCases:
 
     SIMPLE_OCR = (
         "simple_ocr",
-        PipeOcrBlueprint(
+        PipeOcrSpec(
+            the_pipe_code="ocr_extractor",
             definition="Extract text from image",
-            inputs={"ocr_input": InputRequirementBlueprint(concept="Image")},
+            inputs={"ocr_input": InputRequirementSpec(concept="Image")},
             output="ExtractedText",
             ocr="mistral-pixtral",
         ),
-        "ocr_extractor",
         "test_domain",
-        PipeOcrBlueprintCore(
+        PipeOcrBlueprint(
             definition="Extract text from image",
-            inputs={"ocr_input": InputRequirementBlueprintCore(concept="Image")},
+            inputs={"ocr_input": InputRequirementBlueprint(concept="Image")},
             output="ExtractedText",
             type="PipeOcr",
             category="PipeOperator",
@@ -37,9 +35,10 @@ class PipeOcrTestCases:
 
     OCR_WITH_OPTIONS = (
         "ocr_with_options",
-        PipeOcrBlueprint(
+        PipeOcrSpec(
+            the_pipe_code="advanced_ocr",
             definition="OCR with page options",
-            inputs={"ocr_input": InputRequirementBlueprint(concept="PDF")},
+            inputs={"ocr_input": InputRequirementSpec(concept="PDF")},
             output="PageContent",
             ocr="tesseract",
             page_images=True,
@@ -47,11 +46,10 @@ class PipeOcrTestCases:
             page_views=True,
             page_views_dpi=300,
         ),
-        "advanced_ocr",
         "test_domain",
-        PipeOcrBlueprintCore(
+        PipeOcrBlueprint(
             definition="OCR with page options",
-            inputs={"ocr_input": InputRequirementBlueprintCore(concept="PDF")},
+            inputs={"ocr_input": InputRequirementBlueprint(concept="PDF")},
             output="PageContent",
             type="PipeOcr",
             category="PipeOperator",
@@ -59,7 +57,7 @@ class PipeOcrTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeOcrBlueprint, str, str, PipeOcrBlueprintCore]]] = [
+    TEST_CASES: ClassVar[List[Tuple[str, PipeOcrSpec, str, PipeOcrBlueprint]]] = [
         SIMPLE_OCR,
         OCR_WITH_OPTIONS,
     ]

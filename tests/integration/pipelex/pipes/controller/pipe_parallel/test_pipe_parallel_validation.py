@@ -1,7 +1,7 @@
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.hub import get_concept_provider, get_pipe_provider
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory

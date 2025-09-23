@@ -4,10 +4,8 @@ Test suite for PipeConditionBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_condition_builder import PipeConditionBlueprint
-from pipelex.pipe_controllers.condition.pipe_condition_blueprint import (
-    PipeConditionBlueprint as PipeConditionBlueprintCore,
-)
+from pipelex.libraries.pipelines.builder.pipe.pipe_condition_spec import PipeConditionSpec
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 
 from .test_data import PipeConditionTestCases
 
@@ -22,10 +20,10 @@ class TestPipeConditionBlueprintConversion:
     def test_pipe_condition_to_core(
         self,
         test_name: str,
-        pipe_blueprint: PipeConditionBlueprint,
+        pipe_blueprint: PipeConditionSpec,
         pipe_code: str,
         domain: str,
-        expected_core: PipeConditionBlueprintCore,
+        expected_core: PipeConditionBlueprint,
     ):
         """Test converting various pipe condition blueprints to core blueprints."""
         result = pipe_blueprint.to_core_blueprint(pipe_code=pipe_code, domain=domain)

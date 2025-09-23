@@ -6,8 +6,8 @@ from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_setting import LLMSettingChoices
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider, get_optional_domain

@@ -3,12 +3,12 @@ from typing import Literal, Optional
 from pydantic import Field
 from typing_extensions import override
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeBlueprint
-from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint as PipeBatchBlueprintCore
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 
 
-class PipeBatchBlueprint(PipeBlueprint):
-    """Blueprint for batch processing pipe operations in the Pipelex framework.
+class PipeBatchSpec(PipeSpec):
+    """Spec for batch processing pipe operations in the Pipelex framework.
 
     PipeBatch enables parallel execution of a single pipe across multiple items
     in a list. Each item is processed independently, making it ideal for data
@@ -19,6 +19,7 @@ class PipeBatchBlueprint(PipeBlueprint):
     batch_over and batch_as parameters in SubPipeBlueprint.
 
     Attributes:
+        the_pipe_code: Pipe code. Must be snake_case.
         type: Fixed to "PipeBatch" for this pipe type.
         branch_pipe_code: The pipe code to execute for each item in the input list.
                          This pipe is instantiated once per item in parallel.
@@ -31,22 +32,19 @@ class PipeBatchBlueprint(PipeBlueprint):
         1. branch_pipe_code must reference an existing pipe in the pipeline.
         2. When input_list_name is specified, it must reference a list in context.
         3. The branch pipe should be designed to process single items.
-
-    Raises:
-        PipeDefinitionError: When validation rules are violated.
     """
 
     type: Literal["PipeBatch"] = "PipeBatch"
     category: Literal["PipeController"] = "PipeController"
+    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     branch_pipe_code: str
     input_list_name: Optional[str] = None
     input_item_name: Optional[str] = None
 
     @override
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeBatchBlueprintCore:
-        """Convert this PipeBatchBlueprint to the core PipeBatchBlueprint."""
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeBatchBlueprint:
         base_blueprint = super().to_core_blueprint(pipe_code, domain)
-        return PipeBatchBlueprintCore(
+        return PipeBatchBlueprint(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
@@ -56,7 +54,3 @@ class PipeBatchBlueprint(PipeBlueprint):
             input_list_name=self.input_list_name,
             input_item_name=self.input_item_name,
         )
-
-
-class PipeBatchSpecBlueprint(PipeBatchBlueprint):
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")

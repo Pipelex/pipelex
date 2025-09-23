@@ -1,39 +1,46 @@
-"""CLI commands for debugging and running intermediate steps of the builder pipeline."""
-
-from __future__ import annotations
-
 import asyncio
-from typing import Annotated, Any
+from typing import Annotated, Any, List
 
 import typer
 
 from pipelex import log, pretty_print
+from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
+from pipelex.core.stuffs.stuff_content import ListContent
 from pipelex.hub import get_report_delegate
-from pipelex.libraries.pipelines.builder.concept.concept_builder import ConceptSpec
+from pipelex.libraries.pipelines.builder.builder import PipelexBundleSpec
+from pipelex.libraries.pipelines.builder.concept.concept_spec import (
+    ConceptSpec,
+    ConceptStructureSpec,
+    ConceptStructureSpecFieldType,
+)
+from pipelex.libraries.pipelines.builder.pipe.pipe_condition_spec import PipeConditionPipeMapSpec, PipeConditionSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_llm_spec import PipeLLMSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSignature
+from pipelex.libraries.pipelines.builder.pipe.sub_pipe_spec import SubPipeSpec
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
 builder_debug_app = typer.Typer(help="Debug and test intermediate steps of the builder pipeline", no_args_is_help=True)
 
 
-def _get_example_concept_specs() -> list[ConceptSpec]:
+def _get_example_concept_specs() -> List[ConceptSpec]:
     """Get hardcoded example concept specs for testing."""
     return [
         ConceptSpec(
             the_concept_code="TaskDescription",
-            description="A description of a task that needs to be completed",
+            definition="A description of a task that needs to be completed",
             structure="{ 'title': 'str', 'description': 'str', 'priority': 'str', 'due_date': 'Optional[datetime]' }",
         ),
         ConceptSpec(
             the_concept_code="TaskResult",
-            description="The result of completing a task",
+            definition="The result of completing a task",
             structure="{ 'task_id': 'str', 'status': 'str', 'completion_notes': 'str', 'completed_at': 'datetime' }",
         ),
         ConceptSpec(
             the_concept_code="UserProfile",
-            description="A user profile containing personal information",
+            definition="A user profile containing personal information",
             structure="{ 'name': 'str', 'email': 'str', 'role': 'str', 'preferences': 'Dict[str, Any]' }",
         ),
     ]
@@ -160,7 +167,6 @@ def create_pipes_cmd(
             log.info(f"Processing pipe {i + 1}/{len(pipe_signatures)}: {pipe_signature.code}")
 
             # Create list content for concept spec blueprints
-            from pipelex.core.stuffs.stuff_content import ListContent
 
             concept_blueprints_list: ListContent[Any] = ListContent(items=[stuff.content for stuff in concept_spec_blueprints])
 
@@ -224,7 +230,6 @@ def full_pipeline_cmd(
         pipe_spec_blueprints: list[Any] = []
 
         # Create list content for concept spec blueprints
-        from pipelex.core.stuffs.stuff_content import ListContent
 
         concept_blueprints_list: ListContent[Any] = ListContent(items=[stuff.content for stuff in concept_spec_blueprints])
 
@@ -364,79 +369,65 @@ def test_validation_cmd(
 
     def _create_real_bundle_blueprint():
         """Create a comprehensive PipelexBundleBlueprint instance for testing."""
-        from pipelex.libraries.pipelines.builder.builder import PipelexBundleBlueprint
-        from pipelex.libraries.pipelines.builder.concept.concept_builder import (
-            ConceptBlueprint,
-            ConceptStructureBlueprint,
-            ConceptStructureBlueprintFieldType,
-        )
-        from pipelex.libraries.pipelines.builder.pipe.pipe_condition_builder import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
-        from pipelex.libraries.pipelines.builder.pipe.pipe_llm_builder import PipeLLMBlueprint
-        from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_builder import PipeSequenceBlueprint
-        from pipelex.libraries.pipelines.builder.pipe.sub_pipe_builder import SubPipeBlueprint
 
         # Create concept blueprints
-        task_concept = ConceptBlueprint(
+        task_concept = ConceptSpec(
+            the_concept_code="TaskDescription",
             definition="A task description with metadata",
             structure={
-                "title": ConceptStructureBlueprint(definition="The task title", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
-                "description": ConceptStructureBlueprint(
-                    definition="Detailed task description", type=ConceptStructureBlueprintFieldType.TEXT, required=True
+                "title": ConceptStructureSpec(
+                    the_field_name="title", definition="The task title", type=ConceptStructureSpecFieldType.TEXT, required=True
                 ),
-                # "priority": ConceptStructureBlueprint(definition="Task priority level", choices=["low", "medium", "high", "urgent"], required=True),
-                "estimated_hours": ConceptStructureBlueprint(
+                "description": ConceptStructureSpec(
+                    the_field_name="description",
+                    definition="Detailed task description",
+                    type=ConceptStructureSpecFieldType.TEXT,
+                    required=True,
+                ),
+                "estimated_hours": ConceptStructureSpec(
+                    the_field_name="estimated_hours",
                     definition="Estimated hours to complete the task",
-                    type=ConceptStructureBlueprintFieldType.NUMBER,
+                    type=ConceptStructureSpecFieldType.NUMBER,
                     required=False,
                     default_value=1.0,
                 ),
-                # "tags": ConceptStructureBlueprint(
-                #     definition="List of task tags", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=False, default_value=[]
-                # ),
             },
         )
-        analyzed_task_concept = ConceptBlueprint(
+        analyzed_task_concept = ConceptSpec(
+            the_concept_code="AnalyzedTask",
             definition="The result of task analysis",
             structure={
-                "task_id": ConceptStructureBlueprint(
-                    definition="Unique task identifier", type=ConceptStructureBlueprintFieldType.TEXT, required=True
+                "task_id": ConceptStructureSpec(
+                    the_field_name="task_id", definition="Unique task identifier", type=ConceptStructureSpecFieldType.TEXT, required=True
                 ),
-                # "status": ConceptStructureBlueprint(
-                #     definition="Task completion status", choices=["pending", "in_progress", "completed", "failed"], required=True
-                # ),
             },
         )
 
-        task_result_concept = ConceptBlueprint(
+        task_result_concept = ConceptSpec(
+            the_concept_code="TaskResult",
             definition="The result of task processing",
             structure={
-                "task_id": ConceptStructureBlueprint(
-                    definition="Unique task identifier", type=ConceptStructureBlueprintFieldType.TEXT, required=True
+                "task_id": ConceptStructureSpec(
+                    the_field_name="task_id", definition="Unique task identifier", type=ConceptStructureSpecFieldType.TEXT, required=True
                 ),
-                # "status": ConceptStructureBlueprint(
-                #     definition="Task completion status", choices=["pending", "in_progress", "completed", "failed"], required=True
-                # ),
-                "completion_notes": ConceptStructureBlueprint(
-                    definition="Notes about task completion", type=ConceptStructureBlueprintFieldType.TEXT, required=False
+                "completion_notes": ConceptStructureSpec(
+                    the_field_name="completion_notes",
+                    definition="Notes about task completion",
+                    type=ConceptStructureSpecFieldType.TEXT,
+                    required=False,
                 ),
-                # "metadata": ConceptStructureBlueprint(
-                #     definition="Additional task metadata",
-                #     type=ConceptStructureBlueprintFieldType.DICT,
-                #     key_type="text",
-                #     value_type="text",
-                #     required=False,
-                #     default_value={},
-                # ),
             },
         )
 
-        user_profile_concept = ConceptBlueprint(
+        user_profile_concept = ConceptSpec(
+            the_concept_code="UserProfile",
             definition="User profile information",
             refines="Text",  # Refining a native concept
         )
 
         # Create pipe blueprints
-        analyze_task_pipe = PipeLLMBlueprint(
+        analyze_task_pipe = PipeLLMSpec(
+            the_pipe_code="analyze_task",
             type="PipeLLM",
             definition="Analyze a task and extract key information",
             inputs={"task_description": "Text"},
@@ -445,18 +436,20 @@ def test_validation_cmd(
             llm="llm_to_engineer",
         )
 
-        process_user_request_pipe = PipeSequenceBlueprint(
+        process_user_request_pipe = PipeSequenceSpec(
+            the_pipe_code="process_user_request",
             type="PipeSequence",
             definition="Process a user request by analyzing task and generating result",
             inputs={"task_description": "Text", "user_profile": "UserProfile"},
             output="AnalyzedTask",
             steps=[
-                SubPipeBlueprint(pipe="analyze_task", result="analyzed_task"),
-                SubPipeBlueprint(pipe="generate_task_result", result="task_result"),
+                SubPipeSpec(pipe="analyze_task", result="analyzed_task"),
+                SubPipeSpec(pipe="generate_task_result", result="task_result"),
             ],
         )
 
-        generate_task_result_pipe = PipeLLMBlueprint(
+        generate_task_result_pipe = PipeLLMSpec(
+            the_pipe_code="generate_task_result",
             type="PipeLLM",
             definition="Generate task result based on analyzed task",
             inputs={"user_profile": "UserProfile"},
@@ -465,16 +458,18 @@ def test_validation_cmd(
             llm="llm_to_engineer",
         )
 
-        validate_task_pipe = PipeConditionBlueprint(
+        validate_task_pipe = PipeConditionSpec(
+            the_pipe_code="validate_task_completion",
             type="PipeCondition",
             definition="Validate task completion based on status",
             inputs={"task_result": "TaskResult"},
             output="task_management.TaskResult",
             expression="task_result.status",
-            pipe_map=PipeConditionPipeMapBlueprint(root={"completed": "return_success", "failed": "return_failure"}),
+            pipe_map=PipeConditionPipeMapSpec(root={"completed": "return_success", "failed": "return_failure"}),
         )
 
-        return_success_pipe = PipeLLMBlueprint(
+        return_success_pipe = PipeLLMSpec(
+            the_pipe_code="return_success",
             type="PipeLLM",
             definition="Return success message",
             inputs={"task_result": "TaskResult"},
@@ -483,8 +478,9 @@ def test_validation_cmd(
             llm="llm_to_engineer",
         )
 
-        return_failure_pipe = PipeLLMBlueprint(
+        return_failure_pipe = PipeLLMSpec(
             type="PipeLLM",
+            the_pipe_code="return_failure",
             definition="Return failure message",
             inputs={"task_result": "TaskResult"},
             output="TaskResult",
@@ -492,15 +488,14 @@ def test_validation_cmd(
             llm="llm_to_engineer",
         )
 
-        # Create the complete bundle blueprint
-        bundle_blueprint = PipelexBundleBlueprint(
+        bundle_blueprint = PipelexBundleSpec(
             domain="task_management",
             definition="A comprehensive task management pipeline for analyzing, processing, and validating tasks",
             system_prompt="You are an expert task management assistant. Analyze tasks carefully and provide structured, actionable information.",
             concept={
                 "Task": task_concept,
                 "TaskResult": task_result_concept,
-                "UserProfile": user_profile_concept,
+                "user_profile": user_profile_concept,
                 "AnalyzedTask": analyzed_task_concept,
             },
             pipe={
@@ -523,11 +518,9 @@ def test_validation_cmd(
             },
         )
         pretty_print(pipe_output, title="Pipe Output")
-        from pipelex.libraries.pipelines.builder.builder import PipelexBundleBlueprint
 
-        blueprint = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleBlueprint)
+        blueprint = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleSpec)
         pretty_print(blueprint, title="Pipelex Bundle Blueprint")
-        from pipelex.core.interpreter import PipelexInterpreter
 
         plx_content = PipelexInterpreter.make_plx_content(blueprint=blueprint.to_core_blueprint())
         pretty_print(plx_content, title="PLX Content")

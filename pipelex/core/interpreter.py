@@ -11,7 +11,7 @@ from pipelex.core.exceptions import (
     PipelexConfigurationError,
     PipelexUnknownPipeError,
 )
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import (
     PipeConditionBlueprint,

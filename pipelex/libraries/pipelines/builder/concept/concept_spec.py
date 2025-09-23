@@ -3,14 +3,12 @@ from typing import Any, Dict, Optional, Union, cast
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint as ConceptBlueprintCore
 from pipelex.core.concepts.concept_blueprint import (
+    ConceptBlueprint,
     ConceptBlueprintError,
+    ConceptStructureBlueprint,
     ConceptStructureBlueprintError,
-)
-from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint as ConceptStructureBlueprintCore
-from pipelex.core.concepts.concept_blueprint import (
-    ConceptStructureBlueprintFieldType as ConceptStructureBlueprintFieldTypeCore,
+    ConceptStructureBlueprintFieldType,
 )
 from pipelex.core.concepts.concept_native import NativeConceptEnum, is_native_concept
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptStringOrConceptCodeError
@@ -23,20 +21,7 @@ from pipelex.tools.typing.validation_utils import has_more_than_one_among_attrib
 from pipelex.types import StrEnum
 
 
-class ConceptSpec(StructuredContent):
-    the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
-    description: str = Field(description="Description of the concept, in natural language.")
-    structure: str = Field(
-        description="A description of a dict with fieldnames as keys, and values being a dict with: definition, type, required, default_value"
-    )
-    refines: Optional[str] = Field(
-        default=None,
-        description="The native concept this concept extends (Text, Image, PDF, TextAndImages, Number, Page) "
-        "in PascalCase format. Cannot be used together with 'structure'.",
-    )
-
-
-class ConceptStructureBlueprintFieldType(StrEnum):
+class ConceptStructureSpecFieldType(StrEnum):
     TEXT = "text"
     INTEGER = "integer"
     BOOLEAN = "boolean"
@@ -44,8 +29,8 @@ class ConceptStructureBlueprintFieldType(StrEnum):
     DATE = "date"
 
 
-class ConceptStructureBlueprint(StructuredContent):
-    """Blueprint defining a field in the structure of a concept, used as a Pydantic V2 model.
+class ConceptStructureSpec(StructuredContent):
+    """Spec defining a field in the structure of a concept, used as a Pydantic V2 model.
 
     This class represents the schema for a single field in a concept's structure. It supports
     various field types including text, list, dict, integer, boolean, number, and date, as well
@@ -65,17 +50,13 @@ class ConceptStructureBlueprint(StructuredContent):
            - For typed fields: type must be specified and default_value must match that type
            - Type validation includes: text (str), integer (int), boolean (bool),
              number (int/float), dict (dict)
-
-    Raises:
-        ConceptStructureBlueprintError: When validation rules are violated.
     """
 
+    the_field_name: str = Field(description="Field name. Must be snake_case.")
     definition: str
-    type: Optional[ConceptStructureBlueprintFieldType] = Field(default=None, description="The type of the field.")
+    type: Optional[ConceptStructureSpecFieldType] = Field(default=None, description="The type of the field.")
     required: Optional[bool] = True
     default_value: Optional[Any] = None
-
-    # TODO: date translator for default_value
 
     @model_validator(mode="after")
     def validate_structure_blueprint(self) -> Self:
@@ -112,16 +93,16 @@ class ConceptStructureBlueprint(StructuredContent):
             f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
         )
 
-    def to_core_blueprint(self) -> ConceptStructureBlueprintCore:
+    def to_core_blueprint(self) -> ConceptStructureBlueprint:
         """Convert this ConceptStructureBlueprint to the core ConceptStructureBlueprint."""
         # Convert the type enum value - self.type is already a ConceptStructureBlueprintFieldType enum
         # We need to get the corresponding value in the core enum
         core_type = None
         if self.type is not None:
             # Get the string value and use it to get the core enum value
-            core_type = ConceptStructureBlueprintFieldTypeCore(self.type.value)
+            core_type = ConceptStructureBlueprintFieldType(self.type.value)
 
-        return ConceptStructureBlueprintCore(
+        return ConceptStructureBlueprint(
             definition=self.definition,
             type=core_type,
             required=self.required,
@@ -129,12 +110,8 @@ class ConceptStructureBlueprint(StructuredContent):
         )
 
 
-class ConceptStructureSpecBlueprint(ConceptStructureBlueprint):
-    the_field_name: str = Field(description="Field name. Must be snake_case.")
-
-
-class ConceptBlueprint(StructuredContent):
-    """Blueprint defining a concept that can be used in the Pipelex framework.
+class ConceptSpec(StructuredContent):
+    """Spec defining a concept that can be used in the Pipelex framework.
 
     A concept represents a structured data type that can either define its own structure
     or refine an existing native concept. Concepts are fundamental building blocks in
@@ -161,23 +138,18 @@ class ConceptBlueprint(StructuredContent):
         5. Native concepts: When refining, must be one of the valid native concepts.
         6. Structure values: In structure dict, values must be either valid concept strings
            or ConceptStructureBlueprint instances.
-
-
-    Raises:
-        ConceptBlueprintError: When validation rules are violated.
-        ConceptCodeError: When concept code format is invalid.
-        ConceptStringError: When concept string format is invalid.
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
     definition: str
-    structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = None
+    structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureSpec]]]] = None
     refines: Optional[str] = None
 
     @classmethod
     def is_native_concept_code(cls, concept_code: str) -> bool:
-        ConceptBlueprint.validate_concept_code(concept_code=concept_code)
+        ConceptSpec.validate_concept_code(concept_code=concept_code)
         return concept_code in [native_concept.value for native_concept in NativeConceptEnum]
 
     @classmethod
@@ -230,10 +202,7 @@ class ConceptBlueprint(StructuredContent):
         else:
             domain, concept_code = concept_string.split(".", 1)
 
-        # Validate domain
         DomainBlueprint.validate_domain_code(domain)
-
-        # Validate concept code
         if not is_pascal_case(concept_code):
             raise ConceptCodeError(
                 f"Concept code '{concept_code}' must be PascalCase (letters and numbers only, starting with uppercase, without `.`)"
@@ -266,7 +235,7 @@ class ConceptBlueprint(StructuredContent):
         return refines
 
     @model_validator(mode="before")
-    def model_validate_blueprint(cls, values: Union[Dict[str, Any], "ConceptBlueprint"]) -> Union[Dict[str, Any], "ConceptBlueprint"]:
+    def model_validate_blueprint(cls, values: Union[Dict[str, Any], "ConceptSpec"]) -> Union[Dict[str, Any], "ConceptSpec"]:
         if isinstance(values, dict):
             if values.get("refines") and values.get("structure"):
                 raise ConceptBlueprintError(
@@ -281,34 +250,34 @@ class ConceptBlueprint(StructuredContent):
                 )
         return values
 
-    def to_core_blueprint(self) -> ConceptBlueprintCore:
+    def to_core_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""
-        converted_structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprintCore]]]] = None
+        converted_structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = None
         if self.structure:
-            # Convert structure dict with ConceptStructureBlueprint objects to ConceptStructureBlueprintCore objects
             converted_structure = {}
             if isinstance(self.structure, str):
                 converted_structure = self.structure
             else:
-                for field_name, field_spec in cast(Dict[str, ConceptStructureBlueprint], self.structure).items():
+                for field_name, field_spec in cast(Dict[str, ConceptStructureSpec], self.structure).items():
                     converted_structure[field_name] = field_spec.to_core_blueprint()
 
-        return ConceptBlueprintCore(definition=self.definition, structure=converted_structure, refines=self.refines)
+        return ConceptBlueprint(definition=self.definition, structure=converted_structure, refines=self.refines)
 
 
 class ConceptSpecBlueprint(ConceptBlueprint):
     the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
 
 
-async def create_concept_spec_blueprint(working_memory: WorkingMemory) -> ConceptSpecBlueprint:
+async def create_concept_spec_blueprint(working_memory: WorkingMemory) -> ConceptSpec:
     """Create a ConceptSpecBlueprint manually from ConceptSpec and ConceptStructureSpecBlueprint."""
     # Get the inputs from working memory
     concept_spec = working_memory.get_stuff_as(name="concept_spec", content_type=ConceptSpec)
-    concept_spec_structures_stuff = working_memory.get_stuff_as_list(name="concept_spec_structures", item_type=ConceptStructureSpecBlueprint)
+    concept_spec_structures_stuff = working_memory.get_stuff_as_list(name="concept_spec_structures", item_type=ConceptStructureSpec)
 
-    structure_dict: Dict[str, Union[str, ConceptStructureBlueprint]] = {}
+    structure_dict: Dict[str, Union[str, ConceptStructureSpec]] = {}
     for structure_item in concept_spec_structures_stuff.items:
-        structure_blueprint = ConceptStructureBlueprint(
+        structure_blueprint = ConceptStructureSpec(
+            the_field_name=structure_item.the_field_name,
             definition=structure_item.definition,
             type=structure_item.type,
             required=structure_item.required,
@@ -316,10 +285,9 @@ async def create_concept_spec_blueprint(working_memory: WorkingMemory) -> Concep
         )
         structure_dict[structure_item.the_field_name] = structure_blueprint
 
-    # Create the ConceptSpecBlueprint
-    concept_spec_blueprint = ConceptSpecBlueprint(
+    concept_spec_blueprint = ConceptSpec(
         the_concept_code=concept_spec.the_concept_code,
-        definition=concept_spec.description,
+        definition=concept_spec.definition,
         structure=structure_dict,
         refines=concept_spec.refines,
     )

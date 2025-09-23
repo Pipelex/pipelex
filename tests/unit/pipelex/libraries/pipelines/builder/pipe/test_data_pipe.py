@@ -4,12 +4,10 @@ Test data for base PipeBlueprint conversion tests.
 
 from typing import ClassVar, List, Tuple
 
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint as PipeBlueprintCore
-from pipelex.core.pipes.pipe_input_spec_blueprint import (
-    InputRequirementBlueprint as InputRequirementBlueprintCore,
-)
-from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeBlueprint
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
 
 
 class PipeBlueprintTestCases:
@@ -17,26 +15,36 @@ class PipeBlueprintTestCases:
 
     SIMPLE_PIPE = (
         "simple_pipe",
-        PipeBlueprint(
+        PipeSpec(
             type="PipeLLM",
             category="PipeOperator",
             definition="A simple pipe",
             inputs={"input": "Text"},
             output="ProcessedText",
         ),
-        "simple_pipe",
         "test_domain",
-        PipeBlueprintCore(
+        PipeBlueprint(
             type="PipeLLM",
             category="PipeOperator",
             definition="A simple pipe",
-            inputs={"input": InputRequirementBlueprintCore(concept="Text")},
+            inputs={"input": InputRequirementBlueprint(concept="Text")},
             output="ProcessedText",
         ),
     )
 
     PIPE_WITH_INPUT_REQUIREMENTS = (
         "pipe_with_requirements",
+        PipeSpec(
+            type="PipeFunc",
+            category="PipeOperator",
+            definition="Pipe with input requirements",
+            inputs={
+                "data": InputRequirementSpec(concept="Data"),
+                "config": InputRequirementSpec(concept="Config"),
+            },
+            output="Result",
+        ),
+        "test_domain",
         PipeBlueprint(
             type="PipeFunc",
             category="PipeOperator",
@@ -47,32 +55,19 @@ class PipeBlueprintTestCases:
             },
             output="Result",
         ),
-        "requirement_pipe",
-        "test_domain",
-        PipeBlueprintCore(
-            type="PipeFunc",
-            category="PipeOperator",
-            definition="Pipe with input requirements",
-            inputs={
-                "data": InputRequirementBlueprintCore(concept="Data"),
-                "config": InputRequirementBlueprintCore(concept="Config"),
-            },
-            output="Result",
-        ),
     )
 
     PIPE_NO_INPUTS = (
         "pipe_no_inputs",
-        PipeBlueprint(
+        PipeSpec(
             type="PipeFunc",
             category="PipeOperator",
             definition="Pipe without inputs",
             inputs={},
             output="GeneratedData",
         ),
-        "generator_pipe",
         "test_domain",
-        PipeBlueprintCore(
+        PipeBlueprint(
             type="PipeFunc",
             category="PipeOperator",
             definition="Pipe without inputs",
@@ -81,7 +76,7 @@ class PipeBlueprintTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeBlueprint, str, str, PipeBlueprintCore]]] = [
+    TEST_CASES: ClassVar[List[Tuple[str, PipeSpec, str, PipeBlueprint]]] = [
         SIMPLE_PIPE,
         PIPE_WITH_INPUT_REQUIREMENTS,
         PIPE_NO_INPUTS,

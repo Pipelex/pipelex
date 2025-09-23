@@ -39,7 +39,6 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     ) -> None:
         """Registers a function in the registry with a name if it meets eligibility criteria."""
         if not self.is_eligible_function(func):
-            self.log(f"Function '{func.__name__}' is not eligible for registration - skipping")
             return
 
         key = name or func.__name__
@@ -50,7 +49,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
                 raise FuncRegistryError(f"Function '{key}' already exists in registry")
         else:
             self.log(f"Registered new single function '{key}' in registry")
-        self.root.update({key: func})
+        self.root[key] = func
 
     def unregister_function(self, func: Callable[..., Any]) -> None:
         """Unregisters a function from the registry."""

@@ -7,7 +7,7 @@ import typer
 from pipelex import pretty_print
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.hub import get_report_delegate
-from pipelex.libraries.pipelines.builder.builder import PipelexBundleBlueprint
+from pipelex.libraries.pipelines.builder.builder import PipelexBundleSpec
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
@@ -49,7 +49,7 @@ def build_pipe_cmd(
             input_memory={"brief": brief},
         )
         pretty_print(pipe_output, title="Pipe Output")
-        blueprint = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleBlueprint)
+        blueprint = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleSpec)
         plx_content = PipelexInterpreter.make_plx_content(blueprint=blueprint.to_core_blueprint())
 
         # Save to file unless explicitly disabled with empty string

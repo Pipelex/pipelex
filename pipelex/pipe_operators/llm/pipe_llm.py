@@ -17,8 +17,8 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import Domain, SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import (
     PipeOutputMultiplicity,

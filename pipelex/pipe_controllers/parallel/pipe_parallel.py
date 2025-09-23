@@ -8,8 +8,8 @@ from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.stuffs.stuff import Stuff

@@ -6,9 +6,9 @@ from typing import Any, Dict
 
 import pytest
 
-from pipelex.cogt.llm.llm_setting import LLMSetting as LLMSettingCore
-from pipelex.libraries.pipelines.builder.pipe.pipe_llm_builder import PipeLLMBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint as PipeLLMBlueprintCore
+from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.libraries.pipelines.builder.pipe.pipe_llm_spec import PipeLLMSpec
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 from .test_data import PipeLLMTestCases
 
@@ -17,16 +17,16 @@ class TestPipeLLMBlueprintConversion:
     """Test PipeLLMBlueprint.to_core_blueprint conversion."""
 
     @pytest.mark.parametrize(
-        "test_name,pipe_blueprint,pipe_code,domain,expected",
+        "test_name,pipe_blueprint,domain,expected",
         PipeLLMTestCases.TEST_CASES,
     )
-    def test_pipe_llm_to_core(self, test_name: str, pipe_blueprint: PipeLLMBlueprint, pipe_code: str, domain: str, expected: Dict[str, Any]):
+    def test_pipe_llm_to_core(self, test_name: str, pipe_blueprint: PipeLLMSpec, domain: str, expected: Dict[str, Any]):
         """Test converting PipeLLM blueprints to core blueprints."""
         # Perform conversion
-        core_pipe = pipe_blueprint.to_core_blueprint(pipe_code=pipe_code, domain=domain)
+        core_pipe = pipe_blueprint.to_core_blueprint(pipe_code=pipe_blueprint.the_pipe_code, domain=domain)
 
         # Basic assertions
-        assert isinstance(core_pipe, PipeLLMBlueprintCore)
+        assert isinstance(core_pipe, PipeLLMBlueprint)
         assert core_pipe.type == "PipeLLM"
 
         # Check expected fields
@@ -54,7 +54,7 @@ class TestPipeLLMBlueprintConversion:
                 assert isinstance(core_pipe.llm, str)
                 assert core_pipe.llm == expected["llm"]
             elif expected["llm_type"] == "object":
-                assert isinstance(core_pipe.llm, LLMSettingCore)
+                assert isinstance(core_pipe.llm, LLMSetting)
                 if "llm_handle" in expected:
                     assert core_pipe.llm.llm_handle == expected["llm_handle"]
                 if "llm_temperature" in expected:
@@ -81,4 +81,4 @@ class TestPipeLLMBlueprintConversion:
 
         if "llm_to_structure_type" in expected:
             if expected["llm_to_structure_type"] == "object":
-                assert isinstance(core_pipe.llm_to_structure, LLMSettingCore)
+                assert isinstance(core_pipe.llm_to_structure, LLMSetting)

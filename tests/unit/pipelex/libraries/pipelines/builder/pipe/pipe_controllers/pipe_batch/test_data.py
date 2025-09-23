@@ -4,12 +4,10 @@ Test data for PipeBatchBlueprint conversion tests.
 
 from typing import ClassVar, List, Tuple
 
-from pipelex.core.pipes.pipe_input_spec_blueprint import (
-    InputRequirementBlueprint as InputRequirementBlueprintCore,
-)
-from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_batch_builder import PipeBatchBlueprint
-from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint as PipeBatchBlueprintCore
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_batch_spec import PipeBatchSpec
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 
 
 class PipeBatchTestCases:
@@ -17,17 +15,17 @@ class PipeBatchTestCases:
 
     SIMPLE_BATCH = (
         "simple_batch",
-        PipeBatchBlueprint(
+        PipeBatchSpec(
+            the_pipe_code="batch_processor",
             definition="Process items in batch",
-            inputs={"items": InputRequirementBlueprint(concept="ItemList")},
+            inputs={"items": InputRequirementSpec(concept="ItemList")},
             output="ProcessedItems",
             branch_pipe_code="process_item",
         ),
-        "batch_processor",
         "test_domain",
-        PipeBatchBlueprintCore(
+        PipeBatchBlueprint(
             definition="Process items in batch",
-            inputs={"items": InputRequirementBlueprintCore(concept="ItemList")},
+            inputs={"items": InputRequirementBlueprint(concept="ItemList")},
             output="ProcessedItems",
             type="PipeBatch",
             category="PipeController",
@@ -39,19 +37,19 @@ class PipeBatchTestCases:
 
     BATCH_WITH_NAMES = (
         "batch_with_names",
-        PipeBatchBlueprint(
+        PipeBatchSpec(
+            the_pipe_code="named_batch",
             definition="Batch with custom names",
-            inputs={"data": InputRequirementBlueprint(concept="DataList")},
+            inputs={"data": InputRequirementSpec(concept="DataList")},
             output="Results",
             branch_pipe_code="transform_data",
             input_list_name="data_list",
             input_item_name="current_data",
         ),
-        "named_batch",
         "test_domain",
-        PipeBatchBlueprintCore(
+        PipeBatchBlueprint(
             definition="Batch with custom names",
-            inputs={"data": InputRequirementBlueprintCore(concept="DataList")},
+            inputs={"data": InputRequirementBlueprint(concept="DataList")},
             output="Results",
             type="PipeBatch",
             category="PipeController",
@@ -61,7 +59,7 @@ class PipeBatchTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeBatchBlueprint, str, str, PipeBatchBlueprintCore]]] = [
+    TEST_CASES: ClassVar[List[Tuple[str, PipeBatchSpec, str, PipeBatchBlueprint]]] = [
         SIMPLE_BATCH,
         BATCH_WITH_NAMES,
     ]

@@ -253,7 +253,7 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
         func_registry.register_function(valid_async_function)
         func_registry.register_function(invalid_sync_function)
 
-        # Only the valid function should be registered
+        # Only the valid function should be registered (invalid function silently skipped)
         assert func_registry.has_function("valid_async_function"), "Valid async function should be registered"
         assert not func_registry.has_function("invalid_sync_function"), "Invalid sync function should NOT be registered"
 
@@ -266,10 +266,10 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
         def another_invalid_function(working_memory: WorkingMemory) -> TextContent:
             return TextContent(text="another_invalid")
 
-        # Register multiple functions at once
-        func_registry.register_functions([another_valid_function, another_invalid_function])
+        # Register multiple functions at once - invalid functions should be silently skipped
+        func_registry.register_functions([another_invalid_function, another_valid_function])
 
-        # Only the valid function should be registered
+        # Only valid function should be registered, invalid function silently skipped
         assert func_registry.has_function("another_valid_function"), "Valid async function should be registered"
         assert not func_registry.has_function("another_invalid_function"), "Invalid sync function should NOT be registered"
 

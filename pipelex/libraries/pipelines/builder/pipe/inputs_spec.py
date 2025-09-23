@@ -3,13 +3,13 @@ from typing import Optional
 from pydantic import Field, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint as InputRequirementBlueprintCore
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuffs.stuff_content import StructuredContent
 
 
-class InputRequirementBlueprint(StructuredContent):
-    """Blueprint specifying input requirements for a pipe in the Pipelex framework.
+class InputRequirementSpec(StructuredContent):
+    """Spec specifying input requirements for a pipe in the Pipelex framework.
 
     Defines the concept type and multiplicity constraints for pipe inputs, ensuring
     proper data validation and flow control in pipeline execution.
@@ -25,9 +25,6 @@ class InputRequirementBlueprint(StructuredContent):
         1. Concept must be a valid concept code (PascalCase) or concept string (domain.ConceptCode).
         2. Domain and concept code are separated by a dot when using full concept strings.
         3. Concept validation is performed using ConceptBlueprint.validate_concept_string_or_concept_code.
-
-    Raises:
-        ValidationError: When concept format is invalid or doesn't meet PascalCase requirements.
     """
 
     concept: str = Field(description="Concept code or concept string in PascalCase format")
@@ -39,7 +36,5 @@ class InputRequirementBlueprint(StructuredContent):
         ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=concept_string)
         return concept_string
 
-    def to_core_input_requirement(self, domain: str) -> InputRequirementBlueprintCore:
-        """Convert this InputRequirementBlueprint to the core InputRequirement."""
-
-        return InputRequirementBlueprintCore(concept=self.concept, multiplicity=self.multiplicity)
+    def to_core_input_requirement(self, domain: str) -> InputRequirementBlueprint:
+        return InputRequirementBlueprint(concept=self.concept, multiplicity=self.multiplicity)

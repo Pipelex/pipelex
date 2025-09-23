@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint

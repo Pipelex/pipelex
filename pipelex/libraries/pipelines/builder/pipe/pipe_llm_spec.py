@@ -3,17 +3,15 @@ from typing import Literal, Optional, Union
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import Self, override
 
-from pipelex.cogt.llm.llm_setting import LLMChoice as LLMSettingOrPresetIdCore
-from pipelex.cogt.llm.llm_setting import LLMSetting as LLMSettingCore
+from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint as PipeLLMBlueprintCore
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
 
 
-class LLMSetting(StructuredContent):
+class LLMSettingSpec(StructuredContent):
     llm_handle: str
     temperature: float = Field(..., ge=0, le=1)
     max_tokens: Optional[int] = None
@@ -29,17 +27,18 @@ class LLMSetting(StructuredContent):
             return value
 
 
-LLMSettingOrPresetId = Union[LLMSetting, str]
+LLMChoiceSpec = Union[LLMSettingSpec, str]
 
 
-class PipeLLMBlueprint(PipeBlueprint):
-    """Blueprint for LLM-based pipe operations in the Pipelex framework.
+class PipeLLMSpec(PipeSpec):
+    """Spec for LLM-based pipe operations in the Pipelex framework.
 
     PipeLLM enables Large Language Model processing to generate text or structured output.
     Supports text, structured data, and image inputs with flexible prompt configuration
     and output structuring methods.
 
     Attributes:
+        the_pipe_code: Pipe code. Must be snake_case.
         type: Fixed to "PipeLLM" for this pipe type.
         system_prompt_template: Template for system prompt with inline variables using $ syntax.
         system_prompt_template_name: Name reference to a system prompt template.
@@ -74,14 +73,11 @@ class PipeLLMBlueprint(PipeBlueprint):
         3. Output cardinality: nb_output and multiple_output are mutually exclusive.
         4. nb_output must be greater than 0 when specified.
         5. Structuring method must be 'direct' or 'preliminary_text' when specified.
-
-    Raises:
-        PipeDefinitionError: When validation rules are violated or mutually exclusive
-                            fields are set simultaneously.
     """
 
     type: Literal["PipeLLM"] = "PipeLLM"
     category: Literal["PipeOperator"] = "PipeOperator"
+    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     system_prompt_template: Optional[str] = None
     system_prompt_template_name: Optional[str] = None
     system_prompt_name: Optional[str] = None
@@ -92,8 +88,8 @@ class PipeLLMBlueprint(PipeBlueprint):
     prompt_name: Optional[str] = None
     prompt: Optional[str] = None
 
-    llm: Optional[LLMSettingOrPresetId] = None
-    llm_to_structure: Optional[LLMSettingOrPresetId] = None
+    llm: Optional[LLMChoiceSpec] = None
+    llm_to_structure: Optional[LLMChoiceSpec] = None
 
     structuring_method: Optional[StructuringMethod] = None
     prompt_template_to_structure: Optional[str] = None
@@ -122,18 +118,17 @@ class PipeLLMBlueprint(PipeBlueprint):
         return self
 
     @override
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeLLMBlueprintCore:
-        """Convert this PipeLLMBlueprint to the core PipeLLMBlueprint."""
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeLLMBlueprint:
         base_blueprint = super().to_core_blueprint(pipe_code, domain)
-        llm: Optional[LLMSettingOrPresetIdCore] = None
-        if isinstance(self.llm, LLMSetting):
-            llm = LLMSettingCore(llm_handle=self.llm.llm_handle, temperature=self.llm.temperature, max_tokens=self.llm.max_tokens)
+        llm: Optional[LLMChoice] = None
+        if isinstance(self.llm, LLMSettingSpec):
+            llm = LLMSetting(llm_handle=self.llm.llm_handle, temperature=self.llm.temperature, max_tokens=self.llm.max_tokens)
         elif isinstance(self.llm, str):
             llm = self.llm
 
-        llm_to_structure: Optional[LLMSettingOrPresetIdCore] = None
-        if isinstance(self.llm_to_structure, LLMSetting):
-            llm_to_structure = LLMSettingCore(
+        llm_to_structure: Optional[LLMChoice] = None
+        if isinstance(self.llm_to_structure, LLMSettingSpec):
+            llm_to_structure = LLMSetting(
                 llm_handle=self.llm_to_structure.llm_handle,
                 temperature=self.llm_to_structure.temperature,
                 max_tokens=self.llm_to_structure.max_tokens,
@@ -141,7 +136,7 @@ class PipeLLMBlueprint(PipeBlueprint):
         elif isinstance(self.llm_to_structure, str):
             llm_to_structure = self.llm_to_structure
 
-        return PipeLLMBlueprintCore(
+        return PipeLLMBlueprint(
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
@@ -163,7 +158,3 @@ class PipeLLMBlueprint(PipeBlueprint):
             nb_output=self.nb_output,
             multiple_output=self.multiple_output,
         )
-
-
-class PipeLLMSpecBlueprint(PipeLLMBlueprint):
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")

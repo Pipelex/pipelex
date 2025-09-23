@@ -3,12 +3,11 @@ from typing import Any, Dict, Optional, Union
 from pydantic import Field, field_validator
 
 from pipelex.core.pipes.exceptions import PipeBlueprintError
-from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint as PipeBlueprintCore
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint as InputRequirementBlueprintCore
+from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff_content import StructuredContent
-from pipelex.libraries.pipelines.builder.concept.concept_builder import ConceptBlueprint, ConceptSpec
-from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
+from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptBlueprint, ConceptSpec
+from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
 from pipelex.tools.misc.string_utils import is_snake_case
 
 
@@ -27,8 +26,8 @@ class PipeSignature(StructuredContent):
     )
 
 
-class PipeBlueprint(StructuredContent):
-    """Blueprint defining a pipe component in the Pipelex framework.
+class PipeSpec(StructuredContent):
+    """Spec defining a pipe component in the Pipelex framework.
 
     Pipes are the fundamental processing units in Pipelex workflows. They transform
     input concepts into output concepts through various operations like LLM processing,
@@ -52,9 +51,6 @@ class PipeBlueprint(StructuredContent):
         2. Output concept: Must be valid concept string or code in PascalCase.
         3. Input concepts: When provided, must use PascalCase for concept references.
         4. Pipe codes: When validating pipe codes, must be in snake_case format.
-
-    Raises:
-        PipeBlueprintError: When validation rules are violated.
     """
 
     type: Any = Field(description=f"Pipe type. Must be one of: {[AllowedPipeTypes.value for AllowedPipeTypes in AllowedPipeTypes]}")
@@ -62,10 +58,10 @@ class PipeBlueprint(StructuredContent):
         description=f"Pipe category. Must be one of: {[AllowedPipeCategories.value for AllowedPipeCategories in AllowedPipeCategories]}"
     )
     definition: Optional[str] = Field(description="Natural language description of what the pipe does.")
-    inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = Field(
+    inputs: Optional[Dict[str, Union[str, InputRequirementSpec]]] = Field(
         description=(
             "Input concept specifications. Can be either: "
-            "InputRequirementBlueprint with additional constraints"
+            "InputRequirementSpec with additional constraints"
             "Dictionary keys are input names, values are concept specifications. If Its the concept itself, use the concept code in PascalCase."
         )
     )
@@ -73,7 +69,6 @@ class PipeBlueprint(StructuredContent):
 
     @field_validator("type", mode="after")
     def validate_pipe_type(cls, value: Any) -> Any:
-        """Validate that the pipe type is one of the allowed values."""
         allowed_types = [_type.value for _type in AllowedPipeTypes]
         if value not in allowed_types:
             raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {allowed_types}")
@@ -90,19 +85,17 @@ class PipeBlueprint(StructuredContent):
             raise PipeBlueprintError(f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case.")
         return pipe_code
 
-    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeBlueprintCore:
-        """Convert this PipeBlueprint to the core PipeBlueprint."""
-        # Convert inputs
-        converted_inputs: Optional[Dict[str, Union[str, InputRequirementBlueprintCore]]] = None
+    def to_core_blueprint(self, pipe_code: str, domain: str) -> PipeBlueprint:
+        converted_inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
         if self.inputs:
             converted_inputs = {}
             for input_name, input_spec in self.inputs.items():
-                if isinstance(input_spec, InputRequirementBlueprint):
+                if isinstance(input_spec, InputRequirementSpec):
                     converted_inputs[input_name] = input_spec.to_core_input_requirement(domain)
                 else:
-                    converted_inputs[input_name] = InputRequirementBlueprintCore(concept=input_spec)
+                    converted_inputs[input_name] = InputRequirementBlueprint(concept=input_spec)
 
-        return PipeBlueprintCore(
+        return PipeBlueprint(
             definition=self.definition,
             inputs=converted_inputs,
             output=self.output,

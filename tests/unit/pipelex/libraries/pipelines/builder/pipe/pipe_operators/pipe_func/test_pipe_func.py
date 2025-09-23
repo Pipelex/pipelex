@@ -4,8 +4,8 @@ Test suite for PipeFuncBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_func_builder import PipeFuncBlueprint
-from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint as PipeFuncBlueprintCore
+from pipelex.libraries.pipelines.builder.pipe.pipe_func_spec import PipeFuncSpec
+from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 
 from .test_data import PipeFuncTestCases
 
@@ -20,10 +20,10 @@ class TestPipeFuncBlueprintConversion:
     def test_pipe_func_to_core(
         self,
         test_name: str,
-        pipe_blueprint: PipeFuncBlueprint,
+        pipe_blueprint: PipeFuncSpec,
         pipe_code: str,
         domain: str,
-        expected_core: PipeFuncBlueprintCore,
+        expected_core: PipeFuncBlueprint,
     ):
         """Test converting various pipe func blueprints to core blueprints."""
         result = pipe_blueprint.to_core_blueprint(pipe_code=pipe_code, domain=domain)

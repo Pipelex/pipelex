@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_input import PipeInputSpec, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
 from pipelex.core.stuffs.stuff_content import ListContent, StuffContent, TextContent

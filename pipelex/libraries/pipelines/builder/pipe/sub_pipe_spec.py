@@ -5,14 +5,14 @@ from typing_extensions import Self
 
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint as SubPipeBlueprintCore
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
 
 
-class SubPipeBlueprint(StructuredContent):
-    """Blueprint for a single step within a pipe controller.
+class SubPipeSpec(StructuredContent):
+    """Spec for a single step within a pipe controller.
 
-    SubPipeBlueprint defines individual pipe executions within controller pipes
+    SubPipeSpec defines individual pipe executions within controller pipes
     (PipeSequence, PipeParallel, PipeBatch, PipeCondition). Supports output
     cardinality control and batch processing configuration.
 
@@ -35,9 +35,6 @@ class SubPipeBlueprint(StructuredContent):
         2. batch_over and batch_as must be specified together (both or neither).
         3. pipe must reference a valid pipe code.
         4. result, when specified, should follow naming conventions.
-
-    Raises:
-        PipeDefinitionError: When validation rules are violated.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -68,9 +65,9 @@ class SubPipeBlueprint(StructuredContent):
 
         return self
 
-    def to_core_sub_pipe(self) -> SubPipeBlueprintCore:
+    def to_core_sub_pipe(self) -> SubPipeBlueprint:
         """Convert this SubPipeBlueprint to the core SubPipe."""
-        return SubPipeBlueprintCore(
+        return SubPipeBlueprint(
             pipe=self.pipe,
             result=self.result,
             nb_output=self.nb_output,

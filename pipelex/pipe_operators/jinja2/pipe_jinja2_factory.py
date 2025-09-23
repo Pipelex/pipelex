@@ -4,8 +4,8 @@ from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2
