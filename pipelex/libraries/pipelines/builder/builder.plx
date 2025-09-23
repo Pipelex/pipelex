@@ -9,10 +9,17 @@ PipeBlueprint = "A blueprint for a single pipe definition."
 PipeFailure = "Details of a single pipe failure during dry run."
 DryRunResult = "A result of a dry run of a pipelex bundle blueprint."
 
+[concept.DomainInformation]
+definition = "A domain information object."
+
+[concept.DomainInformation.structure]
+domain = { type = "text", definition = "The domain of the bundle."}
+definition = { type = "text", definition = "The definition of the bundle."}
+
 # ────────────────────────────────────────────────────────────────────────────────
 # Main
 # ────────────────────────────────────────────────────────────────────────────────
-
+[pipe]
 [pipe.pipe_builder]
 type = "PipeSequence"
 description = "This pipe is going to be the entry point for the builder. It will take a UserBrief and return a PipelexBundleBlueprint."
@@ -23,11 +30,28 @@ steps = [
     { pipe = "parallel_draft_to_specs" },
     { pipe = "materialize_concept_specs", result = "concept_specs" },
     { pipe = "materialize_pipe_signatures", result = "pipe_signatures" },
+    { pipe = "pipe_builder_domain_information", result = "domain_information" },
     { pipe = "build_concept_blueprint", batch_over = "concept_specs", batch_as = "concept_spec", result = "concept_spec_blueprints" },
     { pipe = "create_pipes_from_signatures", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_spec_blueprints" },
     { pipe = "compile_in_pipelex_bundle_blueprint", result = "pipelex_bundle_blueprint" }
     { pipe = "validate_pipelex_bundle_blueprint", result = "pipelex_bundle_blueprint" }
 ]
+
+[pipe.pipe_builder_domain_information]
+type = "PipeLLM"
+description = "Turn the brief into a DomainInformation object."
+inputs = { brief = "UserBrief" }
+output = "DomainInformation"
+prompt_template = """
+Based on the brief output the "domain" of this pipe, and a definition of what it would represent.
+
+Brief:
+@brief
+
+For example, if the pipe is about generating a compliance matrix out of a RFP, the domain would be "rfp_compliance_matrix"...
+It should be not more than 4 words, in snake_case.
+For the definition, i would like to see a short description of what the bundle would represent.
+"""
 
 # ────────────────────────────────────────────────────────────────────────────────
 # STAGE 1 — plan (natural language pseudo-code, but explicit about IO + sequencing)
@@ -58,7 +82,12 @@ We have pipe controllers:
     and what the different pipes are that can be executed based on the condition. It needs to reference the pipes it will execute.
 - PipeBatch: A pipe that executes a batch of pipes in parallel. It needs to reference the pipe it will execute.
 - PipeImgGen: A pipe that uses an LLM to generate an image. VERY IMPORTANT: IF YOU DECIDE TO CREATE A PIPEIMGEN, YOU ALSO HAVE TO CREATE A PIPELLM THAT WILL WRITE THE PROMPT, AND THAT NEEDS TO PRECEED THE PIPEIMGEN, based on the necessary elements.
-- PipeOcr: A pipe that uses an OCR technology to extract text from an image. VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE NAMED "ocr_input" and it must be either an image or a pdf or a concept which refines one of them. Usually there is no need to rename a variable or create a new concept, just call it ocr_input, and we'll use the basic PDF concept. Thats mean that in the sequence, the input should be ocr_input.
+That means that in the MAIN pipeline, the prompt should NOT be an input. It should be a step that generates the prompt.
+- PipeOcr: A pipe that uses an OCR technology to extract text from an image.
+VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE NAMED "ocr_input" and it must be either an image or a pdf or a concept which refines one of them.
+Usually there is no need to rename a variable or create a new concept, just call it ocr_input, and we'll use the basic PDF concept.
+Thats mean that in the sequence, the input should be ocr_input.
+So the input of PipeOcr is {ocr_input: "PDF"} or {ocr_input: "Image"} or a concept which refines one of them.
 
 Be very detailed, process by steps.
 
@@ -115,11 +144,18 @@ A dict with:
 You can have multiple fields if needed, but each field should represent a single value.
 
 Otherwise, there are native concepts that you can use:
-If the concept you want to create is JUST a text, assign "Text" to the refines field, and no structure field.
-If the concept you want to create is JUST an image, assign "Image" to the refines field, and no structure field.
-If the concept you want to create is JUST a PDF, assign "PDF" to the refines field, and no structure field.
-If the concept you want to create is JUST a Number, assign "Number" to the refines field, and no structure field.
+If the concept you want to create is JUST a text, assign "Text" to the 'refines' field, and no structure field.
+If the concept you want to create is JUST an image, assign "Image" to the 'refines' field, and no structure field.
+If the concept you want to create is JUST a PDF, assign "PDF" to the 'refines' field, and no structure field.
+If the concept you want to create is JUST a Number, assign "Number" to the 'refines' field, and no structure field.
 
+DO NOT redefine native concepts:
+- Text
+- Image
+- PDF
+- Number
+- Page
+If you need one of these, you will later on use them, but you should NOT REDEFINE THEM.
 Plan:
 @plan_draft
 
@@ -192,10 +228,12 @@ The output should be the concept code that refines Image.
 - nb_output: Number of images to generate (default 1)
 VERY IMPORTANT: IF YOU DECIDE TO CREATE A PIPEIMGEN, YOU ALSO HAVE TO CREATE A PIPELLM THAT WILL WRITE THE PROMPT, AND THAT NEEDS TO PRECEED THE PIPEIMGEN, based on the necessary elements.
 THERFORE, the OUTPUT OF THIS PIPELLM should be a VARIABLE NAMED "prompt" that will be used as input for the PipeImgGen.
+That means that in the MAIN pipeline, the prompt should NOT be an input. It should be a step that generates the prompt.
 
 **PipeOcr**: A pipe that uses an LLM to extract text from an image.
 - The INPUTS of this pipe is only "ocr_input" and it must be either an image or a pdf or a concept which refines one of them.
 - Usually there is no need to rename a variable or create a new concept, just call it ocr_input, and we'll use the basic PDF concept. Thats mean that in the sequence, the input should be ocr_input.
+So the input of PipeOcr is {ocr_input: "PDF"} or {ocr_input: "Image"} or a concept which refines one of them.
 
 **PipeFunc**: A pipe that executes a custom Python function.
 - function_name: Name of the Python function to call
@@ -255,6 +293,13 @@ VERY IMPORTANT: A pipe has inputs, and an output. The inputs are a dict of keys 
 The output is a concept code in PascalCase.
 The field "result" is corresponding to the name of the result of the pipe. It will be used in the inputs of the next pipes.
 It is important that they link each other in the right way.
+
+The output concept should be a concepts should be in PascalCase
+
+IMPORTANT:
+- THE MAIN PIPE SHOULD CONTAIN IN ITS NAME "main_pipeline"
+- IF THERE IS A PipeIMG, VERIFIES THAT THE INPUT PROMPT IS ACTUALLY GENERATED BY A PIPELLM BEFORE THE PIPEIMG.
+THIS PIPELLM SHOULD NAME THE RESULT OF ITS PIPE "prompt".
 
 PipeSignatures:
 @pipe_signatures_text

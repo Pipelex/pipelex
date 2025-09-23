@@ -201,10 +201,11 @@ async def compile_in_pipelex_bundle_blueprint(working_memory: WorkingMemory) -> 
     # Get pipe blueprints as ListContent directly and cast for typing
     # We can't use get_stuff_as_list with Union types, so we get the raw content
     pipe_spec_blueprints = cast(ListContent[PipeSpecBlueprintUnion], working_memory.get_stuff(name="pipe_spec_blueprints").content)
+    domain_information = working_memory.get_stuff(name="domain_information").content
 
     return PipelexBundleBlueprint(
-        domain="builder",
-        definition="Builder pipeline library",
+        domain=domain_information.domain,
+        definition=domain_information.definition,
         concept={
             concept_spec_blueprint.the_concept_code: ConceptBlueprint(**concept_spec_blueprint.model_dump(exclude={"the_concept_code"}))
             for concept_spec_blueprint in concept_blueprints.items
@@ -247,6 +248,8 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
     pipelex_bundle_blueprint_core = pipelex_bundle_blueprint.to_core_blueprint()
 
     library_manager = get_library_manager()
+    from pipelex import pretty_print
+    pretty_print(pipelex_bundle_blueprint_core)
     pipes = library_manager.load_from_blueprint(blueprint=pipelex_bundle_blueprint_core)
     dry_run_result = await dry_run_pipes(pipes=pipes, raise_on_failure=False)
     library_manager.remove_from_blueprint(blueprint=pipelex_bundle_blueprint_core)

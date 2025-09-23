@@ -203,6 +203,7 @@ Return a PipeImgGenSpecBlueprint for this signature.
 The inputs for the image has to be only:
 input_name : prompt
 concept : A concept that refines Text. It should be text
+The output concept should be a concept in Pascal case that refines Image.
 For example:
 ```
 inputs = { prompt: ImgGenPrompt }
