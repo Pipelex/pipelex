@@ -165,7 +165,7 @@ def _convert_pipe_spec_to_blueprint(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
     return cast(PipeSpecUnion, pipe_class(**pipe_data))
 
 
-async def compile_in_pipelex_bundle_blueprint(working_memory: WorkingMemory) -> PipelexBundleSpec:
+async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> PipelexBundleSpec:
     """Construct a PipelexBundleSpec from working memory containing concept and pipe blueprints.
 
     Args:
@@ -174,26 +174,26 @@ async def compile_in_pipelex_bundle_blueprint(working_memory: WorkingMemory) -> 
     Returns:
         PipelexBundleSpec: The constructed pipeline spec.
     """
-    concept_blueprints = working_memory.get_stuff_as_list(
-        name="concept_spec_blueprints",
+    concept_specs = working_memory.get_stuff_as_list(
+        name="concept_specs",
         item_type=ConceptSpec,
     )
 
     # Get pipe blueprints as ListContent directly and cast for typing
     # We can't use get_stuff_as_list with Union types, so we get the raw content
-    pipe_spec_blueprints = cast(ListContent[PipeSpecUnion], working_memory.get_stuff(name="pipe_spec_blueprints").content)
+    pipe_specs = cast(ListContent[PipeSpecUnion], working_memory.get_stuff(name="pipe_specs").content)
     domain_information = working_memory.get_stuff(name="domain_information").content
 
     return PipelexBundleSpec(
         domain=domain_information.domain,  # type: ignore
         definition=domain_information.definition,  # type: ignore
         concept={
-            concept_spec_blueprint.the_concept_code: ConceptSpec(**concept_spec_blueprint.model_dump(exclude={"the_concept_code"}))
-            for concept_spec_blueprint in concept_blueprints.items
+            concept_spec.the_concept_code: ConceptSpec(**concept_spec.model_dump(exclude={"the_concept_code"}))
+            for concept_spec in concept_specs.items
         },
         pipe={
-            pipe_spec_blueprint.the_pipe_code: _convert_pipe_spec_to_blueprint(pipe_spec_blueprint)
-            for pipe_spec_blueprint in pipe_spec_blueprints.items
+            pipe_spec.the_pipe_code: _convert_pipe_spec_to_blueprint(pipe_spec)
+            for pipe_spec in pipe_specs.items
         },
     )
 
@@ -273,15 +273,14 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
 
 
 async def reconstruct_bundle_with_all_fixes(working_memory: WorkingMemory) -> PipelexBundleSpec:
-    """Reconstruct the bundle blueprint with all the fixed pipes."""
-    pipelex_bundle_blueprint = working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleSpec)
+    pipelex_bundle_spec = working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
     fixed_pipes_list = cast(ListContent[PipeSpecUnion], working_memory.get_stuff(name="fixed_pipes").content)
 
-    if not pipelex_bundle_blueprint.pipe:
-        raise ValueError("No pipes section found in bundle blueprint")
+    if not pipelex_bundle_spec.pipe:
+        raise ValueError("No pipes section found in bundle spec")
 
     for fixed_pipe_blueprint in fixed_pipes_list.items:
         pipe_code = fixed_pipe_blueprint.the_pipe_code
-        pipelex_bundle_blueprint.pipe[pipe_code] = _convert_pipe_spec_to_blueprint(fixed_pipe_blueprint)
+        pipelex_bundle_spec.pipe[pipe_code] = _convert_pipe_spec_to_blueprint(fixed_pipe_blueprint)
 
-    return pipelex_bundle_blueprint
+    return pipelex_bundle_spec

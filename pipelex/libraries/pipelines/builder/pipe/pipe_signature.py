@@ -87,7 +87,7 @@ class PipeSpec(StructuredContent):
 
     def to_blueprint(self) -> PipeBlueprint:
         converted_inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
-        if self.inputs:
+        if self.inputs is not None:
             converted_inputs = {}
             for input_name, input_spec in self.inputs.items():
                 if isinstance(input_spec, InputRequirementSpec):
