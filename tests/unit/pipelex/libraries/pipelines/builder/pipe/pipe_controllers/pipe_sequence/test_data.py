@@ -8,8 +8,8 @@ from pipelex.core.pipes.pipe_input_spec_blueprint import (
     InputRequirementBlueprint as InputRequirementBlueprintCore,
 )
 from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_sequence import PipeSequenceBlueprint
-from pipelex.libraries.pipelines.builder.pipe.sub_pipe import SubPipeBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_builder import PipeSequenceBlueprint
+from pipelex.libraries.pipelines.builder.pipe.sub_pipe_builder import SubPipeBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import (
     PipeSequenceBlueprint as PipeSequenceBlueprintCore,
 )

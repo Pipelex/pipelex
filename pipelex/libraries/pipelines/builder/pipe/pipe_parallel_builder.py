@@ -3,9 +3,9 @@ from typing import List, Literal, Optional
 from pydantic import Field, field_validator
 from typing_extensions import override
 
-from pipelex.libraries.pipelines.builder.concept.concept import ConceptBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
-from pipelex.libraries.pipelines.builder.pipe.sub_pipe import SubPipeBlueprint
+from pipelex.libraries.pipelines.builder.concept.concept_builder import ConceptBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeBlueprint
+from pipelex.libraries.pipelines.builder.pipe.sub_pipe_builder import SubPipeBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint as PipeParallelBlueprintCore
 
 

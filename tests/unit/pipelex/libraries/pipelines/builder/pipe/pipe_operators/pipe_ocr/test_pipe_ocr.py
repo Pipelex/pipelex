@@ -4,7 +4,7 @@ Test suite for PipeOcrBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_ocr import PipeOcrBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_builder import PipeOcrBlueprint
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint as PipeOcrBlueprintCore
 
 from .test_data import PipeOcrTestCases

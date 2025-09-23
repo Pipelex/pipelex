@@ -7,7 +7,7 @@ import pytest
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint as ConceptBlueprintCore,
 )
-from pipelex.libraries.pipelines.builder.concept.concept import ConceptBlueprint
+from pipelex.libraries.pipelines.builder.concept.concept_builder import ConceptBlueprint
 
 from .test_data import ConceptBlueprintTestCases
 

@@ -4,7 +4,7 @@ Test suite for PipeConditionBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_condition import PipeConditionBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_condition_builder import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import (
     PipeConditionBlueprint as PipeConditionBlueprintCore,
 )

@@ -4,7 +4,7 @@ Test suite for PipeBatchBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_batch import PipeBatchBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_batch_builder import PipeBatchBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint as PipeBatchBlueprintCore
 
 from .test_data import PipeBatchTestCases

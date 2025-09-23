@@ -13,7 +13,7 @@ from pipelex.core.concepts.concept_blueprint import (
 from pipelex.core.concepts.concept_blueprint import (
     ConceptStructureBlueprintFieldType as ConceptStructureBlueprintFieldTypeCore,
 )
-from pipelex.libraries.pipelines.builder.concept.concept import (
+from pipelex.libraries.pipelines.builder.concept.concept_builder import (
     ConceptBlueprint,
     ConceptStructureBlueprint,
     ConceptStructureBlueprintFieldType,

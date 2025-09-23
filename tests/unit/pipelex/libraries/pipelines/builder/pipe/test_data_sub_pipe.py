@@ -4,7 +4,7 @@ Test data for SubPipeBlueprint conversion tests.
 
 from typing import ClassVar, List, Tuple
 
-from pipelex.libraries.pipelines.builder.pipe.sub_pipe import SubPipeBlueprint
+from pipelex.libraries.pipelines.builder.pipe.sub_pipe_builder import SubPipeBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint as SubPipeBlueprintCore
 
 

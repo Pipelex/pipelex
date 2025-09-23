@@ -4,7 +4,7 @@ Test suite for PipeFuncBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_func import PipeFuncBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_func_builder import PipeFuncBlueprint
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint as PipeFuncBlueprintCore
 
 from .test_data import PipeFuncTestCases

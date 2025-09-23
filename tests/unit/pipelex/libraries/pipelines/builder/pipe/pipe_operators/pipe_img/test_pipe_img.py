@@ -4,7 +4,7 @@ Test suite for PipeImgGenBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_img import PipeImgGenBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_img_builder import PipeImgGenBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import (
     PipeImgGenBlueprint as PipeImgGenBlueprintCore,
 )

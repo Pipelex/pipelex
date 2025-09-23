@@ -13,17 +13,17 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent
 from pipelex.hub import get_library_manager
-from pipelex.libraries.pipelines.builder.concept.concept import ConceptBlueprint, ConceptSpec, ConceptSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe import PipeSignature
-from pipelex.libraries.pipelines.builder.pipe.pipe_batch import PipeBatchBlueprint, PipeBatchSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_condition import PipeConditionBlueprint, PipeConditionSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_func import PipeFuncBlueprint, PipeFuncSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_img import PipeImgGenBlueprint, PipeImgGenSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_jinja2 import PipeJinja2Blueprint, PipeJinja2SpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_llm import PipeLLMBlueprint, PipeLLMSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_ocr import PipeOcrBlueprint, PipeOcrSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_parallel import PipeParallelBlueprint, PipeParallelSpecBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_sequence import PipeSequenceBlueprint, PipeSequenceSpecBlueprint
+from pipelex.libraries.pipelines.builder.concept.concept_builder import ConceptBlueprint, ConceptSpec, ConceptSpecBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_batch_builder import PipeBatchBlueprint, PipeBatchSpecBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_condition_builder import PipeConditionBlueprint, PipeConditionSpecBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_func_builder import PipeFuncBlueprint, PipeFuncSpecBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_img_builder import PipeImgGenBlueprint, PipeImgGenSpecBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_jinja2_builder import PipeJinja2Blueprint, PipeJinja2SpecBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_llm_builder import PipeLLMBlueprint, PipeLLMSpecBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_builder import PipeOcrBlueprint, PipeOcrSpecBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_builder import PipeParallelBlueprint, PipeParallelSpecBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_builder import PipeSequenceBlueprint, PipeSequenceSpecBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSignature
 from pipelex.pipe_works.pipe_dry import dry_run_pipes
 from pipelex.types import StrEnum
 
@@ -204,8 +204,8 @@ async def compile_in_pipelex_bundle_blueprint(working_memory: WorkingMemory) -> 
     domain_information = working_memory.get_stuff(name="domain_information").content
 
     return PipelexBundleBlueprint(
-        domain=domain_information.domain,
-        definition=domain_information.definition,
+        domain=domain_information.domain,  # type: ignore
+        definition=domain_information.definition,  # type: ignore
         concept={
             concept_spec_blueprint.the_concept_code: ConceptBlueprint(**concept_spec_blueprint.model_dump(exclude={"the_concept_code"}))
             for concept_spec_blueprint in concept_blueprints.items
@@ -249,6 +249,7 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
 
     library_manager = get_library_manager()
     from pipelex import pretty_print
+
     pretty_print(pipelex_bundle_blueprint_core)
     pipes = library_manager.load_from_blueprint(blueprint=pipelex_bundle_blueprint_core)
     dry_run_result = await dry_run_pipes(pipes=pipes, raise_on_failure=False)

@@ -10,8 +10,8 @@ import typer
 from pipelex import log, pretty_print
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
 from pipelex.hub import get_report_delegate
-from pipelex.libraries.pipelines.builder.concept.concept import ConceptSpec
-from pipelex.libraries.pipelines.builder.pipe.pipe import PipeSignature
+from pipelex.libraries.pipelines.builder.concept.concept_builder import ConceptSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSignature
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
@@ -365,15 +365,15 @@ def test_validation_cmd(
     def _create_real_bundle_blueprint():
         """Create a comprehensive PipelexBundleBlueprint instance for testing."""
         from pipelex.libraries.pipelines.builder.builder import PipelexBundleBlueprint
-        from pipelex.libraries.pipelines.builder.concept.concept import (
+        from pipelex.libraries.pipelines.builder.concept.concept_builder import (
             ConceptBlueprint,
             ConceptStructureBlueprint,
             ConceptStructureBlueprintFieldType,
         )
-        from pipelex.libraries.pipelines.builder.pipe.pipe_condition import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
-        from pipelex.libraries.pipelines.builder.pipe.pipe_llm import PipeLLMBlueprint
-        from pipelex.libraries.pipelines.builder.pipe.pipe_sequence import PipeSequenceBlueprint
-        from pipelex.libraries.pipelines.builder.pipe.sub_pipe import SubPipeBlueprint
+        from pipelex.libraries.pipelines.builder.pipe.pipe_condition_builder import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
+        from pipelex.libraries.pipelines.builder.pipe.pipe_llm_builder import PipeLLMBlueprint
+        from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_builder import PipeSequenceBlueprint
+        from pipelex.libraries.pipelines.builder.pipe.sub_pipe_builder import SubPipeBlueprint
 
         # Create concept blueprints
         task_concept = ConceptBlueprint(
