@@ -163,6 +163,8 @@ async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipel
     Returns:
         PipelexBundleSpec: The constructed pipeline spec.
     """
+    # The working memory actually contains ConceptSpec objects (not ConceptSpecDraft)
+    # but they may have been deserialized incorrectly
     concept_specs = working_memory.get_stuff_as_list(
         name="concept_specs",
         item_type=ConceptSpec,
@@ -171,9 +173,12 @@ async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipel
     pipe_specs = cast(ListContent[PipeSpecUnion], working_memory.get_stuff(name="pipe_specs").content)
     domain_information = working_memory.get_stuff_as(name="domain_information", content_type=DomainInformation)
 
+    # Properly validate and reconstruct concept specs to ensure proper Pydantic validation
     validated_concepts: Dict[str, Union[ConceptSpec, str]] = {}
     for concept_spec in concept_specs.items:
         try:
+            # Re-create the ConceptSpec to ensure proper Pydantic validation
+            # This handles any serialization/deserialization issues from working memory
             validated_concept = ConceptSpec(**concept_spec.model_dump())
             validated_concepts[validated_concept.the_concept_code] = validated_concept
         except Exception as e:
