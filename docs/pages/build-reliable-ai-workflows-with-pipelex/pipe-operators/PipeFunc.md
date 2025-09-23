@@ -4,34 +4,43 @@ The `PipeFunc` operator provides an essential escape hatch, allowing you to exec
 
 ## How it works
 
-`PipeFunc` operates by calling a Python function that has been registered with Pipelex's central function registry.
+`PipeFunc` operates by calling a Python function that has been automatically registered with Pipelex's central function registry.
 
-1.  **Function Registration**: First, you must define a standard Python function and register it with a unique name. This is done once when your application starts up.
-2.  **Function Signature**: The registered function **must** accept a single argument: `working_memory: WorkingMemory`. This object provides access to all the data currently available in the pipeline.
-3.  **Execution**: When the `PipeFunc` pipe is executed, it looks up your function by its registered name and calls it, passing in the current `working_memory`.
-4.  **Returning Data**: The function can return data, which `PipeFunc` will then place back into the working memory, associated with the pipe's `output` concept.
+1.  **Automatic Registration**: Functions are automatically discovered and registered from Python files in the `pipelex/libraries/` directory when Pipelex starts up.
+2.  **Function Signature**: Eligible functions are automatically registered using their function name as the registry key.
+3.  **Execution**: When the `PipeFunc` pipe is executed, it looks up your function by name and calls it, passing in the current `working_memory`.
+4.  **Returning Data**: The function returns data, which `PipeFunc` places back into the working memory, associated with the pipe's `output` concept.
+
+## Function Eligibility Requirements
+
+For a function to be automatically registered and available to `PipeFunc`, it **must** meet all of the following criteria:
+
+!!! warning "Function Eligibility Requirements"
+    - **Must be an async function** (defined with `async def`)
+    - **Must have exactly 1 parameter** named `working_memory`
+    - **Parameter type must be** `WorkingMemory`
+    - **Return type must be** a subclass of `StuffContent` (or a generic type like `ListContent[SomeType]`)
+    - **Must be defined in a Pipelex library file** within the `pipelines/` directory
 
 ### Return values
 
-Your Python function can return one of the following:
+Your async Python function can return:
 -   A `StuffContent` object (e.g., `TextContent`, `ImageContent`, or a custom `StructuredContent` model).
--   A `list` of `StuffContent` objects.
--   A simple Python `str`, which will be automatically converted to a `TextContent`.
+-   A `ListContent` containing `StuffContent` objects.
 
-## How to Register a Function
+## How to Create a Function
 
-To make a Python function available to `PipeFunc`, you must register it using the global `func_registry`.
+To make a Python function available to `PipeFunc`, simply create it in any Python file within the `pipelex/libraries/` directory structure.
 
-Here is an example of a function and its registration:
+Here is an example of an eligible function:
 
 ```python
-# in a file like my_custom_functions.py
+# in a file like pipelex/libraries/my_custom_functions.py
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import TextContent
-from pipelex.tools.func_registry import func_registry
 
-def concatenate_texts(working_memory: WorkingMemory) -> TextContent:
+async def concatenate_texts(working_memory: WorkingMemory) -> TextContent:
     """
     Retrieves two text stuffs, concatenates them, and returns a new text stuff.
     """
@@ -42,14 +51,9 @@ def concatenate_texts(working_memory: WorkingMemory) -> TextContent:
     concatenated = f"{text1} -- {text2}"
 
     return TextContent(text=concatenated)
-
-def register_my_functions():
-    """This function should be called at application startup."""
-    func_registry.register_function(concatenate_texts, name="combine_two_texts")
-
 ```
 
-You would then call `register_my_functions()` when your Pipelex application initializes.
+The function will be automatically registered with the name `concatenate_texts` (the function name) when Pipelex starts up.
 
 ## Configuration
 
@@ -66,12 +70,12 @@ Once the function is registered, you can use it in your `.plx` file.
 
 ### Example
 
-This PLX snippet shows how to use the `combine_two_texts` function defined above. It assumes two previous pipes have produced outputs named `text_a` and `text_b`.
+This PLX snippet shows how to use the `concatenate_texts` function defined above. It assumes two previous pipes have produced outputs named `text_a` and `text_b`.
 
 ```plx
 [pipe.combine_them]
 type = "PipeFunc"
 definition = "Combine two text inputs using a custom Python function"
-function_name = "combine_two_texts"
+function_name = "concatenate_texts"
 output = "ConcatenatedText"
 ```

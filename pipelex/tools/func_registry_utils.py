@@ -1,9 +1,7 @@
 import inspect
 from pathlib import Path
-from typing import Any, Callable, List, get_type_hints
+from typing import Any, Callable, List
 
-from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.func_registry import func_registry
 from pipelex.tools.typing.module_inspector import import_module_from_file
 
@@ -16,7 +14,9 @@ class FuncRegistryUtils:
         is_recursive: bool = True,
     ) -> None:
         """
-        Registers all functions in Python files within a folder that have:
+        Discovers and attempts to register all functions in Python files within a folder.
+        Only functions that meet the eligibility criteria will be registered:
+        - Must be an async function
         - Exactly 1 parameter named "working_memory" with type WorkingMemory
         - Return type that is a subclass of StuffContent
 
@@ -57,9 +57,7 @@ class FuncRegistryUtils:
     @classmethod
     def _find_functions_in_module(cls, module: Any) -> List[Callable[..., Any]]:
         """
-        Finds all functions in a module that match the criteria:
-        - Exactly 1 parameter named "working_memory" with type WorkingMemory
-        - Return type that is a subclass of StuffContent
+        Finds all functions in a module (eligibility will be checked during registration).
         """
         functions: List[Callable[..., Any]] = []
         module_name = module.__name__
@@ -70,66 +68,10 @@ class FuncRegistryUtils:
             if obj.__module__ != module_name:
                 continue
 
-            if cls._is_eligible_function(obj):
-                functions.append(obj)
+            # Add all functions - eligibility will be checked by func_registry.register_function
+            functions.append(obj)
 
         return functions
-
-    @classmethod
-    def _is_eligible_function(cls, func: Callable[..., Any]) -> bool:
-        """
-        Checks if a function matches the criteria:
-        - Exactly 1 parameter named "working_memory" with type WorkingMemory
-        - Return type that is a subclass of StuffContent
-        """
-        try:
-            # Get function signature
-            sig = inspect.signature(func)
-            params = list(sig.parameters.values())
-
-            # Check parameter count and name
-            if len(params) != 1:
-                return False
-
-            param = params[0]
-            if param.name != "working_memory":
-                return False
-
-            # Get type hints
-            type_hints = get_type_hints(func)
-
-            # Check parameter type
-            if "working_memory" not in type_hints:
-                return False
-
-            param_type = type_hints["working_memory"]
-            if param_type != WorkingMemory:
-                return False
-
-            # Check return type
-            if "return" not in type_hints:
-                return False
-
-            return_type = type_hints["return"]
-
-            # Check if return type is a subclass of StuffContent
-            try:
-                if inspect.isclass(return_type) and issubclass(return_type, StuffContent):
-                    return True
-                # Handle generic types like ListContent[SomeType]
-                if hasattr(return_type, "__origin__"):
-                    origin = getattr(return_type, "__origin__")
-                    if inspect.isclass(origin) and issubclass(origin, StuffContent):
-                        return True
-            except TypeError:
-                # Handle cases where issubclass fails on generic types
-                pass
-
-            return False
-
-        except Exception:
-            # If we can't analyze the function, skip it
-            return False
 
     @classmethod
     def _find_files_in_dir(cls, dir_path: str, pattern: str, is_recursive: bool) -> List[Path]:

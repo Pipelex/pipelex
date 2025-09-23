@@ -1,10 +1,10 @@
+import inspect
 import logging
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Optional, TypeVar, get_type_hints
 
 from pydantic import Field, PrivateAttr, RootModel
 
 from pipelex.tools.exceptions import ToolException
-from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 
 FUNC_REGISTRY_LOGGER_CHANNEL_NAME = "func_registry"
 
@@ -37,14 +37,20 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         name: Optional[str] = None,
         should_warn_if_already_registered: bool = True,
     ) -> None:
-        """Registers a function in the registry with a name."""
+        """Registers a function in the registry with a name if it meets eligibility criteria."""
+        if not self.is_eligible_function(func):
+            self.log(f"Function '{func.__name__}' is not eligible for registration - skipping")
+            return
+
         key = name or func.__name__
         if key in self.root:
             if should_warn_if_already_registered:
                 self.log(f"Function '{key}' already exists in registry")
+            else:
+                raise FuncRegistryError(f"Function '{key}' already exists in registry")
         else:
             self.log(f"Registered new single function '{key}' in registry")
-        self.root[key] = func
+        self.root.update({key: func})
 
     def unregister_function(self, func: Callable[..., Any]) -> None:
         """Unregisters a function from the registry."""
@@ -61,36 +67,14 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         del self.root[name]
 
     def register_functions_dict(self, functions: Dict[str, Callable[..., Any]]) -> None:
-        """Registers multiple functions in the registry with names."""
-        self.root.update(functions)
-        nb_functions = len(functions)
-        if nb_functions > 1:
-            self.log(f"Registered {nb_functions} functions in registry")
-            functions_list_str = "\n".join([f"{key}: {value.__name__}" for key, value in functions.items()])
-            logging.log(level=LOGGING_LEVEL_VERBOSE, msg=functions_list_str)
-        else:
-            self.log(f"Registered single function '{list(functions.values())[0].__name__}' in registry")
+        """Registers multiple functions in the registry with names if they meet eligibility criteria."""
+        for name, func in functions.items():
+            self.register_function(func=func, name=name, should_warn_if_already_registered=False)
 
     def register_functions(self, functions: List[Callable[..., Any]]) -> None:
-        """Registers multiple functions in the registry with names."""
-        if not functions:
-            self.log("register_functions called with empty list of functions to register")
-            return
-
+        """Registers multiple functions in the registry with names if they meet eligibility criteria."""
         for func in functions:
-            key = func.__name__
-            if key in self.root:
-                self.log(f"Function '{key}' already exists in registry, skipping")
-                continue
-            self.root[key] = func
-
-        nb_functions = len(functions)
-        if nb_functions > 1:
-            self.log(f"Registered {nb_functions} functions in registry")
-            functions_list_str = "\n".join([f"{func.__name__}: {func}" for func in functions])
-            logging.log(level=LOGGING_LEVEL_VERBOSE, msg=functions_list_str)
-        else:
-            self.log(f"Registered single function '{functions[0].__name__}' in registry")
+            self.register_function(func=func, should_warn_if_already_registered=False)
 
     def get_function(self, name: str) -> Optional[Callable[..., Any]]:
         """Retrieves a function from the registry by its name. Returns None if not found."""
@@ -99,7 +83,10 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def get_required_function(self, name: str) -> Callable[..., Any]:
         """Retrieves a function from the registry by its name. Raises an error if not found."""
         if name not in self.root:
-            raise FuncRegistryError(f"Function '{name}' not found in registry")
+            raise FuncRegistryError(
+                f"Function '{name}' not found in registry: \
+                See how to register a function here: https://docs.pipelex.com/pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc"
+            )
         return self.root[name]
 
     def get_required_function_with_signature(self, name: str, expected_signature: Callable[..., T]) -> Callable[..., T]:
@@ -120,6 +107,70 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def has_function(self, name: str) -> bool:
         """Checks if a function is in the registry by its name."""
         return name in self.root
+
+    def is_eligible_function(self, func: Callable[..., Any]) -> bool:
+        """
+        Checks if a function matches the criteria for PipeFunc registration:
+        - Must be an async function
+        - Exactly 1 parameter named "working_memory" with type WorkingMemory
+        - Return type that is a subclass of StuffContent
+        """
+        try:
+            # Import here to avoid circular imports
+            from pipelex.core.memory.working_memory import WorkingMemory
+            from pipelex.core.stuffs.stuff_content import StuffContent
+
+            # Check if function is async
+            if not inspect.iscoroutinefunction(func):
+                return False
+
+            # Get function signature
+            sig = inspect.signature(func)
+            params = list(sig.parameters.values())
+
+            # Check parameter count and name
+            if len(params) != 1:
+                return False
+
+            param = params[0]
+            if param.name != "working_memory":
+                return False
+
+            # Get type hints
+            type_hints = get_type_hints(func)
+
+            # Check parameter type
+            if "working_memory" not in type_hints:
+                return False
+
+            param_type = type_hints["working_memory"]
+            if param_type != WorkingMemory:
+                return False
+
+            # Check return type
+            if "return" not in type_hints:
+                return False
+
+            return_type = type_hints["return"]
+
+            # Check if return type is a subclass of StuffContent
+            try:
+                if inspect.isclass(return_type) and issubclass(return_type, StuffContent):
+                    return True
+                # Handle generic types like ListContent[SomeType]
+                if hasattr(return_type, "__origin__"):
+                    origin = getattr(return_type, "__origin__")
+                    if inspect.isclass(origin) and issubclass(origin, StuffContent):
+                        return True
+            except TypeError:
+                # Handle cases where issubclass fails on generic types
+                pass
+
+            return False
+
+        except Exception:
+            # If we can't analyze the function, skip it
+            return False
 
 
 func_registry = FuncRegistry()
