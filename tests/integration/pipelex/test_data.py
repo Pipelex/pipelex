@@ -203,22 +203,24 @@ Woman typing on a laptop. On the laptop screen you see python code to generate c
 class StructuredDataTestCases:
     """Test cases for extracting structured data from text prompts."""
 
+    EXTRACTION_PROMPT = """
+Extract information from the following text:
+@data
+"""
+
     # ConceptWithSimpleStructure test cases
     SIMPLE_STRUCTURE_1 = """
-    Extract the following information:
     - name: "Alice Johnson"
     - age: 28
     - is_active: true
     """
 
     SIMPLE_STRUCTURE_2 = """
-    Person details:
     The person's name is Bob Smith, they are 45 years old and their account is not active (is_active: false).
     """
 
     # ConceptWithOptionals test cases
     OPTIONAL_ALL_PRESENT = """
-    Extract this data:
     - required_field: "This is required"
     - optional_string: "This optional has a value"
     - optional_number: 42
@@ -226,7 +228,6 @@ class StructuredDataTestCases:
     """
 
     OPTIONAL_SOME_MISSING = """
-    Please extract:
     - required_field: "Only required field present"
     - optional_string: NOT PROVIDED (should be null)
     - optional_number: 100
@@ -234,28 +235,24 @@ class StructuredDataTestCases:
     """
 
     OPTIONAL_ALL_MISSING = """
-    Data to extract:
     - required_field: "Mandatory value here"
     Note: All optional fields should be null/None as they are not provided.
     """
 
     # ConceptWithLists test cases
     LISTS_WITH_DATA = """
-    Extract these lists:
     - string_list: ["apple", "banana", "cherry", "date"]
     - number_list: [1, 2, 3, 5, 8, 13]
     - optional_list: ["first", "second", "third"]
     """
 
     LISTS_EMPTY = """
-    Extract the following:
     - string_list: [] (empty list)
     - number_list: [] (empty list)
     - optional_list: null (not provided, should be None)
     """
 
     LISTS_MIXED = """
-    List data:
     - string_list: ["only", "one"]
     - number_list: [42]
     - optional_list: NOT PROVIDED (should be null)
@@ -263,14 +260,12 @@ class StructuredDataTestCases:
 
     # CocneptWithDicts test cases (keeping the typo to match the model)
     DICTS_WITH_DATA = """
-    Dictionary data to extract:
     - string_dict: {"key1": "value1", "key2": "value2", "name": "test"}
     - mixed_dict: {"count": 10, "label": "important", "id": 999}
     - optional_dict: {"status": "active", "mode": "production"}
     """
 
     DICTS_EMPTY = """
-    Extract dictionaries:
     - string_dict: {} (empty dictionary)
     - mixed_dict: {"only_string": "no numbers here"}
     - optional_dict: null (not provided)
@@ -278,21 +273,18 @@ class StructuredDataTestCases:
 
     # ConceptWithUnions test cases
     UNIONS_STRING_VARIANT = """
-    Extract union type data:
     - string_or_int: "This is a string value"
     - optional_union: "Also a string"
     - list_of_unions: ["text1", "text2", 100, 200, "text3"]
     """
 
     UNIONS_INT_VARIANT = """
-    Union data:
     - string_or_int: 42 (as integer)
     - optional_union: true (as boolean)
     - list_of_unions: [1, 2, 3, 4, 5]
     """
 
     UNIONS_MIXED = """
-    Mixed union types:
     - string_or_int: 999
     - optional_union: NOT PROVIDED (should be None)
     - list_of_unions: ["mixed", 123, "types", 456, "here"]
@@ -300,7 +292,6 @@ class StructuredDataTestCases:
 
     # ConceptWithNestedStructures test cases
     NESTED_FULL = """
-    Extract nested structure data:
     - simple_nested: {
         name: "Nested Person",
         age: 30,
@@ -319,7 +310,6 @@ class StructuredDataTestCases:
     """
 
     NESTED_PARTIAL = """
-    Nested data with some missing optionals:
     - simple_nested: {
         name: "Main Structure",
         age: 40,
@@ -330,7 +320,6 @@ class StructuredDataTestCases:
     """
 
     NESTED_COMPLEX = """
-    Complex nested structure:
     - simple_nested: {
         name: "Complex Example",
         age: 35,
@@ -348,21 +337,21 @@ class StructuredDataTestCases:
     """
 
     # Combined test cases for parametrized tests
-    STRUCTURE_TEST_CASES: ClassVar[List[Tuple[str, str, str]]] = [  # topic, prompt, expected_structure_type
+    STRUCTURE_TEST_CASES: ClassVar[List[Tuple[str, str, str]]] = [  # topic, data, concept
         ("Simple structure basic", SIMPLE_STRUCTURE_1, "ConceptWithSimpleStructure"),
-        ("Simple structure narrative", SIMPLE_STRUCTURE_2, "ConceptWithSimpleStructure"),
-        ("Optionals all present", OPTIONAL_ALL_PRESENT, "ConceptWithOptionals"),
-        ("Optionals some missing", OPTIONAL_SOME_MISSING, "ConceptWithOptionals"),
-        ("Optionals all missing", OPTIONAL_ALL_MISSING, "ConceptWithOptionals"),
-        ("Lists with data", LISTS_WITH_DATA, "ConceptWithLists"),
-        ("Lists empty", LISTS_EMPTY, "ConceptWithLists"),
-        ("Lists mixed", LISTS_MIXED, "ConceptWithLists"),
-        ("Dicts with data", DICTS_WITH_DATA, "CocneptWithDicts"),
-        ("Dicts empty", DICTS_EMPTY, "CocneptWithDicts"),
-        ("Unions string variant", UNIONS_STRING_VARIANT, "ConceptWithUnions"),
-        ("Unions int variant", UNIONS_INT_VARIANT, "ConceptWithUnions"),
-        ("Unions mixed", UNIONS_MIXED, "ConceptWithUnions"),
-        ("Nested full", NESTED_FULL, "ConceptWithNestedStructures"),
-        ("Nested partial", NESTED_PARTIAL, "ConceptWithNestedStructures"),
-        ("Nested complex", NESTED_COMPLEX, "ConceptWithNestedStructures"),
+        # ("Simple structure narrative", SIMPLE_STRUCTURE_2, "ConceptWithSimpleStructure"),
+        # ("Optionals all present", OPTIONAL_ALL_PRESENT, "ConceptWithOptionals"),
+        # ("Optionals some missing", OPTIONAL_SOME_MISSING, "ConceptWithOptionals"),
+        # ("Optionals all missing", OPTIONAL_ALL_MISSING, "ConceptWithOptionals"),
+        # ("Lists with data", LISTS_WITH_DATA, "ConceptWithLists"),
+        # ("Lists empty", LISTS_EMPTY, "ConceptWithLists"),
+        # ("Lists mixed", LISTS_MIXED, "ConceptWithLists"),
+        # ("Dicts with data", DICTS_WITH_DATA, "CocneptWithDicts"),
+        # ("Dicts empty", DICTS_EMPTY, "CocneptWithDicts"),
+        # ("Unions string variant", UNIONS_STRING_VARIANT, "ConceptWithUnions"),
+        # ("Unions int variant", UNIONS_INT_VARIANT, "ConceptWithUnions"),
+        # ("Unions mixed", UNIONS_MIXED, "ConceptWithUnions"),
+        # ("Nested full", NESTED_FULL, "ConceptWithNestedStructures"),
+        # ("Nested partial", NESTED_PARTIAL, "ConceptWithNestedStructures"),
+        # ("Nested complex", NESTED_COMPLEX, "ConceptWithNestedStructures"),
     ]

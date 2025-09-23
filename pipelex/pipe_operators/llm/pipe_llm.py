@@ -532,19 +532,25 @@ class PipeLLM(PipeOperator):
 
         # TODO: use proper prompt templating for this
         if is_with_preliminary_text:
-            output_structure_prompt = (
-                "\n\n---\nRequested output format: The requested output will be used to define the following class "
-                f"(follow the rules if any): Re-declare all inherited fields in {class_name}; do not rely on inheritance in the final code."
-                f"{class_structure_str}\n"
-                "You do NOT need to output a formatted JSON object, another LLM will take care of that. "
-                "Just output the text representation of the class."
-                "DO NOT create information. If the information is not present, output the default value."
-            )
+            output_structure_prompt = f"""
+
+---
+The instance we want to generate will be for the following class:
+{class_structure_str}
+
+Don't bother with JSON formatting, we'll do that as a second step.
+For now, just output markdown with the details of the instance.
+DO NOT create information.
+If some information is not present for an attribute, output the default value or None according to the attribute definition.
+"""
         else:
-            output_structure_prompt = (
-                "\n\n---\nRequested output format: The output must conform to the following BaseModel "
-                f"(follow the rules if any): Re-declare all inherited fields in {class_name}; do not rely on inheritance in the final code."
-                f"{class_structure_str}\n"
-                "DO NOT create information. If the information is not present, output the default value."
-            )
+            output_structure_prompt = f"""
+
+---
+The instance we want to generate will be for the following class:
+{class_structure_str}
+
+DO NOT create information.
+If some information is not present for an attribute, output the default value or None according to the attribute definition.
+"""
         return output_structure_prompt

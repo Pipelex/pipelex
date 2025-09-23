@@ -4,18 +4,18 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_native import NativeConceptEnum
-from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.hub import get_pipe_provider, get_pipe_router
+from pipelex.hub import get_class_registry, get_pipe_provider, get_pipe_router
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLMOutput
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
-from tests.integration.pipelex.test_data import PipeTestCases
+from pipelex.tools.class_registry_utils import ClassRegistryUtils
+from tests.integration.pipelex.test_data import PipeTestCases, StructuredDataTestCases
 
 
 @pytest.mark.dry_runnable
@@ -54,20 +54,41 @@ class TestPipeLLM:
         llm_generated_text = pipe_llm_output.main_stuff_as_text
         pretty_print(llm_generated_text, title="llm_generated_text")
 
+    @pytest.mark.parametrize(
+        "topic,data,concept",
+        StructuredDataTestCases.STRUCTURE_TEST_CASES,
+    )
+    @pytest.mark.parametrize(
+        "structuring_method",
+        [
+            StructuringMethod.DIRECT,
+            StructuringMethod.PRELIMINARY_TEXT,
+        ],
+    )
     async def test_pipe_llm_structured(
         self,
+        topic: str,
+        data: str,
+        concept: str,
+        structuring_method: StructuringMethod,
         pipe_run_mode: PipeRunMode,
     ):
+        pretty_print(data, title="data")
+        working_memory = WorkingMemoryFactory.make_from_text(text=data, name="data")
+
+        # Create pipe blueprint
         pipe_llm_blueprint = PipeLLMBlueprint(
-            definition="LLM test for basic text generation",
-            output=NativeConceptEnum.TEXT,
-            system_prompt=PipeTestCases.SYSTEM_PROMPT,
-            prompt=PipeTestCases.USER_PROMPT,
-            structuring_method=StructuringMethod.PRELIMINARY_TEXT,
+            definition=f"Extract {concept} from text",
+            inputs={"data": "Text"},
+            output=f"test_structured_generations.{concept}",
+            prompt_template=StructuredDataTestCases.EXTRACTION_PROMPT,
+            llm="gemini-2.5-flash-lite",
+            structuring_method=structuring_method,
         )
+
         pipe = PipeLLMFactory.make_from_blueprint(
-            domain="documents",
-            pipe_code="adhoc_for_test_pipe_llm",
+            domain="test_structured_generations",
+            pipe_code=f"extract_{concept.lower()}_{structuring_method.value}",
             blueprint=pipe_llm_blueprint,
         )
         pipe_provider = get_pipe_provider()
@@ -75,15 +96,40 @@ class TestPipeLLM:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
+            working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
         pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
             pipe_job=pipe_job,
         )
 
-        log.verbose(pipe_llm_output, title="stuff")
-        llm_generated_text = pipe_llm_output.main_stuff_as_text
-        pretty_print(llm_generated_text, title="llm_generated_text")
+        # Log test information
+        log.verbose(f"Testing {topic} with {structuring_method.value} method", title="Test Case")
+
+        # Get the main output
+        main_stuff = pipe_llm_output.main_stuff
+        assert main_stuff is not None, f"No output generated for {topic}"
+
+        # Pretty print the structured output
+        pretty_print(main_stuff.content, title=f"{topic} - {concept} - {structuring_method}")
+
+        # If using PRELIMINARY_TEXT, also print the preliminary text
+        # if structuring_method == StructuringMethod.PRELIMINARY_TEXT:
+        #     # Get preliminary text from working memory
+        #     preliminary_stuff = pipe_llm_output.working_memory.get_optional_stuff("preliminary_text")
+        #     if preliminary_stuff:
+        #         content = preliminary_stuff.content
+        #         if hasattr(content, "text"):
+        #             pretty_print(content.text, title="Preliminary Text")  # type: ignore
+        #         else:
+        #             pretty_print(str(content), title="Preliminary Text")
+
+        # Verify the output type matches expected structure
+        structure_class = get_class_registry().get_class(concept)
+        assert structure_class is not None, f"Structure class {concept} not found in registry"
+        assert isinstance(main_stuff.content, structure_class), (
+            f"Output content is not of expected type {concept}. Got {type(main_stuff.content).__name__} instead."
+        )
 
     @pytest.mark.llm
     @pytest.mark.inference

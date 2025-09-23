@@ -1,31 +1,21 @@
 import asyncio
-from typing import Any, List, Optional, Type, Union
+from typing import List, Optional
 
-import instructor
 from google import genai
 from google.genai import types as genai_types
-from typing_extensions import override
 
-from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCompletionError
+from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
     PromptImageBase64,
-    PromptImageBinary,
     PromptImagePath,
     PromptImageUrl,
 )
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
-from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.backend import InferenceBackend
-from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import load_binary_async
-from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
 class GoogleFactoryError(CogtError):
