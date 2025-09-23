@@ -5,7 +5,7 @@ Test suite for base PipeBlueprint.to_core_blueprint conversion method.
 import pytest
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint as PipeBlueprintCore
-from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeBlueprint
 
 from .test_data_pipe import PipeBlueprintTestCases
 

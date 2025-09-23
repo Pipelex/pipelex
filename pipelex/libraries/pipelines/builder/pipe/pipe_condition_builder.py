@@ -3,7 +3,7 @@ from typing import Dict, Literal, Optional
 from pydantic import Field, RootModel
 from typing_extensions import override
 
-from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import (
     PipeConditionBlueprint as PipeConditionBlueprintCore,
 )

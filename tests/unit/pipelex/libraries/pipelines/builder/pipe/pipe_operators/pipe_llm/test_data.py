@@ -4,7 +4,7 @@ Test data for PipeLLMBlueprint conversion tests.
 
 from typing import Any, ClassVar, Dict, List, Tuple
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_llm import LLMSetting, PipeLLMBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_llm_builder import LLMSetting, PipeLLMBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 
 

@@ -9,7 +9,7 @@ from pipelex.core.pipes.pipe_input_spec_blueprint import (
     InputRequirementBlueprint as InputRequirementBlueprintCore,
 )
 from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeBlueprint
 
 
 class PipeBlueprintTestCases:

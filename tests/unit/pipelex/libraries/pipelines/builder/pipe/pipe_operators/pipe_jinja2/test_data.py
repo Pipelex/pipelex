@@ -8,7 +8,7 @@ from pipelex.core.pipes.pipe_input_spec_blueprint import (
     InputRequirementBlueprint as InputRequirementBlueprintCore,
 )
 from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_jinja2 import PipeJinja2Blueprint, PromptingStyle
+from pipelex.libraries.pipelines.builder.pipe.pipe_jinja2_builder import PipeJinja2Blueprint, PromptingStyle
 from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import (
     PipeJinja2Blueprint as PipeJinja2BlueprintCore,
 )

@@ -4,7 +4,7 @@ Test suite for PipeParallelBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_parallel import PipeParallelBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_builder import PipeParallelBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import (
     PipeParallelBlueprint as PipeParallelBlueprintCore,
 )

@@ -7,7 +7,7 @@ from typing import Any, Dict
 import pytest
 
 from pipelex.cogt.llm.llm_setting import LLMSetting as LLMSettingCore
-from pipelex.libraries.pipelines.builder.pipe.pipe_llm import PipeLLMBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_llm_builder import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint as PipeLLMBlueprintCore
 
 from .test_data import PipeLLMTestCases

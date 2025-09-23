@@ -8,7 +8,7 @@ from pipelex.core.pipes.pipe_input_spec_blueprint import (
     InputRequirementBlueprint as InputRequirementBlueprintCore,
 )
 from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_batch import PipeBatchBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_batch_builder import PipeBatchBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint as PipeBatchBlueprintCore
 
 

@@ -4,7 +4,7 @@ Test suite for PipeSequenceBlueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_sequence import PipeSequenceBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_builder import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import (
     PipeSequenceBlueprint as PipeSequenceBlueprintCore,
 )

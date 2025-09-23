@@ -7,7 +7,7 @@ from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipe
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint as PipeBlueprintCore
 from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint as InputRequirementBlueprintCore
 from pipelex.core.stuffs.stuff_content import StructuredContent
-from pipelex.libraries.pipelines.builder.concept.concept import ConceptBlueprint, ConceptSpec
+from pipelex.libraries.pipelines.builder.concept.concept_builder import ConceptBlueprint, ConceptSpec
 from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
 from pipelex.tools.misc.string_utils import is_snake_case
 

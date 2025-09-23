@@ -4,7 +4,7 @@ Test suite for SubPipeBlueprint.to_core_sub_pipe conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.sub_pipe import SubPipeBlueprint
+from pipelex.libraries.pipelines.builder.pipe.sub_pipe_builder import SubPipeBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint as SubPipeBlueprintCore
 
 from .test_data_sub_pipe import SubPipeTestCases

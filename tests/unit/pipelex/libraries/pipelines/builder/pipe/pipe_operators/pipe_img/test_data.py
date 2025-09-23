@@ -9,7 +9,7 @@ from pipelex.core.pipes.pipe_input_spec_blueprint import (
     InputRequirementBlueprint as InputRequirementBlueprintCore,
 )
 from pipelex.libraries.pipelines.builder.pipe.inputs import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_img import PipeImgGenBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_img_builder import PipeImgGenBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import (
     PipeImgGenBlueprint as PipeImgGenBlueprintCore,
 )

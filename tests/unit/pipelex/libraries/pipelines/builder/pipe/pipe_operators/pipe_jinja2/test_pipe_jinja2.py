@@ -4,7 +4,7 @@ Test suite for PipeJinja2Blueprint.to_core_blueprint conversion method.
 
 import pytest
 
-from pipelex.libraries.pipelines.builder.pipe.pipe_jinja2 import PipeJinja2Blueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_jinja2_builder import PipeJinja2Blueprint
 from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import (
     PipeJinja2Blueprint as PipeJinja2BlueprintCore,
 )

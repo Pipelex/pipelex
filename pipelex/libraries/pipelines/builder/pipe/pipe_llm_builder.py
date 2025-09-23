@@ -7,7 +7,7 @@ from pipelex.cogt.llm.llm_setting import LLMChoice as LLMSettingOrPresetIdCore
 from pipelex.cogt.llm.llm_setting import LLMSetting as LLMSettingCore
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.libraries.pipelines.builder.pipe.pipe import PipeBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint as PipeLLMBlueprintCore
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
