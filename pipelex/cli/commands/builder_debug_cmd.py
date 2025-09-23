@@ -336,49 +336,91 @@ def test_compile_cmd() -> None:
         return DomainInformation(domain="photo_opposite", definition="A pipeline that takes a photo and generates its visual opposite")
 
     def _get_example_concept_specs_for_compile():
-        """Get example concept specs for photo opposite pipeline."""
+        """Get the EXACT concept specs that are failing in the full pipeline."""
         return [
             ConceptSpec(
                 the_concept_code="PhotoAnalysis",
-                definition="Detailed analysis of a photo's visual characteristics including colors, composition, objects, lighting, and mood",
+                definition="Analysis of a photo's visual characteristics and content",
                 structure={
                     "dominant_color": ConceptStructureSpec(
                         the_field_name="dominant_color",
-                        definition="The primary color present in the image",
+                        definition="The primary color that appears most prominently in the photo",
                         type=ConceptStructureSpecFieldType.TEXT,
                         required=True,
+                        default_value=None,
                     ),
-                    "lighting_condition": ConceptStructureSpec(
-                        the_field_name="lighting_condition",
-                        definition="The lighting characteristics of the photo",
+                    "object_present": ConceptStructureSpec(
+                        the_field_name="object_present",
+                        definition="A key object or subject identified in the photo",
                         type=ConceptStructureSpecFieldType.TEXT,
                         required=True,
+                        default_value=None,
                     ),
                     "mood": ConceptStructureSpec(
                         the_field_name="mood",
-                        definition="The emotional tone or atmosphere conveyed by the image",
+                        definition="The emotional tone or atmosphere conveyed by the photo",
                         type=ConceptStructureSpecFieldType.TEXT,
                         required=True,
+                        default_value=None,
+                    ),
+                    "lighting": ConceptStructureSpec(
+                        the_field_name="lighting",
+                        definition="The type and quality of lighting in the photo",
+                        type=ConceptStructureSpecFieldType.TEXT,
+                        required=True,
+                        default_value=None,
+                    ),
+                    "composition_style": ConceptStructureSpec(
+                        the_field_name="composition_style",
+                        definition="The artistic arrangement and framing style of the photo",
+                        type=ConceptStructureSpecFieldType.TEXT,
+                        required=True,
+                        default_value=None,
                     ),
                 },
+                refines=None,
             ),
             ConceptSpec(
                 the_concept_code="OppositeDescription",
-                definition="Conceptual framework describing what the opposite of a photo should be",
+                definition="Description of the visual opposite concept for image generation",
                 structure={
-                    "opposite_color": ConceptStructureSpec(
-                        the_field_name="opposite_color",
-                        definition="The color that represents the opposite of the original dominant color",
+                    "target_color": ConceptStructureSpec(
+                        the_field_name="target_color",
+                        definition="The primary color that should dominate in the opposite image",
                         type=ConceptStructureSpecFieldType.TEXT,
                         required=True,
+                        default_value=None,
                     ),
-                    "opposite_mood": ConceptStructureSpec(
-                        the_field_name="opposite_mood",
-                        definition="The emotional tone that contrasts with the original mood",
+                    "target_mood": ConceptStructureSpec(
+                        the_field_name="target_mood",
+                        definition="The emotional tone that should be conveyed in the opposite image",
                         type=ConceptStructureSpecFieldType.TEXT,
                         required=True,
+                        default_value=None,
+                    ),
+                    "target_object": ConceptStructureSpec(
+                        the_field_name="target_object",
+                        definition="The main object or subject that should appear in the opposite image",
+                        type=ConceptStructureSpecFieldType.TEXT,
+                        required=True,
+                        default_value=None,
+                    ),
+                    "target_lighting": ConceptStructureSpec(
+                        the_field_name="target_lighting",
+                        definition="The type of lighting that should be used in the opposite image",
+                        type=ConceptStructureSpecFieldType.TEXT,
+                        required=True,
+                        default_value=None,
+                    ),
+                    "target_composition": ConceptStructureSpec(
+                        the_field_name="target_composition",
+                        definition="The composition style that should be applied to the opposite image",
+                        type=ConceptStructureSpecFieldType.TEXT,
+                        required=True,
+                        default_value=None,
                     ),
                 },
+                refines=None,
             ),
         ]
 
@@ -388,39 +430,118 @@ def test_compile_cmd() -> None:
 
         return [
             PipeLLMSpec(
-                the_pipe_code="analyze_photo",
                 type="PipeLLM",
-                definition="Analyzes the input photo to identify key visual elements",
+                category="PipeOperator",
+                definition="""
+                Analyzes the input photo using vision LLM capabilities to identify and extract key visual characteristics 
+                including dominant colors, lighting conditions, main subjects, 
+                composition style, mood, and visual elements that will be used to determine the opposite visual representation.""",
                 inputs={"photo": "Image"},
                 output="PhotoAnalysis",
-                prompt_template="Analyze this image in detail. Identify dominant colors, lighting, mood, and composition. Image: @photo",
+                the_pipe_code="analyze_photo",
+                system_prompt_template=None,
+                system_prompt_template_name=None,
+                system_prompt_name=None,
+                system_prompt=None,
+                prompt_template="""
+                Analyze this image in detail. Identify the following characteristics:\n\n1. Dominant colors and color palette\n2.
+                 Lighting conditions (bright/dark, warm/cool, natural/artificial)\n3. Main subjects and objects in the scene\n4. 
+                 Composition style (centered, rule of thirds, symmetrical, etc.)\n5. Overall mood and atmosphere\n6. Key visual elements 
+                 (textures, patterns, shapes)\n7. Background vs foreground elements\n8. Time of day if applicable\n9. Weather conditions 
+                 if visible\n10. Artistic style or photographic technique\n\nProvide a comprehensive analysis that captures the essence
+                  of this image's visual characteristics.\n\nImage: @photo""",
+                template_name=None,
+                prompt_name=None,
+                prompt=None,
+                llm=None,
+                llm_to_structure=None,
+                structuring_method=None,
+                prompt_template_to_structure=None,
+                system_prompt_to_structure=None,
+                nb_output=None,
+                multiple_output=False,
             ),
             PipeLLMSpec(
-                the_pipe_code="generate_opposite_concept",
                 type="PipeLLM",
-                definition="Determines what the conceptual opposite should be by inverting key visual characteristics",
+                category="PipeOperator",
+                definition="""
+                Creates a detailed and comprehensive prompt for image generation that describes the visual opposite of the 
+                analyzed photo by inverting colors, lighting, mood, composition, and other visual characteristics to produce a 
+                contrasting yet coherent image concept.""",
                 inputs={"photo_analysis": "PhotoAnalysis"},
-                output="OppositeDescription",
-                prompt_template="Based on this photo analysis, create a description of its visual opposite: @photo_analysis",
+                output="ImgGenPrompt",
+                the_pipe_code="generate_opposite_prompt",
+                system_prompt_template=None,
+                system_prompt_template_name=None,
+                system_prompt_name=None,
+                system_prompt=None,
+                prompt_template="""
+                Based on the following photo analysis, create a detailed image generation prompt that describes the visual 
+                OPPOSITE of the original image. Invert and contrast the key characteristics:\n\nOriginal Analysis: 
+                @photo_analysis\n\nCreate a prompt that:\n1. Uses opposite/complementary colors to the dominant colors\n2. 
+                Inverts the lighting (if bright make dark, if warm make cool, etc.)\n3. Changes the mood to the opposite 
+                (if cheerful make somber, if calm make energetic, etc.)\n4. Maintains visual coherence while being opposite\n5. 
+                Includes specific details about colors, lighting, atmosphere, and style\n6. Describes the scene composition and 
+                elements in opposite terms\n\nGenerate a detailed, specific prompt for creating this opposite image:""",
+                template_name=None,
+                prompt_name=None,
+                prompt=None,
+                llm=None,
+                llm_to_structure=None,
+                structuring_method=None,
+                prompt_template_to_structure=None,
+                system_prompt_to_structure=None,
+                nb_output=None,
+                multiple_output=False,
             ),
             PipeImgGenSpec(
-                the_pipe_code="generate_opposite_image",
                 type="PipeImgGen",
-                definition="Generates the final opposite image using the crafted prompt",
-                inputs={"prompt": "String"},
+                category="PipeOperator",
+                definition="""
+                Generates the opposite image using AI image generation based on the crafted prompt that 
+                describes visual characteristics opposite to the original photo, creating a contrasting yet aesthetically coherent result.""",
+                inputs={"prompt": "ImgGenPrompt"},
                 output="Image",
-                img_gen_prompt_var_name="prompt",
+                the_pipe_code="render_opposite_image",
+                img_gen_prompt=None,
+                img_gen_prompt_var_name=None,
+                img_gen=None,
+                aspect_ratio=None,
+                is_raw=None,
+                seed=None,
+                nb_output=1,
+                background=None,
+                output_format=None,
             ),
             PipeSequenceSpec(
-                the_pipe_code="main_pipeline_photo_opposite_renderer",
                 type="PipeSequence",
-                definition="Main pipeline that takes a photo and generates its visual opposite",
+                category="PipeController",
+                definition="Main pipeline that takes a photo as input and generates its visual opposite through a systematic process \
+                    of analyzing the original photo's characteristics, creating an opposite description, and rendering the opposite image. \
+                        This pipeline ensures proper sequential execution where each step builds upon the previous one's output.",
                 inputs={"photo": "Image"},
                 output="Image",
+                the_pipe_code="photo_opposite_renderer_main_pipeline",
                 steps=[
-                    SubPipeSpec(the_pipe_code="analyze_photo", result="photo_analysis"),
-                    SubPipeSpec(the_pipe_code="generate_opposite_concept", result="opposite_concept"),
-                    SubPipeSpec(the_pipe_code="generate_opposite_image", result="opposite_image"),
+                    SubPipeSpec(
+                        the_pipe_code="analyze_photo", result="photo_analysis", nb_output=None, multiple_output=None, batch_over=False, batch_as=None
+                    ),
+                    SubPipeSpec(
+                        the_pipe_code="generate_opposite_prompt",
+                        result="prompt",
+                        nb_output=None,
+                        multiple_output=None,
+                        batch_over=False,
+                        batch_as=None,
+                    ),
+                    SubPipeSpec(
+                        the_pipe_code="render_opposite_image",
+                        result="opposite_image",
+                        nb_output=None,
+                        multiple_output=None,
+                        batch_over=False,
+                        batch_as=None,
+                    ),
                 ],
             ),
         ]

@@ -169,17 +169,20 @@ async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipel
     )
 
     pipe_specs = cast(ListContent[PipeSpecUnion], working_memory.get_stuff(name="pipe_specs").content)
-    domain_information = working_memory.get_stuff(name="domain_information").content
+    domain_information = working_memory.get_stuff_as(name="domain_information", content_type=DomainInformation)
 
-    from pipelex import pretty_print
-
-    pretty_print(concept_specs)
-    pretty_print(pipe_specs)
+    validated_concepts: Dict[str, Union[ConceptSpec, str]] = {}
+    for concept_spec in concept_specs.items:
+        try:
+            validated_concept = ConceptSpec(**concept_spec.model_dump())
+            validated_concepts[validated_concept.the_concept_code] = validated_concept
+        except Exception as e:
+            raise ValueError(f"Failed to validate concept spec {concept_spec.the_concept_code}: {e}") from e
 
     return PipelexBundleSpec(
-        domain=domain_information.domain,  # type: ignore
-        definition=domain_information.definition,  # type: ignore
-        concept={concept_spec.the_concept_code: concept_spec for concept_spec in concept_specs.items},
+        domain=domain_information.domain,
+        definition=domain_information.definition,
+        concept=validated_concepts,
         pipe={pipe_spec.the_pipe_code: _convert_pipe_spec(pipe_spec) for pipe_spec in pipe_specs.items},
     )
 

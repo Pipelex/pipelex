@@ -278,8 +278,6 @@ class ConceptSpec(StructuredContent):
 
 
 async def create_concept_spec(working_memory: WorkingMemory) -> ConceptSpec:
-    """Create a ConceptSpec manually from ConceptSpec and ConceptStructureSpecBlueprint."""
-    # Get the inputs from working memory
     concept_spec_draft = working_memory.get_stuff_as(name="concept_spec_draft", content_type=ConceptSpecDraft)
     concept_spec_structures_stuff = working_memory.get_stuff_as_list(name="concept_spec_structures", item_type=ConceptStructureSpec)
 
@@ -294,11 +292,9 @@ async def create_concept_spec(working_memory: WorkingMemory) -> ConceptSpec:
         )
         structure_dict[structure_item.the_field_name] = structure_spec
 
-    concept_spec_spec = ConceptSpec(
+    return ConceptSpec(
         the_concept_code=concept_spec_draft.the_concept_code,
         definition=concept_spec_draft.definition,
         structure=structure_dict,
         refines=concept_spec_draft.refines,
     )
-
-    return concept_spec_spec

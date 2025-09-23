@@ -45,8 +45,8 @@ def build_pipe_cmd(
             input_memory={"brief": brief},
         )
         pretty_print(pipe_output, title="Pipe Output")
-        blueprint = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleSpec)
-        plx_content = PipelexInterpreter.make_plx_content(blueprint=blueprint.to_blueprint())
+        pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
+        plx_content = PipelexInterpreter.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
 
         # Save to file unless explicitly disabled with empty string
         if output_path and output_path != "":
