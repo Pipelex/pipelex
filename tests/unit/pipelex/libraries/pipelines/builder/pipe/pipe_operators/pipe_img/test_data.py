@@ -13,14 +13,13 @@ class PipeImgGenTestCases:
         PipeImgGenSpec(
             the_pipe_code="img_generator",
             definition="Generate an image",
-            inputs={},
+            inputs=None,
             output="GeneratedImage",
             img_gen_prompt="A beautiful sunset over mountains",
         ),
-        "test_domain",
         PipeImgGenBlueprint(
             definition="Generate an image",
-            inputs={},
+            inputs=None,
             output="GeneratedImage",
             type="PipeImgGen",
             category="PipeOperator",
@@ -48,7 +47,6 @@ class PipeImgGenTestCases:
             seed=42,
             nb_output=3,
         ),
-        "test_domain",
         PipeImgGenBlueprint(
             definition="Generate image with options",
             inputs={"description": InputRequirementBlueprint(concept="Text")},
@@ -67,7 +65,7 @@ class PipeImgGenTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeImgGenSpec, str, PipeImgGenBlueprint]]] = [
+    TEST_CASES: ClassVar[List[Tuple[str, PipeImgGenSpec, PipeImgGenBlueprint]]] = [
         SIMPLE_IMG_GEN,
         IMG_GEN_WITH_OPTIONS,
     ]

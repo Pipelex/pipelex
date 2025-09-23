@@ -6,7 +6,7 @@ from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff_content import StructuredContent
-from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptBlueprint, ConceptSpec
+from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptBlueprint, ConceptSpecDraft
 from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
 from pipelex.tools.misc.string_utils import is_snake_case
 
@@ -16,9 +16,9 @@ class PipeSignature(StructuredContent):
     type: AllowedPipeTypes = Field(description="Pipe type.")
     category: AllowedPipeCategories = Field(description="Pipe category.")
     definition: str = Field(description="What the pipe does")
-    inputs: Dict[str, ConceptSpec] = Field(description="Pipe inputs: key is the concept code in pascal Case.")
+    inputs: Dict[str, ConceptSpecDraft] = Field(description="Pipe inputs: key is the concept code in pascal Case.")
     result: str = Field(description="The name of the result of the pipe. Must be snake_case. It will be used in the inputs of the next pipes.")
-    output: ConceptSpec = Field(description="Concept as output")
+    output: ConceptSpecDraft = Field(description="Concept as output")
     important_features: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Important features specific to this pipe type "
@@ -87,7 +87,7 @@ class PipeSpec(StructuredContent):
 
     def to_blueprint(self) -> PipeBlueprint:
         converted_inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
-        if self.inputs:
+        if self.inputs is not None:
             converted_inputs = {}
             for input_name, input_spec in self.inputs.items():
                 if isinstance(input_spec, InputRequirementSpec):

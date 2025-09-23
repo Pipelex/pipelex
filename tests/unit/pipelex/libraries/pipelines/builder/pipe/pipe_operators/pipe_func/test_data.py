@@ -32,14 +32,14 @@ class PipeFuncTestCases:
         PipeFuncSpec(
             the_pipe_code="generator_func",
             definition="Generate data",
-            inputs={},
+            inputs=None,
             output="GeneratedData",
             function_name="generate_data",
         ),
         "test_domain",
         PipeFuncBlueprint(
             definition="Generate data",
-            inputs={},
+            inputs=None,
             output="GeneratedData",
             type="PipeFunc",
             category="PipeOperator",

@@ -48,9 +48,6 @@ class PipeFunc(PipeOperator):
         log.debug(f"Applying function '{self.function_name}'")
 
         function = func_registry.get_required_function(self.function_name)
-        from pipelex import pretty_print
-
-        pretty_print(func_registry)
         if not callable(function):
             raise ValueError(f"Function '{self.function_name}' is not callable")
 

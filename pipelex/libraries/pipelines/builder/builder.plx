@@ -4,17 +4,10 @@ definition = "Auto-generate a Pipelex bundle (concepts + pipes) from a short use
 [concept]
 UserBrief = "A short, natural-language description of what the user wants."
 PlanDraftText = "Natural-language pipeline plan text describing sequences, inputs, outputs."
-PipelexBundleBlueprint = "A Pipelex bundle blueprint."
-PipeBlueprint = "A blueprint for a single pipe definition."
+PipelexBundleSpec = "A Pipelex bundle spec."
 PipeFailure = "Details of a single pipe failure during dry run."
-DryRunResult = "A result of a dry run of a pipelex bundle blueprint."
-
-[concept.DomainInformation]
-definition = "A domain information object."
-
-[concept.DomainInformation.structure]
-domain = { type = "text", definition = "The domain of the bundle."}
-definition = { type = "text", definition = "The definition of the bundle."}
+DryRunResult = "A result of a dry run of a pipelex bundle spec."
+DomainInformation = "A domain information object."
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Main
@@ -22,19 +15,19 @@ definition = { type = "text", definition = "The definition of the bundle."}
 [pipe]
 [pipe.pipe_builder]
 type = "PipeSequence"
-description = "This pipe is going to be the entry point for the builder. It will take a UserBrief and return a PipelexBundleBlueprint."
+description = "This pipe is going to be the entry point for the builder. It will take a UserBrief and return a PipelexBundleSpec."
 inputs = { brief = "UserBrief" }
-output = "PipelexBundleBlueprint"
+output = "PipelexBundleSpec"
 steps = [
     { pipe = "draft_planning_text", result = "plan_draft" },
     { pipe = "parallel_draft_to_specs" },
-    { pipe = "materialize_concept_specs", result = "concept_specs" },
+    { pipe = "materialize_concept_spec_drafts", result = "concept_spec_drafts" },
     { pipe = "materialize_pipe_signatures", result = "pipe_signatures" },
     { pipe = "pipe_builder_domain_information", result = "domain_information" },
-    { pipe = "build_concept_blueprint", batch_over = "concept_specs", batch_as = "concept_spec", result = "concept_spec_blueprints" },
-    { pipe = "create_pipes_from_signatures", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_spec_blueprints" },
-    { pipe = "compile_in_pipelex_bundle_blueprint", result = "pipelex_bundle_blueprint" }
-    { pipe = "validate_pipelex_bundle_blueprint", result = "pipelex_bundle_blueprint" }
+    { pipe = "build_concept_spec", batch_over = "concept_spec_drafts", batch_as = "concept_spec_draft", result = "concept_specs" },
+    { pipe = "create_pipes_from_signatures", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_specs" },
+    { pipe = "compile_in_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
+    { pipe = "validate_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
 ]
 
 [pipe.pipe_builder_domain_information]
@@ -102,11 +95,11 @@ LIMIT TO 10 DIFFERENT PIPES FOR NOW
 # ────────────────────────────────────────────────────────────────────────────────
 [pipe.parallel_draft_to_specs]
 type = "PipeParallel"
-description = "Generate ConceptSpecsText and PipeSignaturesText in parallel from plan draft."
+description = "Generate ConceptSpecDraftsText and PipeSignaturesText in parallel from plan draft."
 inputs = { plan_draft = "PlanDraftText", brief = "UserBrief" }
 output = "Dynamic"
 parallels = [
-    { pipe = "draft_to_conceptspecs_text",   result = "concept_specs_text" },
+    { pipe = "draft_to_conceptspecs_text",   result = "concept_spec_drafts_text" },
     { pipe = "draft_to_pipesignatures_text", result = "pipe_signatures_text" },
 ]
 
@@ -255,11 +248,11 @@ No more than 10 PipeSignatures
 # STAGE 3 — materialize: TEXT → real objects (ConceptSpec[], PipeSignature[])
 # ────────────────────────────────────────────────────────────────────────────────
 
-[pipe.materialize_concept_specs]
+[pipe.materialize_concept_spec_drafts]
 type = "PipeLLM"
 description = "Turn ConceptSpecsText into ConceptSpec objects."
-inputs = { concept_specs_text = "Text", brief = "UserBrief" }
-output = "concept.ConceptSpec"
+inputs = { concept_spec_drafts_text = "Text", brief = "UserBrief" }
+output = "concept.ConceptSpecDraft"
 multiple_output = true
 llm = "llm_to_engineer"
 prompt_template = """
@@ -267,7 +260,7 @@ Materialize ConceptSpec objects from the ConceptSpecsText.
 Do not change the information in the input. Just organize the information
 
 ConceptSpecs:
-@concept_specs_text
+@concept_spec_drafts_text
 
 Brief:
 @brief
@@ -278,14 +271,14 @@ LIMIT TO A MAXIMUM OF 5 fields for now
 [pipe.materialize_pipe_signatures]
 type = "PipeLLM"
 description = "Turn PipeSignaturesText into PipeSignature objects that reference the ConceptSpec objects."
-inputs = { pipe_signatures_text = "Text", concept_specs = "concept.ConceptSpec", brief = "UserBrief" }
+inputs = { pipe_signatures_text = "Text", concept_spec_drafts = "concept.ConceptSpecDraft", brief = "UserBrief" }
 output = "pipe.PipeSignature"
 multiple_output = true
 llm = "llm_to_engineer"
 prompt_template = """
 Materialize PipeSignature objects from the PipeSignaturesText.
 - pipe_code MUST be snake_case
-- inputs must be a Dict[str, ConceptSpec] referencing the provided ConceptSpec objects. If Its the concept itself, use the concept code in PascalCase.
+- inputs must be a Dict[str, ConceptSpecDraft] referencing the provided ConceptSpecDraft objects. If Its the concept itself, use the concept code in PascalCase.
 - output must be a ConceptSpec from the provided set. If Its the concept itself, use the concept code in PascalCase.
 - important_features must be a Dict containing the pipe-specific features mentioned in the text
 
@@ -304,8 +297,8 @@ THIS PIPELLM SHOULD NAME THE RESULT OF ITS PIPE "prompt".
 PipeSignatures:
 @pipe_signatures_text
 
-ConceptSpecs:
-@concept_specs
+ConceptSpecDrafts:
+@concept_spec_drafts
 
 Brief:
 @brief
@@ -313,22 +306,22 @@ Brief:
 No more than 10 PipeSignatures
 """
 
-[pipe.compile_in_pipelex_bundle_blueprint]
+[pipe.compile_in_pipelex_bundle_spec]
 type = "PipeFunc"
-description = "Compile the pipelex bundle blueprint."
-inputs = { pipe_spec_blueprints = "PipeBlueprint", concept_spec_blueprints = "ConceptSpecBlueprint" }
-output = "PipelexBundleBlueprint"
-function_name = "compile_in_pipelex_bundle_blueprint"
+description = "Compile the pipelex bundle spec."
+inputs = { pipe_specs = "PipeSpec", concept_specs = "ConceptSpec" }
+output = "PipelexBundleSpec"
+function_name = "compile_in_pipelex_bundle_spec"
 
-[pipe.validate_pipelex_bundle_blueprint]
+[pipe.validate_pipelex_bundle_spec]
 type = "PipeSequence"
-description = "Validate the pipelex bundle blueprint with iterative fixing."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint" }
-output = "PipelexBundleBlueprint"
+description = "Validate the pipelex bundle spec with iterative fixing."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec" }
+output = "PipelexBundleSpec"
 steps = [
     { pipe = "validate_dry_run", result = "failed_pipes" },
     { pipe = "check_validation_status", result = "validation_status" },
-    { pipe = "handle_validation_result", result = "pipelex_bundle_blueprint" }
+    { pipe = "handle_validation_result", result = "pipelex_bundle_spec" }
 ]
 
 [pipe.check_validation_status]
@@ -341,8 +334,8 @@ jinja2 = "{% if failed_pipes.content.items|length > 0 %}FAILURE{% else %}SUCCESS
 [pipe.handle_validation_result]
 type = "PipeCondition"
 description = "Handle validation result - continue if success or fix failures once."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipes = "PipeFailure", validation_status = "Text" }
-output = "PipelexBundleBlueprint"
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipes = "PipeFailure", validation_status = "Text" }
+output = "PipelexBundleSpec"
 expression = "validation_status.text"
 
 [pipe.handle_validation_result.pipe_map]
@@ -352,32 +345,32 @@ FAILURE = "fix_failing_pipes_once"
 [pipe.fix_failing_pipes_once]
 type = "PipeSequence"
 description = "Fix failing pipes once and return the result."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipes = "PipeFailure" }
-output = "PipelexBundleBlueprint"
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipes = "PipeFailure" }
+output = "PipelexBundleSpec"
 steps = [
     { pipe = "fix_failing_pipe", batch_over = "failed_pipes", batch_as = "failed_pipe", result = "fixed_pipes" },
-    { pipe = "reconstruct_bundle_with_all_fixes", result = "pipelex_bundle_blueprint" },
-    { pipe = "validate_pipelex_bundle_blueprint", result = "pipelex_bundle_blueprint" }
+    { pipe = "reconstruct_bundle_with_all_fixes", result = "pipelex_bundle_spec" },
+    { pipe = "validate_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
 ]
 
 [pipe.validate_dry_run]
 type = "PipeFunc"
-description = "Validate the pipelex bundle blueprint and return only failed pipes."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint" }
+description = "Validate the pipelex bundle spec and return only failed pipes."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec" }
 output = "PipeFailure"
 function_name = "validate_dry_run"
 
 [pipe.continue]
 type = "PipeJinja2"
 description = "Continue with successful validation - return the bundle unchanged."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint" }
-output = "PipelexBundleBlueprint"
-jinja2 = "{{ pipelex_bundle_blueprint }}"
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec" }
+output = "PipelexBundleSpec"
+jinja2 = "{{ pipelex_bundle_spec }}"
 
 [pipe.reconstruct_bundle_with_all_fixes]
 type = "PipeFunc"
-description = "Reconstruct the bundle blueprint with all the fixed pipes."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", fixed_pipes = "Dynamic" }
-output = "PipelexBundleBlueprint"
+description = "Reconstruct the bundle spec with all the fixed pipes."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", fixed_pipes = "Dynamic" }
+output = "PipelexBundleSpec"
 function_name = "reconstruct_bundle_with_all_fixes"
 

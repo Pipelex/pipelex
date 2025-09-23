@@ -1,7 +1,7 @@
 from typing import ClassVar, List, Tuple
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec,ConceptStructureSpec,ConceptStructureSpecFieldType
+from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec, ConceptStructureSpecFieldType
 
 
 class ConceptBlueprintTestCases:

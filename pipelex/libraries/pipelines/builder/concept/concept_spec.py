@@ -110,6 +110,19 @@ class ConceptStructureSpec(StructuredContent):
         )
 
 
+class ConceptSpecDraft(StructuredContent):
+    the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
+    definition: str = Field(description="Description of the concept, in natural language.")
+    structure: str = Field(
+        description="A description of a dict with fieldnames as keys, and values being a dict with: definition, type, required, default_value"
+    )
+    refines: Optional[str] = Field(
+        default=None,
+        description="The native concept this concept extends (Text, Image, PDF, TextAndImages, Number, Page) "
+        "in PascalCase format. Cannot be used together with 'structure'.",
+    )
+
+
 class ConceptSpec(StructuredContent):
     """Spec defining a concept that can be used in the Pipelex framework.
 
@@ -264,32 +277,24 @@ class ConceptSpec(StructuredContent):
         return ConceptBlueprint(definition=self.definition, structure=converted_structure, refines=self.refines)
 
 
-class ConceptSpecBlueprint(ConceptBlueprint):
-    the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
-
-
-async def create_concept_spec_blueprint(working_memory: WorkingMemory) -> ConceptSpec:
-    """Create a ConceptSpecBlueprint manually from ConceptSpec and ConceptStructureSpecBlueprint."""
-    # Get the inputs from working memory
-    concept_spec = working_memory.get_stuff_as(name="concept_spec", content_type=ConceptSpec)
+async def create_concept_spec(working_memory: WorkingMemory) -> ConceptSpec:
+    concept_spec_draft = working_memory.get_stuff_as(name="concept_spec_draft", content_type=ConceptSpecDraft)
     concept_spec_structures_stuff = working_memory.get_stuff_as_list(name="concept_spec_structures", item_type=ConceptStructureSpec)
 
     structure_dict: Dict[str, Union[str, ConceptStructureSpec]] = {}
     for structure_item in concept_spec_structures_stuff.items:
-        structure_blueprint = ConceptStructureSpec(
+        structure_spec = ConceptStructureSpec(
             the_field_name=structure_item.the_field_name,
             definition=structure_item.definition,
             type=structure_item.type,
             required=structure_item.required,
             default_value=structure_item.default_value,
         )
-        structure_dict[structure_item.the_field_name] = structure_blueprint
+        structure_dict[structure_item.the_field_name] = structure_spec
 
-    concept_spec_blueprint = ConceptSpec(
-        the_concept_code=concept_spec.the_concept_code,
-        definition=concept_spec.definition,
+    return ConceptSpec(
+        the_concept_code=concept_spec_draft.the_concept_code,
+        definition=concept_spec_draft.definition,
         structure=structure_dict,
-        refines=concept_spec.refines,
+        refines=concept_spec_draft.refines,
     )
-
-    return concept_spec_blueprint

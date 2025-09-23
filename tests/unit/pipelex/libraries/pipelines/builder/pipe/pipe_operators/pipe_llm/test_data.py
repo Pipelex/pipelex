@@ -32,7 +32,7 @@ class PipeLLMTestCases:
         PipeLLMSpec(
             the_pipe_code="generate_pipe",
             definition="Generate without inputs",
-            inputs={},
+            inputs=None,
             output="Text",
             prompt_template="Generate something interesting",
         ),
@@ -50,7 +50,7 @@ class PipeLLMTestCases:
         PipeLLMSpec(
             the_pipe_code="generate",
             definition="Generate with preset",
-            inputs={},
+            inputs=None,
             output="Text",
             prompt_template="Generate text",
             llm="llm_to_reason",
@@ -58,6 +58,7 @@ class PipeLLMTestCases:
         "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
+            definition="Generate with preset",
             llm="llm_to_reason",
             output="Text",
             prompt_template="Generate text",
@@ -69,7 +70,7 @@ class PipeLLMTestCases:
         PipeLLMSpec(
             the_pipe_code="generate",
             definition="Generate with settings",
-            inputs={},
+            inputs=None,
             output="Text",
             prompt_template="Generate text",
             llm=LLMSettingSpec(
@@ -81,6 +82,7 @@ class PipeLLMTestCases:
         "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
+            definition="Generate with settings",
             llm=LLMSetting(
                 llm_handle="gpt-4o-mini",
                 temperature=0.7,
@@ -96,7 +98,7 @@ class PipeLLMTestCases:
         PipeLLMSpec(
             the_pipe_code="analyze",
             definition="Generate with system prompt",
-            inputs={"data": "Data"},
+            inputs={"data": InputRequirementSpec(concept="Data")},
             output="Analysis",
             system_prompt="You are a data analyst",
             prompt_template="Analyze: @data",
@@ -104,6 +106,8 @@ class PipeLLMTestCases:
         "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
+            definition="Generate with system prompt",
+            inputs={"data": InputRequirementBlueprint(concept="Data")},
             system_prompt="You are a data analyst",
             prompt_template="Analyze: @data",
             output="Analysis",
@@ -115,7 +119,7 @@ class PipeLLMTestCases:
         PipeLLMSpec(
             the_pipe_code="generate_items",
             definition="Generate multiple items",
-            inputs={},
+            inputs=None,
             output="Item",
             prompt_template="Generate items",
             multiple_output=True,
@@ -123,6 +127,7 @@ class PipeLLMTestCases:
         "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
+            definition="Generate multiple items",
             multiple_output=True,
             nb_output=None,
             output="Item",
@@ -135,7 +140,7 @@ class PipeLLMTestCases:
         PipeLLMSpec(
             the_pipe_code="generate_items",
             definition="Generate exactly 5 items",
-            inputs={},
+            inputs=None,
             output="Item",
             prompt_template="Generate items",
             nb_output=5,
@@ -143,6 +148,7 @@ class PipeLLMTestCases:
         "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
+            definition="Generate exactly 5 items",
             nb_output=5,
             multiple_output=None,
             output="Item",
@@ -155,7 +161,7 @@ class PipeLLMTestCases:
         PipeLLMSpec(
             the_pipe_code="test_pipe",
             definition="Extract structured data",
-            inputs={},
+            inputs=None,
             output="PersonInfo",
             prompt_template="Extract person info",
             llm="llm_to_extract",
@@ -171,9 +177,11 @@ class PipeLLMTestCases:
         "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
+            definition="Extract structured data",
             structuring_method=StructuringMethod.PRELIMINARY_TEXT,
             prompt_template_to_structure="Structure the output",
             system_prompt_to_structure="You are a data structurer",
+            llm="llm_to_extract",
             llm_to_structure=LLMSetting(
                 llm_handle="claude-3-sonnet",
                 temperature=0.1,

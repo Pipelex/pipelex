@@ -3,64 +3,64 @@ definition = "Build and process pipes."
 
 [concept]
 PipeSignature = "Pseudo-Pipelex step: code, type, description, inputs, output, optional children refs."
-PipeBlueprint = "A structured blueprint for a pipe (union)."
+PipeSpec = "A structured spec for a pipe (union)."
 # Pipe controllers
-PipeBatchSpecBlueprint = "A structured blueprint for a pipe batch."
-PipeConditionSpecBlueprint = "A structured blueprint for a pipe condition."
-PipeParallelSpecBlueprint = "A structured blueprint for a pipe parallel."
-PipeSequenceSpecBlueprint = "A structured blueprint for a pipe sequence."
+PipeBatchSpec = "A structured spec for a pipe batch."
+PipeConditionSpec = "A structured spec for a pipe condition."
+PipeParallelSpec = "A structured spec for a pipe parallel."
+PipeSequenceSpec = "A structured spec for a pipe sequence."
 # Pipe operators
-PipeFuncSpecBlueprint = "A structured blueprint for a pipe func."
-PipeImgGenSpecBlueprint = "A structured blueprint for a pipe img gen."
-PipeJinja2SpecBlueprint = "A structured blueprint for a pipe jinja2."
-PipeLLMSpecBlueprint = "A structured blueprint for a pipe llm."
-PipeOcrSpecBlueprint = "A structured blueprint for a pipe ocr."
+PipeFuncSpec = "A structured spec for a pipe func."
+PipeImgGenSpec = "A structured spec for a pipe img gen."
+PipeJinja2Spec = "A structured spec for a pipe jinja2."
+PipeLLMSpec = "A structured spec for a pipe llm."
+PipeOcrSpec = "A structured spec for a pipe ocr."
 PipeFailure = "Details of a single pipe failure during dry run."
 
 [pipe]
 # ────────────────────────────────────────────────────────────────────────────────
-# NEW ENTRY POINT — takes PipeSignature[] + ConceptSpecBlueprints → PipeBlueprint[]
+# NEW ENTRY POINT — takes PipeSignature[] + ConceptSpecs → PipeSpecs[]
 # ────────────────────────────────────────────────────────────────────────────────
 [pipe.create_pipes_from_signatures]
 type = "PipeSequence"
-description = "PipeSignature[] + ConceptSpecBlueprints → PipeBlueprint[] (linked & ready)."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint" }
+description = "PipeSignature[] + ConceptSpecs → PipeSpecs[] (linked & ready)."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "Dynamic"
 steps = [
-    { pipe = "generate_pipe_blueprint", result = "pipe_blueprint" },
-    { pipe = "compile_one_signature_blueprint", result = "compiled_blueprints" },
+    { pipe = "generate_pipe_spec", result = "pipe_spec" },
+    { pipe = "compile_one_signature_spec", result = "compiled_spec" },
 ]
 
-[pipe.generate_pipe_blueprint]
+[pipe.generate_pipe_spec]
 type = "PipeLLM"
-description = "Generate a PipeBlueprint from a PipeSignature."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint" }
-output = "PipeBlueprint"
+description = "Generate a PipeSpec from a PipeSignature."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+output = "PipeSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeBlueprint for this signature.
+Return a PipeSpec for this signature.
 
 Signature:
 @pipe_signature
 
 and here are the existing concepts:
-@concept_spec_blueprints
+@concept_specs
 
 The inputs keys should be snake_case.
 The values should be a concept code in PascalCase.
 """
 
 # ────────────────────────────────────────────────────────────────────────────────
-# CORE: signature → route to blueprint emitter (unchanged)
+# CORE: signature → route to spec emitter
 # ────────────────────────────────────────────────────────────────────────────────
-[pipe.compile_one_signature_blueprint]
+[pipe.compile_one_signature_spec]
 type = "PipeCondition"
-description = "Route by signature.type to the correct blueprint emitter."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
+description = "Route by signature.type to the correct spec emitter."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "ConceptSpec", pipe_spec = "PipeSpec" }
 output = "Dynamic"
 expression = "pipe_signature.type"
 
-[pipe.compile_one_signature_blueprint.pipe_map]
+[pipe.compile_one_signature_spec.pipe_map]
 PipeSequence  = "emit_sequence_from_signature"
 PipeParallel  = "emit_parallel_from_signature"
 PipeCondition = "emit_condition_from_signature"
@@ -78,128 +78,128 @@ PipeFunc      = "emit_func_from_signature"
 
 [pipe.emit_sequence_from_signature]
 type = "PipeLLM"
-description = "Build a PipeSequenceSpecBlueprint from the signature (children referenced by code)."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeSequenceSpecBlueprint"
+description = "Build a PipeSequenceSpec from the signature (children referenced by code)."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec", pipe_spec = "PipeSpec" }
+output = "PipeSequenceSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeSequenceSpecBlueprint for this signature.
+Return a PipeSequenceSpec for this signature.
 The Pipe sequence NEEDS to have at least one step.
 Orchestrate all the necessary steps to achieve the goal of the pipe.
 
 Signature:
 @pipe_signature
 
-Here is the base PipeBlueprint:
-@pipe_blueprint
+Here is the base PipeSpec:
+@pipe_spec
 
 And here are the concepts you can use:
-@concept_spec_blueprints
+@concept_specs
 """
 
 [pipe.emit_parallel_from_signature]
 type = "PipeLLM"
-description = "Build a PipeParallelSpecBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeParallelSpecBlueprint"
+description = "Build a PipeParallelSpec from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec", pipe_spec = "PipeSpec" }
+output = "PipeParallelSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeParallelSpecBlueprint for this signature.
+Return a PipeParallelSpec for this signature.
 
 Signature:
 @pipe_signature
 
-Here is the base PipeBlueprint:
-@pipe_blueprint
+Here is the base PipeSpec:
+@pipe_spec
 
 And here are the concepts you can use:
-@concept_spec_blueprints
+@concept_specs
 """
 
 [pipe.emit_condition_from_signature]
 type = "PipeLLM"
-description = "Build a PipeConditionBlueprint from the signature (provide expression/pipe_map consistent with children)."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeConditionSpecBlueprint"
+description = "Build a PipeConditionSpec from the signature (provide expression/pipe_map consistent with children)."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec", pipe_spec = "PipeSpec" }
+output = "PipeConditionSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeConditionSpecBlueprint for this signature.
+Return a PipeConditionSpec for this signature.
 
 Signature:
 @pipe_signature
 
-Here is the base PipeBlueprint:
-@pipe_blueprint
+Here is the base PipeSpec:
+@pipe_spec
 
 And here are the concepts you can use:
-@concept_spec_blueprints
+@concept_specs
 """
 
 [pipe.emit_batch_from_signature]
 type = "PipeLLM"
-description = "Build a PipeBatchSpecBlueprint from the signature (choose branch_pipe_code/params)."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeBatchSpecBlueprint"
+description = "Build a PipeBatchSpec from the signature (choose branch_pipe_code/params)."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec", pipe_spec = "PipeSpec" }
+output = "PipeBatchSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeBatchSpecBlueprint for this signature.
+Return a PipeBatchSpec for this signature.
 
 Signature:
 @pipe_signature
 
-Here is the base PipeBlueprint:
-@pipe_blueprint
+Here is the base PipeSpec:
+@pipe_spec
 
 And here are the concepts you can use:
-@concept_spec_blueprints
+@concept_specs
 """
 
 [pipe.emit_llm_from_signature]
 type = "PipeLLM"
-description = "Build a PipeLLMSpecBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeLLMSpecBlueprint"
+description = "Build a PipeLLMSpec from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec", pipe_spec = "PipeSpec" }
+output = "PipeLLMSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeLLMSpecBlueprint for this signature.
+Return a PipeLLMSpec for this signature.
 
-THe prompt is the field "prompt_template" in the PipeLLMSpecBlueprint.
+THe prompt is the field "prompt_template" in the PipeLLMSpec.
 Signature:
 @pipe_signature
 
-Here is the base PipeBlueprint:
-@pipe_blueprint
+Here is the base PipeSpec:
+@pipe_spec
 
 And here are the concepts you can use:
-@concept_spec_blueprints
+@concept_specs
 """
 
 [pipe.emit_ocr_from_signature]
 type = "PipeLLM"
-description = "Build a PipeOcrSpecBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeOcrSpecBlueprint"
+description = "Build a PipeOcrSpec from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec", pipe_spec = "PipeSpec" }
+output = "PipeOcrSpec"
 prompt_template = """
-Return a PipeOcrSpecBlueprint for this signature.
+Return a PipeOcrSpec for this signature.
 
 VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE NAMED "ocr_input" and it must be either an image or a pdf or a concept which refines one of them.
 Signature:
 @pipe_signature
 
-Here is the base PipeBlueprint:
-@pipe_blueprint
+Here is the base PipeSpec:
+@pipe_spec
 
 And here are the concepts you can use:
-@concept_spec_blueprints
+@concept_specs
 """
 
 [pipe.emit_imggen_from_signature]
 type = "PipeLLM"
-description = "Build a PipeImgGenSpecBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeImgGenSpecBlueprint"
+description = "Build a PipeImgGenSpec from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec", pipe_spec = "PipeSpec" }
+output = "PipeImgGenSpec"
 prompt_template = """
-Return a PipeImgGenSpecBlueprint for this signature.
+Return a PipeImgGenSpec for this signature.
 The inputs for the image has to be only:
 input_name : prompt
 concept : A concept that refines Text. It should be text
@@ -217,48 +217,48 @@ The prompt will need to be be generated by a pipe with the necessary elements.
 Signature:
 @pipe_signature
 
-Here is the base PipeBlueprint:
-@pipe_blueprint
+Here is the base PipeSpec:
+@pipe_spec
 
 And here are the concepts you can use:
-@concept_spec_blueprints
+@concept_specs
 """
 
 [pipe.emit_jinja_from_signature]
 type = "PipeLLM"
-description = "Build a PipeJinja2SpecBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeJinja2SpecBlueprint"
+description = "Build a PipeJinja2Spec from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec", pipe_spec = "PipeSpec" }
+output = "PipeJinja2Spec"
 prompt_template = """
-Return a PipeJinja2SpecBlueprint for this signature.
+Return a PipeJinja2Spec for this signature.
 
 Signature:
 @pipe_signature
 
-Here is the base PipeBlueprint:
-@pipe_blueprint
+Here is the base PipeSpec:
+@pipe_spec
 
 And here are the concepts you can use:
-@concept_spec_blueprints
+@concept_specs
 """
 
 [pipe.emit_func_from_signature]
 type = "PipeLLM"
-description = "Build a PipeFuncSpecBlueprint from the signature."
-inputs = { pipe_signature = "PipeSignature", concept_spec_blueprints = "concept.ConceptSpecBlueprint", pipe_blueprint = "PipeBlueprint" }
-output = "PipeFuncSpecBlueprint"
+description = "Build a PipeFuncSpec from the signature."
+inputs = { pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec", pipe_spec = "PipeSpec" }
+output = "PipeFuncSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Return a PipeFuncSpecBlueprint for this signature.
+Return a PipeFuncSpec for this signature.
 
 Signature:
 @pipe_signature
 
-Here is the base PipeBlueprint:
-@pipe_blueprint
+Here is the base PipeSpec:
+@pipe_spec
 
 And here are the concepts you can use:
-@concept_spec_blueprints
+@concept_specs
 """
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -268,7 +268,7 @@ And here are the concepts you can use:
 [pipe.fix_failing_pipe]
 type = "PipeCondition"
 description = "Route to specific pipe fixer based on the failing pipe type."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipe = "PipeFailure" }
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipe = "PipeFailure" }
 output = "Dynamic"
 expression = "failed_pipe.pipe.type"
 
@@ -285,12 +285,12 @@ PipeBatch = "fix_failing_batch_pipe"
 
 [pipe.fix_failing_llm_pipe]
 type = "PipeLLM"
-description = "Fix a failing PipeLLM blueprint based on its specific error."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipe = "PipeFailure" }
-output = "PipeLLMSpecBlueprint"
+description = "Fix a failing PipeLLM spec based on its specific error."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipe = "PipeFailure" }
+output = "PipeLLMSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Fix this failing PipeLLM blueprint.
+Fix this failing PipeLLM spec.
 
 Failing pipe:
 @failed_pipe.pipe
@@ -298,7 +298,7 @@ Failing pipe:
 Error message:
 @failed_pipe.error_message
 
-Please provide only the corrected PipeLLMSpecBlueprint. Common LLM pipe issues to fix:
+Please provide only the corrected PipeLLMSpec. Common LLM pipe issues to fix:
 - Missing input variables in the pipe inputs that are referenced in prompt_template
 - Incorrect variable names in prompt templates (use $ for inline, @ for blocks)
 - Wrong concept types for inputs/outputs
@@ -308,12 +308,12 @@ Please provide only the corrected PipeLLMSpecBlueprint. Common LLM pipe issues t
 
 [pipe.fix_failing_imggen_pipe]
 type = "PipeLLM"
-description = "Fix a failing PipeImgGen blueprint based on its specific error."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipe = "PipeFailure" }
-output = "PipeImgGenSpecBlueprint"
+description = "Fix a failing PipeImgGen spec based on its specific error."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipe = "PipeFailure" }
+output = "PipeImgGenSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Fix this failing PipeImgGen blueprint.
+Fix this failing PipeImgGen spec.
 
 Failing pipe:
 @failed_pipe.pipe
@@ -321,7 +321,7 @@ Failing pipe:
 Error message:
 @failed_pipe.error_message
 
-Please provide only the corrected PipeImgGenSpecBlueprint. Common ImgGen pipe issues to fix:
+Please provide only the corrected PipeImgGenSpec. Common ImgGen pipe issues to fix:
 - Missing or incorrect prompt input (should be text concept)
 - Wrong img_gen_prompt_var_name (should be None or "prompt")
 - Invalid img_gen choice
@@ -330,12 +330,12 @@ Please provide only the corrected PipeImgGenSpecBlueprint. Common ImgGen pipe is
 
 [pipe.fix_failing_ocr_pipe]
 type = "PipeLLM"
-description = "Fix a failing PipeOcr blueprint based on its specific error."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipe = "PipeFailure" }
-output = "PipeOcrSpecBlueprint"
+description = "Fix a failing PipeOcr spec based on its specific error."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipe = "PipeFailure" }
+output = "PipeOcrSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Fix this failing PipeOcr blueprint.
+Fix this failing PipeOcr spec.
 
 VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE NAMED "ocr_input" and it must be either an image or a pdf or a concept which refines one of them.
 Failing pipe:
@@ -344,7 +344,7 @@ Failing pipe:
 Error message:
 @failed_pipe.error_message
 
-Please provide only the corrected PipeOcrSpecBlueprint. Common OCR pipe issues to fix:
+Please provide only the corrected PipeOcrSpec. Common OCR pipe issues to fix:
 - Input must be named 'ocr_input' and be of type Image or PDF
 - Output should typically be Page (native concept)
 - Missing or incorrect input concept types
@@ -352,12 +352,12 @@ Please provide only the corrected PipeOcrSpecBlueprint. Common OCR pipe issues t
 
 [pipe.fix_failing_func_pipe]
 type = "PipeLLM"
-description = "Fix a failing PipeFunc blueprint based on its specific error."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipe = "PipeFailure" }
-output = "PipeFuncSpecBlueprint"
+description = "Fix a failing PipeFunc spec based on its specific error."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipe = "PipeFailure" }
+output = "PipeFuncSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Fix this failing PipeFunc blueprint.
+Fix this failing PipeFunc spec.
 
 Failing pipe:
 @failed_pipe.pipe
@@ -365,7 +365,7 @@ Failing pipe:
 Error message:
 @failed_pipe.error_message
 
-Please provide only the corrected PipeFuncSpecBlueprint. Common Func pipe issues to fix:
+Please provide only the corrected PipeFuncSpec. Common Func pipe issues to fix:
 - Missing or incorrect function_name
 - Wrong input/output concept types for the function
 - Function not available in registry
@@ -373,12 +373,12 @@ Please provide only the corrected PipeFuncSpecBlueprint. Common Func pipe issues
 
 [pipe.fix_failing_jinja2_pipe]
 type = "PipeLLM"
-description = "Fix a failing PipeJinja2 blueprint based on its specific error."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipe = "PipeFailure" }
-output = "PipeJinja2SpecBlueprint"
+description = "Fix a failing PipeJinja2 spec based on its specific error."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipe = "PipeFailure" }
+output = "PipeJinja2Spec"
 llm = "llm_to_engineer"
 prompt_template = """
-Fix this failing PipeJinja2 blueprint.
+Fix this failing PipeJinja2 spec.
 
 Failing pipe:
 @failed_pipe.pipe
@@ -386,7 +386,7 @@ Failing pipe:
 Error message:
 @failed_pipe.error_message
 
-Please provide only the corrected PipeJinja2SpecBlueprint. Common Jinja2 pipe issues to fix:
+Please provide only the corrected PipeJinja2Spec. Common Jinja2 pipe issues to fix:
 - Invalid Jinja2 template syntax
 - Missing input variables referenced in template
 - Wrong concept types for inputs/outputs
@@ -394,12 +394,12 @@ Please provide only the corrected PipeJinja2SpecBlueprint. Common Jinja2 pipe is
 
 [pipe.fix_failing_sequence_pipe]
 type = "PipeLLM"
-description = "Fix a failing PipeSequence blueprint based on its specific error."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipe = "PipeFailure" }
-output = "PipeSequenceSpecBlueprint"
+description = "Fix a failing PipeSequence spec based on its specific error."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipe = "PipeFailure" }
+output = "PipeSequenceSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Fix this failing PipeSequence blueprint.
+Fix this failing PipeSequence spec.
 
 Failing pipe:
 @failed_pipe.pipe
@@ -407,7 +407,7 @@ Failing pipe:
 Error message:
 @failed_pipe.error_message
 
-Please provide only the corrected PipeSequenceSpecBlueprint. Common Sequence pipe issues to fix:
+Please provide only the corrected PipeSequenceSpec. Common Sequence pipe issues to fix:
 - Missing input variables needed by sub-pipes in steps
 - Referenced pipe codes in steps that don't exist
 - Circular dependencies in step order
@@ -416,12 +416,12 @@ Please provide only the corrected PipeSequenceSpecBlueprint. Common Sequence pip
 
 [pipe.fix_failing_parallel_pipe]
 type = "PipeLLM"
-description = "Fix a failing PipeParallel blueprint based on its specific error."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipe = "PipeFailure" }
-output = "PipeParallelSpecBlueprint"
+description = "Fix a failing PipeParallel spec based on its specific error."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipe = "PipeFailure" }
+output = "PipeParallelSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Fix this failing PipeParallel blueprint.
+Fix this failing PipeParallel spec.
 
 Failing pipe:
 @failed_pipe.pipe
@@ -429,7 +429,7 @@ Failing pipe:
 Error message:
 @failed_pipe.error_message
 
-Please provide only the corrected PipeParallelSpecBlueprint. Common Parallel pipe issues to fix:
+Please provide only the corrected PipeParallelSpec. Common Parallel pipe issues to fix:
 - Missing input variables needed by parallel sub-pipes
 - Referenced pipe codes that don't exist
 - Incompatible output types from parallel branches
@@ -437,12 +437,12 @@ Please provide only the corrected PipeParallelSpecBlueprint. Common Parallel pip
 
 [pipe.fix_failing_condition_pipe]
 type = "PipeLLM"
-description = "Fix a failing PipeCondition blueprint based on its specific error."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipe = "PipeFailure" }
-output = "PipeConditionSpecBlueprint"
+description = "Fix a failing PipeCondition spec based on its specific error."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipe = "PipeFailure" }
+output = "PipeConditionSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Fix this failing PipeCondition blueprint.
+Fix this failing PipeCondition spec.
 
 Failing pipe:
 @failed_pipe.pipe
@@ -450,7 +450,7 @@ Failing pipe:
 Error message:
 @failed_pipe.error_message
 
-Please provide only the corrected PipeConditionSpecBlueprint. Common Condition pipe issues to fix:
+Please provide only the corrected PipeConditionSpec. Common Condition pipe issues to fix:
 - Invalid expression or expression_template syntax
 - Referenced pipe codes in pipe_map that don't exist
 - Missing input variables referenced in expression
@@ -459,12 +459,12 @@ Please provide only the corrected PipeConditionSpecBlueprint. Common Condition p
 
 [pipe.fix_failing_batch_pipe]
 type = "PipeLLM"
-description = "Fix a failing PipeBatch blueprint based on its specific error."
-inputs = { pipelex_bundle_blueprint = "PipelexBundleBlueprint", failed_pipe = "PipeFailure" }
-output = "PipeBatchSpecBlueprint"
+description = "Fix a failing PipeBatch spec based on its specific error."
+inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipe = "PipeFailure" }
+output = "PipeBatchSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Fix this failing PipeBatch blueprint.
+Fix this failing PipeBatch spec.
 
 Failing pipe:
 @failed_pipe.pipe
@@ -472,7 +472,7 @@ Failing pipe:
 Error message:
 @failed_pipe.error_message
 
-Please provide only the corrected PipeBatchSpecBlueprint. Common Batch pipe issues to fix:
+Please provide only the corrected PipeBatchSpec. Common Batch pipe issues to fix:
 - Missing branch_pipe_code or referenced pipe that doesn't exist
 - Wrong input types for batch processing (should be ListContent)
 - Missing batch parameters configuration

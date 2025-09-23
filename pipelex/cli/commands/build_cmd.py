@@ -33,12 +33,8 @@ def build_pipe_cmd(
         Optional[str],
         typer.Option("--output", "-o", help="Path to save the generated PLX file (use --output='' to skip saving)"),
     ] = "./generated_pipeline.plx",
-    config_path: Annotated[
-        Optional[str],
-        typer.Option("--config", "-c", help="Path to the config folder for Pipelex.make()"),
-    ] = "pipelex_libraries",
 ) -> None:
-    Pipelex.make(relative_config_folder_path=config_path, from_file=False)
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
     typer.echo("=" * 70)
     typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
     typer.echo("")
@@ -49,8 +45,8 @@ def build_pipe_cmd(
             input_memory={"brief": brief},
         )
         pretty_print(pipe_output, title="Pipe Output")
-        blueprint = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_blueprint", content_type=PipelexBundleSpec)
-        plx_content = PipelexInterpreter.make_plx_content(blueprint=blueprint.to_blueprint())
+        pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
+        plx_content = PipelexInterpreter.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
 
         # Save to file unless explicitly disabled with empty string
         if output_path and output_path != "":

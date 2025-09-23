@@ -5,6 +5,7 @@ from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec
 
 from .test_data import ConceptBlueprintTestCases
 
+
 class TestConceptBlueprintConversion:
     @pytest.mark.parametrize(
         "test_name,concept_spec,expected_core",
