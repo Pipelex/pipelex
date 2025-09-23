@@ -16,7 +16,8 @@ class FuncRegistryUtils:
         is_recursive: bool = True,
     ) -> None:
         """
-        Registers all functions in Python files within a folder that have:
+        Registers all async functions in Python files within a folder that have:
+        - Must be an async function
         - Exactly 1 parameter named "working_memory" with type WorkingMemory
         - Return type that is a subclass of StuffContent
 
@@ -57,7 +58,8 @@ class FuncRegistryUtils:
     @classmethod
     def _find_functions_in_module(cls, module: Any) -> List[Callable[..., Any]]:
         """
-        Finds all functions in a module that match the criteria:
+        Finds all async functions in a module that match the criteria:
+        - Must be an async function
         - Exactly 1 parameter named "working_memory" with type WorkingMemory
         - Return type that is a subclass of StuffContent
         """
@@ -79,10 +81,15 @@ class FuncRegistryUtils:
     def _is_eligible_function(cls, func: Callable[..., Any]) -> bool:
         """
         Checks if a function matches the criteria:
+        - Must be an async function
         - Exactly 1 parameter named "working_memory" with type WorkingMemory
         - Return type that is a subclass of StuffContent
         """
         try:
+            # Check if function is async
+            if not inspect.iscoroutinefunction(func):
+                return False
+
             # Get function signature
             sig = inspect.signature(func)
             params = list(sig.parameters.values())

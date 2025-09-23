@@ -99,7 +99,10 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def get_required_function(self, name: str) -> Callable[..., Any]:
         """Retrieves a function from the registry by its name. Raises an error if not found."""
         if name not in self.root:
-            raise FuncRegistryError(f"Function '{name}' not found in registry")
+            raise FuncRegistryError(
+                f"Function '{name}' not found in registry: \
+                See how to register a function here: https://docs.pipelex.com/pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc"
+            )
         return self.root[name]
 
     def get_required_function_with_signature(self, name: str, expected_signature: Callable[..., T]) -> Callable[..., T]:

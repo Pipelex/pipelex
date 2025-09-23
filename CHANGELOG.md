@@ -13,6 +13,7 @@
  - Added new placeholder utility module with `make_placeholder_value()` and `value_is_placeholder()` functions
  - Added comprehensive test suite for placeholder functionality
  - Added new test cases for environment variable functions
+ - Added new documentation for `PipeFunc` on how to register functions.
 
 ### Changed 
  - Renamed `llm_deck` terminology to `model_deck` throughout codebase and documentation
