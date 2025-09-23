@@ -34,8 +34,8 @@ class PipeSequenceSpec(PipeSpec):
     steps: List[SubPipeSpec]
 
     @override
-    def to_blueprint(self, pipe_code: str, domain: str) -> PipeSequenceBlueprint:
-        base_blueprint = super().to_blueprint(pipe_code, domain)
+    def to_blueprint(self) -> PipeSequenceBlueprint:
+        base_blueprint = super().to_blueprint()
         core_steps = [step.to_blueprint() for step in self.steps]
         return PipeSequenceBlueprint(
             definition=base_blueprint.definition,

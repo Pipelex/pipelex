@@ -12,5 +12,5 @@ class TestPipeLLMBlueprintConversion:
         PipeLLMTestCases.TEST_CASES,
     )
     def test_pipe_llm_spec_to_blueprint(self, test_name: str, pipe_spec: PipeLLMSpec, domain: str, expected_blueprint: PipeLLMBlueprint):
-        result = pipe_spec.to_blueprint(pipe_code=pipe_spec.the_pipe_code, domain=domain)
+        result = pipe_spec.to_blueprint()
         assert result == expected_blueprint

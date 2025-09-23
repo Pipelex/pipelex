@@ -32,8 +32,8 @@ class PipeJinja2Spec(PipeSpec, Jinja2Spec):
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
 
     @override
-    def to_blueprint(self, pipe_code: str, domain: str) -> PipeJinja2Blueprint:
-        base_blueprint = super().to_blueprint(pipe_code, domain)
+    def to_blueprint(self) -> PipeJinja2Blueprint:
+        base_blueprint = super().to_blueprint()
 
         if self.prompting_style:
             prompting_style = (

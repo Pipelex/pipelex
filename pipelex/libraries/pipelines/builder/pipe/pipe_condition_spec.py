@@ -60,8 +60,8 @@ class PipeConditionSpec(PipeSpec):
     add_alias_from_expression_to: Optional[str] = None
 
     @override
-    def to_blueprint(self, pipe_code: str, domain: str) -> PipeConditionBlueprint:
-        base_blueprint = super().to_blueprint(pipe_code, domain)
+    def to_blueprint(self) -> PipeConditionBlueprint:
+        base_blueprint = super().to_blueprint()
         pipe_map_dict = PipeConditionPipeMapBlueprint(root=dict(self.pipe_map.root))
         return PipeConditionBlueprint(
             definition=base_blueprint.definition,

@@ -18,5 +18,5 @@ class TestPipeOcrBlueprintConversion:
         domain: str,
         expected_blueprint: PipeOcrBlueprint,
     ):
-        result = pipe_spec.to_blueprint(pipe_code=pipe_spec.the_pipe_code, domain=domain)
+        result = pipe_spec.to_blueprint()
         assert result == expected_blueprint

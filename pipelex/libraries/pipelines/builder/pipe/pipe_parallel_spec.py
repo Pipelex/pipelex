@@ -47,8 +47,8 @@ class PipeParallelSpec(PipeSpec):
         return combined_output
 
     @override
-    def to_blueprint(self, pipe_code: str, domain: str) -> PipeParallelBlueprint:
-        base_blueprint = super().to_blueprint(pipe_code, domain)
+    def to_blueprint(self) -> PipeParallelBlueprint:
+        base_blueprint = super().to_blueprint()
         core_parallels = [parallel.to_blueprint() for parallel in self.parallels]
         return PipeParallelBlueprint(
             definition=base_blueprint.definition,

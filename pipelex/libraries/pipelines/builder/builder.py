@@ -127,7 +127,7 @@ class PipelexBundleSpec(StructuredContent):
         if self.pipe:
             pipe = {}
             for pipe_code, pipe_blueprint in self.pipe.items():
-                pipe[pipe_code] = pipe_blueprint.to_blueprint(pipe_code, self.domain)
+                pipe[pipe_code] = pipe_blueprint.to_blueprint()
 
         return PipelexBundleBlueprint(
             domain=self.domain,
