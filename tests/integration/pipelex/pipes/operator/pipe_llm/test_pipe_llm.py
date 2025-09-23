@@ -81,6 +81,7 @@ class TestPipeLLM:
         llm: str,
         llm_to_structure: str,
     ):
+        # TODO: Add assertion on generated objects vs expected results
         pretty_print(data, title="data")
         working_memory = WorkingMemoryFactory.make_from_text(text=data, name="data")
 
