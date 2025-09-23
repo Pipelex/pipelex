@@ -1,23 +1,7 @@
-"""
-Test data for ConceptBlueprint conversion tests.
-"""
-
 from typing import ClassVar, List, Tuple
 
-from pipelex.core.concepts.concept_blueprint import (
-    ConceptBlueprint as ConceptBlueprintCore,
-)
-from pipelex.core.concepts.concept_blueprint import (
-    ConceptStructureBlueprint as ConceptStructureBlueprintCore,
-)
-from pipelex.core.concepts.concept_blueprint import (
-    ConceptStructureBlueprintFieldType as ConceptStructureBlueprintFieldTypeCore,
-)
-from pipelex.libraries.pipelines.builder.concept.concept_spec import (
-    ConceptBlueprint,
-    ConceptStructureBlueprint,
-    ConceptStructureBlueprintFieldType,
-)
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec,ConceptStructureSpec,ConceptStructureSpecFieldType
 
 
 class ConceptBlueprintTestCases:
@@ -25,12 +9,13 @@ class ConceptBlueprintTestCases:
 
     SIMPLE_CONCEPT = (
         "simple_concept",
-        ConceptBlueprint(
+        ConceptSpec(
+            the_concept_code="ConceptCode",
             definition="A simple test concept",
             refines=None,
             structure=None,
         ),
-        ConceptBlueprintCore(
+        ConceptBlueprint(
             definition="A simple test concept",
             refines=None,
             structure=None,
@@ -39,12 +24,13 @@ class ConceptBlueprintTestCases:
 
     CONCEPT_WITH_REFINES = (
         "concept_with_refines",
-        ConceptBlueprint(
+        ConceptSpec(
+            the_concept_code="ConceptCode",
             definition="An enhanced text concept",
             refines="Text",
             structure=None,
         ),
-        ConceptBlueprintCore(
+        ConceptBlueprint(
             definition="An enhanced text concept",
             refines="Text",
             structure=None,
@@ -53,23 +39,25 @@ class ConceptBlueprintTestCases:
 
     CONCEPT_WITH_TEXT_FIELD = (
         "concept_with_text_field",
-        ConceptBlueprint(
+        ConceptSpec(
+            the_concept_code="ConceptCode",
             definition="Entity with text field",
             structure={
-                "name": ConceptStructureBlueprint(
+                "name": ConceptStructureSpec(
+                    the_field_name="name",
                     definition="The name field",
-                    type=ConceptStructureBlueprintFieldType.TEXT,
+                    type=ConceptStructureSpecFieldType.TEXT,
                     required=True,
                 ),
             },
         ),
-        ConceptBlueprintCore(
+        ConceptBlueprint(
             definition="Entity with text field",
             refines=None,
             structure={
-                "name": ConceptStructureBlueprintCore(
+                "name": ConceptStructureBlueprint(
                     definition="The name field",
-                    type=ConceptStructureBlueprintFieldTypeCore.TEXT,
+                    type=ConceptStructureBlueprintFieldType.TEXT,
                     required=True,
                     default_value=None,
                 ),
@@ -79,8 +67,22 @@ class ConceptBlueprintTestCases:
 
     CONCEPT_WITH_INTEGER_FIELD = (
         "concept_with_integer_field",
+        ConceptSpec(
+            the_concept_code="ConceptCode",
+            definition="Entity with integer field",
+            structure={
+                "age": ConceptStructureSpec(
+                    the_field_name="age",
+                    definition="The age field",
+                    type=ConceptStructureSpecFieldType.INTEGER,
+                    required=False,
+                    default_value=0,
+                ),
+            },
+        ),
         ConceptBlueprint(
             definition="Entity with integer field",
+            refines=None,
             structure={
                 "age": ConceptStructureBlueprint(
                     definition="The age field",
@@ -90,29 +92,45 @@ class ConceptBlueprintTestCases:
                 ),
             },
         ),
-        ConceptBlueprintCore(
-            definition="Entity with integer field",
-            refines=None,
-            structure={
-                "age": ConceptStructureBlueprintCore(
-                    definition="The age field",
-                    type=ConceptStructureBlueprintFieldTypeCore.INTEGER,
-                    required=False,
-                    default_value=0,
-                ),
-            },
-        ),
     )
 
     CONCEPT_WITH_MULTIPLE_FIELDS = (
         "concept_with_multiple_fields",
+        ConceptSpec(
+            the_concept_code="ConceptCode",
+            definition="Entity with multiple fields",
+            structure={
+                "name": ConceptStructureSpec(
+                    the_field_name="name",
+                    definition="Name",
+                    type=ConceptStructureSpecFieldType.TEXT,
+                    required=True,
+                ),
+                "age": ConceptStructureSpec(
+                    the_field_name="age",
+                    definition="Age",
+                    type=ConceptStructureSpecFieldType.INTEGER,
+                    required=True,
+                    default_value=18,
+                ),
+                "active": ConceptStructureSpec(
+                    the_field_name="active",
+                    definition="Active status",
+                    type=ConceptStructureSpecFieldType.BOOLEAN,
+                    required=False,
+                    default_value=True,
+                ),
+            },
+        ),
         ConceptBlueprint(
             definition="Entity with multiple fields",
+            refines=None,
             structure={
                 "name": ConceptStructureBlueprint(
                     definition="Name",
                     type=ConceptStructureBlueprintFieldType.TEXT,
                     required=True,
+                    default_value=None,
                 ),
                 "age": ConceptStructureBlueprint(
                     definition="Age",
@@ -128,34 +146,9 @@ class ConceptBlueprintTestCases:
                 ),
             },
         ),
-        ConceptBlueprintCore(
-            definition="Entity with multiple fields",
-            refines=None,
-            structure={
-                "name": ConceptStructureBlueprintCore(
-                    definition="Name",
-                    type=ConceptStructureBlueprintFieldTypeCore.TEXT,
-                    required=True,
-                    default_value=None,
-                ),
-                "age": ConceptStructureBlueprintCore(
-                    definition="Age",
-                    type=ConceptStructureBlueprintFieldTypeCore.INTEGER,
-                    required=True,
-                    default_value=18,
-                ),
-                "active": ConceptStructureBlueprintCore(
-                    definition="Active status",
-                    type=ConceptStructureBlueprintFieldTypeCore.BOOLEAN,
-                    required=False,
-                    default_value=True,
-                ),
-            },
-        ),
     )
 
-    # Collect all test cases
-    TEST_CASES: ClassVar[List[Tuple[str, ConceptBlueprint, ConceptBlueprintCore]]] = [
+    TEST_CASES: ClassVar[List[Tuple[str, ConceptSpec, ConceptBlueprint]]] = [
         SIMPLE_CONCEPT,
         CONCEPT_WITH_REFINES,
         CONCEPT_WITH_TEXT_FIELD,
