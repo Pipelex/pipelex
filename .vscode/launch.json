@@ -36,7 +36,7 @@
                 "-s",
                 "-vv",
                 "-m inference",
-                "-k test_simple_gen"
+                "-k test_pipe_llm_structured"
             ],
             "console": "integratedTerminal"
         },

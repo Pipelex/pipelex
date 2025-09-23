@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, cast
 
 from pydantic import BaseModel
 
@@ -56,5 +56,5 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment) -> List[BaseM
         llm_job=llm_job,
         schema=ListSchema,
     )
-    generated_list: List[BaseModel] = wrapped_list.items  # pyright: ignore[reportUnknownMemberType]
+    generated_list: List[BaseModel] = cast(List[BaseModel], wrapped_list.items)  # pyright: ignore[reportUnknownMemberType]
     return generated_list

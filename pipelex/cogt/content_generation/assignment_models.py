@@ -77,7 +77,6 @@ class LLMAssignment(BaseModel):
 
     @property
     def llm_handle(self) -> str:
-        log.dev(f"Using llm_setting {self.llm_setting}")
         return self.llm_setting.llm_handle
 
     @property

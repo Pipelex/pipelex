@@ -32,7 +32,6 @@ class TestPipeLLM:
             output=NativeConceptEnum.TEXT,
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             prompt=PipeTestCases.USER_PROMPT,
-            structuring_method=StructuringMethod.PRELIMINARY_TEXT,
         )
         pipe = PipeLLMFactory.make_from_blueprint(
             domain="documents",
@@ -65,6 +64,14 @@ class TestPipeLLM:
             StructuringMethod.PRELIMINARY_TEXT,
         ],
     )
+    @pytest.mark.parametrize(
+        "llm,llm_to_structure",
+        [
+            # ("gpt-4o-mini", "gpt-4o-mini"),
+            # ("gemini-2.5-flash-lite", "gemini-2.5-flash-lite"),
+            ("gemini-2.5-flash-lite", "gpt-4o-mini"),
+        ],
+    )
     async def test_pipe_llm_structured(
         self,
         topic: str,
@@ -72,6 +79,8 @@ class TestPipeLLM:
         concept: str,
         structuring_method: StructuringMethod,
         pipe_run_mode: PipeRunMode,
+        llm: str,
+        llm_to_structure: str,
     ):
         pretty_print(data, title="data")
         working_memory = WorkingMemoryFactory.make_from_text(text=data, name="data")
@@ -82,13 +91,16 @@ class TestPipeLLM:
             inputs={"data": "Text"},
             output=f"test_structured_generations.{concept}",
             prompt_template=StructuredDataTestCases.EXTRACTION_PROMPT,
-            llm="gemini-2.5-flash-lite",
+            llm=llm,
+            llm_to_structure=llm_to_structure,
             structuring_method=structuring_method,
         )
 
+        pipe_code = f"extract_{topic}_{concept}_{structuring_method}"
+        pipe_code = pipe_code.lower().replace(" ", "_")
         pipe = PipeLLMFactory.make_from_blueprint(
             domain="test_structured_generations",
-            pipe_code=f"extract_{concept.lower()}_{structuring_method.value}",
+            pipe_code=pipe_code,
             blueprint=pipe_llm_blueprint,
         )
         pipe_provider = get_pipe_provider()

@@ -2,6 +2,7 @@ from typing import Optional
 
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
@@ -36,7 +37,7 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     @property
     @override
     def desc(self) -> str:
-        return f"LLM-Worker:{self.inference_model.tag}"
+        return f"LLM-Worker: {self.inference_model.tag}"
 
     @property
     @override
@@ -48,6 +49,7 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         self,
         llm_job: LLMJob,
     ):
+        log.info(f"LLM Worker: {self.desc} --------------------------------")
         await super()._before_job(llm_job=llm_job)
         llm_job.llm_job_before_start(inference_model=self.inference_model)
 
