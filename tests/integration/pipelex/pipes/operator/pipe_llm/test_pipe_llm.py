@@ -14,8 +14,7 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLMOutput
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
-from pipelex.tools.class_registry_utils import ClassRegistryUtils
-from tests.integration.pipelex.test_data import PipeTestCases, StructuredDataTestCases
+from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, ComplexStructuredDataTestCases, PipeTestCases
 
 
 @pytest.mark.dry_runnable
@@ -55,7 +54,7 @@ class TestPipeLLM:
 
     @pytest.mark.parametrize(
         "topic,data,concept",
-        StructuredDataTestCases.STRUCTURE_TEST_CASES,
+        BasicStructuredDataTestCases.STRUCTURE_TEST_CASES + ComplexStructuredDataTestCases.STRUCTURE_TEST_CASES,
     )
     @pytest.mark.parametrize(
         "structuring_method",
@@ -90,7 +89,7 @@ class TestPipeLLM:
             definition=f"Extract {concept} from text",
             inputs={"data": "Text"},
             output=f"test_structured_generations.{concept}",
-            prompt_template=StructuredDataTestCases.EXTRACTION_PROMPT,
+            prompt_template=BasicStructuredDataTestCases.EXTRACTION_PROMPT,
             llm=llm,
             llm_to_structure=llm_to_structure,
             structuring_method=structuring_method,

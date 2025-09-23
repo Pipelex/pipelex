@@ -89,6 +89,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object: Optional[LLMPromptFactoryAbstract] = None,
     ) -> BaseModelTypeVar:
+        log.verbose(llm_prompt_for_text.user_text, title="llm_prompt_for_text")
         llm_assignment_for_text = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
             llm_setting=llm_setting_main,
@@ -109,7 +110,7 @@ class ContentGenerator(ContentGeneratorProtocol):
 
         preliminary_text = await llm_gen_text(llm_assignment=llm_assignment_for_text)
 
-        log.dev(f"preliminary_text: {preliminary_text}")
+        log.verbose(f"preliminary_text: {preliminary_text}")
 
         fup_llm_assignment = await workflow_arg.llm_assignment_factory_to_object.make_llm_assignment(
             preliminary_text=preliminary_text,

@@ -1,7 +1,7 @@
-"""Test structures for test_structures domain concepts."""
+"""Test structures for basic concepts without union types."""
 
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import List, Optional
 
 from pydantic import Field
 
@@ -31,22 +31,6 @@ class ConceptWithLists(StructuredContent):
     string_list: List[str] = Field(default_factory=list, description="A list of strings")
     number_list: List[int] = Field(default_factory=list, description="A list of numbers")
     optional_list: Optional[List[str]] = Field(None, description="An optional list")
-
-
-class CocneptWithDicts(StructuredContent):
-    """A structure with dictionary fields."""
-
-    string_dict: Dict[str, str] = Field(default_factory=dict, description="A dictionary of strings")
-    mixed_dict: Dict[str, Union[str, int]] = Field(default_factory=dict, description="A dictionary with mixed values")
-    optional_dict: Optional[Dict[str, str]] = Field(None, description="An optional dictionary")
-
-
-class ConceptWithUnions(StructuredContent):
-    """A structure with union types."""
-
-    string_or_int: Union[str, int] = Field(..., description="A field that can be string or int")
-    optional_union: Optional[Union[str, bool]] = Field(None, description="An optional union field")
-    list_of_unions: List[Union[str, int]] = Field(default_factory=list, description="A list of union types")
 
 
 class ConceptWithNestedStructures(StructuredContent):

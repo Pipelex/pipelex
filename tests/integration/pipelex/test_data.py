@@ -200,8 +200,8 @@ Woman typing on a laptop. On the laptop screen you see python code to generate c
     ]
 
 
-class StructuredDataTestCases:
-    """Test cases for extracting structured data from text prompts."""
+class BasicStructuredDataTestCases:
+    """Test cases for extracting basic structured data without union types."""
 
     EXTRACTION_PROMPT = """
 Extract information from the following text:
@@ -256,38 +256,6 @@ Extract information from the following text:
     - string_list: ["only", "one"]
     - number_list: [42]
     - optional_list: NOT PROVIDED (should be null)
-    """
-
-    # CocneptWithDicts test cases (keeping the typo to match the model)
-    DICTS_WITH_DATA = """
-    - string_dict: {"key1": "value1", "key2": "value2", "name": "test"}
-    - mixed_dict: {"count": 10, "label": "important", "id": 999}
-    - optional_dict: {"status": "active", "mode": "production"}
-    """
-
-    DICTS_EMPTY = """
-    - string_dict: {} (empty dictionary)
-    - mixed_dict: {"only_string": "no numbers here"}
-    - optional_dict: null (not provided)
-    """
-
-    # ConceptWithUnions test cases
-    UNIONS_STRING_VARIANT = """
-    - string_or_int: "This is a string value"
-    - optional_union: "Also a string"
-    - list_of_unions: ["text1", "text2", 100, 200, "text3"]
-    """
-
-    UNIONS_INT_VARIANT = """
-    - string_or_int: 42 (as integer)
-    - optional_union: true (as boolean)
-    - list_of_unions: [1, 2, 3, 4, 5]
-    """
-
-    UNIONS_MIXED = """
-    - string_or_int: 999
-    - optional_union: NOT PROVIDED (should be None)
-    - list_of_unions: ["mixed", 123, "types", 456, "here"]
     """
 
     # ConceptWithNestedStructures test cases
@@ -346,12 +314,132 @@ Extract information from the following text:
         ("Lists with data", LISTS_WITH_DATA, "ConceptWithLists"),
         ("Lists empty", LISTS_EMPTY, "ConceptWithLists"),
         ("Lists mixed", LISTS_MIXED, "ConceptWithLists"),
-        ("Dicts with data", DICTS_WITH_DATA, "CocneptWithDicts"),
-        ("Dicts empty", DICTS_EMPTY, "CocneptWithDicts"),
-        ("Unions string variant", UNIONS_STRING_VARIANT, "ConceptWithUnions"),
-        ("Unions int variant", UNIONS_INT_VARIANT, "ConceptWithUnions"),
-        ("Unions mixed", UNIONS_MIXED, "ConceptWithUnions"),
         ("Nested full", NESTED_FULL, "ConceptWithNestedStructures"),
         ("Nested partial", NESTED_PARTIAL, "ConceptWithNestedStructures"),
         ("Nested complex", NESTED_COMPLEX, "ConceptWithNestedStructures"),
+    ]
+
+
+class ComplexStructuredDataTestCases:
+    """Test cases for extracting structured data with complex types (unions, dicts, etc.)."""
+
+    EXTRACTION_PROMPT = """
+Extract information from the following text:
+@data
+"""
+
+    # ConceptWithDicts test cases
+    DICTS_WITH_DATA = """
+    - string_dict: {"key1": "value1", "key2": "value2", "name": "test"}
+    - number_dict: {"count": 10, "score": 95, "id": 999}
+    - optional_dict: {"status": "active", "mode": "production"}
+    """
+
+    DICTS_EMPTY = """
+    - string_dict: {} (empty dictionary)
+    - number_dict: {"total": 100}
+    - optional_dict: null (not provided)
+    """
+
+    # ConceptWithUnions test cases
+    UNIONS_STRING_VARIANT = """
+    - string_or_int: "This is a string value"
+    - optional_union: "Also a string"
+    - list_of_unions: ["text1", "text2", 100, 200, "text3"]
+    """
+
+    UNIONS_INT_VARIANT = """
+    - string_or_int: 42 (as integer)
+    - optional_union: true (as boolean)
+    - list_of_unions: [1, 2, 3, 4, 5]
+    """
+
+    UNIONS_MIXED = """
+    - string_or_int: 999
+    - optional_union: NOT PROVIDED (should be None)
+    - list_of_unions: ["mixed", 123, "types", 456, "here"]
+    """
+
+    # ConceptWithComplexUnions test cases
+    COMPLEX_UNIONS_1 = """
+    - mixed_dict: {"status": "active", "count": 42, "enabled": true}
+    - union_or_list: "single string value"
+    - optional_complex_union: {"key1": "value1", "key2": "value2"}
+    - number_or_bool: 3.14
+    """
+
+    COMPLEX_UNIONS_2 = """
+    - mixed_dict: {"name": "test", "score": 100, "passed": false}
+    - union_or_list: [10, 20, 30, 40]
+    - optional_complex_union: ["item1", "item2", "item3"]
+    - number_or_bool: true
+    """
+
+    COMPLEX_UNIONS_3 = """
+    - mixed_dict: {} (empty dictionary)
+    - union_or_list: [] (empty list as list of integers)
+    - optional_complex_union: NOT PROVIDED (should be None)
+    - number_or_bool: 0
+    """
+
+    # ConceptWithNestedUnions test cases
+    NESTED_UNIONS_SIMPLE = """
+    - simple_or_complex: {
+        name: "John Doe",
+        age: 25,
+        is_active: true
+      }
+    - list_of_union_structures: []
+    - optional_nested_union: null
+    """
+
+    NESTED_UNIONS_COMPLEX = """
+    - simple_or_complex: {
+        required_field: "Complex choice",
+        optional_string: "Has a value",
+        optional_number: null,
+        optional_date: "2024-06-15T10:00:00"
+      }
+    - list_of_union_structures: [
+        {name: "Simple", age: 30, is_active: false},
+        {string_or_int: "text", optional_union: true, list_of_unions: [1, 2, 3]}
+      ]
+    - optional_nested_union: {
+        string_or_int: 42,
+        optional_union: null,
+        list_of_unions: ["a", 1, "b", 2]
+      }
+    """
+
+    NESTED_UNIONS_MIXED = """
+    - simple_or_complex: {
+        name: "Test User",
+        age: 40,
+        is_active: false
+      }
+    - list_of_union_structures: [
+        {string_or_int: 100, optional_union: "string", list_of_unions: []},
+        {name: "Another", age: 22, is_active: true}
+      ]
+    - optional_nested_union: {
+        mixed_dict: {"x": 1, "y": "two", "z": false},
+        union_or_list: "just a string",
+        optional_complex_union: ["list", "of", "strings"],
+        number_or_bool: false
+      }
+    """
+
+    # Combined test cases for parametrized tests
+    STRUCTURE_TEST_CASES: ClassVar[List[Tuple[str, str, str]]] = [  # topic, data, concept
+        ("Dicts with data", DICTS_WITH_DATA, "ConceptWithDicts"),
+        ("Dicts empty", DICTS_EMPTY, "ConceptWithDicts"),
+        ("Unions string variant", UNIONS_STRING_VARIANT, "ConceptWithUnions"),
+        ("Unions int variant", UNIONS_INT_VARIANT, "ConceptWithUnions"),
+        ("Unions mixed", UNIONS_MIXED, "ConceptWithUnions"),
+        ("Complex unions 1", COMPLEX_UNIONS_1, "ConceptWithComplexUnions"),
+        ("Complex unions 2", COMPLEX_UNIONS_2, "ConceptWithComplexUnions"),
+        ("Complex unions 3", COMPLEX_UNIONS_3, "ConceptWithComplexUnions"),
+        ("Nested unions simple", NESTED_UNIONS_SIMPLE, "ConceptWithNestedUnions"),
+        ("Nested unions complex", NESTED_UNIONS_COMPLEX, "ConceptWithNestedUnions"),
+        ("Nested unions mixed", NESTED_UNIONS_MIXED, "ConceptWithNestedUnions"),
     ]

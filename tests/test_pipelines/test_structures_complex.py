@@ -1,0 +1,45 @@
+"""Test structures for complex concepts (dicts, unions, etc.)."""
+
+from typing import Dict, List, Optional, Union
+
+from pydantic import Field
+
+from pipelex.core.stuffs.stuff_content import StructuredContent
+from tests.test_pipelines.test_structures_basic import ConceptWithOptionals, ConceptWithSimpleStructure
+
+
+class ConceptWithDicts(StructuredContent):
+    """A structure with dictionary fields."""
+
+    string_dict: Dict[str, str] = Field(default_factory=dict, description="A dictionary of strings")
+    number_dict: Dict[str, int] = Field(default_factory=dict, description="A dictionary of numbers")
+    optional_dict: Optional[Dict[str, str]] = Field(None, description="An optional dictionary")
+
+
+class ConceptWithUnions(StructuredContent):
+    """A structure with union types."""
+
+    string_or_int: Union[str, int] = Field(..., description="A field that can be string or int")
+    optional_union: Optional[Union[str, bool]] = Field(None, description="An optional union field")
+    list_of_unions: List[Union[str, int]] = Field(default_factory=list, description="A list of union types")
+
+
+class ConceptWithComplexUnions(StructuredContent):
+    """A structure with more complex union combinations."""
+
+    mixed_dict: Dict[str, Union[str, int, bool]] = Field(default_factory=dict, description="A dictionary with mixed value types")
+    union_or_list: Union[str, List[int]] = Field(..., description="Either a string or a list of integers")
+    optional_complex_union: Optional[Union[Dict[str, str], List[str]]] = Field(None, description="Optional dict or list")
+    number_or_bool: Union[int, float, bool] = Field(..., description="Number or boolean value")
+
+
+class ConceptWithNestedUnions(StructuredContent):
+    """A structure with nested unions including other structures."""
+
+    simple_or_complex: Union[ConceptWithSimpleStructure, ConceptWithOptionals] = Field(..., description="Simple or complex structure")
+    list_of_union_structures: List[Union[ConceptWithSimpleStructure, ConceptWithUnions]] = Field(
+        default_factory=list, description="List of different structure types"
+    )
+    optional_nested_union: Optional[Union[ConceptWithUnions, ConceptWithComplexUnions]] = Field(
+        None, description="Optional union of union structures"
+    )

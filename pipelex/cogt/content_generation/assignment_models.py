@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import LLMAssignmentError
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
