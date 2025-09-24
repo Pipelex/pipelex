@@ -37,7 +37,7 @@ class PipeJinja2Output(PipeOutput):
         return self.main_stuff_as_text.text
 
 
-class PipeJinja2(PipeOperator):
+class PipeJinja2(PipeOperator[PipeJinja2Output]):
     type: Literal["PipeJinja2"] = "PipeJinja2"
     model_config = ConfigDict(extra="forbid", strict=False)
 
@@ -169,7 +169,7 @@ class PipeJinja2(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
-    ) -> PipeOutput:
+    ) -> PipeJinja2Output:
         content_generator_used: ContentGeneratorProtocol
         if get_config().pipelex.dry_run_config.apply_to_jinja2_rendering:
             log.debug(f"PipeJinja2: using dry run operator pipe for jinja2 rendering: {self.code}")

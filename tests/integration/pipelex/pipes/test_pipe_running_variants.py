@@ -11,7 +11,8 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.hub import get_library_manager, get_pipe_router
+from pipelex.hub import get_library_manager, get_pipe_router, get_required_pipe
+from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import PipeTestCases
@@ -36,11 +37,13 @@ class TestPipeRunningVariants:
     ):
         log.verbose(stuff, title=f"{topic}: start from '{stuff.stuff_name}', run pipe '{pipe_code}'")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code=pipe_code,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            working_memory=working_memory,
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+        pipe_output: PipeOutput = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code=pipe_code),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+                working_memory=working_memory,
+                job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+            ),
         )
 
         # Save stuff context
@@ -58,11 +61,13 @@ class TestPipeRunningVariants:
         pipe_code: str,
     ):
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code=pipe_code,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            working_memory=WorkingMemoryFactory.make_empty(),
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+        pipe_output: PipeOutput = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code=pipe_code),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+                working_memory=WorkingMemoryFactory.make_empty(),
+                job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+            ),
         )
 
         # Save stuff context
@@ -86,14 +91,16 @@ class TestPipeRunningVariants:
         output_multiplicity: Optional[PipeOutputMultiplicity],
     ):
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code=pipe_code,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(
-                pipe_run_mode=pipe_run_mode,
-                output_multiplicity=output_multiplicity,
+        pipe_output: PipeOutput = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code=pipe_code),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(
+                    pipe_run_mode=pipe_run_mode,
+                    output_multiplicity=output_multiplicity,
+                ),
+                job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+                working_memory=WorkingMemoryFactory.make_empty(),
             ),
-            working_memory=WorkingMemoryFactory.make_empty(),
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
         )
 
         # Save stuff context
@@ -122,13 +129,15 @@ class TestPipeRunningVariants:
 
         log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
         with pytest.raises(exception) as exc:
-            await get_pipe_router().run_pipe_code(
-                pipe_code=pipe_code,
-                pipe_run_params=PipeRunParamsFactory.make_run_params(
-                    pipe_stack_limit=6,
-                    pipe_run_mode=pipe_run_mode,
+            await get_pipe_router().run(
+                pipe_job=PipeJobFactory.make_pipe_job(
+                    pipe=get_required_pipe(pipe_code=pipe_code),
+                    pipe_run_params=PipeRunParamsFactory.make_run_params(
+                        pipe_stack_limit=6,
+                        pipe_run_mode=pipe_run_mode,
+                    ),
+                    job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
                 ),
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
             )
         pretty_print(exc.value, title="exception")
         assert expected_error_message in str(exc.value)

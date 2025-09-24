@@ -21,7 +21,7 @@ class PipeFuncOutput(PipeOutput):
     pass
 
 
-class PipeFunc(PipeOperator):
+class PipeFunc(PipeOperator[PipeFuncOutput]):
     type: Literal["PipeFunc"] = "PipeFunc"
     function_name: str
 
@@ -87,7 +87,7 @@ class PipeFunc(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
-    ) -> PipeOutput:
+    ) -> PipeFuncOutput:
         log.debug(f"Dry run for PipeFunc '{self.function_name}'")
 
         function = func_registry.get_required_function(self.function_name)

@@ -85,6 +85,6 @@ async def start_pipeline(
     )
 
     # Launch execution without awaiting the result.
-    task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run_pipe_job(pipe_job))
+    task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))
 
     return task

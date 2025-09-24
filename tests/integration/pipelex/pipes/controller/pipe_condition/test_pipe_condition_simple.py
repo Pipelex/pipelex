@@ -17,9 +17,10 @@ from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import DryRunError
-from pipelex.hub import get_pipe_router
+from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
+from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition import CategoryInput
 
@@ -194,11 +195,13 @@ class TestPipeConditionSimple:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(input_data_stuff)
 
         # Run dry run using the real pipe - this should succeed
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code="basic_condition_by_category_2",
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
-            working_memory=working_memory,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+        pipe_output: PipeOutput = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                working_memory=working_memory,
+                job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            ),
         )
         pretty_print(pipe_output)
         # Verify the dry run succeeded
@@ -227,11 +230,13 @@ class TestPipeConditionSimple:
 
         # Run dry run using the real pipe - this should fail with DryRunError
         with pytest.raises(DryRunError) as exc_info:
-            await get_pipe_router().run_pipe_code(
-                pipe_code="basic_condition_by_category_2",
-                job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
-                working_memory=empty_working_memory,
-                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+            await get_pipe_router().run(
+                pipe_job=PipeJobFactory.make_pipe_job(
+                    pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
+                    pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                    working_memory=empty_working_memory,
+                    job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+                ),
             )
 
         # Verify the error details
@@ -259,11 +264,13 @@ class TestPipeConditionSimple:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(input_data_stuff)
 
         # Run dry run using the real pipe - this should succeed and validate the 'medium' branch
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code="basic_condition_by_category_2",
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
-            working_memory=working_memory,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+        pipe_output: PipeOutput = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                working_memory=working_memory,
+                job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            ),
         )
 
         pretty_print(pipe_output)

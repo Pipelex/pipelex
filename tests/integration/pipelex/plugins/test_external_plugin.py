@@ -1,4 +1,4 @@
-from typing import Type
+from typing import Type, cast
 
 import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
@@ -107,8 +107,11 @@ class TestExternalPlugin:
                 blueprint=pipe_llm_blueprint,
             ),
         )
-        pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
-            pipe_job=pipe_job,
+        pipe_llm_output: PipeLLMOutput = cast(
+            PipeLLMOutput,
+            await get_pipe_router().run(
+                pipe_job=pipe_job,
+            ),
         )
 
         log.verbose(pipe_llm_output, title="stuff")

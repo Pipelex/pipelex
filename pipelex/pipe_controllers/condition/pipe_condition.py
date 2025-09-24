@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal, Optional, Set, Union, cast
+from typing import Dict, List, Literal, Optional, Set, Union
 
 import shortuuid
 from pydantic import field_validator, model_validator
@@ -31,6 +31,7 @@ from pipelex.pipe_controllers.pipe_controller import PipeController, SpecificPip
 from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2Output
 from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
 from pipelex.pipe_operators.jinja2.pipe_jinja2_factory import PipeJinja2Factory
+from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
@@ -308,12 +309,12 @@ class PipeCondition(PipeController):
         #     )
         # ).rendered_text.strip()
         # TODO: restore the possibility above, without need to explicitly cast the output
-        pipe_output_1: PipeOutput = await pipe_jinja2.run_pipe(
+        pipe_output_1: PipeJinja2Output = await pipe_jinja2.run_pipe(
             job_metadata=jinja2_job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
         )
-        pipe_jinja2_output = cast(PipeJinja2Output, pipe_output_1)
+        pipe_jinja2_output = pipe_output_1
         evaluated_expression = pipe_jinja2_output.rendered_text.strip()
 
         if not evaluated_expression or evaluated_expression == "None":
@@ -371,12 +372,14 @@ class PipeCondition(PipeController):
             )
 
         log.debug(f"Chosen pipe: {chosen_pipe_code}")
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code=chosen_pipe_code,
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
+        pipe_output: PipeOutput = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code=chosen_pipe_code),
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+                output_name=output_name,
+            ),
         )
         get_pipeline_tracker().add_choice_step(
             from_condition=condition_details,

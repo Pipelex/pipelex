@@ -26,7 +26,7 @@ from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
-from pipelex.hub import PipelexHub, set_pipelex_hub
+from pipelex.hub import PipelexHub, get_observer_provider, set_pipelex_hub
 from pipelex.libraries.library_manager_factory import LibraryManagerFactory
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
@@ -206,7 +206,7 @@ class Pipelex(metaclass=MetaSingleton):
             self.class_registry.register_classes(PipelexTestModels.get_all_models())
         self.activity_manager.setup()
 
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter())
+        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observability_provider=get_observer_provider()))
 
         # pipeline
         self.pipeline_tracker.setup()

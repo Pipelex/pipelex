@@ -56,7 +56,7 @@ class PipeLLMOutput(PipeOutput):
     pass
 
 
-class PipeLLM(PipeOperator):
+class PipeLLM(PipeOperator[PipeLLMOutput]):
     type: Literal["PipeLLM"] = "PipeLLM"
     llm_prompt_spec: LLMPromptSpec
     llm_choices: Optional[LLMSettingChoices] = None
@@ -505,7 +505,7 @@ class PipeLLM(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
-    ) -> PipeOutput:
+    ) -> PipeLLMOutput:
         content_generator_dry = ContentGeneratorDry()
         pipe_output = await self._run_operator_pipe(
             job_metadata=job_metadata,

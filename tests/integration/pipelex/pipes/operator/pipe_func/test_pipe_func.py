@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 from pipelex import log, pretty_print
@@ -71,8 +73,11 @@ if __name__ == "__main__":
         )
 
         # Execute the pipe
-        pipe_func_output: PipeFuncOutput = await get_pipe_router().run_pipe_job(
-            pipe_job=pipe_job,
+        pipe_func_output: PipeFuncOutput = cast(
+            PipeFuncOutput,
+            await get_pipe_router().run(
+                pipe_job=pipe_job,
+            ),
         )
 
         # Log and verify results

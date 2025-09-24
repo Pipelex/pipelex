@@ -42,7 +42,7 @@ class PipeOcrOutput(PipeOutput):
 PIPE_OCR_INPUT_NAME = "ocr_input"
 
 
-class PipeOcr(PipeOperator):
+class PipeOcr(PipeOperator[PipeOcrOutput]):
     type: Literal["PipeOcr"] = "PipeOcr"
     ocr_choice: Optional[OcrChoice]
     should_caption_images: bool
@@ -265,7 +265,7 @@ class PipeOcr(PipeOperator):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
-    ) -> PipeOutput:
+    ) -> PipeOcrOutput:
         log.debug(f"PipeOcr: dry run operator pipe: {self.code}")
         if pipe_run_params.run_mode != PipeRunMode.DRY:
             raise PipeDefinitionError(f"Running pipe '{self.code}' (PipeOcr) _dry_run_operator_pipe() in non-dry mode is not allowed.")

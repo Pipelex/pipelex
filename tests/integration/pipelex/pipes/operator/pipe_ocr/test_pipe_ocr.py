@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -70,8 +70,11 @@ class TestPipeOCR:
                 name="page_scan",
             ),
         )
-        pipe_ocr_output: PipeOcrOutput = await get_pipe_router().run_pipe_job(
-            pipe_job=pipe_job,
+        pipe_ocr_output: PipeOcrOutput = cast(
+            PipeOcrOutput,
+            await get_pipe_router().run(
+                pipe_job=pipe_job,
+            ),
         )
         ocr_text = pipe_ocr_output.main_stuff_as_list(item_type=PageContent)
         pretty_print(ocr_text, title="ocr_text")
@@ -106,8 +109,11 @@ class TestPipeOCR:
                 name=PIPE_OCR_INPUT_NAME,
             ),
         )
-        pipe_ocr_output: PipeOcrOutput = await get_pipe_router().run_pipe_job(
-            pipe_job=pipe_job,
+        pipe_ocr_output: PipeOcrOutput = cast(
+            PipeOcrOutput,
+            await get_pipe_router().run(
+                pipe_job=pipe_job,
+            ),
         )
         ocr_text = pipe_ocr_output.main_stuff_as_list(item_type=PageContent)
         pretty_print(ocr_text, title="ocr_text")

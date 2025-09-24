@@ -140,6 +140,7 @@ class PipeBatch(PipeController):
             required_stuff_lists.append(required_stuffs)
             branch_pipe_run_params = pipe_run_params.deep_copy_with_final_stuff_code(final_stuff_code=branch_output_item_code)
 
+            task: Coroutine[Any, Any, PipeOutput]
             if pipe_run_params.run_mode == PipeRunMode.DRY:
                 branch_pipe_run_params.run_mode = PipeRunMode.DRY
                 task = sub_pipe.run_pipe(

@@ -105,4 +105,4 @@ async def execute_pipeline(
         output_name=output_name,
     )
 
-    return await get_pipe_router().run_pipe_job(pipe_job)
+    return await get_pipe_router().run(pipe_job)

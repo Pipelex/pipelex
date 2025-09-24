@@ -5,6 +5,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
@@ -35,7 +36,7 @@ async def test_simple_text_sequence(pipe_run_mode: PipeRunMode):
         working_memory = WorkingMemoryFactory.make_from_multiple_stuffs([raw_text_stuff])
 
         pipe = get_required_pipe(pipe_code="simple_text_sequence")
-        pipe_output = await pipe.run_pipe(
+        pipe_output: PipeOutput = await pipe.run_pipe(
             job_metadata=JobMetadata(job_name="test_simple_text_sequence"),
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

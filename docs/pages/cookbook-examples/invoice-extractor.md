@@ -27,7 +27,7 @@ async def process_expense_report() -> ListContent[Invoice]:
     return pipe_output.main_stuff_as_list(item_type=Invoice)
 ```
 
-This example also showcases some of the powerful observability features of Pipelex. After the pipeline runs, it generates a cost report and a flowchart of the execution.
+This example also showcases some of the powerful observer features of Pipelex. After the pipeline runs, it generates a cost report and a flowchart of the execution.
 
 ```python
 # Print the cost reporting

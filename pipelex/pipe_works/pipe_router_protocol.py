@@ -1,23 +1,49 @@
-from typing import Optional, Protocol
+from typing import Protocol
 
-from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_output import PipeOutputType
-from pipelex.core.pipes.pipe_run_params import PipeRunParams
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
 from pipelex.pipe_works.pipe_job import PipeJob
-from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeRouterProtocol(Protocol):
-    async def run_pipe_job(
+    observability_provider: ObserverProtocol
+
+    def __init__(self, observability_provider: ObserverProtocol):
+        self.observability_provider = observability_provider
+
+    async def _before_run(
         self,
         pipe_job: PipeJob,
-    ) -> PipeOutputType: ...  # pyright: ignore[reportInvalidTypeVarUse]
+    ) -> None:
+        payload: PayloadType = {
+            "pipe_job": pipe_job,
+        }
+        await self.observability_provider.push(payload)
 
-    async def run_pipe_code(
+    async def _after_run(
         self,
-        pipe_code: str,
-        pipe_run_params: Optional[PipeRunParams] = None,
-        job_metadata: Optional[JobMetadata] = None,
-        working_memory: Optional[WorkingMemory] = None,
-        output_name: Optional[str] = None,
-    ) -> PipeOutputType: ...  # pyright: ignore[reportInvalidTypeVarUse]
+        pipe_job: PipeJob,
+        pipe_output: PipeOutput,
+    ) -> None:
+        payload: PayloadType = {
+            "pipe_job": pipe_job,
+            "pipe_output": pipe_output,
+        }
+        await self.observability_provider.push(payload)
+
+    async def run(
+        self,
+        pipe_job: PipeJob,
+    ) -> PipeOutput:
+        await self._before_run(pipe_job)
+
+        pipe_output: PipeOutput = await self._run_pipe_job(pipe_job)
+
+        await self._after_run(pipe_job, pipe_output)
+
+        return pipe_output
+
+    async def _run_pipe_job(
+        self,
+        pipe_job: PipeJob,
+    ) -> PipeOutput: ...
