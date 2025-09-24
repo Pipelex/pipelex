@@ -1,16 +1,16 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from typing_extensions import override
 
 from pipelex.observer.observer_protocol import ObserverProtocol
 
 
-class LocalFileObservability(ObserverProtocol):
-    def __init__(self, storage_dir: str = ".pipelex/observer") -> None:
-        self.storage_dir = Path(storage_dir)
+class LocalObservability(ObserverProtocol):
+    def __init__(self, storage_dir: Optional[str] = None) -> None:
+        self.storage_dir = Path(storage_dir or ".pipelex/observer")
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_daily_file_path(self) -> Path:
