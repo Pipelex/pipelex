@@ -6,10 +6,10 @@ from pipelex.pipe_works.pipe_job import PipeJob
 
 
 class PipeRouterProtocol(Protocol):
-    observability_provider: ObserverProtocol
+    observer_provider: ObserverProtocol
 
-    def __init__(self, observability_provider: ObserverProtocol):
-        self.observability_provider = observability_provider
+    def __init__(self, observer_provider: ObserverProtocol):
+        self.observer_provider = observer_provider
 
     async def _before_run(
         self,
@@ -18,7 +18,7 @@ class PipeRouterProtocol(Protocol):
         payload: PayloadType = {
             "pipe_job": pipe_job,
         }
-        await self.observability_provider.push(payload)
+        await self.observer_provider.push(payload)
 
     async def _after_run(
         self,
@@ -29,7 +29,7 @@ class PipeRouterProtocol(Protocol):
             "pipe_job": pipe_job,
             "pipe_output": pipe_output,
         }
-        await self.observability_provider.push(payload)
+        await self.observer_provider.push(payload)
 
     async def run(
         self,

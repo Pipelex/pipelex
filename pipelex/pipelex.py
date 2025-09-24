@@ -209,7 +209,7 @@ class Pipelex(metaclass=MetaSingleton):
 
         self.pipelex_hub.set_observer_provider(observer_provider=LocalObservability(storage_dir=".pipelex/observer"))
 
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observability_provider=get_observer_provider()))
+        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer_provider=get_observer_provider()))
 
         # pipeline
         self.pipeline_tracker.setup()
