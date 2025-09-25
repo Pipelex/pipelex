@@ -4,8 +4,6 @@ PayloadType = Dict[str, Any]
 
 
 class ObserverProtocol(Protocol):
-    """Enhanced observer protocol with data organization and configurable storage"""
-
     async def before_run(
         self,
         payload: PayloadType,
