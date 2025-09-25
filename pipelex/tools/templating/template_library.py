@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict
+from typing import Any, ClassVar, Dict, cast
 
 from jinja2 import TemplateSyntaxError
 from pydantic import Field, RootModel, ValidationError
@@ -74,7 +74,7 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
                     self._add_new_template(template=template, name=name)
                 elif isinstance(obj, dict):
                     # this is not a templae but a subdomain
-                    sub_recursive_dict: Dict[str, str] = obj
+                    sub_recursive_dict = cast(Dict[str, str], obj)
                     domain = f"{domain}/{name}"
                     self._load_from_recursive_dict(domain=domain, recursive_dict=sub_recursive_dict)
                 else:

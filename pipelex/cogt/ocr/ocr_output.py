@@ -5,7 +5,7 @@ from pydantic import Field
 from pipelex import log
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_directory_exists, save_text_to_path
-from pipelex.tools.typing.pydantic_utils import CustomBaseModel
+from pipelex.tools.typing.pydantic_utils import CustomBaseModel, empty_list_factory_of
 
 
 class ExtractedImage(CustomBaseModel):
@@ -31,7 +31,7 @@ class ExtractedImageFromPage(ExtractedImage):
 
 class Page(CustomBaseModel):
     text: Optional[str] = None
-    extracted_images: List[ExtractedImageFromPage] = Field(default_factory=list)
+    extracted_images: List[ExtractedImageFromPage] = Field(default_factory=empty_list_factory_of(ExtractedImageFromPage))
     page_view: Optional[ExtractedImageFromPage] = None
 
     def save_to_directory(self, directory: str, page_text_file_name: str):

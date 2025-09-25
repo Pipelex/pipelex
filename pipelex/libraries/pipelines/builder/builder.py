@@ -20,6 +20,7 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipePara
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSignature
 from pipelex.pipe_works.pipe_dry import dry_run_pipes
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.types import StrEnum
 
 
@@ -214,7 +215,9 @@ class DryRunResult(StructuredContent):
     """A result of a dry run of a pipelex bundle blueprint."""
 
     status: DryRunStatus
-    failed_pipes: List[PipeFailure] = Field(default_factory=list, description="List of pipes that failed during dry run")
+    failed_pipes: List[PipeFailure] = Field(
+        default_factory=empty_list_factory_of(PipeFailure), description="List of pipes that failed during dry run"
+    )
 
 
 async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFailure]:

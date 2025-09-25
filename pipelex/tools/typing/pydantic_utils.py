@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Sequence, Set, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, TypeVar, Union, cast
 
 from pydantic import BaseModel, ValidationError
 from rich.repr import Result as RichReprResult
@@ -8,6 +8,15 @@ from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.types import StrEnum
 
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
+
+T = TypeVar("T")
+
+
+def empty_list_factory_of(_: type[T]) -> Callable[[], list[T]]:
+    def _factory() -> list[T]:
+        return []
+
+    return _factory
 
 
 def format_pydantic_validation_error(exc: ValidationError) -> str:
@@ -66,10 +75,10 @@ def convert_strenum_to_str(
     obj: Dict[str, Any] | List[Any] | StrEnum | Any,
 ) -> Dict[str, Any] | List[Any] | str | Any:
     if isinstance(obj, dict):
-        obj_dict: Dict[str, Any] = obj
+        obj_dict = cast(Dict[str, Any], obj)
         return {str(key): convert_strenum_to_str(value) for key, value in obj_dict.items()}
     elif isinstance(obj, list):
-        obj_list: List[Any] = obj
+        obj_list = cast(List[Any], obj)
         return [convert_strenum_to_str(item) for item in obj_list]
     elif isinstance(obj, StrEnum):
         if hasattr(obj, "display_name"):
@@ -97,7 +106,7 @@ def clean_model_to_dict(obj: BaseModel) -> Dict[str, Any]:
     )
     if not isinstance(dict_dump, dict):
         raise TypeError(f"Expected dict, got {type(dict_dump)}")
-    result_dict: Dict[str, Any] = dict_dump
+    result_dict = cast(Dict[str, Any], dict_dump)
     return result_dict
 
 
@@ -124,7 +133,12 @@ def serialize_model(
 
     for field_name, field_info in obj.__class__.model_fields.items():
         json_schema_extra = field_info.json_schema_extra
-        is_hidden = json_schema_extra and isinstance(json_schema_extra, dict) and json_schema_extra.get(ExtraFieldAttribute.IS_HIDDEN) is True
+        is_hidden: bool
+        if json_schema_extra and isinstance(json_schema_extra, dict):
+            typed_json_schema_extra = cast(Dict[str, Any], json_schema_extra)
+            is_hidden = typed_json_schema_extra.get(ExtraFieldAttribute.IS_HIDDEN) is True
+        else:
+            is_hidden = False
         match field_visibility:
             case FieldVisibility.ALL_FIELDS:
                 pass
@@ -153,7 +167,7 @@ def serialize_model(
 
         # If it's a list, we recurse for each item
         elif isinstance(value, list):
-            value_list: List[Any] = value
+            value_list = cast(List[Any], value)
             data[field_name] = [
                 serialize_model(
                     obj=item,
@@ -165,7 +179,7 @@ def serialize_model(
 
         # If it's a dict, we can similarly recurse for any nested BaseModels inside the dict
         elif isinstance(value, dict):
-            value_dict: Dict[str, Any] = value
+            value_dict = cast(Dict[str, Any], value)
             data[field_name] = {
                 key: serialize_model(
                     obj=value,
@@ -193,7 +207,7 @@ class CustomBaseModel(BaseModel):
     def __rich_repr__(self) -> RichReprResult:  # type: ignore
         for item in super().__rich_repr__():  # type: ignore
             if isinstance(item, tuple):
-                tuple_item: tuple[Any, ...] = item
+                tuple_item = cast(tuple[Any, ...], item)
                 if len(tuple_item) >= 2:
                     name = tuple_item[0]
                     value = tuple_item[1]
@@ -211,7 +225,7 @@ class CustomBaseModel(BaseModel):
     @override
     def __repr_args__(self) -> Sequence[tuple[Optional[str], Any]]:
         processed_args: list[tuple[Optional[str], Any]] = []
-        for name, value in super().__repr_args__():
+        for name, value in super().__repr_args__():  # type: ignore
             if name and AttributePolisher.should_truncate(name=name, value=value):
                 truncated_value = AttributePolisher.get_truncated_value(name, value)
                 processed_args.append((name, truncated_value))
@@ -254,7 +268,7 @@ class CustomBaseModel(BaseModel):
 
         # If it's a dictionary, recurse into its values
         if isinstance(obj, dict):
-            obj_dict: Dict[str, Any] = obj
+            obj_dict = cast(Dict[str, Any], obj)
             truncated_dict: Dict[str, Any] = {}
             for key, value in obj_dict.items():
                 truncated_dict[key] = self._apply_truncation_recursive(value, name=key)
@@ -262,7 +276,7 @@ class CustomBaseModel(BaseModel):
 
         # If it's a list, recurse into its items
         elif isinstance(obj, list):
-            obj_list: List[Any] = obj
+            obj_list = cast(List[Any], obj)
             return [self._apply_truncation_recursive(item, name=name) for item in obj_list]
 
         # If it's a tuple, recurse into its items and return as tuple

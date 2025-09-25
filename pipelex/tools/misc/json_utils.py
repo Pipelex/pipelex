@@ -288,24 +288,25 @@ def purify_json(
         if not the_list:
             return [], "[]"
         if isinstance(the_list[0], CustomBaseModel) and is_truncate_bytes_enabled:
-            the_list_of_custom_base_models: List[CustomBaseModel] = the_list
+            the_list_of_custom_base_models = cast(List[CustomBaseModel], the_list)
             pure_list = [item.model_dump_truncated(serialize_as_any=True) for item in the_list_of_custom_base_models]
             dict_string = json.dumps(pure_list, indent=indent, default=str)
             return pure_list, dict_string
         elif isinstance(the_list[0], BaseModel):
-            the_list_of_base_models: List[BaseModel] = the_list
+            the_list_of_base_models = cast(List[BaseModel], the_list)
             pure_list = [item.model_dump(serialize_as_any=True) for item in the_list_of_base_models]
             dict_string = json.dumps(pure_list, indent=indent, default=str)
             return pure_list, dict_string
 
     try:
         dict_string = json.dumps(data, indent=indent)
-        pure_dict: Union[Dict[Any, Any], List[Any]] = data
+        pure_dict = cast(Union[Dict[Any, Any], List[Any]], data)
     except TypeError:
         try:
             dict_string = kajson.dumps(data, indent=indent)  # pyright: ignore[reportUnknownMemberType]
         except Exception:
             if is_warning_enabled:
+                data = cast(Union[Dict[Any, Any], List[Any]], data)
                 data = {"!": data}
             dict_string = json.dumps(data, indent=indent, default=str)
         pure_dict = json.loads(dict_string)
@@ -346,7 +347,7 @@ def purify_json_list(
     if not data:
         return [], "[]"
     if isinstance(data[0], CustomBaseModel) and is_truncate_bytes_enabled:
-        the_list_of_custom_base_models: List[CustomBaseModel] = data
+        the_list_of_custom_base_models = cast(List[CustomBaseModel], data)
         pure_list = [item.model_dump_truncated(serialize_as_any=True) for item in the_list_of_custom_base_models]
         list_string = json.dumps(pure_list, indent=indent, default=str)
         return pure_list, list_string

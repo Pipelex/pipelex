@@ -7,6 +7,7 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.usage.cost_category import CostsByCategoryDict
 from pipelex.tools.config.config_model import ConfigModel
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 
 class InferenceModelSpec(ConfigModel):
@@ -21,7 +22,7 @@ class InferenceModelSpec(ConfigModel):
     max_tokens: Optional[int]
     max_prompt_images: Optional[int]
     prompting_target: Optional[PromptingTarget] = Field(default=None, strict=False)
-    constraints: List[ModelConstraints] = Field(default_factory=list)
+    constraints: List[ModelConstraints] = Field(default_factory=empty_list_factory_of(ModelConstraints))
 
     @property
     def tag(self) -> str:

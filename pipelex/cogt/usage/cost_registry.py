@@ -12,12 +12,13 @@ from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportFi
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.costs_per_token import model_cost_per_token
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 CostRegistryRoot = List[LLMTokenCostReport]
 
 
 class CostRegistry(RootModel[CostRegistryRoot]):
-    root: CostRegistryRoot = Field(default_factory=list)
+    root: CostRegistryRoot = Field(default_factory=empty_list_factory_of(LLMTokenCostReport))
 
     def to_dataframe(self) -> pd.DataFrame:
         records: List[Dict[str, Any]] = []

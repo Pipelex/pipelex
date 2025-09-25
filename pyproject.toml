@@ -70,7 +70,7 @@ dev = [
     "boto3-stubs>=1.35.24",
     "cocode==0.1.2",
     "mypy>=1.11.2",
-    "pyright==1.1.398",
+    "pyright>=1.1.405",
     "pandas-stubs>=2.2.3.241126",
     "pytest>=8.3.3",
     "pytest-asyncio>=0.24.0",

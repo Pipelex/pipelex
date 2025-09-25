@@ -5,6 +5,8 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+
 
 class MigrationResult(BaseModel):
     """Result of migration operation."""
@@ -12,5 +14,5 @@ class MigrationResult(BaseModel):
     files_processed: int = 0
     files_modified: int = 0
     total_changes: int = 0
-    modified_files: List[Path] = Field(default_factory=list)
+    modified_files: List[Path] = Field(default_factory=empty_list_factory_of(Path))
     errors: List[str] = Field(default_factory=list)

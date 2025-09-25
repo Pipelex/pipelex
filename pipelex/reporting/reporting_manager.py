@@ -13,12 +13,13 @@ from pipelex.config import ReportingConfig
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 LLMUsageRegistryRoot = List[LLMTokensUsage]
 
 
 class UsageRegistry(RootModel[LLMUsageRegistryRoot]):
-    root: LLMUsageRegistryRoot = Field(default_factory=list)
+    root: LLMUsageRegistryRoot = Field(default_factory=empty_list_factory_of(LLMTokensUsage))
 
     def get_current_tokens_usage(self) -> LLMUsageRegistryRoot:
         return self.root

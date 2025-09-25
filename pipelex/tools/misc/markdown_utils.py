@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.json_utils import purify_json_dict
@@ -11,7 +11,7 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key:
     without needing to specify the markdown type explicitly.
     """
     if isinstance(data, dict):
-        the_dict: Dict[str, Any] = data
+        the_dict = cast(Dict[str, Any], data)
         # Treat keys as headings and values as their content
         dict_result_lines: List[str] = []
         for key, value in the_dict.items():
@@ -38,7 +38,7 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key:
         # they become list items.
         if not data:
             return ""
-        the_list: List[Any] = data
+        the_list = cast(List[Any], data)
         list_result_lines: List[str] = []
         for item in the_list:
             # Convert the item first

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any, Dict, Optional, Type, Union, cast
 
 from pydantic import ConfigDict, ValidationError
 from typing_extensions import override
@@ -145,7 +145,7 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         Raises:
             TypeError: If content is not ListContent or items don't match expected type
         """
-        list_content: ListContent[StuffContentType] = self.content_as(content_type=ListContent)
+        list_content = cast(ListContent[StuffContentType], self.content_as(content_type=ListContent))
 
         # Validate all items are of the expected type
         for item in list_content.items:

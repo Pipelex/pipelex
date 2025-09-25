@@ -2,7 +2,7 @@ import inspect
 import logging
 import os
 import traceback
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Union, cast
 
 from pipelex.tools.log.log_config import CallerInfoTemplate, LogConfig, LogMode
 from pipelex.tools.misc.json_utils import purify_json, purify_json_dict, purify_json_list
@@ -208,7 +208,7 @@ class LogDispatch:
                 message += f"\n{traceback.format_exc()}"
             self._log_to_console(message=message, severity=severity)
         elif isinstance(data, list):
-            list_data: List[Any] = data
+            list_data = cast(List[Any], data)
             _, list_string = purify_json_list(
                 data=list_data,
                 indent=self._log_config.json_logs_indent,
