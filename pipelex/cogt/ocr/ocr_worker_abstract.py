@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 
 from typing_extensions import override
 
@@ -15,9 +15,9 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 class OcrWorkerAbstract(InferenceWorkerAbstract):
     def __init__(
         self,
-        extra_config: Dict[str, Any],
+        extra_config: dict[str, Any],
         inference_model: InferenceModelSpec,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
         self.extra_config = extra_config

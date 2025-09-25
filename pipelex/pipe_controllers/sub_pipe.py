@@ -1,4 +1,3 @@
-from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -18,10 +17,10 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 class SubPipe(BaseModel):
     pipe_code: str
-    output_name: Optional[str] = None
-    output_multiplicity: Optional[PipeOutputMultiplicity] = None
-    batch_params: Optional[BatchParams] = None
-    concept_codes_from_the_same_domain: Optional[List[str]] = None
+    output_name: str | None = None
+    output_multiplicity: PipeOutputMultiplicity | None = None
+    batch_params: BatchParams | None = None
+    concept_codes_from_the_same_domain: list[str] | None = None
 
     async def run_pipe(
         self,
@@ -44,10 +43,11 @@ class SubPipe(BaseModel):
             try:
                 working_memory.get_typed_object_or_attribute(name=batch_params.input_list_stuff_name, wanted_type=ListContent)
             except WorkingMemoryStuffNotFoundError as exc:
-                raise PipeInputError(
+                msg = (
                     f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
                     f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
-                ) from exc
+                )
+                raise PipeInputError(msg) from exc
 
             pipe_batch_blueprint = PipeBatchBlueprint(
                 definition=f"Batch processing for {self.pipe_code}",
@@ -57,7 +57,7 @@ class SubPipe(BaseModel):
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
                     batch_params.input_item_stuff_name: InputRequirementBlueprint(
-                        concept=sub_pipe.inputs.root[batch_params.input_item_stuff_name].concept.concept_string
+                        concept=sub_pipe.inputs.root[batch_params.input_item_stuff_name].concept.concept_string,
                     ),
                 },
             )
@@ -109,14 +109,15 @@ class SubPipe(BaseModel):
             # Case 3: Normal processing
             required_variables = sub_pipe.required_variables()
             log.debug(required_variables, title=f"Required variables for {self.pipe_code}")
-            required_stuff_names = set([required_variable for required_variable in required_variables if not required_variable.startswith("_")])
+            required_stuff_names = set(required_variable for required_variable in required_variables if not required_variable.startswith("_"))
             try:
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
             except WorkingMemoryStuffNotFoundError as exc:
                 sub_pipe_path = sub_pipe_run_params.pipe_layers + [self.pipe_code]
                 sub_pipe_path_str = ".".join(sub_pipe_path)
                 error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
-                raise PipeInputError(f"Some required stuff(s) not found: {error_details}") from exc
+                msg = f"Some required stuff(s) not found: {error_details}"
+                raise PipeInputError(msg) from exc
             log.verbose(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
             # This is the only line that changes between run and dry_run
             if sub_pipe_run_params.run_mode == PipeRunMode.DRY:

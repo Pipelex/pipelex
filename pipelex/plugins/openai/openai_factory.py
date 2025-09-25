@@ -1,4 +1,3 @@
-from typing import Dict, List
 
 import openai
 from openai.types.chat import (
@@ -73,13 +72,12 @@ class OpenAIFactory:
     def make_simple_messages(
         cls,
         llm_job: LLMJob,
-    ) -> List[ChatCompletionMessageParam]:
-        """
-        Makes a list of messages with a system message (if provided) and followed by a user message.
+    ) -> list[ChatCompletionMessageParam]:
+        """Makes a list of messages with a system message (if provided) and followed by a user message.
         """
         llm_prompt = llm_job.llm_prompt
-        messages: List[ChatCompletionMessageParam] = []
-        user_contents: List[ChatCompletionContentPartParam] = []
+        messages: list[ChatCompletionMessageParam] = []
+        user_contents: list[ChatCompletionContentPartParam] = []
         if system_content := llm_prompt.system_text:
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
         # TODO: confirm that we can prompt without user_contents, for instance if we have only images,
@@ -114,7 +112,7 @@ class OpenAIFactory:
 
     @staticmethod
     def make_openai_error_info(exception: Exception) -> str:
-        error_mapping: Dict[type, str] = {
+        error_mapping: dict[type, str] = {
             openai.BadRequestError: "OpenAI API request was invalid.",
             openai.InternalServerError: "OpenAI is having trouble. Please try again later.",
             openai.RateLimitError: "OpenAI API request exceeded rate limit.",

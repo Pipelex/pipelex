@@ -1,7 +1,6 @@
-from typing import Any, Dict, List, Optional, Set, cast
+from typing import Any, Self, cast
 
 from pydantic import Field, RootModel, ValidationError
-from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.exceptions import (
@@ -20,7 +19,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
 
-InferenceBackendLibraryRoot = Dict[str, InferenceBackend]
+InferenceBackendLibraryRoot = dict[str, InferenceBackend]
 
 
 class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
@@ -42,7 +41,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         for backend_name, backend_dict in backends_dict.items():
             # We'll split the read settings into standard fields and extra config
             standard_fields = InferenceBackendBlueprint.model_fields.keys()
-            extra_config: Dict[str, Any] = {}
+            extra_config: dict[str, Any] = {}
             inference_backend_blueprint_dict_raw = backend_dict.copy()
             if not inference_backend_blueprint_dict_raw.get("enabled", True):
                 continue
@@ -94,14 +93,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     raise InferenceModelSpecError(f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}") from exc
             except (FileNotFoundError, InferenceModelSpecError) as exc:
                 raise InferenceBackendLibraryError(f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}") from exc
-            defaults_dict: Dict[str, Any] = model_specs_dict.pop("defaults", {})
-            backend_model_specs: Dict[str, InferenceModelSpec] = {}
+            defaults_dict: dict[str, Any] = model_specs_dict.pop("defaults", {})
+            backend_model_specs: dict[str, InferenceModelSpec] = {}
             for model_spec_name, value in model_specs_dict.items():
                 if not isinstance(value, dict):
                     raise InferenceModelSpecError(
-                        f"Model spec '{model_spec_name}' for backend '{backend_name}' at path '{path_to_model_specs_toml}' is not a dictionary"
+                        f"Model spec '{model_spec_name}' for backend '{backend_name}' at path '{path_to_model_specs_toml}' is not a dictionary",
                     )
-                model_spec_dict: Dict[str, Any] = cast(Dict[str, Any], value)
+                model_spec_dict: dict[str, Any] = cast("dict[str, Any]", value)
                 try:
                     # Start from the defaults
                     model_spec_blueprint_dict = defaults_dict.copy()
@@ -115,10 +114,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     )
                     backend_model_specs[model_spec_name] = model_spec
                 except (InferenceModelSpecError, ValidationError) as exc:
-                    raise InferenceBackendLibraryError(
-                        f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' "
-                        f"from file '{path_to_model_specs_toml}': {exc}"
-                    )
+                    raise InferenceBackendLibraryError(f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' from file '{path_to_model_specs_toml}': {exc}") from exc
             backend = InferenceBackendFactory.make_inference_backend(
                 name=backend_name,
                 blueprint=backend_blueprint,
@@ -128,19 +124,19 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             self.root[backend_name] = backend
             log.debug(f"Loaded inference backend '{backend_name}'")
 
-    def list_backend_names(self) -> List[str]:
+    def list_backend_names(self) -> list[str]:
         return list(self.root.keys())
 
-    def list_all_model_names(self) -> List[str]:
+    def list_all_model_names(self) -> list[str]:
         """List the names of all models in all backends."""
-        all_model_names: Set[str] = set()
+        all_model_names: set[str] = set()
         for backend in self.root.values():
             all_model_names.update(backend.list_model_names())
         return sorted(all_model_names)
 
-    def get_all_models_and_possible_backends(self) -> Dict[str, List[str]]:
+    def get_all_models_and_possible_backends(self) -> dict[str, list[str]]:
         """Get a dictionary of all models and their possible backends."""
-        all_models_and_possible_backends: Dict[str, List[str]] = {}
+        all_models_and_possible_backends: dict[str, list[str]] = {}
         for backend in self.root.values():
             for model_name in backend.list_model_names():
                 if model_name not in all_models_and_possible_backends:
@@ -148,7 +144,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 all_models_and_possible_backends[model_name].append(backend.name)
         return all_models_and_possible_backends
 
-    def get_inference_backend(self, backend_name: str) -> Optional[InferenceBackend]:
+    def get_inference_backend(self, backend_name: str) -> InferenceBackend | None:
         """Get a backend by name."""
         backend = self.root.get(backend_name)
         return backend

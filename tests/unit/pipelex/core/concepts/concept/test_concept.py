@@ -111,7 +111,7 @@ class TestConcept:
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(definition=valid_definition),
                     concept_codes_from_the_same_domain=["RandomConcept"],
-                )
+                ),
             )
             is True
         )
@@ -121,7 +121,7 @@ class TestConcept:
                     concept_code=NativeConceptEnum.TEXT.value,
                     domain=SpecialDomain.NATIVE.value,
                     blueprint=ConceptBlueprint(definition=valid_definition),
-                )
+                ),
             )
             is True
         )
@@ -132,7 +132,7 @@ class TestConcept:
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(definition=valid_definition),
                     concept_codes_from_the_same_domain=["RandomConcept"],
-                )
+                ),
             )
             is True
         )
@@ -143,7 +143,7 @@ class TestConcept:
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(definition=valid_definition),
                     concept_codes_from_the_same_domain=["RandomConcept"],
-                )
+                ),
             )
             is True
         )
@@ -154,7 +154,7 @@ class TestConcept:
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(definition=valid_definition),
                     concept_codes_from_the_same_domain=["RandomConcept"],
-                )
+                ),
             )
             is True
         )
@@ -165,7 +165,7 @@ class TestConcept:
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(definition=valid_definition),
                     concept_codes_from_the_same_domain=["RandomConcept"],
-                )
+                ),
             )
             is True
         )
@@ -176,7 +176,7 @@ class TestConcept:
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(definition=valid_definition),
                     concept_codes_from_the_same_domain=["RandomConcept"],
-                )
+                ),
             )
             is True
         )
@@ -187,7 +187,7 @@ class TestConcept:
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(definition=valid_definition),
                     concept_codes_from_the_same_domain=["RandomConcept"],
-                )
+                ),
             )
             is True
         )
@@ -198,7 +198,7 @@ class TestConcept:
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(definition=valid_definition),
                     concept_codes_from_the_same_domain=["RandomConcept"],
-                )
+                ),
             )
             is False
         )

@@ -1,13 +1,13 @@
-from typing import Dict, Optional
+from typing import Self
 
 from pydantic import RootModel
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_provider_abstract import DomainProviderAbstract
 from pipelex.exceptions import DomainLibraryError
 
-DomainLibraryRoot = Dict[str, Domain]
+DomainLibraryRoot = dict[str, Domain]
 
 
 class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
@@ -34,7 +34,7 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
             del self.root[domain_code]
 
     @override
-    def get_domain(self, domain: str) -> Optional[Domain]:
+    def get_domain(self, domain: str) -> Domain | None:
         return self.root.get(domain)
 
     @override

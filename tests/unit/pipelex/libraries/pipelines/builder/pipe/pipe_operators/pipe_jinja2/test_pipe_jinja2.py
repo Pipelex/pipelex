@@ -8,14 +8,13 @@ from .test_data import PipeJinja2TestCases
 
 class TestPipeJinja2BlueprintConversion:
     @pytest.mark.parametrize(
-        "test_name,pipe_spec,domain,expected_blueprint",
+        "test_name,pipe_spec,expected_blueprint",
         PipeJinja2TestCases.TEST_CASES,
     )
     def test_pipe_jinja2_spec_to_blueprint(
         self,
-        test_name: str,
+        _: str,
         pipe_spec: PipeJinja2Spec,
-        domain: str,
         expected_blueprint: PipeJinja2Blueprint,
     ):
         result = pipe_spec.to_blueprint()

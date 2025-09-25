@@ -1,4 +1,3 @@
-from typing import Optional
 
 import typer
 from click import Command, Context
@@ -11,7 +10,7 @@ from pipelex.cli.commands.build_cmd import build_app
 
 class PipelexCLI(TyperGroup):
     @override
-    def get_command(self, ctx: Context, cmd_name: str) -> Optional[Command]:
+    def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         cmd = super().get_command(ctx, cmd_name)
         if cmd is None:
             typer.echo(f"Unknown command: {cmd_name}")

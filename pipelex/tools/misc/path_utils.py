@@ -1,6 +1,5 @@
 import os
 import urllib.parse
-from typing import Optional, Tuple
 
 from pipelex.types import StrEnum
 
@@ -28,8 +27,7 @@ class InterpretedPathOrUrl(StrEnum):
 
 
 def interpret_path_or_url(path_or_uri: str) -> InterpretedPathOrUrl:
-    """
-    Determines whether a string represents a file URI, URL, or file path.
+    """Determines whether a string represents a file URI, URL, or file path.
 
     This function analyzes the input string to categorize it as one of three types:
     - File URI (starts with "file://")
@@ -55,20 +53,19 @@ def interpret_path_or_url(path_or_uri: str) -> InterpretedPathOrUrl:
         InterpretedPathOrUrl.URL
         >>> interpret_path_or_url("/home/user/file.txt")
         InterpretedPathOrUrl.FILE_PATH
+
     """
     if path_or_uri.startswith("file://"):
         return InterpretedPathOrUrl.FILE_URI
-    elif path_or_uri.startswith("http"):
+    if path_or_uri.startswith("http"):
         return InterpretedPathOrUrl.URL
-    elif os.sep in path_or_uri:
+    if os.sep in path_or_uri:
         return InterpretedPathOrUrl.FILE_PATH
-    else:
-        return InterpretedPathOrUrl.FILE_NAME
+    return InterpretedPathOrUrl.FILE_NAME
 
 
-def clarify_path_or_url(path_or_uri: str) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Separates a path_or_uri string into either a file path or online URL component.
+def clarify_path_or_url(path_or_uri: str) -> tuple[str | None, str | None]:
+    """Separates a path_or_uri string into either a file path or online URL component.
 
     This function processes the input string to determine its type and returns
     the appropriate components. For file URIs, it converts them to regular file paths.
@@ -90,9 +87,10 @@ def clarify_path_or_url(path_or_uri: str) -> Tuple[Optional[str], Optional[str]]
         (None, 'https://example.com')
         >>> clarify_path_or_url("/home/user/file.txt")
         ('/home/user/file.txt', None)
+
     """
-    file_path: Optional[str]
-    url: Optional[str]
+    file_path: str | None
+    url: str | None
     match interpret_path_or_url(path_or_uri):
         case InterpretedPathOrUrl.FILE_URI:
             parsed_uri = urllib.parse.urlparse(path_or_uri)

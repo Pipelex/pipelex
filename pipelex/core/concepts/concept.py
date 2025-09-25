@@ -1,4 +1,3 @@
-from typing import Optional
 
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -19,7 +18,7 @@ class Concept(BaseModel):
     domain: str
     definition: str
     structure_class_name: str
-    refines: Optional[str] = None
+    refines: str | None = None
 
     @property
     def concept_string(self) -> str:
@@ -31,17 +30,17 @@ class Concept(BaseModel):
         return concept_string.startswith(SpecialDomain.IMPLICIT.value)
 
     @field_validator("code")
-    def validate_code(cls, code: str) -> str:
+    def validate_code(self, code: str) -> str:
         ConceptBlueprint.validate_concept_code(concept_code=code)
         return code
 
     @field_validator("domain")
-    def validate_domain(cls, domain: str) -> str:
+    def validate_domain(self, domain: str) -> str:
         DomainBlueprint.validate_domain_code(code=domain)
         return domain
 
     @field_validator("refines", mode="before")
-    def validate_refines(cls, refines: Optional[str]) -> Optional[str]:
+    def validate_refines(self, refines: str | None) -> str | None:
         if refines is None:
             return None
         ConceptBlueprint.validate_concept_string(concept_string=refines)
@@ -71,16 +70,15 @@ class Concept(BaseModel):
             if strict:
                 # Check if classes are equivalent (same fields, types, descriptions)
                 return ClassRegistryUtils.are_classes_equivalent(concept_1_class, concept_2_class)
-            else:
-                # Check if concept_1 is a subclass of concept_2
-                try:
-                    if issubclass(concept_1_class, concept_2_class):
-                        return True
-                except TypeError:
-                    pass
+            # Check if concept_1 is a subclass of concept_2
+            try:
+                if issubclass(concept_1_class, concept_2_class):
+                    return True
+            except TypeError:
+                pass
 
-                # Check if concept_1 has a field that is of type concept_2_class
-                return ClassRegistryUtils.has_compatible_field(concept_1_class, concept_2_class)
+            # Check if concept_1 has a field that is of type concept_2_class
+            return ClassRegistryUtils.has_compatible_field(concept_1_class, concept_2_class)
         return False
 
     @classmethod
@@ -88,8 +86,7 @@ class Concept(BaseModel):
         # We get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
         if KajsonManager.get_class_registry().has_subclass(name=structure_class_name, base_class=StuffContent):
             return True
-        else:
-            # We get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
-            if KajsonManager.get_class_registry().has_class(name=structure_class_name):
-                log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
-            return False
+        # We get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
+        if KajsonManager.get_class_registry().has_class(name=structure_class_name):
+            log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
+        return False

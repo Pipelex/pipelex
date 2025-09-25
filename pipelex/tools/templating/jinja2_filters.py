@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from jinja2 import pass_context
 from jinja2.runtime import Context, Undefined
@@ -17,7 +17,7 @@ ALLOWED_FILTERS = ["tag", "format"]
 
 # Filter to format some Stuff or any object with the appropriate text formatting methods
 @pass_context
-def text_format(context: Context, value: Any, text_format: Optional[TextFormat] = None) -> Any:
+def text_format(context: Context, value: Any, text_format: TextFormat | None = None) -> Any:
     if text_format:
         if isinstance(text_format, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             applied_text_format = TextFormat(text_format)
@@ -31,26 +31,24 @@ def text_format(context: Context, value: Any, text_format: Optional[TextFormat] 
     if hasattr(value, "rendered_str"):
         rendered_str = value.rendered_str(text_format=applied_text_format)
         return rendered_str
-    elif hasattr(value, applied_text_format.render_method_name):
+    if hasattr(value, applied_text_format.render_method_name):
         render_method = getattr(value, applied_text_format.render_method_name)
         rendered_str = render_method()
         return rendered_str
-    elif isinstance(value, StrEnum):
+    if isinstance(value, StrEnum):
         return value.value
-    else:
-        return value
+    return value
 
 
 # TODO: better separate tag and render
 # Filter to tag the variable with a tag style and a provided name, appropriate for tagging in a prompt
 @pass_context
-def tag(context: Context, value: Any, tag_name: Optional[str] = None) -> Any:
+def tag(context: Context, value: Any, tag_name: str | None = None) -> Any:
     if isinstance(value, Undefined):
         # maybe we don't need this check
         if tag_name:
             raise Jinja2ContextError(f"Jinja2 undefined value with tag_name '{tag_name}'")
-        else:
-            raise Jinja2ContextError("Jinja2 undefined value.")
+        raise Jinja2ContextError("Jinja2 undefined value.")
 
     if isinstance(value, Jinja2TaggableAbstract):
         value, tag_name = value.render_tagged_for_jinja2(context=context, tag_name=tag_name)
@@ -58,7 +56,7 @@ def tag(context: Context, value: Any, tag_name: Optional[str] = None) -> Any:
     return render_any_tagged_for_jinja2(context=context, value=value, tag_name=tag_name)
 
 
-def render_any_tagged_for_jinja2(context: Context, value: Any, tag_name: Optional[str] = None) -> Any:
+def render_any_tagged_for_jinja2(context: Context, value: Any, tag_name: str | None = None) -> Any:
     tag_style_str = context.get(Jinja2ContextKey.TAG_STYLE)
     tag_style: TagStyle
     if tag_style_str:

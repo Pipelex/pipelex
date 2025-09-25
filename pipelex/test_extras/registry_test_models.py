@@ -1,4 +1,4 @@
-from typing import ClassVar, List
+from typing import ClassVar
 
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.tools.registry_models import ModelType, RegistryModels
@@ -12,4 +12,4 @@ class FictionCharacter(StructuredContent):
 
 
 class PipelexTestModels(RegistryModels):
-    TEST_MODELS: ClassVar[List[ModelType]] = [FictionCharacter]
+    TEST_MODELS: ClassVar[list[ModelType]] = [FictionCharacter]

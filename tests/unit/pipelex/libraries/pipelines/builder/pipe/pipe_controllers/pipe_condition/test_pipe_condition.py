@@ -8,14 +8,13 @@ from .test_data import PipeConditionTestCases
 
 class TestPipeConditionBlueprintConversion:
     @pytest.mark.parametrize(
-        "test_name,pipe_spec,domain,expected_blueprint",
+        "test_name,pipe_spec,expected_blueprint",
         PipeConditionTestCases.TEST_CASES,
     )
     def test_pipe_condition_spec_to_blueprint(
         self,
-        test_name: str,
+        _: str,
         pipe_spec: PipeConditionSpec,
-        domain: str,
         expected_blueprint: PipeConditionBlueprint,
     ):
         result = pipe_spec.to_blueprint()

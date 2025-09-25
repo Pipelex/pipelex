@@ -5,8 +5,6 @@ from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBluepri
 
 
 class TestPipelexInterpreterBatchPLX:
-    """Test Batch pipe to PLX string conversion."""
-
     @pytest.mark.parametrize(
         "pipe_name,blueprint,expected_plx",
         [

@@ -1,4 +1,3 @@
-from typing import List
 
 from pydantic import Field
 
@@ -25,8 +24,8 @@ class DiscordMessage(StructuredContent):
 
     author: str = Field(..., description="Author of the message")
     content: str = Field(..., description="Content of the message")
-    attachments: List[Attachment] = Field(default_factory=list, description="List of message attachments")
-    embeds: List[Embed] = Field(default_factory=list, description="List of message embeds")
+    attachments: list[Attachment] = Field(default_factory=list, description="List of message attachments")
+    embeds: list[Embed] = Field(default_factory=list, description="List of message embeds")
     link: str = Field(..., description="Link to the message")
 
 
@@ -35,20 +34,20 @@ class DiscordChannelUpdate(StructuredContent):
 
     name: str = Field(..., description="Name of the Discord channel")
     position: int = Field(..., description="Position of the channel")
-    messages: List[DiscordMessage] = Field(default_factory=list, description="List of messages in the channel")
+    messages: list[DiscordMessage] = Field(default_factory=list, description="List of messages in the channel")
 
 
 class ChannelSummary(StructuredContent):
     """Represents a summarized Discord channel for newsletter inclusion"""
 
     channel_name: str = Field(..., description="Name of the Discord channel")
-    summary_items: List[str] = Field(..., description="Well-written summaries of the channel's activity")
+    summary_items: list[str] = Field(..., description="Well-written summaries of the channel's activity")
 
 
 class Newsletter(StructuredContent):
     """Represents the final newsletter content"""
 
     weekly_summary: str = Field(..., description="200 character summary of weekly Share channel content")
-    new_members: List[str] = Field(default_factory=list, description="New member introductions in bullet points")
-    channel_sections: List[ChannelSummary] = Field(default_factory=list, description="Ordered channel summaries")
-    geographic_hubs: List[ChannelSummary] = Field(default_factory=list, description="Geographic hub channels grouped at end")
+    new_members: list[str] = Field(default_factory=list, description="New member introductions in bullet points")
+    channel_sections: list[ChannelSummary] = Field(default_factory=list, description="Ordered channel summaries")
+    geographic_hubs: list[ChannelSummary] = Field(default_factory=list, description="Geographic hub channels grouped at end")

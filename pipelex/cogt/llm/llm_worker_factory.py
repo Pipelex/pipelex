@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
@@ -14,7 +13,7 @@ class LLMWorkerFactory:
     @staticmethod
     def make_llm_worker(
         inference_model: InferenceModelSpec,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ) -> LLMWorkerInternalAbstract:
         plugin = Plugin.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
@@ -24,7 +23,7 @@ class LLMWorkerFactory:
             case "openai" | "azure_openai":
                 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 
-                structure_method: Optional[StructureMethod] = None
+                structure_method: StructureMethod | None = None
                 if get_config().cogt.llm_config.instructor_config.is_openai_structured_output_enabled:
                     structure_method = StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED
 
@@ -46,7 +45,7 @@ class LLMWorkerFactory:
                 )
             case "anthropic" | "bedrock_anthropic":
                 try:
-                    import anthropic  # noqa: F401
+                    import anthropic  # pylint: disable=import-outside-toplevel
                 except ImportError as exc:
                     raise MissingDependencyError(
                         "anthropic",
@@ -58,8 +57,8 @@ class LLMWorkerFactory:
                         ),
                     ) from exc
 
-                from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
-                from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker
+                from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory  # pylint: disable=import-outside-toplevel
+                from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker  # pylint: disable=import-outside-toplevel
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -75,7 +74,7 @@ class LLMWorkerFactory:
                 )
             case "mistral":
                 try:
-                    import mistralai  # noqa: F401
+                    import mistralai
                 except ImportError as exc:
                     raise MissingDependencyError(
                         "mistralai",
@@ -103,15 +102,15 @@ class LLMWorkerFactory:
                 )
             case "bedrock_boto3" | "bedrock_aioboto3":
                 try:
-                    import aioboto3  # noqa: F401
-                    import boto3  # noqa: F401
+                    import aioboto3  # pylint: disable=import-outside-toplevel
+                    import boto3  # pylint: disable=import-outside-toplevel
                 except ImportError as exc:
                     raise MissingDependencyError(
-                        "boto3,aioboto3", "bedrock", "The boto3 and aioboto3 SDKs are required to use Bedrock models."
+                        "boto3,aioboto3", "bedrock", "The boto3 and aioboto3 SDKs are required to use Bedrock models.",
                     ) from exc
 
-                from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory
-                from pipelex.plugins.bedrock.bedrock_llm_worker import BedrockLLMWorker
+                from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory  # pylint: disable=import-outside-toplevel
+                from pipelex.plugins.bedrock.bedrock_llm_worker import BedrockLLMWorker  # pylint: disable=import-outside-toplevel
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -125,7 +124,7 @@ class LLMWorkerFactory:
                 )
             case "google":
                 try:
-                    import google.genai  # noqa: F401
+                    import google.genai  # pylint: disable=import-outside-toplevel
                 except ImportError as exc:
                     raise MissingDependencyError(
                         "google-genai",
@@ -133,8 +132,8 @@ class LLMWorkerFactory:
                         ("The google-genai SDK is required to use Google Gemini API directly. You can install it with 'pip install google-genai'."),
                     ) from exc
 
-                from pipelex.plugins.google.google_factory import GoogleFactory
-                from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker
+                from pipelex.plugins.google.google_factory import GoogleFactory  # pylint: disable=import-outside-toplevel
+                from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker  # pylint: disable=import-outside-toplevel
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,

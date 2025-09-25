@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 import toml
 import tomlkit
@@ -16,13 +17,12 @@ from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 class TOMLValidationError(Exception):
     """Raised when TOML file has formatting issues that could cause problems."""
 
-    pass
 
 
-def validate_toml_content(content: str, file_path: Optional[str] = None) -> None:
+def validate_toml_content(content: str, file_path: str | None = None) -> None:
     """Validate TOML content for common formatting issues."""
     lines = content.splitlines()
-    issues: List[str] = []
+    issues: list[str] = []
 
     for line_num, line in enumerate(lines, 1):
         # Check for trailing whitespace
@@ -55,8 +55,9 @@ def validate_toml_file(path: str) -> None:
 
     Raises:
         TOMLValidationError: If formatting issues are detected
+
     """
-    with open(path, "r", encoding="utf-8") as file:
+    with open(path, encoding="utf-8") as file:
         content = file.read()
         validate_toml_content(content, path)
 
@@ -74,6 +75,7 @@ def clean_trailing_whitespace(content: str) -> str:
 
     Returns:
         The cleaned TOML content with trailing whitespace removed and an empty line at EOF
+
     """
     # Split into lines and clean each line
     lines = [line.rstrip() for line in content.splitlines()]
@@ -90,7 +92,7 @@ def clean_trailing_whitespace(content: str) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def load_toml_from_path(path: str) -> Dict[str, Any]:
+def load_toml_from_path(path: str) -> dict[str, Any]:
     """Load TOML from path.
 
     Args:
@@ -101,9 +103,10 @@ def load_toml_from_path(path: str) -> Dict[str, Any]:
 
     Raises:
         toml.TomlDecodeError: If TOML parsing fails, with file path included
+
     """
     try:
-        with open(path, "r", encoding="utf-8") as file:
+        with open(path, encoding="utf-8") as file:
             content = file.read()
 
         cleaned_content = clean_trailing_whitespace(content)
@@ -114,14 +117,13 @@ def load_toml_from_path(path: str) -> Dict[str, Any]:
                 file.write(cleaned_content)
 
         # Parse TOML first
-        dict_from_toml = toml.loads(cleaned_content)
-
-        return dict_from_toml
+        return toml.loads(cleaned_content)
     except toml.TomlDecodeError as exc:
-        raise toml.TomlDecodeError(f"TOML parsing error in file '{path}': {exc}", exc.doc, exc.pos) from exc
+        msg = f"TOML parsing error in file '{path}': {exc}"
+        raise toml.TomlDecodeError(msg, exc.doc, exc.pos) from exc
 
 
-def failable_load_toml_from_path(path: str) -> Optional[Dict[str, Any]]:
+def failable_load_toml_from_path(path: str) -> dict[str, Any] | None:
     """Load TOML from path with failure handling."""
     if not path_exists(path):
         return None
@@ -139,8 +141,7 @@ def make_toml_string(
     ensure_trailing_newline: bool = True,
     ensure_leading_blank_line_in_value: bool = False,
 ):
-    """
-    Build a tomlkit string node.
+    """Build a tomlkit string node.
     - If `force_multiline` or the text contains '\\n', we emit a triple-quoted multiline string.
     - When multiline, `ensure_trailing_newline` puts the closing quotes on their own line.
     - When multiline, `ensure_leading_blank_line_in_value` inserts a real blank line at the start of the value.
@@ -165,13 +166,13 @@ def _convert_to_inline(value: Any) -> Any:
         # For RootModel, use the root attribute; for regular models, use model_dump()
         if hasattr(value, "root"):
             # This is a RootModel, use its root value
-            value = getattr(value, "root")
+            value = value.root # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType, reportUnknownVariableType]
         else:
             # This is a regular BaseModel, convert to dict
             value = value.model_dump()
 
     if isinstance(value, Mapping):
-        value = cast(Mapping[str, Any], value)
+        value = cast("Mapping[str, Any]", value)
         inline_table_obj = inline_table()
         for key, value_item in value.items():
             inline_table_obj[key] = _convert_to_inline(value_item)
@@ -179,12 +180,12 @@ def _convert_to_inline(value: Any) -> Any:
         return inline_table_obj
 
     if isinstance(value, list):
-        value = cast(List[Any], value)
+        value = cast("list[Any]", value)
         array_obj = array()
         array_obj.multiline(True)  # set to False for single-line arrays
         for element in value:
             if isinstance(element, Mapping):
-                element = cast(Mapping[str, Any], element)
+                element = cast("Mapping[str, Any]", element)
                 inline_element = inline_table()
                 for inner_key, inner_value in element.items():
                     inline_element[inner_key] = _convert_to_inline(inner_value)
@@ -199,32 +200,30 @@ def _convert_to_inline(value: Any) -> Any:
             # This looks like a prompt template - escape newlines for single-line format
             # Return the string directly and let tomlkit handle the escaping properly
             return value
-        else:
-            # Triple quotes if needed (or forced); closing quotes on their own line.
-            return make_toml_string(
-                value,
-                prefer_literal=False,  # flip to True for '''...'''
-                force_multiline=False,  # flip to True to force """...""" even without \n
-                ensure_trailing_newline=True,  # keep closing """ on its own line
-                ensure_leading_blank_line_in_value=False,  # flip to True to keep a blank first line
-            )
-    return value
+        # Triple quotes if needed (or forced); closing quotes on their own line.
+        return make_toml_string(
+            value,
+            prefer_literal=False,  # flip to True for '''...'''
+            force_multiline=False,  # flip to True to force """...""" even without \n
+            ensure_trailing_newline=True,  # keep closing """ on its own line
+            ensure_leading_blank_line_in_value=False,  # flip to True to keep a blank first line
+        )
+    return value # pyright: ignore[reportUnknownVariableType]
 
 
 def _filter_empty_values(value: Any) -> Any:
     """Filter out empty lists and None values from data structures."""
     if isinstance(value, dict):
-        filtered: Dict[str, Any] = {}
-        for k, v in cast(Dict[str, Any], value).items():
+        filtered: dict[str, Any] = {}
+        for k, v in cast("dict[str, Any]", value).items():
             filtered_v = _filter_empty_values(v)
             # Keep empty dicts but skip empty lists and None values
             if filtered_v is not None and (not isinstance(filtered_v, list) or filtered_v):
                 filtered[k] = filtered_v
         return filtered
-    elif isinstance(value, list):
-        return [_filter_empty_values(item) for item in cast(List[Any], value) if _filter_empty_values(item) is not None]
-    else:
-        return value
+    if isinstance(value, list):
+        return [_filter_empty_values(item) for item in cast("list[Any]", value) if _filter_empty_values(item) is not None]
+    return value
 
 
 def _create_ordered_inline_table(data: Mapping[str, Any]) -> Any:
@@ -268,7 +267,7 @@ def dict_to_toml(data: Mapping[str, Any]) -> str:
     # Handle sections (concepts, pipes)
     for section_key, section_value in data.items():
         if isinstance(section_value, Mapping):
-            section_value = cast(Mapping[str, Any], section_value)
+            section_value = cast("Mapping[str, Any]", section_value)
 
             # Skip empty sections
             if not section_value:
@@ -284,7 +283,7 @@ def dict_to_toml(data: Mapping[str, Any]) -> str:
                     section_table.add(item_key, _convert_to_inline(item_value))
                 elif isinstance(item_value, Mapping):
                     # Complex object that needs its own table
-                    item_value = cast(Mapping[str, Any], item_value)
+                    item_value = cast("Mapping[str, Any]", item_value)
                     item_table = table()
 
                     # Handle the structure field specially
@@ -293,9 +292,9 @@ def dict_to_toml(data: Mapping[str, Any]) -> str:
                         if field_key == "structure" and isinstance(field_value, Mapping):
                             # Structure should be its own table [section.item.structure]
                             structure_table = table()
-                            for struct_key, struct_value in cast(Mapping[str, Any], field_value).items():
+                            for struct_key, struct_value in cast("Mapping[str, Any]", field_value).items():
                                 if isinstance(struct_value, Mapping):
-                                    structure_table.add(struct_key, _create_ordered_inline_table(cast(Mapping[str, Any], struct_value)))
+                                    structure_table.add(struct_key, _create_ordered_inline_table(cast("Mapping[str, Any]", struct_value)))
                                 else:
                                     structure_table.add(struct_key, _convert_to_inline(struct_value))
                             item_table.add(field_key, structure_table)
@@ -382,12 +381,13 @@ def dict_to_toml(data: Mapping[str, Any]) -> str:
     return dumped_content
 
 
-def save_toml_to_path(data: Dict[str, Any], path: str) -> None:
+def save_toml_to_path(data: dict[str, Any], path: str) -> None:
     """Save dictionary as TOML to file path.
 
     Args:
         data: Dictionary to save as TOML
         path: Path where to save the TOML file
+
     """
     data_cleaned = data
     with open(path, "w", encoding="utf-8") as file:

@@ -49,6 +49,7 @@ def substitute_vars(content: str) -> str:
 
     Raises:
         VarNotFoundError: If required variable is missing from all specified sources
+
     """
 
     def replace_var(match: re.Match[str]) -> str:
@@ -130,7 +131,7 @@ def _get_env_var(var_name: str) -> str:
     try:
         return get_required_env(var_name)
     except EnvVarNotFoundError as exc:
-        raise VarNotFoundError(message=f"Could not get variable '{var_name}': {str(exc)}", var_name=var_name) from exc
+        raise VarNotFoundError(message=f"Could not get variable '{var_name}': {exc!s}", var_name=var_name) from exc
 
 
 def _get_secret(secret_name: str) -> str:
@@ -138,4 +139,4 @@ def _get_secret(secret_name: str) -> str:
     try:
         return get_secrets_provider().get_secret(secret_id=secret_name)
     except SecretNotFoundError as exc:
-        raise VarNotFoundError(message=f"Could not get variable '{secret_name}': {str(exc)}", var_name=secret_name) from exc
+        raise VarNotFoundError(message=f"Could not get variable '{secret_name}': {exc!s}", var_name=secret_name) from exc

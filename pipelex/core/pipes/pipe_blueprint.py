@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, field_validator
 
@@ -31,8 +31,8 @@ class AllowedPipeTypes(StrEnum):
 class PipeBlueprint(BaseModel):
     category: Any
     type: Any  # TODO: Find a better way to handle this.
-    definition: Optional[str] = None
-    inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
+    definition: str | None = None
+    inputs: dict[str, str | InputRequirementBlueprint] | None = None
     output: str
 
     @field_validator("type", mode="after")

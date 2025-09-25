@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 from pipelex.tools.exceptions import ToolException
 
@@ -11,15 +11,14 @@ class ContextProviderException(ToolException):
 
 
 class ContextProviderAbstract(ABC):
-    """
-    A ContextProvider provides context to templating engine. This interface is implemented by WorkingMemory.
+    """A ContextProvider provides context to templating engine. This interface is implemented by WorkingMemory.
     It exists to make these features available to lower level classes.
     """
 
     @abstractmethod
-    def get_typed_object_or_attribute(self, name: str, wanted_type: Optional[Type[Any]] = None) -> Any:
+    def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None) -> Any:
         pass
 
     @abstractmethod
-    def generate_context(self) -> Dict[str, Any]:
+    def generate_context(self) -> dict[str, Any]:
         pass

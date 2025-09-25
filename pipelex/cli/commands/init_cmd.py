@@ -1,7 +1,7 @@
 import os
 import shutil
 from importlib.metadata import metadata
-from typing import Annotated, List
+from typing import Annotated
 
 import typer
 
@@ -37,8 +37,8 @@ def do_init_config(reset: bool = False) -> None:
     os.makedirs(target_config_dir, exist_ok=True)
 
     try:
-        copied_files: List[str] = []
-        existing_files: List[str] = []
+        copied_files: list[str] = []
+        existing_files: list[str] = []
 
         def copy_directory_structure(src_dir: str, dst_dir: str, relative_path: str = "") -> None:
             """Recursively copy directory structure, handling existing files."""
@@ -50,12 +50,11 @@ def do_init_config(reset: bool = False) -> None:
                 if os.path.isdir(src_item):
                     os.makedirs(dst_item, exist_ok=True)
                     copy_directory_structure(src_item, dst_item, relative_item)
+                elif os.path.exists(dst_item) and not reset:
+                    existing_files.append(relative_item)
                 else:
-                    if os.path.exists(dst_item) and not reset:
-                        existing_files.append(relative_item)
-                    else:
-                        shutil.copy2(src_item, dst_item)
-                        copied_files.append(relative_item)
+                    shutil.copy2(src_item, dst_item)
+                    copied_files.append(relative_item)
 
         copy_directory_structure(config_template_dir, target_config_dir)
 

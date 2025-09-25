@@ -1,4 +1,3 @@
-from typing import List, Optional
 
 from pydantic import BaseModel
 from typing_extensions import override
@@ -11,9 +10,9 @@ from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
 
 
 class LLMPrompt(BaseModel):
-    system_text: Optional[str] = None
-    user_text: Optional[str] = None
-    user_images: List[PromptImage] = []
+    system_text: str | None = None
+    user_text: str | None = None
+    user_images: list[PromptImage] = []
 
     def validate_before_execution(self):
         reaction = runtime_manager.problem_reactions.job
@@ -51,7 +50,7 @@ class LLMPrompt(BaseModel):
     def __format__(self, format_spec: str) -> str:
         return self.desc()
 
-    def desc(self, truncate_text_length: Optional[int] = None) -> str:
+    def desc(self, truncate_text_length: int | None = None) -> str:
         description = "LLM Prompt:"
         if truncate_text_length:
             if self.system_text:

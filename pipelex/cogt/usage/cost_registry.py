@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pandas as pd
 from pydantic import Field, RootModel
@@ -14,14 +14,14 @@ from pipelex.cogt.usage.costs_per_token import model_cost_per_token
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
-CostRegistryRoot = List[LLMTokenCostReport]
+CostRegistryRoot = list[LLMTokenCostReport]
 
 
 class CostRegistry(RootModel[CostRegistryRoot]):
     root: CostRegistryRoot = Field(default_factory=empty_list_factory_of(LLMTokenCostReport))
 
     def to_dataframe(self) -> pd.DataFrame:
-        records: List[Dict[str, Any]] = []
+        records: list[dict[str, Any]] = []
         for token_cost_report in self.root:
             record_dict = token_cost_report.as_flat_dictionary()
             records.append(record_dict)
@@ -32,9 +32,9 @@ class CostRegistry(RootModel[CostRegistryRoot]):
     def generate_report(
         cls,
         pipeline_run_id: str,
-        llm_tokens_usages: List[LLMTokensUsage],
+        llm_tokens_usages: list[LLMTokensUsage],
         unit_scale: float,
-        cost_report_file_path: Optional[str] = None,
+        cost_report_file_path: str | None = None,
     ):
         if not llm_tokens_usages:
             if pipeline_run_id != "untitled":
@@ -76,7 +76,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
                 LLMTokenCostReportField.COST_INPUT_NON_CACHED: "sum",
                 LLMTokenCostReportField.COST_INPUT_JOINED: "sum",
                 LLMTokenCostReportField.COST_OUTPUT: "sum",
-            }
+            },
         ).reset_index()
         if agg_by_llm_name is None or agg_by_llm_name.empty:  # pyright: ignore[reportUnnecessaryComparison]
             raise CostRegistryError("Empty report aggregation by LLM name")
@@ -187,7 +187,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         cost_report.nb_tokens_by_category[TokenCategory.INPUT_CACHED] = nb_tokens_input_cached
 
         cost_report.costs_by_token_category[CostCategory.INPUT_NON_CACHED] = nb_tokens_input_non_cached * model_cost_per_token(
-            costs=llm_tokens_usage.unit_costs, cost_category=CostCategory.INPUT_NON_CACHED
+            costs=llm_tokens_usage.unit_costs, cost_category=CostCategory.INPUT_NON_CACHED,
         )
         costs_input_cached = cost_report.costs_by_token_category.get(CostCategory.INPUT_CACHED, 0)
         cost_report.costs_by_token_category[CostCategory.INPUT_CACHED] = costs_input_cached

@@ -1,4 +1,3 @@
-from typing import Optional, Set
 
 from jinja2 import meta
 from jinja2.exceptions import (
@@ -15,11 +14,10 @@ from pipelex.tools.templating.template_provider_abstract import TemplateProvider
 def detect_jinja2_required_variables(
     template_category: Jinja2TemplateCategory,
     template_provider: TemplateProviderAbstract,
-    jinja2_name: Optional[str] = None,
-    jinja2: Optional[str] = None,
-) -> Set[str]:
-    """
-    Returns a list of variables required by the Jinja2 template.
+    jinja2_name: str | None = None,
+    jinja2: str | None = None,
+) -> set[str]:
+    """Returns a list of variables required by the Jinja2 template.
 
     Args:
         template_category: Category of the template (HTML, MARKDOWN, etc.), used to set the appropriate jinja2 environment settings
@@ -32,6 +30,7 @@ def detect_jinja2_required_variables(
 
     Raises:
         Jinja2StuffError: If neither jinja2 nor jinja2_name is provided
+
     """
     jinja2_env, loader = make_jinja2_env_from_template_provider(
         template_category=template_category,

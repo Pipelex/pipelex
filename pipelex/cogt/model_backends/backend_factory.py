@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import Field
 
@@ -10,9 +10,9 @@ from pipelex.tools.config.config_model import ConfigModel
 
 class InferenceBackendBlueprint(ConfigModel):
     enabled: bool = True
-    endpoint: Optional[str] = None
-    api_key: Optional[str] = None
-    extra_config: Dict[str, Any] = Field(default_factory=dict)
+    endpoint: str | None = None
+    api_key: str | None = None
+    extra_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class InferenceBackendFactory:
@@ -21,8 +21,8 @@ class InferenceBackendFactory:
         cls,
         name: str,
         blueprint: InferenceBackendBlueprint,
-        extra_config: Dict[str, Any],
-        model_specs: Dict[str, InferenceModelSpec],
+        extra_config: dict[str, Any],
+        model_specs: dict[str, InferenceModelSpec],
     ) -> InferenceBackend:
         endpoint = blueprint.endpoint
         api_key = blueprint.api_key

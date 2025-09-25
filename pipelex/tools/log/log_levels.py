@@ -47,9 +47,8 @@ class LogLevel(StrEnum):
     def from_int(logging_level: int) -> "LogLevel":
         if logging_level == LOGGING_LEVEL_VERBOSE:
             return LogLevel.VERBOSE
-        elif logging_level == LOGGING_LEVEL_DEV:
+        if logging_level == LOGGING_LEVEL_DEV:
             return LogLevel.DEV
-        elif logging_level == LOGGING_LEVEL_OFF or logging_level > logging.CRITICAL:
+        if logging_level == LOGGING_LEVEL_OFF or logging_level > logging.CRITICAL:
             return LogLevel.OFF
-        else:
-            return LogLevel(logging.getLevelName(logging_level))
+        return LogLevel(logging.getLevelName(logging_level))

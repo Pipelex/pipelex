@@ -1,4 +1,3 @@
-from typing import Dict, Optional
 
 from pydantic import Field
 
@@ -10,15 +9,15 @@ class RoutingProfileBlueprint(ConfigModel):
     """Blueprint for creating RoutingProfile instances."""
 
     description: str
-    default: Optional[str] = None
-    routes: Dict[str, str] = Field(default_factory=dict)
+    default: str | None = None
+    routes: dict[str, str] = Field(default_factory=dict)
 
 
 class RoutingProfileLibraryBlueprint(ConfigModel):
     """Blueprint for the entire routing profile library."""
 
     active: str
-    profiles: Dict[str, RoutingProfileBlueprint] = Field(default_factory=dict)
+    profiles: dict[str, RoutingProfileBlueprint] = Field(default_factory=dict)
 
 
 class RoutingProfileFactory:
@@ -38,6 +37,7 @@ class RoutingProfileFactory:
 
         Returns:
             RoutingProfile instance
+
         """
         return RoutingProfile(
             name=name,

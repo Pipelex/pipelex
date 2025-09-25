@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from kajson import kajson
@@ -42,7 +42,7 @@ class TestSerDeLLMClasses:
     @pytest.mark.parametrize("test_dict", SerDeTestLLMCases.PYDANTIC_EXAMPLES_DICT)
     def test_serde_model_validate_from_dict(
         self,
-        test_dict: Dict[str, Any],
+        test_dict: dict[str, Any],
     ):
         pretty_print(test_dict, title="Original dict")
         # Deserialize the dictionary to a LLMPromptTemplate model
@@ -63,7 +63,7 @@ class TestSerDeLLMClasses:
     @pytest.mark.parametrize("test_dict", SerDeTestLLMCases.PYDANTIC_EXAMPLES_DICT)
     def test_serde_instantiate_from_kwargs(
         self,
-        test_dict: Dict[str, Any],
+        test_dict: dict[str, Any],
     ):
         pretty_print(test_dict, title="Original dict")
         # Deserialize the dictionary to a LLMPromptTemplate model

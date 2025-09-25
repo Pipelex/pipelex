@@ -78,7 +78,7 @@ class TestPipeParallelSimple:
 
         # Actually run the PipeParallel pipe
         pipe_output = await pipe_parallel.run_pipe(
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             output_name="parallel_results",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -172,7 +172,7 @@ class TestPipeParallelSimple:
 
         # Actually run the PipeParallel pipe
         pipe_output = await pipe_parallel.run_pipe(
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             output_name="parallel_results",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

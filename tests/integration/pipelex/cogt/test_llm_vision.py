@@ -1,4 +1,3 @@
-from typing import Tuple
 
 import pytest
 
@@ -74,7 +73,7 @@ class TestLLMVision:
             pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle_for_vision} because {exc}")
 
     @pytest.mark.parametrize("topic, image_pair", LLMVisionTestCases.IMAGE_PATH_PAIRS)
-    async def test_gen_text_from_vision_2_images(self, llm_handle_for_vision: str, topic: str, image_pair: Tuple[str, str]):
+    async def test_gen_text_from_vision_2_images(self, llm_handle_for_vision: str, topic: str, image_pair: tuple[str, str]):
         prompt_image1 = PromptImagePath(file_path=image_pair[0])
         prompt_image2 = PromptImagePath(file_path=image_pair[1])
         llm_worker = get_llm_worker(llm_handle=llm_handle_for_vision)

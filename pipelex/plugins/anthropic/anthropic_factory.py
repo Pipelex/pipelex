@@ -1,5 +1,4 @@
 import asyncio
-from typing import List, Optional, Union
 
 from anthropic import AsyncAnthropic, AsyncAnthropicBedrock
 from anthropic.types import Usage
@@ -46,7 +45,7 @@ class AnthropicFactory:
     def make_anthropic_client(
         plugin: Plugin,
         backend: InferenceBackend,
-    ) -> Union[AsyncAnthropic, AsyncAnthropicBedrock]:
+    ) -> AsyncAnthropic | AsyncAnthropicBedrock:
         try:
             sdk_variant = AnthropicSdkVariant(plugin.sdk)
         except ValueError:
@@ -73,7 +72,7 @@ class AnthropicFactory:
         llm_job: LLMJob,
     ) -> MessageParam:
         message: MessageParam
-        content: List[Union[TextBlockParam, ImageBlockParam]] = []
+        content: list[TextBlockParam | ImageBlockParam] = []
 
         if llm_job.llm_prompt.user_text:
             text_block_param: TextBlockParam = {
@@ -93,9 +92,9 @@ class AnthropicFactory:
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": mime,  # type: ignore
+                            "media_type": mime,
                             "data": prepped_image.base_64.decode("utf-8"),
-                        },  # type: ignore
+                        }, # pyright: ignore[reportAssignmentType]
                     }
                 elif isinstance(prepped_image, str):  # pyright: ignore[reportUnnecessaryIsInstance]
                     url = prepped_image
@@ -121,13 +120,13 @@ class AnthropicFactory:
     @staticmethod
     def openai_typed_user_message(
         user_content_txt: str,
-        prepped_user_images: Optional[List[PromptImageTypedUrlOrBase64]] = None,
+        prepped_user_images: list[PromptImageTypedUrlOrBase64] | None = None,
     ) -> ChatCompletionMessageParam:
         text_block_param: TextBlockParam = {"type": "text", "text": user_content_txt}
         message: MessageParam
         if prepped_user_images is not None:
             log.debug(prepped_user_images)
-            images_block_params: List[ImageBlockParam] = []
+            images_block_params: list[ImageBlockParam] = []
             for prepped_image in prepped_user_images:
                 image_block_param_in_loop: ImageBlockParam
                 if isinstance(prepped_image, PromptImageTypedBase64):
@@ -136,9 +135,9 @@ class AnthropicFactory:
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": mime,  # type: ignore
+                            "media_type": mime,
                             "data": prepped_image.base_64.decode("utf-8"),
-                        },  # type: ignore
+                        }, # pyright: ignore[reportAssignmentType]
                     }
                 elif isinstance(prepped_image, str):  # pyright: ignore[reportUnnecessaryIsInstance]
                     url = prepped_image
@@ -153,7 +152,7 @@ class AnthropicFactory:
                     raise AnthropicFactoryError(f"Unsupported PromptImageTypedBytesOrUrl type: '{type(prepped_image).__name__}'")
                 images_block_params.append(image_block_param_in_loop)
 
-            content: List[Union[TextBlockParam, ImageBlockParam]] = images_block_params + [text_block_param]
+            content: list[TextBlockParam | ImageBlockParam] = images_block_params + [text_block_param]
             message = {
                 "role": "user",
                 "content": content,
@@ -165,7 +164,7 @@ class AnthropicFactory:
                 "content": [text_block_param],
             }
 
-        return message  # type: ignore
+        return message # pyright: ignore[reportReturnType]
 
     @classmethod
     async def _prep_image_for_anthropic(
@@ -190,17 +189,16 @@ class AnthropicFactory:
     async def make_simple_messages(
         cls,
         llm_job: LLMJob,
-    ) -> List[ChatCompletionMessageParam]:
-        """
-        Makes a list of messages with a system message (if provided) and followed by a user message.
+    ) -> list[ChatCompletionMessageParam]:
+        """Makes a list of messages with a system message (if provided) and followed by a user message.
         """
         llm_prompt = llm_job.llm_prompt
-        messages: List[ChatCompletionMessageParam] = []
+        messages: list[ChatCompletionMessageParam] = []
         #### System message ####
         if system_content := llm_prompt.system_text:
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
 
-        prepped_user_images: Optional[List[PromptImageTypedUrlOrBase64]]
+        prepped_user_images: list[PromptImageTypedUrlOrBase64] | None
         if llm_prompt.user_images:
             tasks_to_prep_images = [cls._prep_image_for_anthropic(prompt_image) for prompt_image in llm_prompt.user_images]
             prepped_user_images = await asyncio.gather(*tasks_to_prep_images)
@@ -212,7 +210,7 @@ class AnthropicFactory:
             AnthropicFactory.openai_typed_user_message(
                 user_content_txt=llm_prompt.user_text if llm_prompt.user_text else "",
                 prepped_user_images=prepped_user_images,
-            )
+            ),
         )
         return messages
 

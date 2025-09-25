@@ -2,14 +2,14 @@ import base64
 import json
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import Any, Generic, Self, TypeVar
 
 import markdown
 from json2html import json2html
 from kajson import kajson
 from PIL import Image
 from pydantic import BaseModel
-from typing_extensions import Self, override
+from typing_extensions import override
 from yattag import Doc
 
 from pipelex.cogt.ocr.ocr_output import ExtractedImage
@@ -32,7 +32,7 @@ class StuffContent(ABC, CustomBaseModel):
     def short_desc(self) -> str:
         return f"some {self.__class__.__name__}"
 
-    def smart_dump(self) -> Union[str, Dict[str, Any], List[str], List[Dict[str, Any]]]:
+    def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
         return self.model_dump(serialize_as_any=True)
 
     @override
@@ -81,7 +81,7 @@ class TextContent(StuffContentInitableFromStr):
     text: str
 
     @override
-    def smart_dump(self) -> Union[str, Dict[str, Any], List[str], List[Dict[str, Any]]]:
+    def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
         return self.text
 
     @property
@@ -138,10 +138,10 @@ class DynamicContent(StuffContent):
 
 
 class NumberContent(StuffContentInitableFromStr):
-    number: Union[int, float]
+    number: int | float
 
     @override
-    def smart_dump(self) -> Union[str, Dict[str, Any], List[str], List[Dict[str, Any]]]:
+    def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
         return str(self.number)
 
     @property
@@ -182,9 +182,9 @@ class NumberContent(StuffContentInitableFromStr):
 
 class ImageContent(StuffContentInitableFromStr):
     url: str
-    source_prompt: Optional[str] = None
-    caption: Optional[str] = None
-    base_64: Optional[str] = None
+    source_prompt: str | None = None
+    caption: str | None = None
+    base_64: str | None = None
 
     @property
     @override
@@ -234,7 +234,7 @@ class ImageContent(StuffContentInitableFromStr):
             base_64=base_64,
         )
 
-    def save_to_directory(self, directory: str, base_name: Optional[str] = None, extension: Optional[str] = None):
+    def save_to_directory(self, directory: str, base_name: str | None = None, extension: str | None = None):
         ensure_directory_exists(directory)
         base_name = base_name or "img"
         if base_64 := self.base_64:
@@ -399,13 +399,13 @@ class StructuredContent(StuffContent):
 
 
 class ListContent(StuffContent, Generic[StuffContentType]):
-    items: List[StuffContentType]
+    items: list[StuffContentType]
 
     @property
     def nb_items(self) -> int:
         return len(self.items)
 
-    def get_items(self, item_type: Type[StuffContent]) -> List[StuffContent]:
+    def get_items(self, item_type: type[StuffContent]) -> list[StuffContent]:
         return [item for item in self.items if isinstance(item, item_type)]
 
     @property
@@ -414,28 +414,25 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         nb_items = len(self.items)
         if nb_items == 0:
             return "empty list"
-        elif nb_items == 1:
+        if nb_items == 1:
             return f"list of 1 {self.items[0].__class__.__name__}"
-        else:
-            item_classes: List[str] = [item.__class__.__name__ for item in self.items]
-            item_classes_set = set(item_classes)
-            nb_classes = len(item_classes_set)
-            if nb_classes == 1:
-                return f"list of {len(self.items)} {item_classes[0]}s"
-            elif nb_items == nb_classes:
-                return f"list of {len(self.items)} items of different types"
-            else:
-                return f"list of {len(self.items)} items of {nb_classes} different types"
+        item_classes: list[str] = [item.__class__.__name__ for item in self.items]
+        item_classes_set = set(item_classes)
+        nb_classes = len(item_classes_set)
+        if nb_classes == 1:
+            return f"list of {len(self.items)} {item_classes[0]}s"
+        if nb_items == nb_classes:
+            return f"list of {len(self.items)} items of different types"
+        return f"list of {len(self.items)} items of {nb_classes} different types"
 
     @property
-    def _single_class_name(self) -> Optional[str]:
-        item_classes: List[str] = [item.__class__.__name__ for item in self.items]
+    def _single_class_name(self) -> str | None:
+        item_classes: list[str] = [item.__class__.__name__ for item in self.items]
         item_classes_set = set(item_classes)
         nb_classes = len(item_classes_set)
         if nb_classes == 1:
             return item_classes[0]
-        else:
-            return None
+        return None
 
     @override
     def model_dump(self, *args: Any, **kwargs: Any):
@@ -473,8 +470,8 @@ class ListContent(StuffContent, Generic[StuffContentType]):
 
 
 class TextAndImagesContent(StuffContent):
-    text: Optional[TextContent]
-    images: Optional[List[ImageContent]]
+    text: TextContent | None
+    images: list[ImageContent] | None
 
     @property
     @override
@@ -510,7 +507,7 @@ class TextAndImagesContent(StuffContent):
 
 class PageContent(StructuredContent):
     text_and_images: TextAndImagesContent
-    page_view: Optional[ImageContent] = None
+    page_view: ImageContent | None = None
 
     def save_to_directory(self, directory: str):
         ensure_directory_exists(directory)

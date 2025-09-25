@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
@@ -16,7 +16,6 @@ class PipeOcrTestCases:
             output="ExtractedText",
             ocr="mistral-pixtral",
         ),
-        "test_domain",
         PipeOcrBlueprint(
             definition="Extract text from image",
             inputs={"ocr_input": InputRequirementBlueprint(concept="Image")},
@@ -40,7 +39,6 @@ class PipeOcrTestCases:
             page_views=True,
             page_views_dpi=300,
         ),
-        "test_domain",
         PipeOcrBlueprint(
             definition="OCR with page options",
             inputs={"ocr_input": InputRequirementBlueprint(concept="PDF")},
@@ -51,7 +49,7 @@ class PipeOcrTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeOcrSpec, str, PipeOcrBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, PipeOcrSpec, PipeOcrBlueprint]]] = [
         SIMPLE_OCR,
         OCR_WITH_OPTIONS,
     ]

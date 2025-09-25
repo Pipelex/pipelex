@@ -1,4 +1,3 @@
-from typing import Dict
 
 from pipelex.types import StrEnum
 
@@ -16,4 +15,4 @@ class CostCategory(StrEnum):
     OUTPUT_REJECTED_PREDICTION = "output_rejected_prediction"
 
 
-CostsByCategoryDict = Dict[CostCategory, float]
+CostsByCategoryDict = dict[CostCategory, float]

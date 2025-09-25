@@ -1,6 +1,4 @@
-"""Test PipelexInterpreter serialize_sub_pipe function."""
-
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -9,8 +7,6 @@ from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
 class TestPipelexInterpreterSerializeSubPipe:
-    """Test the serialize_sub_pipe function directly."""
-
     @pytest.mark.parametrize(
         "sub_pipe_blueprint,expected_result",
         [
@@ -98,8 +94,7 @@ class TestPipelexInterpreterSerializeSubPipe:
             ),
         ],
     )
-    def test_serialize_sub_pipe(self, sub_pipe_blueprint: SubPipeBlueprint, expected_result: Dict[str, Any]):
-        """Test serializing SubPipeBlueprint with various configurations."""
+    def test_serialize_sub_pipe(self, sub_pipe_blueprint: SubPipeBlueprint, expected_result: dict[str, Any]):
         result = PipelexInterpreter.serialize_sub_pipe(sub_pipe_blueprint)
         assert result == expected_result
 
@@ -154,6 +149,5 @@ class TestPipelexInterpreterSerializeSubPipe:
         ],
     )
     def test_sub_pipe_to_plx_string(self, sub_pipe_blueprint: SubPipeBlueprint, expected_plx_string: str):
-        """Test converting SubPipeBlueprint directly to PLX inline table string."""
         result = PipelexInterpreter.sub_pipe_to_plx_string(sub_pipe_blueprint)
         assert result == expected_plx_string

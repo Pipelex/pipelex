@@ -1,7 +1,6 @@
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Self
 
 from pydantic import BaseModel, model_validator
-from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptSpecError
@@ -18,17 +17,17 @@ from pipelex.tools.typing.validation_utils import has_exactly_one_among_attribut
 
 
 class LLMPromptSpec(BaseModel):
-    prompting_style: Optional[PromptingStyle] = None
+    prompting_style: PromptingStyle | None = None
 
-    system_prompt_jinja2_blueprint: Optional[Jinja2Blueprint] = None
-    system_prompt_verbatim_name: Optional[str] = None
-    system_prompt: Optional[str] = None
+    system_prompt_jinja2_blueprint: Jinja2Blueprint | None = None
+    system_prompt_verbatim_name: str | None = None
+    system_prompt: str | None = None
 
-    user_text_jinja2_blueprint: Optional[Jinja2Blueprint] = None
-    user_prompt_verbatim_name: Optional[str] = None
-    user_text: Optional[str] = None
+    user_text_jinja2_blueprint: Jinja2Blueprint | None = None
+    user_prompt_verbatim_name: str | None = None
+    user_text: str | None = None
 
-    user_images: Optional[List[str]] = None
+    user_images: list[str] | None = None
 
     @model_validator(mode="after")
     def validate_user_text(self) -> Self:
@@ -41,7 +40,7 @@ class LLMPromptSpec(BaseModel):
             ],
         ):
             raise LLMPromptSpecError(
-                f"LLMPromptSpec user text must have exactly one of user_text, user_text_jinja2_blueprint or user_prompt_verbatim_name: {self}"
+                f"LLMPromptSpec user text must have exactly one of user_text, user_text_jinja2_blueprint or user_prompt_verbatim_name: {self}",
             )
         if has_more_than_one_among_attributes_from_list(
             obj=self,
@@ -52,7 +51,7 @@ class LLMPromptSpec(BaseModel):
             ],
         ):
             raise LLMPromptSpecError(
-                f"LLMPromptSpec system got more than one of system_prompt, system_prompt_jinja2_blueprint, system_prompt_verbatim_name: {self}"
+                f"LLMPromptSpec system got more than one of system_prompt, system_prompt_jinja2_blueprint, system_prompt_verbatim_name: {self}",
             )
         return self
 
@@ -69,8 +68,8 @@ class LLMPromptSpec(BaseModel):
             the_template = get_template(template_name=self.system_prompt_jinja2_blueprint.jinja2_name)
             log.debug(f"Validated jinja2 template '{self.system_prompt_jinja2_blueprint.jinja2_name}':\n{the_template}")
 
-    def required_variables(self) -> Set[str]:
-        required_variables: Set[str] = set()
+    def required_variables(self) -> set[str]:
+        required_variables: set[str] = set()
         if self.user_images:
             user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
             required_variables.update(user_images_top_object_name)
@@ -94,13 +93,13 @@ class LLMPromptSpec(BaseModel):
         self,
         output_concept_string: str,
         context_provider: ContextProviderAbstract,
-        output_structure_prompt: Optional[str] = None,
-        extra_params: Optional[Dict[str, Any]] = None,
+        output_structure_prompt: str | None = None,
+        extra_params: dict[str, Any] | None = None,
     ) -> LLMPrompt:
         ############################################################
         # User images
         ############################################################
-        prompt_user_images: List[PromptImage] = []
+        prompt_user_images: list[PromptImage] = []
         if self.user_images:
             for user_image_name in self.user_images:
                 log.debug(f"Getting user image '{user_image_name}' from context")
@@ -108,7 +107,7 @@ class LLMPromptSpec(BaseModel):
                     prompt_image_content = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=ImageContent)
                 except ContextProviderException as exc:
                     raise LLMPromptSpecError(
-                        f"Could not find a valid user image named '{user_image_name}' from the provided context_provider: {exc}"
+                        f"Could not find a valid user image named '{user_image_name}' from the provided context_provider: {exc}",
                     ) from exc
 
                 if prompt_image_content is not None:  # An ImageContent can be optional..
@@ -162,19 +161,19 @@ class LLMPromptSpec(BaseModel):
     async def _unravel_text(
         self,
         context_provider: ContextProviderAbstract,
-        jinja2_blueprint: Optional[Jinja2Blueprint],
-        text_verbatim_name: Optional[str],
-        fixed_text: Optional[str],
-        extra_params: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
-        the_text: Optional[str]
+        jinja2_blueprint: Jinja2Blueprint | None,
+        text_verbatim_name: str | None,
+        fixed_text: str | None,
+        extra_params: dict[str, Any] | None = None,
+    ) -> str | None:
+        the_text: str | None
         if jinja2_blueprint:
             log.verbose(f"Working with Jinja2 pipe '{jinja2_blueprint.jinja2_name}'")
             if (prompting_style := self.prompting_style) and not jinja2_blueprint.prompting_style:
                 jinja2_blueprint.prompting_style = prompting_style
                 log.verbose(f"Setting prompting style to {prompting_style}")
 
-            context: Dict[str, Any] = context_provider.generate_context()
+            context: dict[str, Any] = context_provider.generate_context()
             if extra_params:
                 context.update(**extra_params)
             if jinja2_blueprint.extra_context:

@@ -1,4 +1,4 @@
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -34,14 +34,14 @@ def test_serialize_model_with_hidden_fields():
     parent = ParentModel(parent_name="bar", child=child)
 
     # Test default model_dump() shows everything
-    model_dump_result: Dict[str, Any] = parent.model_dump()
-    child_dict = cast(Dict[str, Any], model_dump_result["child"])
+    model_dump_result: dict[str, Any] = parent.model_dump()
+    child_dict = cast("dict[str, Any]", model_dump_result["child"])
     assert "child_secret" in child_dict
     assert child_dict["child_secret"] == "secret_foo"
 
     # Test our custom serializer omits hidden fields (child_secret)
-    serialized_result = cast(Dict[str, Any], serialize_model(parent))
-    child_serialized = cast(Dict[str, Any], serialized_result["child"])
+    serialized_result = cast("dict[str, Any]", serialize_model(parent))
+    child_serialized = cast("dict[str, Any]", serialized_result["child"])
     assert "child_secret" not in child_serialized
     assert serialized_result == {"parent_name": "bar", "child": {"child_name": "foo"}}
 

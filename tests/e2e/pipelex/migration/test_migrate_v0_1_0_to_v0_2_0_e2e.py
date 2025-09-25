@@ -1,7 +1,7 @@
 """End-to-end tests for the migration functionality."""
 
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any
 
 import pytest
 
@@ -13,7 +13,6 @@ class TestMigrationE2E:
 
     def test_real_world_migration_scenario(self, tmp_path: Path) -> None:
         """Test a realistic migration scenario with multiple files and complex structures."""
-
         # Create a realistic pipelex libraries structure
         pipelines_dir = tmp_path / "pipelines"
         pipelines_dir.mkdir()
@@ -177,7 +176,6 @@ prompt_template = "Process: @input_text"
 
     def test_migration_with_complex_formatting(self, tmp_path: Path) -> None:
         """Test migration preserves complex formatting and edge cases."""
-
         test_file = tmp_path / "complex_formatting.toml"
         original_content = """# Complex formatting test file
 domain = "formatting_test"
@@ -272,7 +270,6 @@ Process this: @input_text
 
     def test_dry_run_does_not_modify_files(self, tmp_path: Path) -> None:
         """Test that dry run mode doesn't modify any files."""
-
         test_file = tmp_path / "dry_run_test.toml"
         original_content = """domain = "dry_run_test"
 
@@ -310,7 +307,6 @@ refines = "Document"
 
     def test_error_handling_with_permission_issues(self, tmp_path: Path, mocker: Any) -> None:
         """Test proper error handling when file operations fail."""
-
         test_file = tmp_path / "permission_test.toml"
         test_file.write_text("""[concept.Test]
 Concept = "Test concept"
@@ -375,7 +371,7 @@ Concept = "Test concept"
 
         # Verify the challenge case is still there and unchanged
         challenge_line_found = False
-        concept_lines_outside_multiline: List[Tuple[int, str]] = []
+        concept_lines_outside_multiline: list[tuple[int, str]] = []
 
         lines = migrated_content.split("\n")
         for i, line in enumerate(lines, 1):

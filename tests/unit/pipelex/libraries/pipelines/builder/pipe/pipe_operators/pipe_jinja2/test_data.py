@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
@@ -18,7 +18,6 @@ class PipeJinja2TestCases:
             output="RenderedText",
             jinja2="Hello {{ data.name }}!",
         ),
-        "test_domain",
         PipeJinja2Blueprint(
             definition="Render a template",
             inputs={"data": InputRequirementBlueprint(concept="Data")},
@@ -48,7 +47,6 @@ class PipeJinja2TestCases:
             template_category=Jinja2TemplateCategory.MARKDOWN,
             extra_context={"version": "1.0"},
         ),
-        "test_domain",
         PipeJinja2Blueprint(
             definition="Template with prompting style",
             inputs={"input": InputRequirementBlueprint(concept="Input")},
@@ -66,7 +64,7 @@ class PipeJinja2TestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeJinja2Spec, str, PipeJinja2Blueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, PipeJinja2Spec, PipeJinja2Blueprint]]] = [
         SIMPLE_JINJA2,
         JINJA2_WITH_STYLE,
     ]

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Tuple
+from typing import Any
 
 from jinja2.runtime import Context
 
@@ -18,5 +18,5 @@ class Jinja2ContextKey(StrEnum):
 
 class Jinja2TaggableAbstract(ABC):
     @abstractmethod
-    def render_tagged_for_jinja2(self, context: Context, tag_name: Optional[str] = None) -> Tuple[Any, Optional[str]]:
+    def render_tagged_for_jinja2(self, context: Context, tag_name: str | None = None) -> tuple[Any, str | None]:
         pass

@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, cast
+from typing import Any, ClassVar, cast
 
 from jinja2 import TemplateSyntaxError
 from pydantic import Field, RootModel, ValidationError
@@ -14,7 +14,7 @@ from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.template_provider_abstract import TemplateNotFoundError, TemplateProviderAbstract
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
-TemplateLibraryRoot = Dict[str, str]
+TemplateLibraryRoot = dict[str, str]
 
 
 class TemplateLibraryError(ToolException):
@@ -65,7 +65,7 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
         toml_name = toml_path.split("/")[-1]
         log.debug(f"Loaded {len(self.root) - nb_concepts_before} templates from '{toml_name}'")
 
-    def _load_from_recursive_dict(self, domain: str, recursive_dict: Dict[str, Any]):
+    def _load_from_recursive_dict(self, domain: str, recursive_dict: dict[str, Any]):
         for name, obj in recursive_dict.items():
             try:
                 if isinstance(obj, str):
@@ -74,7 +74,7 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
                     self._add_new_template(template=template, name=name)
                 elif isinstance(obj, dict):
                     # this is not a templae but a subdomain
-                    sub_recursive_dict = cast(Dict[str, str], obj)
+                    sub_recursive_dict = cast("dict[str, str]", obj)
                     domain = f"{domain}/{name}"
                     self._load_from_recursive_dict(domain=domain, recursive_dict=sub_recursive_dict)
                 else:

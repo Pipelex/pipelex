@@ -1,5 +1,4 @@
 import asyncio
-from typing import List
 
 import pytest
 
@@ -44,7 +43,7 @@ class TestLLMReport:
             "llm_for_testing_gen_text",
             "llm_for_testing_gen_object",
         ]
-        tasks: List[asyncio.Task[str]] = []
+        tasks: list[asyncio.Task[str]] = []
         for llm_preset_id in llm_preset_ids:
             llm_worker, llm_job = self._get_async_worker_and_job(llm_preset_id=llm_preset_id, prompt_text=prompt_text)
             job_params_base = llm_job.job_params

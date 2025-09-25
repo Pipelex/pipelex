@@ -1,4 +1,3 @@
-from typing import List, Optional
 
 from pipelex.client.protocol import ImplicitMemory
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -24,13 +23,13 @@ from pipelex.tools.environment import get_optional_env
 
 async def execute_pipeline(
     pipe_code: str,
-    working_memory: Optional[WorkingMemory] = None,
-    input_memory: Optional[ImplicitMemory] = None,
-    search_domains: Optional[List[str]] = None,
-    output_name: Optional[str] = None,
-    output_multiplicity: Optional[PipeOutputMultiplicity] = None,
-    dynamic_output_concept_code: Optional[str] = None,
-    pipe_run_mode: Optional[PipeRunMode] = None,
+    working_memory: WorkingMemory | None = None,
+    input_memory: ImplicitMemory | None = None,
+    search_domains: list[str] | None = None,
+    output_name: str | None = None,
+    output_multiplicity: PipeOutputMultiplicity | None = None,
+    dynamic_output_concept_code: str | None = None,
+    pipe_run_mode: PipeRunMode | None = None,
 ) -> PipeOutput:
     """Execute a pipeline and wait for its completion.
 
@@ -62,6 +61,7 @@ async def execute_pipeline(
     -------
     Tuple[PipeOutput, str]
         A tuple containing the pipe output and the pipeline run ID.
+
     """
     search_domains = search_domains or []
     pipe = get_required_pipe(pipe_code=pipe_code)
@@ -71,7 +71,7 @@ async def execute_pipeline(
     # Can be either working_memory or compact_memory or neither, but not both
     if working_memory and input_memory:
         raise PipelineInputError(f"Cannot pass both working_memory and input_memory to `execute_pipeline` {pipe_code=}")
-    elif input_memory:
+    if input_memory:
         working_memory = WorkingMemoryFactory.make_from_implicit_memory(
             implicit_memory=input_memory,
             search_domains=search_domains,

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, List, cast
+from typing import cast
 
 from pydantic import Field, field_validator
 from rich.highlighter import Highlighter, JSONHighlighter, ReprHighlighter
@@ -35,7 +35,7 @@ class CallerInfoTemplate(Enum):
 
     @classmethod
     def for_template_key(cls, key: "CallerInfoTemplate") -> str:
-        templates: Dict[CallerInfoTemplate, str] = {
+        templates: dict[CallerInfoTemplate, str] = {
             cls.FILE_LINE: "{file}:{line}",
             cls.FILE_LINE_FUNC: "{file}:{line} {func}",
             cls.FUNC: "{func}",
@@ -56,8 +56,8 @@ class RichLogConfig(ConfigModel):
     is_rich_tracebacks: bool
     is_tracebacks_word_wrap: bool
     is_tracebacks_show_locals: bool
-    tracebacks_suppress: List[str]
-    keywords_to_hilight: List[str]
+    tracebacks_suppress: list[str]
+    keywords_to_hilight: list[str]
 
     def make_rich_handler(self) -> RichHandler:
         highlighter: Highlighter
@@ -83,7 +83,7 @@ class RichLogConfig(ConfigModel):
 
 class LogConfig(ConfigModel):
     default_log_level: LogLevel = Field(strict=False)
-    package_log_levels: Dict[str, LogLevel]
+    package_log_levels: dict[str, LogLevel]
     log_mode: LogMode = Field(strict=False)
 
     is_console_logging_enabled: bool
@@ -93,21 +93,20 @@ class LogConfig(ConfigModel):
     is_caller_info_enabled: bool
     caller_info_template: CallerInfoTemplate = Field(strict=False)
 
-    silenced_problem_ids: List[str]
+    silenced_problem_ids: list[str]
 
     rich_log_config: RichLogConfig
 
     # logger name to use for safe logging without fancy features like code filepath and stuff
     generic_poor_logger: str
-    poor_loggers: List[str]
+    poor_loggers: list[str]
 
     @field_validator("package_log_levels", mode="before")
-    def validate_package_log_levels(cls, value: Dict[str, str]) -> Dict[str, LogLevel]:
-        """
-        Validate the package log levels dictionary.
+    def validate_package_log_levels(cls, value: dict[str, str]) -> dict[str, LogLevel]:
+        """Validate the package log levels dictionary.
         """
         the_dict = cast(
-            Dict[str, LogLevel],
+            "dict[str, LogLevel]",
             ConfigModel.transform_dict_str_to_enum(input_dict=value, value_enum_cls=LogLevel),
         )
         return the_dict

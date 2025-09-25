@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Type, TypeVar, Union
+from typing import TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -13,12 +13,11 @@ class ConfigModel(BaseModel):
 
     @staticmethod
     def transform_dict_str_to_enum(
-        input_dict: Dict[str, str],
-        key_enum_cls: Optional[Type[StrEnumType]] = None,
-        value_enum_cls: Optional[Type[StrEnumType]] = None,
-    ) -> Union[Dict[str, StrEnumType], Dict[StrEnumType, str], Dict[StrEnumType, StrEnumType]]:
-        """
-        Transforms a dictionary with str values into a dictionary with enum values.
+        input_dict: dict[str, str],
+        key_enum_cls: type[StrEnumType] | None = None,
+        value_enum_cls: type[StrEnumType] | None = None,
+    ) -> dict[str, StrEnumType] | dict[StrEnumType, str] | dict[StrEnumType, StrEnumType]:
+        """Transforms a dictionary with str values into a dictionary with enum values.
 
         Args:
             input_dict: Dictionary with string values to be transformed.
@@ -27,24 +26,23 @@ class ConfigModel(BaseModel):
 
         Returns:
             A dictionary where the values are converted to the given StrEnum type.
+
         """
         # return {key: value_enum_cls(value) for key, value in input_dict.items()}
         if key_enum_cls and value_enum_cls:
             return {key_enum_cls(key): value_enum_cls(value) for key, value in input_dict.items()}
-        elif key_enum_cls:
+        if key_enum_cls:
             return {key_enum_cls(key): value for key, value in input_dict.items()}
-        elif value_enum_cls:
+        if value_enum_cls:
             return {key: value_enum_cls(value) for key, value in input_dict.items()}
-        else:
-            raise ConfigModelError("Either key_enum_cls or value_enum_cls must be provided.")
+        raise ConfigModelError("Either key_enum_cls or value_enum_cls must be provided.")
 
     @staticmethod
     def transform_dict_of_floats_str_to_enum(
-        input_dict: Dict[str, float],
-        key_enum_cls: Type[StrEnumType],
-    ) -> Dict[StrEnumType, float]:
-        """
-        Transforms a dictionary with str keys and float values into a dictionary with enum keys and float values.
+        input_dict: dict[str, float],
+        key_enum_cls: type[StrEnumType],
+    ) -> dict[StrEnumType, float]:
+        """Transforms a dictionary with str keys and float values into a dictionary with enum keys and float values.
 
         Args:
             input_dict: Dictionary with string values to be transformed.
@@ -52,12 +50,13 @@ class ConfigModel(BaseModel):
 
         Returns:
             A dictionary where the keys are converted to the given StrEnum type.
+
         """
         return {key_enum_cls(key): value for key, value in input_dict.items()}
 
     @staticmethod
     def transform_list_of_str_to_enum(
-        input_list: List[str],
-        enum_cls: Type[StrEnumType],
-    ) -> List[StrEnumType]:
+        input_list: list[str],
+        enum_cls: type[StrEnumType],
+    ) -> list[StrEnumType]:
         return [enum_cls(item) for item in input_list]

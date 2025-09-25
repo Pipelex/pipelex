@@ -16,6 +16,7 @@ def data_path(relative: str) -> Path:
     Example:
         >>> img = data_path("images/white_square.png")
         >>> doc = data_path("documents/solar_system.pdf")
+
     """
     data_dir = resources.files("tests.data")
     return Path(str(data_dir)) / relative

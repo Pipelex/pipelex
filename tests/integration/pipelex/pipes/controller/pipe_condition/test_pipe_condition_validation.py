@@ -18,7 +18,7 @@ class TestPipeConditionValidation:
             concept_codes_from_the_same_domain=["TestConcept"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
-            concept_code="Result", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum"), concept_codes_from_the_same_domain=["Result"]
+            concept_code="Result", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum"), concept_codes_from_the_same_domain=["Result"],
         )
         concept_library = get_concept_provider()
         concept_library.add_concepts([concept_1, concept_2])
@@ -58,7 +58,7 @@ class TestPipeConditionValidation:
             concept_codes_from_the_same_domain=["TestConcept"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
-            concept_code="Result", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum"), concept_codes_from_the_same_domain=["Result"]
+            concept_code="Result", domain=domain, blueprint=ConceptBlueprint(definition="Lorem Ipsum"), concept_codes_from_the_same_domain=["Result"],
         )
         concept_library.add_concepts([concept_1, concept_2])
 

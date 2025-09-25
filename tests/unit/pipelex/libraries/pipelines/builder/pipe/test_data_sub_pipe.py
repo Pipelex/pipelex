@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.libraries.pipelines.builder.pipe.sub_pipe_spec import SubPipeSpec
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
@@ -29,7 +29,7 @@ class SubPipeTestCases:
         SubPipeBlueprint(pipe="process_item", result="processed_items", batch_over="input_list", batch_as="current_item"),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, SubPipeSpec, SubPipeBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, SubPipeSpec, SubPipeBlueprint]]] = [
         SIMPLE_SUB_PIPE,
         SUB_PIPE_WITH_MULTIPLE_OUTPUT,
         SUB_PIPE_WITH_FIXED_OUTPUT,

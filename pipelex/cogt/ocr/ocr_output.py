@@ -1,4 +1,3 @@
-from typing import Dict, List, Optional
 
 from pydantic import Field
 
@@ -10,8 +9,8 @@ from pipelex.tools.typing.pydantic_utils import CustomBaseModel, empty_list_fact
 
 class ExtractedImage(CustomBaseModel):
     image_id: str
-    base_64: Optional[str] = None
-    caption: Optional[str] = None
+    base_64: str | None = None
+    caption: str | None = None
 
     def save_to_directory(self, directory: str):
         ensure_directory_exists(directory)
@@ -23,16 +22,16 @@ class ExtractedImage(CustomBaseModel):
 
 
 class ExtractedImageFromPage(ExtractedImage):
-    top_left_x: Optional[int] = None
-    top_left_y: Optional[int] = None
-    bottom_right_x: Optional[int] = None
-    bottom_right_y: Optional[int] = None
+    top_left_x: int | None = None
+    top_left_y: int | None = None
+    bottom_right_x: int | None = None
+    bottom_right_y: int | None = None
 
 
 class Page(CustomBaseModel):
-    text: Optional[str] = None
-    extracted_images: List[ExtractedImageFromPage] = Field(default_factory=empty_list_factory_of(ExtractedImageFromPage))
-    page_view: Optional[ExtractedImageFromPage] = None
+    text: str | None = None
+    extracted_images: list[ExtractedImageFromPage] = Field(default_factory=empty_list_factory_of(ExtractedImageFromPage))
+    page_view: ExtractedImageFromPage | None = None
 
     def save_to_directory(self, directory: str, page_text_file_name: str):
         ensure_directory_exists(directory)
@@ -47,7 +46,7 @@ class Page(CustomBaseModel):
 
 
 class OcrOutput(CustomBaseModel):
-    pages: Dict[int, Page]
+    pages: dict[int, Page]
 
     @property
     def concatenated_text(self) -> str:

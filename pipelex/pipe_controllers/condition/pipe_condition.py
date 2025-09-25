@@ -1,8 +1,8 @@
-from typing import Dict, List, Literal, Optional, Set, Union, cast
+from typing import Literal, Self, cast
 
 import shortuuid
 from pydantic import field_validator, model_validator
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
@@ -37,20 +37,19 @@ from pipelex.tools.typing.validation_utils import has_exactly_one_among_attribut
 
 class PipeCondition(PipeController):
     type: Literal["PipeCondition"] = "PipeCondition"
-    expression_template: Optional[str] = None
-    expression: Optional[str] = None
+    expression_template: str | None = None
+    expression: str | None = None
     # TODO: rething this pipe_map.
-    pipe_map: List[PipeConditionPipeMap]
-    default_pipe_code: Optional[str] = None
-    add_alias_from_expression_to: Optional[str] = None
+    pipe_map: list[PipeConditionPipeMap]
+    default_pipe_code: str | None = None
+    add_alias_from_expression_to: str | None = None
 
     #########################################################################################
     # Validation
     #########################################################################################
     @override
     def validate_output(self):
-        """
-        Validate the output for the pipe condition.
+        """Validate the output for the pipe condition.
         The output of the pipe condition should match the output of all the conditional pipes, and the default pipe.
         """
         # This pipe CONTINUE enables to leave a PipeCondition and continue the sequence.
@@ -64,7 +63,7 @@ class PipeCondition(PipeController):
                 ):
                     raise PipeConditionError(
                         f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
-                        f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'"
+                        f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'",
                     )
         if self.default_pipe_code:
             default_pipe = get_required_pipe(pipe_code=self.default_pipe_code)
@@ -74,22 +73,22 @@ class PipeCondition(PipeController):
             ):
                 raise PipeConditionError(
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
-                    f"not matching the output concept code '{default_pipe.output.concept_string}' of the default pipe '{self.default_pipe_code}'"
+                    f"not matching the output concept code '{default_pipe.output.concept_string}' of the default pipe '{self.default_pipe_code}'",
                 )
 
     @field_validator("pipe_map")
     @classmethod
-    def validate_pipe_map(cls, pipe_map: List[PipeConditionPipeMap]) -> List[PipeConditionPipeMap]:
+    def validate_pipe_map(cls, pipe_map: list[PipeConditionPipeMap]) -> list[PipeConditionPipeMap]:
         # Validate that the expressions and pipe_code are UNIQUE
         expression_results = [pipe_condition_pipe_map.expression_result for pipe_condition_pipe_map in pipe_map]
         pipe_codes = [pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in pipe_map]
         if len(expression_results) != len(set(expression_results)):
             raise PipeDefinitionError(
-                f"PipeCondition '{cls.code}' must have a unique expression result for each pipe in pipe_map in pipe_map: {pipe_map}"
+                f"PipeCondition '{cls.code}' must have a unique expression result for each pipe in pipe_map in pipe_map: {pipe_map}",
             )
         if len(pipe_codes) != len(set(pipe_codes)):
             raise PipeDefinitionError(
-                f"PipeCondition '{cls.code}' must have a unique pipe code for each expression result in pipe_map in pipe_map: {pipe_map}"
+                f"PipeCondition '{cls.code}' must have a unique pipe code for each expression result in pipe_map in pipe_map: {pipe_map}",
             )
         return pipe_map
 
@@ -113,18 +112,17 @@ class PipeCondition(PipeController):
     def applied_expression_template(self) -> str:
         if self.expression_template:
             return self.expression_template
-        elif self.expression:
+        if self.expression:
             return "{{ " + self.expression + " }}"
-        else:
-            raise PipeExecutionError("No expression or expression_template provided")
+        raise PipeExecutionError("No expression or expression_template provided")
 
     #########################################################################################
     # Inputs
     #########################################################################################
 
     @override
-    def required_variables(self) -> Set[str]:
-        required_variables: Set[str] = set()
+    def required_variables(self) -> set[str]:
+        required_variables: set[str] = set()
         # Variables from the expression/expression_template
         pipe_jinja2 = PipeJinja2Factory.make_pipe_jinja2_from_template_str(
             domain=self.domain,
@@ -145,7 +143,7 @@ class PipeCondition(PipeController):
         return self
 
     @override
-    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
         if visited_pipes is None:
             visited_pipes = set()
 
@@ -197,8 +195,7 @@ class PipeCondition(PipeController):
         return self
 
     def _validate_inputs(self):
-        """
-        Validate that the inputs declared for this PipeCondition match what is actually needed.
+        """Validate that the inputs declared for this PipeCondition match what is actually needed.
         """
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
@@ -242,15 +239,14 @@ class PipeCondition(PipeController):
 
     @override
     def validate_with_libraries(self):
-        """
-        Perform full validation after all libraries are loaded.
+        """Perform full validation after all libraries are loaded.
         This is called after all pipes and concepts are available.
         """
         self._validate_inputs()
         self._validate_required_variables()
 
     @override
-    def pipe_dependencies(self) -> Set[str]:
+    def pipe_dependencies(self) -> set[str]:
         pipe_codes = [
             pipe_condition_pipe_map.pipe_code
             for pipe_condition_pipe_map in self.pipe_map
@@ -266,7 +262,7 @@ class PipeCondition(PipeController):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
     ) -> PipeOutput:
         log.dev(f"{self.class_name} generating a '{self.output.code}'")
 
@@ -274,7 +270,7 @@ class PipeCondition(PipeController):
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
 
         # Convert PipeInputSpec to blueprint format
-        inputs_blueprint: Dict[str, Union[str, InputRequirementBlueprint]] = {}
+        inputs_blueprint: dict[str, str | InputRequirementBlueprint] = {}
         for var_name, requirement in self.inputs.root.items():
             inputs_blueprint[var_name] = InputRequirementBlueprint(
                 concept=requirement.concept.concept_string,
@@ -297,7 +293,7 @@ class PipeCondition(PipeController):
         jinja2_job_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(
                 job_category=JobCategory.JINJA2_JOB,
-            )
+            ),
         )
         log.debug(f"Jinja2 expression: {self.applied_expression_template}")
         # evaluated_expression = (
@@ -313,7 +309,7 @@ class PipeCondition(PipeController):
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
         )
-        pipe_jinja2_output = cast(PipeJinja2Output, pipe_output_1)
+        pipe_jinja2_output = cast("PipeJinja2Output", pipe_output_1)
         evaluated_expression = pipe_jinja2_output.rendered_text.strip()
 
         if not evaluated_expression or evaluated_expression == "None":
@@ -392,17 +388,16 @@ class PipeCondition(PipeController):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
     ) -> PipeOutput:
-        """
-        Dry run implementation for PipeCondition.
+        """Dry run implementation for PipeCondition.
         Validates that all required inputs are present, expression is valid, and target pipes exist.
         """
         log.debug(f"PipeCondition: dry run controller pipe: {self.code}")
 
         # 1. Validate that all required inputs are present in the working memory
         needed_inputs = self.needed_inputs()
-        missing_input_names: List[str] = []
+        missing_input_names: list[str] = []
 
         for named_input_requirement in needed_inputs.named_input_requirements:
             if not working_memory.get_optional_stuff(named_input_requirement.variable_name):
@@ -442,7 +437,7 @@ class PipeCondition(PipeController):
         if self.default_pipe_code:
             all_pipe_codes.add(self.default_pipe_code)
 
-        missing_pipes: List[str] = []
+        missing_pipes: list[str] = []
         for pipe_code in all_pipe_codes:
             try:
                 get_required_pipe(pipe_code=pipe_code)

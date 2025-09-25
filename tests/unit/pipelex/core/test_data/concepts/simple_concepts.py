@@ -1,5 +1,3 @@
-"""Simple concept test cases."""
-
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 SIMPLE_CONCEPTS = (

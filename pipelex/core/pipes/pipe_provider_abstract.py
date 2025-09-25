@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
-PipeLibraryRoot = Dict[str, PipeAbstract]
+PipeLibraryRoot = dict[str, PipeAbstract]
 
 
 class PipeProviderAbstract(ABC):
@@ -16,15 +15,15 @@ class PipeProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_optional_pipe(self, pipe_code: str) -> Optional[PipeAbstract]:
+    def get_optional_pipe(self, pipe_code: str) -> PipeAbstract | None:
         pass
 
     @abstractmethod
-    def get_pipes(self) -> List[PipeAbstract]:
+    def get_pipes(self) -> list[PipeAbstract]:
         pass
 
     @abstractmethod
-    def get_pipes_dict(self) -> Dict[str, PipeAbstract]:
+    def get_pipes_dict(self) -> dict[str, PipeAbstract]:
         pass
 
     @abstractmethod
@@ -40,5 +39,5 @@ class PipeProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def add_pipes(self, pipes: List[PipeAbstract]) -> None:
+    def add_pipes(self, pipes: list[PipeAbstract]) -> None:
         pass

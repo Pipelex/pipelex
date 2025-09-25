@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
@@ -25,7 +25,7 @@ class DomainAndConceptCode(BaseModel):
 
 class ConceptFactory:
     @classmethod
-    def normalize_structure_blueprint(cls, structure_dict: Dict[str, Union[str, ConceptStructureBlueprint]]) -> Dict[str, ConceptStructureBlueprint]:
+    def normalize_structure_blueprint(cls, structure_dict: dict[str, str | ConceptStructureBlueprint]) -> dict[str, ConceptStructureBlueprint]:
         """Convert a mixed structure dictionary to a proper ConceptStructureBlueprint dictionary.
 
         Args:
@@ -33,8 +33,9 @@ class ConceptFactory:
 
         Returns:
             Dictionary with all values as ConceptStructureBlueprint objects
+
         """
-        normalized: Dict[str, ConceptStructureBlueprint] = {}
+        normalized: dict[str, ConceptStructureBlueprint] = {}
 
         for field_name, field_value in structure_dict.items():
             if isinstance(field_value, str):
@@ -64,7 +65,7 @@ class ConceptFactory:
         return f"{domain}.{concept_code}"
 
     @classmethod
-    def make(cls, concept_code: str, domain: str, definition: str, structure_class_name: str, refines: Optional[str] = None) -> Concept:
+    def make(cls, concept_code: str, domain: str, definition: str, structure_class_name: str, refines: str | None = None) -> Concept:
         return Concept(
             code=concept_code,
             domain=domain,
@@ -84,36 +85,32 @@ class ConceptFactory:
 
     @classmethod
     def make_domain_and_concept_code_from_concept_string_or_concept_code(
-        cls, domain: str, concept_string_or_concept_code: str, concept_codes_from_the_same_domain: Optional[List[str]] = None
+        cls, domain: str, concept_string_or_concept_code: str, concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> DomainAndConceptCode:
         # At this point, the concept_string_or_concept_code is already validated
         if "." in concept_string_or_concept_code:
             # Is a concept string.
             parts = concept_string_or_concept_code.rsplit(".")
             return DomainAndConceptCode(domain=parts[0], concept_code=parts[1])
-        else:
-            if is_native_concept(concept_string_or_concept_code=concept_string_or_concept_code):
-                return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=concept_string_or_concept_code)
+        if is_native_concept(concept_string_or_concept_code=concept_string_or_concept_code):
+            return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=concept_string_or_concept_code)
 
-            elif (
-                concept_codes_from_the_same_domain and concept_string_or_concept_code in concept_codes_from_the_same_domain
-            ):  # Is a concept code from the same domain
-                return DomainAndConceptCode(domain=domain, concept_code=concept_string_or_concept_code)
-            else:
-                return DomainAndConceptCode(domain=SpecialDomain.IMPLICIT.value, concept_code=concept_string_or_concept_code)
+        if (
+            concept_codes_from_the_same_domain and concept_string_or_concept_code in concept_codes_from_the_same_domain
+        ):  # Is a concept code from the same domain
+            return DomainAndConceptCode(domain=domain, concept_code=concept_string_or_concept_code)
+        return DomainAndConceptCode(domain=SpecialDomain.IMPLICIT.value, concept_code=concept_string_or_concept_code)
 
     @classmethod
     def make_refine(cls, refine: str) -> str:
         if ConceptBlueprint.is_native_concept_string_or_concept_code(concept_string_or_concept_code=refine):
             if "." in refine:
                 return refine
-            else:
-                return f"{SpecialDomain.NATIVE}.{refine}"
-        else:
-            raise ConceptFactoryError(f"Refine '{refine}' is not a native concept")
+            return f"{SpecialDomain.NATIVE}.{refine}"
+        raise ConceptFactoryError(f"Refine '{refine}' is not a native concept")
 
     @classmethod
-    def make_refines(cls, blueprint: ConceptBlueprint) -> Optional[str]:
+    def make_refines(cls, blueprint: ConceptBlueprint) -> str | None:
         if blueprint.refines:
             return cls.make_refine(refine=blueprint.refines)
         return None
@@ -124,11 +121,11 @@ class ConceptFactory:
         domain: str,
         concept_code: str,
         blueprint: ConceptBlueprint,
-        concept_codes_from_the_same_domain: Optional[List[str]] = None,
+        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> Concept:
         ConceptBlueprint.validate_concept_code(concept_code=concept_code)
         structure_class_name: str
-        current_refine: Optional[str] = None
+        current_refine: str | None = None
 
         # Handle structure definition
         if blueprint.structure:
@@ -137,7 +134,7 @@ class ConceptFactory:
                 if not Concept.is_valid_structure_class(structure_class_name=blueprint.structure):
                     raise StructureClassError(
                         f"Structure class '{blueprint.structure}' set for concept '{concept_code}' in domain '{domain}' "
-                        "is not a registered subclass of StuffContent"
+                        "is not a registered subclass of StuffContent",
                     )
                 structure_class_name = blueprint.structure
             else:
@@ -152,7 +149,7 @@ class ConceptFactory:
                     )
 
                     # Execute the generated Python code to register the class
-                    exec_globals: Dict[str, Any] = {}
+                    exec_globals: dict[str, Any] = {}
                     exec(python_code, exec_globals)
 
                     # Register the generated class
@@ -170,18 +167,17 @@ class ConceptFactory:
             if Concept.is_valid_structure_class(structure_class_name=concept_code):
                 raise ConceptFactoryError(
                     f"Concept '{concept_code}' in domain '{domain}' has refines but also has a structure class registered. "
-                    "A concept cannot have both structure and refines."
+                    "A concept cannot have both structure and refines.",
                 )
             current_refine = cls.make_refines(blueprint=blueprint)
             structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
         # Handle neither structure nor refines - check the class registry
+        # If there is a class, use it. structure_class_name is then the concept_code
+        elif Concept.is_valid_structure_class(structure_class_name=concept_code):
+            structure_class_name = concept_code
         else:
-            # If there is a class, use it. structure_class_name is then the concept_code
-            if Concept.is_valid_structure_class(structure_class_name=concept_code):
-                structure_class_name = concept_code
-            else:
-                # If there is NO class, the fallback class is TextContent.__name__
-                structure_class_name = TextContent.__name__
+            # If there is NO class, the fallback class is TextContent.__name__
+            structure_class_name = TextContent.__name__
 
         domain_and_concept_code = cls.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,

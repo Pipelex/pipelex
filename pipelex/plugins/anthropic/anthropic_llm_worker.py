@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 import instructor
 from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock
@@ -24,29 +24,23 @@ class AnthropicExtraField(StrEnum):
 class AnthropicLLMWorkerError(Exception):
     """Base exception for Anthropic LLM Worker errors."""
 
-    pass
-
 
 class AnthropicBadRequestError(AnthropicLLMWorkerError):
     """Raised when Anthropic API returns a BadRequestError."""
 
-    pass
-
 
 class AnthropicInstructorError(AnthropicLLMWorkerError):
     """Raised when Instructor encounters an error with Anthropic."""
-
-    pass
 
 
 class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        extra_config: Dict[str, Any],
+        extra_config: dict[str, Any],
         inference_model: InferenceModelSpec,
-        structure_method: Optional[StructureMethod] = None,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        structure_method: StructureMethod | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
@@ -54,23 +48,23 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
-        self.extra_config: Dict[str, Any] = extra_config
+        self.extra_config: dict[str, Any] = extra_config
         self.default_max_tokens: int = 0
         if inference_model.max_tokens:
             self.default_max_tokens = inference_model.max_tokens
         else:
             raise AnthropicWorkerConfigurationError(
-                f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Anthropic"
+                f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Anthropic",
             )
 
         # Verify if the sdk_instance is compatible with the current LLM platform
         if isinstance(sdk_instance, (AsyncAnthropic, AsyncAnthropicBedrock)):
-            if inference_model.sdk == AnthropicSdkVariant.ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropic)):
-                raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
-            elif inference_model.sdk == AnthropicSdkVariant.BEDROCK_ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropicBedrock)):
-                raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
+            if (inference_model.sdk == AnthropicSdkVariant.ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropic))) or (inference_model.sdk == AnthropicSdkVariant.BEDROCK_ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropicBedrock))):
+                msg = f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}"
+                raise SdkTypeError(msg)
         else:
-            raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
+            msg = f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}"
+            raise SdkTypeError(msg)
 
         self.anthropic_async_client = sdk_instance
         if structure_method:
@@ -85,7 +79,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     #########################################################
 
     # TODO: implement streaming behind the scenes to avoid timeout/streaming errors with Claude 4 and high tokens
-    def _adapt_max_tokens(self, max_tokens: Optional[int]) -> int:
+    def _adapt_max_tokens(self, max_tokens: int | None) -> int:
         max_tokens = max_tokens or self.default_max_tokens
 
         if (claude_4_tokens_limit := self.extra_config.get(AnthropicExtraField.CLAUDE_4_TOKENS_LIMIT)) and max_tokens > claude_4_tokens_limit:
@@ -129,7 +123,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         messages = await AnthropicFactory.make_simple_messages(llm_job=llm_job)
         max_tokens = self._adapt_max_tokens(max_tokens=llm_job.job_params.max_tokens)

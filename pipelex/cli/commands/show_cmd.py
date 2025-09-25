@@ -52,7 +52,7 @@ def show_config_cmd() -> None:
 @show_app.command("pipes")
 def list_pipes_cmd(
     relative_config_folder_path: Annotated[
-        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
+        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path"),
     ] = "pipelex_libraries",
 ) -> None:
     do_list_pipes(relative_config_folder_path=relative_config_folder_path)
@@ -62,7 +62,7 @@ def list_pipes_cmd(
 def show_pipe_cmd(
     pipe_code: Annotated[str, typer.Argument(help="Pipeline code to show definition for")],
     relative_config_folder_path: Annotated[
-        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path")
+        str, typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path"),
     ] = "./pipelex_libraries",
 ) -> None:
     do_show_pipe(pipe_code=pipe_code, relative_config_folder_path=relative_config_folder_path)

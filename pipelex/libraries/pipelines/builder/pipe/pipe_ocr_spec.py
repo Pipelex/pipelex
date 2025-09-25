@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import Field
 from typing_extensions import override
@@ -34,16 +34,17 @@ class PipeOcrSpec(PipeSpec):
         1. OCR model must be "base_ocr_mistral".
         2. Boolean flags (page_images, page_image_captions, page_views) are optional.
         3. page_views_dpi should be a positive integer when specified.
+
     """
 
     type: Literal["PipeOcr"] = "PipeOcr"
     category: Literal["PipeOperator"] = "PipeOperator"
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     ocr: str = "base_ocr_mistral"
-    page_images: Optional[bool] = None
-    page_image_captions: Optional[bool] = None
-    page_views: Optional[bool] = None
-    page_views_dpi: Optional[int] = None
+    page_images: bool | None = None
+    page_image_captions: bool | None = None
+    page_views: bool | None = None
+    page_views_dpi: int | None = None
 
     @override
     def to_blueprint(self) -> PipeOcrBlueprint:

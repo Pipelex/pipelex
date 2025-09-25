@@ -1,6 +1,6 @@
 """Simple integration test for PipeBatch controller."""
 
-from typing import List, cast
+from typing import cast
 
 import pytest
 from pytest import FixtureRequest
@@ -73,7 +73,7 @@ class TestPipeBatchSimple:
 
         text_list_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-            content=ListContent[StuffContent](items=cast(List[StuffContent], text_items)),
+            content=ListContent[StuffContent](items=cast("list[StuffContent]", text_items)),
             name="text_list",
         )
 
@@ -95,7 +95,7 @@ class TestPipeBatchSimple:
         assert isinstance(text_list.content, ListContent)
 
         # Cast the content to the proper type for type checking
-        list_content = cast(ListContent[TextContent], text_list.content)  # type: ignore
+        list_content = cast("ListContent[TextContent]", text_list.content)  # type: ignore
         assert len(list_content.items) == 3
 
         # Verify each item in the list
@@ -109,7 +109,7 @@ class TestPipeBatchSimple:
 
         # Actually run the PipeBatch pipe
         pipe_output = await pipe_batch._run_controller_pipe(  # pyright: ignore[reportPrivateUsage]
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             output_name="batch_result",
@@ -141,7 +141,7 @@ class TestPipeBatchSimple:
         original_list = final_working_memory.get_stuff("text_list")
         assert original_list is not None
         assert isinstance(original_list.content, ListContent)
-        original_items = cast(ListContent[TextContent], original_list.content)  # type: ignore
+        original_items = cast("ListContent[TextContent]", original_list.content)  # type: ignore
         assert len(original_items.items) == 3
         assert original_items.items[0].text == "hello"
         assert original_items.items[1].text == "world"
@@ -155,7 +155,7 @@ class TestPipeBatchSimple:
 
         # Verify the batch result content matches exactly
         assert isinstance(batch_result.content, ListContent)
-        result_list = cast(ListContent[TextContent], batch_result.content)  # type: ignore
+        result_list = cast("ListContent[TextContent]", batch_result.content)  # type: ignore
         assert len(result_list.items) == 3
         if pipe_run_mode != PipeRunMode.DRY:
             assert result_list.items[0].text == "UPPER: HELLO"

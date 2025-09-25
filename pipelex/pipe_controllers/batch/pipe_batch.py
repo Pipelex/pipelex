@@ -1,9 +1,10 @@
 import asyncio
-from typing import Any, Coroutine, List, Literal, Optional, Set, cast
+from collections.abc import Coroutine
+from typing import Any, Literal, Self, cast
 
 import shortuuid
 from pydantic import model_validator
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import get_config
@@ -28,10 +29,10 @@ class PipeBatch(PipeController):
     type: Literal["PipeBatch"] = "PipeBatch"
 
     branch_pipe_code: str
-    batch_params: Optional[BatchParams] = None
+    batch_params: BatchParams | None = None
 
     @override
-    def pipe_dependencies(self) -> Set[str]:
+    def pipe_dependencies(self) -> set[str]:
         return set([self.branch_pipe_code])
 
     @override
@@ -56,8 +57,8 @@ class PipeBatch(PipeController):
         return self
 
     @override
-    def required_variables(self) -> Set[str]:
-        required_variables: Set[str] = set()
+    def required_variables(self) -> set[str]:
+        required_variables: set[str] = set()
         # 1. Check that the inputs of the pipe branch_pipe_code are in the inputs of the pipe
         pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
         for variable_name, _ in pipe.inputs.items:
@@ -68,7 +69,7 @@ class PipeBatch(PipeController):
         return required_variables
 
     @override
-    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
         return self.inputs
 
     async def _run_batch_pipe(
@@ -76,7 +77,7 @@ class PipeBatch(PipeController):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
     ) -> PipeOutput:
         """Common logic for running or dry-running a pipe in batch mode."""
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
@@ -85,7 +86,7 @@ class PipeBatch(PipeController):
             input_item_concept_code = self.inputs.get_required_input_requirement(input_item_stuff_name)
         except PipeInputNotFoundError as exc:
             raise PipeInputError(
-                f"Batch input item stuff named '{input_item_stuff_name}' is not in this PipeBatch '{self.code}' input spec: {self.inputs}"
+                f"Batch input item stuff named '{input_item_stuff_name}' is not in this PipeBatch '{self.code}' input spec: {self.inputs}",
             ) from exc
 
         if pipe_run_params.final_stuff_code:
@@ -98,25 +99,25 @@ class PipeBatch(PipeController):
             input_stuff = working_memory.get_stuff(batch_params.input_list_stuff_name)
         except WorkingMemoryStuffNotFoundError as exc:
             raise PipeInputError(
-                f"Input list stuff '{batch_params.input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory: {exc}"
+                f"Input list stuff '{batch_params.input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory: {exc}",
             ) from exc
         input_stuff_code = input_stuff.stuff_code
         input_content = input_stuff.content
 
         if not isinstance(input_content, ListContent):
             raise PipeInputError(
-                f"Input of PipeBatch must be ListContent, got {input_stuff.stuff_name or 'unnamed'} = {type(input_content)}. stuff: {input_stuff}"
+                f"Input of PipeBatch must be ListContent, got {input_stuff.stuff_name or 'unnamed'} = {type(input_content)}. stuff: {input_stuff}",
             )
-        input_content = cast(ListContent[StuffContent], input_content)
+        input_content = cast("ListContent[StuffContent]", input_content)
 
         # TODO: Make commented code work when inputing images named "a.b.c"
         sub_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
         nb_history_items_limit = get_config().pipelex.tracker_config.applied_nb_items_limit
         batch_output_stuff_code = shortuuid.uuid()
-        tasks: List[Coroutine[Any, Any, PipeOutput]] = []
-        item_stuffs: List[Stuff] = []
-        required_stuff_lists: List[List[Stuff]] = []
-        branch_output_item_codes: List[str] = []
+        tasks: list[Coroutine[Any, Any, PipeOutput]] = []
+        item_stuffs: list[Stuff] = []
+        required_stuff_lists: list[list[Stuff]] = []
+        branch_output_item_codes: list[str] = []
 
         for branch_index, item in enumerate(input_content.items):
             branch_output_item_code = f"{batch_output_stuff_code}-branch-{branch_index}"
@@ -159,8 +160,8 @@ class PipeBatch(PipeController):
 
         pipe_outputs = await asyncio.gather(*tasks)
 
-        output_items: List[StuffContent] = []
-        output_stuffs: List[Stuff] = []
+        output_items: list[StuffContent] = []
+        output_stuffs: list[Stuff] = []
         output_stuff_code = shortuuid.uuid()[:5]
         for branch_index, pipe_output in enumerate(pipe_outputs):
             branch_output_stuff = pipe_output.main_stuff
@@ -180,7 +181,7 @@ class PipeBatch(PipeController):
             required_stuff_list,
             item_input_stuff,
             item_output_stuff,
-        ) in enumerate(zip(required_stuff_lists, item_stuffs, output_stuffs)):
+        ) in enumerate(zip(required_stuff_lists, item_stuffs, output_stuffs, strict=False)):
             get_pipeline_tracker().add_batch_step(
                 from_stuff=input_stuff,
                 to_stuff=item_input_stuff,
@@ -224,7 +225,7 @@ class PipeBatch(PipeController):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
     ) -> PipeOutput:
         """Run a pipe in batch mode for each item in the input list."""
         return await self._run_batch_pipe(
@@ -240,7 +241,7 @@ class PipeBatch(PipeController):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
     ) -> PipeOutput:
         """Dry run a pipe in batch mode for each item in the input list."""
         return await self._run_batch_pipe(

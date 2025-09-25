@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobReport
@@ -12,9 +11,9 @@ class ImgGenJobFactory:
     def make_img_gen_job_from_prompt(
         cls,
         img_gen_prompt: ImgGenPrompt,
-        img_gen_job_params: Optional[ImgGenJobParams] = None,
-        img_gen_job_config: Optional[ImgGenJobConfig] = None,
-        job_metadata: Optional[JobMetadata] = None,
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
+        job_metadata: JobMetadata | None = None,
     ) -> ImgGenJob:
         img_gen_config = get_config().cogt.img_gen_config
         job_metadata = job_metadata or JobMetadata(
@@ -36,9 +35,9 @@ class ImgGenJobFactory:
     def make_img_gen_job_from_prompt_contents(
         cls,
         positive_text: str,
-        img_gen_job_params: Optional[ImgGenJobParams] = None,
-        img_gen_job_config: Optional[ImgGenJobConfig] = None,
-        job_metadata: Optional[JobMetadata] = None,
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
+        job_metadata: JobMetadata | None = None,
     ) -> ImgGenJob:
         img_gen_config = get_config().cogt.img_gen_config
         job_metadata = job_metadata or JobMetadata(

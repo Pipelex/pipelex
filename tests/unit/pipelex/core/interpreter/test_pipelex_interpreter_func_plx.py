@@ -5,8 +5,6 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 
 
 class TestPipelexInterpreterFuncPLX:
-    """Test Func pipe to PLX string conversion."""
-
     @pytest.mark.parametrize(
         "pipe_name,blueprint,expected_plx",
         [
@@ -45,6 +43,5 @@ function_name = "transform_function\"""",
         ],
     )
     def test_func_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeFuncBlueprint, expected_plx: str):
-        """Test converting Func pipe blueprint to PLX string."""
         result = PipelexInterpreter.func_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

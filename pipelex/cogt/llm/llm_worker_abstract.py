@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Type
 
 from typing_extensions import override
 
@@ -14,13 +13,13 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     def __init__(
         self,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
-        """
-        Initialize the LLMWorker.
+        """Initialize the LLMWorker.
 
         Args:
             reporting_delegate (Optional[ReportingProtocol]): An optional report delegate for reporting unit jobs.
+
         """
         InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
 
@@ -89,7 +88,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     async def gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         log.debug(f"LLM Worker gen_object using {self.desc}")
         log.verbose(llm_job.llm_prompt.desc(), title="llm_prompt")
@@ -114,6 +113,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     async def _gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         pass

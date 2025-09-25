@@ -1,5 +1,3 @@
-"""PipeParallel test cases."""
-
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint

@@ -1,4 +1,3 @@
-from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -11,7 +10,7 @@ class PipeConditionPipeMap(BaseModel):
 class PipeConditionDetails(BaseModel):
     code: str
     test_expression: str
-    pipe_map: List[PipeConditionPipeMap]
-    default_pipe_code: Optional[str] = None
+    pipe_map: list[PipeConditionPipeMap]
+    default_pipe_code: str | None = None
     evaluated_expression: str
     chosen_pipe_code: str

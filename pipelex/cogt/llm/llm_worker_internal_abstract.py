@@ -1,4 +1,3 @@
-from typing import Optional
 
 from typing_extensions import override
 
@@ -15,16 +14,16 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     def __init__(
         self,
         inference_model: InferenceModelSpec,
-        structure_method: Optional[StructureMethod] = None,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        structure_method: StructureMethod | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
-        """
-        Initialize the LLMWorker.
+        """Initialize the LLMWorker.
 
         Args:
             inference_model (InferenceModelSpec): The inference model to be used by the worker.
             structure_method (Optional[StructureMethod]): The structure method to be used by the worker.
             reporting_delegate (Optional[ReportingProtocol]): An optional report delegate for reporting unit jobs.
+
         """
         LLMWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
         self.inference_model = inference_model

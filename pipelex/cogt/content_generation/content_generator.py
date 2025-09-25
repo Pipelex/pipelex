@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Type, cast
+from typing import Any, cast
 
 from typing_extensions import override
 
@@ -60,7 +60,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_object_direct(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar:
@@ -76,18 +76,18 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         obj = await llm_gen_object(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object direct: {obj}")
-        return cast(BaseModelTypeVar, obj)
+        return cast("BaseModelTypeVar", obj)
 
     @override
     @update_job_metadata
     async def make_text_then_object(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_main: LLMSetting,
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object: Optional[LLMPromptFactoryAbstract] = None,
+        llm_prompt_factory_for_object: LLMPromptFactoryAbstract | None = None,
     ) -> BaseModelTypeVar:
         log.verbose(llm_prompt_for_text.user_text, title="llm_prompt_for_text")
         llm_assignment_for_text = LLMAssignment.make_from_prompt(
@@ -123,18 +123,18 @@ class ContentGenerator(ContentGeneratorProtocol):
 
         obj = await llm_gen_object(object_assignment=fup_obj_assignment)
         log.verbose(f"{self.__class__.__name__} generated object after text: {obj}")
-        return cast(BaseModelTypeVar, obj)
+        return cast("BaseModelTypeVar", obj)
 
     @override
     @update_job_metadata
     async def make_object_list_direct(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
-        nb_items: Optional[int] = None,
-    ) -> List[BaseModelTypeVar]:
+        nb_items: int | None = None,
+    ) -> list[BaseModelTypeVar]:
         llm_assignment_for_object = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
             llm_setting=llm_setting_for_object_list,
@@ -146,20 +146,20 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         obj_list = await llm_gen_object_list(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object list direct: {obj_list}")
-        return cast(List[BaseModelTypeVar], obj_list)
+        return cast("list[BaseModelTypeVar]", obj_list)
 
     @override
     @update_job_metadata
     async def make_text_then_object_list(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_main: LLMSetting,
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object_list: Optional[LLMPromptFactoryAbstract] = None,
-        nb_items: Optional[int] = None,
-    ) -> List[BaseModelTypeVar]:
+        llm_prompt_factory_for_object_list: LLMPromptFactoryAbstract | None = None,
+        nb_items: int | None = None,
+    ) -> list[BaseModelTypeVar]:
         llm_assignment_for_text = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
             llm_setting=llm_setting_main,
@@ -192,7 +192,7 @@ class ContentGenerator(ContentGeneratorProtocol):
 
         obj_list = await llm_gen_object_list(object_assignment=fup_obj_assignment)
         log.verbose(f"{self.__class__.__name__} generated object list after text: {obj_list}")
-        return cast(List[BaseModelTypeVar], obj_list)
+        return cast("list[BaseModelTypeVar]", obj_list)
 
     @override
     @update_job_metadata
@@ -201,8 +201,8 @@ class ContentGenerator(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
-        img_gen_job_params: Optional[ImgGenJobParams] = None,
-        img_gen_job_config: Optional[ImgGenJobConfig] = None,
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> GeneratedImage:
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_assignment = ImgGenAssignment(
@@ -225,9 +225,9 @@ class ContentGenerator(ContentGeneratorProtocol):
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
         nb_images: int,
-        img_gen_job_params: Optional[ImgGenJobParams] = None,
-        img_gen_job_config: Optional[ImgGenJobConfig] = None,
-    ) -> List[GeneratedImage]:
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
+    ) -> list[GeneratedImage]:
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
@@ -244,10 +244,10 @@ class ContentGenerator(ContentGeneratorProtocol):
     @override
     async def make_jinja2_text(
         self,
-        context: Dict[str, Any],
-        jinja2_name: Optional[str] = None,
-        jinja2: Optional[str] = None,
-        prompting_style: Optional[PromptingStyle] = None,
+        context: dict[str, Any],
+        jinja2_name: str | None = None,
+        jinja2: str | None = None,
+        prompting_style: PromptingStyle | None = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
     ) -> str:
         jinja2_assignment = Jinja2Assignment(
@@ -267,8 +267,8 @@ class ContentGenerator(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         ocr_input: OcrInput,
         ocr_handle: str,
-        ocr_job_params: Optional[OcrJobParams] = None,
-        ocr_job_config: Optional[OcrJobConfig] = None,
+        ocr_job_params: OcrJobParams | None = None,
+        ocr_job_config: OcrJobConfig | None = None,
     ) -> OcrOutput:
         ocr_assignment = OcrAssignment(
             job_metadata=job_metadata,

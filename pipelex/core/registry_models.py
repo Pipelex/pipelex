@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, List
+from typing import Any, ClassVar
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstractType
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
@@ -38,9 +38,9 @@ from pipelex.tools.registry_models import ModelType, RegistryModels
 
 
 class PipelexRegistryModels(RegistryModels):
-    FIELD_EXTRACTION: ClassVar[List[ModelType]] = []
+    FIELD_EXTRACTION: ClassVar[list[ModelType]] = []
 
-    PIPE_OPERATORS: ClassVar[List[PipeAbstractType]] = [
+    PIPE_OPERATORS: ClassVar[list[PipeAbstractType]] = [
         PipeFunc,
         PipeImgGen,
         PipeJinja2,
@@ -48,7 +48,7 @@ class PipelexRegistryModels(RegistryModels):
         PipeOcr,
     ]
 
-    PIPE_OPERATORS_FACTORY: ClassVar[List[PipeFactoryProtocol[Any, Any]]] = [
+    PIPE_OPERATORS_FACTORY: ClassVar[list[PipeFactoryProtocol[Any, Any]]] = [
         PipeFuncFactory,
         PipeImgGenFactory,
         PipeJinja2Factory,
@@ -56,21 +56,21 @@ class PipelexRegistryModels(RegistryModels):
         PipeOcrFactory,
     ]
 
-    PIPE_CONTROLLERS: ClassVar[List[PipeAbstractType]] = [
+    PIPE_CONTROLLERS: ClassVar[list[PipeAbstractType]] = [
         PipeBatch,
         PipeCondition,
         PipeParallel,
         PipeSequence,
     ]
 
-    PIPE_CONTROLLERS_FACTORY: ClassVar[List[PipeFactoryProtocol[Any, Any]]] = [
+    PIPE_CONTROLLERS_FACTORY: ClassVar[list[PipeFactoryProtocol[Any, Any]]] = [
         PipeBatchFactory,
         PipeConditionFactory,
         PipeParallelFactory,
         PipeSequenceFactory,
     ]
 
-    STUFF: ClassVar[List[ModelType]] = [
+    STUFF: ClassVar[list[ModelType]] = [
         TextContent,
         NumberContent,
         ImageContent,
@@ -84,6 +84,6 @@ class PipelexRegistryModels(RegistryModels):
         PageContent,
     ]
 
-    EXPERIMENTAL: ClassVar[List[ModelType]] = [
+    EXPERIMENTAL: ClassVar[list[ModelType]] = [
         DynamicContent,
     ]

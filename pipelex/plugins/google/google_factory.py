@@ -1,5 +1,4 @@
 import asyncio
-from typing import List, Optional
 
 from google import genai
 from google.genai import types as genai_types
@@ -38,24 +37,22 @@ class GoogleFactory:
             image_bytes = prompt_image.get_decoded_bytes()
             mime_type = prompt_image.get_mime_type()
             return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        elif isinstance(prompt_image, PromptImagePath):
+        if isinstance(prompt_image, PromptImagePath):
             image_bytes = await load_binary_async(prompt_image.file_path)
             mime_type = prompt_image.get_mime_type()
             return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        elif isinstance(prompt_image, PromptImageUrl):
+        if isinstance(prompt_image, PromptImageUrl):
             prompt_image_binary = await PromptImageFactory.make_promptimagebinary_from_url_async(prompt_image)
             image_bytes = prompt_image_binary.binary
             mime_type = prompt_image_binary.get_mime_type()
             return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        else:
-            raise GoogleFactoryError(f"Unsupported PromptImage type: '{type(prompt_image).__name__}'")
+        raise GoogleFactoryError(f"Unsupported PromptImage type: '{type(prompt_image).__name__}'")
 
     @classmethod
     async def prepare_user_contents(cls, llm_prompt: LLMPrompt) -> genai_types.ContentListUnion:
         """Prepare contents for Google genai API."""
-
         # Build list of parts for multimodal content
-        parts: List[genai_types.Part] = []
+        parts: list[genai_types.Part] = []
 
         # Add text content if present
         if llm_prompt.user_text:
@@ -71,7 +68,7 @@ class GoogleFactory:
         return genai_types.Content(parts=parts, role="user")
 
     @classmethod
-    def extract_token_usage(cls, usage_metadata: Optional[genai_types.GenerateContentResponseUsageMetadata]) -> NbTokensByCategoryDict:
+    def extract_token_usage(cls, usage_metadata: genai_types.GenerateContentResponseUsageMetadata | None) -> NbTokensByCategoryDict:
         """Extract token usage from Google's usage metadata."""
         if not usage_metadata:
             return {}

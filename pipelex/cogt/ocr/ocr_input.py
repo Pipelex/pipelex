@@ -1,7 +1,6 @@
-from typing import Optional
+from typing import Self
 
 from pydantic import BaseModel, model_validator
-from typing_extensions import Self
 
 from pipelex.cogt.exceptions import CogtError
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
@@ -12,8 +11,8 @@ class OcrInputError(CogtError):
 
 
 class OcrInput(BaseModel):
-    image_uri: Optional[str] = None
-    pdf_uri: Optional[str] = None
+    image_uri: str | None = None
+    pdf_uri: str | None = None
 
     @model_validator(mode="after")
     def validate_at_exactly_one_input(self) -> Self:

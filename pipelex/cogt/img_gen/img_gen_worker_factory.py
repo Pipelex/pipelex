@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pipelex.cogt.exceptions import CogtError, MissingDependencyError
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
@@ -17,7 +16,7 @@ class ImgGenWorkerFactory:
     def make_img_gen_worker(
         self,
         inference_model: InferenceModelSpec,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ) -> ImgGenWorkerAbstract:
         plugin = Plugin.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
@@ -31,13 +30,13 @@ class ImgGenWorkerFactory:
                     raise FalCredentialsError("FAL_API_KEY not found") from exc
 
                 try:
-                    from fal_client import AsyncClient as FalAsyncClient
+                    from fal_client import AsyncClient as FalAsyncClient  # pylint: disable=import-outside-toplevel
                 except ImportError as exc:
                     raise MissingDependencyError(
-                        "fal-client", "fal", "The fal-client SDK is required to use FAL models (generation of images)."
+                        "fal-client", "fal", "The fal-client SDK is required to use FAL models (generation of images).",
                     ) from exc
 
-                from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker
+                from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker  # pylint: disable=import-outside-toplevel
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -50,8 +49,8 @@ class ImgGenWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case "openai":
-                from pipelex.plugins.openai.openai_factory import OpenAIFactory
-                from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker
+                from pipelex.plugins.openai.openai_factory import OpenAIFactory  # pylint: disable=import-outside-toplevel
+                from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # pylint: disable=import-outside-toplevel
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,

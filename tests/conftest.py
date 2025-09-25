@@ -40,7 +40,7 @@ def reset_pipelex_config_fixture():
 @pytest.fixture(scope="function", autouse=True)
 def pretty():
     # Code to run before each test
-    yield
+    return
     # Code to run after each test
 
 

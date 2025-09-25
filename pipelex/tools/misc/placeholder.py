@@ -1,4 +1,3 @@
-from typing import Optional
 
 PLACEHOLDER_PREFIX = "placeholder"
 
@@ -11,11 +10,12 @@ def make_placeholder_value(key: str) -> str:
 
     Returns:
         A placeholder value in the format "placeholder-for-{key}"
+
     """
     return f"{PLACEHOLDER_PREFIX}-for-{key}"
 
 
-def value_is_placeholder(value: Optional[str]) -> bool:
+def value_is_placeholder(value: str | None) -> bool:
     """Check if a value is a placeholder based on the prefix.
 
     Args:
@@ -23,5 +23,6 @@ def value_is_placeholder(value: Optional[str]) -> bool:
 
     Returns:
         True if the value starts with the placeholder prefix, False otherwise
+
     """
     return value is not None and value.startswith(PLACEHOLDER_PREFIX)

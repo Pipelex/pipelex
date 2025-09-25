@@ -1,4 +1,4 @@
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import Field
 from typing_extensions import override
@@ -16,14 +16,14 @@ class PromptingStyleSpec(StructuredContent):
 
 
 class Jinja2Spec(StructuredContent):
-    jinja2_name: Optional[str] = Field(default=None, description="Name of the Jinja2 template to use")
-    jinja2: Optional[str] = Field(default=None, description="Raw Jinja2 template string")
-    prompting_style: Optional[PromptingStyleSpec] = Field(default=None, description="Style of prompting to use (typically for different LLMs)")
+    jinja2_name: str | None = Field(default=None, description="Name of the Jinja2 template to use")
+    jinja2: str | None = Field(default=None, description="Raw Jinja2 template string")
+    prompting_style: PromptingStyleSpec | None = Field(default=None, description="Style of prompting to use (typically for different LLMs)")
     template_category: Jinja2TemplateCategory = Field(
         default=Jinja2TemplateCategory.LLM_PROMPT,
         description="Category of the template (could also be HTML, MARKDOWN, MERMAID, etc.), influences Jinja2 rendering environment config",
     )
-    extra_context: Optional[Dict[str, Any]] = Field(default=None, description="Additional context variables for template rendering")
+    extra_context: dict[str, Any] | None = Field(default=None, description="Additional context variables for template rendering")
 
 
 class PipeJinja2Spec(PipeSpec, Jinja2Spec):

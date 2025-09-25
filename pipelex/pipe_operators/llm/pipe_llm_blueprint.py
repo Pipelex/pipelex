@@ -1,7 +1,6 @@
-from typing import Literal, Optional
+from typing import Literal, Self
 
 from pydantic import field_validator, model_validator
-from typing_extensions import Self
 
 from pipelex.cogt.llm.llm_setting import LLMChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -18,28 +17,28 @@ class StructuringMethod(StrEnum):
 class PipeLLMBlueprint(PipeBlueprint):
     type: Literal["PipeLLM"] = "PipeLLM"
     category: Literal["PipeOperator"] = "PipeOperator"
-    system_prompt_template: Optional[str] = None
-    system_prompt_template_name: Optional[str] = None
-    system_prompt_name: Optional[str] = None
-    system_prompt: Optional[str] = None
+    system_prompt_template: str | None = None
+    system_prompt_template_name: str | None = None
+    system_prompt_name: str | None = None
+    system_prompt: str | None = None
 
-    prompt_template: Optional[str] = None
-    template_name: Optional[str] = None
-    prompt_name: Optional[str] = None
-    prompt: Optional[str] = None
+    prompt_template: str | None = None
+    template_name: str | None = None
+    prompt_name: str | None = None
+    prompt: str | None = None
 
-    llm: Optional[LLMChoice] = None
-    llm_to_structure: Optional[LLMChoice] = None
+    llm: LLMChoice | None = None
+    llm_to_structure: LLMChoice | None = None
 
-    structuring_method: Optional[StructuringMethod] = None
-    prompt_template_to_structure: Optional[str] = None
-    system_prompt_to_structure: Optional[str] = None
+    structuring_method: StructuringMethod | None = None
+    prompt_template_to_structure: str | None = None
+    system_prompt_to_structure: str | None = None
 
-    nb_output: Optional[int] = None
-    multiple_output: Optional[bool] = None
+    nb_output: int | None = None
+    multiple_output: bool | None = None
 
     @field_validator("nb_output", mode="after")
-    def validate_nb_output(cls, value: Optional[int] = None) -> Optional[int]:
+    def validate_nb_output(cls, value: int | None = None) -> int | None:
         if value and value < 1:
             raise PipeDefinitionError("PipeLLMBlueprint nb_output must be greater than 0")
         return value

@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -39,30 +39,30 @@ class Background(StrEnum):
 class ImgGenJobParams(BaseModel):
     aspect_ratio: AspectRatio = Field(strict=False)
     background: Background = Field(strict=False)
-    quality: Optional[Quality] = Field(default=None, strict=False)
-    nb_steps: Optional[int] = Field(default=None, gt=0)
-    guidance_scale: Optional[float] = Field(default=None, gt=0)
+    quality: Quality | None = Field(default=None, strict=False)
+    nb_steps: int | None = Field(default=None, gt=0)
+    guidance_scale: float | None = Field(default=None, gt=0)
     is_moderated: bool = False
-    safety_tolerance: Optional[int] = Field(default=None, ge=1, le=6)
+    safety_tolerance: int | None = Field(default=None, ge=1, le=6)
     is_raw: bool
     output_format: OutputFormat = Field(strict=False)
-    seed: Optional[int] = Field(None, ge=0)
+    seed: int | None = Field(None, ge=0)
 
 
 class ImgGenJobParamsDefaults(ConfigModel):
     aspect_ratio: AspectRatio = Field(strict=False)
     background: Background = Field(strict=False)
-    quality: Optional[Quality] = Field(default=None, strict=False)
-    nb_steps: Optional[int] = Field(default=None, gt=0)
+    quality: Quality | None = Field(default=None, strict=False)
+    nb_steps: int | None = Field(default=None, gt=0)
     guidance_scale: float = Field(..., gt=0)
     is_moderated: bool
     safety_tolerance: int = Field(..., ge=1, le=6)
     is_raw: bool
     output_format: OutputFormat = Field(strict=False)
-    seed: Union[int, Literal["auto"]]
+    seed: int | Literal["auto"]
 
     def make_img_gen_job_params(self) -> ImgGenJobParams:
-        seed: Optional[int]
+        seed: int | None
         if isinstance(self.seed, str) and self.seed == "auto":
             seed = None
         else:

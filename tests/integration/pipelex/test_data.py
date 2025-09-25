@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Optional, Tuple, Type
+from typing import ClassVar, Optional
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
@@ -71,7 +71,7 @@ class PipeTestCases:
             items=[
                 TextContent(text="The quick brown fox jumps over the lazy dog"),
                 ImageContent(url=URL_IMG_GANTT_1),
-            ]
+            ],
         ),
     )
 
@@ -90,7 +90,7 @@ class PipeTestCases:
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
         name="stuff_with_image_in_sub_object",
     )
-    STUFFS_IMAGE_ATTRIBUTES: ClassVar[List[Tuple[Stuff, List[str]]]] = [  # stuff, attribute_paths
+    STUFFS_IMAGE_ATTRIBUTES: ClassVar[list[tuple[Stuff, list[str]]]] = [  # stuff, attribute_paths
         (STUFF_WITH_IMAGE_ATTRIBUTE, ["stuff_with_image.image_attribute"]),
         (
             STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
@@ -113,14 +113,14 @@ class PipeTestCases:
         concept_string="answer.Question",
         content=USER_TEXT_TRICKY_2,
     )
-    BLUEPRINT_AND_PIPE: ClassVar[List[Tuple[str, StuffBlueprint, str]]] = [  # topic, blueprint, pipe
+    BLUEPRINT_AND_PIPE: ClassVar[list[tuple[str, StuffBlueprint, str]]] = [  # topic, blueprint, pipe
         (
             "Tricky question conclude",
             TRICKY_QUESTION_BLUEPRINT,
             "conclude_tricky_question_by_steps",
         ),
     ]
-    NO_INPUT: ClassVar[List[Tuple[str, str]]] = [  # topic, pipe
+    NO_INPUT: ClassVar[list[tuple[str, str]]] = [  # topic, pipe
         (
             "Test with no input",
             "test_no_input",
@@ -130,7 +130,7 @@ class PipeTestCases:
             "test_no_input_that_could_be_long",
         ),
     ]
-    NO_INPUT_PARALLEL1: ClassVar[List[Tuple[str, str, Optional[PipeOutputMultiplicity]]]] = [  # topic, pipe, multiplicity
+    NO_INPUT_PARALLEL1: ClassVar[list[tuple[str, str, PipeOutputMultiplicity | None]]] = [  # topic, pipe, multiplicity
         (
             "Nature colors painting",
             "choose_colors",
@@ -148,7 +148,7 @@ class PipeTestCases:
         ),
     ]
 
-    STUFF_AND_PIPE: ClassVar[List[Tuple[str, Stuff, str]]] = [  # topic, stuff, pipe_code
+    STUFF_AND_PIPE: ClassVar[list[tuple[str, Stuff, str]]] = [  # topic, stuff, pipe_code
         (
             "Process Simple Image",
             SIMPLE_STUFF_IMAGE,
@@ -160,7 +160,7 @@ class PipeTestCases:
             "ocr_page_contents_from_pdf",
         ),
     ]
-    FAILURE_PIPES: ClassVar[List[Tuple[str, Type[Exception], str]]] = [
+    FAILURE_PIPES: ClassVar[list[tuple[str, type[Exception], str]]] = [
         (
             "infinite_loop_1",
             PipeStackOverflowError,
@@ -170,7 +170,7 @@ class PipeTestCases:
 
 
 class LibraryTestCases:
-    KNOWN_CONCEPTS_AND_PIPES: ClassVar[List[Tuple[str, str]]] = [  # concept, pipe
+    KNOWN_CONCEPTS_AND_PIPES: ClassVar[list[tuple[str, str]]] = [  # concept, pipe
         ("cars.CarDescription", "generate_car_description"),
         ("animals.AnimalDescription", "generate_animal_description"),
         ("flowers.FlowerDescription", "generate_flower_description"),
@@ -178,11 +178,11 @@ class LibraryTestCases:
 
 
 class PipeOcrTestCases:
-    PIPE_OCR_IMAGE_TEST_CASES: ClassVar[List[str]] = [
+    PIPE_OCR_IMAGE_TEST_CASES: ClassVar[list[str]] = [
         ImageTestCases.IMAGE_FILE_PATH_PNG,
         ImageTestCases.IMAGE_URL_PNG,
     ]
-    PIPE_OCR_PDF_TEST_CASES: ClassVar[List[str]] = PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS
+    PIPE_OCR_PDF_TEST_CASES: ClassVar[list[str]] = PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS
 
 
 class ImageGenTestCases:
@@ -192,7 +192,7 @@ class ImageGenTestCases:
 Woman typing on a laptop. On the laptop screen you see python code to generate code to write a prompt for an AI model.
 """
 
-    IMAGE_DESC: ClassVar[List[Tuple[str, str]]] = [  # topic, img_gen_prompt_text
+    IMAGE_DESC: ClassVar[list[tuple[str, str]]] = [  # topic, img_gen_prompt_text
         # (IMG_GEN_PROMPT_1, IMG_GEN_PROMPT_1),
         # (IMG_GEN_PROMPT_2, IMG_GEN_PROMPT_2),
         # (IMG_GEN_PROMPT_3, IMG_GEN_PROMPT_3),
@@ -305,7 +305,7 @@ Extract information from the following text:
     """
 
     # Combined test cases for parametrized tests
-    STRUCTURE_TEST_CASES: ClassVar[List[Tuple[str, str, str]]] = [  # topic, data, concept
+    STRUCTURE_TEST_CASES: ClassVar[list[tuple[str, str, str]]] = [  # topic, data, concept
         ("Simple structure basic", SIMPLE_STRUCTURE_1, "ConceptWithSimpleStructure"),
         ("Simple structure narrative", SIMPLE_STRUCTURE_2, "ConceptWithSimpleStructure"),
         ("Optionals all present", OPTIONAL_ALL_PRESENT, "ConceptWithOptionals"),
@@ -430,7 +430,7 @@ Extract information from the following text:
     """
 
     # Combined test cases for parametrized tests
-    STRUCTURE_TEST_CASES: ClassVar[List[Tuple[str, str, str]]] = [  # topic, data, concept
+    STRUCTURE_TEST_CASES: ClassVar[list[tuple[str, str, str]]] = [  # topic, data, concept
         ("Dicts with data", DICTS_WITH_DATA, "ConceptWithDicts"),
         ("Dicts empty", DICTS_EMPTY, "ConceptWithDicts"),
         ("Unions string variant", UNIONS_STRING_VARIANT, "ConceptWithUnions"),

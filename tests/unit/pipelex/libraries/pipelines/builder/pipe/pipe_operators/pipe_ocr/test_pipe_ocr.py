@@ -8,14 +8,13 @@ from .test_data import PipeOcrTestCases
 
 class TestPipeOcrBlueprintConversion:
     @pytest.mark.parametrize(
-        "test_name,pipe_spec,domain,expected_blueprint",
+        "test_name,pipe_spec,expected_blueprint",
         PipeOcrTestCases.TEST_CASES,
     )
     def test_pipe_ocr_spec_to_blueprint(
         self,
-        test_name: str,
+        _: str,
         pipe_spec: PipeOcrSpec,
-        domain: str,
         expected_blueprint: PipeOcrBlueprint,
     ):
         result = pipe_spec.to_blueprint()

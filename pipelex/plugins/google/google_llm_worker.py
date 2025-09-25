@@ -1,4 +1,4 @@
-from typing import Optional, Type, cast
+from typing import cast
 
 import instructor
 from google import genai
@@ -21,7 +21,6 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 class GoogleLLMWorkerError(Exception):
     """Base exception for Google LLM Worker errors."""
 
-    pass
 
 
 class GoogleLLMWorker(LLMWorkerInternalAbstract):
@@ -29,8 +28,8 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         self,
         sdk_instance: genai.Client,
         inference_model: InferenceModelSpec,
-        structure_method: Optional[StructureMethod] = None,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        structure_method: StructureMethod | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         super().__init__(
             inference_model=inference_model,
@@ -96,7 +95,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         """Generate structured output using Google Gemini API with instructor."""
         # Prepare contents (text and images)
@@ -111,7 +110,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         )
 
         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-            messages=[cast(ChatCompletionMessageParam, contents)],
+            messages=[cast("ChatCompletionMessageParam", contents)],
             response_model=schema,
             max_retries=llm_job.job_config.max_retries,
             model=self.inference_model.model_id,

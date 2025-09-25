@@ -59,7 +59,7 @@ def do_migrate(
             base_for_print = pipelines_dir_or_file if pipelines_dir_or_file.is_dir() else pipelines_dir_or_file.parent
             for file_path in result.modified_files:
                 try:
-                    with open(file_path, "r", encoding="utf-8") as f:
+                    with open(file_path, encoding="utf-8") as f:
                         content = f.read()
 
                     changes = migrator.get_migration_preview(content)

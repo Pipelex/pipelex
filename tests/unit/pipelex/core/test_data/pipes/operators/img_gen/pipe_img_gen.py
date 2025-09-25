@@ -1,5 +1,3 @@
-"""PipeImgGen test cases."""
-
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from mistralai import Mistral
 from typing_extensions import override
@@ -22,9 +22,9 @@ class MistralOcrWorker(OcrWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        extra_config: Dict[str, Any],
+        extra_config: dict[str, Any],
         inference_model: InferenceModelSpec,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         super().__init__(
             extra_config=extra_config,
@@ -72,11 +72,10 @@ class MistralOcrWorker(OcrWorkerAbstract):
             return await self.extract_from_image_url(
                 image_url=image_url,
             )
-        else:
-            assert image_path is not None  # Type narrowing for mypy
-            return await self.extract_from_image_file(
-                image_path=image_path,
-            )
+        assert image_path is not None  # Type narrowing for mypy
+        return await self.extract_from_image_file(
+            image_path=image_path,
+        )
 
     async def _make_ocr_output_from_pdf(
         self,

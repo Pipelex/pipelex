@@ -3,7 +3,8 @@
 import re
 import shutil
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Match
+from re import Match
+from typing import Any, ClassVar
 
 from pipelex.migration.migration_result import MigrationResult
 
@@ -36,7 +37,7 @@ class TOMLMigrator:
             re.MULTILINE,
         )
 
-    def find_toml_files(self, directory: Path) -> List[Path]:
+    def find_toml_files(self, directory: Path) -> list[Path]:
         """Find all TOML files in directory and subdirectories."""
         if not directory.exists():
             raise FileNotFoundError(f"Directory not found: {directory}")
@@ -71,9 +72,9 @@ class TOMLMigrator:
 
         return False
 
-    def get_migration_preview(self, content: str) -> List[Dict[str, Any]]:
+    def get_migration_preview(self, content: str) -> list[dict[str, Any]]:
         """Get preview of changes that would be made."""
-        changes: List[Dict[str, Any]] = []
+        changes: list[dict[str, Any]] = []
 
         # Handle concept migrations
         concept_matches = list(self.concept_pattern.finditer(content))
@@ -117,26 +118,24 @@ class TOMLMigrator:
             if self._is_line_inside_multiline_string(content, match.start()):
                 # Return the original text unchanged
                 return match.group(0)
-            else:
-                # Apply the normal replacement: Concept = -> definition =
-                return f"{match.group(1)}definition{match.group(3)}{match.group(4)}"
+            # Apply the normal replacement: Concept = -> definition =
+            return f"{match.group(1)}definition{match.group(3)}{match.group(4)}"
 
         def pipe_replacement_function(match: Match[str]) -> str:
             # Check if this match is inside a multiline string
             if self._is_line_inside_multiline_string(content, match.start()):
                 # Return the original text unchanged
                 return match.group(0)
-            else:
-                # Apply pipe replacement: PipeClassName = "desc" -> type = "PipeClassName"\ndefinition = "desc"
-                leading_whitespace = match.group(1)
-                pipe_class_name = match.group(2)
-                definition_value = match.group(4)
-                trailing_whitespace = match.group(5)
+            # Apply pipe replacement: PipeClassName = "desc" -> type = "PipeClassName"\ndefinition = "desc"
+            leading_whitespace = match.group(1)
+            pipe_class_name = match.group(2)
+            definition_value = match.group(4)
+            trailing_whitespace = match.group(5)
 
-                type_line = f'{leading_whitespace}type = "{pipe_class_name}"'
-                definition_line = f"{leading_whitespace}definition = {definition_value}"
+            type_line = f'{leading_whitespace}type = "{pipe_class_name}"'
+            definition_line = f"{leading_whitespace}definition = {definition_value}"
 
-                return f"{type_line}\n{definition_line}{trailing_whitespace}"
+            return f"{type_line}\n{definition_line}{trailing_whitespace}"
 
         # Apply concept migrations first
         migrated_content = self.concept_pattern.sub(concept_replacement_function, content)
@@ -146,17 +145,17 @@ class TOMLMigrator:
         return migrated_content
 
     def migrate_file(self, file_path: Path, create_backup: bool = True) -> int:
-        """
-        Migrate a single file from old to new syntax.
+        """Migrate a single file from old to new syntax.
 
         Returns:
             Number of changes made in the file
+
         """
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 original_content = f.read()
         except Exception as e:
-            raise IOError(f"Failed to read file {file_path}: {e}")
+            raise OSError(f"Failed to read file {file_path}: {e}")
 
         if not self.needs_migration(original_content):
             return 0
@@ -175,19 +174,18 @@ class TOMLMigrator:
             try:
                 shutil.copy2(file_path, backup_path)
             except Exception as e:
-                raise IOError(f"Failed to create backup for {file_path}: {e}")
+                raise OSError(f"Failed to create backup for {file_path}: {e}")
 
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(migrated_content)
         except Exception as e:
-            raise IOError(f"Failed to write migrated content to {file_path}: {e}")
+            raise OSError(f"Failed to write migrated content to {file_path}: {e}")
 
         return changes_count
 
     def migrate_directory(self, directory: Path, create_backups: bool = True, dry_run: bool = False) -> MigrationResult:
-        """
-        Migrate all TOML files in a directory.
+        """Migrate all TOML files in a directory.
 
         Args:
             directory: Directory containing TOML files
@@ -196,17 +194,18 @@ class TOMLMigrator:
 
         Returns:
             MigrationResult with statistics and details
+
         """
         toml_files = self.find_toml_files(directory)
         files_processed = len(toml_files)
         files_modified = 0
         total_changes = 0
-        modified_files: List[Path] = []
-        errors: List[str] = []
+        modified_files: list[Path] = []
+        errors: list[str] = []
 
         for toml_file in toml_files:
             try:
-                with open(toml_file, "r", encoding="utf-8") as f:
+                with open(toml_file, encoding="utf-8") as f:
                     content = f.read()
 
                 if not self.needs_migration(content):
@@ -244,8 +243,7 @@ class TOMLMigrator:
 
 
 def migrate_concept_syntax(directory: Path, create_backups: bool = True, dry_run: bool = False) -> MigrationResult:
-    """
-    Convenience function to migrate TOML files from Concept = to definition = syntax.
+    """Convenience function to migrate TOML files from Concept = to definition = syntax.
 
     This function accepts either a directory (the historical behavior) or a path to a single TOML file.
 
@@ -256,6 +254,7 @@ def migrate_concept_syntax(directory: Path, create_backups: bool = True, dry_run
 
     Returns:
         MigrationResult with migration statistics
+
     """
     migrator = TOMLMigrator()
 
@@ -270,7 +269,7 @@ def migrate_concept_syntax(directory: Path, create_backups: bool = True, dry_run
             return result
 
         try:
-            with open(input_path, "r", encoding="utf-8") as f:
+            with open(input_path, encoding="utf-8") as f:
                 content = f.read()
         except Exception as e:
             result.errors.append(f"Failed to read file {input_path}: {e}")

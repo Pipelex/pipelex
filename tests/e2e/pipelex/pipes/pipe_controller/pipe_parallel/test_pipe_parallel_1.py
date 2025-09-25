@@ -78,8 +78,8 @@ class TestPipeParallelDocumentAnalysis:
         assert hasattr(combined_analysis, "content_result")
 
         # Verify that both analyses contain meaningful content
-        length_analysis = cast(LengthAnalysis, length_result_stuff.content)
-        content_analysis = cast(ContentAnalysis, content_result_stuff.content)
+        length_analysis = cast("LengthAnalysis", length_result_stuff.content)
+        content_analysis = cast("ContentAnalysis", content_result_stuff.content)
 
         assert isinstance(length_analysis.analysis, str)
         assert isinstance(content_analysis.analysis, str)

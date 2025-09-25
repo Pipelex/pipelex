@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import ClassVar, List, Optional, Type
+from typing import ClassVar
 
 from pydantic import ValidationError
 from typing_extensions import override
@@ -42,7 +42,7 @@ class LibraryComponent(StrEnum):
     PIPE = "pipe"
 
     @property
-    def error_class(self) -> Type[LibraryError]:
+    def error_class(self) -> type[LibraryError]:
         match self:
             case LibraryComponent.CONCEPT:
                 return ConceptLibraryError
@@ -51,7 +51,7 @@ class LibraryComponent(StrEnum):
 
 
 class LibraryManager(LibraryManagerAbstract):
-    allowed_root_attributes: ClassVar[List[str]] = [
+    allowed_root_attributes: ClassVar[list[str]] = [
         "domain",
         "definition",
         "system_prompt",
@@ -108,17 +108,16 @@ class LibraryManager(LibraryManagerAbstract):
         self.teardown()
         self.setup()
 
-    def _get_pipeline_library_dirs(self) -> List[Path]:
+    def _get_pipeline_library_dirs(self) -> list[Path]:
         library_dirs = [Path(self.library_config.pipelines_dir_path)]
         if runtime_manager.is_unit_testing:
             log.debug("Registering test pipeline structures for unit testing")
             library_dirs += [Path(self.library_config.test_pipelines_dir_path)]
         return library_dirs
 
-    def _get_pipelex_plx_files_from_dirs(self, dirs: List[Path]) -> List[Path]:
+    def _get_pipelex_plx_files_from_dirs(self, dirs: list[Path]) -> list[Path]:
         """Get all valid Pipelex PLX files from the given directories."""
-
-        all_plx_paths: List[Path] = []
+        all_plx_paths: list[Path] = []
         for dir_path in dirs:
             if not dir_path.exists():
                 raise LibraryError(f"Directory does not exist: {dir_path}")
@@ -149,7 +148,7 @@ class LibraryManager(LibraryManagerAbstract):
         self.load_from_blueprint(blueprint)
 
     @override
-    def load_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[PipeAbstract]:
+    def load_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> list[PipeAbstract]:
         """Load a blueprint."""
         # Create and load domain
         domain = self._load_domain_from_blueprint(blueprint)
@@ -188,11 +187,11 @@ class LibraryManager(LibraryManagerAbstract):
                 system_prompt=blueprint.system_prompt,
                 system_prompt_to_structure=blueprint.system_prompt_to_structure,
                 prompt_template_to_structure=blueprint.prompt_template_to_structure,
-            )
+            ),
         )
 
-    def _load_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[Concept]:
-        concepts: List[Concept] = []
+    def _load_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> list[Concept]:
+        concepts: list[Concept] = []
 
         if blueprint.concept is not None:
             for concept_code, concept_blueprint_or_str in blueprint.concept.items():
@@ -207,8 +206,8 @@ class LibraryManager(LibraryManagerAbstract):
                 concepts.append(concept)
         return concepts
 
-    def _load_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[PipeAbstract]:
-        pipes: List[PipeAbstract] = []
+    def _load_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> list[PipeAbstract]:
+        pipes: list[PipeAbstract] = []
         if blueprint.pipe is not None:
             for pipe_name, pipe_blueprint in blueprint.pipe.items():
                 pipe = PipeFactory.make_from_blueprint(
@@ -223,11 +222,11 @@ class LibraryManager(LibraryManagerAbstract):
     @override
     def load_libraries(
         self,
-        library_dirs: Optional[List[Path]] = None,
-        library_file_paths: Optional[List[Path]] = None,
+        library_dirs: list[Path] | None = None,
+        library_file_paths: list[Path] | None = None,
     ) -> None:
-        dirs_to_use: List[Path] = self._get_pipeline_library_dirs()
-        all_plx_paths: List[Path] = self._get_pipelex_plx_files_from_dirs(dirs_to_use)
+        dirs_to_use: list[Path] = self._get_pipeline_library_dirs()
+        all_plx_paths: list[Path] = self._get_pipelex_plx_files_from_dirs(dirs_to_use)
 
         # Remove failing pipelines from the list
         failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
@@ -246,7 +245,7 @@ class LibraryManager(LibraryManagerAbstract):
             all_plx_paths = library_file_paths
 
         # Parse all blueprints first
-        blueprints: List[PipelexBundleBlueprint] = []
+        blueprints: list[PipelexBundleBlueprint] = []
         for plx_file_path in all_plx_paths:
             try:
                 blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
@@ -258,7 +257,7 @@ class LibraryManager(LibraryManagerAbstract):
             blueprints.append(blueprint)
 
         # Load all domains first
-        all_domains: List[Domain] = []
+        all_domains: list[Domain] = []
         for blueprint in blueprints:
             domain = self._load_domain_from_blueprint(blueprint)
             all_domains.append(domain)
@@ -266,14 +265,14 @@ class LibraryManager(LibraryManagerAbstract):
             self.domain_library.add_domain(domain=domain)
 
         # Load all concepts second
-        all_concepts: List[Concept] = []
+        all_concepts: list[Concept] = []
         for blueprint in blueprints:
             concepts = self._load_concepts_from_blueprint(blueprint)
             all_concepts.extend(concepts)
         self.concept_library.add_concepts(concepts=all_concepts)
 
         # Load all pipes third
-        all_pipes: List[PipeAbstract] = []
+        all_pipes: list[PipeAbstract] = []
         for blueprint in blueprints:
             pipes = self._load_pipes_from_blueprint(blueprint)
             all_pipes.extend(pipes)

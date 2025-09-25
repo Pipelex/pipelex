@@ -10,10 +10,7 @@ from pipelex.exceptions import PipelexCLIError
 
 
 class TestInitCmd:
-    """Test cases for the init command functionality."""
-
     def test_do_init_config_copies_all_files(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test that all files from config template are copied to target directory."""
         # Setup directories
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
@@ -38,7 +35,6 @@ class TestInitCmd:
         mock_echo.assert_any_call(f"✅ Copied 1 files to {target_dir}:")
 
     def test_do_init_config_skips_existing_files(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test that existing files are skipped when reset=False."""
         # Setup directories with existing file
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
@@ -73,7 +69,6 @@ class TestInitCmd:
         assert any("ℹ️  Skipped 1 existing files" in call for call in calls)
 
     def test_do_init_config_reset_overwrites_files(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test that reset=True overwrites existing files."""
         # Setup directories with existing file
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
@@ -104,7 +99,6 @@ class TestInitCmd:
         assert not any("ℹ️  Skipped" in call for call in calls)
 
     def test_do_init_config_nested_directory_structure(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test copying of nested directory structures."""
         # Setup complex nested structure
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
@@ -144,7 +138,6 @@ class TestInitCmd:
         assert any("✅ Copied 3 files to" in call for call in calls)
 
     def test_do_init_config_handles_permission_error(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test handling of permission errors during file copying."""
         # Setup directories
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()
@@ -168,7 +161,6 @@ class TestInitCmd:
         assert "Failed to initialize configuration" in str(exc_info.value)
 
     def test_do_init_config_creates_target_directory(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test that target directory is created if it doesn't exist."""
         # Setup template directory only
         template_dir = tmp_path / "config_template"
         template_dir.mkdir()

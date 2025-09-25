@@ -1,5 +1,3 @@
-"""Structured concept test cases."""
-
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 
@@ -29,10 +27,10 @@ birthdate = { type = "date", definition = "The birthdate of the person", require
                 structure={
                     "name": "The name of the person",
                     "age": ConceptStructureBlueprint(
-                        type=ConceptStructureBlueprintFieldType.NUMBER, definition="The age of the person", required=True
+                        type=ConceptStructureBlueprintFieldType.NUMBER, definition="The age of the person", required=True,
                     ),
                     "birthdate": ConceptStructureBlueprint(
-                        type=ConceptStructureBlueprintFieldType.DATE, definition="The birthdate of the person", required=True
+                        type=ConceptStructureBlueprintFieldType.DATE, definition="The birthdate of the person", required=True,
                     ),
                 },
             ),

@@ -1,4 +1,4 @@
-from typing import Optional, Protocol, Tuple, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict
 from pipelex.plugins.bedrock.bedrock_message import BedrockMessageDictList
@@ -9,8 +9,8 @@ class BedrockClientProtocol(Protocol):
     async def chat(
         self,
         messages: BedrockMessageDictList,
-        system_text: Optional[str],
+        system_text: str | None,
         model: str,
         temperature: float,
-        max_tokens: Optional[int] = None,
-    ) -> Tuple[str, NbTokensByCategoryDict]: ...
+        max_tokens: int | None = None,
+    ) -> tuple[str, NbTokensByCategoryDict]: ...

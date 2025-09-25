@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, RootModel
 
@@ -21,7 +21,7 @@ class Plugin(BaseModel):
         )
 
 
-PluginSdkRegistryRoot = Dict[str, Any]
+PluginSdkRegistryRoot = dict[str, Any]
 
 
 class PluginSdkRegistry(RootModel[PluginSdkRegistryRoot]):
@@ -33,7 +33,7 @@ class PluginSdkRegistry(RootModel[PluginSdkRegistryRoot]):
                 sdk_instance.teardown()
         self.root = {}
 
-    def get_sdk_instance(self, plugin: Plugin) -> Optional[Any]:
+    def get_sdk_instance(self, plugin: Plugin) -> Any | None:
         return self.root.get(plugin.sdk_handle)
 
     def set_sdk_instance(self, plugin: Plugin, sdk_instance: Any) -> Any:

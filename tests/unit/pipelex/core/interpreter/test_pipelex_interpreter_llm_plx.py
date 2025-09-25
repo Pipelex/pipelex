@@ -6,8 +6,6 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 
 class TestPipelexInterpreterLLMPLX:
-    """Test LLM pipe to PLX string conversion."""
-
     @pytest.mark.parametrize(
         "pipe_name,blueprint,expected_plx",
         [
@@ -89,6 +87,5 @@ prompt_template = "Generate ideas about: $topic\"""",
         ],
     )
     def test_llm_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeLLMBlueprint, expected_plx: str):
-        """Test converting LLM pipe blueprint to PLX string."""
         result = PipelexInterpreter.llm_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -16,4 +15,4 @@ class BackendMatchForModel(BaseModel):
     backend_name: str
     routing_profile_name: str
     matching_method: BackendMatchingMethod
-    matched_pattern: Optional[str]
+    matched_pattern: str | None

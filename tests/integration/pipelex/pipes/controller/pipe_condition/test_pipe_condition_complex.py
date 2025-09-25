@@ -61,7 +61,7 @@ class TestPipeConditionComplex:
 
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="complex_document_processor",
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -107,7 +107,7 @@ class TestPipeConditionComplex:
 
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="complex_document_processor",
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -150,7 +150,7 @@ class TestPipeConditionComplex:
 
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="complex_document_processor",
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -201,7 +201,7 @@ class TestPipeConditionComplex:
 
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="complex_document_processor",
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -245,7 +245,7 @@ class TestPipeConditionComplex:
 
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="complex_document_processor",
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
@@ -275,7 +275,7 @@ class TestPipeConditionComplex:
         with pytest.raises(DryRunError) as exc_info:
             await get_pipe_router().run_pipe_code(
                 pipe_code="complex_document_processor",
-                job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+                job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
                 working_memory=working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             )
@@ -348,7 +348,7 @@ class TestPipeConditionComplex:
 
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="complex_document_processor",
-            job_metadata=JobMetadata(job_name=f"{cast(str, request.node.originalname)}_{doc_type}_{priority}_{department}"),  # type: ignore
+            job_metadata=JobMetadata(job_name=f"{cast('str', request.node.originalname)}_{doc_type}_{priority}_{department}"),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )

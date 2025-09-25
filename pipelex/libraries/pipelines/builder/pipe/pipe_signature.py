@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from pydantic import Field, field_validator
 
@@ -16,10 +16,10 @@ class PipeSignature(StructuredContent):
     type: AllowedPipeTypes = Field(description="Pipe type.")
     category: AllowedPipeCategories = Field(description="Pipe category.")
     definition: str = Field(description="What the pipe does")
-    inputs: Dict[str, ConceptSpecDraft] = Field(description="Pipe inputs: key is the concept code in pascal Case.")
+    inputs: dict[str, ConceptSpecDraft] = Field(description="Pipe inputs: key is the concept code in pascal Case.")
     result: str = Field(description="The name of the result of the pipe. Must be snake_case. It will be used in the inputs of the next pipes.")
     output: ConceptSpecDraft = Field(description="Concept as output")
-    important_features: Optional[Dict[str, Any]] = Field(
+    important_features: dict[str, Any] | None = Field(
         default=None,
         description="Important features specific to this pipe type "
         "(e.g., referenced pipe codes for controllers, specific configuration for operators)",
@@ -51,19 +51,20 @@ class PipeSpec(StructuredContent):
         2. Output concept: Must be valid concept string or code in PascalCase.
         3. Input concepts: When provided, must use PascalCase for concept references.
         4. Pipe codes: When validating pipe codes, must be in snake_case format.
+
     """
 
     type: Any = Field(description=f"Pipe type. Must be one of: {[AllowedPipeTypes.value for AllowedPipeTypes in AllowedPipeTypes]}")
     category: Any = Field(
-        description=f"Pipe category. Must be one of: {[AllowedPipeCategories.value for AllowedPipeCategories in AllowedPipeCategories]}"
+        description=f"Pipe category. Must be one of: {[AllowedPipeCategories.value for AllowedPipeCategories in AllowedPipeCategories]}",
     )
-    definition: Optional[str] = Field(description="Natural language description of what the pipe does.")
-    inputs: Optional[Dict[str, Union[str, InputRequirementSpec]]] = Field(
+    definition: str | None = Field(description="Natural language description of what the pipe does.")
+    inputs: dict[str, str | InputRequirementSpec] | None = Field(
         description=(
             "Input concept specifications. Can be either: "
             "InputRequirementSpec with additional constraints"
             "Dictionary keys are input names, values are concept specifications. If Its the concept itself, use the concept code in PascalCase."
-        )
+        ),
     )
     output: str = Field(description="Output concept code in PascalCase format!! Very important")
 
@@ -86,7 +87,7 @@ class PipeSpec(StructuredContent):
         return pipe_code
 
     def to_blueprint(self) -> PipeBlueprint:
-        converted_inputs: Optional[Dict[str, Union[str, InputRequirementBlueprint]]] = None
+        converted_inputs: dict[str, str | InputRequirementBlueprint] | None = None
         if self.inputs is not None:
             converted_inputs = {}
             for input_name, input_spec in self.inputs.items():

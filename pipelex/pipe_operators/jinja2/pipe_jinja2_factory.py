@@ -1,4 +1,3 @@
-from typing import List, Optional
 
 from typing_extensions import override
 
@@ -23,9 +22,9 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
         domain: str,
         pipe_code: str,
         blueprint: PipeJinja2Blueprint,
-        concept_codes_from_the_same_domain: Optional[List[str]] = None,
+        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeJinja2:
-        preprocessed_template: Optional[str] = None
+        preprocessed_template: str | None = None
         if blueprint.jinja2:
             preprocessed_template = preprocess_template(blueprint.jinja2)
             check_jinja2_parsing(
@@ -45,12 +44,12 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
             code=pipe_code,
             definition=blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(
-                    domain=output_domain_and_code.domain, concept_code=output_domain_and_code.concept_code
-                )
+                    domain=output_domain_and_code.domain, concept_code=output_domain_and_code.concept_code,
+                ),
             ),
             jinja2_name=blueprint.jinja2_name,
             jinja2=preprocessed_template,
@@ -63,9 +62,9 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
     def make_pipe_jinja2_from_template_str(
         cls,
         domain: str,
-        inputs: Optional[PipeInputSpec] = None,
-        template_str: Optional[str] = None,
-        template_name: Optional[str] = None,
+        inputs: PipeInputSpec | None = None,
+        template_str: str | None = None,
+        template_name: str | None = None,
     ) -> PipeJinja2:
         if template_str:
             preprocessed_template = preprocess_template(template_str)
@@ -79,12 +78,11 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
                 jinja2=preprocessed_template,
                 inputs=inputs or PipeInputSpecFactory.make_empty(),
             )
-        elif template_name:
+        if template_name:
             return PipeJinja2(
                 domain=domain,
                 code="adhoc_pipe_jinja2_from_template_name",
                 jinja2_name=template_name,
                 inputs=inputs or PipeInputSpecFactory.make_empty(),
             )
-        else:
-            raise PipeDefinitionError("Either template_str or template_name must be provided to make_pipe_jinja2_from_template_str")
+        raise PipeDefinitionError("Either template_str or template_name must be provided to make_pipe_jinja2_from_template_str")

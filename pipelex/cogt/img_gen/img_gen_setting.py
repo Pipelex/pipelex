@@ -1,7 +1,6 @@
-from typing import Optional, Union
+from typing import Self, Union
 
 from pydantic import Field, model_validator
-from typing_extensions import Self
 
 from pipelex.cogt.exceptions import ImgGenSettingsValidationError
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
@@ -10,11 +9,11 @@ from pipelex.tools.config.config_model import ConfigModel
 
 class ImgGenSetting(ConfigModel):
     img_gen_handle: str
-    quality: Optional[Quality] = Field(default=None, strict=False)
-    nb_steps: Optional[int] = Field(default=None, gt=0)
-    guidance_scale: Optional[float] = Field(default=None, gt=0)
+    quality: Quality | None = Field(default=None, strict=False)
+    nb_steps: int | None = Field(default=None, gt=0)
+    guidance_scale: float | None = Field(default=None, gt=0)
     is_moderated: bool = False
-    safety_tolerance: Optional[int] = Field(default=None, ge=1, le=6)
+    safety_tolerance: int | None = Field(default=None, ge=1, le=6)
 
     @model_validator(mode="after")
     def validate_quality_or_nb_steps(self) -> Self:

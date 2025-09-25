@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, Union, get_args, get_origin
+from typing import Any, Union, get_args, get_origin
 
 from kajson.kajson_manager import KajsonManager
 from pydantic.fields import FieldInfo
@@ -12,7 +12,7 @@ class ClassRegistryUtils:
     def register_classes_in_file(
         cls,
         file_path: str,
-        base_class: Optional[Type[Any]],
+        base_class: type[Any] | None,
         is_include_imported: bool,
     ) -> None:
         """Processes a Python file to find and register classes."""
@@ -31,12 +31,11 @@ class ClassRegistryUtils:
     def register_classes_in_folder(
         cls,
         folder_path: str,
-        base_class: Optional[Type[Any]] = None,
+        base_class: type[Any] | None = None,
         is_recursive: bool = True,
         is_include_imported: bool = False,
     ) -> None:
-        """
-        Registers all classes in Python files within folders that are subclasses of base_class.
+        """Registers all classes in Python files within folders that are subclasses of base_class.
         If base_class is None, registers all classes.
 
         Args:
@@ -46,8 +45,8 @@ class ClassRegistryUtils:
             exclude_files: List of filenames to exclude
             exclude_dirs: List of directory names to exclude
             include_imported: Whether to include classes imported from other modules
-        """
 
+        """
         python_files = cls.find_files_in_dir(
             dir_path=folder_path,
             pattern="*.py",
@@ -62,9 +61,8 @@ class ClassRegistryUtils:
             )
 
     @classmethod
-    def find_files_in_dir(cls, dir_path: str, pattern: str, is_recursive: bool) -> List[Path]:
-        """
-        Find files matching a pattern in a directory.
+    def find_files_in_dir(cls, dir_path: str, pattern: str, is_recursive: bool) -> list[Path]:
+        """Find files matching a pattern in a directory.
 
         Args:
             dir_path: Directory path to search in
@@ -73,33 +71,33 @@ class ClassRegistryUtils:
 
         Returns:
             List of matching Path objects
+
         """
         path = Path(dir_path)
         if is_recursive:
             return list(path.rglob(pattern))
-        else:
-            return list(path.glob(pattern))
+        return list(path.glob(pattern))
 
     @staticmethod
-    def are_classes_equivalent(class_1: Type[Any], class_2: Type[Any]) -> bool:
+    def are_classes_equivalent(class_1: type[Any], class_2: type[Any]) -> bool:
         """Check if two Pydantic classes are equivalent (same fields, types, descriptions)."""
         if not (hasattr(class_1, "model_fields") and hasattr(class_2, "model_fields")):
             return class_1 == class_2
 
         # Compare model schemas using Pydantic's built-in capabilities
         try:
-            schema_1: Dict[str, Any] = class_1.model_json_schema()  # type: ignore[attr-defined]
-            schema_2: Dict[str, Any] = class_2.model_json_schema()  # type: ignore[attr-defined]
+            schema_1: dict[str, Any] = class_1.model_json_schema()
+            schema_2: dict[str, Any] = class_2.model_json_schema()
             return schema_1 == schema_2
         except Exception:
             # Fallback to manual field comparison if schema comparison fails
-            fields_1: Dict[str, FieldInfo] = class_1.model_fields  # type: ignore[attr-defined]
-            fields_2: Dict[str, FieldInfo] = class_2.model_fields  # type: ignore[attr-defined]
+            fields_1: dict[str, FieldInfo] = class_1.model_fields
+            fields_2: dict[str, FieldInfo] = class_2.model_fields
 
             if set(fields_1.keys()) != set(fields_2.keys()):
                 return False
 
-            for field_name in fields_1.keys():
+            for field_name in fields_1:
                 field_1: FieldInfo = fields_1[field_name]
                 field_2: FieldInfo = fields_2[field_name]
 
@@ -118,12 +116,12 @@ class ClassRegistryUtils:
             return True
 
     @staticmethod
-    def has_compatible_field(class_1: Type[Any], class_2: Type[Any]) -> bool:
+    def has_compatible_field(class_1: type[Any], class_2: type[Any]) -> bool:
         """Check if class_1 has a field that is compatible with class_2."""
         if not hasattr(class_1, "model_fields"):
             return False
 
-        fields: Dict[str, FieldInfo] = class_1.model_fields  # type: ignore[attr-defined]
+        fields: dict[str, FieldInfo] = class_1.model_fields
         for _field_name, field_info in fields.items():
             field_type = field_info.annotation
 

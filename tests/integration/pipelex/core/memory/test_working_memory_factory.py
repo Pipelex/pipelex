@@ -11,7 +11,7 @@ class TestWorkingMemoryFactory:
             "text_item": {
                 "concept_code": NativeConceptEnum.TEXT.value,
                 "content": "Hello, world!",
-            }
+            },
         }
 
         working_memory = WorkingMemoryFactory.make_from_compact_memory(compact_memory)
@@ -33,7 +33,7 @@ class TestWorkingMemoryFactory:
                     "text_and_images": {
                         "text": {
                             "text": "This is a complex document page with multiple images and rich text content. "
-                            "It demonstrates nested structured content handling."
+                            "It demonstrates nested structured content handling.",
                         },
                         "images": [
                             {
@@ -51,7 +51,7 @@ class TestWorkingMemoryFactory:
                     },
                     "page_view": {"url": "mock_url", "caption": "Full page screenshot"},
                 },
-            }
+            },
         }
 
         working_memory = WorkingMemoryFactory.make_from_compact_memory(compact_memory)

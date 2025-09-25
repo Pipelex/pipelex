@@ -131,7 +131,7 @@ class TestDetectFileTypeFromBase64:
     def test_detect_file_type_from_base64_string_success(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
         mock_detect_bytes = mocker.patch(
-            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="gif", mime="image/gif")
+            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="gif", mime="image/gif"),
         )
 
         # GIF header encoded in base64
@@ -148,7 +148,7 @@ class TestDetectFileTypeFromBase64:
     def test_detect_file_type_from_base64_bytes_success(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
         mock_detect_bytes = mocker.patch(
-            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="jpg", mime="image/jpeg")
+            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="jpg", mime="image/jpeg"),
         )
 
         # JPEG header encoded in base64
@@ -165,7 +165,7 @@ class TestDetectFileTypeFromBase64:
     def test_detect_file_type_from_base64_data_url_success(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
         mock_detect_bytes = mocker.patch(
-            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="png", mime="image/png")
+            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="png", mime="image/png"),
         )
 
         # PNG header encoded in base64
@@ -183,7 +183,7 @@ class TestDetectFileTypeFromBase64:
     def test_detect_file_type_from_base64_data_url_with_whitespace(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
         mock_detect_bytes = mocker.patch(
-            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="txt", mime="text/plain")
+            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="txt", mime="text/plain"),
         )
 
         test_bytes = b"hello world"
@@ -215,7 +215,7 @@ class TestDetectFileTypeFromBase64:
     def test_detect_file_type_from_base64_data_url_no_comma(self, mocker: MockerFixture):
         # Test data URL without comma (should be treated as regular base64)
         mocker.patch(
-            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="bin", mime="application/octet-stream")
+            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="bin", mime="application/octet-stream"),
         )
 
         # This will be treated as a base64 string since there's no comma

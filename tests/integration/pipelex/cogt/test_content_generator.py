@@ -1,4 +1,3 @@
-from typing import List
 
 import pytest
 from pytest import FixtureRequest
@@ -90,7 +89,7 @@ class TestContentGenerator:
     async def test_make_object_list_direct(self, request: FixtureRequest):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
 
-        person_list_direct: List[Employee] = await get_content_generator().make_object_list_direct(
+        person_list_direct: list[Employee] = await get_content_generator().make_object_list_direct(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
             object_class=Employee,
             llm_prompt_for_object_list=LLMPrompt(user_text=USER_TEXTS_FOR_PEOPLE_STR),

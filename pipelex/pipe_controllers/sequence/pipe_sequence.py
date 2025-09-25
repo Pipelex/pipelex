@@ -1,7 +1,7 @@
-from typing import List, Literal, Optional, Set
+from typing import Literal, Self
 
 from pydantic import model_validator
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
@@ -25,10 +25,10 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 class PipeSequence(PipeController):
     type: Literal["PipeSequence"] = "PipeSequence"
-    sequential_sub_pipes: List[SubPipe]
+    sequential_sub_pipes: list[SubPipe]
 
     @override
-    def needed_inputs(self, visited_pipes: Optional[Set[str]] = None) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
         if visited_pipes is None:
             visited_pipes = set()
 
@@ -40,7 +40,7 @@ class PipeSequence(PipeController):
         visited_pipes_with_current = visited_pipes | {self.code}
 
         needed_inputs = PipeInputSpecFactory.make_empty()
-        generated_outputs: Set[str] = set()
+        generated_outputs: set[str] = set()
 
         for sequential_sub_pipe in self.sequential_sub_pipes:
             sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
@@ -50,9 +50,7 @@ class PipeSequence(PipeController):
             if isinstance(sub_pipe, PipeParallel):
                 if sub_pipe.add_each_output:
                     for sub_parallel_pipe in sub_pipe.parallel_sub_pipes:
-                        if sub_pipe.add_each_output and sub_parallel_pipe.output_name:
-                            generated_outputs.add(sub_parallel_pipe.output_name)
-                        elif sub_parallel_pipe.output_name:
+                        if (sub_pipe.add_each_output and sub_parallel_pipe.output_name) or sub_parallel_pipe.output_name:
                             generated_outputs.add(sub_parallel_pipe.output_name)
 
             if sequential_sub_pipe.batch_params:
@@ -60,7 +58,7 @@ class PipeSequence(PipeController):
                     needed_inputs.add_requirement(
                         variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
                         concept=sub_pipe_needed_inputs.get_required_input_requirement(
-                            variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name
+                            variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name,
                         ).concept,
                         multiplicity=True,
                     )
@@ -78,13 +76,12 @@ class PipeSequence(PipeController):
         return needed_inputs
 
     @override
-    def required_variables(self) -> Set[str]:
+    def required_variables(self) -> set[str]:
         return set()
 
     @override
     def validate_output(self):
-        """
-        Validate the output for the pipe sequence.
+        """Validate the output for the pipe sequence.
         The output of the pipe sequence should match the output of the last step.
         """
         last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
@@ -92,7 +89,7 @@ class PipeSequence(PipeController):
             raise PipeSequenceError(
                 f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                 f"not matching the output concept code '{last_step_output_pipe.output.concept_string}' "
-                f"of the last step '{self.sequential_sub_pipes[-1].pipe_code}'"
+                f"of the last step '{self.sequential_sub_pipes[-1].pipe_code}'",
             )
 
     @model_validator(mode="after")
@@ -105,13 +102,11 @@ class PipeSequence(PipeController):
         """Validate that the pipe supports the requested output multiplicity."""
         if pipe_run_params.is_multiple_output_required:
             raise PipeRunParamsError(
-                f"{self.__class__.__name__} does not support multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
+                f"{self.__class__.__name__} does not support multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}",
             )
 
     def _validate_inputs(self):
-        """
-        Validate that the inputs declared for this PipeSequence match what is actually needed.
-        """
+        """Validate that the inputs declared for this PipeSequence match what is actually needed."""
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
@@ -159,14 +154,13 @@ class PipeSequence(PipeController):
 
     @override
     def validate_with_libraries(self):
-        """
-        Perform full validation after all libraries are loaded.
+        """Perform full validation after all libraries are loaded.
         This is called after all pipes and concepts are available.
         """
         self._validate_inputs()
 
     @override
-    def pipe_dependencies(self) -> Set[str]:
+    def pipe_dependencies(self) -> set[str]:
         return set(sub_pipe.pipe_code for sub_pipe in self.sequential_sub_pipes)
 
     @override
@@ -175,7 +169,7 @@ class PipeSequence(PipeController):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
     ) -> PipeOutput:
         pipe_run_params.push_pipe_layer(pipe_code=self.code)
         self._validate_output_multiplicity_support(pipe_run_params)
@@ -206,18 +200,20 @@ class PipeSequence(PipeController):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
     ) -> PipeOutput:
         if pipe_run_params.run_mode != PipeRunMode.DRY:
-            raise PipeRunParamsError(f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}")
+            msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
+            raise PipeRunParamsError(msg)
         log.debug(f"PipeSequence._dry_run_controller_pipe() called with {self.code=} {pipe_run_params=}")
         # Verify the output of this pipe is matching the output of the last step.
         concept_string_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output.concept_string
         if self.output.concept_string != concept_string_of_last_step:
-            raise ValueError(
+            msg = (
                 f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                 f"not matching the output concept code '{concept_string_of_last_step}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'"
             )
+            raise ValueError(msg)
         return await self._run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,

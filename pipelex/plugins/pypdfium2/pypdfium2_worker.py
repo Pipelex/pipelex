@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from typing_extensions import override
 
@@ -15,9 +15,9 @@ from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 class Pypdfium2Worker(OcrWorkerAbstract):
     def __init__(
         self,
-        extra_config: Dict[str, Any],
+        extra_config: dict[str, Any],
         inference_model: InferenceModelSpec,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         super().__init__(extra_config=extra_config, inference_model=inference_model, reporting_delegate=reporting_delegate)
 
@@ -29,7 +29,7 @@ class Pypdfium2Worker(OcrWorkerAbstract):
         if ocr_job.ocr_input.image_uri:
             raise NotImplementedError("Pypdfium2 only extracts text from PDFs, not images")
 
-        elif pdf_uri := ocr_job.ocr_input.pdf_uri:
+        if pdf_uri := ocr_job.ocr_input.pdf_uri:
             pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)  # pyright: ignore
             ocr_output: OcrOutput
             if pdf_url:
@@ -50,7 +50,7 @@ class Pypdfium2Worker(OcrWorkerAbstract):
         pdf_url: str,
     ) -> OcrOutput:
         page_texts = await pypdfium2_renderer.get_text_from_pdf_pages_from_uri(pdf_uri=pdf_url)
-        pages: Dict[int, Page] = {}
+        pages: dict[int, Page] = {}
         for page_index, page_text in enumerate(page_texts):
             pages[page_index + 1] = Page(
                 text=page_text,
@@ -65,7 +65,7 @@ class Pypdfium2Worker(OcrWorkerAbstract):
         pdf_path: str,
     ) -> OcrOutput:
         page_texts = await pypdfium2_renderer.get_text_from_pdf_pages(pdf_input=pdf_path)
-        pages: Dict[int, Page] = {}
+        pages: dict[int, Page] = {}
         for page_index, page_text in enumerate(page_texts):
             pages[page_index + 1] = Page(
                 text=page_text,

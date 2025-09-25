@@ -1,7 +1,6 @@
 """Test structures for basic concepts without union types."""
 
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import Field
 
@@ -20,22 +19,22 @@ class ConceptWithOptionals(StructuredContent):
     """A structure with optional fields."""
 
     required_field: str = Field(..., description="A required field")
-    optional_string: Optional[str] = Field(None, description="An optional string field")
-    optional_number: Optional[int] = Field(None, description="An optional number field")
-    optional_date: Optional[datetime] = Field(None, description="An optional date field")
+    optional_string: str | None = Field(None, description="An optional string field")
+    optional_number: int | None = Field(None, description="An optional number field")
+    optional_date: datetime | None = Field(None, description="An optional date field")
 
 
 class ConceptWithLists(StructuredContent):
     """A structure with list fields."""
 
-    string_list: List[str] = Field(default_factory=list, description="A list of strings")
-    number_list: List[int] = Field(default_factory=list, description="A list of numbers")
-    optional_list: Optional[List[str]] = Field(None, description="An optional list")
+    string_list: list[str] = Field(default_factory=list, description="A list of strings")
+    number_list: list[int] = Field(default_factory=list, description="A list of numbers")
+    optional_list: list[str] | None = Field(None, description="An optional list")
 
 
 class ConceptWithNestedStructures(StructuredContent):
     """A structure with nested structures."""
 
     simple_nested: ConceptWithSimpleStructure = Field(..., description="A nested simple structure")
-    optional_nested: Optional[ConceptWithOptionals] = Field(None, description="An optional nested structure")
-    list_of_nested: List[ConceptWithSimpleStructure] = Field(default_factory=list, description="A list of nested structures")
+    optional_nested: ConceptWithOptionals | None = Field(None, description="An optional nested structure")
+    list_of_nested: list[ConceptWithSimpleStructure] = Field(default_factory=list, description="A list of nested structures")

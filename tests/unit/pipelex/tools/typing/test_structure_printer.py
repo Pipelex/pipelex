@@ -1,8 +1,8 @@
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import Literal
 
+import pytest
 from pydantic import BaseModel, Field, field_validator
-from pytest import FixtureRequest
 
 from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent, TextContent
 from pipelex.tools.typing.structure_printer import StructurePrinter
@@ -34,7 +34,6 @@ class MusicGenre(StrEnum):
 class SimpleTextContent(TextContent):
     """A simple text content class"""
 
-    pass
 
 
 class MusicCategoryContent(StructuredContent):
@@ -79,26 +78,26 @@ class PersonContent(StructuredContent):
     name: str
     age: int
     address: AddressContent = Field(description="Address of the person")
-    documents: List[DocumentTypeContent]
-    priority: Optional[Priority] = None
+    documents: list[DocumentTypeContent]
+    priority: Priority | None = None
 
 
 class ComplexListContent(ListContent[PersonContent]):
     """List content with complex items"""
 
-    items: List[PersonContent]
+    items: list[PersonContent]
 
 
 class GanttTaskDetails(StructuredContent):
     """Do not include timezone in the dates."""
 
     name: str
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
 
     @field_validator("start_date", "end_date")
     @classmethod
-    def remove_tzinfo(cls, v: Optional[datetime]) -> Optional[datetime]:
+    def remove_tzinfo(cls, v: datetime | None) -> datetime | None:
         if v is not None:
             return v.replace(tzinfo=None)
         return v
@@ -106,25 +105,24 @@ class GanttTaskDetails(StructuredContent):
 
 class Milestone(StructuredContent):
     name: str
-    date: Optional[datetime]
+    date: datetime | None
 
     @field_validator("date")
     @classmethod
-    def remove_tzinfo(cls, v: Optional[datetime]) -> Optional[datetime]:
+    def remove_tzinfo(cls, v: datetime | None) -> datetime | None:
         if v is not None:
             return v.replace(tzinfo=None)
         return v
 
 
 class GanttChart(StructuredContent):
-    tasks: Optional[List[GanttTaskDetails]] = None
-    milestones: Optional[List[Milestone]] = None
+    tasks: list[GanttTaskDetails] | None = None
+    milestones: list[Milestone] | None = None
 
 
 class TestStructurePrinter:
-    """Tests for the type inspector functionality"""
-
-    def test_simple_text_content(self, request: FixtureRequest):
+    @pytest.mark.usefixtures("request")
+    def test_simple_text_content(self):
         """Test structure of simple text content"""
         result = StructurePrinter().get_type_structure(SimpleTextContent)
         expected = [
@@ -134,7 +132,8 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    def test_simple_structured_content(self, request: FixtureRequest):
+    @pytest.mark.usefixtures("request")
+    def test_simple_structured_content(self):
         """Test structure of simple structured content"""
         result = StructurePrinter().get_type_structure(SimpleStructuredContent)
         expected = [
@@ -146,7 +145,8 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    def test_enum_content(self, request: FixtureRequest):
+    @pytest.mark.usefixtures("request")
+    def test_enum_content(self):
         """Test structure of content with enum"""
         result = StructurePrinter().get_type_structure(DocumentTypeContent)
         expected = [
@@ -160,7 +160,8 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    def test_nested_content(self, request: FixtureRequest):
+    @pytest.mark.usefixtures("request")
+    def test_nested_content(self):
         """Test structure of nested content"""
         result = StructurePrinter().get_type_structure(PersonContent)
         expected = [
@@ -192,7 +193,8 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    def test_list_content(self, request: FixtureRequest):
+    @pytest.mark.usefixtures("request")
+    def test_list_content(self):
         """Test structure of list content"""
         result = StructurePrinter().get_type_structure(ComplexListContent)
         expected = [
@@ -228,7 +230,8 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    def test_model_with_field_description(self, request: FixtureRequest):
+    @pytest.mark.usefixtures("request")
+    def test_model_with_field_description(self):
         """Test structure of a model with field descriptions"""
 
         class Person(BaseModel):
@@ -249,7 +252,8 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    def test_model_with_docstring_and_field_description(self, request: FixtureRequest):
+    @pytest.mark.usefixtures("request")
+    def test_model_with_docstring_and_field_description(self):
         """Test structure of a model with both docstring and field descriptions"""
 
         class TaskContent(StructuredContent):
@@ -261,7 +265,7 @@ class TestStructurePrinter:
 
             title: str = Field(description="The title of the task")
             description: str = Field(description="Detailed description of what needs to be done")
-            is_completed: bool = Field(False, description="Whether the task is completed")
+            is_completed: bool = Field(default=False, description="Whether the task is completed")
 
         result = StructurePrinter().get_type_structure(TaskContent)
         expected = [
@@ -277,7 +281,8 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    def test_literal_field_content(self, request: FixtureRequest):
+    @pytest.mark.usefixtures("request")
+    def test_literal_field_content(self) -> None:
         """Test structure of content with Literal field"""
         result = StructurePrinter().get_type_structure(MusicCategoryContent)
         expected = [
@@ -301,9 +306,8 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    def test_gantt_chart_content(self, request: FixtureRequest):
-        """Test structure of Gantt chart content with datetime validators"""
-
+    @pytest.mark.usefixtures("request")
+    def test_gantt_chart_content(self):
         result = StructurePrinter().get_type_structure(GanttChart, base_class=StructuredContent)
         expected = [
             "class GanttChart(StructuredContent):",
@@ -320,4 +324,4 @@ class TestStructurePrinter:
             "    name: str",
             "    date: Optional[datetime] = None",
         ]
-        assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
+        assert result == expected

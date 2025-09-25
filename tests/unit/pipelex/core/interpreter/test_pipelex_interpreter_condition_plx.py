@@ -5,8 +5,6 @@ from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeCond
 
 
 class TestPipelexInterpreterConditionPLX:
-    """Test Condition pipe to PLX string conversion."""
-
     @pytest.mark.parametrize(
         "pipe_name,blueprint,expected_plx",
         [

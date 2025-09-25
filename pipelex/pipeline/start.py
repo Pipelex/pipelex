@@ -1,5 +1,4 @@
 import asyncio
-from typing import Optional
 
 from pipelex.client.protocol import CompactMemory
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -15,11 +14,11 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 async def start_pipeline(
     pipe_code: str,
-    working_memory: Optional[WorkingMemory] = None,
-    input_memory: Optional[CompactMemory] = None,
-    output_name: Optional[str] = None,
-    output_multiplicity: Optional[PipeOutputMultiplicity] = None,
-    dynamic_output_concept_code: Optional[str] = None,
+    working_memory: WorkingMemory | None = None,
+    input_memory: CompactMemory | None = None,
+    output_name: str | None = None,
+    output_multiplicity: PipeOutputMultiplicity | None = None,
+    dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
 ) -> asyncio.Task[PipeOutput]:
     """Start a pipeline in the background.
@@ -45,13 +44,14 @@ async def start_pipeline(
         Override the dynamic output concept code.
     pipe_run_mode:
         Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``.
+
     Returns
     -------
     Tuple[str, asyncio.Task[PipeOutput]]
         The ``pipeline_run_id`` of the newly started pipeline and a task that
         can be awaited to get the pipe output.
-    """
 
+    """
     if working_memory and input_memory:
         raise StartPipelineException(f"Cannot pass both working_memory and input_memory to `start_pipeline` {pipe_code=}")
 

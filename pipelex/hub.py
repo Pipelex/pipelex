@@ -1,4 +1,4 @@
-from typing import ClassVar, Optional, Type
+from typing import ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 
@@ -34,8 +34,7 @@ from pipelex.tools.templating.template_provider_abstract import TemplateProvider
 
 
 class PipelexHub:
-    """
-    PipelexHub serves as a central dependency manager to break cyclic imports between components.
+    """PipelexHub serves as a central dependency manager to break cyclic imports between components.
     It provides access to core providers and factories through a singleton instance,
     allowing components to retrieve dependencies based on protocols without direct imports that could create cycles.
     """
@@ -44,29 +43,29 @@ class PipelexHub:
 
     def __init__(self):
         # tools
-        self._config: Optional[ConfigRoot] = None
-        self._secrets_provider: Optional[SecretsProviderAbstract] = None
-        self._template_provider: Optional[TemplateProviderAbstract] = None
-        self._class_registry: Optional[ClassRegistryAbstract] = None
-        self._storage_provider: Optional[StorageProviderAbstract] = None
+        self._config: ConfigRoot | None = None
+        self._secrets_provider: SecretsProviderAbstract | None = None
+        self._template_provider: TemplateProviderAbstract | None = None
+        self._class_registry: ClassRegistryAbstract | None = None
+        self._storage_provider: StorageProviderAbstract | None = None
         # cogt
-        self._models_manager: Optional[ModelManagerAbstract] = None
-        self._plugin_manager: Optional[PluginManager] = None
+        self._models_manager: ModelManagerAbstract | None = None
+        self._plugin_manager: PluginManager | None = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
-        self._content_generator: Optional[ContentGeneratorProtocol] = None
+        self._content_generator: ContentGeneratorProtocol | None = None
 
         # pipelex
-        self._domain_provider: Optional[DomainProviderAbstract] = None
-        self._concept_provider: Optional[ConceptProviderAbstract] = None
-        self._pipe_provider: Optional[PipeProviderAbstract] = None
-        self._pipe_router: Optional[PipeRouterProtocol] = None
-        self._library_manager: Optional[LibraryManagerAbstract] = None
+        self._domain_provider: DomainProviderAbstract | None = None
+        self._concept_provider: ConceptProviderAbstract | None = None
+        self._pipe_provider: PipeProviderAbstract | None = None
+        self._pipe_router: PipeRouterProtocol | None = None
+        self._library_manager: LibraryManagerAbstract | None = None
 
         # pipeline
-        self._pipeline_tracker: Optional[PipelineTrackerProtocol] = None
-        self._pipeline_manager: Optional[PipelineManagerAbstract] = None
-        self._activity_manager: Optional[ActivityManagerProtocol] = None
+        self._pipeline_tracker: PipelineTrackerProtocol | None = None
+        self._pipeline_manager: PipelineManagerAbstract | None = None
+        self._activity_manager: ActivityManagerProtocol | None = None
 
     ############################################################
     # Class methods for singleton management
@@ -88,9 +87,8 @@ class PipelexHub:
 
     # tools
 
-    def setup_config(self, config_cls: Type[ConfigRoot], specific_config_path: Optional[str] = None):
-        """
-        Set the global configuration instance.
+    def setup_config(self, config_cls: type[ConfigRoot], specific_config_path: str | None = None):
+        """Set the global configuration instance.
 
         # Args:
         #     config (Config): The configuration instance to set.
@@ -106,8 +104,7 @@ class PipelexHub:
         self._config = config
 
     def reset_config(self) -> None:
-        """
-        Reset the global configuration instance and the config manager.
+        """Reset the global configuration instance and the config manager.
         """
         self._config = None
         log.reset()
@@ -174,8 +171,7 @@ class PipelexHub:
     # tools
 
     def get_required_config(self) -> ConfigRoot:
-        """
-        Get the current configuration instance as an instance of a particular subclass of ConfigRoot. This should be used only from pipelex.tools.
+        """Get the current configuration instance as an instance of a particular subclass of ConfigRoot. This should be used only from pipelex.tools.
             when getting the config from other projects, use their own project.get_config() method to get the Config
             with the proper subclass which is required for proper type checking.
 
@@ -184,6 +180,7 @@ class PipelexHub:
 
         Raises:
             RuntimeError: If the configuration has not been set.
+
         """
         if self._config is None:
             raise RuntimeError("Config instance is not set. You must initialize Pipelex first.")
@@ -239,7 +236,7 @@ class PipelexHub:
             raise RuntimeError("DomainProvider is not initialized")
         return self._domain_provider
 
-    def get_optional_domain_provider(self) -> Optional[DomainProviderAbstract]:
+    def get_optional_domain_provider(self) -> DomainProviderAbstract | None:
         return self._domain_provider
 
     def get_required_concept_provider(self) -> ConceptProviderAbstract:
@@ -247,7 +244,7 @@ class PipelexHub:
             raise RuntimeError("ConceptProvider is not initialized")
         return self._concept_provider
 
-    def get_optional_concept_provider(self) -> Optional[ConceptProviderAbstract]:
+    def get_optional_concept_provider(self) -> ConceptProviderAbstract | None:
         return self._concept_provider
 
     def get_required_pipe_provider(self) -> PipeProviderAbstract:
@@ -280,7 +277,7 @@ class PipelexHub:
             raise RuntimeError("Library manager is not set. You must initialize Pipelex first.")
         return self._library_manager
 
-    def get_optional_library_manager(self) -> Optional[LibraryManagerAbstract]:
+    def get_optional_library_manager(self) -> LibraryManagerAbstract | None:
         return self._library_manager
 
 
@@ -380,11 +377,10 @@ def get_required_domain(domain: str) -> Domain:
     return get_pipelex_hub().get_required_domain_provider().get_required_domain(domain=domain)
 
 
-def get_optional_domain(domain: str) -> Optional[Domain]:
+def get_optional_domain(domain: str) -> Domain | None:
     if domain_provider := get_pipelex_hub().get_optional_domain_provider():
         return domain_provider.get_domain(domain=domain)
-    else:
-        return None
+    return None
 
 
 def get_pipe_provider() -> PipeProviderAbstract:
@@ -395,7 +391,7 @@ def get_required_pipe(pipe_code: str) -> PipeAbstract:
     return get_pipelex_hub().get_required_pipe_provider().get_required_pipe(pipe_code=pipe_code)
 
 
-def get_optional_pipe(pipe_code: str) -> Optional[PipeAbstract]:
+def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
     return get_pipelex_hub().get_required_pipe_provider().get_optional_pipe(pipe_code=pipe_code)
 
 
@@ -403,7 +399,7 @@ def get_concept_provider() -> ConceptProviderAbstract:
     return get_pipelex_hub().get_required_concept_provider()
 
 
-def get_optional_concept_provider() -> Optional[ConceptProviderAbstract]:
+def get_optional_concept_provider() -> ConceptProviderAbstract | None:
     return get_pipelex_hub().get_optional_concept_provider()
 
 

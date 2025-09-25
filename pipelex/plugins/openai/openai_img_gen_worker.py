@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any
 
 import openai
 import shortuuid
@@ -24,7 +24,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
@@ -47,7 +47,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> List[GeneratedImage]:
+    ) -> list[GeneratedImage]:
         image_size = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio=img_gen_job.job_params.aspect_ratio)
         output_format = OpenAIImgGenFactory.output_format_for_gpt_image_1(output_format=img_gen_job.job_params.output_format)
         moderation = OpenAIImgGenFactory.moderation_for_gpt_image_1(is_moderated=img_gen_job.job_params.is_moderated)
@@ -68,7 +68,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         if not result.data:
             raise ImgGenGenerationError("No result from OpenAI")
 
-        generated_image_list: List[GeneratedImage] = []
+        generated_image_list: list[GeneratedImage] = []
         image_id = shortuuid.uuid()[:4]
         for image_index, image_data in enumerate(result.data):
             image_base64 = image_data.b64_json
@@ -85,6 +85,6 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                     url=img_path,
                     width=1024,
                     height=1024,
-                )
+                ),
             )
         return generated_image_list

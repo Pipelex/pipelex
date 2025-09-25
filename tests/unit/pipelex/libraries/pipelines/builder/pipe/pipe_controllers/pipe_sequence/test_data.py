@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
@@ -22,7 +22,6 @@ class PipeSequenceTestCases:
                 SubPipeSpec(the_pipe_code="step3", result="final_result"),
             ],
         ),
-        "test_domain",
         PipeSequenceBlueprint(
             definition="A sequence of operations",
             inputs={"input_data": InputRequirementBlueprint(concept="Text")},
@@ -54,7 +53,6 @@ class PipeSequenceTestCases:
                 ),
             ],
         ),
-        "test_domain",
         PipeSequenceBlueprint(
             definition="Sequence with batch",
             inputs={"items": InputRequirementBlueprint(concept="ItemList")},
@@ -73,7 +71,7 @@ class PipeSequenceTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeSequenceSpec, str, PipeSequenceBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, PipeSequenceSpec, PipeSequenceBlueprint]]] = [
         SIMPLE_SEQUENCE,
         SEQUENCE_WITH_BATCH,
     ]

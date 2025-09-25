@@ -1,4 +1,4 @@
-from typing import Optional, Protocol
+from typing import Protocol
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutputType
@@ -16,8 +16,8 @@ class PipeRouterProtocol(Protocol):
     async def run_pipe_code(
         self,
         pipe_code: str,
-        pipe_run_params: Optional[PipeRunParams] = None,
-        job_metadata: Optional[JobMetadata] = None,
-        working_memory: Optional[WorkingMemory] = None,
-        output_name: Optional[str] = None,
+        pipe_run_params: PipeRunParams | None = None,
+        job_metadata: JobMetadata | None = None,
+        working_memory: WorkingMemory | None = None,
+        output_name: str | None = None,
     ) -> PipeOutputType: ...  # pyright: ignore[reportInvalidTypeVarUse]

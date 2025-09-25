@@ -226,7 +226,7 @@ refines = "Text"
         assert changes[1]["new_line"] == 'definition = "Another concept"'
 
     def test_migrate_file_success(
-        self, migrator: TOMLMigrator, tmp_path: Path, sample_old_syntax_content: str, sample_new_syntax_content: str
+        self, migrator: TOMLMigrator, tmp_path: Path, sample_old_syntax_content: str, sample_new_syntax_content: str,
     ) -> None:
         """Test successful file migration."""
         test_file = tmp_path / "test.toml"
@@ -266,7 +266,7 @@ refines = "Text"
         assert changes_count == 0
 
     def test_migrate_file_without_backup(
-        self, migrator: TOMLMigrator, tmp_path: Path, sample_old_syntax_content: str, sample_new_syntax_content: str
+        self, migrator: TOMLMigrator, tmp_path: Path, sample_old_syntax_content: str, sample_new_syntax_content: str,
     ) -> None:
         """Test file migration without creating backup."""
         test_file = tmp_path / "test.toml"

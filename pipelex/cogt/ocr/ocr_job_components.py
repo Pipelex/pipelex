@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -7,11 +6,11 @@ from pipelex.tools.config.config_model import ConfigModel
 
 class OcrJobParams(BaseModel):
     should_include_images: bool
-    max_nb_images: Optional[int]
-    image_min_size: Optional[int]
+    max_nb_images: int | None
+    image_min_size: int | None
     should_caption_images: bool
     should_include_page_views: bool
-    page_views_dpi: Optional[int]
+    page_views_dpi: int | None
 
     @classmethod
     def make_default_ocr_job_params(cls) -> "OcrJobParams":

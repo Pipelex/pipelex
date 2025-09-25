@@ -1,4 +1,4 @@
-from typing import Any, Optional, Type
+from typing import Any
 
 import instructor
 import openai
@@ -24,8 +24,8 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
-        structure_method: Optional[StructureMethod],
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        structure_method: StructureMethod | None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
@@ -36,7 +36,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
 
         if not isinstance(sdk_instance, openai.AsyncOpenAI):
             raise SdkTypeError(
-                f"Provided LLM sdk_instance for {self.__class__.__name__} is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'"
+                f"Provided LLM sdk_instance for {self.__class__.__name__} is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'",
             )
 
         self.openai_client_for_text: openai.AsyncOpenAI = sdk_instance
@@ -73,7 +73,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here
             raise LLMModelNotFoundError(
-                f"OpenAI model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}"
+                f"OpenAI model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}",
             ) from not_found_error
         except APIConnectionError as api_connection_error:
             raise LLMCompletionError(f"OpenAI API connection error: {api_connection_error}") from api_connection_error
@@ -93,7 +93,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         messages = OpenAIFactory.make_simple_messages(llm_job=llm_job)
         try:
@@ -115,7 +115,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                 )
             except InstructorRetryException as exc:
                 raise LLMCompletionError(
-                    f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"
+                    f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}",
                 ) from exc
         except NotFoundError as exc:
             raise LLMCompletionError(f"OpenAI model or deployment '{self.inference_model.model_id}' not found: {exc}") from exc

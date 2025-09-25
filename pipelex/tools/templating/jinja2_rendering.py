@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from jinja2 import Template, meta
 from jinja2.exceptions import (
@@ -27,7 +27,7 @@ from pipelex.tools.templating.templating_models import PromptingStyle
 ########################################################################################
 
 
-def _add_to_templating_context(temlating_context: Dict[str, Any], jinja2_context_key: Jinja2ContextKey, value: Any) -> None:
+def _add_to_templating_context(temlating_context: dict[str, Any], jinja2_context_key: Jinja2ContextKey, value: Any) -> None:
     if jinja2_context_key in temlating_context:
         raise Jinja2StuffError(f"Jinja2 context key '{jinja2_context_key}' already in temlating_context")
     temlating_context[jinja2_context_key] = value
@@ -36,10 +36,10 @@ def _add_to_templating_context(temlating_context: Dict[str, Any], jinja2_context
 async def render_jinja2(
     template_category: Jinja2TemplateCategory,
     template_provider: TemplateProviderAbstract,
-    temlating_context: Dict[str, Any],
-    jinja2_name: Optional[str] = None,
-    jinja2: Optional[str] = None,
-    prompting_style: Optional[PromptingStyle] = None,
+    temlating_context: dict[str, Any],
+    jinja2_name: str | None = None,
+    jinja2: str | None = None,
+    prompting_style: PromptingStyle | None = None,
 ) -> str:
     jinja2_env, loader = make_jinja2_env_from_template_provider(
         template_category=template_category,

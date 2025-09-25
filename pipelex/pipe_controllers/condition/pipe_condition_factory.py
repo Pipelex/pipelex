@@ -1,4 +1,3 @@
-from typing import List, Optional
 
 from typing_extensions import override
 
@@ -13,7 +12,7 @@ from pipelex.pipe_controllers.condition.pipe_condition_details import PipeCondit
 
 class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondition]):
     @classmethod
-    def make_pipe_condition_pipe_map(cls, pipe_map: PipeConditionPipeMapBlueprint) -> List[PipeConditionPipeMap]:
+    def make_pipe_condition_pipe_map(cls, pipe_map: PipeConditionPipeMapBlueprint) -> list[PipeConditionPipeMap]:
         return [
             PipeConditionPipeMap(expression_result=expression_result, pipe_code=pipe_code) for expression_result, pipe_code in pipe_map.root.items()
         ]
@@ -25,7 +24,7 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
         domain: str,
         pipe_code: str,
         blueprint: PipeConditionBlueprint,
-        concept_codes_from_the_same_domain: Optional[List[str]] = None,
+        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeCondition:
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
@@ -37,12 +36,12 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
             code=pipe_code,
             definition=blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(
-                    domain=output_domain_and_code.domain, concept_code=output_domain_and_code.concept_code
-                )
+                    domain=output_domain_and_code.domain, concept_code=output_domain_and_code.concept_code,
+                ),
             ),
             expression_template=blueprint.expression_template,
             expression=blueprint.expression,

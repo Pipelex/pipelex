@@ -1,4 +1,3 @@
-from typing import List
 
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
@@ -52,7 +51,7 @@ class InferenceConfig(ConfigModel):
     def model_specs_path(self, backend_name: str) -> str:
         return f"{self.inference_config_path}/backends/{backend_name}.toml"
 
-    def get_model_deck_paths(self) -> List[str]:
+    def get_model_deck_paths(self) -> list[str]:
         """Get all LLM deck TOML file paths sorted alphabetically."""
         model_deck_paths = [
             str(path)

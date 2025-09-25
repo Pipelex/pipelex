@@ -1,10 +1,7 @@
-"""Organized test data for PipelexInterpreter tests."""
-
 from typing import ClassVar, List, Tuple, Type, Union
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
-# Import all test data from organized modules
 from .complex.multi_feature import COMPLEX_TEST_CASES
 from .concepts.refining_concepts import REFINING_CONCEPT_TEST_CASES
 from .concepts.simple_concepts import SIMPLE_CONCEPT_TEST_CASES
@@ -26,7 +23,7 @@ class InterpreterTestCases:
     """Test cases for PipelexInterpreter with PLX content and expected blueprints."""
 
     # Aggregate all valid test cases from organized modules
-    VALID_TEST_CASES: ClassVar[List[Tuple[str, str, PipelexBundleBlueprint]]] = [
+    VALID_TEST_CASES: ClassVar[list[tuple[str, str, PipelexBundleBlueprint]]] = [
         # Domain tests
         *DOMAIN_TEST_CASES,
         # Concept tests
@@ -49,4 +46,4 @@ class InterpreterTestCases:
     ]
 
     # Error test cases
-    ERROR_TEST_CASES: ClassVar[List[Tuple[str, str, Union[Type[Exception], Tuple[Type[Exception], ...]]]]] = ERROR_TEST_CASES
+    ERROR_TEST_CASES: ClassVar[list[tuple[str, str, type[Exception] | tuple[type[Exception], ...]]]] = ERROR_TEST_CASES

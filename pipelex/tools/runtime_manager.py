@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -17,13 +16,11 @@ class RunMode(StrEnum):
     def get_from_env_var(cls) -> "RunMode":
         if mode_str := get_optional_env(RUN_MODE_ENV_VAR_KEY):
             return RunMode(mode_str)
-        else:
-            return RunMode.NORMAL
+        return RunMode.NORMAL
 
 
 class WorkerMode(StrEnum):
-    """
-    Used for external worker, note that it can be run "for unit tests" even if it's not a unit test.
+    """Used for external worker, note that it can be run "for unit tests" even if it's not a unit test.
     """
 
     NORMAL = "normal"
@@ -56,7 +53,7 @@ class ProblemReactions(BaseModel):
 class RuntimeManager(BaseModel):
     _environment: RunEnvironment = RunEnvironment.get_from_env_var()
     _run_mode: RunMode = RunMode.get_from_env_var()
-    _worker_mode: Optional[WorkerMode] = None
+    _worker_mode: WorkerMode | None = None
 
     problem_reactions: ProblemReactions = ProblemReactions(
         template_inputs=ProblemReaction.LOG,
@@ -79,7 +76,7 @@ class RuntimeManager(BaseModel):
         return self._run_mode
 
     @property
-    def worker_mode(self) -> Optional[WorkerMode]:
+    def worker_mode(self) -> WorkerMode | None:
         return self._worker_mode
 
     @property

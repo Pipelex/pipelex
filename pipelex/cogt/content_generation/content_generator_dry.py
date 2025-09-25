@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
 from polyfactory.factories.pydantic_factory import ModelFactory
 from typing_extensions import override
@@ -22,8 +22,7 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
 class ContentGeneratorDry(ContentGeneratorProtocol):
-    """
-    This class is used to generate mock content for testing purposes.
+    """This class is used to generate mock content for testing purposes.
     It does not use any inference.
     """
 
@@ -50,14 +49,14 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_object_direct(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar:
         func_name = "make_object_direct"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
 
-        class ObjectFactory(ModelFactory[object_class]):  # type: ignore
+        class ObjectFactory(ModelFactory[object_class]):
             __model__ = object_class
             __check_model__ = True
             __use_examples__ = True
@@ -75,11 +74,11 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_text_then_object(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_main: LLMSetting,
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object: Optional[LLMPromptFactoryAbstract] = None,
+        llm_prompt_factory_for_object: LLMPromptFactoryAbstract | None = None,
     ) -> BaseModelTypeVar:
         func_name = "make_text_then_object"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -96,11 +95,11 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_object_list_direct(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
-        nb_items: Optional[int] = None,
-    ) -> List[BaseModelTypeVar]:
+        nb_items: int | None = None,
+    ) -> list[BaseModelTypeVar]:
         func_name = "make_object_list_direct"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         nb_list_items = nb_items or get_config().pipelex.dry_run_config.nb_list_items
@@ -120,13 +119,13 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_text_then_object_list(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_main: LLMSetting,
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object_list: Optional[LLMPromptFactoryAbstract] = None,
-        nb_items: Optional[int] = None,
-    ) -> List[BaseModelTypeVar]:
+        llm_prompt_factory_for_object_list: LLMPromptFactoryAbstract | None = None,
+        nb_items: int | None = None,
+    ) -> list[BaseModelTypeVar]:
         func_name = "make_text_then_object_list"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         return await self.make_object_list_direct(
@@ -144,8 +143,8 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
-        img_gen_job_params: Optional[ImgGenJobParams] = None,
-        img_gen_job_config: Optional[ImgGenJobConfig] = None,
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> GeneratedImage:
         func_name = "make_single_image"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
@@ -166,9 +165,9 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
         nb_images: int,
-        img_gen_job_params: Optional[ImgGenJobParams] = None,
-        img_gen_job_config: Optional[ImgGenJobConfig] = None,
-    ) -> List[GeneratedImage]:
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
+    ) -> list[GeneratedImage]:
         func_name = "make_image_list"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
@@ -185,10 +184,10 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     @override
     async def make_jinja2_text(
         self,
-        context: Dict[str, Any],
-        jinja2_name: Optional[str] = None,
-        jinja2: Optional[str] = None,
-        prompting_style: Optional[PromptingStyle] = None,
+        context: dict[str, Any],
+        jinja2_name: str | None = None,
+        jinja2: str | None = None,
+        prompting_style: PromptingStyle | None = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
     ) -> str:
         # TODO: Use the code that checks if the jinja2 is a valid template
@@ -207,8 +206,8 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         ocr_input: OcrInput,
         ocr_handle: str,
-        ocr_job_params: Optional[OcrJobParams] = None,
-        ocr_job_config: Optional[OcrJobConfig] = None,
+        ocr_job_params: OcrJobParams | None = None,
+        ocr_job_config: OcrJobConfig | None = None,
     ) -> OcrOutput:
         func_name = "make_ocr_extract_pages"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")

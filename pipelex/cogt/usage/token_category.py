@@ -1,4 +1,3 @@
-from typing import Dict
 
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.types import StrEnum
@@ -21,4 +20,4 @@ class TokenCategory(StrEnum):
         return CostCategory(self.value)
 
 
-NbTokensByCategoryDict = Dict[TokenCategory, int]
+NbTokensByCategoryDict = dict[TokenCategory, int]

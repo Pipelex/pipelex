@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pytest
 from pydantic import BaseModel
@@ -26,8 +26,8 @@ class Priority(Enum):
 
 class TaskStatus(BaseModel):
     is_complete: bool
-    completion_date: Optional[datetime] = None
-    notes: List[str] = []
+    completion_date: datetime | None = None
+    notes: list[str] = []
 
 
 class ComplexTask(BaseModel):
@@ -35,34 +35,31 @@ class ComplexTask(BaseModel):
     title: str
     priority: Priority
     status: TaskStatus
-    due_dates: List[datetime]
-    metadata: Dict[str, Any]
-    score: Optional[Decimal] = None
+    due_dates: list[datetime]
+    metadata: dict[str, Any]
+    score: Decimal | None = None
 
 
 class Project(BaseModel):
     name: str
     created_at: datetime
-    tasks: List[ComplexTask]
-    settings: Dict[str, Any]
+    tasks: list[ComplexTask]
+    settings: dict[str, Any]
 
 
 class TestApiSerialization:
-    """Test API-specific serialization with kajson, datetime formatting, and cleanup."""
-
     @pytest.fixture
     def datetime_content_memory(self) -> WorkingMemory:
-        """Create WorkingMemory with datetime content."""
         datetime_event = DateTimeEvent(
             event_name="Project Kickoff Meeting",
-            start_time=datetime(2024, 1, 15, 10, 0, 0),
-            end_time=datetime(2024, 1, 15, 11, 30, 0),
-            created_at=datetime(2024, 1, 1, 9, 0, 0),
+            start_time=datetime(2024, 1, 15, 10, 0, 0, tzinfo=None),
+            end_time=datetime(2024, 1, 15, 11, 30, 0, tzinfo=None),
+            created_at=datetime(2024, 1, 1, 9, 0, 0, tzinfo=None),
         )
 
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
-                concept_code="DateTimeEvent", domain="event", definition="event.DateTimeEvent", structure_class_name="DateTimeEvent"
+                concept_code="DateTimeEvent", domain="event", definition="event.DateTimeEvent", structure_class_name="DateTimeEvent",
             ),
             name="project_meeting",
             content=datetime_event,
@@ -71,7 +68,6 @@ class TestApiSerialization:
 
     @pytest.fixture
     def text_content_memory(self) -> WorkingMemory:
-        """Create WorkingMemory with text content."""
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
             name="sample_text",
@@ -81,7 +77,6 @@ class TestApiSerialization:
 
     @pytest.fixture
     def number_content_memory(self) -> WorkingMemory:
-        """Create WorkingMemory with number content."""
         number_content = NumberContent(number=3.14159)
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.NUMBER]),
@@ -91,7 +86,6 @@ class TestApiSerialization:
         return WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
     def test_serialize_working_memory_with_datetime(self, datetime_content_memory: WorkingMemory):
-        """Test that datetime content is properly serialized to ISO format strings."""
         compact_memory = ApiSerializer.serialize_working_memory_for_api(datetime_content_memory)
 
         # Should have one entry for the datetime content
@@ -124,7 +118,6 @@ class TestApiSerialization:
         assert "__class__" not in content
 
     def test_api_serialized_memory_is_json_serializable(self, datetime_content_memory: WorkingMemory):
-        """Test that API serialized memory is JSON serializable."""
         compact_memory = ApiSerializer.serialize_working_memory_for_api(datetime_content_memory)
 
         # This should NOT raise an exception now
@@ -141,7 +134,6 @@ class TestApiSerialization:
         assert isinstance(content["created_at"], str)
 
     def test_serialize_text_content(self, text_content_memory: WorkingMemory):
-        """Test that text content is handled specially."""
         compact_memory = ApiSerializer.serialize_working_memory_for_api(text_content_memory)
 
         assert len(compact_memory) == 1
@@ -153,7 +145,6 @@ class TestApiSerialization:
         assert text_blueprint["content"] == "Sample text content"
 
     def test_serialize_number_content(self, number_content_memory: WorkingMemory):
-        """Test that number content is properly serialized."""
         compact_memory = ApiSerializer.serialize_working_memory_for_api(number_content_memory)
 
         assert len(compact_memory) == 1

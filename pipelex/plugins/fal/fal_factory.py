@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGeneratedTypeError, ImgGenParameterError
@@ -75,10 +75,10 @@ class FalFactory:
         fal_application: str,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         params = img_gen_job.job_params
-        args_dict: Dict[str, Any]
-        num_inference_steps: Optional[int]
+        args_dict: dict[str, Any]
+        num_inference_steps: int | None
         match fal_application:
             case "fal-ai/flux-pro" | "fal-ai/flux-pro/v1.1":
                 num_inference_steps = params.nb_steps
@@ -134,7 +134,7 @@ class FalFactory:
         return args_dict
 
     @staticmethod
-    def make_generated_image(fal_result: Dict[str, Any]) -> GeneratedImage:
+    def make_generated_image(fal_result: dict[str, Any]) -> GeneratedImage:
         images = fal_result["images"]
         fal_image_dict = images[0]
         image_url = fal_image_dict["url"]
@@ -157,10 +157,10 @@ class FalFactory:
         return generated_image
 
     @staticmethod
-    def make_generated_image_list(fal_result: Dict[str, Any]) -> List[GeneratedImage]:
+    def make_generated_image_list(fal_result: dict[str, Any]) -> list[GeneratedImage]:
         fal_image_dicts = fal_result["images"]
 
-        generated_image_list: List[GeneratedImage] = []
+        generated_image_list: list[GeneratedImage] = []
         for fal_image_dict in fal_image_dicts:
             image_url = fal_image_dict["url"]
             if not isinstance(image_url, str):

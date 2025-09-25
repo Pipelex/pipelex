@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -18,26 +18,25 @@ class SecretMethod(StrEnum):
 
 
 class ConfigRoot(ConfigModel):
-    """
-    Main configuration class for the project.
+    """Main configuration class for the project.
 
     Attributes:
         project_name (str): Name of the current project.
+
     """
 
-    project_name: Optional[str] = None
+    project_name: str | None = None
 
     def __init__(self, **kwargs: Any):
-        """
-        Initialize the Config instance.
+        """Initialize the Config instance.
 
         Args:
             **kwargs: Keyword arguments for configuration.
 
         Raises:
             ConfigValidationError: If the provided data is invalid.
-        """
 
+        """
         try:
             super().__init__(**kwargs)
         except ValidationError as exc:

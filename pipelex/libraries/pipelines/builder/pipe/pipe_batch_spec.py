@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import Field
 from typing_extensions import override
@@ -32,14 +32,15 @@ class PipeBatchSpec(PipeSpec):
         1. branch_pipe_code must reference an existing pipe in the pipeline.
         2. When input_list_name is specified, it must reference a list in context.
         3. The branch pipe should be designed to process single items.
+
     """
 
     type: Literal["PipeBatch"] = "PipeBatch"
     category: Literal["PipeController"] = "PipeController"
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     branch_pipe_code: str
-    input_list_name: Optional[str] = None
-    input_item_name: Optional[str] = None
+    input_list_name: str | None = None
+    input_item_name: str | None = None
 
     @override
     def to_blueprint(self) -> PipeBatchBlueprint:

@@ -1,9 +1,7 @@
-"""
-make t TEST=TestLibraries
+"""make t TEST=TestLibraries
 """
 
 from pathlib import Path
-from typing import Optional
 
 import pytest
 from rich import box
@@ -20,7 +18,7 @@ from tests.integration.pipelex.test_data import LibraryTestCases
 
 def pretty_print_all_pipes(
     pipe_library: PipeLibrary,
-    title: Optional[str] = None,
+    title: str | None = None,
 ):
     console = Console()
     table = Table(
@@ -54,7 +52,7 @@ def pretty_print_all_pipes(
 
 def pretty_print_all_concepts(
     concept_library: ConceptLibrary,
-    title: Optional[str] = None,
+    title: str | None = None,
 ):
     console = Console()
     table = Table(
@@ -101,7 +99,7 @@ class TestLibraries:
         # Test individual concepts and pipes
         assert library_manager.concept_library.get_required_concept(concept_string=known_concept) is not None
         pretty_print(
-            f"Concept: {known_concept} is correctly loaded as {library_manager.concept_library.get_required_concept(concept_string=known_concept)}"
+            f"Concept: {known_concept} is correctly loaded as {library_manager.concept_library.get_required_concept(concept_string=known_concept)}",
         )
         assert library_manager.pipe_library.get_optional_pipe(known_pipe) is not None
         pretty_print(f"Pipe: {known_pipe} is correctly loaded as {library_manager.pipe_library.get_optional_pipe(known_pipe)}")

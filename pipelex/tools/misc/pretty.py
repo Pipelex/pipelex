@@ -1,5 +1,5 @@
 import shutil
-from typing import Any, ClassVar, List, Optional, Union
+from typing import Any, ClassVar
 
 from rich import print as rich_print
 from rich.markdown import Markdown
@@ -18,19 +18,19 @@ BORDER_COLOR = TerminalColor.YELLOW
 
 
 def pretty_print(
-    content: Union[str, Any],
-    title: Optional[TextType] = None,
-    subtitle: Optional[TextType] = None,
-    border_style: Optional[StyleType] = None,
+    content: str | Any,
+    title: TextType | None = None,
+    subtitle: TextType | None = None,
+    border_style: StyleType | None = None,
 ):
     PrettyPrinter.pretty_print(content=content, title=title, subtitle=subtitle, border_style=border_style)
 
 
 def pretty_print_md(
     content: str,
-    title: Optional[TextType] = None,
-    subtitle: Optional[TextType] = None,
-    border_style: Optional[StyleType] = None,
+    title: TextType | None = None,
+    subtitle: TextType | None = None,
+    border_style: StyleType | None = None,
 ):
     md_content = Markdown(content)
     PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, border_style=border_style)
@@ -47,10 +47,10 @@ class PrettyPrinter:
     @classmethod
     def pretty_print(
         cls,
-        content: Union[str, Any],
-        title: Optional[TextType] = None,
-        subtitle: Optional[TextType] = None,
-        border_style: Optional[StyleType] = None,
+        content: str | Any,
+        title: TextType | None = None,
+        subtitle: TextType | None = None,
+        border_style: StyleType | None = None,
     ):
         match cls.mode:
             case PrettyPrintMode.RICH:
@@ -61,10 +61,10 @@ class PrettyPrinter:
     @classmethod
     def pretty_print_using_rich(
         cls,
-        content: Union[str, Any],
-        title: Optional[TextType] = None,
-        subtitle: Optional[TextType] = None,
-        border_style: Optional[StyleType] = None,
+        content: str | Any,
+        title: TextType | None = None,
+        subtitle: TextType | None = None,
+        border_style: StyleType | None = None,
     ):
         if isinstance(content, str):
             if content.startswith(("http://", "https://")):
@@ -99,9 +99,9 @@ class PrettyPrinter:
     @classmethod
     def pretty_print_without_rich(
         cls,
-        content: Union[str, Any],
-        title: Optional[TextType] = None,
-        subtitle: Optional[TextType] = None,
+        content: str | Any,
+        title: TextType | None = None,
+        subtitle: TextType | None = None,
     ):
         if isinstance(content, str) and content.startswith(("http://", "https://")):
             cls.pretty_print_url_without_rich(content=content, title=title, subtitle=subtitle)
@@ -112,7 +112,7 @@ class PrettyPrinter:
         terminal_width = shutil.get_terminal_size().columns
         content_str = f"{content}"
         max_content_width = terminal_width - len(title) - 8  # Accounting for frame and padding
-        wrapped_lines: List[str] = []
+        wrapped_lines: list[str] = []
         for line in content_str.splitlines():
             while len(line) > max_content_width:
                 wrapped_lines.append(line[:max_content_width])
@@ -137,9 +137,9 @@ class PrettyPrinter:
     @classmethod
     def pretty_print_url_without_rich(
         cls,
-        content: Union[str, Any],
-        title: Optional[TextType] = None,
-        subtitle: Optional[TextType] = None,
+        content: str | Any,
+        title: TextType | None = None,
+        subtitle: TextType | None = None,
     ):
         title = title or ""
         if subtitle:

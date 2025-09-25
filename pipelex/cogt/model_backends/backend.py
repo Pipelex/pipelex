@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import Field
 
@@ -8,20 +8,20 @@ from pipelex.tools.config.config_model import ConfigModel
 
 class InferenceBackend(ConfigModel):
     name: str
-    endpoint: Optional[str] = None
-    api_key: Optional[str] = None
-    extra_config: Dict[str, Any] = Field(default_factory=dict)
-    model_specs: Dict[str, InferenceModelSpec] = Field(default_factory=dict)
+    endpoint: str | None = None
+    api_key: str | None = None
+    extra_config: dict[str, Any] = Field(default_factory=dict)
+    model_specs: dict[str, InferenceModelSpec] = Field(default_factory=dict)
 
-    def list_model_names(self) -> List[str]:
+    def list_model_names(self) -> list[str]:
         """List the names of all models in the backend."""
         return list(self.model_specs.keys())
 
-    def get_model_spec(self, model_name: str) -> Optional[InferenceModelSpec]:
+    def get_model_spec(self, model_name: str) -> InferenceModelSpec | None:
         """Get a model spec by name."""
         model_spec = self.model_specs.get(model_name)
         return model_spec
 
-    def get_extra_config(self, key: str) -> Optional[Any]:
+    def get_extra_config(self, key: str) -> Any | None:
         """Get an extra config by key."""
         return self.extra_config.get(key)

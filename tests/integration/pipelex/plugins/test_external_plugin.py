@@ -1,4 +1,3 @@
-from typing import Type
 
 import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
@@ -49,7 +48,7 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         class ObjectFactory(ModelFactory[schema]):  # type: ignore
             __model__ = schema

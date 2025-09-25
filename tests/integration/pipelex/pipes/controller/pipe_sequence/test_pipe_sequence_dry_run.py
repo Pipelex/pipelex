@@ -36,7 +36,7 @@ class TestPipeSequenceDryRun:
 
         # Create structured DiscordChannelUpdate objects
         discord_channel_updates = ListContent[DiscordChannelUpdate](
-            items=[DiscordChannelUpdate.model_validate(article_data) for article_data in discord_channel_updates_data]
+            items=[DiscordChannelUpdate.model_validate(article_data) for article_data in discord_channel_updates_data],
         )
 
         # Create Stuff object for the discord channel updates list

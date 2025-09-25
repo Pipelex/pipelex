@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import field_validator
 
@@ -10,9 +10,9 @@ from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 class PipeParallelBlueprint(PipeBlueprint):
     type: Literal["PipeParallel"] = "PipeParallel"
     category: Literal["PipeController"] = "PipeController"
-    parallels: List[SubPipeBlueprint]
+    parallels: list[SubPipeBlueprint]
     add_each_output: bool = True
-    combined_output: Optional[str] = None
+    combined_output: str | None = None
 
     @field_validator("combined_output", mode="before")
     def validate_combined_output(cls, combined_output: str) -> str:

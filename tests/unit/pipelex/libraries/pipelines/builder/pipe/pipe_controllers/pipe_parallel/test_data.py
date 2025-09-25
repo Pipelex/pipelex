@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
@@ -22,7 +22,6 @@ class PipeParallelTestCases:
                 SubPipeSpec(the_pipe_code="validate_data", result="validation"),
             ],
         ),
-        "test_domain",
         PipeParallelBlueprint(
             definition="Run pipes in parallel",
             inputs={"data": InputRequirementBlueprint(concept="Data")},
@@ -53,7 +52,6 @@ class PipeParallelTestCases:
             add_each_output=False,
             combined_output="MergedData",
         ),
-        "test_domain",
         PipeParallelBlueprint(
             definition="Parallel with combined output",
             inputs={"input": InputRequirementBlueprint(concept="Input")},
@@ -69,7 +67,7 @@ class PipeParallelTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeParallelSpec, str, PipeParallelBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, PipeParallelSpec, PipeParallelBlueprint]]] = [
         SIMPLE_PARALLEL,
         PARALLEL_WITH_COMBINED,
     ]

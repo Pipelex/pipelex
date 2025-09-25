@@ -1,13 +1,8 @@
-"""Invalid PLX test cases focused on PLX structure and PipelexBundleBlueprint validation."""
-
-from typing import List, Tuple, Type, Union
-
 from pydantic import ValidationError
 
 from pipelex.core.domains.exceptions import DomainError
 from pipelex.core.interpreter import PLXDecodeError
 
-# PLX Syntax Errors
 INVALID_PLX_SYNTAX = (
     "invalid_plx_syntax",
     """domain = "test_domain"
@@ -207,7 +202,7 @@ definition = "Domain with invalid array syntax"
 )
 
 # Export all error test cases
-ERROR_TEST_CASES: List[Tuple[str, str, Union[Type[Exception], Tuple[Type[Exception], ...]]]] = [
+ERROR_TEST_CASES: list[tuple[str, str, type[Exception] | tuple[type[Exception], ...]]] = [
     # PLX Syntax Errors
     INVALID_PLX_SYNTAX,
     MALFORMED_SECTION,

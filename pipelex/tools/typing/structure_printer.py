@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Type, Union, get_args, get_origin, get_type_hints
+from typing import Any, Union, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 
@@ -24,9 +24,9 @@ class StructurePrinter:
 
         if str(origin).endswith("Literal") and args:  # Handle both typing.Literal and typing_extensions.Literal
             # For enum values, just get their values
-            values: List[str] = []
+            values: list[str] = []
             for arg in args:
-                if isinstance(arg, Enum) or isinstance(arg, StrEnum):
+                if isinstance(arg, (Enum, StrEnum)):
                     values.append(f'"{arg.value}"')
                 else:
                     values.append(repr(arg))
@@ -35,22 +35,21 @@ class StructurePrinter:
                 return "Literal[\n        " + ",\n        ".join(values) + ",\n    ]"
             return f"Literal[{', '.join(values)}]"
 
-        if (origin is list or origin is List) and args:
+        if (origin is list or origin is list) and args:
             return f"List[{self.pretty_type(args[0])}]"
-        if (origin is dict or origin is Dict) and args:
+        if (origin is dict or origin is dict) and args:
             return f"Dict[{self.pretty_type(args[0])}, {self.pretty_type(args[1])}]"
         return str(tp)
 
     def get_type_structure(
         self,
-        tp: Type[Any],
-        seen_types: Optional[Set[str]] = None,
-        collected_types: Optional[Dict[str, Type[Any]]] = None,
-        collected_enums: Optional[Dict[str, Type[Enum]]] = None,
-        base_class: Type[Any] = BaseModel,
-    ) -> List[str]:
-        """
-        Get the structure of a type, listing referenced subclasses of base_class and enums.
+        tp: type[Any],
+        seen_types: set[str] | None = None,
+        collected_types: dict[str, type[Any]] | None = None,
+        collected_enums: dict[str, type[Enum]] | None = None,
+        base_class: type[Any] = BaseModel,
+    ) -> list[str]:
+        """Get the structure of a type, listing referenced subclasses of base_class and enums.
 
         Args:
             tp: The type to analyze
@@ -58,6 +57,7 @@ class StructurePrinter:
             collected_types: Dictionary of collected types to analyze
             collected_enums: Dictionary of collected enums
             base_class: The base class to check for inheritance (defaults to BaseModel)
+
         """
         if seen_types is None:
             seen_types = set()
@@ -83,10 +83,10 @@ class StructurePrinter:
 
             if str(origin).endswith("Literal") and args:  # Handle both typing.Literal and typing_extensions.Literal
                 # For enum values, just get their values
-                values: List[str] = []
+                values: list[str] = []
                 enum_type = None
                 for arg in args:
-                    if isinstance(arg, Enum) or isinstance(arg, StrEnum):
+                    if isinstance(arg, (Enum, StrEnum)):
                         values.append(arg.value)
                         if enum_type is None:
                             enum_type = type(arg)
@@ -97,19 +97,19 @@ class StructurePrinter:
                     collected_enums[enum_type.__name__] = enum_type
                 # Return multi-line format for Literal fields
                 if len(values) > 1:
-                    lines: List[str] = []
+                    lines: list[str] = []
                     for value in values:
                         lines.append(f'"{value}"')
                     return "Literal[\n        " + ",\n        ".join(lines) + ",\n    ]"
                 return f"Literal[{', '.join(values)}]"
 
-            if origin in (list, List):
+            if origin in (list, list):
                 return f"List[{format_type(args[0])}]"
-            if origin in (dict, Dict):
+            if origin in (dict, dict):
                 return f"Dict[{format_type(args[0])}, {format_type(args[1])}]"
             return str(tp)
 
-        def collect_types(tp: Type[Any]) -> None:
+        def collect_types(tp: type[Any]) -> None:
             """Recursively collect types and enums"""
             origin = get_origin(tp)
             args = get_args(tp)
@@ -118,20 +118,14 @@ class StructurePrinter:
                 if origin is Union:
                     non_none = [a for a in args if a is not type(None)]
                     for arg in non_none:
-                        if isinstance(arg, type):
+                        if isinstance(arg, type) or hasattr(arg, "__origin__"):
                             collect_types(arg)
-                        elif hasattr(arg, "__origin__"):  # Handle nested generics
-                            collect_types(arg)
-                elif origin in (list, List):
-                    if isinstance(args[0], type):
+                elif origin in (list, list):
+                    if isinstance(args[0], type) or hasattr(args[0], "__origin__"):
                         collect_types(args[0])
-                    elif hasattr(args[0], "__origin__"):  # Handle nested generics
-                        collect_types(args[0])
-                elif origin in (dict, Dict):
+                elif origin in (dict, dict):
                     for arg in args:
-                        if isinstance(arg, type):
-                            collect_types(arg)
-                        elif hasattr(arg, "__origin__"):  # Handle nested generics
+                        if isinstance(arg, type) or hasattr(arg, "__origin__"):
                             collect_types(arg)
                 return
 
@@ -150,8 +144,7 @@ class StructurePrinter:
                     if (
                         issubclass(base, BaseModel)
                         and base is not BaseModel
-                        and base.__module__ != "pydantic.main"
-                        and base.__module__ != "abc"
+                        and base.__module__ not in ("pydantic.main", "abc")
                         and not base.__module__.startswith("pipelex.core")
                     ):
                         collect_types(base)
@@ -165,7 +158,7 @@ class StructurePrinter:
                             ftype = type_hints[fname]
                             collect_types(ftype)
                     elif hasattr(tp, "__annotations__"):
-                        for fname, ftype in type_hints.items():
+                        for _, ftype in type_hints.items():
                             collect_types(ftype)
                 except (TypeError, AttributeError):
                     # Handle cases where type hints cannot be retrieved
@@ -175,7 +168,7 @@ class StructurePrinter:
         collect_types(tp)
 
         # Generate output
-        output: List[str] = []
+        output: list[str] = []
 
         # First output the main class and its dependencies
         for class_name, class_type in collected_types.items():
@@ -236,7 +229,7 @@ class StructurePrinter:
                     fields = [(type_k, type_hints[type_k]) for type_k in sorted(type_hints.keys())]
 
                 # Check if all fields are inherited
-                parent_fields: Set[str] = set()
+                parent_fields: set[str] = set()
                 for base in class_type.__bases__:
                     try:
                         parent_fields.update(get_type_hints(base).keys())
@@ -281,9 +274,9 @@ class StructurePrinter:
                             field_line += " = None"
                         elif field_default is not None:
                             if isinstance(field_default, bool):
-                                field_line += f" = {str(field_default)}"
+                                field_line += f" = {field_default!s}"
                             elif not isinstance(field_default, (BaseModel, list, dict)):
-                                field_line += f" = {repr(field_default)}"
+                                field_line += f" = {field_default!r}"
 
                         # Add description as a comment if available
                         # First check if there's a direct field description from model_fields
@@ -291,8 +284,8 @@ class StructurePrinter:
                             field_line += f"  # {field_description}"
                         # Then check if the field type itself has model_fields and a description
                         # This handles nested content types that have field descriptions
-                        elif hasattr(ftype, "model_fields") and fname in ftype.model_fields and hasattr(ftype.model_fields[fname], "description"):  # type: ignore
-                            field_line += f"  # {ftype.model_fields[fname].description}"  # type: ignore
+                        elif hasattr(ftype, "model_fields") and fname in ftype.model_fields and hasattr(ftype.model_fields[fname], "description"): # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                            field_line += f"  # {ftype.model_fields[fname].description}" # pyright: ignore[reportUnknownMemberType]
 
                         # Split multi-line field lines
                         if "\n" in field_line:
@@ -319,7 +312,6 @@ class StructurePrinter:
             if enum_type.__doc__ and enum_type.__doc__.strip() != "An enumeration.":
                 doc = enum_type.__doc__.strip()
                 output.append(f'    """{doc}"""')
-            for member in enum_type:
-                output.append(f'    {member.name} = "{member.value}"')
+            output += [f'    {member.name} = "{member.value}"' for member in enum_type]
 
         return output

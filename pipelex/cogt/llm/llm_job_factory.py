@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImage
@@ -18,8 +18,8 @@ class LLMJobFactory:
         cls,
         llm_prompt: LLMPrompt,
         llm_job_params: LLMJobParams,
-        llm_job_config: Optional[LLMJobConfig] = None,
-        job_metadata: Optional[JobMetadata] = None,
+        llm_job_config: LLMJobConfig | None = None,
+        job_metadata: JobMetadata | None = None,
     ) -> LLMJob:
         config = get_config()
         llm_config = config.cogt.llm_config
@@ -27,7 +27,7 @@ class LLMJobFactory:
             job_metadata.update(
                 JobMetadata(
                     job_category=JobCategory.LLM_JOB,
-                )
+                ),
             )
         else:
             job_metadata = JobMetadata(
@@ -49,10 +49,10 @@ class LLMJobFactory:
     async def make_llm_job_from_prompt_factory(
         cls,
         llm_prompt_factory: LLMPromptFactoryAbstract,
-        llm_prompt_arguments: Dict[str, Any],
+        llm_prompt_arguments: dict[str, Any],
         llm_job_params: LLMJobParams,
-        llm_job_config: Optional[LLMJobConfig] = None,
-        job_metadata: Optional[JobMetadata] = None,
+        llm_job_config: LLMJobConfig | None = None,
+        job_metadata: JobMetadata | None = None,
     ) -> LLMJob:
         log.debug(llm_prompt_arguments, title="llm_prompt_arguments")
         llm_prompt = await llm_prompt_factory.make_llm_prompt_from_args(**llm_prompt_arguments)
@@ -69,10 +69,10 @@ class LLMJobFactory:
     async def make_llm_job_from_prompt_template(
         cls,
         llm_prompt_template: LLMPromptTemplate,
-        llm_prompt_arguments: Dict[str, Any],
+        llm_prompt_arguments: dict[str, Any],
         llm_job_params: LLMJobParams,
-        llm_job_config: Optional[LLMJobConfig] = None,
-        job_metadata: Optional[JobMetadata] = None,
+        llm_job_config: LLMJobConfig | None = None,
+        job_metadata: JobMetadata | None = None,
     ) -> LLMJob:
         log.debug(llm_prompt_arguments, title="llm_prompt_arguments")
         llm_prompt = await llm_prompt_template.make_llm_prompt_from_args(**llm_prompt_arguments)
@@ -88,11 +88,11 @@ class LLMJobFactory:
     def make_llm_job_from_prompt_contents(
         cls,
         llm_job_params: LLMJobParams,
-        user_text: Optional[str] = None,
-        system_text: Optional[str] = None,
-        user_images: Optional[List[PromptImage]] = None,
-        llm_job_config: Optional[LLMJobConfig] = None,
-        job_metadata: Optional[JobMetadata] = None,
+        user_text: str | None = None,
+        system_text: str | None = None,
+        user_images: list[PromptImage] | None = None,
+        llm_job_config: LLMJobConfig | None = None,
+        job_metadata: JobMetadata | None = None,
     ) -> LLMJob:
         config = get_config()
         llm_config = config.cogt.llm_config
@@ -100,7 +100,7 @@ class LLMJobFactory:
             job_metadata.update(
                 JobMetadata(
                     job_category=JobCategory.LLM_JOB,
-                )
+                ),
             )
         else:
             job_metadata = JobMetadata(

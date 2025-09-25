@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
@@ -19,10 +19,9 @@ class PipeConditionTestCases:
                 root={
                     "active": "process_active",
                     "inactive": "process_inactive",
-                }
+                },
             ),
         ),
-        "test_domain",
         PipeConditionBlueprint(
             definition="Choose pipe based on condition",
             inputs={"data": InputRequirementBlueprint(concept="Data")},
@@ -35,7 +34,7 @@ class PipeConditionTestCases:
                 root={
                     "active": "process_active",
                     "inactive": "process_inactive",
-                }
+                },
             ),
             default_pipe_code=None,
             add_alias_from_expression_to=None,
@@ -55,12 +54,11 @@ class PipeConditionTestCases:
                     "A": "process_a",
                     "B": "process_b",
                     "C": "process_c",
-                }
+                },
             ),
             default_pipe_code="process_default",
             add_alias_from_expression_to="category_result",
         ),
-        "test_domain",
         PipeConditionBlueprint(
             definition="Conditional with template",
             inputs={"item": InputRequirementBlueprint(concept="Item")},
@@ -74,14 +72,14 @@ class PipeConditionTestCases:
                     "A": "process_a",
                     "B": "process_b",
                     "C": "process_c",
-                }
+                },
             ),
             default_pipe_code="process_default",
             add_alias_from_expression_to="category_result",
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeConditionSpec, str, PipeConditionBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, PipeConditionSpec, PipeConditionBlueprint]]] = [
         SIMPLE_CONDITION,
         CONDITION_WITH_TEMPLATE,
     ]

@@ -5,8 +5,6 @@ from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Bluepr
 
 
 class TestPipelexInterpreterJinja2PLX:
-    """Test Jinja2 pipe to PLX string conversion."""
-
     @pytest.mark.parametrize(
         "pipe_name,blueprint,expected_plx",
         [
@@ -45,6 +43,5 @@ jinja2_name = "data_formatter\"""",
         ],
     )
     def test_jinja2_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeJinja2Blueprint, expected_plx: str):
-        """Test converting Jinja2 pipe blueprint to PLX string."""
         result = PipelexInterpreter.jinja2_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

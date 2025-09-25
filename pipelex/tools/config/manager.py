@@ -1,7 +1,7 @@
 import importlib
 import os
 from configparser import ConfigParser
-from typing import Any, Dict, Optional
+from typing import Any
 
 import toml
 
@@ -45,7 +45,8 @@ class ConfigManager:
     @property
     def local_root_dir(self) -> str:
         """Get the root directory of the project using pipelex.
-        This is the directory from where the command is being run."""
+        This is the directory from where the command is being run.
+        """
         return os.path.abspath(os.getcwd())
 
     @property
@@ -56,29 +57,30 @@ class ConfigManager:
     def pipelex_specific_config_file_path(self) -> str:
         return os.path.join(self.pipelex_config_dir, CONFIG_NAME)
 
-    def get_pipelex_config(self) -> Dict[str, Any]:
+    def get_pipelex_config(self) -> dict[str, Any]:
         """Get the pipelex configuration from pipelex.toml.
 
         Returns:
             Dict[str, Any]: The configuration dictionary from pipelex.toml
+
         """
         config_path = self.pipelex_root_config_path
         config = load_toml_from_path(config_path)
         return config
 
-    def get_local_config(self) -> Dict[str, Any]:
+    def get_local_config(self) -> dict[str, Any]:
         """Get the local pipelex configuration from pipelex.toml in the project root.
 
         Returns:
             Dict[str, Any]: The configuration dictionary from the local pipelex.toml
+
         """
         config_path = os.path.join(self.local_root_dir, CONFIG_NAME)
         config = failable_load_toml_from_path(config_path)
         return config or {}
 
-    def load_inheritance_config(self, the_pipelex_config: Dict[str, Any]):
-        """
-        Load the config by inheritance in a pyproject.toml file.
+    def load_inheritance_config(self, the_pipelex_config: dict[str, Any]):
+        """Load the config by inheritance in a pyproject.toml file.
         This will be removed in the future.
         Requires to have a pyproject.toml file in the project root.
         """
@@ -87,7 +89,7 @@ class ConfigManager:
             print(f"pyproject.toml not found in {self.local_root_dir}")
             return
 
-        def _find_package_path(package_name: str) -> Optional[str]:
+        def _find_package_path(package_name: str) -> str | None:
             """Find package path by importing it"""
             try:
                 module = importlib.import_module(package_name)
@@ -109,7 +111,7 @@ class ConfigManager:
                         if config:
                             deep_update(the_pipelex_config, config)
 
-    def load_config(self, specific_config_path: Optional[str] = None) -> Dict[str, Any]:
+    def load_config(self, specific_config_path: str | None = None) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
 
         The configuration is loaded and merged in the following order:
@@ -122,8 +124,8 @@ class ConfigManager:
 
         Returns:
             Dict[str, Any]: The merged configuration dictionary
-        """
 
+        """
         #################### 1. Load pipelex config ####################
         pipelex_config = self.get_pipelex_config()
 
@@ -160,7 +162,7 @@ class ConfigManager:
 
         return pipelex_config
 
-    def get_project_name(self) -> Optional[str]:
+    def get_project_name(self) -> str | None:
         """Get the project name from configuration files.
 
         Checks the following files in order:
@@ -171,6 +173,7 @@ class ConfigManager:
 
         Returns:
             Optional[str]: The project name or None if not found
+
         """
         # First check pipelex's pyproject.toml
         pipelex_pyproject_path = os.path.join(os.path.dirname(self.local_root_dir), "pyproject.toml")
@@ -230,7 +233,7 @@ class ConfigManager:
                                     return line[start + 1 : end]
         except FileNotFoundError as exc:
             print(f"setup.py not found at {setup_py_path}: {exc}")
-        except (IOError, UnicodeDecodeError) as exc:
+        except (OSError, UnicodeDecodeError) as exc:
             print(f"Failed to read setup.py at {setup_py_path}: {exc}")
 
         print("Could not find project name in any of the configuration files")

@@ -1,12 +1,10 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec, ConceptStructureSpecFieldType
 
 
 class ConceptBlueprintTestCases:
-    """Test cases for ConceptBlueprint.to_blueprint conversion."""
-
     SIMPLE_CONCEPT = (
         "simple_concept",
         ConceptSpec(
@@ -148,7 +146,7 @@ class ConceptBlueprintTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, ConceptSpec, ConceptBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, ConceptSpec, ConceptBlueprint]]] = [
         SIMPLE_CONCEPT,
         CONCEPT_WITH_REFINES,
         CONCEPT_WITH_TEXT_FIELD,

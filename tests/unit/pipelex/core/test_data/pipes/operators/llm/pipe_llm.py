@@ -1,5 +1,3 @@
-"""PipeLLM test cases."""
-
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint

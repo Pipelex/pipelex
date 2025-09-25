@@ -17,7 +17,8 @@ from pipelex.tools.misc.string_utils import (
 
 class BadStr:
     def __str__(self) -> str:  # pyright: ignore[reportImplicitOverride] pragma: no cover - used only for raising
-        raise RuntimeError("boom")
+        msg = "boom"
+        raise RuntimeError(msg)
 
 
 @pytest.mark.parametrize(
@@ -262,7 +263,6 @@ class TestMatchesWildcardPattern:
         ],
     )
     def test_matches_wildcard_pattern(self, text: str, pattern: str, expected: bool) -> None:
-        """Test wildcard pattern matching with comprehensive test cases."""
         assert matches_wildcard_pattern(text, pattern) is expected
 
     def test_matches_wildcard_pattern_model_routing_examples(self) -> None:

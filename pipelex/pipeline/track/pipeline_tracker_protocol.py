@@ -2,7 +2,7 @@
 # pyright: reportUnknownArgumentType=false
 # pyright: reportUnknownMemberType=false
 # pyright: reportMissingTypeArgument=false
-from typing import List, Optional, Protocol
+from typing import Protocol
 
 from typing_extensions import override
 
@@ -19,21 +19,21 @@ class PipelineTrackerProtocol(Protocol):
 
     def add_pipe_step(
         self,
-        from_stuff: Optional[Stuff],
+        from_stuff: Stuff | None,
         to_stuff: Stuff,
         pipe_code: str,
         comment: str,
-        pipe_layer: List[str],
-        as_item_index: Optional[int] = None,
+        pipe_layer: list[str],
+        as_item_index: int | None = None,
         is_with_edge: bool = True,
     ): ...
 
     def add_batch_step(
         self,
-        from_stuff: Optional[Stuff],
+        from_stuff: Stuff | None,
         to_stuff: Stuff,
         to_branch_index: int,
-        pipe_layer: List[str],
+        pipe_layer: list[str],
         comment: str,
     ): ...
 
@@ -41,7 +41,7 @@ class PipelineTrackerProtocol(Protocol):
         self,
         from_stuff: Stuff,
         to_stuff: Stuff,
-        pipe_layer: List[str],
+        pipe_layer: list[str],
         comment: str,
     ): ...
 
@@ -50,7 +50,7 @@ class PipelineTrackerProtocol(Protocol):
         from_stuff: Stuff,
         to_condition: PipeConditionDetails,
         condition_expression: str,
-        pipe_layer: List[str],
+        pipe_layer: list[str],
         comment: str,
     ): ...
 
@@ -58,16 +58,16 @@ class PipelineTrackerProtocol(Protocol):
         self,
         from_condition: PipeConditionDetails,
         to_stuff: Stuff,
-        pipe_layer: List[str],
+        pipe_layer: list[str],
         comment: str,
     ): ...
 
     def output_flowchart(
         self,
-        title: Optional[str] = None,
-        subtitle: Optional[str] = None,
+        title: str | None = None,
+        subtitle: str | None = None,
         is_detailed: bool = False,
-    ) -> Optional[str]: ...
+    ) -> str | None: ...
 
 
 class PipelineTrackerNoOp(PipelineTrackerProtocol):
@@ -90,12 +90,12 @@ class PipelineTrackerNoOp(PipelineTrackerProtocol):
     @override
     def add_pipe_step(
         self,
-        from_stuff: Optional[Stuff],
+        from_stuff: Stuff | None,
         to_stuff: Stuff,
         pipe_code: str,
         comment: str,
-        pipe_layer: List[str],
-        as_item_index: Optional[int] = None,
+        pipe_layer: list[str],
+        as_item_index: int | None = None,
         is_with_edge: bool = True,
     ) -> None:
         pass
@@ -103,10 +103,10 @@ class PipelineTrackerNoOp(PipelineTrackerProtocol):
     @override
     def add_batch_step(
         self,
-        from_stuff: Optional[Stuff],
+        from_stuff: Stuff | None,
         to_stuff: Stuff,
         to_branch_index: int,
-        pipe_layer: List[str],
+        pipe_layer: list[str],
         comment: str,
     ) -> None:
         pass
@@ -116,7 +116,7 @@ class PipelineTrackerNoOp(PipelineTrackerProtocol):
         self,
         from_stuff: Stuff,
         to_stuff: Stuff,
-        pipe_layer: List[str],
+        pipe_layer: list[str],
         comment: str,
     ) -> None:
         pass
@@ -127,7 +127,7 @@ class PipelineTrackerNoOp(PipelineTrackerProtocol):
         from_stuff: Stuff,
         to_condition: PipeConditionDetails,
         condition_expression: str,
-        pipe_layer: List[str],
+        pipe_layer: list[str],
         comment: str,
     ) -> None:
         pass
@@ -137,7 +137,7 @@ class PipelineTrackerNoOp(PipelineTrackerProtocol):
         self,
         from_condition: PipeConditionDetails,
         to_stuff: Stuff,
-        pipe_layer: List[str],
+        pipe_layer: list[str],
         comment: str,
     ) -> None:
         pass
@@ -145,8 +145,8 @@ class PipelineTrackerNoOp(PipelineTrackerProtocol):
     @override
     def output_flowchart(
         self,
-        title: Optional[str] = None,
-        subtitle: Optional[str] = None,
+        title: str | None = None,
+        subtitle: str | None = None,
         is_detailed: bool = False,
     ) -> None:
         pass

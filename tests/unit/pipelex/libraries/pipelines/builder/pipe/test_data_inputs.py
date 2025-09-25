@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
@@ -33,7 +33,7 @@ class InputRequirementTestCases:
         InputRequirementBlueprint(concept="domain.ConceptName"),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, InputRequirementSpec, str, InputRequirementBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, InputRequirementSpec, str, InputRequirementBlueprint]]] = [
         SIMPLE_TEXT_INPUT,
         IMAGE_INPUT,
         CUSTOM_CONCEPT_INPUT,

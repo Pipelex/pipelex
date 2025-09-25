@@ -1,11 +1,7 @@
-"""Test data for make_output_multiplicity function tests."""
-
-from typing import Optional, Tuple
-
 from pipelex.core.pipes.pipe_run_params import OutputMultiplicityResolution, PipeOutputMultiplicity
 
 # Test cases format: (nb_output, multiple_output, expected_result, test_description)
-MAKE_OUTPUT_MULTIPLICITY_TEST_CASES: list[Tuple[Optional[int], Optional[bool], Optional[PipeOutputMultiplicity], str]] = [
+MAKE_OUTPUT_MULTIPLICITY_TEST_CASES: list[tuple[int | None, bool | None, PipeOutputMultiplicity | None, str]] = [
     # nb_output, multiple_output, expected_result, description
     # Test cases where nb_output takes precedence
     (3, None, 3, "nb_output=3, multiple_output=None -> returns 3"),
@@ -31,7 +27,7 @@ MAKE_OUTPUT_MULTIPLICITY_TEST_CASES: list[Tuple[Optional[int], Optional[bool], O
 
 # Test cases format: (base, override, expected_result, description)
 OUTPUT_MULTIPLICITY_TO_APPLY_TEST_CASES: list[
-    Tuple[Optional[PipeOutputMultiplicity], Optional[PipeOutputMultiplicity], OutputMultiplicityResolution, str]
+    tuple[PipeOutputMultiplicity | None, PipeOutputMultiplicity | None, OutputMultiplicityResolution, str]
 ] = [
     # base, override, expected_result, description
     # Override is None - use base value as-is

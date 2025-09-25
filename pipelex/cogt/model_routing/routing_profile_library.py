@@ -1,7 +1,6 @@
-from typing import Dict, Optional
+from typing import Self
 
 from pydantic import Field, RootModel, ValidationError
-from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.exceptions import RoutingProfileLibraryError, RoutingProfileLibraryNotFoundError
@@ -14,14 +13,14 @@ from pipelex.cogt.model_routing.routing_profile_factory import (
 from pipelex.config import get_config
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path
 
-RoutingProfileLibraryRoot = Dict[str, RoutingProfile]
+RoutingProfileLibraryRoot = dict[str, RoutingProfile]
 
 
 class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
     """Library for managing routing profile configurations."""
 
     root: RoutingProfileLibraryRoot = Field(default_factory=dict)
-    _active_config: Optional[str] = None
+    _active_config: str | None = None
 
     @property
     def active_profile(self) -> RoutingProfile:
@@ -46,11 +45,11 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
             catalog_dict = load_toml_from_path(path=routing_profile_library_path)
         except FileNotFoundError as not_found_exc:
             raise RoutingProfileLibraryNotFoundError(
-                f"Failed to load routing profile library from file '{routing_profile_library_path}': {not_found_exc}"
+                f"Failed to load routing profile library from file '{routing_profile_library_path}': {not_found_exc}",
             ) from not_found_exc
         except TOMLValidationError as toml_validation_exc:
             raise RoutingProfileLibraryError(
-                f"Failed to load routing profile library from file '{routing_profile_library_path}': {toml_validation_exc}"
+                f"Failed to load routing profile library from file '{routing_profile_library_path}': {toml_validation_exc}",
             ) from toml_validation_exc
 
         try:
@@ -61,7 +60,7 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         # Validate that the active config exists
         if catalog_blueprint.active not in catalog_blueprint.profiles:
             raise RoutingProfileLibraryError(
-                f"Active profile '{catalog_blueprint.active}' not found in library. Available profiles: {list(catalog_blueprint.profiles.keys())}"
+                f"Active profile '{catalog_blueprint.active}' not found in library. Available profiles: {list(catalog_blueprint.profiles.keys())}",
             )
 
         # Load all profiles
@@ -76,7 +75,7 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         log.debug(f"Loaded routing profile library with active profile: '{self._active_config}'")
         log.debug(f"Available profiles: {list(self.root.keys())}")
 
-    def get_backend_match_for_model_from_active_routing_profile(self, model_name: str) -> Optional[BackendMatchForModel]:
+    def get_backend_match_for_model_from_active_routing_profile(self, model_name: str) -> BackendMatchForModel | None:
         """Get the backend name for a given model.
 
         Args:
@@ -87,6 +86,7 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
 
         Raises:
             RoutingProfileLibraryError: If no active profile is set or config not found
+
         """
         profile = self.active_profile
         backend_match_for_model = profile.get_backend_match_for_model(model_name)

@@ -8,14 +8,13 @@ from .test_data import PipeBatchTestCases
 
 class TestPipeBatchBlueprintConversion:
     @pytest.mark.parametrize(
-        "test_name,pipe_spec,domain,expected_blueprint",
+        "test_name,pipe_spec,expected_blueprint",
         PipeBatchTestCases.TEST_CASES,
     )
     def test_pipe_batch_spec_to_blueprint(
         self,
-        test_name: str,
+        _: str,
         pipe_spec: PipeBatchSpec,
-        domain: str,
         expected_blueprint: PipeBatchBlueprint,
     ):
         result = pipe_spec.to_blueprint()

@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -17,7 +17,6 @@ class PipeLLMTestCases:
             output="Text",
             prompt_template="Write about $topic",
         ),
-        "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
             definition="Generate text",
@@ -36,7 +35,6 @@ class PipeLLMTestCases:
             output="Text",
             prompt_template="Generate something interesting",
         ),
-        "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
             definition="Generate without inputs",
@@ -55,7 +53,6 @@ class PipeLLMTestCases:
             prompt_template="Generate text",
             llm="llm_to_reason",
         ),
-        "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
             definition="Generate with preset",
@@ -79,7 +76,6 @@ class PipeLLMTestCases:
                 max_tokens=None,  # "auto" is handled at conversion to core
             ),
         ),
-        "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
             definition="Generate with settings",
@@ -103,7 +99,6 @@ class PipeLLMTestCases:
             system_prompt="You are a data analyst",
             prompt_template="Analyze: @data",
         ),
-        "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
             definition="Generate with system prompt",
@@ -124,7 +119,6 @@ class PipeLLMTestCases:
             prompt_template="Generate items",
             multiple_output=True,
         ),
-        "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
             definition="Generate multiple items",
@@ -145,7 +139,6 @@ class PipeLLMTestCases:
             prompt_template="Generate items",
             nb_output=5,
         ),
-        "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
             definition="Generate exactly 5 items",
@@ -174,7 +167,6 @@ class PipeLLMTestCases:
             prompt_template_to_structure="Structure the output",
             system_prompt_to_structure="You are a data structurer",
         ),
-        "test_domain",
         PipeLLMBlueprint(
             type="PipeLLM",
             definition="Extract structured data",
@@ -192,7 +184,7 @@ class PipeLLMTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeLLMSpec, str, PipeLLMBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, PipeLLMSpec, PipeLLMBlueprint]]] = [
         SIMPLE_LLM,
         LLM_NO_INPUTS,
         LLM_WITH_PRESET,

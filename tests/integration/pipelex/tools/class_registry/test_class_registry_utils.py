@@ -16,7 +16,7 @@ class TestClassRegistryUtilsIntegration:
         """Integration test for registering StuffContent classes recursively."""
         class_registry = get_class_registry()
         ClassRegistryUtils.register_classes_in_folder(
-            folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH, base_class=StuffContent, is_recursive=True
+            folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH, base_class=StuffContent, is_recursive=True,
         )
 
         # Should register classes that inherit from StuffContent
@@ -28,7 +28,7 @@ class TestClassRegistryUtilsIntegration:
         """Integration test for registering StuffContent classes non-recursively."""
         class_registry = get_class_registry()
         ClassRegistryUtils.register_classes_in_folder(
-            folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH, base_class=StuffContent, is_recursive=False
+            folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH, base_class=StuffContent, is_recursive=False,
         )
 
         # Should register only top-level StuffContent classes

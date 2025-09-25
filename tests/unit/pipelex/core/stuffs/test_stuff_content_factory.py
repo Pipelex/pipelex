@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, List, Tuple
+from typing import Any, ClassVar
 
 import pytest
 
@@ -11,42 +11,42 @@ from pipelex.core.stuffs.stuff_factory import StuffContentFactory
 
 class TestCases:
     # Test cases for TextContent with string content
-    TEXT_STRING_BLUEPRINT: ClassVar[Dict[str, Any]] = {
+    TEXT_STRING_BLUEPRINT: ClassVar[dict[str, Any]] = {
         "concept_string": f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
         "content": "The Dawn of Ultra-Rapid Transit: NextGen High-Speed Trains Redefine Travel",
     }
 
     # Test cases for TextContent with dict content
-    TEXT_DICT_BLUEPRINT: ClassVar[Dict[str, Any]] = {
+    TEXT_DICT_BLUEPRINT: ClassVar[dict[str, Any]] = {
         "concept_string": f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
         "content": {"text": "Sample text content"},
     }
 
     # Test cases for native concept without prefix (should work)
-    TEXT_NO_PREFIX_BLUEPRINT: ClassVar[Dict[str, Any]] = {
+    TEXT_NO_PREFIX_BLUEPRINT: ClassVar[dict[str, Any]] = {
         "concept_string": f"{NativeConceptEnum.TEXT.value}",
         "content": {"text": "Text content without native prefix"},
     }
 
     # Test cases for registered class (using actual registered class)
-    REGISTERED_CLASS_BLUEPRINT: ClassVar[Dict[str, Any]] = {
+    REGISTERED_CLASS_BLUEPRINT: ClassVar[dict[str, Any]] = {
         "concept_string": "test.MockRegisteredContent",
         "content": {"title": "Test Question", "description": "What are aerodynamic features?"},
     }
 
     # Test cases for unregistered class (creates implicit concept, returns TextContent)
-    UNREGISTERED_STRING_BLUEPRINT: ClassVar[Dict[str, Any]] = {
+    UNREGISTERED_STRING_BLUEPRINT: ClassVar[dict[str, Any]] = {
         "concept_string": "unknown.NonExistentConcept",
         "content": "This should create implicit concept and return TextContent",
     }
 
     # Test cases for unregistered class with dict content
-    UNREGISTERED_DICT_BLUEPRINT: ClassVar[Dict[str, Any]] = {
+    UNREGISTERED_DICT_BLUEPRINT: ClassVar[dict[str, Any]] = {
         "concept_string": "unknown.NonExistentConcept",
         "content": {"text": "Dict content for implicit concept"},
     }
 
-    TEST_BLUEPRINTS: ClassVar[List[Tuple[str, Dict[str, Any]]]] = [
+    TEST_BLUEPRINTS: ClassVar[list[tuple[str, dict[str, Any]]]] = [
         ("text_string", TEXT_STRING_BLUEPRINT),
         ("text_dict", TEXT_DICT_BLUEPRINT),
         ("text_no_prefix", TEXT_NO_PREFIX_BLUEPRINT),
@@ -79,7 +79,7 @@ class TestStuffContentFactory:
             description: str
 
         result = StuffContentFactory.make_content_from_value(
-            stuff_content_subclass=MockStructuredContent, value={"title": "Test Title", "description": "Test Description"}
+            stuff_content_subclass=MockStructuredContent, value={"title": "Test Title", "description": "Test Description"},
         )
 
         assert isinstance(result, MockStructuredContent)
@@ -89,7 +89,7 @@ class TestStuffContentFactory:
     def test_make_stuffcontent_from_concept_code_required_text_content(self):
         """Test required method with native.Text concept (should work)."""
         result = StuffContentFactory.make_stuff_content_from_concept_required(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value="Test text content"
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value="Test text content",
         )
 
         assert isinstance(result, TextContent)
@@ -108,7 +108,7 @@ class TestStuffContentFactory:
     def test_make_stuffcontent_from_concept_code_with_fallback_text_success(self):
         """Test fallback method with native.Text concept."""
         result = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value="Test text content"
+            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value="Test text content",
         )
 
         assert isinstance(result, TextContent)
@@ -138,14 +138,14 @@ class TestStuffContentFactory:
         "test_name, blueprint",
         TestCases.TEST_BLUEPRINTS,
     )
-    def test_blueprint_scenarios(self, test_name: str, blueprint: Dict[str, Any]):
+    def test_blueprint_scenarios(self, test_name: str, blueprint: dict[str, Any]):
         """Test various blueprint scenarios with parametrized test cases."""
         content = blueprint["content"]
 
         if test_name.startswith("text_"):
             # Test native.Text concept with required method
             result = StuffContentFactory.make_stuff_content_from_concept_required(
-                concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value=content
+                concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value=content,
             )
             assert isinstance(result, TextContent)
             if isinstance(content, str):
@@ -162,7 +162,7 @@ class TestStuffContentFactory:
             # The dict will be passed through model_validate which should fail for TextContent
             try:
                 result_required = StuffContentFactory.make_stuff_content_from_concept_required(
-                    concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value=content
+                    concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value=content,
                 )
                 # If it succeeds, it should be TextContent (due to implicit concept)
                 assert isinstance(result_required, TextContent)
@@ -173,7 +173,7 @@ class TestStuffContentFactory:
             # Test fallback method - same behavior expected
             try:
                 result_fallback = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-                    concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value=content
+                    concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value=content,
                 )
                 # If it succeeds, it should be TextContent (due to implicit concept)
                 assert isinstance(result_fallback, TextContent)
@@ -186,12 +186,12 @@ class TestStuffContentFactory:
             # Both methods should work and return TextContent due to implicit concept creation
 
             result_required = StuffContentFactory.make_stuff_content_from_concept_required(
-                concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value=content
+                concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value=content,
             )
             assert isinstance(result_required, TextContent)
 
             result_fallback = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-                concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value=content
+                concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]), value=content,
             )
             assert isinstance(result_fallback, TextContent)
 

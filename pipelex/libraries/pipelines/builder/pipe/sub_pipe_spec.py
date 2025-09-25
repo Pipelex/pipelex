@@ -1,7 +1,6 @@
-from typing import Optional, Union
+from typing import Self
 
 from pydantic import ConfigDict, model_validator
-from typing_extensions import Self
 
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.exceptions import PipeDefinitionError
@@ -35,16 +34,17 @@ class SubPipeSpec(StructuredContent):
         2. batch_over and batch_as must be specified together (both or neither).
         3. pipe must reference a valid pipe code.
         4. result, when specified, should follow naming conventions.
+
     """
 
     model_config = ConfigDict(extra="forbid")
 
     the_pipe_code: str
-    result: Optional[str] = None
-    nb_output: Optional[int] = None
-    multiple_output: Optional[bool] = None
-    batch_over: Union[bool, str] = False
-    batch_as: Optional[str] = None
+    result: str | None = None
+    nb_output: int | None = None
+    multiple_output: bool | None = None
+    batch_over: bool | str = False
+    batch_as: str | None = None
 
     @model_validator(mode="after")
     def validate_multiple_output(self) -> Self:

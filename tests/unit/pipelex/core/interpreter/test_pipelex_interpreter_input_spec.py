@@ -7,10 +7,7 @@ from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 
 
 class TestPipelexInterpreterInputSpec:
-    """Test input serialization for both simple strings and InputRequirementBlueprint objects."""
-
     def test_inputs_to_plx_string_simple_strings(self):
-        """Test converting simple string inputs to PLX format like { text = "Text", topic = "Text" }."""
         # Simple string inputs (like "Text")
         simple_inputs = {"text": "Text", "topic": "Text"}
 
@@ -20,7 +17,6 @@ class TestPipelexInterpreterInputSpec:
         assert result == expected
 
     def test_inputs_to_plx_string_input_requirement_blueprints(self):
-        """Test converting InputRequirementBlueprint inputs to PLX format like { text = { concept = "Text", multiplicity = 1 } }."""
         # InputRequirementBlueprint inputs
         complex_inputs = {
             "text": InputRequirementBlueprint(concept="Text", multiplicity=1),
@@ -53,6 +49,5 @@ class TestPipelexInterpreterInputSpec:
         ],
     )
     def test_serialize_input_requirement(self, input_req: InputRequirementBlueprint, expected: dict[str, Any]):
-        """Test serializing a single InputRequirementBlueprint with various multiplicity values."""
         result = PipelexInterpreter.serialize_input_requirement(input_req)
         assert result == expected

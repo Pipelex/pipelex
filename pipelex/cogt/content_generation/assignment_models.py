@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 from pydantic import BaseModel
 from typing_extensions import override
@@ -25,8 +25,8 @@ class LLMAssignmentFactory(BaseModel):
 
     async def make_llm_assignment(
         self,
-        job_metadata: Optional[JobMetadata] = None,
-        llm_setting: Optional[LLMSetting] = None,
+        job_metadata: JobMetadata | None = None,
+        llm_setting: LLMSetting | None = None,
         **prompt_arguments: Any,
     ) -> "LLMAssignment":
         llm_prompt = await self.llm_prompt_factory.make_llm_prompt_from_args(**prompt_arguments)
@@ -95,7 +95,7 @@ class ObjectAssignment(BaseModel):
 
     @staticmethod
     def make_for_class(
-        object_class: Type[BaseModel],
+        object_class: type[BaseModel],
         llm_assignment: LLMAssignment,
     ) -> "ObjectAssignment":
         object_class_name = object_class.__name__
@@ -127,10 +127,10 @@ class ImgGenAssignment(BaseModel):
 
 
 class Jinja2Assignment(BaseModel):
-    context: Dict[str, Any]
-    jinja2_name: Optional[str] = None
-    jinja2: Optional[str] = None
-    prompting_style: Optional[PromptingStyle] = None
+    context: dict[str, Any]
+    jinja2_name: str | None = None
+    jinja2: str | None = None
+    prompting_style: PromptingStyle | None = None
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
 
 

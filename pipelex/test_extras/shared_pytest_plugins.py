@@ -1,5 +1,4 @@
 import os
-from typing import List
 
 import pytest
 from pytest import FixtureRequest, Parser
@@ -61,7 +60,7 @@ def pipe_run_mode(request: FixtureRequest) -> PipeRunMode:
     return PipeRunMode(mode_str)
 
 
-def _setup_env_var_placeholders(env_var_keys: List[str]) -> None:
+def _setup_env_var_placeholders(env_var_keys: list[str]) -> None:
     """Set placeholder environment variables when running in CI to prevent import failures.
 
     These placeholders allow the code to import successfully, while actual inference tests
@@ -69,6 +68,7 @@ def _setup_env_var_placeholders(env_var_keys: List[str]) -> None:
 
     Args:
         env_var_keys: List of environment variable keys that need placeholders
+
     """
     # Set placeholders for env vars who's presence is required for the code to run properly
     # even if their value is not used in the test
@@ -83,7 +83,7 @@ def _setup_env_var_placeholders(env_var_keys: List[str]) -> None:
         print(f"[yellow]Set {substitutions_counter} placeholder environment variables[/yellow]")
 
 
-def _cleanup_placeholder_env_vars(env_var_keys: List[str]) -> None:
+def _cleanup_placeholder_env_vars(env_var_keys: list[str]) -> None:
     """Remove placeholder environment variables that were set during CI testing.
 
     This function identifies and removes any environment variables that contain
@@ -91,6 +91,7 @@ def _cleanup_placeholder_env_vars(env_var_keys: List[str]) -> None:
 
     Args:
         env_var_keys: List of environment variable keys to check for placeholders
+
     """
     removed_counter = 0
 

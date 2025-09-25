@@ -6,8 +6,6 @@ from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlue
 
 
 class TestPipelexInterpreterImgGenPLX:
-    """Test ImgGen pipe to PLX string conversion."""
-
     @pytest.mark.parametrize(
         "pipe_name,blueprint,expected_plx",
         [
@@ -48,6 +46,5 @@ seed = 12345""",
         ],
     )
     def test_img_gen_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeImgGenBlueprint, expected_plx: str):
-        """Test converting ImgGen pipe blueprint to PLX string."""
         result = PipelexInterpreter.img_gen_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

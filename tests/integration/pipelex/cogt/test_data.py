@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, List, Tuple
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -59,17 +59,17 @@ class LLMVisionTestCases:
 
     PATH_IMG_GANTT_1 = f"{TEST_IMAGE_DIRECTORY}/gantt_tree_house.png"
 
-    IMAGE_PATHS: ClassVar[List[Tuple[str, str]]] = [  # topic, image_path
+    IMAGE_PATHS: ClassVar[list[tuple[str, str]]] = [  # topic, image_path
         ("AI Lympics PNG", PATH_IMG_PNG_1),
         ("AI Lympics JPEG", PATH_IMG_JPEG_1),
         ("Gantt Chart", PATH_IMG_GANTT_1),
         ("Eiffel Tower", PATH_IMG_JPEG_3),
     ]
-    IMAGE_PATH_PAIRS: ClassVar[List[Tuple[str, Tuple[str, str]]]] = [  # topic, image_pair
+    IMAGE_PATH_PAIRS: ClassVar[list[tuple[str, tuple[str, str]]]] = [  # topic, image_pair
         ("AI Lympics PNG", (PATH_IMG_PNG_1, PATH_IMG_PNG_2)),
     ]
 
-    IMAGE_URLS: ClassVar[List[Tuple[str, str]]] = [  # topic, image_uri
+    IMAGE_URLS: ClassVar[list[tuple[str, str]]] = [  # topic, image_uri
         (
             "Alan Turing",
             URL_WIKIPEDIA_ALAN_TURING,
@@ -85,7 +85,7 @@ class LLMTestConstants:
     USER_TEXT_SHORT = "In one sentence, who is Bill Gates?"
     # USER_TEXT_SHORT = "What's the biggest football match tonight in Europe?"
     PROMPT_TEMPLATE_TEXT = "Can you give one example of flower which is {color} in color ?"
-    PROMPT_COLOR_EXAMPLES: ClassVar[List[str]] = [
+    PROMPT_COLOR_EXAMPLES: ClassVar[list[str]] = [
         "red",
         "blue",
         "green",
@@ -104,17 +104,17 @@ class LLMTestCases:
 When my son was 7 he was 3ft tall. When he was 8 he was 4ft tall. When he was 9 he was 5ft tall.
 How tall do you think he was when he was 12? and at 15?
 """
-    SINGLE_TEXT: ClassVar[List[Tuple[str, str]]] = [  # topic, prompt_text
+    SINGLE_TEXT: ClassVar[list[tuple[str, str]]] = [  # topic, prompt_text
         ("Haiku", USER_TEXT_HAIKU),
         ("Tricky", USER_TEXT_TRICKY),
     ]
-    SINGLE_OBJECT: ClassVar[List[Tuple[str, BaseModel]]] = [
+    SINGLE_OBJECT: ClassVar[list[tuple[str, BaseModel]]] = [
         ("name: John, age: 30", Person(name="John", age=30)),
         ("Betty Draper, 51", Person(name="Betty Draper", age=51)),
         ("Whiskers, the cat", Pet(species=PetSpecies.CAT, name="Whiskers")),
         ("Whiskers, the dog", Pet(species=PetSpecies.DOG, name="Whiskers")),
     ]
-    MULTIPLE_OBJECTS: ClassVar[List[List[Tuple[str, BaseModel]]]] = [
+    MULTIPLE_OBJECTS: ClassVar[list[list[tuple[str, BaseModel]]]] = [
         [
             ("name: John, age: 30", Person(name="John", age=30)),
             # ("Betty Draper, 51", Person(name="Betty Draper", age=51)),
@@ -155,7 +155,7 @@ class SerDeTestLLMCases:
     )
 
     # Dictionary representation example ------------------------------------
-    DICT_1: ClassVar[Dict[str, Any]] = {
+    DICT_1: ClassVar[dict[str, Any]] = {
         "proto_prompt": LLMPrompt(
             system_text=None,
             user_text="Some user text in the template",
@@ -176,13 +176,13 @@ class SerDeTestLLMCases:
     )
 
     # Group constants for parametrization ----------------------------------
-    PYDANTIC_EXAMPLES: ClassVar[List[BaseModel]] = [
+    PYDANTIC_EXAMPLES: ClassVar[list[BaseModel]] = [
         MY_PROMPT_TEMPLATE_MODEL_1,
         MY_PROMPT_TEMPLATE_MODEL_2,
     ]
-    PYDANTIC_EXAMPLES_USING_SUBCLASS: ClassVar[List[BaseModel]] = [
+    PYDANTIC_EXAMPLES_USING_SUBCLASS: ClassVar[list[BaseModel]] = [
         PROMPT_WITH_IMAGE_PATH,
     ]
-    PYDANTIC_EXAMPLES_DICT: ClassVar[List[Dict[str, Any]]] = [
+    PYDANTIC_EXAMPLES_DICT: ClassVar[list[dict[str, Any]]] = [
         DICT_1,
     ]

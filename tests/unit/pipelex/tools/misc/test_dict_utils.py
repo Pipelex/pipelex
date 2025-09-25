@@ -1,14 +1,10 @@
-"""Unit tests for dict_utils module."""
-
-from typing import Any, Dict
+from typing import Any
 
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.tools.misc.dict_utils import apply_to_strings_in_list, apply_to_strings_recursive, insert_before
 
 
 class TestDictUtils:
-    """Test class for dict_utils functions."""
-
     def test_insert_before_basic(self) -> None:
         """Test basic insert_before functionality."""
         original = {"a": 1, "c": 3}
@@ -94,7 +90,7 @@ class TestDictUtils:
 
     def test_apply_to_strings_recursive_empty_structures(self) -> None:
         """Test apply_to_strings_recursive with empty dictionaries and lists."""
-        data: Dict[str, Any] = {"empty_dict": {}, "empty_list": [], "mixed": {"inner_empty": {}, "inner_list": []}}
+        data: dict[str, Any] = {"empty_dict": {}, "empty_list": [], "mixed": {"inner_empty": {}, "inner_list": []}}
 
         def dummy_transform(s: str) -> str:
             return s.upper()

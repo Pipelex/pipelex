@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -38,11 +38,11 @@ class LLMTokenCostReport(BaseModel):
     nb_tokens_by_category: NbTokensByCategoryDict
     costs_by_token_category: CostsByCategoryDict
 
-    def as_flat_dictionary(self) -> Dict[str, Any]:
-        the_dict: Dict[str, Any] = {}
+    def as_flat_dictionary(self) -> dict[str, Any]:
+        the_dict: dict[str, Any] = {}
         dict_for_job_metadata = self.job_metadata.model_dump(serialize_as_any=True)
         the_dict.update(dict_for_job_metadata)
-        dict_for_llm: Dict[str, Any] = {
+        dict_for_llm: dict[str, Any] = {
             LLMTokenCostReportField.LLM_NAME: self.inference_model_name,
             LLMTokenCostReportField.PLATFORM_LLM_ID: self.platform_llm_id,
         }

@@ -2,8 +2,6 @@ from pipelex.tools.templating.template_preprocessor import preprocess_template
 
 
 class TestTemplatePreprocessor:
-    """Test the template preprocessing functionality."""
-
     def test_at_variable_pattern(self):
         """Test basic @variable pattern replacement."""
         template = "@expense\n@invoices"

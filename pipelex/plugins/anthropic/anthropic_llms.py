@@ -1,4 +1,3 @@
-from typing import List
 
 from anthropic import AsyncAnthropic
 from anthropic.types import ModelInfo
@@ -9,12 +8,12 @@ from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
-async def anthropic_list_anthropic_models(plugin: Plugin, backend: InferenceBackend) -> List[ModelInfo]:
-    """
-    List available Anthropic models.
+async def anthropic_list_anthropic_models(plugin: Plugin, backend: InferenceBackend) -> list[ModelInfo]:
+    """List available Anthropic models.
 
     Returns:
         List[ModelInfo]: A list of Anthropic model information objects
+
     """
     anthropic_client = AnthropicFactory.make_anthropic_client(plugin=plugin, backend=backend)
     if not hasattr(anthropic_client, "models"):

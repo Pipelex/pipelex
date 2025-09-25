@@ -1,7 +1,3 @@
-"""Unit tests for ModelDeck class."""
-
-from typing import List, Optional
-
 import pytest
 from pytest_mock import MockerFixture
 
@@ -13,10 +9,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 
 
 class TestModelDeckGetOptionalInferenceModel:
-    """Unit tests for get_optional_inference_model method."""
-
     def _create_test_model_spec(self, name: str) -> InferenceModelSpec:
-        """Helper to create a test InferenceModelSpec."""
         return InferenceModelSpec(
             backend_name="test_backend",
             name=name,
@@ -30,10 +23,9 @@ class TestModelDeckGetOptionalInferenceModel:
 
     def _create_test_model_deck(
         self,
-        inference_models: Optional[dict[str, InferenceModelSpec]] = None,
-        aliases: Optional[dict[str, str | List[str]]] = None,
+        inference_models: dict[str, InferenceModelSpec] | None = None,
+        aliases: dict[str, str | list[str]] | None = None,
     ) -> ModelDeck:
-        """Helper to create a test ModelDeck."""
         return ModelDeck(
             inference_models=inference_models or {},
             aliases=aliases or {},
@@ -49,7 +41,6 @@ class TestModelDeckGetOptionalInferenceModel:
         )
 
     def test_direct_model_lookup_success(self):
-        """Test successful direct model lookup."""
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec})
@@ -61,7 +52,6 @@ class TestModelDeckGetOptionalInferenceModel:
         assert result == model_spec
 
     def test_direct_model_lookup_not_found(self, mocker: MockerFixture):
-        """Test direct model lookup when model doesn't exist."""
         # Arrange
         model_deck = self._create_test_model_deck()
         mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
@@ -74,7 +64,6 @@ class TestModelDeckGetOptionalInferenceModel:
         mock_log.warning.assert_called_once_with("Skipping model handle 'nonexistent-model' because it's not found in deck")
 
     def test_simple_string_alias_resolution_success(self, mocker: MockerFixture):
-        """Test successful resolution of a simple string alias."""
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, aliases={"best-gpt": "gpt-4"})
@@ -88,7 +77,6 @@ class TestModelDeckGetOptionalInferenceModel:
         mock_log.debug.assert_called_once_with("Redirection for 'best-gpt': gpt-4")
 
     def test_simple_string_alias_resolution_not_found(self, mocker: MockerFixture):
-        """Test string alias resolution when target model doesn't exist."""
         # Arrange
         model_deck = self._create_test_model_deck(aliases={"best-gpt": "nonexistent-model"})
         mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
@@ -103,7 +91,6 @@ class TestModelDeckGetOptionalInferenceModel:
         mock_log.warning.assert_called_with("Skipping model handle 'best-gpt' because it's not found in deck")
 
     def test_list_alias_resolution_first_success(self, mocker: MockerFixture):
-        """Test list alias resolution where first model in list exists."""
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, aliases={"best-model": ["gpt-4", "claude-3"]})
@@ -117,11 +104,10 @@ class TestModelDeckGetOptionalInferenceModel:
         mock_log.debug.assert_called_once_with("Redirection for 'best-model': ['gpt-4', 'claude-3']")
 
     def test_list_alias_resolution_second_success(self, mocker: MockerFixture):
-        """Test list alias resolution where second model in list exists."""
         # Arrange
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
-            inference_models={"claude-3": model_spec}, aliases={"best-model": ["nonexistent-model", "claude-3"]}
+            inference_models={"claude-3": model_spec}, aliases={"best-model": ["nonexistent-model", "claude-3"]},
         )
         mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
@@ -133,7 +119,6 @@ class TestModelDeckGetOptionalInferenceModel:
         mock_log.debug.assert_called_once_with("Redirection for 'best-model': ['nonexistent-model', 'claude-3']")
 
     def test_list_alias_resolution_none_found(self, mocker: MockerFixture):
-        """Test list alias resolution where no models in list exist."""
         # Arrange
         model_deck = self._create_test_model_deck(aliases={"best-model": ["nonexistent-1", "nonexistent-2"]})
         mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
@@ -148,7 +133,6 @@ class TestModelDeckGetOptionalInferenceModel:
         assert mock_log.warning.call_count == 3
 
     def test_recursive_alias_resolution_success(self, mocker: MockerFixture):
-        """Test recursive alias resolution where alias points to another alias."""
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, aliases={"best-model": "best-gpt", "best-gpt": "gpt-4"})
@@ -163,11 +147,10 @@ class TestModelDeckGetOptionalInferenceModel:
         assert mock_log.debug.call_count == 2
 
     def test_recursive_alias_resolution_with_list(self, mocker: MockerFixture):
-        """Test recursive alias resolution where alias points to list containing another alias."""
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec}, aliases={"best-model": ["nonexistent", "best-gpt"], "best-gpt": "gpt-4"}
+            inference_models={"gpt-4": model_spec}, aliases={"best-model": ["nonexistent", "best-gpt"], "best-gpt": "gpt-4"},
         )
         mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
@@ -180,7 +163,6 @@ class TestModelDeckGetOptionalInferenceModel:
         assert mock_log.debug.call_count >= 2
 
     def test_empty_alias_list(self, mocker: MockerFixture):
-        """Test behavior with empty alias list."""
         # Arrange
         model_deck = self._create_test_model_deck(aliases={"empty-alias": []})
         mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
@@ -195,7 +177,6 @@ class TestModelDeckGetOptionalInferenceModel:
         mock_log.warning.assert_called_once_with("Skipping model handle 'empty-alias' because it's not found in deck")
 
     def test_circular_alias_prevention(self, mocker: MockerFixture):
-        """Test that circular aliases don't cause infinite loops."""
         # Note: The current implementation doesn't have explicit circular reference detection,
         # but Python's recursion limit should prevent infinite loops.
         # This test ensures the method handles it gracefully.
@@ -213,7 +194,6 @@ class TestModelDeckGetOptionalInferenceModel:
             assert result is None
 
     def test_complex_waterfall_scenario(self, mocker: MockerFixture):
-        """Test complex waterfall scenario with multiple levels."""
         # Arrange
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
@@ -231,7 +211,6 @@ class TestModelDeckGetOptionalInferenceModel:
         assert mock_log.debug.call_count >= 2
 
     def test_mixed_string_and_list_aliases(self, mocker: MockerFixture):
-        """Test scenario with mix of string and list aliases."""
         # Arrange
         model_spec1 = self._create_test_model_spec("gpt-4")
         model_spec2 = self._create_test_model_spec("claude-3")
@@ -263,7 +242,6 @@ class TestModelDeckGetOptionalInferenceModel:
         ],
     )
     def test_edge_case_llm_handles(self, llm_handle: str, mocker: MockerFixture):
-        """Test edge cases for llm_handle parameter."""
         # Arrange
         model_deck = self._create_test_model_deck()
         mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
@@ -276,7 +254,6 @@ class TestModelDeckGetOptionalInferenceModel:
         mock_log.warning.assert_called_once_with(f"Skipping model handle '{llm_handle}' because it's not found in deck")
 
     def test_logging_behavior(self, mocker: MockerFixture):
-        """Test that logging is called with correct messages."""
         # Arrange
         model_deck = self._create_test_model_deck(aliases={"test-alias": "target-model"})
         mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")

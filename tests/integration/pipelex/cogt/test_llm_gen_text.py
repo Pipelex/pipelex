@@ -1,5 +1,4 @@
 import asyncio
-from typing import List, Tuple
 
 import pytest
 
@@ -14,7 +13,7 @@ from pipelex.hub import get_llm_worker, get_model_deck
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 
-def get_worker_and_job(llm_preset_id: str, user_text: str) -> Tuple[LLMWorkerAbstract, LLMJob]:
+def get_worker_and_job(llm_preset_id: str, user_text: str) -> tuple[LLMWorkerAbstract, LLMJob]:
     llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
     pretty_print(llm_setting, title=llm_preset_id)
     pretty_print(user_text)
@@ -56,7 +55,7 @@ class TestLLMGenText:
         job_params_base = llm_job.job_params
         max_tokens = 30
         temperature = 0.1
-        tasks: List[asyncio.Task[str]] = []
+        tasks: list[asyncio.Task[str]] = []
         for _ in range(4):
             max_tokens += 50
             temperature += 0.2

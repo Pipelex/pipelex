@@ -1,4 +1,4 @@
-from typing import ClassVar, List
+from typing import ClassVar
 
 from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.misc.file_utils import copy_file_from_package, copy_folder_from_package, find_files_in_dir
@@ -27,10 +27,10 @@ class LibraryConfig(ConfigModel):
         return "tests/test_pipelines"
 
     @property
-    def failing_pipelines_file_paths(self) -> List[str]:
+    def failing_pipelines_file_paths(self) -> list[str]:
         return ["tests/test_pipelines/failing_pipelines.plx"]
 
-    def get_templates_paths(self) -> List[str]:
+    def get_templates_paths(self) -> list[str]:
         return [str(path) for path in find_files_in_dir(dir_path=self.templates_dir_path, pattern="*.toml", is_recursive=True)]
 
     def export_libraries(self, overwrite: bool = False) -> None:

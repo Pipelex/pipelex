@@ -1,4 +1,3 @@
-from typing import Tuple
 
 from jinja2 import BaseLoader, Environment, PackageLoader
 
@@ -51,7 +50,7 @@ def make_jinja2_env_from_package(
     template_category: Jinja2TemplateCategory,
     package_name: str,
     package_path: str,
-) -> Tuple[Environment, BaseLoader]:
+) -> tuple[Environment, BaseLoader]:
     full_package_path = f"{package_path}/jinja2_{template_category}"
     loader = PackageLoader(
         package_name=package_name,
@@ -72,7 +71,7 @@ def make_jinja2_env_without_loader(
 def make_jinja2_env_from_template_provider(
     template_category: Jinja2TemplateCategory,
     template_provider: TemplateProviderAbstract,
-) -> Tuple[Environment, BaseLoader]:
+) -> tuple[Environment, BaseLoader]:
     loader = Jinja2TemplateLoader(template_provider=template_provider)
     jinja2_env = make_jinja2_env_from_loader(template_category=template_category, loader=loader)
 

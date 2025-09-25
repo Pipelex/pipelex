@@ -1,4 +1,3 @@
-from typing import Optional
 
 from typing_extensions import override
 
@@ -16,16 +15,18 @@ class EnvSecretsProvider(SecretsProviderAbstract):
             raise SecretNotFoundError(f"Secret '{secret_id}' not found") from exc
 
     @override
-    def get_optional_secret(self, secret_id: str) -> Optional[str]:
+    def get_optional_secret(self, secret_id: str) -> str | None:
         return get_optional_env(key=secret_id)
 
     @override
     def get_required_secret_specific_version(self, secret_id: str, version_id: str) -> str:
-        raise NotImplementedError("EnvSecretsProvider does not support specific versions")
+        msg = "EnvSecretsProvider does not support specific versions"
+        raise NotImplementedError(msg)
 
     @override
-    def get_optional_secret_specific_version(self, secret_id: str, version_id: str) -> Optional[str]:
-        raise NotImplementedError("EnvSecretsProvider does not support specific versions")
+    def get_optional_secret_specific_version(self, secret_id: str, version_id: str) -> str | None:
+        msg = "EnvSecretsProvider does not support specific versions"
+        raise NotImplementedError(msg)
 
     @override
     def set_secret_as_env_var(self, secret_id: str, version_id: str = "latest"):

@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Dict, List
+from typing import Any
 
 import boto3
 import pytest
@@ -36,8 +36,8 @@ class TestBedrock:
         if any_env_var_is_placeholder(REQUIRED_ENV_VARS):
             pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         client = boto3.client("bedrock", region_name=bedrock_region_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        response: Dict[str, Any] = client.list_foundation_models(byProvider=bedrock_provider)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        bedrock_models_list: List[Dict[str, Any]] = response["modelSummaries"]  # pyright: ignore[reportUnknownVariableType]
+        response: dict[str, Any] = client.list_foundation_models(byProvider=bedrock_provider)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        bedrock_models_list: list[dict[str, Any]] = response["modelSummaries"]  # pyright: ignore[reportUnknownVariableType]
         if pytestconfig.get_verbosity() >= 2:
             # Create and configure the table
             console = Console()
@@ -72,8 +72,8 @@ class TestBedrock:
         if any_env_var_is_placeholder(REQUIRED_ENV_VARS):
             pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         client = boto3.client("bedrock", region_name=bedrock_region_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        response: Dict[str, Any] = client.list_inference_profiles()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        inference_profiles_list: List[Dict[str, Any]] = response["inferenceProfileSummaries"]  # pyright: ignore[reportUnknownVariableType]
+        response: dict[str, Any] = client.list_inference_profiles()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        inference_profiles_list: list[dict[str, Any]] = response["inferenceProfileSummaries"]  # pyright: ignore[reportUnknownVariableType]
         if pytestconfig.get_verbosity() >= 2:
             # Create and configure the table
             console = Console()

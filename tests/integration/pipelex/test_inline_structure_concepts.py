@@ -1,6 +1,5 @@
 """Integration tests for inline structure definitions in concepts."""
 
-from typing import Dict, Union
 
 import pytest
 
@@ -21,18 +20,18 @@ class TestInlineStructureConcepts:
     def test_inline_structure_definition_creation(self):
         """Test that concepts with inline structure definitions are created correctly."""
         # Define inline structure with mixed syntax
-        inline_structure: Dict[str, Union[str, ConceptStructureBlueprint]] = {
+        inline_structure: dict[str, str | ConceptStructureBlueprint] = {
             "dominant_feature": ConceptStructureBlueprint(
-                type=ConceptStructureBlueprintFieldType.TEXT, definition="The most important feature", required=False
+                type=ConceptStructureBlueprintFieldType.TEXT, definition="The most important feature", required=False,
             ),
             "visual_elements": ConceptStructureBlueprint(
-                type=ConceptStructureBlueprintFieldType.TEXT, definition="Key visual elements", required=False
+                type=ConceptStructureBlueprintFieldType.TEXT, definition="Key visual elements", required=False,
             ),
             "composition": ConceptStructureBlueprint(
-                type=ConceptStructureBlueprintFieldType.TEXT, definition="Analysis of the image composition", required=False
+                type=ConceptStructureBlueprintFieldType.TEXT, definition="Analysis of the image composition", required=False,
             ),
             "color_palette": ConceptStructureBlueprint(
-                type=ConceptStructureBlueprintFieldType.TEXT, definition="Description of the main colors", required=False
+                type=ConceptStructureBlueprintFieldType.TEXT, definition="Description of the main colors", required=False,
             ),
             "mood_atmosphere": "The overall mood or atmosphere",
         }
@@ -42,7 +41,7 @@ class TestInlineStructureConcepts:
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain", concept_code="TestFeatureAnalysis", blueprint=blueprint, concept_codes_from_the_same_domain=["TestFeatureAnalysis"]
+            domain="test_domain", concept_code="TestFeatureAnalysis", blueprint=blueprint, concept_codes_from_the_same_domain=["TestFeatureAnalysis"],
         )
 
         # Verify concept properties
@@ -80,7 +79,7 @@ class TestInlineStructureConcepts:
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain", concept_code="TestStringRef", blueprint=blueprint, concept_codes_from_the_same_domain=["TestStringRef"]
+            domain="test_domain", concept_code="TestStringRef", blueprint=blueprint, concept_codes_from_the_same_domain=["TestStringRef"],
         )
 
         # Verify concept properties
@@ -96,7 +95,7 @@ class TestInlineStructureConcepts:
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain", concept_code="TestAutoDetect", blueprint=blueprint, concept_codes_from_the_same_domain=["TestAutoDetect"]
+            domain="test_domain", concept_code="TestAutoDetect", blueprint=blueprint, concept_codes_from_the_same_domain=["TestAutoDetect"],
         )
 
         # Should default to TextContent since TestAutoDetect is not a registered class
@@ -104,7 +103,7 @@ class TestInlineStructureConcepts:
 
     def test_inline_structure_with_complex_types(self):
         """Test inline structure with complex field types."""
-        inline_structure: Dict[str, Union[str, ConceptStructureBlueprint]] = {
+        inline_structure: dict[str, str | ConceptStructureBlueprint] = {
             "title": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.TEXT, definition="Document title"),
             "tags": ConceptStructureBlueprint(
                 type=ConceptStructureBlueprintFieldType.LIST,
@@ -122,14 +121,14 @@ class TestInlineStructureConcepts:
             "priority": ConceptStructureBlueprint(choices=["low", "medium", "high"], definition="Priority level", required=False),
             "page_count": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.INTEGER, definition="Number of pages", required=False),
             "is_active": ConceptStructureBlueprint(
-                type=ConceptStructureBlueprintFieldType.BOOLEAN, definition="Whether document is active", required=False
+                type=ConceptStructureBlueprintFieldType.BOOLEAN, definition="Whether document is active", required=False,
             ),
         }
 
         blueprint = ConceptBlueprint(definition="Complex document structure", structure=inline_structure)
 
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain", concept_code="ComplexDocument", blueprint=blueprint, concept_codes_from_the_same_domain=["ComplexDocument"]
+            domain="test_domain", concept_code="ComplexDocument", blueprint=blueprint, concept_codes_from_the_same_domain=["ComplexDocument"],
         )
 
         # Verify concept creation
@@ -174,25 +173,25 @@ not a registered subclass of StuffContent",
     def test_multiple_inline_structures_do_not_conflict(self):
         """Test that multiple inline structures with same field names don't conflict."""
         # First structure
-        structure1: Dict[str, Union[str, ConceptStructureBlueprint]] = {
+        structure1: dict[str, str | ConceptStructureBlueprint] = {
             "name": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.TEXT, definition="Person name"),
             "age": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.INTEGER, definition="Person age", required=False),
         }
 
         blueprint1 = ConceptBlueprint(definition="Person information", structure=structure1)
         concept1 = ConceptFactory.make_from_blueprint(
-            domain="test_domain", concept_code="Person", blueprint=blueprint1, concept_codes_from_the_same_domain=["Person"]
+            domain="test_domain", concept_code="Person", blueprint=blueprint1, concept_codes_from_the_same_domain=["Person"],
         )
 
         # Second structure with same field names but different context
-        structure2: Dict[str, Union[str, ConceptStructureBlueprint]] = {
+        structure2: dict[str, str | ConceptStructureBlueprint] = {
             "name": "Product name",
             "age": ConceptStructureBlueprint(type=ConceptStructureBlueprintFieldType.INTEGER, definition="Product age in days", required=False),
         }
 
         blueprint2 = ConceptBlueprint(definition="Product information", structure=structure2)
         concept2 = ConceptFactory.make_from_blueprint(
-            domain="test_domain", concept_code="Product", blueprint=blueprint2, concept_codes_from_the_same_domain=["Product"]
+            domain="test_domain", concept_code="Product", blueprint=blueprint2, concept_codes_from_the_same_domain=["Product"],
         )
 
         # Both should be created successfully

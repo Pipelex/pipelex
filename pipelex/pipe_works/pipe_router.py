@@ -1,4 +1,4 @@
-from typing import Optional, cast
+from typing import cast
 
 from typing_extensions import override
 
@@ -32,16 +32,16 @@ class PipeRouter(PipeRouterProtocol):
             pipe_run_params=pipe_job.pipe_run_params,
         )
         log.debug(f"Completed run_pipe_job: pipe_code={pipe_job.pipe.code}")
-        return cast(PipeOutputType, pipe_output)
+        return cast("PipeOutputType", pipe_output)
 
     @override
     async def run_pipe_code(
         self,
         pipe_code: str,
-        pipe_run_params: Optional[PipeRunParams] = None,
-        job_metadata: Optional[JobMetadata] = None,
-        working_memory: Optional[WorkingMemory] = None,
-        output_name: Optional[str] = None,
+        pipe_run_params: PipeRunParams | None = None,
+        job_metadata: JobMetadata | None = None,
+        working_memory: WorkingMemory | None = None,
+        output_name: str | None = None,
     ) -> PipeOutputType:  # pyright: ignore[reportInvalidTypeVarUse]
         log.debug(f"Start run_pipe_code: pipe_code={pipe_code}")
         pipe = get_required_pipe(pipe_code)

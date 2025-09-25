@@ -1,5 +1,4 @@
 import logging
-from typing import Dict, Optional
 
 from typing_extensions import override
 
@@ -8,33 +7,32 @@ from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalCol
 
 
 # TODO: move these to the config
-def emoji_for_channel(channel_name: str) -> Optional[str]:
-    channel_emojis: Dict[str, str] = {
+def emoji_for_channel(channel_name: str) -> str | None:
+    channel_emojis: dict[str, str] = {
         "root": "",
         "werkzeug": "📡",
         "urllib3.connectionpool": "⚡️",
     }
 
-    emoji = channel_emojis.get(channel_name, None)
+    emoji = channel_emojis.get(channel_name)
     if emoji == "":
         # blank emoji is OK
         return emoji
-    elif emoji:
+    if emoji:
         return emoji
-    elif channel_name.startswith("google"):
+    if channel_name.startswith("google"):
         return "🌀"
-    elif channel_name.startswith("openai"):
+    if channel_name.startswith("openai"):
         return "⚪️"
-    elif channel_name.startswith("kajson"):
+    if channel_name.startswith("kajson"):
         # space added to make it look better
         return "*️⃣ "
-    elif channel_name.startswith("#poor-log"):
+    if channel_name.startswith("#poor-log"):
         # space added to make it look better
         return "🧿 "
-    elif channel_name.startswith("pipelex"):
+    if channel_name.startswith("pipelex"):
         return "🧠"
-    else:
-        return None
+    return None
 
 
 class EmojiLogFormatter(logging.Formatter):
@@ -53,7 +51,7 @@ class EmojiLogFormatter(logging.Formatter):
         return formatter.format(record)
 
 
-log_level_color: Dict[int, TerminalColor] = {
+log_level_color: dict[int, TerminalColor] = {
     LOGGING_LEVEL_VERBOSE: TerminalColor.WHITE,
     logging.DEBUG: TerminalColor.GREEN,
     LOGGING_LEVEL_DEV: TerminalColor.CYAN,
@@ -64,7 +62,7 @@ log_level_color: Dict[int, TerminalColor] = {
 }
 
 # added spaces and truncated to 5 characters to make it look better
-log_level_tag: Dict[int, str] = {
+log_level_tag: dict[int, str] = {
     LOGGING_LEVEL_VERBOSE: "VERBO",
     logging.DEBUG: "DEBUG",
     LOGGING_LEVEL_DEV: "DEV  ",

@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any
 
 from fal_client import AsyncClient, InProgress
 from typing_extensions import override
@@ -18,7 +18,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
@@ -64,7 +64,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> List[GeneratedImage]:
+    ) -> list[GeneratedImage]:
         application = self.inference_model.model_id
         arguments = FalFactory.make_fal_arguments(
             fal_application=application,

@@ -1,4 +1,4 @@
-from typing import Dict, Literal, Optional
+from typing import Literal
 
 from pydantic import Field, RootModel
 from typing_extensions import override
@@ -6,7 +6,7 @@ from typing_extensions import override
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
 
-PipeConditionPipeMapRoot = Dict[str, str]
+PipeConditionPipeMapRoot = dict[str, str]
 
 
 class PipeConditionPipeMapSpec(RootModel[PipeConditionPipeMapRoot]):
@@ -18,6 +18,7 @@ class PipeConditionPipeMapSpec(RootModel[PipeConditionPipeMapRoot]):
         root: Dictionary mapping condition results (keys) to pipe codes (values).
               Each key represents a possible condition outcome, and its value
               is the pipe code to execute when that condition is met.
+
     """
 
     root: PipeConditionPipeMapRoot = Field(default_factory=dict)
@@ -48,16 +49,17 @@ class PipeConditionSpec(PipeSpec):
         1. Either expression or expression_template should be provided, not both.
         2. pipe_map keys must be strings representing possible condition outcomes.
         3. All pipe codes in pipe_map and default_pipe_code must be valid pipe references.
+
     """
 
     type: Literal["PipeCondition"] = "PipeCondition"
     category: Literal["PipeController"] = "PipeController"
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
-    expression_template: Optional[str] = None
-    expression: Optional[str] = None
+    expression_template: str | None = None
+    expression: str | None = None
     pipe_map: PipeConditionPipeMapSpec = Field(default_factory=PipeConditionPipeMapSpec)
-    default_pipe_code: Optional[str] = None
-    add_alias_from_expression_to: Optional[str] = None
+    default_pipe_code: str | None = None
+    add_alias_from_expression_to: str | None = None
 
     @override
     def to_blueprint(self) -> PipeConditionBlueprint:

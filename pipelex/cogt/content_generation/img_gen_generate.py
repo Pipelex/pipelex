@@ -1,4 +1,3 @@
-from typing import List, Union
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
@@ -20,7 +19,7 @@ async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> Generate
     return generated_image
 
 
-async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> List[GeneratedImage]:
+async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[GeneratedImage]:
     img_gen_worker = get_img_gen_worker(img_gen_handle=img_gen_assignment.img_gen_handle)
     img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
         img_gen_prompt=img_gen_assignment.img_gen_prompt,
@@ -36,8 +35,7 @@ async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> List[Gener
     return generated_image_list
 
 
-async def img_gen_image(img_gen_assignment: ImgGenAssignment) -> Union[GeneratedImage, List[GeneratedImage]]:
+async def img_gen_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImage | list[GeneratedImage]:
     if img_gen_assignment.nb_images > 1:
         return await img_gen_image_list(img_gen_assignment)
-    else:
-        return await img_gen_single_image(img_gen_assignment)
+    return await img_gen_single_image(img_gen_assignment)

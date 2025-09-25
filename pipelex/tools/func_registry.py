@@ -1,6 +1,7 @@
 import inspect
 import logging
-from typing import Any, Callable, Dict, List, Optional, TypeVar, get_type_hints
+from collections.abc import Callable
+from typing import Any, TypeVar, get_type_hints
 
 from pydantic import Field, PrivateAttr, RootModel
 
@@ -10,7 +11,7 @@ FUNC_REGISTRY_LOGGER_CHANNEL_NAME = "func_registry"
 
 # Type variable for generic function types
 T = TypeVar("T")
-FuncRegistryDict = Dict[str, Callable[..., Any]]
+FuncRegistryDict = dict[str, Callable[..., Any]]
 
 
 class FuncRegistryError(ToolException):
@@ -34,7 +35,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def register_function(
         self,
         func: Callable[..., Any],
-        name: Optional[str] = None,
+        name: str | None = None,
         should_warn_if_already_registered: bool = True,
     ) -> None:
         """Registers a function in the registry with a name if it meets eligibility criteria."""
@@ -65,17 +66,17 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
             raise FuncRegistryError(f"Function '{name}' not found in registry")
         del self.root[name]
 
-    def register_functions_dict(self, functions: Dict[str, Callable[..., Any]]) -> None:
+    def register_functions_dict(self, functions: dict[str, Callable[..., Any]]) -> None:
         """Registers multiple functions in the registry with names if they meet eligibility criteria."""
         for name, func in functions.items():
             self.register_function(func=func, name=name, should_warn_if_already_registered=False)
 
-    def register_functions(self, functions: List[Callable[..., Any]]) -> None:
+    def register_functions(self, functions: list[Callable[..., Any]]) -> None:
         """Registers multiple functions in the registry with names if they meet eligibility criteria."""
         for func in functions:
             self.register_function(func=func, should_warn_if_already_registered=False)
 
-    def get_function(self, name: str) -> Optional[Callable[..., Any]]:
+    def get_function(self, name: str) -> Callable[..., Any] | None:
         """Retrieves a function from the registry by its name. Returns None if not found."""
         return self.root.get(name)
 
@@ -84,13 +85,12 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         if name not in self.root:
             raise FuncRegistryError(
                 f"Function '{name}' not found in registry: \
-                See how to register a function here: https://docs.pipelex.com/pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc"
+                See how to register a function here: https://docs.pipelex.com/pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc",
             )
         return self.root[name]
 
     def get_required_function_with_signature(self, name: str) -> Callable[..., object]:
-        """
-        Retrieves a function from the registry by its name and verifies it matches the expected signature.
+        """Retrieves a function from the registry by its name and verifies it matches the expected signature.
         Raises an error if not found or if signature doesn't match.
         """
         if name not in self.root:
@@ -108,8 +108,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         return name in self.root
 
     def is_eligible_function(self, func: Callable[..., Any]) -> bool:
-        """
-        Checks if a function matches the criteria for PipeFunc registration:
+        """Checks if a function matches the criteria for PipeFunc registration:
         - Exactly 1 parameter named "working_memory" with type WorkingMemory
         - Return type that is a subclass of StuffContent
         """
@@ -153,7 +152,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
                     return True
                 # Handle generic types like ListContent[SomeType]
                 if hasattr(return_type, "__origin__"):
-                    origin = getattr(return_type, "__origin__")
+                    origin = return_type.__origin__
                     if inspect.isclass(origin) and issubclass(origin, StuffContent):
                         return True
             except TypeError:

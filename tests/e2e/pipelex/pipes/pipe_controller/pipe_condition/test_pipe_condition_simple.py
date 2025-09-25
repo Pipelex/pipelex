@@ -86,8 +86,8 @@ class TestPipeConditionSimple:
                         structure_class_name="CategoryInput",
                     ),
                     structure_class=CategoryInput,
-                )
-            ]
+                ),
+            ],
         )
 
         try:

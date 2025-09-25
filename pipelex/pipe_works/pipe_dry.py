@@ -2,7 +2,6 @@ import asyncio
 import functools
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -22,8 +21,6 @@ from pipelex.types import StrEnum
 class DryRunError(Exception):
     """Raised when a dry run fails due to missing inputs or other validation issues."""
 
-    pass
-
 
 class DryRunStatus(StrEnum):
     SUCCESS = "SUCCESS"
@@ -34,13 +31,12 @@ class DryRunStatus(StrEnum):
 class DryRunOutput(BaseModel):
     pipe_code: str
     status: DryRunStatus
-    error_message: Optional[str] = None
-    warning_message: Optional[str] = None
+    error_message: str | None = None
+    warning_message: str | None = None
 
 
 async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> DryRunOutput:
-    """
-    Dry run a single pipe directly without parallelization.
+    """Dry run a single pipe directly without parallelization.
     """
     allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
     needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
@@ -58,19 +54,19 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
             warning_message = f"Allowed to fail dry run for pipe '{pipe.code}': {exc}"
             log.warning(warning_message)
             return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.WARNING, warning_message=warning_message)
-        elif raise_on_failure:
+
+        if raise_on_failure:
             raise exc
-        else:
-            error_message = f"Dry run failed for pipe '{pipe.code}': {exc}"
-            log.error(error_message)
-            return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
+
+        error_message = f"Dry run failed for pipe '{pipe.code}': {exc}"
+        log.error(error_message)
+        return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
     log.info(f"Pipe '{pipe.code}' dry run completed successfully")
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
 
 
-async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True, raise_on_failure: bool = True) -> Dict[str, DryRunOutput]:
-    """
-    Dry run pipes with optional parallelization.
+async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True, raise_on_failure: bool = True) -> dict[str, DryRunOutput]:
+    """Dry run pipes with optional parallelization.
 
     Args:
         pipes: List of pipes to dry run
@@ -83,10 +79,10 @@ async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True,
 
     Returns:
         Dict mapping pipe codes to their dry run status ("SUCCESS" or error message)
-    """
 
+    """
     start_time = time.time()
-    results: Dict[str, DryRunOutput] = {}
+    results: dict[str, DryRunOutput] = {}
     allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
 
     if run_in_parallel:
@@ -113,30 +109,29 @@ async def dry_run_pipes(pipes: List[PipeAbstract], run_in_parallel: bool = True,
 
     log.info(
         f"Dry run completed: '{len(successful_pipes)}' successful, '{len(failed_pipes)}' failed, "
-        f"'{len(allowed_to_fail_pipes)}' allowed to fail, in '{time.time() - start_time:.2f}' seconds"
+        f"'{len(allowed_to_fail_pipes)}' allowed to fail, in '{time.time() - start_time:.2f}' seconds",
     )
     if unexpected_failures:
         unexpected_failures_details = "\n".join([f"'{pipe_code}': {results[pipe_code]}" for pipe_code in unexpected_failures])
         if raise_on_failure:
             raise DryRunError(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
-        else:
-            log.error(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
-            return results
+        log.error(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
+        return results
 
     return results
 
 
-def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List[TypedNamedInputRequirement]:
-    """
-    Convert PipeInputSpec to the format needed by WorkingMemoryFactory.make_for_dry_run.
+def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> list[TypedNamedInputRequirement]:
+    """Convert PipeInputSpec to the format needed by WorkingMemoryFactory.make_for_dry_run.
 
     Args:
         needed_inputs_spec: PipeInputSpec with detailed_requirements
 
     Returns:
         List of tuples (variable_name, concept_code, structure_class)
+
     """
-    needed_inputs_for_factory: List[TypedNamedInputRequirement] = []
+    needed_inputs_for_factory: list[TypedNamedInputRequirement] = []
     class_registry = get_class_registry()
 
     for named_input_requirement in needed_inputs_spec.named_input_requirements:
@@ -158,7 +153,7 @@ def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List
                 # Fallback to TextContent if we can't get the proper class
                 log.warning(
                     f"Could not get structure class '{structure_class_name}' for "
-                    f"concept '{named_input_requirement.concept.code}', falling back to TextContent"
+                    f"concept '{named_input_requirement.concept.code}', falling back to TextContent",
                 )
                 text_typed_named_input_requirement = TypedNamedInputRequirement.make_from_named(
                     named=named_input_requirement,

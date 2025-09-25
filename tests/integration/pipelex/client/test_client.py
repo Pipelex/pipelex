@@ -1,4 +1,3 @@
-from typing import List
 
 import pytest
 from pydantic import BaseModel
@@ -17,16 +16,15 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 
 class Example(BaseModel):
     pipe_code: str
-    memory: List[Stuff]
+    memory: list[Stuff]
 
 
 @pytest.mark.pipelex_api
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipelexApiClient:
     @pytest.fixture
-    def examples(self) -> List[Example]:
-        """
-        Fixture providing test example for API client tests.
+    def examples(self) -> list[Example]:
+        """Fixture providing test example for API client tests.
         """
         return [
             Example(
@@ -74,12 +72,12 @@ class TestPipelexApiClient:
                                 distinctive bionic design inspired by peregrine falcons, the train uses an innovative 
                                 hybrid propulsion system that combines traditional electric motors with 
                                 compressed air boosters for acceleration phases.
-                            """
+                            """,
                         ),
                     ),
                     StuffFactory.make_stuff(
                         concept=ConceptFactory.make(
-                            concept_code="Question", domain="answer", definition="answer.Question", structure_class_name="Question"
+                            concept_code="Question", domain="answer", definition="answer.Question", structure_class_name="Question",
                         ),
                         name="question",
                         content=TextContent(text="Aerodynamic features?"),
@@ -90,13 +88,13 @@ class TestPipelexApiClient:
 
     async def test_client_execute_pipeline(
         self,
-        examples: List[Example],
+        examples: list[Example],
     ):
-        """
-        Test the execute_pipe method with the example.
+        """Test the execute_pipe method with the example.
 
         Args:
             examples: List of test examples from the fixture
+
         """
         for example in examples:
             # Create working memory from example data

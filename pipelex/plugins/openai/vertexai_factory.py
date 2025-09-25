@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from pipelex.cogt.exceptions import CogtError, MissingDependencyError
 from pipelex.tools.config.config_model import ConfigModel
@@ -26,8 +26,8 @@ class VertexAIFactory(ConfigModel):
     @classmethod
     def make_endpoint_and_api_key(
         cls,
-        extra_config: Dict[str, Any],
-    ) -> Tuple[str, str]:
+        extra_config: dict[str, Any],
+    ) -> tuple[str, str]:
         """Configure and return endpoint, and API key."""
         gcp_project_id = extra_config.get(VertexAIExtraField.GCP_PROJECT_ID)
         if not gcp_project_id:
@@ -69,14 +69,14 @@ class VertexAIFactory(ConfigModel):
             ) from exc
 
         try:
-            credentials_dict: Dict[str, Any] = load_json_dict_from_path(path=gcp_credentials_file_path)
+            credentials_dict: dict[str, Any] = load_json_dict_from_path(path=gcp_credentials_file_path)
         except FileNotFoundError as exc:
             raise VertexAICredentialsError(
-                f"Could not get VertexAI credentials from GCP credentials file: File not found: {gcp_credentials_file_path}"
+                f"Could not get VertexAI credentials from GCP credentials file: File not found: {gcp_credentials_file_path}",
             ) from exc
 
         credentials = Credentials.from_service_account_info(  # pyright: ignore[reportUnknownMemberType]
-            credentials_dict, scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            credentials_dict, scopes=["https://www.googleapis.com/auth/cloud-platform"],
         )
         auth_req = Request()
         credentials.refresh(auth_req)  # pyright: ignore[reportUnknownMemberType]

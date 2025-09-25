@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -8,10 +7,10 @@ from pipelex.tools.misc.string_utils import is_snake_case
 
 class DomainBlueprint(BaseModel):
     code: str
-    definition: Optional[str] = None
-    system_prompt: Optional[str] = None
-    system_prompt_to_structure: Optional[str] = None
-    prompt_template_to_structure: Optional[str] = None
+    definition: str | None = None
+    system_prompt: str | None = None
+    system_prompt_to_structure: str | None = None
+    prompt_template_to_structure: str | None = None
 
     @staticmethod
     def validate_domain_code(code: str) -> None:

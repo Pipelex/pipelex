@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Optional, Tuple, Type
+from typing import Any
 
 import pytest
 from pytest import FixtureRequest
@@ -28,7 +28,7 @@ class TestPipeRunningVariants:
         self,
         pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
-        pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
+        pipe_result_handler: tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
         topic: str,
         stuff: Stuff,
@@ -52,7 +52,7 @@ class TestPipeRunningVariants:
         self,
         pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
-        pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
+        pipe_result_handler: tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
         topic: str,
         pipe_code: str,
@@ -79,11 +79,11 @@ class TestPipeRunningVariants:
         self,
         pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
-        pipe_result_handler: Tuple[str, ActivityHandlerForResultFiles],
+        pipe_result_handler: tuple[str, ActivityHandlerForResultFiles],
         save_working_memory: Any,
         topic: str,
         pipe_code: str,
-        output_multiplicity: Optional[PipeOutputMultiplicity],
+        output_multiplicity: PipeOutputMultiplicity | None,
     ):
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
@@ -111,13 +111,13 @@ class TestPipeRunningVariants:
         pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
         pipe_code: str,
-        exception: Type[Exception],
+        exception: type[Exception],
         expected_error_message: str,
     ):
         failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
         library_manager = get_library_manager()
         library_manager.load_libraries(
-            library_file_paths=[Path(failing_pipeline_file_path) for failing_pipeline_file_path in failing_pipelines_file_paths]
+            library_file_paths=[Path(failing_pipeline_file_path) for failing_pipeline_file_path in failing_pipelines_file_paths],
         )
 
         log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")

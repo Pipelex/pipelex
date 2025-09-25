@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 import pytest
 
@@ -12,8 +12,6 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 
 
 class TestWorkingMemoryData:
-    """Test data for WorkingMemory tests."""
-
     # Sample text content
     SAMPLE_TEXT = """
     The Dawn of Ultra-Rapid Transit: NextGen High-Speed Trains Redefine Travel
@@ -40,7 +38,7 @@ class TestWorkingMemoryData:
     HTML_CONTENT_CASE = "html_content"
     NUMBER_CONTENT_CASE = "number_content"
 
-    TEST_CASES: ClassVar[List[Tuple[str, str]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, str]]] = [
         ("Single text content", SINGLE_TEXT_CASE),
         ("Single image content", SINGLE_IMAGE_CASE),
         ("Single PDF content", SINGLE_PDF_CASE),
@@ -60,21 +58,21 @@ class TestWorkingMemory:
     def single_text_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single text content."""
         return WorkingMemoryFactory.make_from_text(
-            text=TestWorkingMemoryData.SAMPLE_TEXT, concept_string=SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value, name="sample_text"
+            text=TestWorkingMemoryData.SAMPLE_TEXT, concept_string=SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value, name="sample_text",
         )
 
     @pytest.fixture
     def single_image_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single image content."""
         return WorkingMemoryFactory.make_from_image(
-            image_url=TestWorkingMemoryData.SAMPLE_IMAGE_URL, concept_string="gantt.GanttImage", name="gantt_chart_image"
+            image_url=TestWorkingMemoryData.SAMPLE_IMAGE_URL, concept_string="gantt.GanttImage", name="gantt_chart_image",
         )
 
     @pytest.fixture
     def single_pdf_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single PDF content."""
         return WorkingMemoryFactory.make_from_pdf(
-            pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL, concept_string=NativeConceptEnum.PDF.value, name="pdf_document"
+            pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL, concept_string=NativeConceptEnum.PDF.value, name="pdf_document",
         )
 
     @pytest.fixture
@@ -129,12 +127,12 @@ class TestWorkingMemory:
                 TextContent(text="The quick brown fox jumps over the lazy dog"),
                 ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
                 NumberContent(number=42.5),
-            ]
+            ],
         )
 
         complex_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
-                concept_code="List", domain=SpecialDomain.NATIVE.value, definition="Lorem Ipsum", structure_class_name="ListContent"
+                concept_code="List", domain=SpecialDomain.NATIVE.value, definition="Lorem Ipsum", structure_class_name="ListContent",
             ),
             name="mixed_list",
             content=complex_content,
@@ -168,7 +166,7 @@ class TestWorkingMemory:
 
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
-                concept_code="Html", domain=SpecialDomain.NATIVE.value, definition="Lorem Ipsum", structure_class_name="HtmlContent"
+                concept_code="Html", domain=SpecialDomain.NATIVE.value, definition="Lorem Ipsum", structure_class_name="HtmlContent",
             ),
             name="test_report",
             content=html_content,

@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 from typing_extensions import override
 
@@ -22,7 +22,7 @@ class ModelManager(ModelManagerAbstract):
     def __init__(self) -> None:
         self.routing_profile_library = RoutingProfileLibrary.make_empty()
         self.inference_backend_library = InferenceBackendLibrary.make_empty()
-        self.model_deck: Optional[ModelDeck] = None
+        self.model_deck: ModelDeck | None = None
 
     @override
     def get_model_deck(self) -> ModelDeck:
@@ -59,7 +59,7 @@ class ModelManager(ModelManagerAbstract):
     @classmethod
     def load_deck_blueprint(cls) -> ModelDeckBlueprint:
         deck_paths = get_config().cogt.inference_config.get_model_deck_paths()
-        full_deck_dict: Dict[str, Any] = {}
+        full_deck_dict: dict[str, Any] = {}
         if not deck_paths:
             raise ModelDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
 
@@ -79,7 +79,7 @@ class ModelManager(ModelManagerAbstract):
 
     def build_deck(self, model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
-        inference_models: Dict[str, InferenceModelSpec] = {}
+        inference_models: dict[str, InferenceModelSpec] = {}
 
         for model_name, available_backends in all_models_and_possible_backends.items():
             backend_match_for_model = self.routing_profile_library.get_backend_match_for_model_from_active_routing_profile(
@@ -99,12 +99,12 @@ class ModelManager(ModelManagerAbstract):
                     case BackendMatchingMethod.EXACT_MATCH:
                         raise ModelsManagerError(
                             f"Model spec '{model_name}' not found in backend '{matched_backend_name}' "
-                            f"which was matched exactly in routing profile '{backend_match_for_model.routing_profile_name}'"
+                            f"which was matched exactly in routing profile '{backend_match_for_model.routing_profile_name}'",
                         )
                     case BackendMatchingMethod.PATTERN_MATCH:
                         log.verbose(
                             f"Model spec '{model_name}' not found in backend '{matched_backend_name}' but it's OK because "
-                            f"it was only matched by pattern in routing profile '{backend_match_for_model.routing_profile_name}'"
+                            f"it was only matched by pattern in routing profile '{backend_match_for_model.routing_profile_name}'",
                         )
                         # We can skip it because it was only a pattern match
                         continue
@@ -125,7 +125,7 @@ class ModelManager(ModelManagerAbstract):
                         if model_spec is None:
                             raise ModelsManagerError(
                                 f"Model spec '{model_name}' not found in any of the available backends '{available_backends}' "
-                                f"which was set as default in routing profile '{backend_match_for_model.routing_profile_name}'"
+                                f"which was set as default in routing profile '{backend_match_for_model.routing_profile_name}'",
                             )
             inference_models[model_name] = model_spec
 

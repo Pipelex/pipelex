@@ -1,5 +1,5 @@
 import os
-from typing import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 import pytest_asyncio
 from pytest import FixtureRequest
@@ -14,8 +14,7 @@ from tests.conftest import TEST_OUTPUTS_DIR
 
 @pytest_asyncio.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
 async def pipe_result_handler(request: FixtureRequest) -> AsyncIterator[tuple[str, ActivityHandlerForResultFiles]]:
-    """
-    This fixture is used to handle the result of a pipe run in unit tests.
+    """This fixture is used to handle the result of a pipe run in unit tests.
     It creates and registers an activity handler to save the activities of the pipe into a specific directory.
     It returns a tuple with the result directory path and the activity handler, which enables the
     calling test to save whatever it wants into that result directory.

@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
@@ -16,7 +16,6 @@ class PipeFuncTestCases:
             output="ProcessedData",
             function_name="process_data",
         ),
-        "test_domain",
         PipeFuncBlueprint(
             definition="Execute a function",
             inputs={"data": InputRequirementBlueprint(concept="Data")},
@@ -36,7 +35,6 @@ class PipeFuncTestCases:
             output="GeneratedData",
             function_name="generate_data",
         ),
-        "test_domain",
         PipeFuncBlueprint(
             definition="Generate data",
             inputs=None,
@@ -47,7 +45,7 @@ class PipeFuncTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeFuncSpec, str, PipeFuncBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, PipeFuncSpec, PipeFuncBlueprint]]] = [
         SIMPLE_FUNC,
         FUNC_NO_INPUTS,
     ]

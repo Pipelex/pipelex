@@ -1,38 +1,30 @@
-#!/usr/bin/env python3
-"""Test script for FuncRegistryUtils"""
-
 import tempfile
 from pathlib import Path
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 import pytest
 from pydantic import Field
 
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.stuff_content import StructuredContent, TextContent
 from pipelex.tools.func_registry import func_registry
 from pipelex.tools.func_registry_utils import FuncRegistryUtils
 
 
 class FilePath(StructuredContent):
-    """A path to a file in the codebase."""
-
     path: str = Field(description="Path to the file")
 
 
 class CodebaseFileContent(StructuredContent):
-    """Content of a codebase file."""
-
     file_path: str = Field(description="Path to the codebase file")
     file_content: str = Field(description="Content of the codebase file")
 
 
 class TestCases:
-    """Test cases for function eligibility."""
-
     VALID_ASYNC_FUNCTION = """
 async def read_file_content(working_memory: WorkingMemory) -> ListContent[CodebaseFileContent]:
     '''Read the content of related codebase files.'''
-    
+
     file_paths_list = working_memory.get_stuff_as_list("related_file_paths", item_type=FilePath)
 
     codebase_files: List[CodebaseFileContent] = []
@@ -88,7 +80,7 @@ def invalid_function_no_type_hints(working_memory):
     pass
 """
 
-    TEST_CASES: ClassVar[List[Tuple[str, str, List[str], List[str]]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, str, list[str], list[str]]]] = [
         ("valid_async_function", VALID_ASYNC_FUNCTION, ["read_file_content"], []),
         ("valid_sync_function", VALID_SYNC_FUNCTION, ["sync_function"], []),
         (
@@ -108,21 +100,17 @@ def invalid_function_no_type_hints(working_memory):
 
 
 class TestFuncRegistryUtils:
-    """Test class for FuncRegistryUtils."""
-
     @pytest.mark.parametrize(
         "test_name, function_code, expected_registered, expected_not_registered",
         TestCases.TEST_CASES,
     )
     def test_function_registration_eligibility(
         self,
-        test_name: str,
+        _: str,
         function_code: str,
-        expected_registered: List[str],
-        expected_not_registered: List[str],
+        expected_registered: list[str],
+        expected_not_registered: list[str],
     ):
-        """Test that only eligible functions are registered (both sync and async are now eligible)."""
-
         # Create a temporary directory and file with test functions
         with tempfile.TemporaryDirectory() as temp_dir:
             test_file = Path(temp_dir) / "test_functions.py"
@@ -171,7 +159,6 @@ class CodebaseFileContent(StructuredContent):
 
     def test_recursive_folder_search(self):
         """Test that recursive folder search works correctly."""
-
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create nested directory structure
             nested_dir = Path(temp_dir) / "subdir"
@@ -216,18 +203,12 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
             assert not func_registry.has_function("nested_function"), "nested_function should NOT be registered"
 
     def test_eligibility_check_directly(self):
-        """Test the eligibility check method directly."""
-
-        # Create test functions dynamically for direct testing
-        from pipelex.core.memory.working_memory import WorkingMemory
-        from pipelex.core.stuffs.stuff_content import TextContent
-
         # Valid async function
-        async def valid_async_function(working_memory: WorkingMemory) -> TextContent:
+        async def valid_async_function(working_memory: WorkingMemory) -> TextContent: # noqa: ARG001
             return TextContent(text="test")
 
         # Valid sync function
-        def valid_sync_function(working_memory: WorkingMemory) -> TextContent:
+        def valid_sync_function(working_memory: WorkingMemory) -> TextContent: # noqa: ARG001
             return TextContent(text="test")
 
         # Test eligibility
@@ -235,20 +216,14 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
         assert func_registry.is_eligible_function(valid_sync_function), "Valid sync function should be eligible"
 
     def test_register_function_checks_eligibility(self):
-        """Test that register_function checks eligibility before registering."""
-
-        from pipelex.core.memory.working_memory import WorkingMemory
-        from pipelex.core.stuffs.stuff_content import TextContent
-
-        # Clear registry
         func_registry.teardown()
 
         # Valid async function
-        async def valid_async_function(working_memory: WorkingMemory) -> TextContent:
+        async def valid_async_function(working_memory: WorkingMemory) -> TextContent: # noqa: ARG001
             return TextContent(text="valid")
 
         # Valid sync function
-        def valid_sync_function(working_memory: WorkingMemory) -> TextContent:
+        def valid_sync_function(working_memory: WorkingMemory) -> TextContent: # noqa: ARG001
             return TextContent(text="valid")
 
         # Try to register both functions
@@ -262,14 +237,14 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
         # Test register_functions method as well
         func_registry.teardown()
 
-        async def another_valid_async_function(working_memory: WorkingMemory) -> TextContent:
+        async def another_valid_async_function(working_memory: WorkingMemory) -> TextContent: # noqa: ARG001
             return TextContent(text="another_valid_async")
 
-        def another_valid_sync_function(working_memory: WorkingMemory) -> TextContent:
+        def another_valid_sync_function(working_memory: WorkingMemory) -> TextContent: # noqa: ARG001
             return TextContent(text="another_valid_sync")
 
         # Invalid function (wrong parameter name)
-        def invalid_function(other_param: WorkingMemory) -> TextContent:
+        def invalid_function(other_param: WorkingMemory) -> TextContent: # noqa: ARG001
             return TextContent(text="invalid")
 
         # Register multiple functions at once - invalid functions should be silently skipped

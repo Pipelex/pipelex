@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any
 
 from typing_extensions import override
 
@@ -19,8 +19,8 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
     base_template_inputs: LLMPromptTemplateInputs = LLMPromptTemplateInputs()
 
     # fields kept for reference and debugging only (they have no effect)
-    source_system_template_name: Optional[str] = None
-    source_user_template_name: Optional[str] = None
+    source_system_template_name: str | None = None
+    source_user_template_name: str | None = None
 
     @property
     @override
@@ -41,18 +41,18 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
         arguments_dict = prompt_arguments.copy()
 
         # pop the base fields and then use the templating method
-        system_text: Optional[str] = arguments_dict.pop("system_text", None)
-        user_text: Optional[str] = arguments_dict.pop("user_text", None)
+        system_text: str | None = arguments_dict.pop("system_text", None)
+        user_text: str | None = arguments_dict.pop("user_text", None)
         if not user_text:
             user_text = self.proto_prompt.user_text
 
         # user_images is Optional here: None means the template is not altering the user_images field
-        user_images: Optional[List[PromptImage]] = None
+        user_images: list[PromptImage] | None = None
         if "user_images" in arguments_dict:
             user_images = arguments_dict.pop("user_images")
         elif "user_image" in arguments_dict:
             user_images = [arguments_dict.pop("user_image")]
-        is_user_images_append: Optional[bool] = arguments_dict.pop("is_user_images_append", None)
+        is_user_images_append: bool | None = arguments_dict.pop("is_user_images_append", None)
 
         return self.make_llm_prompt(
             system_text=system_text,
@@ -64,11 +64,11 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
 
     def make_llm_prompt(
         self,
-        system_text: Optional[str] = None,
-        user_text: Optional[str] = None,
-        user_images: Optional[List[PromptImage]] = None,
-        is_user_images_append: Optional[bool] = None,
-        template_inputs: Optional[LLMPromptTemplateInputs] = None,
+        system_text: str | None = None,
+        user_text: str | None = None,
+        user_images: list[PromptImage] | None = None,
+        is_user_images_append: bool | None = None,
+        template_inputs: LLMPromptTemplateInputs | None = None,
     ) -> LLMPrompt:
         if not is_none_or_has_text(system_text):
             if system_text == "":
@@ -120,11 +120,11 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
     def from_template_name(
         cls,
         template_provider: TemplateProviderAbstract,
-        system_text: Optional[str] = None,
-        user_text: Optional[str] = None,
-        user_images: Optional[List[PromptImage]] = None,
-        system_template_name: Optional[str] = None,
-        user_template_name: Optional[str] = None,
+        system_text: str | None = None,
+        user_text: str | None = None,
+        user_images: list[PromptImage] | None = None,
+        system_template_name: str | None = None,
+        user_template_name: str | None = None,
     ) -> "LLMPromptTemplate":
         proto_prompt: LLMPrompt = LLMPrompt(
             system_text=system_text,
@@ -145,9 +145,9 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
     @classmethod
     def from_template_contents(
         cls,
-        system_text: Optional[str] = None,
-        user_text: Optional[str] = None,
-        user_images: Optional[List[PromptImage]] = None,
+        system_text: str | None = None,
+        user_text: str | None = None,
+        user_images: list[PromptImage] | None = None,
     ) -> "LLMPromptTemplate":
         proto_prompt = LLMPrompt(
             user_text=user_text,

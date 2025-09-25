@@ -8,14 +8,14 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 
 
 class PipeFuncSpec(PipeSpec):
-    """
-    PipeFunc enables calling custom functions in the Pipelex framework.
+    """PipeFunc enables calling custom functions in the Pipelex framework.
 
     Attributes:
         the_pipe_code: Pipe code. Must be snake_case.
         type: Fixed to "PipeFunc" for this pipe type.
         category: Fixed to "PipeOperator" for this pipe category.
         function_name: The name of the function to call.
+
     """
 
     type: Literal["PipeFunc"] = "PipeFunc"

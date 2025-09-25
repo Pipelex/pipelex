@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, cast
 
 import shortuuid
 from polyfactory.factories.pydantic_factory import ModelFactory
@@ -23,7 +23,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         text: str,
         concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value,
-        name: Optional[str] = "text",
+        name: str | None = "text",
     ) -> WorkingMemory:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
         return cls.make_from_single_stuff(
@@ -31,7 +31,7 @@ class WorkingMemoryFactory(BaseModel):
                 concept=get_required_concept(concept_string=concept_string),
                 content=TextContent(text=text),
                 name=name,
-            )
+            ),
         )
 
     @classmethod
@@ -39,7 +39,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         image_url: str,
         concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.IMAGE.value,
-        name: Optional[str] = "image",
+        name: str | None = "image",
     ) -> WorkingMemory:
         # TODO: validate that the concept is compatible with an image concept
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
@@ -55,7 +55,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         pdf_url: str,
         concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.PDF.value,
-        name: Optional[str] = "pdf",
+        name: str | None = "pdf",
     ) -> WorkingMemory:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
         return cls.make_from_single_stuff(
@@ -63,7 +63,7 @@ class WorkingMemoryFactory(BaseModel):
                 concept=get_required_concept(concept_string=concept_string),
                 content=PDFContent(url=pdf_url),
                 name=name,
-            )
+            ),
         )
 
     @classmethod
@@ -76,8 +76,8 @@ class WorkingMemoryFactory(BaseModel):
     @classmethod
     def make_from_multiple_stuffs(
         cls,
-        stuff_list: List[Stuff],
-        main_name: Optional[str] = None,
+        stuff_list: list[Stuff],
+        main_name: str | None = None,
         is_ignore_unnamed: bool = False,
     ) -> WorkingMemory:
         stuff_dict: StuffDict = {}
@@ -86,10 +86,9 @@ class WorkingMemoryFactory(BaseModel):
             if not name:
                 if is_ignore_unnamed:
                     continue
-                else:
-                    raise WorkingMemoryFactoryError(f"Stuff {stuff} has no name")
+                raise WorkingMemoryFactoryError(f"Stuff {stuff} has no name")
             stuff_dict[name] = stuff
-        aliases: Dict[str, str] = {}
+        aliases: dict[str, str] = {}
         if stuff_dict:
             if main_name:
                 aliases[MAIN_STUFF_NAME] = main_name
@@ -98,7 +97,7 @@ class WorkingMemoryFactory(BaseModel):
         return WorkingMemory(root=stuff_dict, aliases=aliases)
 
     @classmethod
-    def make_from_strings_from_dict(cls, input_dict: Dict[str, Any]) -> WorkingMemory:
+    def make_from_strings_from_dict(cls, input_dict: dict[str, Any]) -> WorkingMemory:
         # TODO: Add unit tests for this method
         stuff_dict: StuffDict = {}
         for name, content in input_dict.items():
@@ -121,9 +120,9 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_compact_memory(
         cls,
         compact_memory: CompactMemory,
-        search_domains: Optional[List[str]] = None,
+        search_domains: list[str] | None = None,
     ) -> WorkingMemory:
-        implicit_memory = cast(ImplicitMemory, compact_memory)
+        implicit_memory = cast("ImplicitMemory", compact_memory)
         return cls.make_from_implicit_memory(
             implicit_memory=implicit_memory,
             search_domains=search_domains,
@@ -133,16 +132,16 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_implicit_memory(
         cls,
         implicit_memory: ImplicitMemory,
-        search_domains: Optional[List[str]] = None,
+        search_domains: list[str] | None = None,
     ) -> WorkingMemory:
-        """
-        Create a WorkingMemory from a compact memory dictionary.
+        """Create a WorkingMemory from a compact memory dictionary.
 
         Args:
             compact_memory: Dictionary in the format from API serialization
 
         Returns:
             WorkingMemory object reconstructed from the compact format
+
         """
         working_memory = cls.make_empty()
 
@@ -162,34 +161,34 @@ class WorkingMemoryFactory(BaseModel):
         """Helper method to create mock content for a requirement."""
         if requirement.structure_class:
             # Create mock object using polyfactory
-            class MockFactory(ModelFactory[requirement.structure_class]):  # type: ignore
+            class MockFactory(ModelFactory[requirement.structure_class]):
                 __model__ = requirement.structure_class
                 __check_model__ = True
                 __use_examples__ = True
                 __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
-            return MockFactory.build(factory_use_construct=True)  # type: ignore
-        else:
-            # Fallback to text content
-            return TextContent(text=f"DRY RUN: Mock content for '{requirement.variable_name}' ({requirement.concept.code})")
+            return MockFactory.build(factory_use_construct=True)
+
+        # Fallback to text content
+        return TextContent(text=f"DRY RUN: Mock content for '{requirement.variable_name}' ({requirement.concept.code})")
 
     @classmethod
-    def make_for_dry_run(cls, needed_inputs: List[TypedNamedInputRequirement]) -> "WorkingMemory":
-        """
-        Create a WorkingMemory with mock objects for dry run mode.
+    def make_for_dry_run(cls, needed_inputs: list[TypedNamedInputRequirement]) -> "WorkingMemory":
+        """Create a WorkingMemory with mock objects for dry run mode.
 
         Args:
             needed_inputs: List of tuples (stuff_name, concept_code, structure_class)
 
         Returns:
             WorkingMemory with mock objects for each needed input
+
         """
         working_memory = cls.make_empty()
 
         for requirement in needed_inputs:
             log.debug(
                 f"Creating dry run mock for '{requirement.variable_name}' with concept "
-                f"'{requirement.concept.code}' and class '{requirement.structure_class.__name__}'"
+                f"'{requirement.concept.code}' and class '{requirement.structure_class.__name__}'",
             )
 
             try:
@@ -214,7 +213,7 @@ class WorkingMemoryFactory(BaseModel):
                     else:
                         nb_stuffs = requirement.multiplicity
 
-                    items: List[StuffContent] = []
+                    items: list[StuffContent] = []
                     for _ in range(nb_stuffs):
                         item_mock_content = cls.create_mock_content(requirement)
                         items.append(item_mock_content)
@@ -233,7 +232,7 @@ class WorkingMemoryFactory(BaseModel):
 
             except Exception as exc:
                 log.warning(
-                    f"Failed to create mock for '{requirement.variable_name}' ({requirement.concept.code}): {exc}. Using fallback text content."
+                    f"Failed to create mock for '{requirement.variable_name}' ({requirement.concept.code}): {exc}. Using fallback text content.",
                 )
                 # Create fallback text content
                 fallback_content = TextContent(text=f"DRY RUN: Fallback mock for '{requirement.variable_name}' ({requirement.concept.code})")

@@ -66,7 +66,7 @@ class TestPipeConditionSimple:
         assert input_text.content.text == "hello world"
 
         pipe_output = await pipe_condition.run_pipe(
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -138,7 +138,7 @@ class TestPipeConditionSimple:
 
         # Actually run the PipeCondition pipe
         pipe_output = await pipe_condition.run_pipe(
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -196,7 +196,7 @@ class TestPipeConditionSimple:
         # Run dry run using the real pipe - this should succeed
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="basic_condition_by_category_2",
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
@@ -229,7 +229,7 @@ class TestPipeConditionSimple:
         with pytest.raises(DryRunError) as exc_info:
             await get_pipe_router().run_pipe_code(
                 pipe_code="basic_condition_by_category_2",
-                job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+                job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
                 working_memory=empty_working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             )
@@ -261,7 +261,7 @@ class TestPipeConditionSimple:
         # Run dry run using the real pipe - this should succeed and validate the 'medium' branch
         pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
             pipe_code="basic_condition_by_category_2",
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )

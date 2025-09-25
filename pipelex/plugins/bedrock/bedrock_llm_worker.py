@@ -1,4 +1,4 @@
-from typing import Any, Optional, Type
+from typing import Any
 
 from typing_extensions import override
 
@@ -23,8 +23,8 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
-        structure_method: Optional[StructureMethod] = None,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        structure_method: StructureMethod | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
@@ -35,14 +35,14 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
 
         if not isinstance(sdk_instance, BedrockClientProtocol):
             raise SdkTypeError(
-                f"Provided sdk_instance for {self.__class__.__name__} is not of type BedrockClientProtocol: it's a '{type(sdk_instance)}'"
+                f"Provided sdk_instance for {self.__class__.__name__} is not of type BedrockClientProtocol: it's a '{type(sdk_instance)}'",
             )
 
         if default_max_tokens := inference_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
             raise BedrockWorkerConfigurationError(
-                f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Bedrock"
+                f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Bedrock",
             )
         self.bedrock_client_for_text = sdk_instance
 
@@ -70,7 +70,7 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         # TODO: try with the newest instructor release
         raise LLMCapabilityError(f"It is not possible to generate objects with a {self.__class__.__name__}.")

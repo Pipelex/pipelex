@@ -1,7 +1,7 @@
 import inspect
 import os
 from importlib.metadata import metadata
-from typing import Optional, Type, cast
+from typing import Self, cast
 
 from dotenv import load_dotenv
 from kajson.class_registry import ClassRegistry
@@ -9,7 +9,6 @@ from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
 from kajson.singleton import MetaSingleton
 from pydantic import ValidationError
-from typing_extensions import Self
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
@@ -63,16 +62,16 @@ class Pipelex(metaclass=MetaSingleton):
         self,
         config_dir_path: str,
         # Dependency injection
-        pipelex_hub: Optional[PipelexHub] = None,
-        config_cls: Optional[Type[ConfigRoot]] = None,
-        class_registry: Optional[ClassRegistryAbstract] = None,
-        template_provider: Optional[TemplateLibrary] = None,
-        models_manager: Optional[ModelManagerAbstract] = None,
-        inference_manager: Optional[InferenceManager] = None,
-        pipeline_manager: Optional[PipelineManager] = None,
-        pipeline_tracker: Optional[PipelineTracker] = None,
-        activity_manager: Optional[ActivityManagerProtocol] = None,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        pipelex_hub: PipelexHub | None = None,
+        config_cls: type[ConfigRoot] | None = None,
+        class_registry: ClassRegistryAbstract | None = None,
+        template_provider: TemplateLibrary | None = None,
+        models_manager: ModelManagerAbstract | None = None,
+        inference_manager: InferenceManager | None = None,
+        pipeline_manager: PipelineManager | None = None,
+        pipeline_tracker: PipelineTracker | None = None,
+        activity_manager: ActivityManagerProtocol | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ) -> None:
         self.config_dir_path = config_dir_path
         self.pipelex_hub = pipelex_hub or PipelexHub()
@@ -160,10 +159,10 @@ class Pipelex(metaclass=MetaSingleton):
 
     def setup(
         self,
-        secrets_provider: Optional[SecretsProviderAbstract] = None,
-        content_generator: Optional[ContentGeneratorProtocol] = None,
-        pipe_router: Optional[PipeRouterProtocol] = None,
-        storage_provider: Optional[StorageProviderAbstract] = None,
+        secrets_provider: SecretsProviderAbstract | None = None,
+        content_generator: ContentGeneratorProtocol | None = None,
+        pipe_router: PipeRouterProtocol | None = None,
+        storage_provider: StorageProviderAbstract | None = None,
     ):
         # tools
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
@@ -174,7 +173,7 @@ class Pipelex(metaclass=MetaSingleton):
             self.models_manager.setup()
         except RoutingProfileLibraryNotFoundError as routing_profile_library_exc:
             raise PipelexSetupError(
-                "The routing library could not be found, please call `pipelex init config` to create it"
+                "The routing library could not be found, please call `pipelex init config` to create it",
             ) from routing_profile_library_exc
         except InferenceBackendCredentialsError as credentials_exc:
             backend_name = credentials_exc.backend_name
@@ -260,9 +259,9 @@ class Pipelex(metaclass=MetaSingleton):
     @classmethod
     def make(
         cls,
-        relative_config_folder_path: Optional[str] = None,
-        absolute_config_folder_path: Optional[str] = None,
-        from_file: Optional[bool] = True,
+        relative_config_folder_path: str | None = None,
+        absolute_config_folder_path: str | None = None,
+        from_file: bool | None = True,
     ) -> Self:
         """Create and initialize a Pipelex instance.
 
@@ -284,6 +283,7 @@ class Pipelex(metaclass=MetaSingleton):
 
         Note:
             If neither path is provided, defaults to "./pipelex_libraries".
+
         """
         if relative_config_folder_path is not None and absolute_config_folder_path is not None:
             raise PipelexSetupError("Cannot specify both relative_config_folder_path and absolute_config_folder_path")
@@ -311,13 +311,13 @@ class Pipelex(metaclass=MetaSingleton):
         return pipelex_instance
 
     @classmethod
-    def get_optional_instance(cls) -> Optional[Self]:
+    def get_optional_instance(cls) -> Self | None:
         instance = MetaSingleton.instances.get(cls)
-        return cast(Optional[Self], instance)
+        return cast("Self | None", instance)
 
     @classmethod
     def get_instance(cls) -> Self:
         instance = MetaSingleton.instances.get(cls)
         if instance is None:
             raise RuntimeError("Pipelex is not initialized")
-        return cast(Self, instance)
+        return cast("Self", instance)

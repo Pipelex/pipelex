@@ -9,4 +9,5 @@ def test_testing():
         case RunMode.UNIT_TEST:
             assert not is_env_var_set(key="GITHUB_ACTIONS") and not is_env_var_set(key="CI")
         case _:
-            raise RuntimeError(f"Invalid run mode: {runtime_manager.run_mode}")
+            msg = f"Invalid run mode: {runtime_manager.run_mode}"
+            raise RuntimeError(msg)

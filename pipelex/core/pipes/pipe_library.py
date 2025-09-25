@@ -1,10 +1,10 @@
 from itertools import groupby
-from typing import Dict, List, Optional
+from typing import Self
 
 from pydantic import RootModel
 from rich import box
 from rich.table import Table
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -12,7 +12,7 @@ from pipelex.core.pipes.pipe_provider_abstract import PipeProviderAbstract
 from pipelex.exceptions import ConceptError, ConceptLibraryConceptNotFoundError, PipeLibraryError, PipeLibraryPipeNotFoundError
 from pipelex.hub import get_concept_provider
 
-PipeLibraryRoot = Dict[str, PipeAbstract]
+PipeLibraryRoot = dict[str, PipeAbstract]
 
 
 class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
@@ -27,7 +27,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
                         concept_provider.get_required_concept(concept_string=concept.concept_string)
                     except ConceptError as concept_error:
                         raise PipeLibraryError(
-                            f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
+                            f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}",
                         ) from concept_error
                 for pipe_code in pipe.pipe_dependencies():
                     self.get_required_pipe(pipe_code=pipe_code)
@@ -46,7 +46,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         self.root[pipe.code] = pipe
 
     @override
-    def add_pipes(self, pipes: List[PipeAbstract]):
+    def add_pipes(self, pipes: list[PipeAbstract]):
         for pipe in pipes:
             self.add_new_pipe(pipe=pipe)
 
@@ -58,7 +58,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         self.root[name] = pipe
 
     @override
-    def get_optional_pipe(self, pipe_code: str) -> Optional[PipeAbstract]:
+    def get_optional_pipe(self, pipe_code: str) -> PipeAbstract | None:
         return self.root.get(pipe_code)
 
     @override
@@ -66,19 +66,19 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         the_pipe = self.get_optional_pipe(pipe_code=pipe_code)
         if not the_pipe:
             raise PipeLibraryPipeNotFoundError(
-                f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in a library listed in the config."
+                f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in a library listed in the config.",
             )
         return the_pipe
 
     @override
-    def get_pipes(self) -> List[PipeAbstract]:
+    def get_pipes(self) -> list[PipeAbstract]:
         return list(self.root.values())
 
     @override
-    def get_pipes_dict(self) -> Dict[str, PipeAbstract]:
+    def get_pipes_dict(self) -> dict[str, PipeAbstract]:
         return self.root
 
-    def remove_pipes_by_codes(self, pipe_codes: List[str]) -> None:
+    def remove_pipes_by_codes(self, pipe_codes: list[str]) -> None:
         # TODO: We should create a separate library, that copies the original one, and then removes the pipes from it
         # Then run the dry run + validation to see if removing those pipe has not broken any other pipe.
         # If validated, it should update the real library.
@@ -92,7 +92,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
 
     @override
     def pretty_list_pipes(self) -> None:
-        def _format_concept_code(concept_code: Optional[str], current_domain: str) -> str:
+        def _format_concept_code(concept_code: str | None, current_domain: str) -> str:
             """Format concept code by removing domain prefix if it matches current domain."""
             if not concept_code:
                 return ""
@@ -107,7 +107,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         ordered_items = sorted(pipes, key=lambda pipe: (pipe.domain or "", pipe.code or ""))
 
         # Create dictionary for return value
-        pipes_dict: Dict[str, Dict[str, Dict[str, str]]] = {}
+        pipes_dict: dict[str, dict[str, dict[str, str]]] = {}
 
         # Group by domain and create separate tables
         for domain, domain_pipes in groupby(ordered_items, key=lambda pipe: pipe.domain):

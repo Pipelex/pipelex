@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from typing import List, Optional
 
 from typing_extensions import override
 
@@ -16,7 +15,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
     def __init__(
         self,
         inference_model: InferenceModelSpec,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
         self.inference_model = inference_model
@@ -73,7 +72,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> List[GeneratedImage]:
+    ) -> list[GeneratedImage]:
         log.debug(f"Image gen worker gen_image_list using {self.desc}")
 
         # Verify that the job is valid
@@ -103,5 +102,5 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> List[GeneratedImage]:
+    ) -> list[GeneratedImage]:
         pass

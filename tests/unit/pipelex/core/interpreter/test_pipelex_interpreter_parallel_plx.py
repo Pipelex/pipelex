@@ -6,8 +6,6 @@ from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
 class TestPipelexInterpreterParallelPLX:
-    """Test Parallel pipe to PLX string conversion."""
-
     @pytest.mark.parametrize(
         "pipe_name,blueprint,expected_plx",
         [
@@ -64,6 +62,5 @@ combined_output = "MergedResults\"""",
         ],
     )
     def test_parallel_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeParallelBlueprint, expected_plx: str):
-        """Test converting Parallel pipe blueprint to PLX string."""
         result = PipelexInterpreter.parallel_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

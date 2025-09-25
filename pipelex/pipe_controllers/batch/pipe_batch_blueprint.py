@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
@@ -7,5 +7,5 @@ class PipeBatchBlueprint(PipeBlueprint):
     type: Literal["PipeBatch"] = "PipeBatch"
     category: Literal["PipeController"] = "PipeController"
     branch_pipe_code: str
-    input_list_name: Optional[str] = None
-    input_item_name: Optional[str] = None
+    input_list_name: str | None = None
+    input_item_name: str | None = None

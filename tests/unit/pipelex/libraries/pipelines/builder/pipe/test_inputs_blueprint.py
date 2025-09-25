@@ -12,7 +12,7 @@ class TestInputRequirementBlueprintConversion:
         InputRequirementTestCases.TEST_CASES,
     )
     def test_input_requirement_spec_to_blueprint(
-        self, test_name: str, input_spec: InputRequirementSpec, domain: str, expected_blueprint: InputRequirementBlueprint
+        self, test_name: str, input_spec: InputRequirementSpec, domain: str, expected_blueprint: InputRequirementBlueprint,
     ):
         result = input_spec.to_blueprint()
         assert result == expected_blueprint

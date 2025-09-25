@@ -3,7 +3,7 @@
 # pyright: reportUnknownMemberType=false
 # pyright: reportUnknownParameterType=false
 # pyright: reportMissingTypeArgument=false
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import networkx as nx
 import yaml
@@ -37,7 +37,7 @@ class PipelineFlowChart:
         self._tracker_config = tracker_config
         self.is_debug_mode = tracker_config.is_debug_mode
         self.start_node = start_node
-        self.sub_graph_class_defs: List[SubGraphClassDef] = []
+        self.sub_graph_class_defs: list[SubGraphClassDef] = []
         for sub_graph_index, sub_graph_color in enumerate(self._tracker_config.sub_graph_colors):
             class_def_letter = chr(ord("a") + sub_graph_index)
             class_def_name = f"sub_{class_def_letter}"
@@ -45,14 +45,14 @@ class PipelineFlowChart:
 
     def generate_mermaid_flowchart(
         self,
-        title: Optional[str] = None,
-        subtitle: Optional[str] = None,
-    ) -> Tuple[str, str]:
+        title: str | None = None,
+        subtitle: str | None = None,
+    ) -> tuple[str, str]:
         nb_nodes = len(self.nx_graph.nodes)
         if nb_nodes == 0:
             raise JobHistoryError("Graph has no nodes")
         log.debug(f"Generating mermaid flowchart for the whole graph which holds {nb_nodes} nodes")
-        mermaid_settings: Dict[str, Any] = {}
+        mermaid_settings: dict[str, Any] = {}
         if title:
             mermaid_settings["title"] = title
         mermaid_settings["config"] = {}
@@ -144,13 +144,13 @@ class PipelineFlowChart:
         url = make_mermaid_url(mermaid_code)
         return mermaid_code, url
 
-    def generate_subgraph_lines(self, graph_tree: GraphTree) -> List[str]:
-        subgraph_lines: List[str] = []
-        subgraph_class_lines: List[str] = []
+    def generate_subgraph_lines(self, graph_tree: GraphTree) -> list[str]:
+        subgraph_lines: list[str] = []
+        subgraph_class_lines: list[str] = []
 
         cycle = 0
         for subgraph_name, nodes in graph_tree.nodes_by_subgraph.items():
-            node_lines: List[str] = []
+            node_lines: list[str] = []
             for node in nodes:
                 # log.debug(f"generate_subgraph_lines for node '{node}'")
                 node_attributes = self.nx_graph.nodes[node]

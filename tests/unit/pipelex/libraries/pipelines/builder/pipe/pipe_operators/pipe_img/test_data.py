@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
@@ -65,7 +65,7 @@ class PipeImgGenTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeImgGenSpec, PipeImgGenBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, PipeImgGenSpec, PipeImgGenBlueprint]]] = [
         SIMPLE_IMG_GEN,
         IMG_GEN_WITH_OPTIONS,
     ]

@@ -1,5 +1,3 @@
-"""PipeCondition test cases."""
-
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
 
@@ -28,7 +26,7 @@ expression = "input_data.category"
                     {
                         "small": "process_small",
                         "large": "process_large",
-                    }
+                    },
                 ),
             ),
         },

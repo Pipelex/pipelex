@@ -1,7 +1,8 @@
-from typing import Any, Dict, ItemsView, List, Optional
+from collections.abc import ItemsView
+from typing import Any, Optional, Self
 
 from pydantic import ConfigDict, Field, RootModel, model_validator
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptTemplateInputsError
@@ -9,7 +10,7 @@ from pipelex.tools.misc.json_utils import json_str
 from pipelex.tools.misc.string_utils import can_inject_text
 from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
 
-LLMPromptTemplateInputsDict = Dict[str, Any]
+LLMPromptTemplateInputsDict = dict[str, Any]
 
 
 class LLMPromptTemplateInputs(RootModel[LLMPromptTemplateInputsDict]):
@@ -37,7 +38,7 @@ class LLMPromptTemplateInputs(RootModel[LLMPromptTemplateInputsDict]):
     def items(self) -> ItemsView[str, Any]:
         return self.root.items()
 
-    def list_keys(self) -> List[str]:
+    def list_keys(self) -> list[str]:
         return list(self.root.keys())
 
     def complemented_by(self, additional_template_inputs: Optional["LLMPromptTemplateInputs"]) -> "LLMPromptTemplateInputs":
@@ -46,7 +47,7 @@ class LLMPromptTemplateInputs(RootModel[LLMPromptTemplateInputsDict]):
             all_template_inputs.update(additional_template_inputs.root)
         return LLMPromptTemplateInputs(root=all_template_inputs)
 
-    def complemented_by_dict(self, additional_inputs_dict: Optional[LLMPromptTemplateInputsDict]) -> "LLMPromptTemplateInputs":
+    def complemented_by_dict(self, additional_inputs_dict: LLMPromptTemplateInputsDict | None) -> "LLMPromptTemplateInputs":
         all_template_inputs = self.root.copy()
         if additional_inputs_dict:
             all_template_inputs.update(additional_inputs_dict)

@@ -2,13 +2,12 @@ import importlib.util
 import inspect
 import os
 import sys
-from typing import Any, List, Optional, Type
+from typing import Any
 
 
 class ModuleFileError(Exception):
     """Exception raised for errors related to module file operations."""
 
-    pass
 
 
 def import_module_from_file(file_path: str) -> Any:
@@ -22,6 +21,7 @@ def import_module_from_file(file_path: str) -> Any:
 
     Raises:
         ModuleFileError: If the file is not a Python file or cannot be loaded
+
     """
     # Validate that the file is a Python file
     if not file_path.endswith(".py"):
@@ -53,25 +53,23 @@ def import_module_from_file(file_path: str) -> Any:
 def _convert_file_path_to_module_path(file_path: str) -> str:
     """Convert a file path to a module-style path."""
     # Remove .py extension
-    module_path = file_path[:-3] if file_path.endswith(".py") else file_path
+    module_path = file_path.removesuffix(".py")
 
     # Replace path separators with dots
     module_path = module_path.replace(os.sep, ".")
 
     # Handle __init__.py files by removing the __init__ part
-    if module_path.endswith(".__init__"):
-        module_path = module_path[:-9]
+    module_path = module_path.removesuffix(".__init__")
 
     return module_path
 
 
 def find_classes_in_module(
     module: Any,
-    base_class: Optional[Type[Any]],
+    base_class: type[Any] | None,
     include_imported: bool,
-) -> List[Type[Any]]:
-    """
-    Finds all classes in a module that match the criteria.
+) -> list[type[Any]]:
+    """Finds all classes in a module that match the criteria.
 
     Args:
         module: The module to search for classes
@@ -80,8 +78,9 @@ def find_classes_in_module(
 
     Returns:
         List of class types that match the criteria
+
     """
-    classes: List[Type[Any]] = []
+    classes: list[type[Any]] = []
     module_name = module.__name__
 
     # Find all classes in the module

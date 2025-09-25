@@ -5,8 +5,6 @@ from pipelex.core.interpreter import PipelexInterpreter
 
 
 class TestPipelexInterpreterConceptPLX:
-    """Test concept to PLX string conversion."""
-
     @pytest.mark.parametrize(
         "concepts,expected_plx",
         [

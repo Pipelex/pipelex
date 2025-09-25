@@ -1,4 +1,3 @@
-from typing import List
 
 import pytest
 
@@ -150,7 +149,7 @@ class TestPipeLLM:
     async def test_pipe_llm_attribute_image(
         self,
         stuff: Stuff,
-        attribute_paths: List[str],
+        attribute_paths: list[str],
         pipe_run_mode: PipeRunMode,
     ):
         for attribute_path in attribute_paths:

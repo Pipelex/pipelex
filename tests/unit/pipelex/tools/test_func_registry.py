@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Callable, Dict, List, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 from pytest import LogCaptureFixture
@@ -53,10 +54,10 @@ def no_type_hints(working_memory):  # type: ignore
 
 
 # Type alias for test parameters
-TestParams = Tuple[str, Callable[..., Any], bool]
+TestParams = tuple[str, Callable[..., Any], bool]
 
 # Test data
-TEST_CASES: List[TestParams] = [
+TEST_CASES: list[TestParams] = [
     # Valid cases
     ("valid_function", valid_function, True),
     ("valid_async_function", valid_async_function, True),
@@ -84,8 +85,6 @@ def registry():
 class TestFuncRegistry:
     @pytest.mark.parametrize("test_name, func, is_eligible", TEST_CASES)
     def test_function_eligibility_and_registration(self, registry: FuncRegistry, test_name: str, func: Callable[..., Any], is_eligible: bool):
-        """Test function eligibility check and registration behavior."""
-
         # Test eligibility check directly
         actual_eligibility = registry.is_eligible_function(func)
         assert actual_eligibility == is_eligible, f"Eligibility check failed for {test_name}: expected {is_eligible}, got {actual_eligibility}"
@@ -131,7 +130,7 @@ class TestFuncRegistry:
             registry.unregister_function_by_name("non_existent")
 
     def test_register_functions_dict_with_ineligible_functions(self, registry: FuncRegistry):
-        functions: Dict[str, Callable[..., Any]] = {"func1": sample_function, "func2": another_function}
+        functions: dict[str, Callable[..., Any]] = {"func1": sample_function, "func2": another_function}
         registry.register_functions_dict(functions)
         # Ineligible functions should be silently skipped
         assert not registry.has_function("func1")
@@ -139,7 +138,7 @@ class TestFuncRegistry:
         assert len(registry.root) == 0
 
     def test_register_functions_list_with_ineligible_functions(self, registry: FuncRegistry):
-        functions: List[Callable[..., Any]] = [sample_function, another_function]
+        functions: list[Callable[..., Any]] = [sample_function, another_function]
         registry.register_functions(functions)
         # Ineligible functions should be silently skipped
         assert not registry.has_function("sample_function")
@@ -172,7 +171,7 @@ class TestFuncRegistry:
             registry.get_required_function_with_signature("non_existent")
 
     def test_get_required_function_with_signature_not_callable(self, registry: FuncRegistry):
-        registry.root["not_a_function"] = "a string"  # type: ignore
+        registry.root["not_a_function"] = "a string" # type: ignore
         with pytest.raises(FuncRegistryError, match="is not a callable function"):
             registry.get_required_function_with_signature("not_a_function")
 

@@ -1,5 +1,5 @@
 import os
-from typing import Set, cast
+from typing import cast
 
 from pipelex import log
 from pipelex.config import get_config
@@ -28,7 +28,7 @@ class ActivityHandlerForResultFiles:
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_param_defaults = img_gen_config.img_gen_param_defaults
         self.image_output_format = img_gen_param_defaults.output_format
-        self.already_handled_stuff: Set[str] = set()
+        self.already_handled_stuff: set[str] = set()
 
     def _generate_stuff_id(self, stuff: Stuff) -> str:
         # Use name if available, otherwise just use code
@@ -66,7 +66,7 @@ class ActivityHandlerForResultFiles:
             self._handle_structured_content(content=stuff.content, stuff_id=stuff_id)
         elif isinstance(stuff.content, ListContent):
             # TODO: check that all items are StuffContent
-            self._handle_list_content(content=cast(ListContent[StuffContent], stuff.content), stuff_id=stuff_id)  # type: ignore
+            self._handle_list_content(content=cast("ListContent[StuffContent]", stuff.content), stuff_id=stuff_id)
         else:
             log.error(f"Unhandled stuff content type: {type(stuff.content)}")
 

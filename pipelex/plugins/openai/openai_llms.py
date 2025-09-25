@@ -1,4 +1,3 @@
-from typing import List
 
 from openai.types import Model
 
@@ -10,7 +9,7 @@ from pipelex.plugins.plugin_sdk_registry import Plugin
 async def openai_list_available_models(
     plugin: Plugin,
     backend: InferenceBackend,
-) -> List[Model]:
+) -> list[Model]:
     openai_client_async = OpenAIFactory.make_openai_client(
         plugin=plugin,
         backend=backend,

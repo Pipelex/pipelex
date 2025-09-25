@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
@@ -16,7 +16,6 @@ class PipeBatchTestCases:
             output="ProcessedItems",
             branch_pipe_code="process_item",
         ),
-        "test_domain",
         PipeBatchBlueprint(
             definition="Process items in batch",
             inputs={"items": InputRequirementBlueprint(concept="ItemList")},
@@ -40,7 +39,6 @@ class PipeBatchTestCases:
             input_list_name="data_list",
             input_item_name="current_data",
         ),
-        "test_domain",
         PipeBatchBlueprint(
             definition="Batch with custom names",
             inputs={"data": InputRequirementBlueprint(concept="DataList")},
@@ -53,7 +51,7 @@ class PipeBatchTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[List[Tuple[str, PipeBatchSpec, str, PipeBatchBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, PipeBatchSpec, PipeBatchBlueprint]]] = [
         SIMPLE_BATCH,
         BATCH_WITH_NAMES,
     ]

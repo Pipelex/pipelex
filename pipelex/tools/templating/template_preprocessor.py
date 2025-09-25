@@ -1,6 +1,5 @@
 import re
 from re import Match
-from typing import List
 
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
 from pipelex.tools.templating.jinja2_filters import ALLOWED_FILTERS
@@ -14,6 +13,7 @@ def _detect_non_existent_filters(template_str: str) -> None:
 
     Raises:
         Jinja2TemplateError: If any non-allowed filters are found
+
     """
     # Pattern to match Jinja2 filter syntax: {{ variable|filter() }} or {{ variable|filter(param) }}
     # This handles:
@@ -24,7 +24,7 @@ def _detect_non_existent_filters(template_str: str) -> None:
     filter_pattern = r"\{\{\s*[^|}]+\|\s*([a-zA-Z0-9_]+)(?:\([^)]*\))?\s*\}\}"
     matches = re.finditer(filter_pattern, template_str)
 
-    invalid_filters: List[str] = []
+    invalid_filters: list[str] = []
     for match in matches:
         filter_name = match.group(1)
         if filter_name not in ALLOWED_FILTERS:
@@ -57,8 +57,7 @@ def replace_dollar_variable(match: Match[str]) -> str:
 
 
 def preprocess_template(template: str) -> str:
-    """
-    Preprocess a template string to interpret our syntax patterns and convert them to Jinja2 syntax.
+    """Preprocess a template string to interpret our syntax patterns and convert them to Jinja2 syntax.
     Also, detect the use of non-existent filters.
     """
     _detect_non_existent_filters(template_str=template)

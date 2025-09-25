@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pydantic import Field
 from typing_extensions import override
@@ -44,24 +44,25 @@ class PipeImgGenSpec(PipeSpec):
     Raises:
         PipeDefinitionError: When validation rules are violated or mutually exclusive
                             fields are set simultaneously.
+
     """
 
     type: Literal["PipeImgGen"] = "PipeImgGen"
     category: Literal["PipeOperator"] = "PipeOperator"
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
-    img_gen_prompt: Optional[str] = None
-    img_gen_prompt_var_name: Optional[str] = None
+    img_gen_prompt: str | None = None
+    img_gen_prompt_var_name: str | None = None
 
     # New ImgGenChoice pattern (like LLM)
-    img_gen: Optional[ImgGenChoice] = None
+    img_gen: ImgGenChoice | None = None
 
     # One-time settings (not in ImgGenSetting)
-    aspect_ratio: Optional[AspectRatio] = Field(default=None, strict=False)
-    is_raw: Optional[bool] = None
-    seed: Optional[Union[int, Literal["auto"]]] = None
-    nb_output: Optional[int] = Field(default=None, ge=1)
-    background: Optional[Background] = Field(default=None, strict=False)
-    output_format: Optional[OutputFormat] = Field(default=None, strict=False)
+    aspect_ratio: AspectRatio | None = Field(default=None, strict=False)
+    is_raw: bool | None = None
+    seed: int | Literal["auto"] | None = None
+    nb_output: int | None = Field(default=None, ge=1)
+    background: Background | None = Field(default=None, strict=False)
+    output_format: OutputFormat | None = Field(default=None, strict=False)
 
     @override
     def to_blueprint(self) -> PipeImgGenBlueprint:

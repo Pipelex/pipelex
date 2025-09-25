@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from pytest_mock import MockerFixture
 
@@ -71,7 +73,6 @@ class TestInterpretPathOrUrl:
 
     def test_interpret_path_with_current_os_separator(self, mocker: MockerFixture):
         # Test with the current OS path separator
-        import os
 
         path_with_sep = f"user{os.sep}file.txt"
         result = interpret_path_or_url(path_with_sep)
@@ -109,7 +110,7 @@ class TestClarifyPathOrUrl:
         assert file_path == "/C:/Users/user/file.txt"
         assert url is None
 
-    def test_clarify_file_uri_with_spaces(self):
+    def test_clarify_file_uri_with_spaces(self) -> None:
         file_path, url = clarify_path_or_url("file:///home/user/my%20file.txt")
         assert file_path == "/home/user/my file.txt"
         assert url is None
@@ -150,12 +151,12 @@ class TestClarifyPathOrUrl:
         assert url is None
 
     def test_clarify_base_64_raises_not_implemented(self, mocker: MockerFixture):
+        # Mock interpret_path_or_url to return BASE_64
+        mocker.patch(
+            "pipelex.tools.misc.path_utils.interpret_path_or_url",
+            return_value=InterpretedPathOrUrl.BASE_64,
+        )
         with pytest.raises(NotImplementedError, match="Base 64 is not supported yet by clarify_path_or_url"):
-            # Mock interpret_path_or_url to return BASE_64
-            mocker.patch(
-                "pipelex.tools.misc.path_utils.interpret_path_or_url",
-                return_value=InterpretedPathOrUrl.BASE_64,
-            )
             clarify_path_or_url("some_base64_data")
 
     def test_clarify_uses_interpret_path_or_url(self, mocker: MockerFixture):

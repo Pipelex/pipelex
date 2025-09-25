@@ -11,6 +11,6 @@ class TestSubPipeBlueprintConversion:
         "test_name,sub_pipe_spec,expected_blueprint",
         SubPipeTestCases.TEST_CASES,
     )
-    def test_sub_pipe_to_core(self, test_name: str, sub_pipe_spec: SubPipeSpec, expected_blueprint: SubPipeBlueprint):
+    def test_sub_pipe_to_core(self, _: str, sub_pipe_spec: SubPipeSpec, expected_blueprint: SubPipeBlueprint):
         result = sub_pipe_spec.to_blueprint()
         assert result == expected_blueprint

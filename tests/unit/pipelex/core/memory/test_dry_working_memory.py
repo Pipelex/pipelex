@@ -1,7 +1,3 @@
-"""Test dry working memory functionality."""
-
-from typing import List
-
 import pytest
 from pytest import FixtureRequest
 
@@ -17,13 +13,10 @@ from tests.test_pipelines.tricky_questions import ThoughtfulAnswer
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestDryWorkingMemory:
-    """Test WorkingMemory dry run functionality."""
-
     async def test_make_for_dry_run_with_page_content(
         self,
         request: FixtureRequest,
     ):
-        """Test that make_for_dry_run creates appropriate mocks for PageContent."""
         log.info("Testing dry run with PageContent")
 
         # Test the specific inputs requested by the user
@@ -31,7 +24,7 @@ class TestDryWorkingMemory:
             TypedNamedInputRequirement(
                 variable_name="page",
                 concept=ConceptFactory.make(
-                    concept_code=NativeConceptEnum.PAGE.value, domain="test_tricky_questions", definition="Lorem Ipsum", structure_class_name="Page"
+                    concept_code=NativeConceptEnum.PAGE.value, domain="test_tricky_questions", definition="Lorem Ipsum", structure_class_name="Page",
                 ),
                 structure_class=PageContent,
             ),
@@ -65,7 +58,6 @@ class TestDryWorkingMemory:
         self,
         request: FixtureRequest,
     ):
-        """Test that make_for_dry_run creates appropriate mocks for structured content."""
         log.info("Testing dry run with structured content (ThoughtfulAnswer)")
 
         # Use ThoughtfulAnswer from tricky questions domain
@@ -88,9 +80,9 @@ class TestDryWorkingMemory:
         ]
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
+        expected_number_of_elements_in_memory = 2
 
-        # Verify mocks were created
-        assert len(dry_memory.root) == 2
+        assert len(dry_memory.root) == expected_number_of_elements_in_memory
         assert dry_memory.get_optional_stuff("thoughtful_answer") is not None
         assert dry_memory.get_optional_stuff("question") is not None
 
@@ -124,7 +116,6 @@ class TestDryWorkingMemory:
         self,
         request: FixtureRequest,
     ):
-        """Test that make_for_dry_run falls back to TextContent when needed."""
         log.info("Testing dry run with TextContent fallback")
 
         needed_inputs = [
@@ -152,7 +143,6 @@ class TestDryWorkingMemory:
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
-        # Verify mocks were created
         assert len(dry_memory.root) == 2
         assert dry_memory.get_optional_stuff("question_analysis") is not None
         assert dry_memory.get_optional_stuff("conclusion") is not None
@@ -174,7 +164,6 @@ class TestDryWorkingMemory:
         self,
         request: FixtureRequest,
     ):
-        """Test that make_for_dry_run handles mixed content types correctly."""
         log.info("Testing dry run with mixed content types")
 
         needed_inputs = [
@@ -207,7 +196,6 @@ class TestDryWorkingMemory:
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
-        # Verify all mocks were created
         assert len(dry_memory.root) == 3
 
         # Verify structured content
@@ -234,10 +222,9 @@ class TestDryWorkingMemory:
         self,
         request: FixtureRequest,
     ):
-        """Test that make_for_dry_run handles empty inputs gracefully."""
         log.info("Testing dry run with empty inputs")
 
-        needed_inputs: List[TypedNamedInputRequirement] = []
+        needed_inputs: list[TypedNamedInputRequirement] = []
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
@@ -251,7 +238,6 @@ class TestDryWorkingMemory:
         self,
         request: FixtureRequest,
     ):
-        """Test make_for_dry_run with a realistic pipeline scenario from tricky questions."""
         log.info("Testing dry run with realistic tricky questions pipeline scenario")
 
         # Simulate the conclude_tricky_question_by_steps pipeline needs

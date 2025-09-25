@@ -1,4 +1,3 @@
-from typing import List, Optional
 
 from pipelex.core.pipes.pipe_run_params import BatchParams, make_output_multiplicity
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -10,7 +9,7 @@ class SubPipeFactory:
     def make_from_blueprint(
         cls,
         blueprint: SubPipeBlueprint,
-        concept_codes_from_the_same_domain: Optional[List[str]] = None,
+        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> SubPipe:
         """Create a SubPipe from a SubPipeBlueprint."""
         output_multiplicity = make_output_multiplicity(

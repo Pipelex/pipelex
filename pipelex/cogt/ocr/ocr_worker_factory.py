@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -12,7 +11,7 @@ class OcrWorkerFactory:
     def make_ocr_worker(
         self,
         inference_model: InferenceModelSpec,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ) -> OcrWorkerAbstract:
         plugin = Plugin.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
@@ -21,7 +20,7 @@ class OcrWorkerFactory:
         match plugin.sdk:
             case "mistral":
                 try:
-                    import mistralai  # noqa: F401
+                    import mistralai  # pylint: disable=import-outside-toplevel
                 except ImportError as exc:
                     raise MissingDependencyError(
                         "mistralai",
@@ -29,8 +28,8 @@ class OcrWorkerFactory:
                         "The mistralai SDK is required to use Mistral OCR models through the mistralai client.",
                     ) from exc
 
-                from pipelex.plugins.mistral.mistral_factory import MistralFactory
-                from pipelex.plugins.mistral.mistral_ocr_worker import MistralOcrWorker
+                from pipelex.plugins.mistral.mistral_factory import MistralFactory  # pylint: disable=import-outside-toplevel
+                from pipelex.plugins.mistral.mistral_ocr_worker import MistralOcrWorker  # pylint: disable=import-outside-toplevel
 
                 ocr_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -44,7 +43,7 @@ class OcrWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case "pypdfium2":
-                from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker
+                from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker  # pylint: disable=import-outside-toplevel
 
                 ocr_worker = Pypdfium2Worker(
                     extra_config=backend.extra_config,

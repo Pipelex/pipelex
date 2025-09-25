@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -98,8 +98,8 @@ class BedrockImage(BaseModel):
 
 
 class BedrockContentItem(BaseModel):
-    text: Optional[str] = None
-    image: Optional[BedrockImage] = None
+    text: str | None = None
+    image: BedrockImage | None = None
     # document: Optional[BedrockDocument] = None
     # video: Optional[BedrockVideo] = None
     # toolUse: Optional[BedrockToolUse] = None
@@ -107,13 +107,13 @@ class BedrockContentItem(BaseModel):
     # guardContent: Optional[GuardContent] = None
 
 
-BedrockMessageDict = Dict[str, Any]
-BedrockMessageDictList = List[BedrockMessageDict]
+BedrockMessageDict = dict[str, Any]
+BedrockMessageDictList = list[BedrockMessageDict]
 
 
 class BedrockMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: List[BedrockContentItem]
+    content: list[BedrockContentItem]
 
     def to_dict(self) -> BedrockMessageDict:
         return self.model_dump(exclude_none=True)

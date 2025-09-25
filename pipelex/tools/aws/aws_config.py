@@ -1,4 +1,3 @@
-from typing import Tuple
 
 from pydantic import Field
 
@@ -28,10 +27,10 @@ AWS_REGION_VAR_NAME = "AWS_REGION"
 class AwsConfig(ConfigModel):
     api_key_method: AwsKeyMethod = Field(strict=False)
 
-    def get_aws_access_keys(self) -> Tuple[str, str, str]:
+    def get_aws_access_keys(self) -> tuple[str, str, str]:
         return self.get_aws_access_keys_with_method(api_key_method=self.api_key_method)
 
-    def get_aws_access_keys_with_method(self, api_key_method: AwsKeyMethod) -> Tuple[str, str, str]:
+    def get_aws_access_keys_with_method(self, api_key_method: AwsKeyMethod) -> tuple[str, str, str]:
         match api_key_method:
             case AwsKeyMethod.ENV:
                 log.debug("Getting AWS access keys from environment (key id and secret access key).")

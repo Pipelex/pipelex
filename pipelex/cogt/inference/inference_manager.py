@@ -1,4 +1,3 @@
-from typing import Dict, Type
 
 from typing_extensions import override
 
@@ -21,9 +20,9 @@ class InferenceManager(InferenceManagerProtocol):
     def __init__(self):
         self.img_gen_worker_factory = ImgGenWorkerFactory()
         self.ocr_worker_factory = OcrWorkerFactory()
-        self.llm_workers: Dict[str, LLMWorkerAbstract] = {}
-        self.img_gen_workers: Dict[str, ImgGenWorkerAbstract] = {}
-        self.ocr_workers: Dict[str, OcrWorkerAbstract] = {}
+        self.llm_workers: dict[str, LLMWorkerAbstract] = {}
+        self.img_gen_workers: dict[str, ImgGenWorkerAbstract] = {}
+        self.ocr_workers: dict[str, OcrWorkerAbstract] = {}
 
     @override
     def teardown(self):
@@ -76,7 +75,7 @@ class InferenceManager(InferenceManagerProtocol):
             return llm_worker
         if not get_config().cogt.inference_manager_config.is_auto_setup_preset_llm:
             raise InferenceManagerWorkerSetupError(
-                f"No LLM worker for '{llm_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_llm"
+                f"No LLM worker for '{llm_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_llm",
             )
 
         inference_model = get_models_manager().get_inference_model(model_handle=llm_handle)
@@ -91,7 +90,7 @@ class InferenceManager(InferenceManagerProtocol):
     def set_llm_worker_from_external_plugin(
         self,
         llm_handle: str,
-        llm_worker_class: Type[LLMWorkerAbstract],
+        llm_worker_class: type[LLMWorkerAbstract],
         should_warn_if_already_registered: bool = True,
     ):
         if llm_handle in self.llm_workers:
@@ -119,7 +118,7 @@ class InferenceManager(InferenceManagerProtocol):
         if img_gen_worker is None:
             if not get_config().cogt.inference_manager_config.is_auto_setup_preset_img_gen:
                 raise InferenceManagerWorkerSetupError(
-                    f"Found no Imgg worker for '{img_gen_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_img_gen"
+                    f"Found no Imgg worker for '{img_gen_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_img_gen",
                 )
 
             img_gen_worker = self._setup_one_img_gen_worker(img_gen_handle=img_gen_handle)
@@ -147,7 +146,7 @@ class InferenceManager(InferenceManagerProtocol):
             return ocr_worker
         if not get_config().cogt.inference_manager_config.is_auto_setup_preset_ocr:
             raise InferenceManagerWorkerSetupError(
-                f"Found no OCR worker for '{model_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_ocr"
+                f"Found no OCR worker for '{model_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_ocr",
             )
 
         inference_model = get_models_manager().get_inference_model(model_handle=model_handle)

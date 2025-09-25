@@ -1,4 +1,4 @@
-from typing import List, Literal
+from typing import Literal
 
 from pydantic import Field
 from typing_extensions import override
@@ -26,12 +26,13 @@ class PipeSequenceSpec(PipeSpec):
         1. Steps list must not be empty.
         2. Each step must be a valid SubPipeBlueprint instance.
         3. Pipe codes referenced in steps must exist in the pipeline.
+
     """
 
     type: Literal["PipeSequence"] = "PipeSequence"
     category: Literal["PipeController"] = "PipeController"
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
-    steps: List[SubPipeSpec]
+    steps: list[SubPipeSpec]
 
     @override
     def to_blueprint(self) -> PipeSequenceBlueprint:

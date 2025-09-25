@@ -1,4 +1,3 @@
-from typing import List
 
 from pydantic import Field
 
@@ -27,19 +26,19 @@ def read_file_content(working_memory: WorkingMemory) -> ListContent[CodebaseFile
 
     Returns:
         ListContent of CodebaseFileContent objects
-    """
 
+    """
     file_paths_list = working_memory.get_stuff_as_list("related_file_paths", item_type=FilePath)
 
-    codebase_files: List[CodebaseFileContent] = []
+    codebase_files: list[CodebaseFileContent] = []
     for file_path in file_paths_list.items:
         try:
-            with open(file_path.path, "r", encoding="utf-8") as file:
+            with open(file_path.path, encoding="utf-8") as file:
                 content = file.read()
                 codebase_files.append(CodebaseFileContent(file_path=file_path.path, file_content=content))
         except Exception as e:
             codebase_files.append(
-                CodebaseFileContent(file_path=file_path.path, file_content=f"# File not found or unreadable: {file_path.path}\n# Error: {str(e)}")
+                CodebaseFileContent(file_path=file_path.path, file_content=f"# File not found or unreadable: {file_path.path}\n# Error: {e!s}"),
             )
 
     return ListContent[CodebaseFileContent](items=codebase_files)

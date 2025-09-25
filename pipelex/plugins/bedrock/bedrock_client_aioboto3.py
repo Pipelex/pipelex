@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Tuple, cast
+from typing import Any, cast
 
 import aioboto3
 from types_aiobotocore_bedrock_runtime.type_defs import ConverseResponseTypeDef
@@ -20,12 +20,12 @@ class BedrockClientAioboto3(BedrockClientProtocol):
     async def chat(
         self,
         messages: BedrockMessageDictList,
-        system_text: Optional[str],
+        system_text: str | None,
         model: str,
         temperature: float,
-        max_tokens: Optional[int] = None,
-    ) -> Tuple[str, NbTokensByCategoryDict]:
-        params: Dict[str, Any] = {
+        max_tokens: int | None = None,
+    ) -> tuple[str, NbTokensByCategoryDict]:
+        params: dict[str, Any] = {
             "modelId": model,
             "messages": messages,
             "inferenceConfig": {
@@ -36,10 +36,10 @@ class BedrockClientAioboto3(BedrockClientProtocol):
         if system_text:
             params["system"] = [{"text": system_text}]
 
-        async with self.session.client("bedrock-runtime", region_name=self.aws_region) as aioboto3_session:  # type: ignore
+        async with self.session.client("bedrock-runtime", region_name=self.aws_region) as aioboto3_session: # pyright: ignore[reportUnknownMemberType]
             conversation_response: ConverseResponseTypeDef = await aioboto3_session.converse(**params)
-            resp_dict: Dict[str, Any] = cast(Dict[str, Any], conversation_response)
-            usage_dict: Dict[str, Any] = resp_dict["usage"]
+            resp_dict: dict[str, Any] = cast("dict[str, Any]", conversation_response)
+            usage_dict: dict[str, Any] = resp_dict["usage"]
             nb_tokens_by_category: NbTokensByCategoryDict = {
                 TokenCategory.INPUT: usage_dict["inputTokens"],
                 TokenCategory.OUTPUT: usage_dict["outputTokens"],

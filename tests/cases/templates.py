@@ -1,6 +1,6 @@
 """Template constants for testing."""
 
-from typing import Any, ClassVar, List, Tuple
+from typing import Any, ClassVar
 
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
 
@@ -11,12 +11,12 @@ class JINJA2TestCases:
     """Jinja2 template test constants."""
 
     # Template names
-    JINJA2_NAME: ClassVar[List[str]] = [
+    JINJA2_NAME: ClassVar[list[str]] = [
         "jinja2_test_template",
     ]
 
     # Basic templates
-    JINJA2_FOR_ANY: ClassVar[List[str]] = [
+    JINJA2_FOR_ANY: ClassVar[list[str]] = [
         "I want a {{ place_holder }} cocktail.",
     ]
 
@@ -78,7 +78,7 @@ Format filter html:
 """
 
     # Template collections
-    JINJA2_FOR_STUFF: ClassVar[List[str]] = [
+    JINJA2_FOR_STUFF: ClassVar[list[str]] = [
         JINJA2_FILTER_TAG,
         JINJA2_FILTER_FORMAT,
         JINJA2_FILTER_FORMAT_PLAIN,
@@ -90,7 +90,7 @@ Format filter html:
     ]
 
     # Style configurations
-    STYLE: ClassVar[List[PromptingStyle]] = [
+    STYLE: ClassVar[list[PromptingStyle]] = [
         PromptingStyle(
             tag_style=TagStyle.NO_TAG,
             text_format=TextFormat.PLAIN,
@@ -110,20 +110,20 @@ Format filter html:
     ]
 
     # Test data
-    COLOR: ClassVar[List[str]] = [
+    COLOR: ClassVar[list[str]] = [
         "red",
         "blue",
         "green",
     ]
 
-    FRUIT: ClassVar[List[Fruit]] = [
+    FRUIT: ClassVar[list[Fruit]] = [
         Fruit(color="red", name="cherry"),
         Fruit(color="blue", name="blueberry"),
         Fruit(color="green", name="grape"),
     ]
 
     # Mixed object types for comprehensive testing
-    ANY_OBJECT: ClassVar[List[Tuple[str, Any]]] = [  # topic, any_object
+    ANY_OBJECT: ClassVar[list[tuple[str, Any]]] = [  # topic, any_object
         ("string", "test_string"),
         ("integer", 42),
         ("float", 3.14),

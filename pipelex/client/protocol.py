@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 from typing_extensions import runtime_checkable
@@ -9,15 +9,14 @@ from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.types import StrEnum
 
-StuffContentOrData = Dict[str, Any] | StuffContent | List[Any] | str
-ImplicitMemory = Dict[str, StuffContentOrData]
-CompactMemory = Dict[str, Dict[str, Any]]
+StuffContentOrData = dict[str, Any] | StuffContent | list[Any] | str
+ImplicitMemory = dict[str, StuffContentOrData]
+CompactMemory = dict[str, dict[str, Any]]
 COMPACT_MEMORY_KEY = "compact_memory"
 
 
 class PipelineState(StrEnum):
-    """
-    Enum representing the possible states of a pipe execution.
+    """Enum representing the possible states of a pipe execution.
     """
 
     RUNNING = "RUNNING"
@@ -29,40 +28,39 @@ class PipelineState(StrEnum):
 
 
 class ApiResponse(BaseModel):
-    """
-    Base response class for Pipelex API calls.
+    """Base response class for Pipelex API calls.
 
     Attributes:
         status (Optional[str]): Status of the API call ("success", "error", etc.)
         message (Optional[str]): Optional message providing additional information
         error (Optional[str]): Optional error message when status is not "success"
+
     """
 
-    status: Optional[str] = None
-    message: Optional[str] = None
-    error: Optional[str] = None
+    status: str | None = None
+    message: str | None = None
+    error: str | None = None
 
 
 class PipelineRequest(BaseModel):
-    """
-    Request for executing a pipeline.
+    """Request for executing a pipeline.
 
     Attributes:
         input_memory (Optional[CompactMemory]): In the format of WorkingMemory.to_compact_memory()
         output_name (Optional[str]): Name of the output slot to write to
         output_multiplicity (Optional[PipeOutputMultiplicity]): Output multiplicity setting
         dynamic_output_concept_code (Optional[str]): Override for the dynamic output concept code
+
     """
 
-    input_memory: Optional[CompactMemory] = None
-    output_name: Optional[str] = None
-    output_multiplicity: Optional[PipeOutputMultiplicity] = None
-    dynamic_output_concept_code: Optional[str] = None
+    input_memory: CompactMemory | None = None
+    output_name: str | None = None
+    output_multiplicity: PipeOutputMultiplicity | None = None
+    dynamic_output_concept_code: str | None = None
 
 
 class PipelineResponse(ApiResponse):
-    """
-    Response for pipeline execution requests.
+    """Response for pipeline execution requests.
 
     Attributes:
         pipeline_run_id (str): Unique identifier for the pipeline run
@@ -98,19 +96,19 @@ class PipelineResponse(ApiResponse):
                 }
             }
         }
+
     """
 
     pipeline_run_id: str
     created_at: str
     pipeline_state: PipelineState
-    finished_at: Optional[str] = None
-    pipe_output: Optional[CompactMemory] = None
+    finished_at: str | None = None
+    pipe_output: CompactMemory | None = None
 
 
 @runtime_checkable
 class PipelexProtocol(Protocol):
-    """
-    Protocol defining the contract for the Pipelex API.
+    """Protocol defining the contract for the Pipelex API.
 
     This protocol specifies the interface that any Pipelex API implementation must adhere to.
     All methods are asynchronous and handle pipeline execution, monitoring, and control.
@@ -118,6 +116,7 @@ class PipelexProtocol(Protocol):
     Attributes:
         api_token (Optional[str]): Authentication token for API access
         api_base_url (Optional[str]): Base URL for the API
+
     """
 
     api_token: str
@@ -127,14 +126,13 @@ class PipelexProtocol(Protocol):
     async def execute_pipeline(
         self,
         pipe_code: str,
-        working_memory: Optional[WorkingMemory] = None,
-        input_memory: Optional[CompactMemory] = None,
-        output_name: Optional[str] = None,
-        output_multiplicity: Optional[PipeOutputMultiplicity] = None,
-        dynamic_output_concept_code: Optional[str] = None,
+        working_memory: WorkingMemory | None = None,
+        input_memory: CompactMemory | None = None,
+        output_name: str | None = None,
+        output_multiplicity: PipeOutputMultiplicity | None = None,
+        dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
-        """
-        Execute a pipeline synchronously and wait for its completion.
+        """Execute a pipeline synchronously and wait for its completion.
 
         Args:
             pipe_code (str): The code identifying the pipeline to execute
@@ -149,6 +147,7 @@ class PipelexProtocol(Protocol):
         Raises:
             HTTPException: On execution failure or error
             ClientAuthenticationError: If API token is missing for API execution
+
         """
         ...
 
@@ -156,14 +155,13 @@ class PipelexProtocol(Protocol):
     async def start_pipeline(
         self,
         pipe_code: str,
-        working_memory: Optional[WorkingMemory] = None,
-        input_memory: Optional[CompactMemory] = None,
-        output_name: Optional[str] = None,
-        output_multiplicity: Optional[PipeOutputMultiplicity] = None,
-        dynamic_output_concept_code: Optional[str] = None,
+        working_memory: WorkingMemory | None = None,
+        input_memory: CompactMemory | None = None,
+        output_name: str | None = None,
+        output_multiplicity: PipeOutputMultiplicity | None = None,
+        dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
-        """
-        Start a pipeline execution asynchronously without waiting for completion.
+        """Start a pipeline execution asynchronously without waiting for completion.
 
         Args:
             pipe_code (str): The code identifying the pipeline to execute
@@ -179,5 +177,6 @@ class PipelexProtocol(Protocol):
         Raises:
             HTTPException: On pipeline start failure
             ClientAuthenticationError: If API token is missing for API execution
+
         """
         ...

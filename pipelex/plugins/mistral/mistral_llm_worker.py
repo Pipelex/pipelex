@@ -1,4 +1,4 @@
-from typing import Any, Optional, Type
+from typing import Any
 
 import instructor
 from mistralai import Mistral
@@ -22,8 +22,8 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
-        structure_method: Optional[StructureMethod] = None,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        structure_method: StructureMethod | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
@@ -39,7 +39,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             self.default_max_tokens = default_max_tokens
         else:
             raise MistralWorkerConfigurationError(
-                f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Mistral"
+                f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Mistral",
             )
         self.mistral_client_for_text: Mistral = sdk_instance
 
@@ -56,7 +56,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
     ) -> str:
         messages = MistralFactory.make_simple_messages(llm_job=llm_job)
-        response: Optional[ChatCompletionResponse] = await self.mistral_client_for_text.chat.complete_async(
+        response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
             messages=messages,
             model=self.inference_model.model_id,
             temperature=llm_job.job_params.temperature,
@@ -79,7 +79,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
             response_model=schema,

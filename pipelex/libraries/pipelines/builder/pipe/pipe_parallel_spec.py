@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import Field, field_validator
 from typing_extensions import override
@@ -31,14 +31,15 @@ class PipeParallelSpec(PipeSpec):
         2. Each parallel step must be a valid SubPipeSpec.
         3. combined_output, when specified, must be a valid concept string or code.
         4. Pipe codes in parallels must reference existing pipes.
+
     """
 
     type: Literal["PipeParallel"] = "PipeParallel"
     category: Literal["PipeController"] = "PipeController"
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
-    parallels: List[SubPipeSpec]
+    parallels: list[SubPipeSpec]
     add_each_output: bool = True
-    combined_output: Optional[str] = None
+    combined_output: str | None = None
 
     @field_validator("combined_output", mode="before")
     def validate_combined_output(cls, combined_output: str) -> str:

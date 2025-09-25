@@ -90,7 +90,7 @@ class TestPipeSequenceSimple:
 
         # Actually run the PipeSequence pipe
         pipe_output = await pipe_sequence.run_pipe(
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # type: ignore
             working_memory=working_memory,
             output_name="sequence_result",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -30,7 +30,7 @@ def build_pipe_cmd(
         typer.Argument(help="Brief description of what the pipeline should do"),
     ],
     output_path: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--output", "-o", help="Path to save the generated PLX file (use --output='' to skip saving)"),
     ] = "./generated_pipeline.plx",
 ) -> None:

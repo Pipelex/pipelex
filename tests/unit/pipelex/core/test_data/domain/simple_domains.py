@@ -1,5 +1,3 @@
-"""Simple domain test cases."""
-
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 SIMPLE_DOMAIN = (
