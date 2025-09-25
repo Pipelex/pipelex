@@ -7,7 +7,6 @@ from pytest import FixtureRequest
 from pipelex import log, pretty_print
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
@@ -37,7 +36,7 @@ class TestPipeRunningVariants:
     ):
         log.verbose(stuff, title=f"{topic}: start from '{stuff.stuff_name}', run pipe '{pipe_code}'")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -61,7 +60,7 @@ class TestPipeRunningVariants:
         pipe_code: str,
     ):
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -91,7 +90,7 @@ class TestPipeRunningVariants:
         output_multiplicity: Optional[PipeOutputMultiplicity],
     ):
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(

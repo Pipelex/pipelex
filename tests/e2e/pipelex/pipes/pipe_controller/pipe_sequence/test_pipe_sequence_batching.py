@@ -8,7 +8,6 @@ from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input import TypedNamedInputRequirement
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -24,7 +23,6 @@ from tests.test_pipelines.pipe_controllers.pipe_sequence.pipe_sequence import Do
 async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode):
     """Test customer review analysis sequence with batching."""
     # Create test input - a document with reviews
-    pipe_output: PipeOutput
     if pipe_run_mode == PipeRunMode.DRY:
         working_memory = WorkingMemoryFactory.make_for_dry_run(
             needed_inputs=[

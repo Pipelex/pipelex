@@ -8,7 +8,6 @@ from pytest import FixtureRequest
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
@@ -60,7 +59,7 @@ class TestPipeConditionComplex:
 
         working_memory = WorkingMemoryFactory.make_from_multiple_stuffs([doc_stuff, user_stuff])
 
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -108,7 +107,7 @@ class TestPipeConditionComplex:
 
         working_memory = WorkingMemoryFactory.make_from_multiple_stuffs([doc_stuff, user_stuff])
 
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -153,7 +152,7 @@ class TestPipeConditionComplex:
 
         working_memory = WorkingMemoryFactory.make_from_multiple_stuffs([doc_stuff, user_stuff])
 
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -206,7 +205,7 @@ class TestPipeConditionComplex:
 
         working_memory = WorkingMemoryFactory.make_from_multiple_stuffs([doc_stuff, user_stuff])
 
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -252,7 +251,7 @@ class TestPipeConditionComplex:
 
         working_memory = WorkingMemoryFactory.make_from_multiple_stuffs([doc_stuff, user_stuff])
 
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
@@ -359,7 +358,7 @@ class TestPipeConditionComplex:
 
         working_memory = WorkingMemoryFactory.make_from_multiple_stuffs([doc_stuff, user_stuff])
 
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),

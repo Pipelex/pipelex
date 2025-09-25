@@ -28,7 +28,6 @@ from pipelex.exceptions import (
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
 from pipelex.pipe_controllers.pipe_controller import PipeController, SpecificPipeCodesEnum
-from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2Output
 from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
 from pipelex.pipe_operators.jinja2.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -309,12 +308,11 @@ class PipeCondition(PipeController):
         #     )
         # ).rendered_text.strip()
         # TODO: restore the possibility above, without need to explicitly cast the output
-        pipe_output_1: PipeJinja2Output = await pipe_jinja2.run_pipe(
+        pipe_jinja2_output = await pipe_jinja2.run_pipe(
             job_metadata=jinja2_job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
         )
-        pipe_jinja2_output = pipe_output_1
         evaluated_expression = pipe_jinja2_output.rendered_text.strip()
 
         if not evaluated_expression or evaluated_expression == "None":
@@ -372,7 +370,7 @@ class PipeCondition(PipeController):
             )
 
         log.debug(f"Chosen pipe: {chosen_pipe_code}")
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code=chosen_pipe_code),
                 job_metadata=job_metadata,

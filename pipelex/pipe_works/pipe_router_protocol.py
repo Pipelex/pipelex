@@ -48,7 +48,7 @@ class PipeRouterProtocol(Protocol):
         await self._before_run(pipe_job)
 
         try:
-            pipe_output: PipeOutput = await self._run_pipe_job(pipe_job)
+            pipe_output = await self._run_pipe_job(pipe_job)
         except Exception as exc:
             await self._failing_run(pipe_job, exc)
             raise exc

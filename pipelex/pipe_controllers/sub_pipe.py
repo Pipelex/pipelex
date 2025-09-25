@@ -38,7 +38,6 @@ class SubPipe(BaseModel):
         sub_pipe_run_params.batch_params = self.batch_params
 
         sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
-        pipe_output: PipeOutput
 
         # Case 1: Batch processing
         if batch_params := self.batch_params:

@@ -7,7 +7,6 @@ from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
@@ -55,7 +54,7 @@ class TestPipeSequenceDryRun:
         # Create working memory with the discord channel updates
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=discord_updates_stuff)
         # Run the Discord newsletter pipeline in dry run mode
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="write_discord_newsletter"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

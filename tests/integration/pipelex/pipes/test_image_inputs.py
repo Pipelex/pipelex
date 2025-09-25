@@ -4,7 +4,6 @@ from pytest import FixtureRequest
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import ImageContent, PageContent, TextAndImagesContent, TextContent
@@ -31,7 +30,7 @@ class TestImageInputs:
         """Test that an image is indeed given to the LLM, and that it can extract extact whats on the image."""
         working_memory = WorkingMemoryFactory.make_from_image(name="image", image_url=ImageTestCases.IMAGE_FILE_PATH_PNG)
 
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="extract_article_from_image"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -73,7 +72,7 @@ class TestImageInputs:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Run the pipe
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="describe_page"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

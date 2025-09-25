@@ -11,7 +11,6 @@ from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeCon
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
@@ -195,7 +194,7 @@ class TestPipeConditionSimple:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(input_data_stuff)
 
         # Run dry run using the real pipe - this should succeed
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
@@ -264,7 +263,7 @@ class TestPipeConditionSimple:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(input_data_stuff)
 
         # Run dry run using the real pipe - this should succeed and validate the 'medium' branch
-        pipe_output: PipeOutput = await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),

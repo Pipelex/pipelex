@@ -104,7 +104,7 @@ working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 3. Run the pipe:
 
 ```python
-pipe_output: PipeOutput = await pipe_router.run_pipe(
+pipe_output = await pipe_router.run_pipe(
     pipe_code="pipe_name",
     pipe_run_params=PipeRunParamsFactory.make_run_params(),
     working_memory=working_memory,
