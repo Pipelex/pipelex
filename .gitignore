@@ -56,3 +56,5 @@ gcp_credentials.json
 
 /pipelex.toml
 settings.local.json
+
+.pipelex/observer/
