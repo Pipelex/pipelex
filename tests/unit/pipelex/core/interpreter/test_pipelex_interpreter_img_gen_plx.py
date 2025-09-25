@@ -49,5 +49,5 @@ seed = 12345""",
     )
     def test_img_gen_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeImgGenBlueprint, expected_plx: str):
         """Test converting ImgGen pipe blueprint to PLX string."""
-        result = PipelexInterpreter.img_gen_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        result = PipelexInterpreter.img_gen_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

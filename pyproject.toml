@@ -112,15 +112,15 @@ ignore_missing_imports = true
 module = ["filetype", "json2html", "pypdfium2", "pypdfium2.raw"]
 
 [tool.pyright]
+pythonVersion = "3.11"
+include = ["pipelex", "tests"]
+exclude = ["**/node_modules", "**/__pycache__", ".venv", ".git", "build", "dist", "node_modules", "**/__init__.py", "tests"]
 analyzeUnannotatedFunctions = true
 deprecateTypingAliases = false
 disableBytesTypePromotions = true
 enableExperimentalFeatures = false
 enableTypeIgnoreComments = true
-exclude = ["**/node_modules", "**/__pycache__"]
 extraPaths = ["./tests"]
-include = ["pipelex", "tests"]
-pythonVersion = "3.11"
 reportAbstractUsage = "error"
 reportArgumentType = "error"
 reportAssertAlwaysTrue = "error"
@@ -201,6 +201,7 @@ reportUnusedFunction = "error"
 reportUnusedImport = "none"
 reportUnusedVariable = "error"
 reportWildcardImportFromLibrary = "error"
+reportUnusedParameter = "error"
 strictDictionaryInference = true
 strictListInference = true
 strictParameterNoneValue = true
@@ -258,10 +259,12 @@ target-version = "py311"
 ignore = ["F401"]
 external = ["F401"]
 select = [
+    "F841",
     "E4",
     "E7",
     "E9",
     "F",
+    "ARG",
     "A001",
     "A002",
     "A003",
@@ -273,6 +276,7 @@ select = [
     "E501",
     "I",
 ]
+per-file-ignores = { "tests/**" = ["ARG001", "ARG002", "ARG003", "ARG004"] }
 
 [tool.uv]
 required-version = ">=0.7.2"

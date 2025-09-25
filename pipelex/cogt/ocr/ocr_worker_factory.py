@@ -47,7 +47,6 @@ class OcrWorkerFactory:
                 from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker
 
                 ocr_worker = Pypdfium2Worker(
-                    sdk_instance=None,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

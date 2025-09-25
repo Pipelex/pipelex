@@ -177,7 +177,7 @@ class TestSerializeConcepts:
 
     def test_serialize_concepts_empty(self):
         """Test serializing empty concepts."""
-        result = PipelexInterpreter.serialize_concepts(None, "test_domain")
+        result = PipelexInterpreter.serialize_concepts(None)
         assert result == {}
 
     def test_serialize_concepts_mixed(self):
@@ -193,7 +193,7 @@ class TestSerializeConcepts:
                 },
             ),
         }
-        result = PipelexInterpreter.serialize_concepts(concepts, "test_domain")
+        result = PipelexInterpreter.serialize_concepts(concepts)
 
         expected = {
             "SimpleText": "A simple text concept",
@@ -256,7 +256,7 @@ class TestSerializePipeBlueprints:
     def test_serialize_llm_pipe_basic(self):
         """Test serializing basic PipeLLM blueprint."""
         pipe = PipeLLMBlueprint(type="PipeLLM", definition="Generate text using LLM", output="Text", prompt_template="Generate a story")
-        result = PipelexInterpreter.serialize_llm_pipe(pipe, "test_domain")
+        result = PipelexInterpreter.serialize_llm_pipe(pipe)
 
         expected = {"type": "PipeLLM", "definition": "Generate text using LLM", "output": "Text", "prompt_template": "Generate a story"}
         assert result == expected
@@ -272,7 +272,7 @@ class TestSerializePipeBlueprints:
             prompt_template="Extract info about $topic from @text",
             nb_output=2,
         )
-        result = PipelexInterpreter.serialize_llm_pipe(pipe, "test_domain")
+        result = PipelexInterpreter.serialize_llm_pipe(pipe)
 
         expected = {
             "type": "PipeLLM",
@@ -288,7 +288,7 @@ class TestSerializePipeBlueprints:
     def test_serialize_ocr_pipe_basic(self):
         """Test serializing basic PipeOcr blueprint."""
         pipe = PipeOcrBlueprint(type="PipeOcr", definition="Extract text from PDF", output="Page", ocr="base_ocr_pypdfium2")
-        result = PipelexInterpreter.serialize_ocr_pipe(pipe, "test_domain")
+        result = PipelexInterpreter.serialize_ocr_pipe(pipe)
 
         expected = {"type": "PipeOcr", "definition": "Extract text from PDF", "output": "Page", "ocr": "base_ocr_pypdfium2"}
         assert result == expected
@@ -301,7 +301,7 @@ class TestSerializePipeBlueprints:
             output="Result",
             steps=[SubPipeBlueprint(pipe="step1", result="result1"), SubPipeBlueprint(pipe="step2", result="result2")],
         )
-        result = PipelexInterpreter.serialize_sequence_pipe(pipe, "test_domain")
+        result = PipelexInterpreter.serialize_sequence_pipe(pipe)
 
         expected = {
             "type": "PipeSequence",

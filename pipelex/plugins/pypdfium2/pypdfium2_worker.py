@@ -15,7 +15,6 @@ from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 class Pypdfium2Worker(OcrWorkerAbstract):
     def __init__(
         self,
-        sdk_instance: Any,
         extra_config: Dict[str, Any],
         inference_model: InferenceModelSpec,
         reporting_delegate: Optional[ReportingProtocol] = None,

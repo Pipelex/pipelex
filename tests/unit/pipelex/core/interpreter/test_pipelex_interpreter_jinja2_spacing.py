@@ -76,5 +76,5 @@ jinja2_name = "greeting_template\"""",
     )
     def test_jinja2_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeJinja2Blueprint, expected_plx: str):
         """Test converting PipeJinja2Blueprint to PLX string with various configurations."""
-        result = PipelexInterpreter.jinja2_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        result = PipelexInterpreter.jinja2_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

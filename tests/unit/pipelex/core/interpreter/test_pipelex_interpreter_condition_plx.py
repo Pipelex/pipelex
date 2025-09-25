@@ -50,5 +50,5 @@ expression_template = "{{ data.size if data.size > threshold else 'low' }}\"""",
     )
     def test_condition_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeConditionBlueprint, expected_plx: str):
         """Test converting Condition pipe blueprint to PLX string."""
-        result = PipelexInterpreter.condition_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        result = PipelexInterpreter.condition_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

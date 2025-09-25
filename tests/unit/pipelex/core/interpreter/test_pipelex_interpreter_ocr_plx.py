@@ -46,5 +46,5 @@ ocr = "base_ocr_pypdfium2\"""",
     )
     def test_ocr_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeOcrBlueprint, expected_plx: str):
         """Test converting OCR pipe blueprint to PLX string."""
-        result = PipelexInterpreter.ocr_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        result = PipelexInterpreter.ocr_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

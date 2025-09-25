@@ -162,13 +162,13 @@ class PipelexInterpreter(BaseModel):
 
         # Concepts section
         if blueprint.concept:
-            concept_plx = PipelexInterpreter.concepts_to_plx_string(blueprint.concept, blueprint.domain)
+            concept_plx = PipelexInterpreter.concepts_to_plx_string(blueprint.concept)
             if concept_plx:  # Only add if not empty
                 plx_parts.append(concept_plx)
 
         # Pipes section
         if blueprint.pipe:
-            pipes_plx = PipelexInterpreter.pipes_to_plx_string(blueprint.pipe, blueprint.domain)
+            pipes_plx = PipelexInterpreter.pipes_to_plx_string(blueprint.pipe)
             if pipes_plx:  # Only add if not empty
                 plx_parts.append(pipes_plx)
 
@@ -178,7 +178,7 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def concepts_to_plx_string(concepts: Dict[str, ConceptBlueprint | str], domain: str) -> str:
+    def concepts_to_plx_string(concepts: Dict[str, ConceptBlueprint | str]) -> str:
         """Convert concepts dict to PLX string."""
         if not concepts:
             return ""
@@ -264,42 +264,42 @@ class PipelexInterpreter(BaseModel):
             return f"{field_name} = {{ {', '.join(field_parts)} }}"
 
     @staticmethod
-    def pipes_to_plx_string(pipes: Dict[str, Any], domain: str) -> str:
+    def pipes_to_plx_string(pipes: Dict[str, Any]) -> str:
         """Convert pipes dict to PLX string."""
         plx_parts: list[str] = []
         for pipe_name, blueprint in pipes.items():
-            pipe_plx = PipelexInterpreter.pipe_to_plx_string(pipe_name, blueprint, domain)
+            pipe_plx = PipelexInterpreter.pipe_to_plx_string(pipe_name, blueprint)
             plx_parts.append(pipe_plx)
         return "\n\n".join(plx_parts)
 
     @staticmethod
-    def pipe_to_plx_string(pipe_name: str, blueprint: Any, domain: str) -> str:
+    def pipe_to_plx_string(pipe_name: str, blueprint: Any) -> str:
         """Convert a single pipe blueprint to PLX string."""
         if isinstance(blueprint, PipeLLMBlueprint):
-            return PipelexInterpreter.llm_pipe_to_plx_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.llm_pipe_to_plx_string(pipe_name, blueprint)
         elif isinstance(blueprint, PipeSequenceBlueprint):
-            return PipelexInterpreter.sequence_pipe_to_plx_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.sequence_pipe_to_plx_string(pipe_name, blueprint)
         elif isinstance(blueprint, PipeOcrBlueprint):
-            return PipelexInterpreter.ocr_pipe_to_plx_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.ocr_pipe_to_plx_string(pipe_name, blueprint)
         elif isinstance(blueprint, PipeFuncBlueprint):
-            return PipelexInterpreter.func_pipe_to_plx_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.func_pipe_to_plx_string(pipe_name, blueprint)
         elif isinstance(blueprint, PipeImgGenBlueprint):
-            return PipelexInterpreter.img_gen_pipe_to_plx_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.img_gen_pipe_to_plx_string(pipe_name, blueprint)
         elif isinstance(blueprint, PipeJinja2Blueprint):
-            return PipelexInterpreter.jinja2_pipe_to_plx_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.jinja2_pipe_to_plx_string(pipe_name, blueprint)
         elif isinstance(blueprint, PipeConditionBlueprint):
-            return PipelexInterpreter.condition_pipe_to_plx_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.condition_pipe_to_plx_string(pipe_name, blueprint)
         elif isinstance(blueprint, PipeParallelBlueprint):
-            return PipelexInterpreter.parallel_pipe_to_plx_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.parallel_pipe_to_plx_string(pipe_name, blueprint)
         elif isinstance(blueprint, PipeBatchBlueprint):
-            return PipelexInterpreter.batch_pipe_to_plx_string(pipe_name, blueprint, domain)
+            return PipelexInterpreter.batch_pipe_to_plx_string(pipe_name, blueprint)
         else:
             # Fallback to old dict approach for unknown pipe types
-            pipe_dict = PipelexInterpreter.serialize_pipe(blueprint, domain)
+            pipe_dict = PipelexInterpreter.serialize_pipe(blueprint)
             return f"[pipe.{pipe_name}]\n" + "\n".join([f'{k} = "{v}"' if isinstance(v, str) else f"{k} = {v}" for k, v in pipe_dict.items()])
 
     @staticmethod
-    def llm_pipe_to_plx_string(pipe_name: str, pipe: PipeLLMBlueprint, domain: str) -> str:
+    def llm_pipe_to_plx_string(pipe_name: str, pipe: PipeLLMBlueprint) -> str:
         """Convert a PipeLLM blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
@@ -332,7 +332,7 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def ocr_pipe_to_plx_string(pipe_name: str, pipe: PipeOcrBlueprint, domain: str) -> str:
+    def ocr_pipe_to_plx_string(pipe_name: str, pipe: PipeOcrBlueprint) -> str:
         """Convert a PipeOcr blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
@@ -349,7 +349,7 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def func_pipe_to_plx_string(pipe_name: str, pipe: PipeFuncBlueprint, domain: str) -> str:
+    def func_pipe_to_plx_string(pipe_name: str, pipe: PipeFuncBlueprint) -> str:
         """Convert a PipeFunc blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
@@ -366,7 +366,7 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def img_gen_pipe_to_plx_string(pipe_name: str, pipe: PipeImgGenBlueprint, domain: str) -> str:
+    def img_gen_pipe_to_plx_string(pipe_name: str, pipe: PipeImgGenBlueprint) -> str:
         """Convert a PipeImgGen blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
@@ -394,7 +394,7 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def jinja2_pipe_to_plx_string(pipe_name: str, pipe: PipeJinja2Blueprint, domain: str) -> str:
+    def jinja2_pipe_to_plx_string(pipe_name: str, pipe: PipeJinja2Blueprint) -> str:
         """Convert a PipeJinja2 blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
@@ -416,7 +416,7 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def condition_pipe_to_plx_string(pipe_name: str, pipe: PipeConditionBlueprint, domain: str) -> str:
+    def condition_pipe_to_plx_string(pipe_name: str, pipe: PipeConditionBlueprint) -> str:
         """Convert a PipeCondition blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
@@ -450,7 +450,7 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def parallel_pipe_to_plx_string(pipe_name: str, pipe: PipeParallelBlueprint, domain: str) -> str:
+    def parallel_pipe_to_plx_string(pipe_name: str, pipe: PipeParallelBlueprint) -> str:
         """Convert a PipeParallel blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
@@ -480,7 +480,7 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def batch_pipe_to_plx_string(pipe_name: str, pipe: PipeBatchBlueprint, domain: str) -> str:
+    def batch_pipe_to_plx_string(pipe_name: str, pipe: PipeBatchBlueprint) -> str:
         """Convert a PipeBatch blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
@@ -571,7 +571,7 @@ class PipelexInterpreter(BaseModel):
             return concept_blueprint.definition
 
     @staticmethod
-    def serialize_concepts(concepts: Optional[Dict[str, ConceptBlueprint | str]], domain: str) -> Dict[str, Any]:
+    def serialize_concepts(concepts: Optional[Dict[str, ConceptBlueprint | str]]) -> Dict[str, Any]:
         """Serialize concepts section with domain context."""
         if concepts is None:
             return {}
@@ -582,40 +582,38 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def serialize_pipes(pipes: Dict[str, Any], domain: str) -> Dict[str, Any]:
+    def serialize_pipes(pipes: Dict[str, Any]) -> Dict[str, Any]:
         """Serialize pipes section with domain context."""
         result: Dict[str, Any] = {}
         for pipe_name, blueprint in pipes.items():
-            result[pipe_name] = PipelexInterpreter.serialize_pipe(blueprint, domain)
+            result[pipe_name] = PipelexInterpreter.serialize_pipe(blueprint)
         return result
 
     @staticmethod
-    def serialize_pipe(blueprint: Any, domain: str) -> Dict[str, Any]:
-        """Serialize a single pipe blueprint with domain context."""
-
+    def serialize_pipe(blueprint: Any) -> Dict[str, Any]:
         if isinstance(blueprint, PipeLLMBlueprint):
-            return PipelexInterpreter.serialize_llm_pipe(blueprint, domain)
+            return PipelexInterpreter.serialize_llm_pipe(blueprint)
         elif isinstance(blueprint, PipeOcrBlueprint):
-            return PipelexInterpreter.serialize_ocr_pipe(blueprint, domain)
+            return PipelexInterpreter.serialize_ocr_pipe(blueprint)
         elif isinstance(blueprint, PipeFuncBlueprint):
-            return PipelexInterpreter._serialize_func_pipe(blueprint, domain)
+            return PipelexInterpreter._serialize_func_pipe(blueprint)
         elif isinstance(blueprint, PipeImgGenBlueprint):
-            return PipelexInterpreter._serialize_img_gen_pipe(blueprint, domain)
+            return PipelexInterpreter._serialize_img_gen_pipe(blueprint)
         elif isinstance(blueprint, PipeJinja2Blueprint):
-            return PipelexInterpreter.serialize_jinja2_pipe(blueprint, domain)
+            return PipelexInterpreter.serialize_jinja2_pipe(blueprint)
         elif isinstance(blueprint, PipeSequenceBlueprint):
-            return PipelexInterpreter.serialize_sequence_pipe(blueprint, domain)
+            return PipelexInterpreter.serialize_sequence_pipe(blueprint)
         elif isinstance(blueprint, PipeConditionBlueprint):
-            return PipelexInterpreter._serialize_condition_pipe(blueprint, domain)
+            return PipelexInterpreter._serialize_condition_pipe(blueprint)
         elif isinstance(blueprint, PipeParallelBlueprint):
-            return PipelexInterpreter._serialize_parallel_pipe(blueprint, domain)
+            return PipelexInterpreter._serialize_parallel_pipe(blueprint)
         elif isinstance(blueprint, PipeBatchBlueprint):
-            return PipelexInterpreter._serialize_batch_pipe(blueprint, domain)
+            return PipelexInterpreter._serialize_batch_pipe(blueprint)
         else:
             raise PipelexUnknownPipeError(f"Unknown pipe blueprint type: {type(blueprint)}")
 
     @staticmethod
-    def serialize_llm_pipe(pipe: PipeLLMBlueprint, domain: str) -> Dict[str, Any]:
+    def serialize_llm_pipe(pipe: PipeLLMBlueprint) -> Dict[str, Any]:
         """Serialize PipeLLM blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,
@@ -674,7 +672,7 @@ class PipelexInterpreter(BaseModel):
             result["inputs"] = PipelexInterpreter.serialize_inputs(pipe.inputs)
 
     @staticmethod
-    def _serialize_ocr_pipe(pipe: PipeOcrBlueprint, domain: str) -> Dict[str, Any]:
+    def _serialize_ocr_pipe(pipe: PipeOcrBlueprint) -> Dict[str, Any]:
         """Serialize PipeOcr blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,
@@ -686,7 +684,7 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def _serialize_func_pipe(pipe: PipeFuncBlueprint, domain: str) -> Dict[str, Any]:
+    def _serialize_func_pipe(pipe: PipeFuncBlueprint) -> Dict[str, Any]:
         """Serialize PipeFunc blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,
@@ -699,7 +697,7 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def _serialize_img_gen_pipe(pipe: PipeImgGenBlueprint, domain: str) -> Dict[str, Any]:
+    def _serialize_img_gen_pipe(pipe: PipeImgGenBlueprint) -> Dict[str, Any]:
         """Serialize PipeImgGen blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,
@@ -724,7 +722,7 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def serialize_ocr_pipe(pipe: PipeOcrBlueprint, domain: str) -> Dict[str, Any]:
+    def serialize_ocr_pipe(pipe: PipeOcrBlueprint) -> Dict[str, Any]:
         """Serialize a PipeOcr blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,
@@ -753,7 +751,7 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def serialize_sequence_pipe(pipe: PipeSequenceBlueprint, domain: str) -> Dict[str, Any]:
+    def serialize_sequence_pipe(pipe: PipeSequenceBlueprint) -> Dict[str, Any]:
         """Serialize a PipeSequence blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,
@@ -773,7 +771,7 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def serialize_jinja2_pipe(pipe: PipeJinja2Blueprint, domain: str) -> Dict[str, Any]:
+    def serialize_jinja2_pipe(pipe: PipeJinja2Blueprint) -> Dict[str, Any]:
         """Serialize PipeJinja2 blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,
@@ -835,7 +833,7 @@ class PipelexInterpreter(BaseModel):
         return "{ " + ", ".join(parts) + " }"
 
     @staticmethod
-    def _serialize_sequence_pipe(pipe: PipeSequenceBlueprint, domain: str) -> Dict[str, Any]:
+    def _serialize_sequence_pipe(pipe: PipeSequenceBlueprint) -> Dict[str, Any]:
         """Serialize PipeSequence blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,
@@ -851,7 +849,7 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def sequence_pipe_to_plx_string(pipe_name: str, pipe: PipeSequenceBlueprint, domain: str) -> str:
+    def sequence_pipe_to_plx_string(pipe_name: str, pipe: PipeSequenceBlueprint) -> str:
         """Convert a PipeSequence blueprint directly to PLX section string."""
         lines: list[str] = [
             f"[pipe.{pipe_name}]",
@@ -877,7 +875,7 @@ class PipelexInterpreter(BaseModel):
         return "\n".join(lines)
 
     @staticmethod
-    def _serialize_condition_pipe(pipe: PipeConditionBlueprint, domain: str) -> Dict[str, Any]:
+    def _serialize_condition_pipe(pipe: PipeConditionBlueprint) -> Dict[str, Any]:
         """Serialize PipeCondition blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,
@@ -901,7 +899,7 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def _serialize_parallel_pipe(pipe: PipeParallelBlueprint, domain: str) -> Dict[str, Any]:
+    def _serialize_parallel_pipe(pipe: PipeParallelBlueprint) -> Dict[str, Any]:
         """Serialize PipeParallel blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,
@@ -921,7 +919,7 @@ class PipelexInterpreter(BaseModel):
         return result
 
     @staticmethod
-    def _serialize_batch_pipe(pipe: PipeBatchBlueprint, domain: str) -> Dict[str, Any]:
+    def _serialize_batch_pipe(pipe: PipeBatchBlueprint) -> Dict[str, Any]:
         """Serialize PipeBatch blueprint."""
         result: Dict[str, Any] = {
             "type": pipe.type,

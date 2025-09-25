@@ -90,5 +90,5 @@ prompt_template = "Generate ideas about: $topic\"""",
     )
     def test_llm_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeLLMBlueprint, expected_plx: str):
         """Test converting LLM pipe blueprint to PLX string."""
-        result = PipelexInterpreter.llm_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        result = PipelexInterpreter.llm_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

@@ -65,5 +65,5 @@ combined_output = "MergedResults\"""",
     )
     def test_parallel_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeParallelBlueprint, expected_plx: str):
         """Test converting Parallel pipe blueprint to PLX string."""
-        result = PipelexInterpreter.parallel_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        result = PipelexInterpreter.parallel_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx

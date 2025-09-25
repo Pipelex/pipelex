@@ -85,5 +85,5 @@ steps = [
     )
     def test_sequence_pipe_to_plx_string(self, pipe_name: str, blueprint: PipeSequenceBlueprint, expected_plx: str):
         """Test converting Sequence pipe blueprint to PLX string."""
-        result = PipelexInterpreter.sequence_pipe_to_plx_string(pipe_name, blueprint, "test_domain")
+        result = PipelexInterpreter.sequence_pipe_to_plx_string(pipe_name, blueprint)
         assert result == expected_plx
