@@ -42,7 +42,8 @@ class Pypdfium2Worker(OcrWorkerAbstract):
                     pdf_path=pdf_path,
                 )
         else:
-            raise OcrInputError("No PDF URI provided in OcrJob")
+            msg = "No PDF URI provided in OcrJob"
+            raise OcrInputError(msg)
         return ocr_output
 
     async def extract_from_pdf_url(

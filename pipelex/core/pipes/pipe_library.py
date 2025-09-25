@@ -26,9 +26,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
                     try:
                         concept_provider.get_required_concept(concept_string=concept.concept_string)
                     except ConceptError as concept_error:
-                        raise PipeLibraryError(
-                            f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}",
-                        ) from concept_error
+                        msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
+                        raise PipeLibraryError(msg) from concept_error
                 for pipe_code in pipe.pipe_dependencies():
                     self.get_required_pipe(pipe_code=pipe_code)
                 pipe.validate_with_libraries()
@@ -42,7 +41,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     @override
     def add_new_pipe(self, pipe: PipeAbstract):
         if pipe.code in self.root:
-            raise PipeLibraryError(f"Pipe '{pipe.code}' already exists in the library")
+            msg = f"Pipe '{pipe.code}' already exists in the library"
+            raise PipeLibraryError(msg)
         self.root[pipe.code] = pipe
 
     @override
@@ -65,9 +65,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
         the_pipe = self.get_optional_pipe(pipe_code=pipe_code)
         if not the_pipe:
-            raise PipeLibraryPipeNotFoundError(
-                f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in a library listed in the config.",
-            )
+            msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in a library listed in the config."
+            raise PipeLibraryPipeNotFoundError(msg)
         return the_pipe
 
     @override

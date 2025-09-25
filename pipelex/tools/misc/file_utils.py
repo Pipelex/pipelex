@@ -175,7 +175,7 @@ def copy_folder_from_package(
             dest_file = os.path.join(target_subdir, file)
 
             # Check if the file exists and respect the overwrite parameter
-            if not os.path.exists(dest_file) or (overwrite and file not in non_overwrite_files):
+            if not Path(dest_file).exists() or (overwrite and file not in non_overwrite_files):
                 copy_file(
                     source_path=src_file,
                     target_path=dest_file,
@@ -198,7 +198,7 @@ def remove_file(file_path: str):
 
     """
     if path_exists(file_path):
-        os.remove(file_path)
+        Path(file_path).unlink()
 
 
 def remove_folder(folder_path: str) -> None:
@@ -211,7 +211,7 @@ def remove_folder(folder_path: str) -> None:
         folder_path (str): The path to the folder to be removed.
 
     """
-    if os.path.exists(folder_path):
+    if Path(folder_path).exists():
         shutil.rmtree(folder_path)
 
 
@@ -227,7 +227,7 @@ def ensure_directory_exists(directory_path: str) -> None:
         directory_path (str): The path to the directory to create.
 
     """
-    os.makedirs(directory_path, exist_ok=True)
+    Path(directory_path).mkdir(parents=True, exist_ok=True)
 
 
 def ensure_path(path: str) -> bool:
@@ -243,10 +243,9 @@ def ensure_path(path: str) -> bool:
         bool: True if the directory was created, False if it already existed.
 
     """
-    typed_path = Path(path)
-    if typed_path.exists():
+    if Path(path).exists():
         return False
-    typed_path.mkdir(parents=True, exist_ok=True)
+    Path(path).mkdir(parents=True, exist_ok=True)
     return True
 
 
@@ -263,8 +262,7 @@ def path_exists(path_str: str) -> bool:
         bool: True if a file or directory exists at the path, False otherwise.
 
     """
-    path = Path(path_str)
-    return path.exists()
+    return Path(path_str).exists()
 
 
 def get_incremental_directory_path(base_path: str, base_name: str, start_at: int = 1) -> str:

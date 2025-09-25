@@ -42,13 +42,11 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
                 base_class=PipeFactoryProtocol,
             )
         except ClassRegistryNotFoundError as factory_not_found_error:
-            raise PipeFactoryError(
-                f"Pipe '{pipe_code}' couldn't be created: factory '{factory_class_name}' not found: {factory_not_found_error}",
-            ) from factory_not_found_error
+            msg = f"Pipe '{pipe_code}' couldn't be created: factory '{factory_class_name}' not found: {factory_not_found_error}"
+            raise PipeFactoryError(msg) from factory_not_found_error
         except ClassRegistryInheritanceError as factory_inheritance_error:
-            raise PipeFactoryError(
-                f"Pipe '{pipe_code}' couldn't be created: factory '{factory_class_name}' is not a subclass of {type(PipeFactoryProtocol)}.",
-            ) from factory_inheritance_error
+            msg = f"Pipe '{pipe_code}' couldn't be created: factory '{factory_class_name}' is not a subclass of {type(PipeFactoryProtocol)}."
+            raise PipeFactoryError(msg) from factory_inheritance_error
 
         pipe_from_blueprint: PipeAbstract = pipe_factory.make_from_blueprint(
             domain=domain,

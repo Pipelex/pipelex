@@ -53,7 +53,8 @@ async def start_pipeline(
 
     """
     if working_memory and input_memory:
-        raise StartPipelineException(f"Cannot pass both working_memory and input_memory to `start_pipeline` {pipe_code=}")
+        msg = f"Cannot pass both working_memory and input_memory to `start_pipeline` {pipe_code=}"
+        raise StartPipelineException(msg)
 
     if input_memory:
         working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)

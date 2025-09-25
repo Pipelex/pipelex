@@ -24,14 +24,12 @@ async def load_binary_async(path: str) -> bytes:
 
 
 def encode_to_base64(data_bytes: bytes) -> bytes:
-    b64 = base64.b64encode(data_bytes)
-    return b64
+    return base64.b64encode(data_bytes)
 
 
 async def encode_to_base64_async(data_bytes: bytes) -> bytes:
     # Use asyncio.to_thread to run the CPU-bound task in a separate thread
-    b64 = await asyncio.to_thread(base64.b64encode, data_bytes)
-    return b64
+    return await asyncio.to_thread(base64.b64encode, data_bytes)
 
 
 def save_base64_to_binary_file(

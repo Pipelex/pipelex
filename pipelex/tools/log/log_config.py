@@ -20,7 +20,7 @@ class HighlighterName(StrEnum):
     REPR = "repr"
 
 
-class PROBLEM_IDS(StrEnum):
+class ProblemIds(StrEnum):
     AZURE_OPENAI_NO_STREAM_OPTIONS = "Azure OpenAI no stream_options"
 
 
@@ -102,9 +102,8 @@ class LogConfig(ConfigModel):
     poor_loggers: list[str]
 
     @field_validator("package_log_levels", mode="before")
-    def validate_package_log_levels(cls, value: dict[str, str]) -> dict[str, LogLevel]:
-        """Validate the package log levels dictionary.
-        """
+    def validate_package_log_levels(self, value: dict[str, str]) -> dict[str, LogLevel]:
+        """Validate the package log levels dictionary."""
         the_dict = cast(
             "dict[str, LogLevel]",
             ConfigModel.transform_dict_str_to_enum(input_dict=value, value_enum_cls=LogLevel),

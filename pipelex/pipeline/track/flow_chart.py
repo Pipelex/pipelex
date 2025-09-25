@@ -50,7 +50,8 @@ class PipelineFlowChart:
     ) -> tuple[str, str]:
         nb_nodes = len(self.nx_graph.nodes)
         if nb_nodes == 0:
-            raise JobHistoryError("Graph has no nodes")
+            msg = "Graph has no nodes"
+            raise JobHistoryError(msg)
         log.debug(f"Generating mermaid flowchart for the whole graph which holds {nb_nodes} nodes")
         mermaid_settings: dict[str, Any] = {}
         if title:

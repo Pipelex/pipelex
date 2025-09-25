@@ -124,7 +124,8 @@ def load_json_dict_from_path(path: str) -> dict[Any, Any]:
     json_content: JsonContent = load_json_from_path(path)
     if isinstance(json_content, dict):
         return json_content
-    raise JsonTypeError(f"{path} is not a dict")
+    msg = f"{path} is not a dict"
+    raise JsonTypeError(msg)
 
 
 def load_json_list_from_path(path: str) -> list[Any]:
@@ -148,7 +149,8 @@ def load_json_list_from_path(path: str) -> list[Any]:
     json_content: JsonContent = load_json_from_path(path)
     if isinstance(json_content, list):
         return json_content
-    raise JsonTypeError(f"{path} is not a list")
+    msg = f"{path} is not a list"
+    raise JsonTypeError(msg)
 
 
 def deep_update(target_dict: dict[str, Any], updates: dict[str, Any]):
@@ -173,9 +175,9 @@ def deep_update(target_dict: dict[str, Any], updates: dict[str, Any]):
     """
     for key, value in updates.items():
         if isinstance(value, dict) and key in target_dict and isinstance(target_dict[key], dict):
-            deep_update(target_dict[key], value)  # type: ignore
+            deep_update(target_dict[key], value)  # pyright: ignore[reportUnknownArgumentType]
         elif isinstance(value, list) and key in target_dict and isinstance(target_dict[key], list):
-            target_dict[key] = list(target_dict[key] + value)  # type: ignore
+            target_dict[key] = list(target_dict[key] + value)
         else:
             target_dict[key] = value
 
@@ -227,7 +229,8 @@ def remove_none_values(json_content: JsonContent | Any) -> JsonContent | Any:
 def remove_none_values_from_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     processed = remove_none_values(json_content=data)
     if not isinstance(processed, dict):
-        raise JsonTypeError("Removing None values from a dict, we expected a dict in return")
+        msg = "Removing None values from a dict, we expected a dict in return"
+        raise JsonTypeError(msg)
     processed = cast("dict[str, Any]", processed)  # pyright: ignore[reportUnnecessaryCast]
     return processed
 
@@ -404,7 +407,8 @@ def purify_json_dict(data: Any, indent: int | None = None, is_warning_enabled: b
         )
 
     if isinstance(data, list):
-        raise ArgumentTypeError("The data is a list, not a dict")
+        msg = "The data is a list, not a dict"
+        raise ArgumentTypeError(msg)
 
     try:
         dict_string = json.dumps(data, indent=indent)

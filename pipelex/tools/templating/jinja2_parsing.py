@@ -16,4 +16,5 @@ def check_jinja2_parsing(
     try:
         jinja2_env.parse(jinja2_template_source)
     except TemplateSyntaxError as exc:
-        raise Jinja2ParsingError(f"Could not parse Jinja2 template because of: {exc}. The template is:\n{jinja2_template_source}") from exc
+        msg = f"Could not parse Jinja2 template because of: {exc}. The template is:\n{jinja2_template_source}"
+        raise Jinja2ParsingError(msg) from exc

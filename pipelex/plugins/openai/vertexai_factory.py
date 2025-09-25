@@ -41,7 +41,8 @@ class VertexAIFactory(ConfigModel):
 
         gcp_credentials_file_path = extra_config.get(VertexAIExtraField.GCP_CREDENTIALS_FILE_PATH)
         if not gcp_credentials_file_path or value_is_placeholder(gcp_credentials_file_path):
-            raise VertexAIConfigError("GCP credentials file path is not properly set for VertexAI.")
+            msg = "GCP credentials file path is not properly set for VertexAI."
+            raise VertexAIConfigError(msg)
 
         api_key = cls._make_api_key(gcp_credentials_file_path=gcp_credentials_file_path)
 
@@ -55,25 +56,25 @@ class VertexAIFactory(ConfigModel):
     def _make_api_key(cls, gcp_credentials_file_path: str) -> str:
         """Get GCP credentials and return access token."""
         try:
-            from google.auth.transport.requests import Request
-            from google.oauth2.service_account import Credentials
+            from google.auth.transport.requests import Request # noqa: PLC0415
+            from google.oauth2.service_account import Credentials # noqa: PLC0415
         except ImportError as exc:
-            raise MissingDependencyError(
-                "google-auth-oauthlib",
-                "google",
-                (
+            msg = (
                     "The google-auth-oauthlib SDK is required to use Google connection. "
                     "You can install it with 'pip install pipelex[google]', or use this model via another provider "
                     "(such as Azure OpenAI, OpenAI, anthropic or bedrock)."
-                ),
+                )
+            raise MissingDependencyError(
+                "google-auth-oauthlib",
+                "google",
+                msg,
             ) from exc
 
         try:
             credentials_dict: dict[str, Any] = load_json_dict_from_path(path=gcp_credentials_file_path)
         except FileNotFoundError as exc:
-            raise VertexAICredentialsError(
-                f"Could not get VertexAI credentials from GCP credentials file: File not found: {gcp_credentials_file_path}",
-            ) from exc
+            msg = f"Could not get VertexAI credentials from GCP credentials file: File not found: {gcp_credentials_file_path}"
+            raise VertexAICredentialsError(msg) from exc
 
         credentials = Credentials.from_service_account_info(  # pyright: ignore[reportUnknownMemberType]
             credentials_dict, scopes=["https://www.googleapis.com/auth/cloud-platform"],
@@ -81,5 +82,6 @@ class VertexAIFactory(ConfigModel):
         auth_req = Request()
         credentials.refresh(auth_req)  # pyright: ignore[reportUnknownMemberType]
         if not isinstance(credentials.token, str):  # pyright: ignore[reportUnknownMemberType]
-            raise VertexAICredentialsError("Token is not a string")
+            msg = "Token is not a string"
+            raise VertexAICredentialsError(msg)
         return credentials.token

@@ -32,7 +32,8 @@ def detect_file_type_from_path(path: str | Path) -> FileType:
     """
     kind = filetype.guess(path)  # pyright: ignore[reportUnknownMemberType]
     if kind is None:
-        raise FileTypeException(f"Could not identify file type of '{path!s}'")
+        msg = f"Could not identify file type of '{path!s}'"
+        raise FileTypeException(msg)
     extension = f"{kind.extension}"
     mime = f"{kind.mime}"
     return FileType(extension=extension, mime=mime)
@@ -53,7 +54,8 @@ def detect_file_type_from_bytes(buf: bytes) -> FileType:
     """
     kind = filetype.guess(buf)  # pyright: ignore[reportUnknownMemberType]
     if kind is None:
-        raise FileTypeException(f"Could not identify file type of given bytes: {buf[:300]!r}")
+        msg = f"Could not identify file type of given bytes: {buf[:300]!r}"
+        raise FileTypeException(msg)
     extension = f"{kind.extension}"
     mime = f"{kind.mime}"
     return FileType(extension=extension, mime=mime)
@@ -83,6 +85,7 @@ def detect_file_type_from_base64(b64: str | bytes) -> FileType:
     try:
         raw = base64.b64decode(b64_bytes, validate=True)
     except binascii.Error as exc:  # malformed Base-64
-        raise FileTypeException(f"Could not identify file type of given bytes because input is not valid Base-64: {exc}") from exc
+        msg = f"Could not identify file type of given bytes because input is not valid Base-64: {exc}"
+        raise FileTypeException(msg) from exc
 
     return detect_file_type_from_bytes(buf=raw)

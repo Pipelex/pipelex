@@ -151,7 +151,7 @@ def serialize_model(
 
     # Build a dict, omitting hidden fields. Recursively handle nested models.
     data: dict[str, Any] = {}
-    for field_name, _ in obj.__class__.model_fields.items():
+    for field_name in obj.__class__.model_fields:
         if field_name in fields_to_exclude:
             continue  # Skip hidden fields
 

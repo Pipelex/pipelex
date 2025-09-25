@@ -40,7 +40,8 @@ class PipeBlueprint(BaseModel):
         """Validate that the pipe type is one of the allowed values."""
         allowed_types = [_type.value for _type in AllowedPipeTypes]
         if value not in allowed_types:
-            raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {allowed_types}")
+            msg = f"Invalid pipe type '{value}'. Must be one of: {allowed_types}"
+            raise PipeBlueprintError(msg)
         return value
 
     @field_validator("category", mode="after")
@@ -48,7 +49,8 @@ class PipeBlueprint(BaseModel):
         """Validate that the pipe category is one of the allowed values."""
         allowed_categories = [_category.value for _category in AllowedPipeCategories]
         if value not in allowed_categories:
-            raise PipeBlueprintError(f"Invalid pipe category '{value}'. Must be one of: {allowed_categories}")
+            msg = f"Invalid pipe category '{value}'. Must be one of: {allowed_categories}"
+            raise PipeBlueprintError(msg)
         return value
 
     @field_validator("output", mode="before")
@@ -59,5 +61,6 @@ class PipeBlueprint(BaseModel):
     @classmethod
     def validate_pipe_code_syntax(cls, pipe_code: str) -> str:
         if not is_snake_case(pipe_code):
-            raise PipeBlueprintError(f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case.")
+            msg = f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case."
+            raise PipeBlueprintError(msg)
         return pipe_code

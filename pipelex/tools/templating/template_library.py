@@ -46,7 +46,8 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
         try:
             return self.root[template_name]
         except KeyError as exc:
-            raise TemplateNotFoundError(f"Template '{template_name}' not found in template library") from exc
+            msg = f"Template '{template_name}' not found in template library"
+            raise TemplateNotFoundError(msg) from exc
 
     def _set_template(self, template: str, name: str):
         preprocessed_template = preprocess_template(template)
@@ -54,7 +55,8 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
 
     def _add_new_template(self, template: str, name: str):
         if name in self.root:
-            raise TemplateLibraryError(f"Template '{name}' already exists in the library")
+            msg = f"Template '{name}' already exists in the library"
+            raise TemplateLibraryError(msg)
         self._set_template(template=template, name=name)
 
     def _load_from_toml(self, toml_path: str):
@@ -78,10 +80,12 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
                     domain = f"{domain}/{name}"
                     self._load_from_recursive_dict(domain=domain, recursive_dict=sub_recursive_dict)
                 else:
-                    raise TemplateLibraryError(f"Unexpected type for key '{name}' in recursive_dict: {type(obj)}")
+                    msg = f"Unexpected type for key '{name}' in recursive_dict: {type(obj)}"
+                    raise TemplateLibraryError(msg)
             except ValidationError as exc:
                 error_msg = format_pydantic_validation_error(exc)
-                raise TemplateLibraryError(f"Error loading concept '{name}' of domain '{domain}' because of: {error_msg}") from exc
+                msg = f"Error loading concept '{name}' of domain '{domain}' because of: {error_msg}"
+                raise TemplateLibraryError(msg) from exc
 
     def validate_templates(self, template_category: Jinja2TemplateCategory):
         for template_name, template in self.root.items():
@@ -96,4 +100,5 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
                     error_msg += f"\nThe template is:\n{template}"
                 else:
                     error_msg += "The template is empty."
-                raise TemplateLibraryError(error_msg) from exc
+                msg = error_msg
+                raise TemplateLibraryError(msg) from exc

@@ -25,8 +25,7 @@ class LogDispatch:
         self.log_mode = mode
 
     def reset(self):
-        """Reset the log dispatch.
-        """
+        """Reset the log dispatch."""
         self.project_name = None
         self._log_config_instance = None
 
@@ -42,7 +41,8 @@ class LogDispatch:
 
         """
         if self._log_config_instance is None:
-            raise RuntimeError("LogConfig is not set. You must call pipelex_hub.set_config().")
+            msg = "LogConfig is not set. You must call pipelex_hub.set_config()."
+            raise RuntimeError(msg)
         return self._log_config_instance
 
     def configure(
@@ -61,7 +61,8 @@ class LogDispatch:
 
         """
         if self._log_config_instance is not None:
-            raise RuntimeError("LogConfig is already set. You can only call log.configure() once.")
+            msg = "LogConfig is already set. You can only call log.configure() once."
+            raise RuntimeError(msg)
         self._log_config_instance = log_config
         self.project_name = project_name
         self.log_mode = log_config.log_mode
@@ -276,7 +277,8 @@ class LogDispatch:
                         continue
                     if module.__name__ == "__main__":
                         if self.project_name is None:
-                            raise RuntimeError("Project name is not set. You must call initialize Pipelex first.")
+                            msg = "Project name is not set. You must call initialize Pipelex first."
+                            raise RuntimeError(msg)
                         log_origin_name = self.project_name
                     else:
                         log_origin_name = module.__name__.split(sep=".", maxsplit=1)[0]
