@@ -1,7 +1,7 @@
-import json
 import os
 from typing import Optional
 
+import kajson
 from typing_extensions import override
 
 from pipelex.config import get_config
@@ -14,14 +14,14 @@ class LocalObserver(ObserverProtocol):
         os.makedirs(self.storage_dir, exist_ok=True)
 
     def _write_to_jsonl(self, event_type: str, payload: PayloadType) -> None:
-        timestamped_payload = {
+        payload = {
             "event_type": event_type,
             **payload,
         }
 
         file_path = os.path.join(self.storage_dir, f"{event_type}.jsonl")
         with open(file_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(timestamped_payload) + "\n")
+            f.write(kajson.dumps(payload) + "\n")
 
     @override
     async def before_run(self, payload: PayloadType) -> None:
