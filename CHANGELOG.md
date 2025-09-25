@@ -6,12 +6,14 @@
 
 - **New pipe builder** pipeline to generate Pipes based on a brief in natural language: use the cli `pipelex build pipe "Your task"` to build the pipe.
 - **Full refactoring of OCR and Image Generation** to use the same patterns as `LLM` workers and pipes.
+- **New observer system** to log events and metrics from pipe runs.
 
 ### Added
 
  - Added a badge on the `README.md` to display the number of tests.
  - Added new placeholder utility module with `make_placeholder_value()` and `value_is_placeholder()` functions
  - Added comprehensive test suite for placeholder functionality
+ - Added new observer system to log events and metrics from pipe runs: Added an extract point before running a pipe, and after running a pipe. Added a local observer that dumps the payload to a local JSONL file.
  - Added new test cases for environment variable functions
  - Added new documentation for `PipeFunc` on how to register functions.
 
