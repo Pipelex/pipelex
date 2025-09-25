@@ -1,36 +1,36 @@
 import json
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, Optional
+import os
+from typing import Optional
 
 from typing_extensions import override
 
-from pipelex.observer.observer_protocol import ObserverProtocol
+from pipelex.config import get_config
+from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
 
 
-class LocalObservability(ObserverProtocol):
+class LocalObserver(ObserverProtocol):
     def __init__(self, storage_dir: Optional[str] = None) -> None:
-        self.storage_dir = Path(storage_dir or ".pipelex/observer")
-        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        self.storage_dir = storage_dir or get_config().pipelex.observer_config.observer_dir
+        os.makedirs(self.storage_dir, exist_ok=True)
 
-    def _get_daily_file_path(self) -> Path:
-        today = datetime.now().strftime("%Y-%m-%d")
-        return self.storage_dir / f"pipe_logs_{today}.jsonl"
-
-    def _serialize_payload(self, payload: Dict[str, Any]) -> str:
-        serializable_payload = {
+    def _write_to_jsonl(self, event_type: str, payload: PayloadType) -> None:
+        timestamped_payload = {
+            "event_type": event_type,
             **payload,
-            "timestamp": datetime.now().isoformat(),
         }
-        return json.dumps(serializable_payload, default=str)
+
+        file_path = os.path.join(self.storage_dir, f"{event_type}.jsonl")
+        with open(file_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(timestamped_payload) + "\n")
 
     @override
-    async def push(
-        self,
-        payload: Dict[str, Any],
-    ) -> None:
-        file_path = self._get_daily_file_path()
-        serialized_payload = self._serialize_payload(payload)
+    async def before_run(self, payload: PayloadType) -> None:
+        self._write_to_jsonl("before_run", payload)
 
-        with open(file_path, "a", encoding="utf-8") as f:
-            f.write(serialized_payload + "\n")
+    @override
+    async def successful_run(self, payload: PayloadType) -> None:
+        self._write_to_jsonl("successful_run", payload)
+
+    @override
+    async def failing_run(self, payload: PayloadType) -> None:
+        self._write_to_jsonl("failing_run", payload)

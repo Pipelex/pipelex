@@ -94,8 +94,11 @@ class ReportingConfig(ConfigModel):
     cost_report_unit_scale: float
 
 
+class ObserverConfig(ConfigModel):
+    observer_dir: str
+
+
 class Pipelex(ConfigModel):
-    extra_env_files: List[str]
     feature_config: FeatureConfig
     log_config: LogConfig
     aws_config: AwsConfig
@@ -110,6 +113,7 @@ class Pipelex(ConfigModel):
     dry_run_config: DryRunConfig
     pipe_run_config: PipeRunConfig
     reporting_config: ReportingConfig
+    observer_config: ObserverConfig
 
 
 class PipelexConfig(ConfigRoot):
