@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Self
+from typing import Any
 
 from pydantic import ConfigDict, Field, RootModel, model_validator
 from typing_extensions import TYPE_CHECKING, override
@@ -13,6 +13,8 @@ from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
 
 if TYPE_CHECKING:
     from collections.abc import ItemsView
+
+    from pipelex.types import Self
 
 LLMPromptTemplateInputsDict = dict[str, Any]
 

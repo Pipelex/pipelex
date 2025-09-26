@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Literal, Self
+from typing import Any, ClassVar, Literal
 
 from jinja2 import TemplateSyntaxError
 from pydantic import ConfigDict, model_validator
@@ -29,6 +29,7 @@ from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_req
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
+from pipelex.types import Self
 
 
 class PipeJinja2Output(PipeOutput):

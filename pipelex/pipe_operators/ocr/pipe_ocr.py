@@ -1,4 +1,4 @@
-from typing import Literal, Self
+from typing import Literal
 
 from pydantic import model_validator
 from typing_extensions import override
@@ -33,6 +33,7 @@ from pipelex.hub import (
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
+from pipelex.types import Self
 
 
 class PipeOcrOutput(PipeOutput):

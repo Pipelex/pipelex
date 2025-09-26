@@ -1,8 +1,6 @@
-from typing import Self
-
 from pydantic import BaseModel
 
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 
 class SpecialDomain(StrEnum):

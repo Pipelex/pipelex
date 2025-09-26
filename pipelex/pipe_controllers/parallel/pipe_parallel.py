@@ -1,5 +1,5 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import model_validator
 from typing_extensions import override
@@ -18,6 +18,7 @@ from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.types import Self
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine

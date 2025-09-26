@@ -1,4 +1,4 @@
-from typing import Self, Union
+from typing import Union
 
 from pydantic import Field, field_validator, model_validator
 
@@ -18,6 +18,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
 from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.exceptions import ConfigValidationError
+from pipelex.types import Self
 
 LLM_PRESET_DISABLED = "disabled"
 

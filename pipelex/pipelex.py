@@ -1,7 +1,7 @@
 import inspect
 import os
 from importlib.metadata import metadata
-from typing import Self, cast
+from typing import cast
 
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -52,6 +52,7 @@ from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstr
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.templating.template_library import TemplateLibrary
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.types import Self
 
 PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
 PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]

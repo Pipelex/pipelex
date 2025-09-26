@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Self
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -8,7 +8,7 @@ from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringErro
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.tools.misc.string_utils import is_pascal_case
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 
 class ConceptBlueprintError(Exception):

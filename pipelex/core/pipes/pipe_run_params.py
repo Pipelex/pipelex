@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Self, Union
+from typing import Any, Union
 
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex import log
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 
 class PipeRunParamKey(StrEnum):

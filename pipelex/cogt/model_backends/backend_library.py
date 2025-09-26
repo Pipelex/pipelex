@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import Field, RootModel, ValidationError
 
@@ -17,6 +17,7 @@ from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
+from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec

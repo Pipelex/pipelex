@@ -1,4 +1,4 @@
-from typing import Any, Self
+from typing import Any
 
 from pydantic import Field, RootModel
 from typing_extensions import override
@@ -12,6 +12,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
+from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]
 

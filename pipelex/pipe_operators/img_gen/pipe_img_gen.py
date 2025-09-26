@@ -1,4 +1,4 @@
-from typing import Literal, Self
+from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
@@ -33,6 +33,7 @@ from pipelex.exceptions import (
 from pipelex.hub import get_concept_provider, get_content_generator, get_model_deck
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.types import Self
 
 
 class PipeImgGenOutput(PipeOutput):

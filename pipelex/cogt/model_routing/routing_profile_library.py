@@ -1,5 +1,3 @@
-from typing import Self
-
 from pydantic import Field, RootModel, ValidationError
 
 from pipelex import log
@@ -12,6 +10,7 @@ from pipelex.cogt.model_routing.routing_profile_factory import (
 )
 from pipelex.config import get_config
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path
+from pipelex.types import Self
 
 RoutingProfileLibraryRoot = dict[str, RoutingProfile]
 

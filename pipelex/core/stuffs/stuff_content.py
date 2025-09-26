@@ -2,7 +2,7 @@ import base64
 import json
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Generic, TypeVar
 
 import markdown
 from json2html import json2html
@@ -20,6 +20,7 @@ from pipelex.tools.misc.markdown_utils import convert_to_markdown
 from pipelex.tools.misc.path_utils import InterpretedPathOrUrl, interpret_path_or_url
 from pipelex.tools.templating.templating_models import TextFormat
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, clean_model_to_dict
+from pipelex.types import Self
 
 ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")

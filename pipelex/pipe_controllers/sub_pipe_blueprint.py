@@ -1,9 +1,8 @@
-from typing import Self
-
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
+from pipelex.types import Self
 
 
 class SubPipeBlueprint(BaseModel):

@@ -1,9 +1,7 @@
-from typing import Self
-
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 
 class TextFormat(StrEnum):

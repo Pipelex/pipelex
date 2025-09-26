@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal, Self, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import shortuuid
 from pydantic import field_validator, model_validator
@@ -34,6 +34,7 @@ from pipelex.pipe_operators.jinja2.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
+from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2Output

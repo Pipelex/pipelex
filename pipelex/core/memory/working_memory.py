@@ -1,5 +1,5 @@
 from operator import attrgetter
-from typing import Any, Self
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import override
@@ -25,6 +25,7 @@ from pipelex.exceptions import (
     WorkingMemoryTypeError,
 )
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
+from pipelex.types import Self
 
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"

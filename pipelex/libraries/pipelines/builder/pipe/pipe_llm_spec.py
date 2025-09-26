@@ -1,4 +1,4 @@
-from typing import Literal, Self, Union
+from typing import Literal, Union
 
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
@@ -9,6 +9,7 @@ from pipelex.exceptions import PipeDefinitionError
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
+from pipelex.types import Self
 
 
 class LLMSettingSpec(StructuredContent):

@@ -1,4 +1,4 @@
-from typing import Literal, Self
+from typing import Literal
 
 from pydantic import model_validator
 from typing_extensions import override
@@ -21,6 +21,7 @@ from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.types import Self
 
 
 class PipeSequence(PipeController):

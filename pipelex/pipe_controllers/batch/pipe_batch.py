@@ -1,5 +1,5 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Literal, Self, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import shortuuid
 from pydantic import model_validator
@@ -21,6 +21,7 @@ from pipelex.exceptions import (
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.types import Self
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine

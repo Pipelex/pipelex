@@ -1,4 +1,4 @@
-from typing import Literal, Self, cast
+from typing import Literal, cast
 
 from pydantic import model_validator
 from typing_extensions import override
@@ -50,6 +50,7 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.structure_printer import StructurePrinter
+from pipelex.types import Self
 
 
 class PipeLLMOutput(PipeOutput):

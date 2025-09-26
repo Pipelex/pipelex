@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Self, cast
+from typing import Any, cast
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
@@ -17,7 +17,7 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.tools.misc.string_utils import is_pascal_case
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 
 class ConceptStructureSpecFieldType(StrEnum):

@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Self, cast
+from typing import Any, cast
 
 import toml
 from pydantic import BaseModel, model_validator
@@ -32,6 +32,7 @@ from pipelex.tools.misc.toml_utils import (
     validate_toml_content,
     validate_toml_file,
 )
+from pipelex.types import Self
 
 
 class PLXDecodeError(toml.TomlDecodeError):
