@@ -24,13 +24,13 @@ class LocalObserver(ObserverProtocol):
             f.write(kajson.dumps(payload) + "\n")
 
     @override
-    async def before_run(self, payload: PayloadType) -> None:
+    async def observe_before_run(self, payload: PayloadType) -> None:
         self._write_to_jsonl("before_run", payload)
 
     @override
-    async def successful_run(self, payload: PayloadType) -> None:
+    async def observe_after_successful_run(self, payload: PayloadType) -> None:
         self._write_to_jsonl("successful_run", payload)
 
     @override
-    async def failing_run(self, payload: PayloadType) -> None:
+    async def observe_after_failing_run(self, payload: PayloadType) -> None:
         self._write_to_jsonl("failing_run", payload)

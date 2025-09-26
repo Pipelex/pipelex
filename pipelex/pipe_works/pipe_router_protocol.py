@@ -18,9 +18,9 @@ class PipeRouterProtocol(Protocol):
         payload: PayloadType = {
             "pipe_job": pipe_job,
         }
-        await self.observer_provider.before_run(payload)
+        await self.observer_provider.observe_before_run(payload)
 
-    async def _successful_run(
+    async def _after_successful_run(
         self,
         pipe_job: PipeJob,
         pipe_output: PipeOutput,
@@ -29,9 +29,9 @@ class PipeRouterProtocol(Protocol):
             "pipe_job": pipe_job,
             "pipe_output": pipe_output,
         }
-        await self.observer_provider.successful_run(payload)
+        await self.observer_provider.observe_after_successful_run(payload)
 
-    async def _failing_run(
+    async def _after_failing_run(
         self,
         pipe_job: PipeJob,
         error: Exception,
@@ -39,7 +39,7 @@ class PipeRouterProtocol(Protocol):
         payload: PayloadType = {
             "pipe_job": pipe_job,
         }
-        await self.observer_provider.failing_run(payload)
+        await self.observer_provider.observe_after_failing_run(payload)
 
     async def run(
         self,
@@ -50,10 +50,10 @@ class PipeRouterProtocol(Protocol):
         try:
             pipe_output = await self._run_pipe_job(pipe_job)
         except Exception as exc:
-            await self._failing_run(pipe_job, exc)
+            await self._after_failing_run(pipe_job, exc)
             raise exc
 
-        await self._successful_run(pipe_job, pipe_output)
+        await self._after_successful_run(pipe_job, pipe_output)
 
         return pipe_output
 
