@@ -1,7 +1,8 @@
 
 
 [pipelex]
-extra_env_files = []
+[pipelex.observer_config]
+observer_dir = ".pipelex/observer"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags

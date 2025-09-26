@@ -66,7 +66,7 @@ class TestConcept:
         with pytest.raises(ConceptCodeError):
             ConceptBlueprint.is_native_concept_code("text")
 
-    def test_is_native_concept_string_or_concept_code(self):
+    def test_is_native_concept_string_or_code(self):
         """Test is_native_concept_code method."""
         assert NativeConceptManager.is_native_concept(NativeConceptEnum.TEXT) is True
         assert NativeConceptManager.is_native_concept(NativeConceptEnum.IMAGE) is True

@@ -1,5 +1,5 @@
-from typing import Literal, Self
-
+from typing import Literal, Optional
+from typing_extensions import Self
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
 
@@ -54,7 +54,7 @@ class PipeImgGenOutput(PipeOutput):
 DEFAULT_PROMPT_VAR_NAME = "prompt"
 
 
-class PipeImgGen(PipeOperator):
+class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     type: Literal["PipeImgGen"] = "PipeImgGen"
     img_gen_prompt: str | None = None
     img_gen_prompt_var_name: str | None = None
@@ -361,8 +361,8 @@ class PipeImgGen(PipeOperator):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeOutput:
+        output_name: Optional[str] = None,
+    ) -> PipeImgGenOutput:
         log.debug(f"PipeImgGen: dry run operator pipe: {self.code}")
         content_generator_dry = ContentGeneratorDry()
         return await self._run_operator_pipe(

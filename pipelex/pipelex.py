@@ -3,7 +3,6 @@ import os
 from importlib.metadata import metadata
 from typing import Self, cast
 
-from dotenv import load_dotenv
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
@@ -25,8 +24,9 @@ from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.core.registry_models import PipelexRegistryModels
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
-from pipelex.hub import PipelexHub, set_pipelex_hub
+from pipelex.hub import PipelexHub, get_observer_provider, set_pipelex_hub
 from pipelex.libraries.library_manager_factory import LibraryManagerFactory
+from pipelex.observer.local_observer import LocalObserver
 from pipelex.pipe_works.pipe_router import PipeRouter
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager import ActivityManager
@@ -84,9 +84,6 @@ class Pipelex(metaclass=MetaSingleton):
             formatted_error_msg = format_pydantic_validation_error(exc)
             msg = f"Could not setup config because of: {formatted_error_msg}"
             raise PipelexConfigError(msg) from exc
-
-        for extra_env_file in get_config().pipelex.extra_env_files:
-            load_dotenv(dotenv_path=extra_env_file, override=True)
 
         log.configure(
             project_name=get_config().project_name or "unknown_project",
@@ -205,7 +202,9 @@ class Pipelex(metaclass=MetaSingleton):
             self.class_registry.register_classes(PipelexTestModels.get_all_models())
         self.activity_manager.setup()
 
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter())
+        self.pipelex_hub.set_observer_provider(observer_provider=LocalObserver())
+
+        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer_provider=get_observer_provider()))
 
         # pipeline
         self.pipeline_tracker.setup()

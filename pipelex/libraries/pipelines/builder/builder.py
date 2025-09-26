@@ -20,7 +20,7 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipePara
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSignature
 from pipelex.pipe_works.pipe_dry import dry_run_pipes
-from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of, format_pydantic_validation_error
 from pipelex.types import StrEnum
 
 
@@ -155,7 +155,7 @@ def _convert_pipe_spec(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
     if pipe_class is None:
         msg = f"Unknown pipe type: {pipe_spec.type}"
         raise PipeBuilderError(msg)
-    return cast("PipeSpecUnion", pipe_class(**pipe_spec.model_dump(serialize_as_any=True)))
+    return cast(PipeSpecUnion, pipe_class(**pipe_spec.model_dump(serialize_as_any=True)))
 
 
 async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> PipelexBundleSpec:
@@ -187,7 +187,7 @@ async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipel
             validated_concept = ConceptSpec(**concept_spec.model_dump(serialize_as_any=True))
             validated_concepts[validated_concept.the_concept_code] = validated_concept
         except ValidationError as exc:
-            msg = f"Failed to validate concept spec {concept_spec.the_concept_code}: {exc}"
+            msg = f"Failed to validate concept spec {concept_spec.the_concept_code}: {format_pydantic_validation_error(exc)}"
             raise PipeBuilderError(msg) from exc
 
     return PipelexBundleSpec(
@@ -248,19 +248,20 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
 
     failed_pipes: list[PipeFailure] = []
     for pipe_code, dry_run_output in dry_run_result.items():
-        if dry_run_output.status == DryRunStatus.FAILURE and pipelex_bundle_spec.pipe and pipe_code in pipelex_bundle_spec.pipe:
-            pipe_spec = pipelex_bundle_spec.pipe[pipe_code]
-            spec_class = pipe_type_to_spec_class.get(pipe_spec.type)
-            if not spec_class:
-                msg = f"Unknown pipe type: {pipe_spec.type}"
-                raise ValidateDryRunError(msg)
-            pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
-            failed_pipes.append(
-                PipeFailure(
-                    pipe=pipe_spec,
-                    error_message=dry_run_output.error_message or "",
-                ),
-            )
+        if dry_run_output.status == DryRunStatus.FAILURE:
+            if pipelex_bundle_spec.pipe and pipe_code in pipelex_bundle_spec.pipe:
+                pipe_spec = pipelex_bundle_spec.pipe[pipe_code]
+                spec_class = pipe_type_to_spec_class.get(pipe_spec.type)
+                if not spec_class:
+                    msg = f"Unknown pipe type: {pipe_spec.type}"
+                    raise ValidateDryRunError(msg)
+                pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
+                failed_pipes.append(
+                    PipeFailure(
+                        pipe=pipe_spec,
+                        error_message=dry_run_output.error_message or "",
+                    )
+                )
 
     return ListContent[PipeFailure](items=failed_pipes)
 

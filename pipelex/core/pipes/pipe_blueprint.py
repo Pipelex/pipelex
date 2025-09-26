@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, field_validator
 
@@ -14,7 +14,7 @@ class AllowedPipeCategories(StrEnum):
     PIPE_CONTROLLER = "PipeController"
 
     @classmethod
-    def value_list(cls) -> list[str]:
+    def value_list(cls) -> List[str]:
         return [value for value in cls]
 
 
@@ -32,8 +32,8 @@ class AllowedPipeTypes(StrEnum):
     PIPE_SEQUENCE = "PipeSequence"
 
     @classmethod
-    def value_list(cls) -> list[str]:
-        return list(cls)
+    def value_list(cls) -> List[str]:
+        return [value for value in cls]
 
 
 class PipeBlueprint(BaseModel):
@@ -55,13 +55,12 @@ class PipeBlueprint(BaseModel):
     def validate_pipe_category(self, value: Any) -> Any:
         """Validate that the pipe category is one of the allowed values."""
         if value not in AllowedPipeCategories.value_list():
-            msg = f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}"
-            raise PipeBlueprintError(msg)
+            raise PipeBlueprintError(f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}")
         return value
 
     @field_validator("output", mode="before")
-    def validate_concept_string_or_concept_code(self, output: str) -> str:
-        ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_code=output)
+    def validate_concept_string_or_code(cls, output: str) -> str:
+        ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=output)
         return output
 
     @classmethod

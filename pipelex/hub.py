@@ -19,6 +19,7 @@ from pipelex.core.domains.domain_provider_abstract import DomainProviderAbstract
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_provider_abstract import PipeProviderAbstract
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
+from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerProtocol
 from pipelex.pipeline.pipeline import Pipeline
@@ -63,9 +64,10 @@ class PipelexHub:
         self._library_manager: LibraryManagerAbstract | None = None
 
         # pipeline
-        self._pipeline_tracker: PipelineTrackerProtocol | None = None
-        self._pipeline_manager: PipelineManagerAbstract | None = None
-        self._activity_manager: ActivityManagerProtocol | None = None
+        self._pipeline_tracker: Optional[PipelineTrackerProtocol] = None
+        self._pipeline_manager: Optional[PipelineManagerAbstract] = None
+        self._activity_manager: Optional[ActivityManagerProtocol] = None
+        self._observer_provider: Optional[ObserverProtocol] = None
 
     ############################################################
     # Class methods for singleton management
@@ -163,6 +165,9 @@ class PipelexHub:
 
     def set_library_manager(self, library_manager: LibraryManagerAbstract):
         self._library_manager = library_manager
+
+    def set_observer_provider(self, observer_provider: ObserverProtocol):
+        self._observer_provider = observer_provider
 
     ############################################################
     # Getters
@@ -295,6 +300,11 @@ class PipelexHub:
 
     def get_optional_library_manager(self) -> LibraryManagerAbstract | None:
         return self._library_manager
+
+    def get_observer_provider(self) -> ObserverProtocol:
+        if self._observer_provider is None:
+            raise RuntimeError("Observer is not set. You must initialize Pipelex first.")
+        return self._observer_provider
 
 
 # Shorthand functions for accessing the singleton
@@ -445,3 +455,7 @@ def get_pipeline(pipeline_run_id: str) -> Pipeline:
 
 def get_library_manager() -> LibraryManagerAbstract:
     return get_pipelex_hub().get_required_library_manager()
+
+
+def get_observer_provider() -> ObserverProtocol:
+    return get_pipelex_hub().get_observer_provider()

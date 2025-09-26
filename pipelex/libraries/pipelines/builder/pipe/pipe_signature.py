@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Union, Optional, Dict
 
 from pydantic import Field, field_validator
 
@@ -56,8 +56,8 @@ class PipeSpec(StructuredContent):
 
     type: Any = Field(description=f"Pipe type. Must be one of: {AllowedPipeTypes}")
     category: Any = Field(description=f"Pipe category. Must be one of: {AllowedPipeCategories}")
-    definition: str | None = Field(description="Natural language description of what the pipe does.")
-    inputs: dict[str, str | InputRequirementSpec] | None = Field(
+    definition: Optional[str] = Field(description="Natural language description of what the pipe does.")
+    inputs: Optional[Dict[str, Union[str, InputRequirementSpec]]] = Field(
         description=(
             "Input concept specifications. Can be either: "
             "InputRequirementSpec with additional constraints"
@@ -74,8 +74,8 @@ class PipeSpec(StructuredContent):
         return value
 
     @field_validator("output", mode="before")
-    def validate_concept_string_or_concept_code(self, output: str) -> str:
-        ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_code=output)
+    def validate_concept_string_or_code(cls, output: str) -> str:
+        ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=output)
         return output
 
     @classmethod

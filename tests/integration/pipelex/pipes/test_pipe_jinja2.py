@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 from pipelex import pretty_print
@@ -38,7 +40,7 @@ class TestPipeJinja2:
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
-        pipe_jinja2_output: PipeJinja2Output = await get_pipe_router().run_pipe_job(pipe_job=pipe_job)
+        pipe_jinja2_output = cast(PipeJinja2Output, await get_pipe_router().run(pipe_job=pipe_job))
         rendered_text = pipe_jinja2_output.rendered_text
         pretty_print(rendered_text)
 
@@ -66,6 +68,6 @@ class TestPipeJinja2:
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
         )
-        pipe_jinja2_output: PipeJinja2Output = await get_pipe_router().run_pipe_job(pipe_job=pipe_job)
+        pipe_jinja2_output = cast(PipeJinja2Output, await get_pipe_router().run(pipe_job=pipe_job))
         rendered_text = pipe_jinja2_output.rendered_text
         pretty_print(rendered_text)

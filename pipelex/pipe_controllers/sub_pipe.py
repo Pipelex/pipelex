@@ -11,6 +11,7 @@ from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
+from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -35,7 +36,6 @@ class SubPipe(BaseModel):
         sub_pipe_run_params.batch_params = self.batch_params
 
         sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
-        pipe_output: PipeOutput
 
         # Case 1: Batch processing
         if batch_params := self.batch_params:
@@ -97,12 +97,14 @@ class SubPipe(BaseModel):
                 )
             else:
                 sub_pipe_run_params.run_mode = PipeRunMode.LIVE
-                pipe_output = await get_pipe_router().run_pipe_code(
-                    pipe_code=self.pipe_code,
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    output_name=self.output_name,
-                    pipe_run_params=sub_pipe_run_params,
+                pipe_output = await get_pipe_router().run(
+                    pipe_job=PipeJobFactory.make_pipe_job(
+                        pipe=get_required_pipe(pipe_code=self.pipe_code),
+                        job_metadata=job_metadata,
+                        working_memory=working_memory,
+                        output_name=self.output_name,
+                        pipe_run_params=sub_pipe_run_params,
+                    ),
                 )
         else:
             # Case 3: Normal processing
@@ -129,12 +131,14 @@ class SubPipe(BaseModel):
                 )
             else:
                 sub_pipe_run_params.run_mode = PipeRunMode.LIVE
-                pipe_output = await get_pipe_router().run_pipe_code(
-                    pipe_code=self.pipe_code,
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    output_name=self.output_name,
-                    pipe_run_params=sub_pipe_run_params,
+                pipe_output = await get_pipe_router().run(
+                    pipe_job=PipeJobFactory.make_pipe_job(
+                        pipe=get_required_pipe(pipe_code=self.pipe_code),
+                        job_metadata=job_metadata,
+                        working_memory=working_memory,
+                        output_name=self.output_name,
+                        pipe_run_params=sub_pipe_run_params,
+                    ),
                 )
             new_output_stuff = pipe_output.main_stuff
             for stuff in required_stuffs:

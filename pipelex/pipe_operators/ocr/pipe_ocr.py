@@ -1,4 +1,4 @@
-from typing import Literal, Self
+from typing import Literal, Self, Optional
 
 from pydantic import model_validator
 from typing_extensions import override
@@ -42,7 +42,7 @@ class PipeOcrOutput(PipeOutput):
 PIPE_OCR_INPUT_NAME = "ocr_input"
 
 
-class PipeOcr(PipeOperator):
+class PipeOcr(PipeOperator[PipeOcrOutput]):
     type: Literal["PipeOcr"] = "PipeOcr"
     ocr_choice: OcrChoice | None
     should_caption_images: bool
@@ -265,8 +265,8 @@ class PipeOcr(PipeOperator):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeOutput:
+        output_name: Optional[str] = None,
+    ) -> PipeOcrOutput:
         log.debug(f"PipeOcr: dry run operator pipe: {self.code}")
         if pipe_run_params.run_mode != PipeRunMode.DRY:
             msg = f"Running pipe '{self.code}' (PipeOcr) _dry_run_operator_pipe() in non-dry mode is not allowed."

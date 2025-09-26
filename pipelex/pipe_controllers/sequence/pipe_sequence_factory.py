@@ -19,7 +19,7 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
         blueprint: PipeSequenceBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeSequence:
-        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,

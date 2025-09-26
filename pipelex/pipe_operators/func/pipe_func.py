@@ -1,4 +1,4 @@
-from typing import Literal, cast, get_type_hints
+from typing import Literal, cast, get_type_hints, Optional
 
 from typing_extensions import override
 
@@ -21,7 +21,7 @@ class PipeFuncOutput(PipeOutput):
     pass
 
 
-class PipeFunc(PipeOperator):
+class PipeFunc(PipeOperator[PipeFuncOutput]):
     type: Literal["PipeFunc"] = "PipeFunc"
     function_name: str
 
@@ -87,8 +87,8 @@ class PipeFunc(PipeOperator):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeOutput:
+        output_name: Optional[str] = None,
+    ) -> PipeFuncOutput:
         log.debug(f"Dry run for PipeFunc '{self.function_name}'")
 
         function = func_registry.get_required_function(self.function_name)

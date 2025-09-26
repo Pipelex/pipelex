@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Literal
+from typing import Generic, Literal, Optional, TypeVar
 
 from typing_extensions import override
 
@@ -13,8 +13,10 @@ from pipelex.hub import get_activity_manager
 from pipelex.pipeline.activity.activity_models import ActivityReport
 from pipelex.pipeline.job_metadata import JobMetadata
 
+PipeOperatorOutputType = TypeVar("PipeOperatorOutputType", bound=PipeOutput)
 
-class PipeOperator(PipeAbstract):
+
+class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
     category: Literal["PipeOperator"] = "PipeOperator"
 
     @override
@@ -81,8 +83,8 @@ class PipeOperator(PipeAbstract):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeOutput:
+        output_name: Optional[str] = None,
+    ) -> PipeOperatorOutputType:
         pass
 
     @abstractmethod
@@ -91,6 +93,6 @@ class PipeOperator(PipeAbstract):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeOutput:
+        output_name: Optional[str] = None,
+    ) -> PipeOperatorOutputType:
         pass

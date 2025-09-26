@@ -1,6 +1,4 @@
-"""Test data for ConceptFactory tests."""
-
-from typing import ClassVar
+from typing import ClassVar, Optional, List, Tuple
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import (
@@ -14,8 +12,6 @@ from pipelex.core.domains.domain import SpecialDomain
 
 
 class TestCases:
-    """Test cases for ConceptFactory methods."""
-
     # Test cases for make_refines method - only native concepts can be refined
     MAKE_REFINES_TEST_CASES: ClassVar[list[tuple[str, ConceptBlueprint, str]]] = [
         (
@@ -33,8 +29,8 @@ class TestCases:
         ),
     ]
 
-    # Test cases for make_domain_and_concept_code_from_concept_string_or_concept_code method
-    MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES: ClassVar[list[tuple[str, str, list[str] | None, DomainAndConceptCode]]] = [
+    # Test cases for make_domain_and_concept_code_from_concept_string_or_code method
+    MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES: ClassVar[List[Tuple[str, str, Optional[List[str]], DomainAndConceptCode]]] = [
         # Test case 1: Concept string with dot notation
         ("my_domain", "other_domain.ConceptName", None, DomainAndConceptCode(domain="other_domain", concept_code="ConceptName")),
         # Test case 2: Concept string with dot notation (ignores same domain codes)

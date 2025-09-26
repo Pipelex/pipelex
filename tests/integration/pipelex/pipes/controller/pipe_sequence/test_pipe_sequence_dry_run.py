@@ -7,13 +7,13 @@ from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipe_router
+from pipelex.hub import get_pipe_router, get_required_pipe
+from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.json_utils import load_json_list_from_path
 from tests.test_pipelines.discord_newsletter import ChannelSummary, DiscordChannelUpdate
@@ -54,11 +54,13 @@ class TestPipeSequenceDryRun:
         # Create working memory with the discord channel updates
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=discord_updates_stuff)
         # Run the Discord newsletter pipeline in dry run mode
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code="write_discord_newsletter",
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
-            working_memory=working_memory,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+        pipe_output = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code="write_discord_newsletter"),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+                working_memory=working_memory,
+                job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+            ),
         )
 
         # Log output for debugging

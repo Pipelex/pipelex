@@ -9,7 +9,6 @@ from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipe_router
-from pipelex.pipe_operators.func.pipe_func import PipeFuncOutput
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -71,7 +70,7 @@ if __name__ == "__main__":
         )
 
         # Execute the pipe
-        pipe_func_output: PipeFuncOutput = await get_pipe_router().run_pipe_job(
+        pipe_func_output = await get_pipe_router().run(
             pipe_job=pipe_job,
         )
 

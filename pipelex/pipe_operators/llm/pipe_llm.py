@@ -1,4 +1,4 @@
-from typing import Literal, Self, cast
+from typing import Literal, Self, cast, Optional
 
 from pydantic import model_validator
 from typing_extensions import override
@@ -56,7 +56,7 @@ class PipeLLMOutput(PipeOutput):
     pass
 
 
-class PipeLLM(PipeOperator):
+class PipeLLM(PipeOperator[PipeLLMOutput]):
     type: Literal["PipeLLM"] = "PipeLLM"
     llm_prompt_spec: LLMPromptSpec
     llm_choices: LLMSettingChoices | None = None
@@ -505,8 +505,8 @@ class PipeLLM(PipeOperator):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeOutput:
+        output_name: Optional[str] = None,
+    ) -> PipeLLMOutput:
         content_generator_dry = ContentGeneratorDry()
         return await self._run_operator_pipe(
             job_metadata=job_metadata,
