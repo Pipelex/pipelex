@@ -8,9 +8,6 @@ from pipelex.pipe_works.pipe_job import PipeJob
 class PipeRouterProtocol(Protocol):
     observer_provider: ObserverProtocol
 
-    def __init__(self, observer_provider: ObserverProtocol):
-        self.observer_provider = observer_provider
-
     async def _before_run(
         self,
         pipe_job: PipeJob,

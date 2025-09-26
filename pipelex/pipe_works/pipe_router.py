@@ -1,11 +1,15 @@
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_works.pipe_job import PipeJob
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
 
 
 class PipeRouter(PipeRouterProtocol):
+    def __init__(self, observer_provider: ObserverProtocol):
+        self.observer_provider = observer_provider
+
     @override
     async def _run_pipe_job(
         self,
