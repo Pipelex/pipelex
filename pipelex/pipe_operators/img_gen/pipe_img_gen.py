@@ -1,4 +1,4 @@
-from typing import Literal, Self
+from typing import Literal, Self, Optional
 
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
@@ -361,7 +361,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
+        output_name: Optional[str] = None,
     ) -> PipeImgGenOutput:
         log.debug(f"PipeImgGen: dry run operator pipe: {self.code}")
         content_generator_dry = ContentGeneratorDry()

@@ -1,6 +1,6 @@
-from typing import Any, Protocol
+from typing import Any, Dict, Protocol
 
-PayloadType = dict[str, Any]
+PayloadType = Dict[str, Any]
 
 
 class ObserverProtocol(Protocol):

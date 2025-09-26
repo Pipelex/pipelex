@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Literal, Self
+from typing import Any, ClassVar, Literal, Self, Optional
 
 from jinja2 import TemplateSyntaxError
 from pydantic import ConfigDict, model_validator
@@ -167,7 +167,7 @@ class PipeJinja2(PipeOperator[PipeJinja2Output]):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
+        output_name: Optional[str] = None,
     ) -> PipeJinja2Output:
         content_generator_used: ContentGeneratorProtocol
         if get_config().pipelex.dry_run_config.apply_to_jinja2_rendering:
