@@ -30,7 +30,8 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     @override
     def setup(self):
         native_concepts = [
-            ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[native_concept]) for native_concept in NativeConceptEnum
+            ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[native_concept])
+            for native_concept in [native_concept for native_concept in NativeConceptEnum]
         ]
         self.add_concepts(native_concepts)
 
@@ -50,13 +51,13 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     @override
     def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
         try:
-            return self.root[f"{SpecialDomain.NATIVE.value}.{native_concept.value}"]
+            return self.root[f"{SpecialDomain.NATIVE}.{native_concept}"]
         except KeyError:
-            raise ConceptLibraryConceptNotFoundError(f"Native concept '{native_concept.value}' not found in the library")
+            raise ConceptLibraryConceptNotFoundError(f"Native concept '{native_concept}' not found in the library")
 
     def get_native_concepts(self) -> List[Concept]:
         """Create all native concepts from the hardcoded data"""
-        return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptEnum]
+        return [self.get_native_concept(native_concept=native_concept) for native_concept in [native_concept for native_concept in NativeConceptEnum]]
 
     @override
     def list_concepts(self) -> List[Concept]:

@@ -141,7 +141,7 @@ class TestPipelexApiClient:
                 assert isinstance(item["justification"], str)
 
             # Verify text structure
-            assert working_memory["text"]["concept_code"] == f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}"
+            assert working_memory["text"]["concept_code"] == f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}"
             assert "content" in working_memory["text"]
             assert isinstance(working_memory["text"]["content"], str)
             assert "The Dawn of Ultra-Rapid Transit" in working_memory["text"]["content"]

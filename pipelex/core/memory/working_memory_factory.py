@@ -22,7 +22,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_text(
         cls,
         text: str,
-        concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value,
+        concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT,
         name: Optional[str] = "text",
     ) -> WorkingMemory:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
@@ -38,7 +38,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_image(
         cls,
         image_url: str,
-        concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.IMAGE.value,
+        concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptEnum.IMAGE,
         name: Optional[str] = "image",
     ) -> WorkingMemory:
         # TODO: validate that the concept is compatible with an image concept
@@ -54,7 +54,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_pdf(
         cls,
         pdf_url: str,
-        concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.PDF.value,
+        concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptEnum.PDF,
         name: Optional[str] = "pdf",
     ) -> WorkingMemory:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
@@ -106,7 +106,7 @@ class WorkingMemoryFactory(BaseModel):
                 continue
             text_content = TextContent(text=content)
             stuff_dict[name] = StuffFactory.make_stuff(
-                concept=get_required_concept(concept_string=SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value),
+                concept=get_required_concept(concept_string=SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT),
                 content=text_content,
                 name=name,
                 code="",

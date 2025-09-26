@@ -27,7 +27,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         pipe_run_params: PipeRunParams,
         output_name: Optional[str] = None,
         print_intermediate_outputs: Optional[bool] = False,
-    ) -> PipeOperatorOutputType:
+    ) -> PipeOutput:
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
 

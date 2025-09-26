@@ -66,7 +66,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
                 temperature=temperature,
-                max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
+                max_tokens=llm_job.job_params.max_tokens or None,
                 seed=llm_job.job_params.seed,
                 messages=messages,
             )

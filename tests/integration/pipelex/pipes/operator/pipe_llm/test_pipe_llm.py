@@ -114,12 +114,7 @@ class TestPipeLLM:
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
-        pipe_llm_output: PipeLLMOutput = cast(
-            PipeLLMOutput,
-            await get_pipe_router().run(
-                pipe_job=pipe_job,
-            ),
-        )
+        pipe_llm_output = await get_pipe_router().run(pipe_job=pipe_job)
 
         # Log test information
         log.verbose(f"Testing {topic} with {structuring_method.value} method", title="Test Case")

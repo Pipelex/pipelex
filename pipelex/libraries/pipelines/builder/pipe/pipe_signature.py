@@ -53,10 +53,8 @@ class PipeSpec(StructuredContent):
         4. Pipe codes: When validating pipe codes, must be in snake_case format.
     """
 
-    type: Any = Field(description=f"Pipe type. Must be one of: {[AllowedPipeTypes.value for AllowedPipeTypes in AllowedPipeTypes]}")
-    category: Any = Field(
-        description=f"Pipe category. Must be one of: {[AllowedPipeCategories.value for AllowedPipeCategories in AllowedPipeCategories]}"
-    )
+    type: Any = Field(description=f"Pipe type. Must be one of: {AllowedPipeTypes}")
+    category: Any = Field(description=f"Pipe category. Must be one of: {AllowedPipeCategories}")
     definition: Optional[str] = Field(description="Natural language description of what the pipe does.")
     inputs: Optional[Dict[str, Union[str, InputRequirementSpec]]] = Field(
         description=(
@@ -75,8 +73,8 @@ class PipeSpec(StructuredContent):
         return value
 
     @field_validator("output", mode="before")
-    def validate_concept_string_or_concept_code(cls, output: str) -> str:
-        ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=output)
+    def validate_concept_string_or_code(cls, output: str) -> str:
+        ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=output)
         return output
 
     @classmethod

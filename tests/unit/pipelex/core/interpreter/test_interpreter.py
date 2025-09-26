@@ -9,8 +9,6 @@ from tests.unit.pipelex.core.test_data import InterpreterTestCases
 
 
 class TestPipelexInterpreter:
-    """Test the PipelexInterpreter class with various PLX configurations."""
-
     def test_init_with_both_file_path_and_content(self, tmp_path: Path):
         """Test initialization with both file_path and file_content."""
         test_file = tmp_path / "test.plx"

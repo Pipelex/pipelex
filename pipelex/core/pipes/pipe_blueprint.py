@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, field_validator
 
@@ -12,6 +12,10 @@ from pipelex.types import StrEnum
 class AllowedPipeCategories(StrEnum):
     PIPE_OPERATOR = "PipeOperator"
     PIPE_CONTROLLER = "PipeController"
+
+    @classmethod
+    def value_list(cls) -> List[str]:
+        return [value for value in cls]
 
 
 class AllowedPipeTypes(StrEnum):
@@ -27,6 +31,10 @@ class AllowedPipeTypes(StrEnum):
     PIPE_PARALLEL = "PipeParallel"
     PIPE_SEQUENCE = "PipeSequence"
 
+    @classmethod
+    def value_list(cls) -> List[str]:
+        return [value for value in cls]
+
 
 class PipeBlueprint(BaseModel):
     category: Any
@@ -38,22 +46,20 @@ class PipeBlueprint(BaseModel):
     @field_validator("type", mode="after")
     def validate_pipe_type(cls, value: Any) -> Any:
         """Validate that the pipe type is one of the allowed values."""
-        allowed_types = [_type.value for _type in AllowedPipeTypes]
-        if value not in allowed_types:
-            raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {allowed_types}")
+        if value not in AllowedPipeTypes.value_list():
+            raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}")
         return value
 
     @field_validator("category", mode="after")
     def validate_pipe_category(cls, value: Any) -> Any:
         """Validate that the pipe category is one of the allowed values."""
-        allowed_categories = [_category.value for _category in AllowedPipeCategories]
-        if value not in allowed_categories:
-            raise PipeBlueprintError(f"Invalid pipe category '{value}'. Must be one of: {allowed_categories}")
+        if value not in AllowedPipeCategories.value_list():
+            raise PipeBlueprintError(f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}")
         return value
 
     @field_validator("output", mode="before")
-    def validate_concept_string_or_concept_code(cls, output: str) -> str:
-        ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=output)
+    def validate_concept_string_or_code(cls, output: str) -> str:
+        ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=output)
         return output
 
     @classmethod

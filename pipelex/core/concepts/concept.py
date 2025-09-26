@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_native import NativeConceptManager
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -28,7 +29,7 @@ class Concept(BaseModel):
     @classmethod
     def is_implicit_concept(cls, concept_string: str) -> bool:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
-        return concept_string.startswith(SpecialDomain.IMPLICIT.value)
+        return concept_string.startswith(SpecialDomain.IMPLICIT)
 
     @field_validator("code")
     def validate_code(cls, code: str) -> str:
@@ -53,7 +54,7 @@ class Concept(BaseModel):
 
     @classmethod
     def is_native_concept(cls, concept: "Concept") -> bool:
-        return ConceptBlueprint.is_native_concept_string_or_concept_code(concept_string_or_concept_code=concept.concept_string)
+        return NativeConceptManager.is_native_concept(concept_string_or_code=concept.concept_string)
 
     @classmethod
     def are_concept_compatible(cls, concept_1: "Concept", concept_2: "Concept", strict: bool = False) -> bool:

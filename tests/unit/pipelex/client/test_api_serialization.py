@@ -148,7 +148,7 @@ class TestApiSerialization:
         assert "sample_text" in compact_memory
 
         text_blueprint = compact_memory["sample_text"]
-        assert text_blueprint["concept_code"] == NativeConceptEnum.TEXT.value
+        assert text_blueprint["concept_code"] == NativeConceptEnum.TEXT
         assert isinstance(text_blueprint["content"], str)
         assert text_blueprint["content"] == "Sample text content"
 
@@ -160,6 +160,6 @@ class TestApiSerialization:
         assert "pi_value" in compact_memory
 
         number_blueprint = compact_memory["pi_value"]
-        assert number_blueprint["concept_code"] == NativeConceptEnum.NUMBER.value
+        assert number_blueprint["concept_code"] == NativeConceptEnum.NUMBER
         assert isinstance(number_blueprint["content"], dict)
         assert number_blueprint["content"]["number"] == 3.14159

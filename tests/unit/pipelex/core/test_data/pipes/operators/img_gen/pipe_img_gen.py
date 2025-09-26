@@ -22,7 +22,7 @@ img_gen_prompt = "A beautiful landscape"
             "generate_image": PipeImgGenBlueprint(
                 type="PipeImgGen",
                 definition="Generate an image from a prompt",
-                output=NativeConceptEnum.IMAGE.value,
+                output=NativeConceptEnum.IMAGE,
                 img_gen_prompt="A beautiful landscape",
             ),
         },

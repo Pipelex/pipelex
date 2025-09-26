@@ -41,7 +41,7 @@ class TestDictUtils:
 
     def test_complex_nested_structure(self) -> None:
         """Test with complex nested dictionary structure."""
-        original = {"type": "PipeLLM", "definition": "Test pipe", "output": NativeConceptEnum.TEXT.value, "system_prompt": "Test prompt"}
+        original = {"type": "PipeLLM", "definition": "Test pipe", "output": NativeConceptEnum.TEXT, "system_prompt": "Test prompt"}
 
         # Insert inputs before output
         result = insert_before(original, "output", "inputs", "InputText")

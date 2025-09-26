@@ -25,6 +25,28 @@ class NativeConceptEnum(StrEnum):
     PAGE = "Page"
     ANYTHING = "Anything"
 
+    @classmethod
+    def is_text(cls, concept_code: str) -> bool:
+        try:
+            enum_value = NativeConceptEnum(concept_code)
+        except ValueError:
+            return False
+
+        match enum_value:
+            case NativeConceptEnum.TEXT:
+                return True
+            case (
+                NativeConceptEnum.DYNAMIC
+                | NativeConceptEnum.IMAGE
+                | NativeConceptEnum.PDF
+                | NativeConceptEnum.TEXT_AND_IMAGES
+                | NativeConceptEnum.NUMBER
+                | NativeConceptEnum.LLM_PROMPT
+                | NativeConceptEnum.PAGE
+                | NativeConceptEnum.ANYTHING
+            ):
+                return False
+
 
 NATIVE_CONCEPTS_DATA: Dict[NativeConceptEnum, NativeConceptEnumData] = {
     NativeConceptEnum.DYNAMIC: NativeConceptEnumData(
@@ -59,18 +81,46 @@ NATIVE_CONCEPTS_DATA: Dict[NativeConceptEnum, NativeConceptEnumData] = {
 }
 
 
-def is_native_concept(concept_string_or_concept_code: str) -> bool:
-    """Check if a concept reference is a native concept (short or fully qualified form)."""
-    native_concept_values = [native_concept.value for native_concept in NativeConceptEnum]
+class NativeConceptManager:
+    @classmethod
+    def is_native_concept(cls, concept_string_or_code: str) -> bool:
+        native_concept_values = [concept.value for concept in NativeConceptEnum]
 
-    # Check short form (e.g., "Text")
-    if concept_string_or_concept_code in native_concept_values:
-        return True
+        if "." in concept_string_or_code:
+            domain, concept_code = concept_string_or_code.split(".", 1)
+            if SpecialDomain.is_native(domain=domain) and concept_code in native_concept_values:
+                return True
 
-    # Check fully qualified form (e.g., "native.Text")
-    if "." in concept_string_or_concept_code:
-        domain, concept_code = concept_string_or_concept_code.split(".", 1)
-        if domain == SpecialDomain.NATIVE.value and concept_code in native_concept_values:
+        if concept_string_or_code in native_concept_values:
             return True
 
-    return False
+        return False
+
+    @classmethod
+    def get_native_concept_string(cls, concept_string_or_code: str) -> str:
+        if not cls.is_native_concept(concept_string_or_code):
+            msg = f"Trying to get a native concept with code '{concept_string_or_code}' that is not a native concept"
+            raise NativeConceptEnumError(msg)
+
+        if "." in concept_string_or_code and SpecialDomain.is_native(domain=concept_string_or_code.split(".")[0]):
+            return concept_string_or_code
+
+        return f"{SpecialDomain.NATIVE}.{concept_string_or_code}"
+
+    @classmethod
+    def get_native_concept_enum(cls, concept_string_or_code: str) -> NativeConceptEnum:
+        if not cls.is_native_concept(concept_string_or_code):
+            msg = f"Trying to get a native concept with string or code '{concept_string_or_code}' that is not a native concept"
+            raise NativeConceptEnumError(msg)
+
+        if "." in concept_string_or_code:
+            _, concept_code = concept_string_or_code.split(".", 1)
+        else:
+            concept_code = concept_string_or_code
+
+        return NativeConceptEnum(concept_code)
+
+    @classmethod
+    def get_native_concept_data(cls, concept_string_or_code: str) -> NativeConceptEnumData:
+        enum_value = cls.get_native_concept_enum(concept_string_or_code)
+        return NATIVE_CONCEPTS_DATA[enum_value]

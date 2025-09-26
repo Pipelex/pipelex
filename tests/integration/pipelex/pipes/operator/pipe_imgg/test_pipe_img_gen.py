@@ -42,7 +42,7 @@ class TestPipeImgGen:
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
-        pipe_img_gen_output: PipeImgGenOutput = cast(
+        pipe_img_gen_output = cast(
             PipeImgGenOutput,
             await get_pipe_router().run(
                 pipe_job=pipe_job,

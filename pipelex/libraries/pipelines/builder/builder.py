@@ -1,6 +1,6 @@
 from typing import Annotated, Dict, List, Optional, Union, cast
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, ValidationError, field_validator
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -20,12 +20,17 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipePara
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSignature
 from pipelex.pipe_works.pipe_dry import dry_run_pipes
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import StrEnum
 
 
 class DomainInformation(StructuredContent):
     domain: str = Field(description="The domain of the pipeline library.")
     definition: str = Field(description="The definition of the pipeline library.")
+
+
+class PipeBuilderError(Exception):
+    pass
 
 
 class PipelexBundleSpecDraft(StructuredContent):
@@ -135,6 +140,7 @@ class PipelexBundleSpec(StructuredContent):
         )
 
 
+# TODO: Put this in a factory. Investigate why it is necessary.
 def _convert_pipe_spec(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
     pipe_type_to_class: Dict[str, type] = {
         "PipeFunc": PipeFuncSpec,
@@ -150,8 +156,9 @@ def _convert_pipe_spec(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
 
     pipe_class = pipe_type_to_class.get(pipe_spec.type)
     if pipe_class is None:
-        raise ValueError(f"Unknown pipe type: {pipe_spec.type}")
-    return cast(PipeSpecUnion, pipe_class(**pipe_spec.model_dump()))
+        msg = f"Unknown pipe type: {pipe_spec.type}"
+        raise PipeBuilderError(msg)
+    return cast(PipeSpecUnion, pipe_class(**pipe_spec.model_dump(serialize_as_any=True)))
 
 
 async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> PipelexBundleSpec:
@@ -179,10 +186,11 @@ async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipel
         try:
             # Re-create the ConceptSpec to ensure proper Pydantic validation
             # This handles any serialization/deserialization issues from working memory
-            validated_concept = ConceptSpec(**concept_spec.model_dump())
+            validated_concept = ConceptSpec(**concept_spec.model_dump(serialize_as_any=True))
             validated_concepts[validated_concept.the_concept_code] = validated_concept
-        except Exception as e:
-            raise ValueError(f"Failed to validate concept spec {concept_spec.the_concept_code}: {e}") from e
+        except ValidationError as exc:
+            msg = f"Failed to validate concept spec {concept_spec.the_concept_code}: {format_pydantic_validation_error(exc)}"
+            raise PipeBuilderError(msg) from exc
 
     return PipelexBundleSpec(
         domain=domain_information.domain,
@@ -245,16 +253,16 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
             if pipelex_bundle_spec.pipe and pipe_code in pipelex_bundle_spec.pipe:
                 pipe_spec = pipelex_bundle_spec.pipe[pipe_code]
                 spec_class = pipe_type_to_spec_class.get(pipe_spec.type)
-                if spec_class:
-                    pipe_spec = spec_class(**pipe_spec.model_dump())
-                    failed_pipes.append(
-                        PipeFailure(
-                            pipe=pipe_spec,
-                            error_message=dry_run_output.error_message or "",
-                        )
+                if not spec_class:
+                    msg = f"Unknown pipe type: {pipe_spec.type}"
+                    raise ValidateDryRunError(msg)
+                pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
+                failed_pipes.append(
+                    PipeFailure(
+                        pipe=pipe_spec,
+                        error_message=dry_run_output.error_message or "",
                     )
-                else:
-                    raise ValidateDryRunError(f"Unknown pipe type: {pipe_spec.type}")
+                )
 
     return ListContent[PipeFailure](items=failed_pipes)
 
@@ -264,7 +272,8 @@ async def reconstruct_bundle_with_all_fixes(working_memory: WorkingMemory) -> Pi
     fixed_pipes_list = cast(ListContent[PipeSpecUnion], working_memory.get_stuff(name="fixed_pipes").content)
 
     if not pipelex_bundle_spec.pipe:
-        raise ValueError("No pipes section found in bundle spec")
+        msg = "No pipes section found in bundle spec"
+        raise PipeBuilderError(msg)
 
     for fixed_pipe_blueprint in fixed_pipes_list.items:
         pipe_code = fixed_pipe_blueprint.the_pipe_code

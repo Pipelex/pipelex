@@ -1,5 +1,3 @@
-"""Tests for ConceptFactory methods."""
-
 from typing import Dict, List, Optional, Union
 
 import pytest
@@ -71,20 +69,20 @@ class TestConceptFactory:
         assert ConceptFactory.normalize_structure_blueprint(mixed_structure_blueprint2) == expected_structure2
 
     @pytest.mark.parametrize(
-        "domain,concept_string_or_concept_code,concept_codes_from_the_same_domain,expected_result",
+        "domain,concept_string_or_code,concept_codes_from_the_same_domain,expected_result",
         TestCases.MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES,
     )
     def test_make_domain_and_concept_code_from_concept_string_or_concept_code(
         self,
         domain: str,
-        concept_string_or_concept_code: str,
+        concept_string_or_code: str,
         concept_codes_from_the_same_domain: Optional[List[str]],
         expected_result: List[str],
     ):
         """Test make_domain_and_concept_code_from_concept_string_or_concept_code method with various inputs."""
         result = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
             domain=domain,
-            concept_string_or_concept_code=concept_string_or_concept_code,
+            concept_string_or_code=concept_string_or_code,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         assert result == expected_result
