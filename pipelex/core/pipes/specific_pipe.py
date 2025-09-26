@@ -7,12 +7,10 @@ class SpecificPipeCodesEnum(StrEnum):
     # BREAK = "break"
 
 
+# TODO: Rethink this class. They are not pipes really.
 class SpecificPipe:
-    """Container for specific pipe codes and related utilities."""
-
     @staticmethod
     def is_continue(pipe_code: str) -> bool:
-        """Check if the pipe code is CONTINUE using match/case for exhaustive enum checking."""
         try:
             enum_value = SpecificPipeCodesEnum(pipe_code)
         except ValueError:

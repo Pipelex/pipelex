@@ -11,13 +11,6 @@ from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import StrEnum
 
-
-class SpecificPipeCodesEnum(StrEnum):
-    CONTINUE = "continue"
-    # TODO: Implement the break pipe: It should enable to leave the current sequence.
-    # BREAK = "break"
-
-
 class PipeController(PipeAbstract):
     category: Literal["PipeController"] = "PipeController"
 
