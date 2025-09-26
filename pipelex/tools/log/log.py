@@ -51,7 +51,10 @@ class Log:
 
         # Remove handlers from poor loggers
         if self._log_config_instance:
-            poor_loggers = set(self._log_config_instance.poor_loggers + [self._log_config_instance.generic_poor_logger])
+            poor_loggers = {
+                *self._log_config_instance.poor_loggers,
+                self._log_config_instance.generic_poor_logger,
+            }
             for logger_name in poor_loggers:
                 logger = logging.getLogger(logger_name)
                 for handler in logger.handlers[:]:
@@ -102,7 +105,7 @@ class Log:
 
         self.poor_handler = logging.StreamHandler()
         self.poor_handler.setFormatter(LevelAndEmojiLogFormatter())
-        poor_loggers = { *log_config.poor_loggers, log_config.generic_poor_logger }
+        poor_loggers = {*log_config.poor_loggers, log_config.generic_poor_logger}
         for logger_name in poor_loggers:
             logger = logging.getLogger(logger_name)
             logger.setLevel(log_config.default_log_level.int_logging_level)
@@ -136,9 +139,7 @@ class Log:
             bool: True if the message should be ignored, False otherwise.
 
         """
-        if problem_id and problem_id in self._log_config.silenced_problem_ids:
-            return True
-        return False
+        return bool(problem_id) and problem_id in self._log_config.silenced_problem_ids
 
     ########################################################
     # Public methods

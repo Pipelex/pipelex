@@ -66,7 +66,7 @@ class ActivityHandlerForResultFiles:
             self._handle_structured_content(content=stuff.content, stuff_id=stuff_id)
         elif isinstance(stuff.content, ListContent):
             # TODO: check that all items are StuffContent
-            self._handle_list_content(content=cast("ListContent[StuffContent]", stuff.content), stuff_id=stuff_id)
+            self._handle_list_content(content=cast("ListContent[StuffContent]", stuff.content), stuff_id=stuff_id)  # pyright: ignore[reportUnknownMemberType]
         else:
             log.error(f"Unhandled stuff content type: {type(stuff.content)}")
 
@@ -88,7 +88,7 @@ class ActivityHandlerForResultFiles:
         # Save the image
         image_path = os.path.join(self.images_dir_path, f"{stuff_id}.{self.image_output_format}")
         if content.url.startswith("http"):
-            image_bytes: bytes = fetch_file_from_url_httpx(url=content.url, timeout=10)
+            image_bytes: bytes = fetch_file_from_url_httpx(url=content.url, request_timeout=10)
             with open(image_path, "wb") as image_file:
                 image_file.write(image_bytes)
         else:

@@ -43,9 +43,9 @@ class OpenAIFactory:
     ) -> openai.AsyncClient:
         try:
             sdk_variant = OpenAISdkVariant(plugin.sdk)
-        except ValueError:
+        except ValueError as exc:
             msg = f"Plugin '{plugin}' is not supported by OpenAIFactory"
-            raise OpenAIFactoryError(msg)
+            raise OpenAIFactoryError(msg) from exc
 
         the_client: openai.AsyncOpenAI
         match sdk_variant:

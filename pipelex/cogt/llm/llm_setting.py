@@ -48,16 +48,7 @@ class LLMSettingChoices(ConfigModel):
     for_object: LLMChoice | None
 
     def list_choices(self) -> set[str]:
-        return set(
-            [
-                choice
-                for choice in [
-                    self.for_text,
-                    self.for_object,
-                ]
-                if isinstance(choice, str)
-            ],
-        )
+        return {c for c in (self.for_text, self.for_object) if isinstance(c, str)}
 
     @classmethod
     def make_completed_with_defaults(

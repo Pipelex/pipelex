@@ -22,16 +22,15 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     def validate_with_libraries(self):
         """Validates that the each refine concept code in the refines array of each concept in the library exists in the library"""
         for concept in self.root.values():
-            if concept.refines and concept.refines not in self.root.keys():
-                raise ConceptLibraryError(
-                    f"Concept '{concept.code}' refines '{concept.refines}' but no concept with the code '{concept.refines}' exists",
-                )
+            if concept.refines and concept.refines not in self.root:
+                msg = f"Concept '{concept.code}' refines '{concept.refines}' but no concept with the code '{concept.refines}' exists"
+                raise ConceptLibraryError(msg)
 
     @override
     def setup(self):
         native_concepts = [
             ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[native_concept])
-            for native_concept in [native_concept for native_concept in NativeConceptEnum]
+            for native_concept in NativeConceptEnum.values_list()
         ]
         self.add_concepts(native_concepts)
 
@@ -52,12 +51,13 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
         try:
             return self.root[f"{SpecialDomain.NATIVE}.{native_concept}"]
-        except KeyError:
-            raise ConceptLibraryConceptNotFoundError(f"Native concept '{native_concept}' not found in the library")
+        except KeyError as key_error:
+            msg = f"Native concept '{native_concept}' not found in the library"
+            raise ConceptLibraryConceptNotFoundError(msg) from key_error
 
     def get_native_concepts(self) -> list[Concept]:
         """Create all native concepts from the hardcoded data"""
-        return [self.get_native_concept(native_concept=native_concept) for native_concept in [native_concept for native_concept in NativeConceptEnum]]
+        return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptEnum.values_list()]
 
     @override
     def list_concepts(self) -> list[Concept]:
@@ -70,7 +70,8 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     @override
     def add_new_concept(self, concept: Concept):
         if concept.concept_string in self.root:
-            raise ConceptLibraryError(f"Concept '{concept.concept_string}' already exists in the library")
+            msg = f"Concept '{concept.concept_string}' already exists in the library"
+            raise ConceptLibraryError(msg)
         self.root[concept.concept_string] = concept
 
     @override
@@ -85,9 +86,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
     @override
     def is_compatible(self, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
-        if Concept.are_concept_compatible(concept_1=tested_concept, concept_2=wanted_concept, strict=strict):
-            return True
-        return False
+        return Concept.are_concept_compatible(concept_1=tested_concept, concept_2=wanted_concept, strict=strict)
 
     @override
     def get_required_concept(self, concept_string: str) -> Concept:
@@ -97,8 +96,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         if Concept.is_implicit_concept(concept_string=concept_string):
             return ConceptFactory.make_implicit_concept(concept_string=concept_string)
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
-        concept = self.root[concept_string]
-        return concept
+        return self.root[concept_string]
 
     @override
     def get_class(self, concept_code: str) -> type[Any] | None:

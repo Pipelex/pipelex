@@ -34,9 +34,9 @@ class BedrockFactory:
     ) -> BedrockClientProtocol:
         try:
             sdk_variant = BedrockSdkVariant(plugin.sdk)
-        except ValueError:
+        except ValueError as exc:
             msg = f"Plugin '{plugin}' is not supported by BedrockFactory"
-            raise BedrockFactoryError(msg)
+            raise BedrockFactoryError(msg) from exc
 
         bedrock_async_client: BedrockClientProtocol
         log.verbose(f"Using '{sdk_variant}' for BedrockClient")

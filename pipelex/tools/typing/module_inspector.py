@@ -60,9 +60,7 @@ def _convert_file_path_to_module_path(file_path: str) -> str:
     module_path = module_path.replace(os.sep, ".")
 
     # Handle __init__.py files by removing the __init__ part
-    module_path = module_path.removesuffix(".__init__")
-
-    return module_path
+    return module_path.removesuffix(".__init__")
 
 
 def find_classes_in_module(

@@ -28,8 +28,8 @@ class StaticValidationConfig(ConfigModel):
     reactions: dict[StaticValidationErrorType, StaticValidationReaction]
 
     @field_validator("reactions", mode="before")
-    def validate_reactions(cls, value: dict[str, str]) -> dict[StaticValidationErrorType, StaticValidationReaction]:
-        the_dict = cast(
+    def validate_reactions(self, value: dict[str, str]) -> dict[StaticValidationErrorType, StaticValidationReaction]:
+        return cast(
             "dict[StaticValidationErrorType, StaticValidationReaction]",
             ConfigModel.transform_dict_str_to_enum(
                 input_dict=value,
@@ -37,7 +37,6 @@ class StaticValidationConfig(ConfigModel):
                 value_enum_cls=StaticValidationReaction,
             ),
         )
-        return the_dict
 
 
 class PipeRunConfig(ConfigModel):
@@ -53,9 +52,10 @@ class DryRunConfig(ConfigModel):
     allowed_to_fail_pipes: list[str] = Field(default_factory=list)
 
     @field_validator("image_urls", mode="before")
-    def validate_image_urls(cls, value: list[str]) -> list[str]:
+    def validate_image_urls(self, value: list[str]) -> list[str]:
         if not value:
-            raise PipelexConfigError("dry_run_config.image_urls must be a non-empty list")
+            msg = "dry_run_config.image_urls must be a non-empty list"
+            raise PipelexConfigError(msg)
         return value
 
 
@@ -124,5 +124,6 @@ class PipelexConfig(ConfigRoot):
 def get_config() -> PipelexConfig:
     singleton_config = get_required_config()
     if not isinstance(singleton_config, PipelexConfig):
-        raise RuntimeError(f"Expected {PipelexConfig}, but got {type(singleton_config)}")
+        msg = f"Expected {PipelexConfig}, but got {type(singleton_config)}"
+        raise TypeError(msg)
     return singleton_config

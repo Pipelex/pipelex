@@ -276,7 +276,7 @@ class PipeParallel(PipeController):
                 message=msg,
                 missing_inputs=[],
                 pipe_code=self.code,
-            )
+            ) from exc
 
         # 4. Process outputs as in the regular run
         output_stuffs: dict[str, Stuff] = {}

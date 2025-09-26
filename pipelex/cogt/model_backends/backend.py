@@ -19,8 +19,7 @@ class InferenceBackend(ConfigModel):
 
     def get_model_spec(self, model_name: str) -> InferenceModelSpec | None:
         """Get a model spec by name."""
-        model_spec = self.model_specs.get(model_name)
-        return model_spec
+        return self.model_specs.get(model_name)
 
     def get_extra_config(self, key: str) -> Any | None:
         """Get an extra config by key."""

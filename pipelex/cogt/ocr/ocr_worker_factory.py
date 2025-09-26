@@ -19,16 +19,19 @@ class OcrWorkerFactory:
         match plugin.sdk:
             case "mistral":
                 try:
-                    import mistralai  # pylint: disable=import-outside-toplevel # noqa: F401
+                    import mistralai  # noqa: PLC0415,F401
                 except ImportError as exc:
+                    lib_name = "mistralai"
+                    lib_extra_name = "mistral"
+                    msg = "The mistralai SDK is required to use Mistral OCR models through the mistralai client."
                     raise MissingDependencyError(
-                        "mistralai",
-                        "mistral",
-                        "The mistralai SDK is required to use Mistral OCR models through the mistralai client.",
+                        lib_name,
+                        lib_extra_name,
+                        msg,
                     ) from exc
 
-                from pipelex.plugins.mistral.mistral_factory import MistralFactory  # pylint: disable=import-outside-toplevel
-                from pipelex.plugins.mistral.mistral_ocr_worker import MistralOcrWorker  # pylint: disable=import-outside-toplevel
+                from pipelex.plugins.mistral.mistral_factory import MistralFactory  # noqa: PLC0415
+                from pipelex.plugins.mistral.mistral_ocr_worker import MistralOcrWorker  # noqa: PLC0415
 
                 ocr_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -42,7 +45,7 @@ class OcrWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case "pypdfium2":
-                from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker  # pylint: disable=import-outside-toplevel
+                from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker  # noqa: PLC0415
 
                 ocr_worker = Pypdfium2Worker(
                     extra_config=backend.extra_config,
@@ -50,6 +53,7 @@ class OcrWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case _:
-                raise NotImplementedError(f"Plugin '{plugin}' is not supported")
+                msg = f"Plugin '{plugin}' is not supported"
+                raise NotImplementedError(msg)
 
         return ocr_worker

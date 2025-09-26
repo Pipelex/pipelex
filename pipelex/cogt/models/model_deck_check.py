@@ -13,7 +13,8 @@ def check_llm_choice_with_deck(llm_choice: LLMChoice):
 
     if llm_choice in llm_deck.llm_presets or llm_deck.is_handle_defined(model_handle=llm_choice):
         return
-    raise LLMChoiceNotFoundError(f"LLM choice '{llm_choice}' not found in deck")
+    msg = f"LLM choice '{llm_choice}' not found in deck"
+    raise LLMChoiceNotFoundError(msg)
 
 
 def check_ocr_choice_with_deck(ocr_choice: OcrChoice):
@@ -22,7 +23,8 @@ def check_ocr_choice_with_deck(ocr_choice: OcrChoice):
     ocr_deck = get_model_deck()
     if ocr_choice in ocr_deck.ocr_presets or ocr_deck.is_handle_defined(model_handle=ocr_choice):
         return
-    raise OcrChoiceNotFoundError(f"OCR choice '{ocr_choice}' not found in deck")
+    msg = f"OCR choice '{ocr_choice}' not found in deck"
+    raise OcrChoiceNotFoundError(msg)
 
 
 def check_img_gen_choice_with_deck(img_gen_choice: ImgGenChoice):
@@ -31,4 +33,5 @@ def check_img_gen_choice_with_deck(img_gen_choice: ImgGenChoice):
     img_gen_deck = get_model_deck()
     if img_gen_choice in img_gen_deck.img_gen_presets or img_gen_deck.is_handle_defined(model_handle=img_gen_choice):
         return
-    raise ImgGenChoiceNotFoundError(f"Image generation choice '{img_gen_choice}' not found in deck")
+    msg = f"Image generation choice '{img_gen_choice}' not found in deck"
+    raise ImgGenChoiceNotFoundError(msg)

@@ -51,9 +51,9 @@ class AnthropicFactory:
     ) -> AsyncAnthropic | AsyncAnthropicBedrock:
         try:
             sdk_variant = AnthropicSdkVariant(plugin.sdk)
-        except ValueError:
+        except ValueError as exc:
             msg = f"Plugin '{plugin}' is not supported by AnthropicFactory"
-            raise AnthropicFactoryError(msg)
+            raise AnthropicFactoryError(msg) from exc
 
         match sdk_variant:
             case AnthropicSdkVariant.ANTHROPIC:

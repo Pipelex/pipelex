@@ -46,7 +46,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
             if not stuff.stuff_name:
                 self.root[key].stuff_name = key
-            elif key != MAIN_STUFF_NAME and stuff.stuff_name != key:
+            elif key not in (MAIN_STUFF_NAME, stuff.stuff_name):
                 log.warning(f"Stuff name '{stuff.stuff_name}' does not match the key '{key}'")
             elif stuff.stuff_name.startswith("_") and stuff.stuff_name != BATCH_ITEM_STUFF_NAME:
                 log.warning(f"Stuff name '{stuff.stuff_name}' starts with '_', which is reserved for params")

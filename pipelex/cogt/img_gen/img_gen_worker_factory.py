@@ -30,7 +30,7 @@ class ImgGenWorkerFactory:
                     raise FalCredentialsError(msg) from exc
 
                 try:
-                    from fal_client import AsyncClient as FalAsyncClient  # pylint: disable=import-outside-toplevel # noqa: PLC0415
+                    from fal_client import AsyncClient as FalAsyncClient  # noqa: PLC0415
                 except ImportError as exc:
                     lib_name = "fal-client"
                     lib_extra_name = "fal"
@@ -41,7 +41,7 @@ class ImgGenWorkerFactory:
                         msg,
                     ) from exc
 
-                from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker  # pylint: disable=import-outside-toplevel # noqa: PLC0415
+                from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -54,8 +54,8 @@ class ImgGenWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case "openai":
-                from pipelex.plugins.openai.openai_factory import OpenAIFactory  # pylint: disable=import-outside-toplevel # noqa: PLC0415
-                from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # pylint: disable=import-outside-toplevel # noqa: PLC0415
+                from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,

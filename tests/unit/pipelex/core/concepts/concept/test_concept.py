@@ -98,7 +98,7 @@ class TestConcept:
         valid_domain = "valid_domain"
         valid_definition = "Lorem Ipsum"
 
-        for native_concept in [native_concept for native_concept in NativeConceptEnum]:
+        for native_concept in NativeConceptEnum.values_list():
             assert Concept.is_native_concept(ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[native_concept])) is True
 
         assert (

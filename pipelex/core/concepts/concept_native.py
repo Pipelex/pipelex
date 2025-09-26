@@ -26,6 +26,10 @@ class NativeConceptEnum(StrEnum):
     ANYTHING = "Anything"
 
     @classmethod
+    def values_list(cls) -> list["NativeConceptEnum"]:
+        return list(cls)
+
+    @classmethod
     def is_text(cls, concept_code: str) -> bool:
         try:
             enum_value = NativeConceptEnum(concept_code)
@@ -100,17 +104,14 @@ NATIVE_CONCEPTS_DATA: dict[NativeConceptEnum, NativeConceptEnumData] = {
 class NativeConceptManager:
     @classmethod
     def is_native_concept(cls, concept_string_or_code: str) -> bool:
-        native_concept_values = [concept.value for concept in NativeConceptEnum]
+        native_concept_values = NativeConceptEnum.values_list()
 
         if "." in concept_string_or_code:
             domain, concept_code = concept_string_or_code.split(".", 1)
             if SpecialDomain.is_native(domain=domain) and concept_code in native_concept_values:
                 return True
 
-        if concept_string_or_code in native_concept_values:
-            return True
-
-        return False
+        return concept_string_or_code in native_concept_values
 
     @classmethod
     def get_native_concept_string(cls, concept_string_or_code: str) -> str:

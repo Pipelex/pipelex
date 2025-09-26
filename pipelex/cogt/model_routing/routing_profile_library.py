@@ -25,9 +25,11 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
     @property
     def active_profile(self) -> RoutingProfile:
         if not self._active_config:
-            raise RoutingProfileLibraryError("No active routing profile loaded")
+            msg = "No active routing profile loaded"
+            raise RoutingProfileLibraryError(msg)
         if self._active_config not in self.root:
-            raise RoutingProfileLibraryError(f"Active routing profile '{self._active_config}' not found in loaded routing profile library")
+            msg = f"Active routing profile '{self._active_config}' not found in loaded routing profile library"
+            raise RoutingProfileLibraryError(msg)
         return self.root[self._active_config]
 
     @classmethod
@@ -44,24 +46,22 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         try:
             catalog_dict = load_toml_from_path(path=routing_profile_library_path)
         except FileNotFoundError as not_found_exc:
-            raise RoutingProfileLibraryNotFoundError(
-                f"Failed to load routing profile library from file '{routing_profile_library_path}': {not_found_exc}",
-            ) from not_found_exc
+            msg = f"Failed to load routing profile library from file '{routing_profile_library_path}': {not_found_exc}"
+            raise RoutingProfileLibraryNotFoundError(msg) from not_found_exc
         except TOMLValidationError as toml_validation_exc:
-            raise RoutingProfileLibraryError(
-                f"Failed to load routing profile library from file '{routing_profile_library_path}': {toml_validation_exc}",
-            ) from toml_validation_exc
+            msg = f"Failed to load routing profile library from file '{routing_profile_library_path}': {toml_validation_exc}"
+            raise RoutingProfileLibraryError(msg) from toml_validation_exc
 
         try:
             catalog_blueprint = RoutingProfileLibraryBlueprint.model_validate(catalog_dict)
         except ValidationError as exc:
-            raise RoutingProfileLibraryError(f"Invalid routing profile library configuration in '{routing_profile_library_path}': {exc}") from exc
+            msg = f"Invalid routing profile library configuration in '{routing_profile_library_path}': {exc}"
+            raise RoutingProfileLibraryError(msg) from exc
 
         # Validate that the active config exists
         if catalog_blueprint.active not in catalog_blueprint.profiles:
-            raise RoutingProfileLibraryError(
-                f"Active profile '{catalog_blueprint.active}' not found in library. Available profiles: {list(catalog_blueprint.profiles.keys())}",
-            )
+            msg = f"Active profile '{catalog_blueprint.active}' not found in library. Available profiles: {list(catalog_blueprint.profiles.keys())}"
+            raise RoutingProfileLibraryError(msg)
 
         # Load all profiles
         self.root = {}
@@ -89,8 +89,7 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
 
         """
         profile = self.active_profile
-        backend_match_for_model = profile.get_backend_match_for_model(model_name)
-        return backend_match_for_model
+        return profile.get_backend_match_for_model(model_name)
 
     def list_routing_profile_names(self) -> list[str]:
         """Get a list of all available routing profile names."""
@@ -99,5 +98,6 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
     def get_required_routing_profile(self, routing_profile_name: str) -> RoutingProfile:
         routing_profile = self.root.get(routing_profile_name)
         if not routing_profile:
-            raise RoutingProfileLibraryError(f"Routing profile '{routing_profile_name}' not found in loaded routing profile library")
+            msg = f"Routing profile '{routing_profile_name}' not found in loaded routing profile library"
+            raise RoutingProfileLibraryError(msg)
         return routing_profile

@@ -55,8 +55,10 @@ async def execute_pipeline(
         If not specified, the pipe run mode is inferred from the environment variable
         ``PIPELEX_FORCE_DRY_RUN_MODE``. If the environment variable is not set,
         the pipe run mode is ``PipeRunMode.LIVE``.
+    search_domains:
+        List of domains to search for pipes.
 
-    Returns
+    Returns:
     -------
     Tuple[PipeOutput, str]
         A tuple containing the pipe output and the pipeline run ID.

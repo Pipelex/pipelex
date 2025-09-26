@@ -6,7 +6,7 @@ import toml
 from pydantic import BaseModel, model_validator
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.exceptions import (
     PipelexConfigurationError,
     PipelexUnknownPipeError,
@@ -56,8 +56,7 @@ class PipelexInterpreter(BaseModel):
         # Replace actual newlines with escaped newlines
         value = value.replace("\n", "\\n")
         value = value.replace("\r", "\\r")
-        value = value.replace("\t", "\\t")
-        return value
+        return value.replace("\t", "\\t")
 
     @model_validator(mode="after")
     def check_file_path_or_file_content(self) -> Self:
@@ -504,8 +503,6 @@ class PipelexInterpreter(BaseModel):
     @staticmethod
     def serialize_concept_structure_field(field_value: Any) -> Any:
         """Serialize a single concept structure field."""
-        from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint
-
         if isinstance(field_value, str):
             return field_value
         if isinstance(field_value, ConceptStructureBlueprint):
@@ -551,18 +548,16 @@ class PipelexInterpreter(BaseModel):
         # Handle ConceptBlueprint object
         if concept_blueprint.structure is not None:
             # Structured concept
-            concept_data = {
+            return {
                 "definition": concept_blueprint.definition,
                 "structure": PipelexInterpreter.serialize_concept_structure(concept_blueprint.structure),
             }
-            return concept_data
         if concept_blueprint.refines is not None:
             # Concept with refines
-            concept_data = {
+            return {
                 "definition": concept_blueprint.definition,
                 "refines": concept_blueprint.refines,
             }
-            return concept_data
         # Simple concept with just definition
         return concept_blueprint.definition
 

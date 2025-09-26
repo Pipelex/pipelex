@@ -25,8 +25,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         for token_cost_report in self.root:
             record_dict = token_cost_report.as_flat_dictionary()
             records.append(record_dict)
-        df = pd.DataFrame(records)
-        return df
+        return pd.DataFrame(records)
 
     @classmethod
     def generate_report(
@@ -79,7 +78,8 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             },
         ).reset_index()
         if agg_by_llm_name is None or agg_by_llm_name.empty:  # pyright: ignore[reportUnnecessaryComparison]
-            raise CostRegistryError("Empty report aggregation by LLM name")
+            msg = "Empty report aggregation by LLM name"
+            raise CostRegistryError(msg)
 
         console = Console()
         title = "Costs by LLM model"
@@ -161,21 +161,21 @@ class CostRegistry(RootModel[CostRegistryRoot]):
                 cost_category=token_type.to_cost_category,
             )
             costs_by_token_category[token_type.to_cost_category] = cost_per_token * nb_tokens
-        token_cost_report = LLMTokenCostReport(
+        return LLMTokenCostReport(
             job_metadata=llm_tokens_usage.job_metadata,
             inference_model_name=llm_tokens_usage.inference_model_name,
             platform_llm_id=llm_tokens_usage.inference_model_id,
             nb_tokens_by_category=llm_tokens_usage.nb_tokens_by_category,
             costs_by_token_category=costs_by_token_category,
         )
-        return token_cost_report
 
     @classmethod
     def complete_cost_report(cls, llm_tokens_usage: LLMTokensUsage) -> LLMTokenCostReport:
         cost_report = cls.compute_cost_report(llm_tokens_usage=llm_tokens_usage)
         # compute the input_non_cached tokens
         if cost_report.nb_tokens_by_category.get(TokenCategory.INPUT_NON_CACHED) is not None:
-            raise CostRegistryError("CostCategory.INPUT_NON_CACHED already exists in the cost report")
+            msg = "CostCategory.INPUT_NON_CACHED already exists in the cost report"
+            raise CostRegistryError(msg)
         # we use pop to remove input tokens which will be replaced by "input joined"
         nb_tokens_input_joined = cost_report.nb_tokens_by_category.pop(TokenCategory.INPUT, 0)
         cost_report.costs_by_token_category.pop(CostCategory.INPUT, None)

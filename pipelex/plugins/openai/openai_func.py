@@ -36,7 +36,7 @@ def create_openai_schema_from_function(func: Callable[..., Any]) -> dict[str, An
     func : Callable[..., Any]
         The Python function to introspect and convert into an OpenAI tool schema.
 
-    Returns
+    Returns:
     -------
     dict[str, Any]
         The OpenAI-compatible schema describing the function's name, description,

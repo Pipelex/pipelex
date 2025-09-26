@@ -98,9 +98,9 @@ class ClassRegistryUtils:
             if set(fields_1.keys()) != set(fields_2.keys()):
                 return False
 
-            for field_name in fields_1:
-                field_1: FieldInfo = fields_1[field_name]
-                field_2: FieldInfo = fields_2[field_name]
+            for field_1_name, field_1_info in fields_1.items():
+                field_1: FieldInfo = field_1_info
+                field_2: FieldInfo = fields_2[field_1_name]
 
                 # Compare field types
                 if field_1.annotation != field_2.annotation:

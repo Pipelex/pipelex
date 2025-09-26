@@ -15,7 +15,7 @@ class AllowedPipeCategories(StrEnum):
 
     @classmethod
     def value_list(cls) -> list[str]:
-        return [value for value in cls]
+        return list(cls)
 
 
 class AllowedPipeTypes(StrEnum):

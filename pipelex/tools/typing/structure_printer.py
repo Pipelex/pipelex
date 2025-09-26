@@ -97,9 +97,7 @@ class StructurePrinter:
                     collected_enums[enum_type.__name__] = enum_type
                 # Return multi-line format for Literal fields
                 if len(values) > 1:
-                    lines: list[str] = []
-                    for value in values:
-                        lines.append(f'"{value}"')
+                    lines = [f'"{value}"' for value in values]
                     return "Literal[\n        " + ",\n        ".join(lines) + ",\n    ]"
                 return f"Literal[{', '.join(values)}]"
 
@@ -154,11 +152,11 @@ class StructurePrinter:
                     model_fields = getattr(tp, "model_fields", {})
 
                     if model_fields:
-                        for fname, _ in model_fields.items():
+                        for fname in model_fields:
                             ftype = type_hints[fname]
                             collect_types(ftype)
                     elif hasattr(tp, "__annotations__"):
-                        for _, ftype in type_hints.items():
+                        for ftype in type_hints.values():
                             collect_types(ftype)
                 except (TypeError, AttributeError):
                     # Handle cases where type hints cannot be retrieved

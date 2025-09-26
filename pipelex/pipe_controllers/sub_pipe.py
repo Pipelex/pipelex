@@ -110,7 +110,7 @@ class SubPipe(BaseModel):
             # Case 3: Normal processing
             required_variables = sub_pipe.required_variables()
             log.debug(required_variables, title=f"Required variables for {self.pipe_code}")
-            required_stuff_names = set(required_variable for required_variable in required_variables if not required_variable.startswith("_"))
+            required_stuff_names = {rv for rv in required_variables if not rv.startswith("_")}
             try:
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
             except WorkingMemoryStuffNotFoundError as exc:

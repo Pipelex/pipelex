@@ -20,13 +20,13 @@ class LLMWorkerFactory:
         llm_worker: LLMWorkerInternalAbstract
         match plugin.sdk:
             case "openai" | "azure_openai":
-                from pipelex.plugins.openai.openai_factory import OpenAIFactory
+                from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
 
                 structure_method: StructureMethod | None = None
                 if get_config().cogt.llm_config.instructor_config.is_openai_structured_output_enabled:
                     structure_method = StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED
 
-                from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker  # pylint: disable=import-outside-toplevel # noqa: PLC0415
+                from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -44,21 +44,23 @@ class LLMWorkerFactory:
                 )
             case "anthropic" | "bedrock_anthropic":
                 try:
-                    import anthropic  # pylint: disable=import-outside-toplevel # noqa: F401
+                    import anthropic  # noqa: PLC0415,F401
                 except ImportError as exc:
+                    lib_name = "anthropic"
+                    lib_extra_name = "anthropic"
                     msg = (
                         "The anthropic SDK is required to use Anthropic models via the anthropic client. "
                         "However, you can use Anthropic models through bedrock directly "
                         "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
                     )
                     raise MissingDependencyError(
-                        "anthropic",
-                        "anthropic",
+                        lib_name,
+                        lib_extra_name,
                         msg,
                     ) from exc
 
-                from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory  # pylint: disable=import-outside-toplevel
-                from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker  # pylint: disable=import-outside-toplevel
+                from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory  # noqa: PLC0415
+                from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -74,20 +76,23 @@ class LLMWorkerFactory:
                 )
             case "mistral":
                 try:
-                    import mistralai  # pylint: disable=import-outside-toplevel # noqa: F401
+                    import mistralai  # noqa: PLC0415,F401
                 except ImportError as exc:
+                    lib_name = "mistralai"
+                    lib_extra_name = "mistral"
+                    msg = (
+                        "The mistralai SDK is required to use Mistral models through the mistralai client. "
+                        "However, you can use Mistral models through bedrock directly "
+                        "by using the 'bedrock-mistral' llm family. (eg: bedrock-mistral-large)"
+                    )
                     raise MissingDependencyError(
-                        "mistralai",
-                        "mistral",
-                        (
-                            "The mistralai SDK is required to use Mistral models through the mistralai client. "
-                            "However, you can use Mistral models through bedrock directly "
-                            "by using the 'bedrock-mistral' llm family. (eg: bedrock-mistral-large)"
-                        ),
+                        lib_name,
+                        lib_extra_name,
+                        msg,
                     ) from exc
 
-                from pipelex.plugins.mistral.mistral_factory import MistralFactory
-                from pipelex.plugins.mistral.mistral_llm_worker import MistralLLMWorker
+                from pipelex.plugins.mistral.mistral_factory import MistralFactory  # noqa: PLC0415
+                from pipelex.plugins.mistral.mistral_llm_worker import MistralLLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -102,17 +107,20 @@ class LLMWorkerFactory:
                 )
             case "bedrock_boto3" | "bedrock_aioboto3":
                 try:
-                    import aioboto3  # pylint: disable=import-outside-toplevel # noqa: F401
-                    import boto3  # pylint: disable=import-outside-toplevel # noqa: F401
+                    import aioboto3  # noqa: PLC0415,F401
+                    import boto3  # noqa: PLC0415,F401
                 except ImportError as exc:
+                    lib_name = "boto3,aioboto3"
+                    lib_extra_name = "bedrock"
+                    msg = "The boto3 and aioboto3 SDKs are required to use Bedrock models."
                     raise MissingDependencyError(
-                        "boto3,aioboto3",
-                        "bedrock",
-                        "The boto3 and aioboto3 SDKs are required to use Bedrock models.",
+                        lib_name,
+                        lib_extra_name,
+                        msg,
                     ) from exc
 
-                from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory  # pylint: disable=import-outside-toplevel
-                from pipelex.plugins.bedrock.bedrock_llm_worker import BedrockLLMWorker  # pylint: disable=import-outside-toplevel
+                from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory  # noqa: PLC0415
+                from pipelex.plugins.bedrock.bedrock_llm_worker import BedrockLLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -126,16 +134,19 @@ class LLMWorkerFactory:
                 )
             case "google":
                 try:
-                    import google.genai  # pylint: disable=import-outside-toplevel # noqa: F401
+                    import google.genai  # noqa: PLC0415,F401
                 except ImportError as exc:
+                    lib_name = "google-genai"
+                    lib_extra_name = "google"
+                    msg = "The google-genai SDK is required to use Google Gemini API directly. You can install it with 'pip install google-genai'."
                     raise MissingDependencyError(
-                        "google-genai",
-                        "google",
-                        ("The google-genai SDK is required to use Google Gemini API directly. You can install it with 'pip install google-genai'."),
+                        lib_name,
+                        lib_extra_name,
+                        msg,
                     ) from exc
 
-                from pipelex.plugins.google.google_factory import GoogleFactory  # pylint: disable=import-outside-toplevel
-                from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker  # pylint: disable=import-outside-toplevel
+                from pipelex.plugins.google.google_factory import GoogleFactory  # noqa: PLC0415
+                from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -149,5 +160,6 @@ class LLMWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case _:
-                raise NotImplementedError(f"Plugin '{plugin}' is not supported")
+                msg = f"Plugin '{plugin}' is not supported"
+                raise NotImplementedError(msg)
         return llm_worker

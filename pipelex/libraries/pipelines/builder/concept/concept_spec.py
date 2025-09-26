@@ -168,7 +168,7 @@ class ConceptSpec(StructuredContent):
     @classmethod
     def is_native_concept_code(cls, concept_code: str) -> bool:
         ConceptSpec.validate_concept_code(concept_code=concept_code)
-        return concept_code in [native_concept for native_concept in [native_concept for native_concept in NativeConceptEnum]]
+        return concept_code in NativeConceptEnum.values_list()
 
     @classmethod
     def validate_concept_code(cls, concept_code: str) -> None:
@@ -210,9 +210,7 @@ class ConceptSpec(StructuredContent):
             raise ConceptCodeError(msg)
 
         # Validate that if the concept code is among the native concepts, the domain MUST be native.
-        if not SpecialDomain.is_native(domain=domain) and concept_code in [
-            concept.value for concept in [native_concept for native_concept in NativeConceptEnum]
-        ]:
+        if not SpecialDomain.is_native(domain=domain) and concept_code in NativeConceptEnum.values_list():
             msg = (
                 f"Concept string '{concept_string}' is invalid. "
                 f"Concept code '{concept_code}' is a native concept, so the domain must be '{SpecialDomain.NATIVE}', "
@@ -222,28 +220,31 @@ class ConceptSpec(StructuredContent):
 
         # Validate that if the domain is native, the concept code is a native concept
         if SpecialDomain.is_native(domain=domain):
-            if concept_code not in [native_concept for native_concept in NativeConceptEnum]:
-                raise ConceptStringError(
+            if concept_code not in NativeConceptEnum.values_list():
+                msg = (
                     f"Concept string '{concept_string}' is invalid. "
                     f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'.",
                 )
+                raise ConceptStringError(msg)
 
     @field_validator("refines", mode="before")
     @classmethod
     def validate_refines(cls, refines: str | None = None) -> str | None:
         if refines is not None:
             if not NativeConceptManager.is_native_concept(refines):
-                raise ConceptBlueprintError(f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon.")
+                msg = f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon."
+                raise ConceptBlueprintError(msg)
             cls.validate_concept_string_or_code(concept_string_or_code=refines)
         return refines
 
     @model_validator(mode="before")
-    def model_validate_spec(cls, values: dict[str, Any]) -> dict[str, Any]:
+    def model_validate_spec(self, values: dict[str, Any]) -> dict[str, Any]:
         if values.get("refines") and values.get("structure"):
-            raise ConceptSpecError(
+            msg = (
                 f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
                 f"and `{values.get('structure')}` for concept that has the definition `{values.get('definition')}`",
             )
+            raise ConceptSpecError(msg)
         return values
 
     def to_blueprint(self) -> ConceptBlueprint:

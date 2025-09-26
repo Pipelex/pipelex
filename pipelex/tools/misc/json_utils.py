@@ -328,6 +328,7 @@ def purify_json_list(
         data (List[Any]): The list to convert. Can contain Pydantic models or other types.
         indent (Optional[int], optional): Number of spaces for JSON formatting indentation.
             Defaults to None.
+        is_truncate_bytes_enabled (bool, optional): If True, truncates bytes values to a string representation. Defaults to False.
 
     Returns:
         Tuple[List[Any], str]: A tuple containing:

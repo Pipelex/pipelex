@@ -108,8 +108,7 @@ def clean_model_to_dict(obj: BaseModel) -> dict[str, Any]:
     if not isinstance(dict_dump, dict):
         msg = f"Expected dict, got {type(dict_dump)}"
         raise TypeError(msg)
-    result_dict = cast("dict[str, Any]", dict_dump)
-    return result_dict
+    return cast("dict[str, Any]", dict_dump)
 
 
 def serialize_model(

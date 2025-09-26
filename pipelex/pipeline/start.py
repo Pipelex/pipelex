@@ -6,7 +6,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.exceptions import StartPipelineException
+from pipelex.exceptions import StartPipelineError
 from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -45,7 +45,7 @@ async def start_pipeline(
     pipe_run_mode:
         Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``.
 
-    Returns
+    Returns:
     -------
     Tuple[str, asyncio.Task[PipeOutput]]
         The ``pipeline_run_id`` of the newly started pipeline and a task that
@@ -54,7 +54,7 @@ async def start_pipeline(
     """
     if working_memory and input_memory:
         msg = f"Cannot pass both working_memory and input_memory to `start_pipeline` {pipe_code=}"
-        raise StartPipelineException(msg)
+        raise StartPipelineError(msg)
 
     if input_memory:
         working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)

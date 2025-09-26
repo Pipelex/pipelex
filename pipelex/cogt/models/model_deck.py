@@ -76,7 +76,8 @@ class ModelDeck(ConfigModel):
             return
         if preset_id == LLM_PRESET_DISABLED and is_disabled_allowed:
             return
-        raise LLMChoiceNotFoundError(f"llm preset id '{preset_id}' not found in deck")
+        msg = f"llm preset id '{preset_id}' not found in deck"
+        raise LLMChoiceNotFoundError(msg)
 
     def get_llm_setting(self, llm_choice: LLMChoice) -> LLMSetting:
         if isinstance(llm_choice, LLMSetting):
@@ -86,7 +87,8 @@ class ModelDeck(ConfigModel):
             return llm_preset
         if self.is_handle_defined(model_handle=llm_choice):
             return LLMSetting(llm_handle=llm_choice, temperature=0.7, max_tokens=None)
-        raise LLMChoiceNotFoundError(f"LLM choice '{llm_choice}' not found in deck")
+        msg = f"LLM choice '{llm_choice}' not found in deck"
+        raise LLMChoiceNotFoundError(msg)
 
     def get_ocr_setting(self, ocr_choice: OcrChoice) -> OcrSetting:
         if isinstance(ocr_choice, OcrSetting):
@@ -96,7 +98,8 @@ class ModelDeck(ConfigModel):
             return ocr_preset
         if self.is_handle_defined(model_handle=ocr_choice):
             return OcrSetting(ocr_handle=ocr_choice)
-        raise OcrChoiceNotFoundError(f"OCR choice '{ocr_choice}' not found in deck")
+        msg = f"OCR choice '{ocr_choice}' not found in deck"
+        raise OcrChoiceNotFoundError(msg)
 
     def get_img_gen_setting(self, img_gen_choice: ImgGenChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):
@@ -106,7 +109,8 @@ class ModelDeck(ConfigModel):
             return img_gen_preset
         if self.is_handle_defined(model_handle=img_gen_choice):
             return ImgGenSetting(img_gen_handle=img_gen_choice)
-        raise ImgGenChoiceNotFoundError(f"Image generation choice '{img_gen_choice}' not found in deck")
+        msg = f"Image generation choice '{img_gen_choice}' not found in deck"
+        raise ImgGenChoiceNotFoundError(msg)
 
     @classmethod
     def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]
@@ -115,7 +119,8 @@ class ModelDeck(ConfigModel):
             try:
                 cls._validate_llm_setting(llm_setting=llm_setting, inference_model=inference_model)
             except ConfigValidationError as exc:
-                raise ModelDeckValidatonError(f"LLM preset '{llm_preset_id}' is invalid: {exc}") from exc
+                msg = f"LLM preset '{llm_preset_id}' is invalid: {exc}"
+                raise ModelDeckValidatonError(msg) from exc
 
     ############################################################
     #### ModelDeck validations
@@ -125,23 +130,27 @@ class ModelDeck(ConfigModel):
     def _validate_llm_setting(cls, llm_setting: LLMSetting, inference_model: InferenceModelSpec):
         if inference_model.max_tokens is not None and (llm_setting_max_tokens := llm_setting.max_tokens):
             if llm_setting_max_tokens > inference_model.max_tokens:
-                raise LLMSettingsValidationError(
+                msg = (
                     f"LLM setting '{llm_setting.llm_handle}' has a max_tokens of {llm_setting_max_tokens}, "
-                    f"which is greater than the model's max_tokens of {inference_model.max_tokens}",
+                    f"which is greater than the model's max_tokens of {inference_model.max_tokens}"
                 )
+                raise LLMSettingsValidationError(msg)
         if ModelConstraints.TEMPERATURE_MUST_BE_1 in inference_model.constraints and llm_setting.temperature != 1:
-            raise LLMSettingsValidationError(
+            msg = (
                 f"LLM setting '{llm_setting.llm_handle}' has a temperature of {llm_setting.temperature}, "
-                f"which is not allowed by the model's constraints: it must be 1",
+                f"which is not allowed by the model's constraints: it must be 1"
             )
+            raise LLMSettingsValidationError(msg)
 
     @field_validator("llm_choice_defaults", mode="after")
     @classmethod
     def validate_llm_choice_defaults(cls, llm_choice_defaults: LLMSettingChoices) -> LLMSettingChoices:
         if llm_choice_defaults.for_text is None:
-            raise ConfigValidationError("llm_choice_defaults.for_text cannot be None")
+            msg = "llm_choice_defaults.for_text cannot be None"
+            raise ConfigValidationError(msg)
         if llm_choice_defaults.for_object is None:
-            raise ConfigValidationError("llm_choice_defaults.for_object cannot be None")
+            msg = "llm_choice_defaults.for_object cannot be None"
+            raise ConfigValidationError(msg)
         return llm_choice_defaults
 
     @field_validator("llm_choice_overrides", mode="after")
@@ -156,7 +165,8 @@ class ModelDeck(ConfigModel):
     def validate_llm_presets(self) -> Self:
         for llm_preset_id, llm_setting in self.llm_presets.items():
             if llm_setting.llm_handle not in self.inference_models:
-                raise LLMHandleNotFoundError(f"llm_handle '{llm_setting.llm_handle}' for llm_preset '{llm_preset_id}' not found in deck")
+                msg = f"llm_handle '{llm_setting.llm_handle}' for llm_preset '{llm_preset_id}' not found in deck"
+                raise LLMHandleNotFoundError(msg)
         return self
 
     @model_validator(mode="after")
@@ -189,7 +199,8 @@ class ModelDeck(ConfigModel):
     def get_required_inference_model(self, model_handle: str) -> InferenceModelSpec:
         inference_model = self.get_optional_inference_model(model_handle=model_handle)
         if inference_model is None:
-            raise LLMHandleNotFoundError(f"Model handle '{model_handle}' not found in deck")
+            msg = f"Model handle '{model_handle}' not found in deck"
+            raise LLMHandleNotFoundError(msg)
         if model_handle not in self.inference_models:
             log.dev(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
         return inference_model

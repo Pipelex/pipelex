@@ -51,7 +51,8 @@ class StructureGenerator:
 
         # Validate the generated code
         if not self.validate_generated_code(generated_code, class_name):
-            raise ValueError(f"Generated code for class '{class_name}' failed validation")
+            msg = f"Generated code for class '{class_name}' failed validation"
+            raise ValueError(msg)
 
         return generated_code
 
@@ -325,10 +326,7 @@ class StructureGenerator:
             return False
 
         # Step 4: Class instantiation validation
-        if not self._validate_instantiation(python_code, expected_class_name):
-            return False
-
-        return True
+        return self._validate_instantiation(python_code, expected_class_name)
 
     def _validate_syntax(self, python_code: str) -> bool:
         """Validate that the code has valid Python syntax."""
@@ -352,13 +350,13 @@ class StructureGenerator:
         """Validate that the code executes and creates the expected class."""
         try:
             # Import necessary modules for the execution context
-            from datetime import datetime
-            from enum import Enum
-            from typing import Any, Dict, List, Literal, Optional  # noqa: F401
+            from datetime import datetime  # noqa: PLC0415
+            from enum import Enum  # noqa: PLC0415
+            from typing import Any, Dict, List, Literal, Optional  # noqa: PLC0415,F401
 
-            from pydantic import Field
+            from pydantic import Field  # noqa: PLC0415
 
-            from pipelex.core.stuffs.stuff_content import StructuredContent
+            from pipelex.core.stuffs.stuff_content import StructuredContent  # noqa: PLC0415
 
             # Provide necessary imports in the execution context
             exec_globals = {

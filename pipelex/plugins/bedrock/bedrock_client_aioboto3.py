@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import aioboto3
 from types_aiobotocore_bedrock_runtime.type_defs import ConverseResponseTypeDef
@@ -8,6 +8,9 @@ from pipelex import log
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
 from pipelex.plugins.bedrock.bedrock_message import BedrockMessageDictList
+
+if TYPE_CHECKING:
+    from types_aiobotocore_bedrock_runtime.type_defs import ConverseResponseTypeDef
 
 
 class BedrockClientAioboto3(BedrockClientProtocol):
