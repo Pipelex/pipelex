@@ -16,7 +16,6 @@ class SpecificPipe:
         try:
             enum_value = SpecificPipeCodesEnum(pipe_code)
         except ValueError:
-            # If pipe_code is not a valid enum value, it's definitely not CONTINUE
             return False
 
         match enum_value:

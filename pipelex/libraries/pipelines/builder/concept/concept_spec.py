@@ -227,7 +227,7 @@ class ConceptSpec(StructuredContent):
                 )
 
         # Validate that if the domain is native, the concept code is a native concept
-        if domain == SpecialDomain.NATIVE:
+        if SpecialDomain.is_native(domain=domain):
             if concept_code not in [native_concept for native_concept in NativeConceptEnum]:
                 raise ConceptStringError(
                     f"Concept string '{concept_string}' is invalid. "

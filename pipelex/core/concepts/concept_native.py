@@ -25,6 +25,28 @@ class NativeConceptEnum(StrEnum):
     PAGE = "Page"
     ANYTHING = "Anything"
 
+    @classmethod
+    def is_text(cls, concept_code: str) -> bool:
+        try:
+            enum_value = NativeConceptEnum(concept_code)
+        except ValueError:
+            return False
+
+        match enum_value:
+            case NativeConceptEnum.TEXT:
+                return True
+            case (
+                NativeConceptEnum.DYNAMIC
+                | NativeConceptEnum.IMAGE
+                | NativeConceptEnum.PDF
+                | NativeConceptEnum.TEXT_AND_IMAGES
+                | NativeConceptEnum.NUMBER
+                | NativeConceptEnum.LLM_PROMPT
+                | NativeConceptEnum.PAGE
+                | NativeConceptEnum.ANYTHING
+            ):
+                return False
+
 
 NATIVE_CONCEPTS_DATA: Dict[NativeConceptEnum, NativeConceptEnumData] = {
     NativeConceptEnum.DYNAMIC: NativeConceptEnumData(
@@ -66,7 +88,7 @@ class NativeConceptManager:
 
         if "." in concept_string_or_code:
             domain, concept_code = concept_string_or_code.split(".", 1)
-            if domain == SpecialDomain.NATIVE and concept_code in native_concept_values:
+            if SpecialDomain.is_native(domain=domain) and concept_code in native_concept_values:
                 return True
 
         if concept_string_or_code in native_concept_values:
@@ -80,7 +102,7 @@ class NativeConceptManager:
             msg = f"Trying to get a native concept with code '{concept_string_or_code}' that is not a native concept"
             raise NativeConceptEnumError(msg)
 
-        if "." in concept_string_or_code and concept_string_or_code.split(".")[0] == SpecialDomain.NATIVE:
+        if "." in concept_string_or_code and SpecialDomain.is_native(domain=concept_string_or_code.split(".")[0]):
             return concept_string_or_code
 
         return f"{SpecialDomain.NATIVE}.{concept_string_or_code}"

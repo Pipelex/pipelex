@@ -20,6 +20,7 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipePara
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSignature
 from pipelex.pipe_works.pipe_dry import dry_run_pipes
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import StrEnum
 
 
@@ -188,7 +189,7 @@ async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipel
             validated_concept = ConceptSpec(**concept_spec.model_dump(serialize_as_any=True))
             validated_concepts[validated_concept.the_concept_code] = validated_concept
         except ValidationError as exc:
-            msg = f"Failed to validate concept spec {concept_spec.the_concept_code}: {exc}"
+            msg = f"Failed to validate concept spec {concept_spec.the_concept_code}: {format_pydantic_validation_error(exc)}"
             raise PipeBuilderError(msg) from exc
 
     return PipelexBundleSpec(
@@ -255,14 +256,13 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
                 if not spec_class:
                     msg = f"Unknown pipe type: {pipe_spec.type}"
                     raise ValidateDryRunError(msg)
-                else:
-                    pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
-                    failed_pipes.append(
-                        PipeFailure(
-                            pipe=pipe_spec,
-                            error_message=dry_run_output.error_message or "",
-                        )
+                pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
+                failed_pipes.append(
+                    PipeFailure(
+                        pipe=pipe_spec,
+                        error_message=dry_run_output.error_message or "",
                     )
+                )
 
     return ListContent[PipeFailure](items=failed_pipes)
 
