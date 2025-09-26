@@ -260,7 +260,6 @@ class TestConcept:
             ConceptBlueprint.validate_concept_string(f"{SpecialDomain.NATIVE}.InvalidNativeConcept")
 
     def test_are_concept_compatible(self):
-        """Test are_concept_compatible method."""
         concept1 = ConceptFactory.make_from_blueprint(
             concept_code="Code1",
             domain="domain1",
