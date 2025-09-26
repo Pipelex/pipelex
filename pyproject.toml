@@ -329,6 +329,8 @@ ignore = [
     "PTH208", # Use `pathlib.Path.iterdir()` instead.
 
     "ASYNC230", # Async functions should not open files with blocking methods like `open`
+
+    "UP007", # Use `X | Y` for type annotations
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -359,22 +361,8 @@ py-version = "3.11"
 reports = false
 
 [tool.pylint.messages_control]
-disable = [
-    "C0301", # Line too loog (/100)
-    "C0115", # Missing class docstring
-    "C0116", # Missing function docstring
-    "C0114", # Missing module docstring
-    "R0913", # Too many arguments (/5)
-    "R0917", # Too many positional arguments (/5)
-    "R0904", # Too many public methods (/20)
-    "R0801", # Similar lines in 2 files (/2)
-    "R0903", # Too few public methods (/2)
-    "R0915", # Too many statements (/50)
-    "R0912", # Too many branches (/12)
-    "R0914", # Too many local variables (/15)
-    "W0511", # Bring up TODO
-    "E1101", # Instance of 'FieldInfo' has no 'items' member (no-member) FieldInfo is from the 'Field' module of pydantic.
-    "W0611", # Unused import (unused-import)
-    "W0122", # Use of exec (exec-used)
-    ]
+disable = ["all"]
+enable = [
+    "W0101", # Unreachable code: Used when there is some code behind a "return" or "raise" statement, which will never be accessed.
+]
 ignore = [".venv", "__pycache__", "build", "dist", "node_modules", ".git"]

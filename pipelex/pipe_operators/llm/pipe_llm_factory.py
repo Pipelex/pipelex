@@ -74,8 +74,11 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         if blueprint.inputs:
             for stuff_name, requirement in blueprint.inputs.items():
                 if isinstance(requirement, str):
-                    requirement = InputRequirementBlueprint(concept=requirement)
-                concept_string = requirement.concept
+                    input_requirement_blueprint = InputRequirementBlueprint(concept=requirement)
+                else:
+                    input_requirement_blueprint = requirement
+
+                concept_string = input_requirement_blueprint.concept
                 domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                     domain=domain,
                     concept_string_or_code=concept_string,

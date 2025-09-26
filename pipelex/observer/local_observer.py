@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 import kajson
 from typing_extensions import override
@@ -9,7 +8,7 @@ from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
 
 
 class LocalObserver(ObserverProtocol):
-    def __init__(self, storage_dir: Optional[str] = None) -> None:
+    def __init__(self, storage_dir: str | None = None) -> None:
         self.storage_dir = storage_dir or get_config().pipelex.observer_config.observer_dir
         os.makedirs(self.storage_dir, exist_ok=True)
 

@@ -131,7 +131,7 @@ class ConceptBlueprint(BaseModel):
     @classmethod
     def validate_concept_string_or_code(cls, concept_string_or_code: str) -> None:
         if concept_string_or_code.count(".") > 1:
-            raise ConceptStringOrConceptCodeError(
+            msg = (
                 f"concept_string_or_code '{concept_string_or_code}' is invalid. "
                 "It should either contain a domain in snake_case and a concept code in PascalCase separated by one dot, "
                 "or be a concept code in PascalCase.",
@@ -167,7 +167,7 @@ class ConceptBlueprint(BaseModel):
         # Validate that if the concept code is among the native concepts, the domain MUST be native.
         if concept_code in [concept.value for concept in [native_concept for native_concept in NativeConceptEnum]]:
             if not SpecialDomain.is_native(domain=domain):
-                raise ConceptStringError(
+                msg = (
                     f"Concept string '{concept_string}' is invalid. "
                     f"Concept code '{concept_code}' is a native concept, so the domain must be '{SpecialDomain.NATIVE}', "
                     f"or nothing, but not '{domain}'",
@@ -176,7 +176,7 @@ class ConceptBlueprint(BaseModel):
         # Validate that if the domain is native, the concept code is a native concept
         if SpecialDomain.is_native(domain=domain):
             if concept_code not in [native_concept for native_concept in NativeConceptEnum]:
-                raise ConceptStringError(
+                msg = (
                     f"Concept string '{concept_string}' is invalid. "
                     f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'.",
                 )

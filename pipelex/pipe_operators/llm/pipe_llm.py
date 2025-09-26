@@ -1,4 +1,4 @@
-from typing import Literal, Self, cast, Optional
+from typing import Literal, Self, cast
 
 from pydantic import model_validator
 from typing_extensions import override
@@ -73,13 +73,12 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
-        if self.structuring_method is not None:
-            if self.output.structure_class_name == NativeConceptEnum.TEXT:
-                msg = (
-                    f"Output concept '{self.output.code}' is considered a Text concept, "
-                    f"so it cannot be structured. Maybe you forgot to add '{NativeConceptEnum.TEXT}' to the class registry?"
-                )
-                raise PipeDefinitionError(msg)
+        if self.structuring_method is not None and self.output.structure_class_name == NativeConceptEnum.TEXT:
+            msg = (
+                f"Output concept '{self.output.code}' is considered a Text concept, "
+                f"so it cannot be structured. Maybe you forgot to add '{NativeConceptEnum.TEXT}' to the class registry?"
+            )
+            raise PipeDefinitionError(msg)
         return self
 
     @override
@@ -505,7 +504,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
     ) -> PipeLLMOutput:
         content_generator_dry = ContentGeneratorDry()
         return await self._run_operator_pipe(

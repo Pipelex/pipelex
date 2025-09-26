@@ -33,7 +33,7 @@ class AllowedPipeTypes(StrEnum):
 
     @classmethod
     def value_list(cls) -> list[str]:
-        return [value for value in cls]
+        return list(cls)
 
 
 class PipeBlueprint(BaseModel):
@@ -55,11 +55,12 @@ class PipeBlueprint(BaseModel):
     def validate_pipe_category(self, value: Any) -> Any:
         """Validate that the pipe category is one of the allowed values."""
         if value not in AllowedPipeCategories.value_list():
-            raise PipeBlueprintError(f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}")
+            msg = f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}"
+            raise PipeBlueprintError(msg)
         return value
 
     @field_validator("output", mode="before")
-    def validate_concept_string_or_code(cls, output: str) -> str:
+    def validate_concept_string_or_code(self, output: str) -> str:
         ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=output)
         return output
 

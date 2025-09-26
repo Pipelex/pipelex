@@ -303,7 +303,8 @@ class PipelexHub:
 
     def get_observer_provider(self) -> ObserverProtocol:
         if self._observer_provider is None:
-            raise RuntimeError("Observer is not set. You must initialize Pipelex first.")
+            msg = "Observer is not set. You must initialize Pipelex first."
+            raise RuntimeError(msg)
         return self._observer_provider
 
 

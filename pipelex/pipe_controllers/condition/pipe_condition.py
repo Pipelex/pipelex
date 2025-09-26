@@ -312,7 +312,7 @@ class PipeCondition(PipeController):
         # ).rendered_text.strip()
         # TODO: restore the possibility above, without need to explicitly cast the output
         pipe_jinja2_output = cast(
-            PipeJinja2Output,
+            "PipeJinja2Output",
             await pipe_jinja2.run_pipe(
                 job_metadata=jinja2_job_metadata,
                 working_memory=working_memory,

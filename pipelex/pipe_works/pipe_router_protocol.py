@@ -35,6 +35,7 @@ class PipeRouterProtocol(Protocol):
     ) -> None:
         payload: PayloadType = {
             "pipe_job": pipe_job,
+            "error": error,
         }
         await self.observer_provider.observe_after_failing_run(payload)
 
@@ -48,7 +49,7 @@ class PipeRouterProtocol(Protocol):
             pipe_output = await self._run_pipe_job(pipe_job)
         except Exception as exc:
             await self._after_failing_run(pipe_job, exc)
-            raise exc
+            raise
 
         await self._after_successful_run(pipe_job, pipe_output)
 

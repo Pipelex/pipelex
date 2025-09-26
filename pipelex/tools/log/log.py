@@ -102,7 +102,7 @@ class Log:
 
         self.poor_handler = logging.StreamHandler()
         self.poor_handler.setFormatter(LevelAndEmojiLogFormatter())
-        poor_loggers = set(log_config.poor_loggers + [log_config.generic_poor_logger])
+        poor_loggers = { *log_config.poor_loggers, log_config.generic_poor_logger }
         for logger_name in poor_loggers:
             logger = logging.getLogger(logger_name)
             logger.setLevel(log_config.default_log_level.int_logging_level)
