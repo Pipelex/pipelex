@@ -9,7 +9,7 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.types import StrEnum
+
 
 class PipeController(PipeAbstract):
     category: Literal["PipeController"] = "PipeController"
