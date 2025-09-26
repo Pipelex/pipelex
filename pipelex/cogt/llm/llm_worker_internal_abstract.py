@@ -20,8 +20,8 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
 
         Args:
             inference_model (InferenceModelSpec): The inference model to be used by the worker.
-            structure_method (Optional[StructureMethod]): The structure method to be used by the worker.
-            reporting_delegate (Optional[ReportingProtocol]): An optional report delegate for reporting unit jobs.
+            structure_method (StructureMethod | None): The structure method to be used by the worker.
+            reporting_delegate (ReportingProtocol | None): An optional report delegate for reporting unit jobs.
 
         """
         LLMWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)

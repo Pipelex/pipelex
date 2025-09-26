@@ -174,7 +174,7 @@ class ConfigManager:
         4. setup.py
 
         Returns:
-            Optional[str]: The project name or None if not found
+            str | None: The project name or None if not found
 
         """
         # First check pipelex's pyproject.toml

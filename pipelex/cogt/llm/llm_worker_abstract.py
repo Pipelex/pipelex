@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
-from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.pipeline.job_metadata import UnitJobId
-from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+if TYPE_CHECKING:
+    from pipelex.cogt.llm.llm_job import LLMJob
+    from pipelex.reporting.reporting_protocol import ReportingProtocol
+    from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
 class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
@@ -18,7 +23,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """Initialize the LLMWorker.
 
         Args:
-            reporting_delegate (Optional[ReportingProtocol]): An optional report delegate for reporting unit jobs.
+            reporting_delegate (ReportingProtocol | None): An optional report delegate for reporting unit jobs.
 
         """
         InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)

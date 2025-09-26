@@ -23,7 +23,7 @@ class SomeContentWithImageAttribute(StructuredContent):
 
 class SomeContentWithImageSubObjectAttribute(StructuredContent):
     image_attribute: ImageContent
-    sub_object: Optional["SomeContentWithImageAttribute"] = None
+    sub_object: SomeContentWithImageAttribute | None = None
 
 
 class PipeTestCases:

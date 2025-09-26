@@ -30,7 +30,7 @@ def json_str(some_object: Any, title: str | None = None, is_spaced: bool = False
     Args:
         some_object (Any): The object to convert to a JSON string. Can be any type supported
             by purify_json.
-        title (Optional[str], optional): A title to prepend to the JSON string. If provided,
+        title (str | None, optional): A title to prepend to the JSON string. If provided,
             the output will be in the format "title: {json_string}". Defaults to None.
         is_spaced (bool, optional): If True, adds newlines before and after the JSON string
             for better readability. Defaults to False.
@@ -70,7 +70,7 @@ def save_as_json_to_path(
     Args:
         object_to_save (Any): The Python object to be saved as JSON. Can be any JSON-serializable object.
         path (str): The file path where the JSON file will be saved.
-        indent (Optional[int], optional): Number of spaces for JSON formatting indentation. Defaults to 4.
+        indent (int | None, optional): Number of spaces for JSON formatting indentation. Defaults to 4.
         is_warning_enabled (bool, optional): Whether to show warnings during JSON purification. Defaults to True.
 
     Returns:
@@ -250,7 +250,7 @@ def purify_json(
 
     Args:
         data (Any): The data to convert. Can be a Pydantic model, list, dict, or any other type.
-        indent (Optional[int], optional): Number of spaces for JSON formatting indentation. Defaults to None.
+        indent (int | None, optional): Number of spaces for JSON formatting indentation. Defaults to None.
         is_truncate_bytes_enabled (bool, optional): If True, truncates bytes values to a string representation. Defaults to False.
         is_warning_enabled (bool, optional): If True, wraps non-serializable data in a warning object.
             Defaults to True.
@@ -326,7 +326,7 @@ def purify_json_list(
 
     Args:
         data (List[Any]): The list to convert. Can contain Pydantic models or other types.
-        indent (Optional[int], optional): Number of spaces for JSON formatting indentation.
+        indent (int | None, optional): Number of spaces for JSON formatting indentation.
             Defaults to None.
         is_truncate_bytes_enabled (bool, optional): If True, truncates bytes values to a string representation. Defaults to False.
 
@@ -379,7 +379,7 @@ def purify_json_dict(data: Any, indent: int | None = None, is_warning_enabled: b
 
     Args:
         data (Any): The data to convert. Can be a Pydantic model or dictionary-like object.
-        indent (Optional[int], optional): Number of spaces for JSON formatting indentation.
+        indent (int | None, optional): Number of spaces for JSON formatting indentation.
             Defaults to None.
         is_warning_enabled (bool, optional): If True, wraps non-serializable data in a warning
             object with a "!" key. Defaults to True.
@@ -435,7 +435,7 @@ def pure_json_str(data: Any, indent: int | None = None, is_warning_enabled: bool
     Args:
         data (Any): The data to convert to a JSON string. Can be any type supported
             by purify_json.
-        indent (Optional[int], optional): Number of spaces for JSON formatting indentation.
+        indent (int | None, optional): Number of spaces for JSON formatting indentation.
             Defaults to None.
         is_warning_enabled (bool, optional): If True, wraps non-serializable data in a
             warning object. Defaults to True.

@@ -25,7 +25,7 @@ def is_none_or_has_text(text: str | None) -> bool:
     a string is either None or contains meaningful content.
 
     Args:
-        text (Optional[str]): The string to check, which can be None.
+        text (str | None): The string to check, which can be None.
 
     Returns:
         bool: True if the string is None or contains at least one alphanumeric character,
@@ -43,7 +43,7 @@ def can_inject_text(value: Any | None) -> bool:
     safe for type-uncertain inputs.
 
     Args:
-        value (Optional[Any]): Any value that might be convertible to a string, including None.
+        value (Any | None): Any value that might be convertible to a string, including None.
 
     Returns:
         bool: True if the value can be converted to a string containing alphanumeric characters,
@@ -65,7 +65,7 @@ def is_not_none_and_has_text(text: str | None) -> bool:
     a string exists and contains meaningful content. It's the opposite of is_none_or_has_text.
 
     Args:
-        text (Optional[str]): The string to check, which can be None.
+        text (str | None): The string to check, which can be None.
 
     Returns:
         bool: True if the string is not None and contains at least one alphanumeric character,

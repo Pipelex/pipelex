@@ -75,7 +75,7 @@ class TestConceptFactory:
         self,
         domain: str,
         concept_string_or_code: str,
-        concept_codes_from_the_same_domain: Optional[List[str]],
+        concept_codes_from_the_same_domain: List[str] | None,
         expected_result: List[str],
     ):
         """Test make_domain_and_concept_code_from_concept_string_or_code method with various inputs."""

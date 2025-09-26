@@ -1,14 +1,18 @@
-from collections.abc import ItemsView
-from typing import Any, Optional, Self
+from __future__ import annotations
+
+from typing import Any, Self
 
 from pydantic import ConfigDict, Field, RootModel, model_validator
-from typing_extensions import override
+from typing_extensions import TYPE_CHECKING, override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptTemplateInputsError
 from pipelex.tools.misc.json_utils import json_str
 from pipelex.tools.misc.string_utils import can_inject_text
 from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
+
+if TYPE_CHECKING:
+    from collections.abc import ItemsView
 
 LLMPromptTemplateInputsDict = dict[str, Any]
 
@@ -41,13 +45,13 @@ class LLMPromptTemplateInputs(RootModel[LLMPromptTemplateInputsDict]):
     def list_keys(self) -> list[str]:
         return list(self.root.keys())
 
-    def complemented_by(self, additional_template_inputs: Optional["LLMPromptTemplateInputs"]) -> "LLMPromptTemplateInputs":
+    def complemented_by(self, additional_template_inputs: LLMPromptTemplateInputs | None) -> LLMPromptTemplateInputs:
         all_template_inputs = self.root.copy()
         if additional_template_inputs:
             all_template_inputs.update(additional_template_inputs.root)
         return LLMPromptTemplateInputs(root=all_template_inputs)
 
-    def complemented_by_dict(self, additional_inputs_dict: LLMPromptTemplateInputsDict | None) -> "LLMPromptTemplateInputs":
+    def complemented_by_dict(self, additional_inputs_dict: LLMPromptTemplateInputsDict | None) -> LLMPromptTemplateInputs:
         all_template_inputs = self.root.copy()
         if additional_inputs_dict:
             all_template_inputs.update(additional_inputs_dict)
@@ -58,5 +62,5 @@ class LLMPromptTemplateInputs(RootModel[LLMPromptTemplateInputsDict]):
         return json_str(self.root, title="llm_prompt_template_inputs", is_spaced=True)
 
     @staticmethod
-    def from_args(**template_inputs: Any) -> "LLMPromptTemplateInputs":
+    def from_args(**template_inputs: Any) -> LLMPromptTemplateInputs:
         return LLMPromptTemplateInputs(root=template_inputs)

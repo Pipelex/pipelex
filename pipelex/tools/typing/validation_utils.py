@@ -50,7 +50,7 @@ def has_more_than_one_among_attributes_from_lists(obj: Any, attributes_lists: li
         attributes_lists (List[List[str]]): List of lists of attribute names to check.
 
     Returns:
-        Optional[List[str]]: The list of attributes that are non-None if more than one, None otherwise.
+        List[str] | None: The list of attributes that are non-None if more than one, None otherwise.
 
     """
     for attributes_list in attributes_lists:

@@ -84,8 +84,8 @@ class LogDispatch:
         Args:
             content (Union[str, Any]): The content to be logged.
             severity (int): The severity level of the log message.
-            title (Optional[str], optional): The title of the log message. Defaults to None.
-            inline (Optional[str], optional): Inline title for the log message. Defaults to None.
+            title (str | None, optional): The title of the log message. Defaults to None.
+            inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             include_exception (bool, optional): Whether to include exception traceback. Defaults to False.
 
@@ -143,9 +143,9 @@ class LogDispatch:
         Args:
             message (str): The message to be logged.
             severity (int): The severity level of the log message.
-            caller_info_str (Optional[str]): Information about the caller.
-            title (Optional[str], optional): The title of the log message. Defaults to None.
-            inline (Optional[str], optional): Inline title for the log message. Defaults to None.
+            caller_info_str (str | None): Information about the caller.
+            title (str | None, optional): The title of the log message. Defaults to None.
+            inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             include_exception (bool, optional): Whether to include exception traceback. Defaults to False.
 
@@ -176,8 +176,8 @@ class LogDispatch:
         Args:
             data (Any): The data to be logged.
             severity (int): The severity level of the log message.
-            caller_info_str (Optional[str]): Information about the caller.
-            title (Optional[str], optional): The title of the log message. Defaults to None.
+            caller_info_str (str | None): Information about the caller.
+            title (str | None, optional): The title of the log message. Defaults to None.
             include_exception (bool, optional): Whether to include exception traceback. Defaults to False.
 
         """

@@ -1,4 +1,6 @@
-from typing import Any, Optional, Self, Union
+from __future__ import annotations
+
+from typing import Any, Self, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -173,7 +175,7 @@ class BatchParams(BaseModel):
         cls,
         input_list_name: bool | str,
         input_item_name: str | None = None,
-    ) -> Optional["BatchParams"]:
+    ) -> BatchParams | None:
         the_batch_params: BatchParams | None = None
         if input_list_name or input_item_name:
             input_list_stuff_name: str
@@ -189,7 +191,7 @@ class BatchParams(BaseModel):
         return the_batch_params
 
     @classmethod
-    def make_default(cls) -> "BatchParams":
+    def make_default(cls) -> BatchParams:
         return BatchParams(
             input_list_stuff_name=MAIN_STUFF_NAME,
             input_item_stuff_name=BATCH_ITEM_STUFF_NAME,

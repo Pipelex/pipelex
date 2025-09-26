@@ -133,7 +133,7 @@ class Log:
         """Check if a log message should be ignored based on the problem ID.
 
         Args:
-            problem_id (Optional[str]): The problem ID to check.
+            problem_id (str | None): The problem ID to check.
 
         Returns:
             bool: True if the message should be ignored, False otherwise.
@@ -209,8 +209,8 @@ class Log:
 
         Args:
             content (Union[str, Any]): The content to log.
-            title (Optional[str], optional): The title of the log message. Defaults to None.
-            inline (Optional[str], optional): Inline title for the log message. Defaults to None.
+            title (str | None, optional): The title of the log message. Defaults to None.
+            inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
 
         """
@@ -227,8 +227,8 @@ class Log:
 
         Args:
             content (Union[str, Any]): The content to log.
-            title (Optional[str], optional): The title of the log message. Defaults to None.
-            inline (Optional[str], optional): Inline title for the log message. Defaults to None.
+            title (str | None, optional): The title of the log message. Defaults to None.
+            inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
 
         """
@@ -245,8 +245,8 @@ class Log:
 
         Args:
             content (Union[str, Any]): The content to log.
-            title (Optional[str], optional): The title of the log message. Defaults to None.
-            inline (Optional[str], optional): Inline title for the log message. Defaults to None.
+            title (str | None, optional): The title of the log message. Defaults to None.
+            inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
 
         """
@@ -263,8 +263,8 @@ class Log:
 
         Args:
             content (Union[str, Any]): The content to log.
-            title (Optional[str], optional): The title of the log message. Defaults to None.
-            inline (Optional[str], optional): Inline title for the log message. Defaults to None.
+            title (str | None, optional): The title of the log message. Defaults to None.
+            inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
 
         """
@@ -282,10 +282,10 @@ class Log:
 
         Args:
             content (Union[str, Any]): The content to log.
-            title (Optional[str], optional): The title of the log message. Defaults to None.
-            inline (Optional[str], optional): Inline title for the log message. Defaults to None.
+            title (str | None, optional): The title of the log message. Defaults to None.
+            inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
-            problem_id (Optional[str], optional): A problem ID to associate with the warning. Defaults to None.
+            problem_id (str | None, optional): A problem ID to associate with the warning. Defaults to None.
 
         """
         if self._should_ignore(problem_id=problem_id):
@@ -305,11 +305,11 @@ class Log:
 
         Args:
             content (Union[str, Any]): The content to log.
-            title (Optional[str], optional): The title of the log message. Defaults to None.
-            inline (Optional[str], optional): Inline title for the log message. Defaults to None.
+            title (str | None, optional): The title of the log message. Defaults to None.
+            inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             include_exception (bool, optional): Whether to include exception information. Defaults to False.
-            problem_id (Optional[str], optional): A problem ID to associate with the error. Defaults to None.
+            problem_id (str | None, optional): A problem ID to associate with the error. Defaults to None.
 
         """
         if self._should_ignore(problem_id=problem_id):
@@ -335,11 +335,11 @@ class Log:
 
         Args:
             content (Union[str, Any]): The content to log.
-            title (Optional[str], optional): The title of the log message. Defaults to None.
-            inline (Optional[str], optional): Inline title for the log message. Defaults to None.
+            title (str | None, optional): The title of the log message. Defaults to None.
+            inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             include_exception (bool, optional): Whether to include exception information. Defaults to False.
-            problem_id (Optional[str], optional): A problem ID to associate with the critical message. Defaults to None.
+            problem_id (str | None, optional): A problem ID to associate with the critical message. Defaults to None.
 
         """
         if self._should_ignore(problem_id=problem_id):
