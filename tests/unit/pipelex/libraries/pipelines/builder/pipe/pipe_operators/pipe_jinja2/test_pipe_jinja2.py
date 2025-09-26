@@ -13,7 +13,7 @@ class TestPipeJinja2BlueprintConversion:
     )
     def test_pipe_jinja2_spec_to_blueprint(
         self,
-        _: str,
+        test_name: str,
         pipe_spec: PipeJinja2Spec,
         expected_blueprint: PipeJinja2Blueprint,
     ):

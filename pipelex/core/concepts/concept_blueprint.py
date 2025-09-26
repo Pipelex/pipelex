@@ -196,7 +196,8 @@ class ConceptBlueprint(BaseModel):
         return refines
 
     @model_validator(mode="before")
-    def model_validate_blueprint(self, values: dict[str, Any] | str) -> dict[str, Any] | str:
+    @classmethod
+    def model_validate_blueprint(cls, values: dict[str, Any] | str) -> dict[str, Any] | str:
         if isinstance(values, dict) and values.get("refines") and values.get("structure"):
             msg = (
                 f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "

@@ -13,7 +13,7 @@ class TestPipeOcrBlueprintConversion:
     )
     def test_pipe_ocr_spec_to_blueprint(
         self,
-        _: str,
+        test_name: str,
         pipe_spec: PipeOcrSpec,
         expected_blueprint: PipeOcrBlueprint,
     ):

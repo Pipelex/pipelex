@@ -242,7 +242,7 @@ exclude_lines = [
 
 [tool.ruff]
 exclude = [
-    "tests",
+    "tests", # TO REMOVE
     ".cursor",
     ".git",
     ".github",

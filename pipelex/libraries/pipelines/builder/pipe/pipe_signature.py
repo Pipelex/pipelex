@@ -67,14 +67,16 @@ class PipeSpec(StructuredContent):
     output: str = Field(description="Output concept code in PascalCase format!! Very important")
 
     @field_validator("type", mode="after")
-    def validate_pipe_type(self, value: Any) -> Any:
+    @staticmethod
+    def validate_pipe_type(value: Any) -> Any:
         if value not in AllowedPipeTypes.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
             raise PipeBlueprintError(msg)
         return value
 
     @field_validator("output", mode="before")
-    def validate_concept_string_or_code(self, output: str) -> str:
+    @staticmethod
+    def validate_concept_string_or_code(output: str) -> str:
         ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=output)
         return output
 

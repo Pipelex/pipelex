@@ -13,7 +13,7 @@ class TestPipeParallelBlueprintConversion:
     )
     def test_pipe_parallel_spec_to_blueprint(
         self,
-        _: str,
+        test_name: str,
         pipe_spec: PipeParallelSpec,
         expected_blueprint: PipeParallelBlueprint,
     ):

@@ -13,7 +13,7 @@ class TestPipeImgGenBlueprintConversion:
     )
     def test_pipe_img_gen_spec_to_blueprint(
         self,
-        _: str,
+        test_name: str,
         pipe_spec: PipeImgGenSpec,
         expected_blueprint: PipeImgGenBlueprint,
     ):

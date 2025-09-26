@@ -11,6 +11,6 @@ class TestConceptBlueprintConversion:
         "test_name,concept_spec,expected_core",
         ConceptBlueprintTestCases.TEST_CASES,
     )
-    def test_concept_to_core_blueprint(self, _: str, concept_spec: ConceptSpec, expected_core: ConceptBlueprint):
+    def test_concept_to_core_blueprint(self, test_name: str, concept_spec: ConceptSpec, expected_core: ConceptBlueprint):
         result = concept_spec.to_blueprint()
         assert result == expected_core

@@ -102,7 +102,8 @@ class LogConfig(ConfigModel):
     poor_loggers: list[str]
 
     @field_validator("package_log_levels", mode="before")
-    def validate_package_log_levels(self, value: dict[str, str]) -> dict[str, LogLevel]:
+    @staticmethod
+    def validate_package_log_levels(value: dict[str, str]) -> dict[str, LogLevel]:
         return cast(
             "dict[str, LogLevel]",
             ConfigModel.transform_dict_str_to_enum(input_dict=value, value_enum_cls=LogLevel),

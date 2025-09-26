@@ -23,14 +23,16 @@ class InferenceModelSpecBlueprint(ConfigModel):
     constraints: list[ModelConstraints] = Field(default_factory=empty_list_factory_of(ModelConstraints))
 
     @field_validator("costs", mode="before")
-    def validate_costs(self, value: dict[str, float]) -> CostsByCategoryDict:
+    @staticmethod
+    def validate_costs(value: dict[str, float]) -> CostsByCategoryDict:
         return ConfigModel.transform_dict_of_floats_str_to_enum(
             input_dict=value,
             key_enum_cls=CostCategory,
         )
 
     @field_validator("constraints", mode="before")
-    def validate_constraints(self, value: list[str]) -> list[ModelConstraints]:
+    @staticmethod
+    def validate_constraints(value: list[str]) -> list[ModelConstraints]:
         return ConfigModel.transform_list_of_str_to_enum(
             input_list=value,
             enum_cls=ModelConstraints,

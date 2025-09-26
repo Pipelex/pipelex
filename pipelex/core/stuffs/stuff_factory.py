@@ -29,7 +29,8 @@ class StuffBlueprint(BaseModel):
     content: dict[str, Any] | str
 
     @field_validator("concept_string")
-    def validate_concept_string(self, concept_string: str) -> str:
+    @staticmethod
+    def validate_concept_string(concept_string: str) -> str:
         ConceptBlueprint.validate_concept_string(concept_string)
         return concept_string
 

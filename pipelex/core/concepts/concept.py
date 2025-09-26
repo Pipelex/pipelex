@@ -30,17 +30,20 @@ class Concept(BaseModel):
         return concept_string.startswith(SpecialDomain.IMPLICIT)
 
     @field_validator("code")
-    def validate_code(self, code: str) -> str:
+    @staticmethod
+    def validate_code(code: str) -> str:
         ConceptBlueprint.validate_concept_code(concept_code=code)
         return code
 
     @field_validator("domain")
-    def validate_domain(self, domain: str) -> str:
+    @staticmethod
+    def validate_domain(domain: str) -> str:
         DomainBlueprint.validate_domain_code(code=domain)
         return domain
 
     @field_validator("refines", mode="before")
-    def validate_refines(self, refines: str | None) -> str | None:
+    @staticmethod
+    def validate_refines(refines: str | None) -> str | None:
         if refines is None:
             return None
         ConceptBlueprint.validate_concept_string(concept_string=refines)

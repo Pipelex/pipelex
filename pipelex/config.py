@@ -28,7 +28,8 @@ class StaticValidationConfig(ConfigModel):
     reactions: dict[StaticValidationErrorType, StaticValidationReaction]
 
     @field_validator("reactions", mode="before")
-    def validate_reactions(self, value: dict[str, str]) -> dict[StaticValidationErrorType, StaticValidationReaction]:
+    @staticmethod
+    def validate_reactions(value: dict[str, str]) -> dict[StaticValidationErrorType, StaticValidationReaction]:
         return cast(
             "dict[StaticValidationErrorType, StaticValidationReaction]",
             ConfigModel.transform_dict_str_to_enum(
@@ -52,7 +53,8 @@ class DryRunConfig(ConfigModel):
     allowed_to_fail_pipes: list[str] = Field(default_factory=list)
 
     @field_validator("image_urls", mode="before")
-    def validate_image_urls(self, value: list[str]) -> list[str]:
+    @staticmethod
+    def validate_image_urls(value: list[str]) -> list[str]:
         if not value:
             msg = "dry_run_config.image_urls must be a non-empty list"
             raise PipelexConfigError(msg)

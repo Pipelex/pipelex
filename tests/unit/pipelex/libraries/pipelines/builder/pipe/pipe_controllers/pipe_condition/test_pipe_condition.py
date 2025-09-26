@@ -13,7 +13,7 @@ class TestPipeConditionBlueprintConversion:
     )
     def test_pipe_condition_spec_to_blueprint(
         self,
-        _: str,
+        test_name: str,
         pipe_spec: PipeConditionSpec,
         expected_blueprint: PipeConditionBlueprint,
     ):

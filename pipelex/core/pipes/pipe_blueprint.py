@@ -44,7 +44,8 @@ class PipeBlueprint(BaseModel):
     output: str
 
     @field_validator("type", mode="after")
-    def validate_pipe_type(self, value: Any) -> Any:
+    @staticmethod
+    def validate_pipe_type(value: Any) -> Any:
         """Validate that the pipe type is one of the allowed values."""
         if value not in AllowedPipeTypes.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
@@ -52,7 +53,8 @@ class PipeBlueprint(BaseModel):
         return value
 
     @field_validator("category", mode="after")
-    def validate_pipe_category(self, value: Any) -> Any:
+    @staticmethod
+    def validate_pipe_category(value: Any) -> Any:
         """Validate that the pipe category is one of the allowed values."""
         if value not in AllowedPipeCategories.value_list():
             msg = f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}"
@@ -60,7 +62,8 @@ class PipeBlueprint(BaseModel):
         return value
 
     @field_validator("output", mode="before")
-    def validate_concept_string_or_code(self, output: str) -> str:
+    @staticmethod
+    def validate_concept_string_or_code(output: str) -> str:
         ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=output)
         return output
 

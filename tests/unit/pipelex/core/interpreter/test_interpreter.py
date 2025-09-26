@@ -37,7 +37,7 @@ class TestPipelexInterpreter:
         assert get_plx_content == plx_content
 
     @pytest.mark.parametrize("test_name,invalid_plx_content,expected_exception", InterpreterTestCases.ERROR_TEST_CASES)
-    def test_invalid_plx_should_raise_exception(self, _: str, invalid_plx_content: str, expected_exception: type[Exception]):
+    def test_invalid_plx_should_raise_exception(self, test_name: str, invalid_plx_content: str, expected_exception: type[Exception]):
         converter = PipelexInterpreter(file_content=invalid_plx_content)
 
         with pytest.raises(expected_exception):

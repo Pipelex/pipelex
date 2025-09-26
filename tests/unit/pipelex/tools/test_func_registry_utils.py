@@ -106,7 +106,7 @@ class TestFuncRegistryUtils:
     )
     def test_function_registration_eligibility(
         self,
-        _: str,
+        test_name: str,
         function_code: str,
         expected_registered: list[str],
         expected_not_registered: list[str],

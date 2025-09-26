@@ -13,7 +13,7 @@ class TestPipeSequenceBlueprintConversion:
     )
     def test_pipe_sequence_spec_to_blueprint(
         self,
-        _: str,
+        test_name: str,
         pipe_spec: PipeSequenceSpec,
         expected_blueprint: PipeSequenceBlueprint,
     ):
