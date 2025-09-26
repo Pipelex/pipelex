@@ -164,13 +164,13 @@ class WorkingMemoryFactory(BaseModel):
         """Helper method to create mock content for a requirement."""
         if requirement.structure_class:
             # Create mock object using polyfactory
-            class MockFactory(ModelFactory[requirement.structure_class]):
+            class MockFactory(ModelFactory[requirement.structure_class]):  # type: ignore[requirement,name-defined]
                 __model__ = requirement.structure_class
                 __check_model__ = True
                 __use_examples__ = True
                 __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
-            return MockFactory.build(factory_use_construct=True)
+            return MockFactory.build(factory_use_construct=True)  # type: ignore[no-any-return]
 
         # Fallback to text content
         return TextContent(text=f"DRY RUN: Mock content for '{requirement.variable_name}' ({requirement.concept.code})")

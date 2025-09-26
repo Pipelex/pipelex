@@ -96,7 +96,7 @@ class AnthropicFactory:
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": mime,
+                            "media_type": mime,  # type: ignore[typeddict-item]
                             "data": prepped_image.base_64.decode("utf-8"),
                         },  # pyright: ignore[reportAssignmentType]
                     }
@@ -140,7 +140,7 @@ class AnthropicFactory:
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": mime,
+                            "media_type": mime,  # type: ignore[typeddict-item]
                             "data": prepped_image.base_64.decode("utf-8"),
                         },  # pyright: ignore[reportAssignmentType]
                     }
@@ -170,7 +170,7 @@ class AnthropicFactory:
                 "content": [text_block_param],
             }
 
-        return message  # pyright: ignore[reportReturnType]
+        return message  # type: ignore[return-value, valid-type] # pyright: ignore[reportReturnType]
 
     @classmethod
     async def _prep_image_for_anthropic(

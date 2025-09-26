@@ -99,10 +99,9 @@ class LogDispatch:
             and (caller_frame := frame1.f_back)
         ):
             caller_info = inspect.getframeinfo(caller_frame)
-            caller_file = caller_info.filename
-            cwd = Path.cwd()
+            caller_path = Path(caller_info.filename)
             try:
-                caller_file = Path(caller_file).relative_to(cwd)
+                caller_path = caller_path.relative_to(Path.cwd())
             except ValueError:
                 # This can happen if the file is on a different drive (on Windows)
                 # In this case, we'll keep the absolute path
@@ -110,7 +109,7 @@ class LogDispatch:
             caller_line = caller_info.lineno
             caller_func = caller_info.function
             template_str = CallerInfoTemplate.for_template_key(key=self._log_config.caller_info_template)
-            caller_info_str = template_str.format(file=caller_file, line=caller_line, func=caller_func)
+            caller_info_str = template_str.format(file=str(caller_path), line=caller_line, func=caller_func)
 
         if isinstance(content, str):
             self._log_message(

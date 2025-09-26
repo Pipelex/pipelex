@@ -173,7 +173,7 @@ class ConceptBlueprint(BaseModel):
                 msg = (
                     f"Concept string '{concept_string}' is invalid. "
                     f"Concept code '{concept_code}' is a native concept, so the domain must be '{SpecialDomain.NATIVE}', "
-                    f"or nothing, but not '{domain}'",
+                    f"or nothing, but not '{domain}'"
                 )
                 raise ConceptStringError(msg)
         # Validate that if the domain is native, the concept code is a native concept
@@ -181,7 +181,7 @@ class ConceptBlueprint(BaseModel):
             if concept_code not in NativeConceptEnum.values_list():
                 msg = (
                     f"Concept string '{concept_string}' is invalid. "
-                    f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'.",
+                    f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'."
                 )
                 raise ConceptStringError(msg)
 

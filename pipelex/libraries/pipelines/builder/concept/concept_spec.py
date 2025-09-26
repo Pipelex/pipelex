@@ -223,7 +223,7 @@ class ConceptSpec(StructuredContent):
             if concept_code not in NativeConceptEnum.values_list():
                 msg = (
                     f"Concept string '{concept_string}' is invalid. "
-                    f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'.",
+                    f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'."
                 )
                 raise ConceptStringError(msg)
 

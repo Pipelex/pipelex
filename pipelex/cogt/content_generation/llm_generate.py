@@ -50,7 +50,7 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseM
     item_class = get_class_registry().get_required_class(name=item_class_name)
 
     class ListSchema(BaseModel):
-        items: list[item_class]  # pyright: ignore[reportInvalidTypeForm]
+        items: list[item_class]  # type: ignore[valid-type] # pyright: ignore[reportInvalidTypeForm]
 
     wrapped_list: ListSchema = await llm_worker.gen_object(
         llm_job=llm_job,

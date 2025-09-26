@@ -205,7 +205,7 @@ def serialize_model(
 class CustomBaseModel(BaseModel):
     @override
     def __rich_repr__(self) -> RichReprResult:
-        for item in super().__rich_repr__():
+        for item in super().__rich_repr__():  # type: ignore[misc]
             if isinstance(item, tuple):
                 tuple_item = cast("tuple[Any, ...]", item)
                 if len(tuple_item) >= 2:

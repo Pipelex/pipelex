@@ -182,7 +182,7 @@ class ConfigManager:
         try:
             pyproject = toml.load(pipelex_pyproject_path)
             if (project_name := pyproject.get("project", {}).get("name")) and isinstance(project_name, str):
-                return project_name
+                return str(project_name)
         except FileNotFoundError:
             pass
         except toml.TomlDecodeError as exc:
@@ -194,11 +194,9 @@ class ConfigManager:
         pyproject_path = os.path.join(self.local_root_dir, "pyproject.toml")
         try:
             pyproject = toml.load(pyproject_path)
-            if (project_name := pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name")) and isinstance(
-                project_name,
-                str,
-            ):
-                return project_name
+            name_obj: object = pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name")
+            if isinstance(name_obj, str):
+                return name_obj
         except FileNotFoundError as exc:
             print(f"Local pyproject.toml not found at {pyproject_path}: {exc}")
         except toml.TomlDecodeError as exc:

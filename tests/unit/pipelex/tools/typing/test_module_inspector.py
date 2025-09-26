@@ -135,9 +135,9 @@ class TestFindClassesInModule:
         # Set __module__ so inspect.getmembers finds them
         ClassA.__module__ = test_module.__name__
         ClassB.__module__ = test_module.__name__
-        test_module.ClassA = ClassA
-        test_module.ClassB = ClassB
-        test_module.some_function = lambda: None
+        setattr(test_module, "ClassA", ClassA)
+        setattr(test_module, "ClassB", ClassB)
+        setattr(test_module, "some_function", lambda: None)
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
         expected_number_of_classes = 2
         assert len(classes) == expected_number_of_classes
@@ -161,9 +161,9 @@ class TestFindClassesInModule:
         BaseClass.__module__ = test_module.__name__
         SubClass.__module__ = test_module.__name__
         UnrelatedClass.__module__ = test_module.__name__
-        test_module.BaseClass = BaseClass
-        test_module.SubClass = SubClass
-        test_module.UnrelatedClass = UnrelatedClass
+        setattr(test_module, "BaseClass", BaseClass)
+        setattr(test_module, "SubClass", SubClass)
+        setattr(test_module, "UnrelatedClass", UnrelatedClass)
         classes = find_classes_in_module(test_module, base_class=BaseClass, include_imported=False)
         expected_number_of_classes = 2
         assert len(classes) == expected_number_of_classes
@@ -183,8 +183,8 @@ class TestFindClassesInModule:
 
         LocalClass.__module__ = test_module.__name__
         ImportedClass.__module__ = "other_module"
-        test_module.LocalClass = LocalClass
-        test_module.ImportedClass = ImportedClass
+        setattr(test_module, "LocalClass", LocalClass)
+        setattr(test_module, "ImportedClass", ImportedClass)
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
         expected_number_of_classes = 1
         assert len(classes) == expected_number_of_classes
@@ -203,8 +203,8 @@ class TestFindClassesInModule:
 
         LocalClass.__module__ = test_module.__name__
         ImportedClass.__module__ = "other_module"
-        test_module.LocalClass = LocalClass
-        test_module.ImportedClass = ImportedClass
+        setattr(test_module, "LocalClass", LocalClass)
+        setattr(test_module, "ImportedClass", ImportedClass)
         classes = find_classes_in_module(test_module, base_class=None, include_imported=True)
         expected_number_of_classes = 2
         assert len(classes) == expected_number_of_classes
@@ -230,10 +230,10 @@ class TestFindClassesInModule:
         def test_function():
             pass
 
-        test_module.TestClass = TestClass
-        test_module.test_function = test_function
-        test_module.some_variable = 42
-        test_module.some_string = "hello"
+        setattr(test_module, "TestClass", TestClass)
+        setattr(test_module, "test_function", test_function)
+        setattr(test_module, "some_variable", 42)
+        setattr(test_module, "some_string", "hello")
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
         expected_number_of_classes = 1
         assert len(classes) == expected_number_of_classes
@@ -248,7 +248,7 @@ class TestFindClassesInModule:
                 pass
 
         OuterClass.__module__ = test_module.__name__
-        test_module.OuterClass = OuterClass
+        setattr(test_module, "OuterClass", OuterClass)
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
         expected_number_of_classes = 1
         assert len(classes) == expected_number_of_classes
@@ -266,8 +266,8 @@ class TestFindClassesInModule:
 
         MyClassA.__module__ = test_module.__name__
         MyClassB.__module__ = test_module.__name__
-        test_module.MyClassA = MyClassA
-        test_module.MyClassB = MyClassB
+        setattr(test_module, "MyClassA", MyClassA)
+        setattr(test_module, "MyClassB", MyClassB)
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
         expected_number_of_classes = 2
         assert len(classes) == expected_number_of_classes
@@ -289,9 +289,9 @@ class TestFindClassesInModule:
         BaseClass.__module__ = test_module.__name__
         LocalSubClass.__module__ = test_module.__name__
         ImportedSubClass.__module__ = "other_module"
-        test_module.BaseClass = BaseClass
-        test_module.LocalSubClass = LocalSubClass
-        test_module.ImportedSubClass = ImportedSubClass
+        setattr(test_module, "BaseClass", BaseClass)
+        setattr(test_module, "LocalSubClass", LocalSubClass)
+        setattr(test_module, "ImportedSubClass", ImportedSubClass)
         classes = find_classes_in_module(test_module, base_class=BaseClass, include_imported=False)
         expected_number_of_classes = 2
         assert len(classes) == expected_number_of_classes

@@ -15,7 +15,7 @@ class TestHttpxFetching:
         assert (
             await fetch_file_from_url_httpx_async(
                 url=url,
-                timeout=60,
+                request_timeout=60,
             )
             is not None
         )
@@ -28,7 +28,7 @@ class TestHttpxFetching:
         assert (
             fetch_file_from_url_httpx(
                 url=url,
-                timeout=60,
+                request_timeout=60,
             )
             is not None
         )
