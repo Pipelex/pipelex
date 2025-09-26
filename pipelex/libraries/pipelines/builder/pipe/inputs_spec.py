@@ -33,7 +33,7 @@ class InputRequirementSpec(StructuredContent):
     @field_validator("concept", mode="before")
     @classmethod
     def validate_concept_string(cls, concept_string: str) -> str:
-        ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=concept_string)
+        ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_code=concept_string)
         return concept_string
 
     def to_blueprint(self) -> InputRequirementBlueprint:

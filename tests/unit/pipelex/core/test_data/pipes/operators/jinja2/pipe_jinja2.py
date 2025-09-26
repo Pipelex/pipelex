@@ -22,7 +22,7 @@ jinja2 = "Hello {{ name }}!"
             "process_template": PipeJinja2Blueprint(
                 type="PipeJinja2",
                 definition="Process a Jinja2 template",
-                output=NativeConceptEnum.TEXT.value,
+                output=NativeConceptEnum.TEXT,
                 jinja2="Hello {{ name }}!",
             ),
         },

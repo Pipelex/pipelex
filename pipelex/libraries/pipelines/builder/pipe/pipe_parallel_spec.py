@@ -43,7 +43,7 @@ class PipeParallelSpec(PipeSpec):
     @field_validator("combined_output", mode="before")
     def validate_combined_output(cls, combined_output: str) -> str:
         if combined_output:
-            ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_concept_code=combined_output)
+            ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_code=combined_output)
         return combined_output
 
     @override

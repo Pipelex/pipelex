@@ -22,7 +22,7 @@ ocr = "base_ocr_pypdfium2"
             "extract_text": PipeOcrBlueprint(
                 type="PipeOcr",
                 definition="Extract text from document",
-                output=NativeConceptEnum.PAGE.value,
+                output=NativeConceptEnum.PAGE,
                 ocr="base_ocr_pypdfium2",
             ),
         },

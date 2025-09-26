@@ -9,7 +9,7 @@ class TestWorkingMemoryFactory:
         """Test deserialization of compact memory with text content."""
         compact_memory: CompactMemory = {
             "text_item": {
-                "concept_code": NativeConceptEnum.TEXT.value,
+                "concept_code": NativeConceptEnum.TEXT,
                 "content": "Hello, world!",
             }
         }
@@ -20,7 +20,7 @@ class TestWorkingMemoryFactory:
         assert "text_item" in working_memory.root
 
         stuff = working_memory.root["text_item"]
-        assert stuff.concept.code == NativeConceptEnum.TEXT.value
+        assert stuff.concept.code == NativeConceptEnum.TEXT
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == "Hello, world!"
 
@@ -28,7 +28,7 @@ class TestWorkingMemoryFactory:
         """Test deserialization of compact memory with complex nested structured content."""
         compact_memory: CompactMemory = {
             "complex_page": {
-                "concept_code": NativeConceptEnum.PAGE.value,
+                "concept_code": NativeConceptEnum.PAGE,
                 "content": {
                     "text_and_images": {
                         "text": {
@@ -60,7 +60,7 @@ class TestWorkingMemoryFactory:
         assert "complex_page" in working_memory.root
 
         stuff = working_memory.root["complex_page"]
-        assert stuff.concept.code == NativeConceptEnum.PAGE.value
+        assert stuff.concept.code == NativeConceptEnum.PAGE
         assert isinstance(stuff.content, PageContent)
 
         # Verify text_and_images structure
@@ -118,11 +118,11 @@ class TestWorkingMemoryFactory:
         """Test deserialization of compact memory with multiple items."""
         compact_memory: CompactMemory = {
             "text1": {
-                "concept_code": NativeConceptEnum.TEXT.value,
+                "concept_code": NativeConceptEnum.TEXT,
                 "content": "First text",
             },
             "text2": {
-                "concept_code": NativeConceptEnum.TEXT.value,
+                "concept_code": NativeConceptEnum.TEXT,
                 "content": "Second text",
             },
         }

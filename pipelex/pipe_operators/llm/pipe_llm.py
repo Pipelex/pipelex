@@ -74,10 +74,10 @@ class PipeLLM(PipeOperator):
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
         if self.structuring_method is not None:
-            if self.output.structure_class_name == NativeConceptEnum.TEXT.value:
+            if self.output.structure_class_name == NativeConceptEnum.TEXT:
                 raise PipeDefinitionError(
                     f"Output concept '{self.output.code}' is considered a Text concept, "
-                    f"so it cannot be structured. Maybe you forgot to add '{NativeConceptEnum.TEXT.value}' to the class registry?"
+                    f"so it cannot be structured. Maybe you forgot to add '{NativeConceptEnum.TEXT}' to the class registry?"
                 )
         return self
 
@@ -237,13 +237,13 @@ class PipeLLM(PipeOperator):
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {self.code}")
         output_concept = self.output
-        if self.output.code == SpecialDomain.NATIVE.value + "." + NativeConceptEnum.DYNAMIC.value:
+        if self.output.code == SpecialDomain.NATIVE + "." + NativeConceptEnum.DYNAMIC:
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
             output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
 
             if not output_concept_code:
-                output_concept_code = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value
+                output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT
             else:
                 output_concept = get_concept_provider().get_required_concept(
                     concept_string=ConceptFactory.construct_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code)
@@ -318,7 +318,7 @@ class PipeLLM(PipeOperator):
         )
 
         the_content: StuffContent
-        if output_concept.structure_class_name == NativeConceptEnum.TEXT.value and not is_multiple_output:
+        if output_concept.structure_class_name == NativeConceptEnum.TEXT and not is_multiple_output:
             log.debug(f"PipeLLM generating a single text output: {self.class_name}_gen_text")
             generated_text: str = await content_generator.make_llm_text(
                 job_metadata=job_metadata,

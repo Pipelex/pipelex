@@ -12,19 +12,19 @@ from pipelex.core.stuffs.stuff_factory import StuffContentFactory
 class TestCases:
     # Test cases for TextContent with string content
     TEXT_STRING_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_string": f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+        "concept_string": f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
         "content": "The Dawn of Ultra-Rapid Transit: NextGen High-Speed Trains Redefine Travel",
     }
 
     # Test cases for TextContent with dict content
     TEXT_DICT_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_string": f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+        "concept_string": f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
         "content": {"text": "Sample text content"},
     }
 
     # Test cases for native concept without prefix (should work)
     TEXT_NO_PREFIX_BLUEPRINT: ClassVar[Dict[str, Any]] = {
-        "concept_string": f"{NativeConceptEnum.TEXT.value}",
+        "concept_string": f"{NativeConceptEnum.TEXT}",
         "content": {"text": "Text content without native prefix"},
     }
 
