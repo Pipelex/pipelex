@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 import pytest
 from pydantic import BaseModel, Field, field_validator
@@ -171,7 +171,7 @@ class TestStructurePrinter:
             "    age: int",
             "    address: AddressContent  # Address of the person",
             "    documents: List[DocumentTypeContent]",
-            "    priority: Optional[Priority] = None",
+            "    priority: Priority | None = None",
             "",
             "class AddressContent(StructuredContent):",
             '    """Nested address content"""',
@@ -191,6 +191,9 @@ class TestStructurePrinter:
             '    HIGH = "HIGH"',
             '    LOW = "LOW"',
         ]
+        from pipelex import pretty_print
+        pretty_print(result, "results")
+        pretty_print(expected, "expected")
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
     @pytest.mark.usefixtures("request")
@@ -208,7 +211,7 @@ class TestStructurePrinter:
             "    age: int",
             "    address: AddressContent  # Address of the person",
             "    documents: List[DocumentTypeContent]",
-            "    priority: Optional[Priority] = None",
+            "    priority: Priority | None = None",
             "",
             "class AddressContent(StructuredContent):",
             '    """Nested address content"""',
@@ -311,17 +314,17 @@ class TestStructurePrinter:
         result = StructurePrinter().get_type_structure(GanttChart, base_class=StructuredContent)
         expected = [
             "class GanttChart(StructuredContent):",
-            "    tasks: Optional[List[GanttTaskDetails]] = None",
-            "    milestones: Optional[List[Milestone]] = None",
+            "    tasks: List[GanttTaskDetails] | None = None",
+            "    milestones: List[Milestone] | None = None",
             "",
             "class GanttTaskDetails(StructuredContent):",
             '    """Do not include timezone in the dates."""',
             "    name: str",
-            "    start_date: Optional[datetime] = None",
-            "    end_date: Optional[datetime] = None",
+            "    start_date: datetime | None = None",
+            "    end_date: datetime | None = None",
             "",
             "class Milestone(StructuredContent):",
             "    name: str",
-            "    date: Optional[datetime] = None",
+            "    date: datetime | None = None",
         ]
         assert result == expected

@@ -1,5 +1,6 @@
+import types
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, Union, get_args, get_origin
 
 from kajson.kajson_manager import KajsonManager
 
@@ -7,6 +8,9 @@ if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
 from pipelex.tools.typing.module_inspector import find_classes_in_module, import_module_from_file
+
+_NoneType = type(None)
+_UnionType = getattr(types, "UnionType", None)  # Py3.10+: types.UnionType
 
 
 class ClassRegistryUtils:
@@ -118,31 +122,33 @@ class ClassRegistryUtils:
 
     @staticmethod
     def has_compatible_field(class_1: type[Any], class_2: type[Any]) -> bool:
-        """Check if class_1 has a field that is compatible with class_2."""
+        """Check if class_1 has a field whose (possibly wrapped) type matches/subclasses class_2."""
         if not hasattr(class_1, "model_fields"):
             return False
 
-        fields: dict[str, FieldInfo] = class_1.model_fields
-        for field_info in fields.values():
-            field_type = field_info.annotation
+        fields: dict[str, FieldInfo] = class_1.model_fields  # type: ignore[attr-defined]
 
-            # Handle Optional types by extracting the inner type
-            origin = get_origin(field_type)
-            if origin is Union:
-                args = get_args(field_type)
-                # Check if this is Optional[T] (Union[T, None])
-                if len(args) == 2 and type(None) in args:
-                    field_type = args[0] if args[1] is type(None) else args[1]
+        def _is_compatible(t: Any) -> bool:
+            # Unwrap Annotated[T, ...]
+            if get_origin(t) is Annotated:
+                t = get_args(t)[0]
 
-            # Check if the field type matches class_2
-            if field_type == class_2:
-                return True
+            origin = get_origin(t)
 
-            # Check if field_type is a subclass of class_2
+            # Handle unions, including PEP 604 (T | None)
+            if origin in (Union, _UnionType):
+                for arg in get_args(t):
+                    if arg is _NoneType:
+                        continue
+                    if _is_compatible(arg):
+                        return True
+                return False
+
+            # Base case: direct match / subclass
             try:
-                if isinstance(field_type, type) and issubclass(field_type, class_2):
-                    return True
+                return t is class_2 or (isinstance(t, type) and issubclass(t, class_2))
             except TypeError:
-                pass
+                # Not a class type (e.g., typing constructs you don't care about)
+                return False
 
-        return False
+        return any(_is_compatible(field.annotation) for field in fields.values())

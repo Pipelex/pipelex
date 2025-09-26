@@ -1,3 +1,4 @@
+import types
 from enum import Enum
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
@@ -9,18 +10,21 @@ from pipelex.types import StrEnum
 class StructurePrinter:
     def pretty_type(self, tp: object) -> str:
         """Pretty print a type, with special handling for containers, literals and enums."""
-        origin = getattr(tp, "__origin__", None)
         args = getattr(tp, "__args__", None)
+        origin = get_origin(tp)
         if origin is None:
             if isinstance(tp, type):
                 return tp.__name__
             return str(tp)
 
-        if origin is Union and args:
+        args = get_args(tp)
+
+        # was: if origin is Union and args:
+        if origin in (Union, types.UnionType) and args:
             non_none = [a for a in args if a is not type(None)]
-            if len(non_none) == 1 and len(args) == 2:
-                return f"Optional[{self.pretty_type(non_none[0])}]"
-            return f"Union[{', '.join(self.pretty_type(a) for a in args)}]"
+            if len(args) == 2 and len(non_none) == 1:
+                return f"{self.pretty_type(non_none[0])} | None"
+            return " | ".join(self.pretty_type(a) for a in args)
 
         if str(origin).endswith("Literal") and args:  # Handle both typing.Literal and typing_extensions.Literal
             # For enum values, just get their values
@@ -75,11 +79,12 @@ class StructurePrinter:
                 return str(tp)
 
             args = get_args(tp)
-            if origin is Union:
+            # was: if origin is Union:
+            if origin in (Union, types.UnionType):
                 non_none = [a for a in args if a is not type(None)]
-                if len(non_none) == 1:
-                    return f"Optional[{format_type(non_none[0])}]"
-                return f"Union[{', '.join(format_type(a) for a in non_none)}]"
+                if len(args) == 2 and len(non_none) == 1:
+                    return f"{format_type(non_none[0])} | None"
+                return " | ".join(format_type(a) for a in args)
 
             if str(origin).endswith("Literal") and args:  # Handle both typing.Literal and typing_extensions.Literal
                 # For enum values, just get their values
@@ -109,21 +114,26 @@ class StructurePrinter:
 
         def collect_types(tp: type[Any]) -> None:
             """Recursively collect types and enums"""
+            args = get_args(tp)
+
             origin = get_origin(tp)
             args = get_args(tp)
 
             if origin:
-                if origin is Union:
-                    non_none = [a for a in args if a is not type(None)]
-                    for arg in non_none:
-                        if isinstance(arg, type) or hasattr(arg, "__origin__"):
-                            collect_types(arg)
-                elif origin in (list, list):
-                    if isinstance(args[0], type) or hasattr(args[0], "__origin__"):
-                        collect_types(args[0])
-                elif origin in (dict, dict):
+                # was: if origin is Union:
+                if origin in (Union, types.UnionType):
                     for arg in args:
-                        if isinstance(arg, type) or hasattr(arg, "__origin__"):
+                        if arg is type(None):
+                            continue
+                        if isinstance(arg, type) or get_origin(arg) is not None:
+                            collect_types(arg)
+                elif origin is list:
+                    inner = args[0]
+                    if isinstance(inner, type) or get_origin(inner) is not None:
+                        collect_types(inner)
+                elif origin is dict:
+                    for arg in args:
+                        if isinstance(arg, type) or get_origin(arg) is not None:
                             collect_types(arg)
                 return
 
@@ -248,10 +258,11 @@ class StructurePrinter:
                         else:
                             field_type = type_hints[fname]
                             ftype_str = format_type(field_type)
-                            # Check if field is Optional
+
                             field_origin = get_origin(field_type)
                             field_args = get_args(field_type)
-                            is_optional = field_origin is Union and type(None) in field_args
+
+                            is_optional = field_origin in (Union, types.UnionType) and type(None) in field_args
 
                         # Handle default values
                         field_default = None
