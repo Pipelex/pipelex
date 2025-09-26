@@ -138,7 +138,7 @@ class PipelexBundleSpec(StructuredContent):
             concept=concept,
         )
 
-
+#TODO: Put this in a factory. Investigate why it is necessary.
 def _convert_pipe_spec(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
     pipe_type_to_class: Dict[str, type] = {
         "PipeFunc": PipeFuncSpec,
