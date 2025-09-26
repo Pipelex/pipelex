@@ -31,7 +31,7 @@ class TestCases:
         ),
     ]
 
-    # Test cases for make_domain_and_concept_code_from_concept_string_or_concept_code method
+    # Test cases for make_domain_and_concept_code_from_concept_string_or_code method
     MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES: ClassVar[List[Tuple[str, str, Optional[List[str]], DomainAndConceptCode]]] = [
         # Test case 1: Concept string with dot notation
         ("my_domain", "other_domain.ConceptName", None, DomainAndConceptCode(domain="other_domain", concept_code="ConceptName")),

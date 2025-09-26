@@ -83,7 +83,7 @@ class ConceptFactory:
         )
 
     @classmethod
-    def make_domain_and_concept_code_from_concept_string_or_concept_code(
+    def make_domain_and_concept_code_from_concept_string_or_code(
         cls, domain: str, concept_string_or_code: str, concept_codes_from_the_same_domain: Optional[List[str]] = None
     ) -> DomainAndConceptCode:
         # At this point, the concept_string_or_code is already validated
@@ -179,7 +179,7 @@ class ConceptFactory:
                 # If there is NO class, the fallback class is TextContent.__name__
                 structure_class_name = TextContent.__name__
 
-        domain_and_concept_code = cls.make_domain_and_concept_code_from_concept_string_or_concept_code(
+        domain_and_concept_code = cls.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=concept_code,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,

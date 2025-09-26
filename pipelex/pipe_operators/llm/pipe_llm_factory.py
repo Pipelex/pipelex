@@ -78,7 +78,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 if isinstance(requirement, str):
                     requirement = InputRequirementBlueprint(concept=requirement)
                 concept_string = requirement.concept
-                domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+                domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                     domain=domain,
                     concept_string_or_code=concept_string,
                     concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
@@ -114,7 +114,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             multiple_output=blueprint.multiple_output,
         )
 
-        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,

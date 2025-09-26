@@ -33,7 +33,7 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
             raise PipeDefinitionError("PipeParallel requires either add_each_output or combined_output to be set")
 
         if blueprint.combined_output:
-            combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+            combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                 domain=domain,
                 concept_string_or_code=blueprint.output,
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
@@ -46,7 +46,7 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         else:
             combined_output = None
 
-        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,

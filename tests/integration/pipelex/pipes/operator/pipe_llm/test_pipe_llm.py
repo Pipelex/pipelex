@@ -113,7 +113,7 @@ class TestPipeLLM:
         pipe_llm_output = await get_pipe_router().run(pipe_job=pipe_job)
 
         # Log test information
-        log.verbose(f"Testing {topic} with {structuring_method.value} method", title="Test Case")
+        log.verbose(f"Testing {topic} with {structuring_method} method", title="Test Case")
 
         # Get the main output
         main_stuff = pipe_llm_output.main_stuff
