@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Any, Dict, Optional, Union, cast
-from typing_extensions import Self
+from typing import Any, Self, cast
+
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from pipelex.core.concepts.concept_blueprint import (
@@ -182,11 +182,11 @@ class ConceptSpec(StructuredContent):
             raise ConceptStringOrConceptCodeError(
                 f"concept_string_or_code '{concept_string_or_code}' is invalid. "
                 "It should either contain a domain in snake_case and a concept code in PascalCase separated by one dot, "
-                "or be a concept code in PascalCase."
+                "or be a concept code in PascalCase.",
             )
             raise ConceptStringOrConceptCodeError(msg)
 
-        elif concept_string_or_code.count(".") == 1:
+        if concept_string_or_code.count(".") == 1:
             domain, concept_code = concept_string_or_code.split(".")
             DomainBlueprint.validate_domain_code(code=domain)
             cls.validate_concept_code(concept_code=concept_code)
@@ -215,7 +215,7 @@ class ConceptSpec(StructuredContent):
                 raise ConceptStringError(
                     f"Concept string '{concept_string}' is invalid. "
                     f"Concept code '{concept_code}' is a native concept, so the domain must be '{SpecialDomain.NATIVE}', "
-                    f"or nothing, but not '{domain}'"
+                    f"or nothing, but not '{domain}'",
                 )
                 raise ConceptStringError(msg)
 
@@ -224,7 +224,7 @@ class ConceptSpec(StructuredContent):
             if concept_code not in [native_concept for native_concept in NativeConceptEnum]:
                 raise ConceptStringError(
                     f"Concept string '{concept_string}' is invalid. "
-                    f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'."
+                    f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'.",
                 )
 
     @field_validator("refines", mode="before")
@@ -237,18 +237,18 @@ class ConceptSpec(StructuredContent):
         return refines
 
     @model_validator(mode="before")
-    def model_validate_spec(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+    def model_validate_spec(cls, values: dict[str, Any]) -> dict[str, Any]:
         if values.get("refines") and values.get("structure"):
             raise ConceptSpecError(
                 f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
-                f"and `{values.get('structure')}` for concept that has the definition `{values.get('definition')}`"
+                f"and `{values.get('structure')}` for concept that has the definition `{values.get('definition')}`",
             )
         return values
 
     def to_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""
         # TODO: Clarify concept structure blueprint
-        converted_structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = None
+        converted_structure: str | dict[str, str | ConceptStructureBlueprint] | None = None
         if self.structure:
             converted_structure = {}
             if isinstance(self.structure, str):

@@ -155,7 +155,7 @@ def _convert_pipe_spec(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
     if pipe_class is None:
         msg = f"Unknown pipe type: {pipe_spec.type}"
         raise PipeBuilderError(msg)
-    return cast(PipeSpecUnion, pipe_class(**pipe_spec.model_dump(serialize_as_any=True)))
+    return cast("PipeSpecUnion", pipe_class(**pipe_spec.model_dump(serialize_as_any=True)))
 
 
 async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> PipelexBundleSpec:
@@ -260,7 +260,7 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
                     PipeFailure(
                         pipe=pipe_spec,
                         error_message=dry_run_output.error_message or "",
-                    )
+                    ),
                 )
 
     return ListContent[PipeFailure](items=failed_pipes)

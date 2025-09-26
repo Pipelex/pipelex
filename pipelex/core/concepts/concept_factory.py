@@ -1,4 +1,5 @@
-from typing import Optional, List, Any
+from typing import Any
+
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
 
@@ -84,23 +85,21 @@ class ConceptFactory:
 
     @classmethod
     def make_domain_and_concept_code_from_concept_string_or_code(
-        cls, domain: str, concept_string_or_code: str, concept_codes_from_the_same_domain: Optional[List[str]] = None
+        cls, domain: str, concept_string_or_code: str, concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> DomainAndConceptCode:
         # At this point, the concept_string_or_code is already validated
         if "." in concept_string_or_code:
             # Is a concept string.
             parts = concept_string_or_code.rsplit(".")
             return DomainAndConceptCode(domain=parts[0], concept_code=parts[1])
-        else:
-            if NativeConceptManager.is_native_concept(concept_string_or_code=concept_string_or_code):
-                return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=concept_string_or_code)
+        if NativeConceptManager.is_native_concept(concept_string_or_code=concept_string_or_code):
+            return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=concept_string_or_code)
 
-            elif (
-                concept_codes_from_the_same_domain and concept_string_or_code in concept_codes_from_the_same_domain
-            ):  # Is a concept code from the same domain
-                return DomainAndConceptCode(domain=domain, concept_code=concept_string_or_code)
-            else:
-                return DomainAndConceptCode(domain=SpecialDomain.IMPLICIT, concept_code=concept_string_or_code)
+        if (
+            concept_codes_from_the_same_domain and concept_string_or_code in concept_codes_from_the_same_domain
+        ):  # Is a concept code from the same domain
+            return DomainAndConceptCode(domain=domain, concept_code=concept_string_or_code)
+        return DomainAndConceptCode(domain=SpecialDomain.IMPLICIT, concept_code=concept_string_or_code)
 
     @classmethod
     def make_refine(cls, refine: str) -> str:

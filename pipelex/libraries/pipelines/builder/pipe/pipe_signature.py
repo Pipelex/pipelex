@@ -1,4 +1,4 @@
-from typing import Any, Union, Optional, Dict
+from typing import Any
 
 from pydantic import Field, field_validator
 
@@ -56,8 +56,8 @@ class PipeSpec(StructuredContent):
 
     type: Any = Field(description=f"Pipe type. Must be one of: {AllowedPipeTypes}")
     category: Any = Field(description=f"Pipe category. Must be one of: {AllowedPipeCategories}")
-    definition: Optional[str] = Field(description="Natural language description of what the pipe does.")
-    inputs: Optional[Dict[str, Union[str, InputRequirementSpec]]] = Field(
+    definition: str | None = Field(description="Natural language description of what the pipe does.")
+    inputs: dict[str, str | InputRequirementSpec] | None = Field(
         description=(
             "Input concept specifications. Can be either: "
             "InputRequirementSpec with additional constraints"

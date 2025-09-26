@@ -64,10 +64,10 @@ class PipelexHub:
         self._library_manager: LibraryManagerAbstract | None = None
 
         # pipeline
-        self._pipeline_tracker: Optional[PipelineTrackerProtocol] = None
-        self._pipeline_manager: Optional[PipelineManagerAbstract] = None
-        self._activity_manager: Optional[ActivityManagerProtocol] = None
-        self._observer_provider: Optional[ObserverProtocol] = None
+        self._pipeline_tracker: PipelineTrackerProtocol | None = None
+        self._pipeline_manager: PipelineManagerAbstract | None = None
+        self._activity_manager: ActivityManagerProtocol | None = None
+        self._observer_provider: ObserverProtocol | None = None
 
     ############################################################
     # Class methods for singleton management

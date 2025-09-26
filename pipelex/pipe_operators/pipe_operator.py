@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Generic, Literal, Optional, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from typing_extensions import override
 
@@ -83,7 +83,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
     ) -> PipeOperatorOutputType:
         pass
 
@@ -93,6 +93,6 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
     ) -> PipeOperatorOutputType:
         pass

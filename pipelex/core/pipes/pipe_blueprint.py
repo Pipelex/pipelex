@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, field_validator
 
@@ -14,7 +14,7 @@ class AllowedPipeCategories(StrEnum):
     PIPE_CONTROLLER = "PipeController"
 
     @classmethod
-    def value_list(cls) -> List[str]:
+    def value_list(cls) -> list[str]:
         return [value for value in cls]
 
 
@@ -32,7 +32,7 @@ class AllowedPipeTypes(StrEnum):
     PIPE_SEQUENCE = "PipeSequence"
 
     @classmethod
-    def value_list(cls) -> List[str]:
+    def value_list(cls) -> list[str]:
         return [value for value in cls]
 
 
