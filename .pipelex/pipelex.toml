@@ -1,3 +1,7 @@
+[pipelex]
+[pipelex.observer_config]
+observer_dir = "results/observer"
+
 [pipelex.aws_config]
 api_key_method = "env"
 # The possible values are "env" and "secret_provider".

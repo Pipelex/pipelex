@@ -1,6 +1,6 @@
 [pipelex]
 [pipelex.observer_config]
-observer_dir = "results/"
+observer_dir = "results/observer"
 
 [pipelex.aws_config]
 api_key_method = "env"

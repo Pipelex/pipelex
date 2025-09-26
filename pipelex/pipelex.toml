@@ -2,7 +2,7 @@
 
 [pipelex]
 [pipelex.observer_config]
-observer_dir = ".pipelex/observer"
+observer_dir = "results/observer"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags
