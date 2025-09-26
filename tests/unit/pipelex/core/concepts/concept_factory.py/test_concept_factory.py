@@ -1,5 +1,3 @@
-"""Tests for ConceptFactory methods."""
-
 from typing import Dict, List, Optional, Union
 
 import pytest

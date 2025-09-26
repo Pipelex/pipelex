@@ -14,8 +14,6 @@ from pipelex.core.domains.domain import SpecialDomain
 
 
 class TestCases:
-    """Test cases for ConceptFactory methods."""
-
     # Test cases for make_refines method - only native concepts can be refined
     MAKE_REFINES_TEST_CASES: ClassVar[List[Tuple[str, ConceptBlueprint, str]]] = [
         (

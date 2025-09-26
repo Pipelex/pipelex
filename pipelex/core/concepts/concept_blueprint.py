@@ -181,7 +181,7 @@ class ConceptBlueprint(BaseModel):
 
         # Validate that if the concept code is among the native concepts, the domain MUST be native.
         if concept_code in [concept.value for concept in [native_concept for native_concept in NativeConceptEnum]]:
-            if SpecialDomain.is_native(domain=domain):
+            if not SpecialDomain.is_native(domain=domain):
                 raise ConceptStringError(
                     f"Concept string '{concept_string}' is invalid. "
                     f"Concept code '{concept_code}' is a native concept, so the domain must be '{SpecialDomain.NATIVE}', "
