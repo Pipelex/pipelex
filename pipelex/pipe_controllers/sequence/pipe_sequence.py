@@ -52,17 +52,18 @@ class PipeSequence(PipeController):
                     if (sub_pipe.add_each_output and sub_parallel_pipe.output_name) or sub_parallel_pipe.output_name:
                         generated_outputs.add(sub_parallel_pipe.output_name)
 
-            if sequential_sub_pipe.batch_params and sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
-                needed_inputs.add_requirement(
-                    variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
-                    concept=sub_pipe_needed_inputs.get_required_input_requirement(
-                        variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name,
-                    ).concept,
-                    multiplicity=True,
-                )
-                for input_name, requirement in sub_pipe_needed_inputs.items:
-                    if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:
-                        needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
+            if sequential_sub_pipe.batch_params:
+                if sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
+                    needed_inputs.add_requirement(
+                        variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
+                        concept=sub_pipe_needed_inputs.get_required_input_requirement(
+                            variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name,
+                        ).concept,
+                        multiplicity=True,
+                    )
+                    for input_name, requirement in sub_pipe_needed_inputs.items:
+                        if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:
+                            needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
             else:
                 for input_name, requirement in sub_pipe_needed_inputs.items:
                     if input_name not in generated_outputs:
