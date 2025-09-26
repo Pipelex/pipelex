@@ -270,20 +270,23 @@ ignore = [
     "D205", # 1 blank line required between summary line and description
     "D400", # First line should end with a period
     "D401", # First line of docstring should be in imperative mood: "My docstring...."
+    "D404", # First word of the docstring should not be "This"
     "D415", # First line should end with a period, question mark, or exclamation point
 
     "ANN201", # Missing return type annotation for public function `my_func`
     "ANN202", # Missing return type annotation for private function `my_func`
-    "ANN204", #Missing return type annotation for special method `my_func`
+    "ANN204", # Missing return type annotation for special method `my_func`
+    "ANN206", #  Missing return type annotation for classmethod `my_func`
+    "ANN401", # Dynamically typed expressions (typing.Any) are disallowed in `...`
 
     "S101", # Use of `assert` detected
     "S106", # Possible hardcoded password assigned to argument: "secret"
     "S105", # Possible hardcoded password assigned to: "child_secret"
 
-    "PTH123", # `open()` should be replaced by `Path.open()`
 
     "PLR0911", # Too many return statements (/6)
     "PLR0912", # Too many branches (/12)
+    "PLR0913", # Too many arguments in function definition (/5)
     "PLR0915", # Too many statements (/50)
 
     "C901", # Is to complex
@@ -299,6 +302,22 @@ ignore = [
 
     "FBT001", # Boolean-typed positional argument in function definition
     "FBT002", # Boolean default positional argument in function definition
+
+    "SIM105", # Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+    "SIM108", # Use ternary operator `description = func.__doc__.strip().split("\n")[0] if func.__doc__ else func.__name__` instead of `if`-`else`-block
+
+    "RUF001", # String contains ambiguous `′` (PRIME). Did you mean ``` (GRAVE ACCENT)?
+
+    "DTZ005", # `datetime.datetime.now()` called without a `tz` argument
+
+    "PT013", # Incorrect import of `pytest`; use `import pytest` instead
+    "PYI051", # `Literal["auto"]` is redundant in a union with `str`
+
+    "PTH100", # `os.path.abspath()` should be replaced by `Path.resolve()`
+    "PTH109", # `os.getcwd()` should be replaced by `Path.cwd()`
+    "PTH118", # `os.path.join()` should be replaced by `Path` with `/` operator
+    "PTH120", # `os.path.dirname()` should be replaced by `Path.parent`
+    "PTH123", # `open()` should be replaced by `Path.open()`
 ]
 
 [tool.ruff.per-file-ignores]

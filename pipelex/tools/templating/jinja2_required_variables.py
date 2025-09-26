@@ -20,7 +20,7 @@ def detect_jinja2_required_variables(
 
     Args:
         template_category: Category of the template (HTML, MARKDOWN, etc.), used to set the appropriate jinja2 environment settings
-        template_library: Library containing templates
+        template_provider: Library containing templates
         jinja2_name: Name of template in library (optional)
         jinja2: Direct Jinja2 template string (optional)
 
@@ -42,19 +42,23 @@ def detect_jinja2_required_variables(
     elif jinja2_name:
         template_source = loader.get_source(jinja2_env, jinja2_name)[0]
     else:
-        raise Jinja2StuffError("No jinja2 or jinja2_name provided")
+        msg = "No jinja2 or jinja2_name provided"
+        raise Jinja2StuffError(msg)
 
     try:
         parsed_ast = jinja2_env.parse(template_source)
         undeclared_variables = meta.find_undeclared_variables(parsed_ast)
     except Jinja2StuffError as stuff_error:
         explanation = make_jinja2_error_explanation(jinja2_name=jinja2_name, template_text=template_source)
-        raise Jinja2DetectVariablesError(f"Jinja2 detect variables — stuff error: '{stuff_error}' {explanation}") from stuff_error
+        msg = f"Jinja2 detect variables — stuff error: '{stuff_error}' {explanation}"
+        raise Jinja2DetectVariablesError(msg) from stuff_error
     except TemplateSyntaxError as syntax_error:
         explanation = make_jinja2_error_explanation(jinja2_name=jinja2_name, template_text=template_source)
-        raise Jinja2DetectVariablesError(f"Jinja2 detect variables — syntax error: '{syntax_error}' {explanation}") from syntax_error
+        msg = f"Jinja2 detect variables — syntax error: '{syntax_error}' {explanation}"
+        raise Jinja2DetectVariablesError(msg) from syntax_error
     except UndefinedError as undef_error:
         explanation = make_jinja2_error_explanation(jinja2_name=jinja2_name, template_text=template_source)
-        raise Jinja2DetectVariablesError(f"Jinja2 detect variables — undefined error: '{undef_error}' {explanation}") from undef_error
+        msg = f"Jinja2 detect variables — undefined error: '{undef_error}' {explanation}"
+        raise Jinja2DetectVariablesError(msg) from undef_error
 
     return undeclared_variables

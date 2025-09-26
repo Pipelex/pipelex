@@ -24,8 +24,7 @@ def make_mermaid_url(mermaid_code: str) -> str:
         },
     }
     encoded = encode_pako_from_string(json.dumps(as_dict))
-    url = f"https://mermaid.ink/img/{encoded}"
-    return url
+    return f"https://mermaid.ink/img/{encoded}"
 
 
 def clean_str_for_mermaid_node_title(text: str) -> str:
@@ -41,8 +40,7 @@ def clean_str_for_mermaid_node_title(text: str) -> str:
     """
     # Replace single and double quotes with similar Unicode characters
     text = text.replace('"', "″")  # Replace with prime symbol
-    text = text.replace("'", "′")  # Replace with curly quote
-    return text
+    return text.replace("'", "′")  # Replace with curly quote
 
 
 def print_mermaid_url(url: str, title: str):

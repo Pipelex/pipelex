@@ -1,10 +1,10 @@
 import asyncio
+from typing import TYPE_CHECKING
 
 from anthropic import AsyncAnthropic, AsyncAnthropicBedrock
 from anthropic.types import Usage
-from anthropic.types.image_block_param import ImageBlockParam
+
 from anthropic.types.message_param import MessageParam
-from anthropic.types.text_block_param import TextBlockParam
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionSystemMessageParam,
@@ -30,6 +30,9 @@ from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.types import StrEnum
 
+if TYPE_CHECKING:
+    from anthropic.types.text_block_param import TextBlockParam
+    from anthropic.types.image_block_param import ImageBlockParam
 
 class AnthropicFactoryError(CogtError):
     pass
@@ -49,7 +52,8 @@ class AnthropicFactory:
         try:
             sdk_variant = AnthropicSdkVariant(plugin.sdk)
         except ValueError:
-            raise AnthropicFactoryError(f"Plugin '{plugin}' is not supported by AnthropicFactory")
+            msg = f"Plugin '{plugin}' is not supported by AnthropicFactory"
+            raise AnthropicFactoryError(msg)
 
         match sdk_variant:
             case AnthropicSdkVariant.ANTHROPIC:
@@ -106,7 +110,8 @@ class AnthropicFactory:
                         },
                     }
                 else:
-                    raise AnthropicFactoryError(f"Unsupported PromptImageTypedBytesOrUrl type: '{type(prepped_image).__name__}'")
+                    msg = f"Unsupported PromptImageTypedBytesOrUrl type: '{type(prepped_image).__name__}'"
+                    raise AnthropicFactoryError(msg)
                 content.append(image_block_param)
 
         message = {
@@ -149,10 +154,11 @@ class AnthropicFactory:
                         },
                     }
                 else:
-                    raise AnthropicFactoryError(f"Unsupported PromptImageTypedBytesOrUrl type: '{type(prepped_image).__name__}'")
+                    msg = f"Unsupported PromptImageTypedBytesOrUrl type: '{type(prepped_image).__name__}'"
+                    raise AnthropicFactoryError(msg)
                 images_block_params.append(image_block_param_in_loop)
 
-            content: list[TextBlockParam | ImageBlockParam] = images_block_params + [text_block_param]
+            content: list[TextBlockParam | ImageBlockParam] = [*images_block_params, text_block_param]
             message = {
                 "role": "user",
                 "content": content,
@@ -182,7 +188,8 @@ class AnthropicFactory:
             b64 = await load_binary_as_base64_async(prompt_image.file_path)
             typed_bytes_or_url = PromptImageTypedBase64(base_64=b64, file_type=prompt_image.get_file_type())
         else:
-            raise AnthropicFactoryError(f"Unsupported PromptImage type: '{type(prompt_image).__name__}'")
+            msg = f"Unsupported PromptImage type: '{type(prompt_image).__name__}'"
+            raise AnthropicFactoryError(msg)
         return typed_bytes_or_url
 
     @classmethod

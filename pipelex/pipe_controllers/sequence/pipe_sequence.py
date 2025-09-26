@@ -47,21 +47,19 @@ class PipeSequence(PipeController):
             # Use the centralized recursion detection
             sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes_with_current)
 
-            if isinstance(sub_pipe, PipeParallel):
-                if sub_pipe.add_each_output:
-                    for sub_parallel_pipe in sub_pipe.parallel_sub_pipes:
-                        if (sub_pipe.add_each_output and sub_parallel_pipe.output_name) or sub_parallel_pipe.output_name:
-                            generated_outputs.add(sub_parallel_pipe.output_name)
+            if isinstance(sub_pipe, PipeParallel) and sub_pipe.add_each_output:
+                for sub_parallel_pipe in sub_pipe.parallel_sub_pipes:
+                    if (sub_pipe.add_each_output and sub_parallel_pipe.output_name) or sub_parallel_pipe.output_name:
+                        generated_outputs.add(sub_parallel_pipe.output_name)
 
-            if sequential_sub_pipe.batch_params:
-                if sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
-                    needed_inputs.add_requirement(
-                        variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
-                        concept=sub_pipe_needed_inputs.get_required_input_requirement(
-                            variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name,
-                        ).concept,
-                        multiplicity=True,
-                    )
+            if sequential_sub_pipe.batch_params and sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
+                needed_inputs.add_requirement(
+                    variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
+                    concept=sub_pipe_needed_inputs.get_required_input_requirement(
+                        variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name,
+                    ).concept,
+                    multiplicity=True,
+                )
                 for input_name, requirement in sub_pipe_needed_inputs.items:
                     if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:
                         needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
@@ -86,24 +84,25 @@ class PipeSequence(PipeController):
         """
         last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
         if self.output.concept_string != last_step_output_pipe.output.concept_string:
-            raise PipeSequenceError(
+            msg = (
                 f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                 f"not matching the output concept code '{last_step_output_pipe.output.concept_string}' "
                 f"of the last step '{self.sequential_sub_pipes[-1].pipe_code}'",
             )
+            raise PipeSequenceError(msg)
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
         if len(self.sequential_sub_pipes) == 0:
-            raise ValueError(f"Pipe'{self.code}'(PipeSequence) must have at least 1 step")
+            msg = f"Pipe'{self.code}'(PipeSequence) must have at least 1 step"
+            raise ValueError(msg)
         return self
 
     def _validate_output_multiplicity_support(self, pipe_run_params: PipeRunParams) -> None:
         """Validate that the pipe supports the requested output multiplicity."""
         if pipe_run_params.is_multiple_output_required:
-            raise PipeRunParamsError(
-                f"{self.__class__.__name__} does not support multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}",
-            )
+            msg = f"{self.__class__.__name__} does not support multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
+            raise PipeRunParamsError(msg)
 
     def _validate_inputs(self):
         """Validate that the inputs declared for this PipeSequence match what is actually needed."""
@@ -161,7 +160,7 @@ class PipeSequence(PipeController):
 
     @override
     def pipe_dependencies(self) -> set[str]:
-        return set(sub_pipe.pipe_code for sub_pipe in self.sequential_sub_pipes)
+        return {sub_pipe.pipe_code for sub_pipe in self.sequential_sub_pipes}
 
     @override
     async def _run_controller_pipe(

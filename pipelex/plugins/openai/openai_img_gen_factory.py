@@ -28,7 +28,8 @@ class OpenAIImgGenFactory:
                 | AspectRatio.PORTRAIT_9_16
                 | AspectRatio.PORTRAIT_9_21
             ):
-                raise ImgGenParameterError(f"Aspect ratio '{aspect_ratio}' is not supported by GPT Image 1 model")
+                msg = f"Aspect ratio '{aspect_ratio}' is not supported by GPT Image 1 model"
+                raise ImgGenParameterError(msg)
 
     @classmethod
     def output_format_for_gpt_image_1(cls, output_format: OutputFormat) -> GptImage1OutputFormatType:

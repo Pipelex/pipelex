@@ -1,10 +1,9 @@
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from pydantic import BaseModel, model_validator
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptSpecError
-from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.core.stuffs.stuff_content import ImageContent
@@ -14,6 +13,9 @@ from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
+
+if TYPE_CHECKING:
+    from pipelex.cogt.image.prompt_image import PromptImage
 
 
 class LLMPromptSpec(BaseModel):
@@ -39,9 +41,8 @@ class LLMPromptSpec(BaseModel):
                 "user_text",
             ],
         ):
-            raise LLMPromptSpecError(
-                f"LLMPromptSpec user text must have exactly one of user_text, user_text_jinja2_blueprint or user_prompt_verbatim_name: {self}",
-            )
+            msg = f"LLMPromptSpec user text must have exactly one of user_text, user_text_jinja2_blueprint or user_prompt_verbatim_name: {self}"
+            raise LLMPromptSpecError(msg)
         if has_more_than_one_among_attributes_from_list(
             obj=self,
             attributes_list=[
@@ -50,9 +51,8 @@ class LLMPromptSpec(BaseModel):
                 "system_prompt",
             ],
         ):
-            raise LLMPromptSpecError(
-                f"LLMPromptSpec system got more than one of system_prompt, system_prompt_jinja2_blueprint, system_prompt_verbatim_name: {self}",
-            )
+            msg = f"LLMPromptSpec system got more than one of system_prompt, system_prompt_jinja2_blueprint, system_prompt_verbatim_name: {self}"
+            raise LLMPromptSpecError(msg)
         return self
 
     def validate_with_libraries(self):
@@ -106,9 +106,8 @@ class LLMPromptSpec(BaseModel):
                 try:
                     prompt_image_content = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=ImageContent)
                 except ContextProviderException as exc:
-                    raise LLMPromptSpecError(
-                        f"Could not find a valid user image named '{user_image_name}' from the provided context_provider: {exc}",
-                    ) from exc
+                    msg = f"Could not find a valid user image named '{user_image_name}' from the provided context_provider: {exc}"
+                    raise LLMPromptSpecError(msg) from exc
 
                 if prompt_image_content is not None:  # An ImageContent can be optional..
                     if base_64 := prompt_image_content.base_64:
@@ -129,7 +128,8 @@ class LLMPromptSpec(BaseModel):
             extra_params=extra_params,
         )
         if not user_text:
-            raise ValueError("For user_text we need either a pipe_jinja2, a text_verbatim_name or a fixed user_text")
+            msg = "For user_text we need either a pipe_jinja2, a text_verbatim_name or a fixed user_text"
+            raise ValueError(msg)
 
         if output_structure_prompt:
             user_text += output_structure_prompt
@@ -191,7 +191,8 @@ class LLMPromptSpec(BaseModel):
                 template_name=text_verbatim_name,
             )
             if not user_text_verbatim:
-                raise ValueError(f"Could not find text_verbatim template '{text_verbatim_name}'")
+                msg = f"Could not find text_verbatim template '{text_verbatim_name}'"
+                raise ValueError(msg)
             the_text = user_text_verbatim
         elif fixed_text:
             the_text = fixed_text

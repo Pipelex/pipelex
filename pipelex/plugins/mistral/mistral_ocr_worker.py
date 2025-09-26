@@ -33,7 +33,8 @@ class MistralOcrWorker(OcrWorkerAbstract):
         )
 
         if not isinstance(sdk_instance, Mistral):
-            raise SdkTypeError(f"Provided OCR sdk_instance for {self.__class__.__name__} is not of type Mistral: it's a '{type(sdk_instance)}'")
+            msg = f"Provided OCR sdk_instance for {self.__class__.__name__} is not of type Mistral: it's a '{type(sdk_instance)}'"
+            raise SdkTypeError(msg)
 
         self.mistral_client: Mistral = sdk_instance
 
@@ -57,7 +58,8 @@ class MistralOcrWorker(OcrWorkerAbstract):
                 should_include_page_views=ocr_job.job_params.should_include_page_views,
             )
         else:
-            raise OcrInputError("No image nor PDF URI provided in OcrJob")
+            msg = "No image nor PDF URI provided in OcrJob"
+            raise OcrInputError(msg)
         return ocr_output
 
     async def _make_ocr_output_from_image(
@@ -66,13 +68,14 @@ class MistralOcrWorker(OcrWorkerAbstract):
         should_caption_image: bool = False,
     ) -> OcrOutput:
         if should_caption_image:
-            raise NotImplementedError("Captioning is not implemented for Mistral OCR.")
+            msg = "Captioning is not implemented for Mistral OCR."
+            raise NotImplementedError(msg)
         image_path, image_url = clarify_path_or_url(path_or_uri=image_uri)
         if image_url:
             return await self.extract_from_image_url(
                 image_url=image_url,
             )
-        assert image_path is not None  # Type narrowing for mypy
+        assert image_path is not None
         return await self.extract_from_image_file(
             image_path=image_path,
         )
@@ -85,14 +88,15 @@ class MistralOcrWorker(OcrWorkerAbstract):
         should_include_page_views: bool,
     ) -> OcrOutput:
         if should_caption_images:
-            raise OcrCapabilityError("Captioning is not implemented for Mistral OCR.")
+            msg = "Captioning is not implemented for Mistral OCR."
+            raise OcrCapabilityError(msg)
         if should_include_page_views:
             log.debug("Page views are not implemented for Mistral OCR.")
             # TODO: use a model capability flag to check possibility before asking for it
             # it it's asked and not available, raise
             # the caller will be responsible to get the page views using other solution if needed
             # raise OcrCapabilityError("Page views are not implemented for Mistral OCR.")
-        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)  # pyright: ignore
+        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
         ocr_output: OcrOutput
         if pdf_url:
             ocr_output = await self.extract_from_pdf_url(
@@ -100,7 +104,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
                 should_include_images=should_include_images,
             )
         else:  # pdf_path must be provided based on validation
-            assert pdf_path is not None  # Type narrowing for mypy
+            assert pdf_path is not None
             ocr_output = await self.extract_from_pdf_file(
                 pdf_path=pdf_path,
                 should_include_images=should_include_images,
@@ -118,10 +122,9 @@ class MistralOcrWorker(OcrWorkerAbstract):
                 "image_url": image_url,
             },
         )
-        ocr_output = await MistralFactory.make_ocr_output_from_mistral_response(
+        return await MistralFactory.make_ocr_output_from_mistral_response(
             mistral_ocr_response=ocr_response,
         )
-        return ocr_output
 
     async def extract_from_image_file(
         self,
@@ -136,10 +139,9 @@ class MistralOcrWorker(OcrWorkerAbstract):
             model=self.inference_model.model_id,
             document={"type": "image_url", "image_url": f"data:{mime_type};base64,{b64.decode('utf-8')}"},
         )
-        ocr_output = await MistralFactory.make_ocr_output_from_mistral_response(
+        return await MistralFactory.make_ocr_output_from_mistral_response(
             mistral_ocr_response=ocr_response,
         )
-        return ocr_output
 
     async def extract_from_pdf_url(
         self,
@@ -155,11 +157,10 @@ class MistralOcrWorker(OcrWorkerAbstract):
             include_image_base64=should_include_images,
         )
 
-        ocr_output = await MistralFactory.make_ocr_output_from_mistral_response(
+        return await MistralFactory.make_ocr_output_from_mistral_response(
             mistral_ocr_response=ocr_response,
             should_include_images=should_include_images,
         )
-        return ocr_output
 
     async def extract_from_pdf_file(
         self,

@@ -26,15 +26,17 @@ class ImgGenWorkerFactory:
                 try:
                     fal_api_key = get_secret(secret_id="FAL_API_KEY")
                 except SecretNotFoundError as exc:
-                    raise FalCredentialsError("FAL_API_KEY not found") from exc
+                    msg = "FAL_API_KEY not found"
+                    raise FalCredentialsError(msg) from exc
 
                 try:
-                    from fal_client import AsyncClient as FalAsyncClient  # pylint: disable=import-outside-toplevel
+                    from fal_client import AsyncClient as FalAsyncClient  # pylint: disable=import-outside-toplevel # noqa: PLC0415
                 except ImportError as exc:
+                    msg = "The fal-client SDK is required to use FAL models (generation of images)."
                     raise MissingDependencyError(
                         "fal-client",
                         "fal",
-                        "The fal-client SDK is required to use FAL models (generation of images).",
+                        msg,
                     ) from exc
 
                 from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker  # pylint: disable=import-outside-toplevel
@@ -67,6 +69,7 @@ class ImgGenWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case _:
-                raise NotImplementedError(f"Plugin '{plugin}' is not supported for image generation")
+                msg = f"Plugin '{plugin}' is not supported for image generation"
+                raise NotImplementedError(msg)
 
         return img_gen_worker

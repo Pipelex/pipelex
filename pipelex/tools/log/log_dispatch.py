@@ -2,6 +2,7 @@ import inspect
 import logging
 import os
 import traceback
+from pathlib import Path
 from typing import Any, cast
 
 from pipelex.tools.log.log_config import CallerInfoTemplate, LogConfig, LogMode
@@ -99,9 +100,9 @@ class LogDispatch:
         ):
             caller_info = inspect.getframeinfo(caller_frame)
             caller_file = caller_info.filename
-            cwd = os.getcwd()
+            cwd = Path.cwd()
             try:
-                caller_file = os.path.relpath(caller_file, cwd)
+                caller_file = Path(caller_file).relative_to(cwd)
             except ValueError:
                 # This can happen if the file is on a different drive (on Windows)
                 # In this case, we'll keep the absolute path
@@ -256,7 +257,7 @@ class LogDispatch:
 
         stack = inspect.stack()
         try:
-            logging_module_path = os.path.abspath(__file__)
+            logging_module_path = Path(__file__).absolute()
             log_origin_name = "unknown"
 
             for frame_info in stack[1:]:

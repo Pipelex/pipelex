@@ -17,7 +17,8 @@ class ImgGenPrompt(BaseModel):
                 pass
             case ProblemReaction.RAISE:
                 if self.positive_text == "":
-                    raise ImgGenPromptError("ImgGen prompt positive_text must not be an empty string")
+                    msg = "ImgGen prompt positive_text must not be an empty string"
+                    raise ImgGenPromptError(msg)
             case ProblemReaction.LOG:
                 if self.positive_text == "":
                     log.warning("ImgGen prompt positive_text should not be an empty string")

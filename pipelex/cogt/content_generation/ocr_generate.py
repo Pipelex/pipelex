@@ -12,5 +12,4 @@ async def ocr_gen_extract_pages(ocr_assignment: OcrAssignment) -> OcrOutput:
         ocr_job_config=ocr_assignment.ocr_job_config,
         job_metadata=ocr_assignment.job_metadata,
     )
-    ocr_output = await ocr_worker.ocr_extract_pages(ocr_job=ocr_job)
-    return ocr_output
+    return await ocr_worker.ocr_extract_pages(ocr_job=ocr_job)

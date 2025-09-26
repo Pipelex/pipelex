@@ -29,7 +29,8 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
         if not isinstance(sdk_instance, openai.AsyncOpenAI):
-            raise SdkTypeError(f"Provided Imgg sdk_instance is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'")
+            msg = f"Provided Imgg sdk_instance is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'"
+            raise SdkTypeError(msg)
 
         self.openai_client = sdk_instance
 
@@ -39,8 +40,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImage:
         one_image_list = await self.gen_image_list(img_gen_job=img_gen_job, nb_images=1)
-        generated_image = one_image_list[0]
-        return generated_image
+        return one_image_list[0]
 
     @override
     async def _gen_image_list(
@@ -66,14 +66,16 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             n=nb_images,
         )
         if not result.data:
-            raise ImgGenGenerationError("No result from OpenAI")
+            msg = "No result from OpenAI"
+            raise ImgGenGenerationError(msg)
 
         generated_image_list: list[GeneratedImage] = []
         image_id = shortuuid.uuid()[:4]
         for image_index, image_data in enumerate(result.data):
             image_base64 = image_data.b64_json
             if not image_base64:
-                raise ImgGenGenerationError("No base64 image data received from OpenAI")
+                msg = "No base64 image data received from OpenAI"
+                raise ImgGenGenerationError(msg)
 
             folder_path = TEMP_OUTPUTS_DIR
             ensure_path(folder_path)

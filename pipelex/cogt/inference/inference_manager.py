@@ -92,9 +92,8 @@ class InferenceManager(InferenceManagerProtocol):
         llm_worker_class: type[LLMWorkerAbstract],
         should_warn_if_already_registered: bool = True,
     ):
-        if llm_handle in self.llm_workers:
-            if should_warn_if_already_registered:
-                log.warning(f"LLM worker for '{llm_handle}' already registered, skipping")
+        if llm_handle in self.llm_workers and should_warn_if_already_registered:
+            log.warning(f"LLM worker for '{llm_handle}' already registered, skipping")
         self.llm_workers[llm_handle] = llm_worker_class(reporting_delegate=get_report_delegate())
 
     ####################################################################################################
@@ -116,9 +115,8 @@ class InferenceManager(InferenceManagerProtocol):
         img_gen_worker = self.img_gen_workers.get(img_gen_handle)
         if img_gen_worker is None:
             if not get_config().cogt.inference_manager_config.is_auto_setup_preset_img_gen:
-                raise InferenceManagerWorkerSetupError(
-                    f"Found no Imgg worker for '{img_gen_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_img_gen",
-                )
+                msg = f"Found no Imgg worker for '{img_gen_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_img_gen"
+                raise InferenceManagerWorkerSetupError(msg)
 
             img_gen_worker = self._setup_one_img_gen_worker(img_gen_handle=img_gen_handle)
         return img_gen_worker
@@ -149,8 +147,7 @@ class InferenceManager(InferenceManagerProtocol):
             )
 
         inference_model = get_models_manager().get_inference_model(model_handle=model_handle)
-        ocr_worker = self._setup_one_ocr_worker(
+        return self._setup_one_ocr_worker(
             inference_model=inference_model,
             model_handle=model_handle,
         )
-        return ocr_worker

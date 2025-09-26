@@ -76,11 +76,10 @@ class PipeFunc(PipeOperator):
             name=output_name,
         )
 
-        pipe_output = PipeFuncOutput(
+        return PipeFuncOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
-        return pipe_output
 
     @override
     async def _dry_run_operator_pipe(
@@ -94,15 +93,15 @@ class PipeFunc(PipeOperator):
 
         function = func_registry.get_required_function(self.function_name)
         if not callable(function):
-            raise ValueError(f"Function '{self.function_name}' is not callable")
+            msg = f"Function '{self.function_name}' is not callable"
+            raise ValueError(msg)
 
         # Check that all needed inputs are present in working memory
         needed_inputs = self.needed_inputs()
         for input_name, _ in needed_inputs.items:
             if input_name not in working_memory.root:
-                raise DryRunError(
-                    f"Required input '{input_name}' not found in working memory for function '{self.function_name}' in pipe '{self.code}'",
-                )
+                msg = f"Required input '{input_name}' not found in working memory for function '{self.function_name}' in pipe '{self.code}'"
+                raise DryRunError(msg)
 
         try:
             return_type = get_type_hints(function).get("return")

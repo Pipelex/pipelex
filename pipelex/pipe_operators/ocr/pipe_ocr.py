@@ -71,7 +71,8 @@ class PipeOcr(PipeOperator):
     @override
     def validate_output(self):
         if self.output != get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.PAGE):
-            raise PipeDefinitionError(f"PipeOcr output should be a Page concept, but is {self.output.concept_string}")
+            msg = f"PipeOcr output should be a Page concept, but is {self.output.concept_string}"
+            raise PipeDefinitionError(msg)
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()
@@ -173,7 +174,8 @@ class PipeOcr(PipeOperator):
             pdf_stuff = working_memory.get_stuff_as_pdf(name=self.pdf_stuff_name)
             pdf_uri = pdf_stuff.url
         else:
-            raise PipeDefinitionError("PipeOcr should have a non-None image_stuff_name or pdf_stuff_name")
+            msg = "PipeOcr should have a non-None image_stuff_name or pdf_stuff_name"
+            raise PipeDefinitionError(msg)
 
         ocr_choice: OcrChoice = self.ocr_choice or get_model_deck().ocr_choice_default
         ocr_setting: OcrSetting = get_model_deck().get_ocr_setting(ocr_choice=ocr_choice)
@@ -203,9 +205,9 @@ class PipeOcr(PipeOperator):
         if self.should_include_page_views:
             log.debug(f"should_include_page_views: {self.should_include_page_views}, pdf_uri: {pdf_uri}, image_uri: {image_uri}")
             if pdf_uri:
-                for page in ocr_output.pages.values():
-                    if page.page_view:
-                        page_view_contents.append(ImageContent.make_from_extracted_image(extracted_image=page.page_view))
+                page_view_contents.extend(
+                    ImageContent.make_from_extracted_image(extracted_image=page.page_view) for page in ocr_output.pages.values() if page.page_view
+                )
                 log.debug(f"page_view_contents: {page_view_contents}")
                 needs_to_generate_page_views: bool
                 if len(page_view_contents) == 0:
@@ -252,11 +254,10 @@ class PipeOcr(PipeOperator):
             name=output_name,
         )
 
-        pipe_output = PipeOcrOutput(
+        return PipeOcrOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
-        return pipe_output
 
     @override
     async def _dry_run_operator_pipe(
@@ -268,14 +269,14 @@ class PipeOcr(PipeOperator):
     ) -> PipeOutput:
         log.debug(f"PipeOcr: dry run operator pipe: {self.code}")
         if pipe_run_params.run_mode != PipeRunMode.DRY:
-            raise PipeDefinitionError(f"Running pipe '{self.code}' (PipeOcr) _dry_run_operator_pipe() in non-dry mode is not allowed.")
+            msg = f"Running pipe '{self.code}' (PipeOcr) _dry_run_operator_pipe() in non-dry mode is not allowed."
+            raise PipeDefinitionError(msg)
 
         content_generator_dry = ContentGeneratorDry()
-        pipe_output = await self._run_operator_pipe(
+        return await self._run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
             content_generator=content_generator_dry,
         )
-        return pipe_output

@@ -53,9 +53,8 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         if inference_model.max_tokens:
             self.default_max_tokens = inference_model.max_tokens
         else:
-            raise AnthropicWorkerConfigurationError(
-                f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Anthropic",
-            )
+            msg = f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Anthropic"
+            raise AnthropicWorkerConfigurationError(msg)
 
         # Verify if the sdk_instance is compatible with the current LLM platform
         if isinstance(sdk_instance, (AsyncAnthropic, AsyncAnthropicBedrock)):
@@ -88,7 +87,8 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             max_tokens = claude_4_tokens_limit
             log.warning(f"Max tokens is greater than the claude 4 reduced tokens limit, reducing to {max_tokens}")
         if not max_tokens:
-            raise AnthropicWorkerConfigurationError(f"Max tokens is None for model {self.inference_model.desc}")
+            msg = f"Max tokens is None for model {self.inference_model.desc}"
+            raise AnthropicWorkerConfigurationError(msg)
         return max_tokens
 
     @override
@@ -108,12 +108,14 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
 
         single_content_block = response.content[0]
         if single_content_block.type != "text":
-            raise LLMCompletionError(f"Unexpected content block type: {single_content_block.type}\nmodel: {self.inference_model.desc}")
+            msg = f"Unexpected content block type: {single_content_block.type}\nmodel: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
         full_reply_content = single_content_block.text
 
         single_content_block = response.content[0]
         if single_content_block.type != "text":
-            raise LLMCompletionError(f"Unexpected content block type: {single_content_block.type}\nmodel: {self.inference_model.desc}")
+            msg = f"Unexpected content block type: {single_content_block.type}\nmodel: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
         full_reply_content = single_content_block.text
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):

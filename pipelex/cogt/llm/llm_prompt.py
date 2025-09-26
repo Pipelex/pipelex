@@ -23,9 +23,11 @@ class LLMPrompt(BaseModel):
                     if self.system_text == "":
                         log.warning(f"system_text should be None or contain text. system_text = '{self.system_text}'")
                     else:
-                        raise LLMPromptParameterError("system_text should be None or contain text")
+                        msg = "system_text should be None or contain text"
+                        raise LLMPromptParameterError(msg)
                 if not is_not_none_and_has_text(text=self.user_text):
-                    raise LLMPromptParameterError("user_text should contain text")
+                    msg = "user_text should contain text"
+                    raise LLMPromptParameterError(msg)
             case ProblemReaction.LOG:
                 if not is_none_or_has_text(text=self.system_text):
                     if self.system_text == "":

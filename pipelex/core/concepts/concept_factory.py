@@ -85,7 +85,10 @@ class ConceptFactory:
 
     @classmethod
     def make_domain_and_concept_code_from_concept_string_or_concept_code(
-        cls, domain: str, concept_string_or_code: str, concept_codes_from_the_same_domain: list[str] | None = None,
+        cls,
+        domain: str,
+        concept_string_or_code: str,
+        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> DomainAndConceptCode:
         # At this point, the concept_string_or_code is already validated
         if "." in concept_string_or_code:

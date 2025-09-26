@@ -31,11 +31,13 @@ class VertexAIFactory(ConfigModel):
         """Configure and return endpoint, and API key."""
         gcp_project_id = extra_config.get(VertexAIExtraField.GCP_PROJECT_ID)
         if not gcp_project_id:
-            raise VertexAIConfigError("GCP project ID is not set in VertexAI config")
+            msg = "GCP project ID is not set in VertexAI config"
+            raise VertexAIConfigError(msg)
 
         gcp_location = extra_config.get(VertexAIExtraField.GCP_LOCATION)
         if not gcp_location:
-            raise VertexAIConfigError("GCP location is not set in VertexAI config")
+            msg = "GCP location is not set in VertexAI config"
+            raise VertexAIConfigError(msg)
 
         endpoint = cls._make_endpoint(gcp_project_id=gcp_project_id, gcp_location=gcp_location)
 

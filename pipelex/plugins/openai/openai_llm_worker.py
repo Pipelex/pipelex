@@ -1,10 +1,12 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import instructor
 import openai
 from instructor.exceptions import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError
-from openai.types.chat import ChatCompletionMessage
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
 from pipelex import log
@@ -35,9 +37,8 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         )
 
         if not isinstance(sdk_instance, openai.AsyncOpenAI):
-            raise SdkTypeError(
-                f"Provided LLM sdk_instance for {self.__class__.__name__} is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'",
-            )
+            msg = f"Provided LLM sdk_instance for {self.__class__.__name__} is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'"
+            raise SdkTypeError(msg)
 
         self.openai_client_for_text: openai.AsyncOpenAI = sdk_instance
         if structure_method:
@@ -72,18 +73,20 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             )
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here
-            raise LLMModelNotFoundError(
-                f"OpenAI model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}",
-            ) from not_found_error
+            msg = f"OpenAI model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}"
+            raise LLMModelNotFoundError(msg) from not_found_error
         except APIConnectionError as api_connection_error:
-            raise LLMCompletionError(f"OpenAI API connection error: {api_connection_error}") from api_connection_error
+            msg = f"OpenAI API connection error: {api_connection_error}"
+            raise LLMCompletionError(msg) from api_connection_error
         except BadRequestError as bad_request_error:
-            raise LLMCompletionError(f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}") from bad_request_error
+            msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
+            raise LLMCompletionError(msg) from bad_request_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message
         response_text = openai_message.content
         if response_text is None:
-            raise LLMCompletionError(f"OpenAI response message content is None: {response}\nmodel: {self.inference_model.desc}")
+            msg = f"OpenAI response message content is None: {response}\nmodel: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
             llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)
@@ -114,13 +117,14 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     max_retries=llm_job.job_config.max_retries,
                 )
             except InstructorRetryException as exc:
-                raise LLMCompletionError(
-                    f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}",
-                ) from exc
+                msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"
+                raise LLMCompletionError(msg) from exc
         except NotFoundError as exc:
-            raise LLMCompletionError(f"OpenAI model or deployment '{self.inference_model.model_id}' not found: {exc}") from exc
+            msg = f"OpenAI model or deployment '{self.inference_model.model_id}' not found: {exc}"
+            raise LLMCompletionError(msg) from exc
         except BadRequestError as bad_request_error:
-            raise LLMCompletionError(f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}") from bad_request_error
+            msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
+            raise LLMCompletionError(msg) from bad_request_error
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)

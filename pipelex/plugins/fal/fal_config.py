@@ -17,9 +17,12 @@ class FalConfig(ConfigModel):
         invalid_qualities = set(value.keys()) - valid_qualities
 
         if missing_qualities and invalid_qualities:
-            raise ConfigValidationError(f"Missing ({missing_qualities}) and invalid ({invalid_qualities}) quality levels in mapping")
+            msg = f"Missing ({missing_qualities}) and invalid ({invalid_qualities}) quality levels in mapping"
+            raise ConfigValidationError(msg)
         if missing_qualities:
-            raise ConfigValidationError(f"Missing quality levels in mapping: {missing_qualities}")
+            msg = f"Missing quality levels in mapping: {missing_qualities}"
+            raise ConfigValidationError(msg)
         if invalid_qualities:
-            raise ConfigValidationError(f"Invalid quality levels in mapping: {invalid_qualities}")
+            msg = f"Invalid quality levels in mapping: {invalid_qualities}"
+            raise ConfigValidationError(msg)
         return value

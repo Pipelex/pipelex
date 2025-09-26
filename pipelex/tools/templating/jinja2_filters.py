@@ -29,12 +29,10 @@ def text_format(context: Context, value: Any, text_format: TextFormat | None = N
         applied_text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN))
 
     if hasattr(value, "rendered_str"):
-        rendered_str = value.rendered_str(text_format=applied_text_format)
-        return rendered_str
+        return value.rendered_str(text_format=applied_text_format)
     if hasattr(value, applied_text_format.render_method_name):
         render_method = getattr(value, applied_text_format.render_method_name)
-        rendered_str = render_method()
-        return rendered_str
+        return render_method()
     if isinstance(value, StrEnum):
         return value.value
     return value
@@ -47,8 +45,10 @@ def tag(context: Context, value: Any, tag_name: str | None = None) -> Any:
     if isinstance(value, Undefined):
         # maybe we don't need this check
         if tag_name:
-            raise Jinja2ContextError(f"Jinja2 undefined value with tag_name '{tag_name}'")
-        raise Jinja2ContextError("Jinja2 undefined value.")
+            msg = f"Jinja2 undefined value with tag_name '{tag_name}'"
+            raise Jinja2ContextError(msg)
+        msg = "Jinja2 undefined value."
+        raise Jinja2ContextError(msg)
 
     if isinstance(value, Jinja2TaggableAbstract):
         value, tag_name = value.render_tagged_for_jinja2(context=context, tag_name=tag_name)

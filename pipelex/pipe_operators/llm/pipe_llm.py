@@ -75,10 +75,11 @@ class PipeLLM(PipeOperator):
     def validate_output_concept_consistency(self) -> Self:
         if self.structuring_method is not None:
             if self.output.structure_class_name == NativeConceptEnum.TEXT:
-                raise PipeDefinitionError(
+                msg = (
                     f"Output concept '{self.output.code}' is considered a Text concept, "
-                    f"so it cannot be structured. Maybe you forgot to add '{NativeConceptEnum.TEXT}' to the class registry?",
+                    f"so it cannot be structured. Maybe you forgot to add '{NativeConceptEnum.TEXT}' to the class registry?"
                 )
+                raise PipeDefinitionError(msg)
         return self
 
     @override
@@ -99,10 +100,11 @@ class PipeLLM(PipeOperator):
             tested_concept=self.output,
             wanted_concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE),
         ):
-            raise PipeDefinitionError(
+            msg = (
                 f"The output of a LLM pipe cannot be compatible with the Image concept. In the "
-                f"pipe '{self.code}' the output is '{self.output.concept_string}'",
+                f"pipe '{self.code}' the output is '{self.output.concept_string}'"
             )
+            raise PipeDefinitionError(msg)
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
@@ -128,15 +130,15 @@ class PipeLLM(PipeOperator):
         """Required variables are the variables that are used in the current prompt template or system prompt"""
         required_variables: set[str] = set()
         required_variables.update(self.llm_prompt_spec.required_variables())
-        required_variables = {variable_name for variable_name in required_variables if not variable_name.startswith("_")}
-        return required_variables
+        return {variable_name for variable_name in required_variables if not variable_name.startswith("_")}
 
     def _validate_required_variables(self) -> Self:
         """This method checks that all required variables are in the inputs"""
         required_variables = self.required_variables()
         for required_variable_name in required_variables:
             if required_variable_name not in self.inputs.variables:
-                raise PipeDefinitionError(f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}")
+                msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}"
+                raise PipeDefinitionError(msg)
         return self
 
     def _validate_inputs(self):
@@ -170,9 +172,8 @@ class PipeLLM(PipeOperator):
                         variable_name=named_input_requirement.variable_name,
                     )
                 except PipeInputNotFoundError as exc:
-                    raise PipeInputError(
-                        f"Input variable '{named_input_requirement.variable_name}' is not in this PipeLLM '{self.code}' input spec: {self.inputs}",
-                    ) from exc
+                    msg = f"Input variable '{named_input_requirement.variable_name}' is not in this PipeLLM '{self.code}' input spec: {self.inputs}"
+                    raise PipeInputError(msg) from exc
                 if not concept_provider.is_compatible(
                     tested_concept=input_requirement_of_declared_input.concept,
                     wanted_concept=named_input_requirement.concept,
@@ -410,11 +411,10 @@ class PipeLLM(PipeOperator):
             name=output_name,
         )
 
-        pipe_output = PipeLLMOutput(
+        return PipeLLMOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
-        return pipe_output
 
     async def _llm_gen_object_stuff_content(
         self,
@@ -508,14 +508,13 @@ class PipeLLM(PipeOperator):
         output_name: str | None = None,
     ) -> PipeOutput:
         content_generator_dry = ContentGeneratorDry()
-        pipe_output = await self._run_operator_pipe(
+        return await self._run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
             content_generator=content_generator_dry,
         )
-        return pipe_output
 
     @staticmethod
     def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str:

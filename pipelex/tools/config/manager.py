@@ -65,8 +65,7 @@ class ConfigManager:
 
         """
         config_path = self.pipelex_root_config_path
-        config = load_toml_from_path(config_path)
-        return config
+        return load_toml_from_path(config_path)
 
     def get_local_config(self) -> dict[str, Any]:
         """Get the local pipelex configuration from pipelex.toml in the project root.
@@ -76,8 +75,7 @@ class ConfigManager:
 
         """
         config_path = os.path.join(self.local_root_dir, CONFIG_NAME)
-        config = failable_load_toml_from_path(config_path)
-        return config or {}
+        return failable_load_toml_from_path(config_path) or {}
 
     def load_inheritance_config(self, the_pipelex_config: dict[str, Any]):
         """Load the config by inheritance in a pyproject.toml file.

@@ -35,19 +35,20 @@ class BedrockFactory:
         try:
             sdk_variant = BedrockSdkVariant(plugin.sdk)
         except ValueError:
-            raise BedrockFactoryError(f"Plugin '{plugin}' is not supported by BedrockFactory")
+            msg = f"Plugin '{plugin}' is not supported by BedrockFactory"
+            raise BedrockFactoryError(msg)
 
         bedrock_async_client: BedrockClientProtocol
         log.verbose(f"Using '{sdk_variant}' for BedrockClient")
         match sdk_variant:
             case BedrockSdkVariant.AIBOTO3:
-                from pipelex.plugins.bedrock.bedrock_client_aioboto3 import BedrockClientAioboto3
+                from pipelex.plugins.bedrock.bedrock_client_aioboto3 import BedrockClientAioboto3  # noqa: PLC0415
 
                 bedrock_async_client = BedrockClientAioboto3(
                     aws_region=backend.extra_config[BedrockExtraField.AWS_REGION],
                 )
             case BedrockSdkVariant.BOTO3:
-                from pipelex.plugins.bedrock.bedrock_client_boto3 import BedrockClientBoto3
+                from pipelex.plugins.bedrock.bedrock_client_boto3 import BedrockClientBoto3  # noqa: PLC0415
 
                 bedrock_async_client = BedrockClientBoto3(
                     aws_region=backend.extra_config[BedrockExtraField.AWS_REGION],
@@ -66,6 +67,7 @@ class BedrockFactory:
         if user_text := llm_job.llm_prompt.user_text:
             message.content.append(BedrockContentItem(text=user_text))
         if llm_job.llm_prompt.user_images:
-            raise LLMCapabilityError("BedrockFactory does not support images. Skipping images.")
+            msg = "BedrockFactory does not support images. Skipping images."
+            raise LLMCapabilityError(msg)
 
         return message

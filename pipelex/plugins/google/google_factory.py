@@ -46,7 +46,8 @@ class GoogleFactory:
             image_bytes = prompt_image_binary.binary
             mime_type = prompt_image_binary.get_mime_type()
             return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        raise GoogleFactoryError(f"Unsupported PromptImage type: '{type(prompt_image).__name__}'")
+        msg = f"Unsupported PromptImage type: '{type(prompt_image).__name__}'"
+        raise GoogleFactoryError(msg)
 
     @classmethod
     async def prepare_user_contents(cls, llm_prompt: LLMPrompt) -> genai_types.ContentListUnion:

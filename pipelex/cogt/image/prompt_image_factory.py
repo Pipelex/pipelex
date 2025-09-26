@@ -23,7 +23,8 @@ class PromptImageFactory:
             return PromptImageUrl(url=url)
         if base_64:
             return PromptImageBase64(base_64=base_64)
-        raise PromptImageFactoryError("PromptImageFactory requires one of file_path, url, or image_bytes")
+        msg = "PromptImageFactory requires one of file_path, url, or image_bytes"
+        raise PromptImageFactoryError(msg)
 
     @classmethod
     def make_prompt_image_from_uri(
@@ -64,7 +65,8 @@ class PromptImageFactory:
                 image_bytes = await cls.make_promptimagebase64_from_url_async(prompt_image)
                 return image_bytes.base_64
             case _:
-                raise PromptImageFactoryError(f"Unknown PromptImage type: {prompt_image}")
+                msg = f"Unknown PromptImage type: {prompt_image}"
+                raise PromptImageFactoryError(msg)
 
     @classmethod
     async def promptimage_to_bytes_async(cls, prompt_image: PromptImage) -> bytes:
@@ -77,4 +79,5 @@ class PromptImageFactory:
                 image_bytes = await cls.make_promptimagebinary_from_url_async(prompt_image)
                 return image_bytes.binary
             case _:
-                raise PromptImageFactoryError(f"Unknown PromptImage type: {prompt_image}")
+                msg = f"Unknown PromptImage type: {prompt_image}"
+                raise PromptImageFactoryError(msg)

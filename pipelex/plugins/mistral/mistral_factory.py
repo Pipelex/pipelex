@@ -52,8 +52,7 @@ class MistralFactory:
         if user_text := llm_job.llm_prompt.user_text:
             user_content.append(TextChunk(text=user_text))
         if user_images := llm_job.llm_prompt.user_images:
-            for user_image in user_images:
-                user_content.append(cls.make_mistral_image_url(user_image))
+            user_content.extend(cls.make_mistral_image_url(user_image) for user_image in user_images)
         if user_content:
             messages.append(UserMessage(content=user_content))
 
@@ -74,7 +73,8 @@ class MistralFactory:
             image_bytes = prompt_image.base_64.decode("utf-8")
             file_type = detect_file_type_from_base64(prompt_image.base_64)
             return ImageURLChunk(image_url=f"data:{file_type.mime};base64,{image_bytes}")
-        raise PromptImageFormatError(f"prompt_image of type {type(prompt_image)} is not supported")
+        msg = f"prompt_image of type {type(prompt_image)} is not supported"
+        raise PromptImageFormatError(msg)
 
     @classmethod
     def make_simple_messages_openai_typed(
@@ -138,7 +138,7 @@ class MistralFactory:
         cls,
         mistral_ocr_image_obj: OCRImageObject,
     ) -> ExtractedImageFromPage:
-        extracted_image = ExtractedImageFromPage(
+        return ExtractedImageFromPage(
             image_id=mistral_ocr_image_obj.id,
             top_left_x=mistral_ocr_image_obj.top_left_x,
             top_left_y=mistral_ocr_image_obj.top_left_y,
@@ -146,4 +146,3 @@ class MistralFactory:
             bottom_right_y=mistral_ocr_image_obj.bottom_right_y,
             base_64=mistral_ocr_image_obj.image_base64 if mistral_ocr_image_obj.image_base64 else None,
         )
-        return extracted_image

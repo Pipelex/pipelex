@@ -46,14 +46,15 @@ class LLMWorkerFactory:
                 try:
                     import anthropic  # pylint: disable=import-outside-toplevel # noqa: F401
                 except ImportError as exc:
+                    msg = (
+                        "The anthropic SDK is required to use Anthropic models via the anthropic client. "
+                        "However, you can use Anthropic models through bedrock directly "
+                        "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
+                    )
                     raise MissingDependencyError(
                         "anthropic",
                         "anthropic",
-                        (
-                            "The anthropic SDK is required to use Anthropic models via the anthropic client. "
-                            "However, you can use Anthropic models through bedrock directly "
-                            "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
-                        ),
+                        msg,
                     ) from exc
 
                 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory  # pylint: disable=import-outside-toplevel

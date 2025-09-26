@@ -44,14 +44,16 @@ class OpenAIFactory:
         try:
             sdk_variant = OpenAISdkVariant(plugin.sdk)
         except ValueError:
-            raise OpenAIFactoryError(f"Plugin '{plugin}' is not supported by OpenAIFactory")
+            msg = f"Plugin '{plugin}' is not supported by OpenAIFactory"
+            raise OpenAIFactoryError(msg)
 
         the_client: openai.AsyncOpenAI
         match sdk_variant:
             case OpenAISdkVariant.AZURE_OPENAI:
                 log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 if backend.endpoint is None:
-                    raise OpenAIFactoryError("Azure OpenAI endpoint is not set")
+                    msg = "Azure OpenAI endpoint is not set"
+                    raise OpenAIFactoryError(msg)
                 the_client = openai.AsyncAzureOpenAI(
                     azure_endpoint=backend.endpoint,
                     api_key=backend.api_key,
@@ -105,7 +107,8 @@ class OpenAIFactory:
             image_bytes = load_binary_as_base64(path=prompt_image.file_path)
             return cls.make_openai_image_url(PromptImageBase64(base_64=image_bytes))
         else:
-            raise LLMPromptParameterError(f"prompt_image of type {type(prompt_image)} is not supported")
+            msg = f"prompt_image of type {type(prompt_image)} is not supported"
+            raise LLMPromptParameterError(msg)
         return openai_image_url
 
     @staticmethod
@@ -121,8 +124,7 @@ class OpenAIFactory:
             openai.APIConnectionError: "OpenAI API request failed to connect.",
             openai.APIError: "OpenAI API returned an API Error.",
         }
-        error_info = error_mapping.get(type(exception), "An unexpected error occurred with the OpenAI API.")
-        return error_info
+        return error_mapping.get(type(exception), "An unexpected error occurred with the OpenAI API.")
 
     # reference:
     # https://help.openai.com/en/articles/5247780-using-logit-bias-to-define-token-probability

@@ -126,7 +126,8 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         # TODO: Add unit tests for this method
         log.debug(f"Adding new stuff '{name}' to WorkingMemory with aliases: {aliases}")
         if self.is_stuff_code_used(stuff_code=stuff.stuff_code):
-            raise WorkingMemoryConsistencyError(f"Stuff code '{stuff.stuff_code}' is already used by another stuff")
+            msg = f"Stuff code '{stuff.stuff_code}' is already used by another stuff"
+            raise WorkingMemoryConsistencyError(msg)
         if name in self.root or name in self.aliases:
             existing_stuff = self.get_stuff(name=name)
             if existing_stuff == stuff:
@@ -156,16 +157,19 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     def set_alias(self, alias: str, target: str) -> None:
         """Add an alias pointing to a target name."""
         if alias == target:
-            raise WorkingMemoryConsistencyError(f"Cannot create alias '{alias}' pointing to itself")
+            msg = f"Cannot create alias '{alias}' pointing to itself"
+            raise WorkingMemoryConsistencyError(msg)
         if target not in self.root:
-            raise WorkingMemoryConsistencyError(f"Cannot create alias to non-existent target '{target}'")
+            msg = f"Cannot create alias to non-existent target '{target}'"
+            raise WorkingMemoryConsistencyError(msg)
         log.debug(f"Setting alias '{alias}' pointing to target '{target}'")
         self.aliases[alias] = target
 
     def add_alias(self, alias: str, target: str) -> None:
         """Add an alias pointing to a target name."""
         if alias in self.root:
-            raise WorkingMemoryConsistencyError(f"Cannot add alias '{alias}' as it already exists")
+            msg = f"Cannot add alias '{alias}' as it already exists"
+            raise WorkingMemoryConsistencyError(msg)
         self.set_alias(alias=alias, target=target)
         log.debug(f"Added alias '{alias}' pointing to target '{target}'")
 

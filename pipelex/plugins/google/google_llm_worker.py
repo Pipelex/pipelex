@@ -1,9 +1,11 @@
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import instructor
 from google import genai
 from google.genai import types
-from openai.types.chat import ChatCompletionMessageParam
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam
 from typing_extensions import override
 
 from pipelex import log
@@ -73,16 +75,19 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
 
         # Extract text from response
         if not response.candidates:
-            raise LLMCompletionError(f"No candidates returned from model: {self.inference_model.desc}")
+            msg = f"No candidates returned from model: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
 
         candidate = response.candidates[0]
         if not candidate.content or not candidate.content.parts:
-            raise LLMCompletionError(f"No content parts in response from model: {self.inference_model.desc}")
+            msg = f"No content parts in response from model: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
 
         # Extract text from the first part
         text_content = candidate.content.parts[0].text
         if not text_content:
-            raise LLMCompletionError(f"No text content in response from model: {self.inference_model.desc}")
+            msg = f"No text content in response from model: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
 
         # Track token usage if available
         if llm_job.job_report.llm_tokens_usage and response.usage_metadata:
@@ -116,7 +121,8 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             generation_config=generation_config,
         )
         if not isinstance(result_object, schema):
-            raise GoogleLLMWorkerError(f"Google Gemini API returned an object that is not of type {schema}: {result_object}")
+            msg = f"Google Gemini API returned an object that is not of type {schema}: {result_object}"
+            raise GoogleLLMWorkerError(msg)
 
         # Track token usage if available from completion
         if llm_job.job_report.llm_tokens_usage:

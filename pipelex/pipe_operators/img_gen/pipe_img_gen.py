@@ -46,7 +46,8 @@ class PipeImgGenOutput(PipeOutput):
         elif isinstance(content, ImageContent):
             the_urls = [content.url]
         else:
-            raise PipeRunParamsError(f"PipeImgGen output should be a ListContent or an ImageContent, got {type(content)}")
+            msg = f"PipeImgGen output should be a ListContent or an ImageContent, got {type(content)}"
+            raise PipeRunParamsError(msg)
         return the_urls
 
 
@@ -81,7 +82,8 @@ class PipeImgGen(PipeOperator):
     @classmethod
     def validate_input_var_name_not_provided_as_attribute(cls, value: str | None) -> str | None:
         if value is not None:
-            raise PipeDefinitionError("img_gen_prompt_var_name must be None before input validation")
+            msg = "img_gen_prompt_var_name must be None before input validation"
+            raise PipeDefinitionError(msg)
         return value
 
     @model_validator(mode="after")
@@ -223,9 +225,11 @@ class PipeImgGen(PipeOperator):
             try:
                 img_gen_prompt_text = working_memory.get_stuff_as_str(stuff_name)
             except WorkingMemoryStuffNotFoundError as exc:
-                raise PipeInputError(f"Could not find a valid user image named '{stuff_name}' in the working_memory: {exc}") from exc
+                msg = f"Could not find a valid user image named '{stuff_name}' in the working_memory: {exc}"
+                raise PipeInputError(msg) from exc
         else:
-            raise UnexpectedPipeDefinitionError("You must provide an image gen prompt either as attribute of the pipe or as a single text input")
+            msg = "You must provide an image gen prompt either as attribute of the pipe or as a single text input"
+            raise UnexpectedPipeDefinitionError(msg)
 
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_param_defaults = img_gen_config.img_gen_param_defaults
@@ -346,11 +350,10 @@ class PipeImgGen(PipeOperator):
             name=output_name,
         )
 
-        pipe_output = PipeImgGenOutput(
+        return PipeImgGenOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
-        return pipe_output
 
     @override
     async def _dry_run_operator_pipe(
@@ -362,11 +365,10 @@ class PipeImgGen(PipeOperator):
     ) -> PipeOutput:
         log.debug(f"PipeImgGen: dry run operator pipe: {self.code}")
         content_generator_dry = ContentGeneratorDry()
-        pipe_output = await self._run_operator_pipe(
+        return await self._run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             output_name=output_name,
             content_generator=content_generator_dry,
         )
-        return pipe_output

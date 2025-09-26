@@ -16,5 +16,4 @@ async def openai_list_available_models(
 
     models = await openai_client_async.models.list()
     data = models.data
-    sorted_data = sorted(data, key=lambda model: model.id)
-    return sorted_data
+    return sorted(data, key=lambda model: model.id)

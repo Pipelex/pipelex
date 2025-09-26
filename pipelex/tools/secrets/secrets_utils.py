@@ -98,11 +98,12 @@ def _handle_fallback_pattern(var_spec: str) -> str:
 
             try:
                 prefix = VarPrefix(prefix_str)
-            except ValueError:
+            except ValueError as exc:
+                msg = f"Unknown variable prefix: '{prefix_str}'"
                 raise UnknownVarPrefixError(
                     var_name=var_name,
-                    message=f"Unknown variable prefix: '{prefix_str}'",
-                )
+                    message=msg,
+                ) from exc
 
             match prefix:
                 case VarPrefix.ENV:
@@ -120,10 +121,8 @@ def _handle_fallback_pattern(var_spec: str) -> str:
                 return get_secrets_provider().get_secret(secret_id=part)
             except SecretNotFoundError:
                 continue  # Try next option
-
-    raise VarFallbackPatternError(
-        message=f"Could not get variable from fallback pattern: {var_spec}",
-    )
+    msg = f"Could not get variable from fallback pattern: {var_spec}"
+    raise VarFallbackPatternError(message=msg)
 
 
 def _get_env_var(var_name: str) -> str:
@@ -131,7 +130,8 @@ def _get_env_var(var_name: str) -> str:
     try:
         return get_required_env(var_name)
     except EnvVarNotFoundError as exc:
-        raise VarNotFoundError(message=f"Could not get variable '{var_name}': {exc!s}", var_name=var_name) from exc
+        msg = f"Could not get variable '{var_name}': {exc!s}"
+        raise VarNotFoundError(message=msg, var_name=var_name) from exc
 
 
 def _get_secret(secret_name: str) -> str:
@@ -139,4 +139,5 @@ def _get_secret(secret_name: str) -> str:
     try:
         return get_secrets_provider().get_secret(secret_id=secret_name)
     except SecretNotFoundError as exc:
-        raise VarNotFoundError(message=f"Could not get variable '{secret_name}': {exc!s}", var_name=secret_name) from exc
+        msg = f"Could not get variable '{secret_name}': {exc!s}"
+        raise VarNotFoundError(message=msg, var_name=secret_name) from exc

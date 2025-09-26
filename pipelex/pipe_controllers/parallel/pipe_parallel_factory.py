@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -7,8 +9,10 @@ from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
-from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeFactory
+
+if TYPE_CHECKING:
+    from pipelex.pipe_controllers.sub_pipe import SubPipe
 
 
 class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParallel]):
@@ -24,11 +28,13 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         parallel_sub_pipes: list[SubPipe] = []
         for sub_pipe_blueprint in blueprint.parallels:
             if not sub_pipe_blueprint.result:
-                raise PipeDefinitionError("PipeParallel requires a result specified for each parallel sub pipe")
+                msg = "PipeParallel requires a result specified for each parallel sub pipe"
+                raise PipeDefinitionError(msg)
             sub_pipe = SubPipeFactory.make_from_blueprint(sub_pipe_blueprint, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain)
             parallel_sub_pipes.append(sub_pipe)
         if not blueprint.add_each_output and not blueprint.combined_output:
-            raise PipeDefinitionError("PipeParallel requires either add_each_output or combined_output to be set")
+            msg = "PipeParallel requires either add_each_output or combined_output to be set"
+            raise PipeDefinitionError(msg)
 
         if blueprint.combined_output:
             combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(

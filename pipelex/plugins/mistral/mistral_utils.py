@@ -11,7 +11,8 @@ async def upload_file_for_ocr(
     """Upload a local file to Mistral.
 
     Args:
-        pdf_path: Path to the local file to upload
+        file_path: Path to the local file to upload
+        mistral_client: Mistral client
 
     Returns:
         ID of the uploaded file

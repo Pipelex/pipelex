@@ -69,7 +69,8 @@ async def execute_pipeline(
 
     # Can be either working_memory or compact_memory or neither, but not both
     if working_memory and input_memory:
-        raise PipelineInputError(f"Cannot pass both working_memory and input_memory to `execute_pipeline` {pipe_code=}")
+        msg = f"Cannot pass both working_memory and input_memory to `execute_pipeline` {pipe_code=}"
+        raise PipelineInputError(msg)
     if input_memory:
         working_memory = WorkingMemoryFactory.make_from_implicit_memory(
             implicit_memory=input_memory,

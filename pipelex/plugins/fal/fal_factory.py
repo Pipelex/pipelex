@@ -37,7 +37,8 @@ class FalFactory:
             case AspectRatio.PORTRAIT_9_21:
                 return "portrait_21_9"
             case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
-                raise ImgGenParameterError(f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1 image generation model")
+                msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1 image generation model"
+                raise ImgGenParameterError(msg)
 
     @classmethod
     def make_aspect_ratio_for_flux_1_1_ultra(cls, aspect_ratio: AspectRatio) -> str:
@@ -57,7 +58,8 @@ class FalFactory:
             case AspectRatio.PORTRAIT_9_21:
                 return "9:21"
             case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
-                raise ImgGenParameterError(f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1.1 Ultra image generation model")
+                msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1.1 Ultra image generation model"
+                raise ImgGenParameterError(msg)
 
     @classmethod
     def make_output_format_for_flux(cls, output_format: OutputFormat) -> str:
@@ -67,7 +69,8 @@ class FalFactory:
             case OutputFormat.JPG:
                 return "jpeg"
             case OutputFormat.WEBP:
-                raise ImgGenParameterError("Output format WebP is not supported for Flux")
+                msg = "Output format WebP is not supported for Flux"
+                raise ImgGenParameterError(msg)
 
     @classmethod
     def make_fal_arguments(
@@ -84,7 +87,8 @@ class FalFactory:
                 num_inference_steps = params.nb_steps
                 if not num_inference_steps:
                     if not params.quality:
-                        raise ImgGenParameterError(f"Either nb_steps or quality must be set for image generation with '{fal_application}'")
+                        msg = f"Either nb_steps or quality must be set for image generation with '{fal_application}'"
+                        raise ImgGenParameterError(msg)
                     num_inference_steps = cls.make_nb_steps_from_quality_for_flux_pro(quality=params.quality)
 
                 args_dict = {
@@ -129,7 +133,8 @@ class FalFactory:
                     "sync_mode": img_gen_job.job_config.is_sync_mode,
                 }
             case _:
-                raise ImgGenParameterError(f"Invalid fal application: '{fal_application}'")
+                msg = f"Invalid fal application: '{fal_application}'"
+                raise ImgGenParameterError(msg)
 
         return args_dict
 
@@ -139,22 +144,24 @@ class FalFactory:
         fal_image_dict = images[0]
         image_url = fal_image_dict["url"]
         if not isinstance(image_url, str):
-            raise ImgGenGeneratedTypeError("Image url is not a string")
+            msg = "Image url is not a string"
+            raise ImgGenGeneratedTypeError(msg)
         # TODO: if the url is actual image data, send it to cloud storage?
 
         width = fal_image_dict["width"]
         if not isinstance(width, int):
-            raise ImgGenGeneratedTypeError("Image width is not an integer")
+            msg = "Image width is not an integer"
+            raise ImgGenGeneratedTypeError(msg)
         height = fal_image_dict["height"]
         if not isinstance(height, int):
-            raise ImgGenGeneratedTypeError("Image height is not an integer")
+            msg = "Image height is not an integer"
+            raise ImgGenGeneratedTypeError(msg)
 
-        generated_image = GeneratedImage(
+        return GeneratedImage(
             url=image_url,
             width=width,
             height=height,
         )
-        return generated_image
 
     @staticmethod
     def make_generated_image_list(fal_result: dict[str, Any]) -> list[GeneratedImage]:
@@ -164,14 +171,17 @@ class FalFactory:
         for fal_image_dict in fal_image_dicts:
             image_url = fal_image_dict["url"]
             if not isinstance(image_url, str):
-                raise ImgGenGeneratedTypeError("Image url is not a string")
+                msg = "Image url is not a string"
+                raise ImgGenGeneratedTypeError(msg)
 
             width = fal_image_dict["width"]
             if not isinstance(width, int):
-                raise ImgGenGeneratedTypeError("Image width is not an integer")
+                msg = "Image width is not an integer"
+                raise ImgGenGeneratedTypeError(msg)
             height = fal_image_dict["height"]
             if not isinstance(height, int):
-                raise ImgGenGeneratedTypeError("Image height is not an integer")
+                msg = "Image height is not an integer"
+                raise ImgGenGeneratedTypeError(msg)
 
             generated_image = GeneratedImage(
                 url=image_url,

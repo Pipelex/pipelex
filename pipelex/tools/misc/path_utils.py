@@ -107,5 +107,6 @@ def clarify_path_or_url(path_or_uri: str) -> tuple[str | None, str | None]:
             file_path = path_or_uri
             url = None
         case InterpretedPathOrUrl.BASE_64:
-            raise NotImplementedError("Base 64 is not supported yet by clarify_path_or_url")
+            msg = "Base 64 is not supported yet by clarify_path_or_url"
+            raise NotImplementedError(msg)
     return file_path, url

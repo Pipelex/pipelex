@@ -38,7 +38,8 @@ class AwsConfig(ConfigModel):
                     aws_secret_access_key = get_required_env(AWS_SECRET_ACCESS_KEY_VAR_NAME)
                     aws_region = get_required_env(AWS_REGION_VAR_NAME)
                 except EnvVarNotFoundError as exc:
-                    raise AwsCredentialsError(f"Error getting AWS access keys from environment: {exc}") from exc
+                    msg = f"Error getting AWS access keys from environment: {exc}"
+                    raise AwsCredentialsError(msg) from exc
                 log.debug("Getting AWS region from environment (priority override) or from aws_config.")
 
             case AwsKeyMethod.SECRET_PROVIDER:
@@ -48,7 +49,8 @@ class AwsConfig(ConfigModel):
                     aws_secret_access_key = get_secret(AWS_SECRET_ACCESS_KEY_VAR_NAME)
                     aws_region = get_secret(AWS_REGION_VAR_NAME)
                 except SecretNotFoundError as exc:
-                    raise AwsCredentialsError("Error getting AWS access keys from secrets provider.") from exc
+                    msg = "Error getting AWS access keys from secrets provider."
+                    raise AwsCredentialsError(msg) from exc
                 log.debug("Getting AWS region from environment (priority override) or from aws_config.")
 
         return aws_access_key_id, aws_secret_access_key, aws_region

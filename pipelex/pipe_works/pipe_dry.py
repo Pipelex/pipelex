@@ -55,7 +55,7 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
             return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.WARNING, warning_message=warning_message)
 
         if raise_on_failure:
-            raise exc
+            raise
 
         error_message = f"Dry run failed for pipe '{pipe.code}': {exc}"
         log.error(error_message)
@@ -70,6 +70,7 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
     Args:
         pipes: List of pipes to dry run
         run_in_parallel: If True, run pipes in parallel using ThreadPoolExecutor. If False, run sequentially.
+        raise_on_failure: If True, raise an exception if any pipe fails.
 
     For each pipe, this method:
     1. Gets the pipe's needed inputs
@@ -113,7 +114,8 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
     if unexpected_failures:
         unexpected_failures_details = "\n".join([f"'{pipe_code}': {results[pipe_code]}" for pipe_code in unexpected_failures])
         if raise_on_failure:
-            raise DryRunError(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
+            msg = f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}"
+            raise DryRunError(msg)
         log.error(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
         return results
 

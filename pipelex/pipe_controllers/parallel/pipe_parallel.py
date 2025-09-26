@@ -70,7 +70,8 @@ class PipeParallel(PipeController):
     def validate_inputs(self) -> Self:
         # Validate that either add_each_output or combined_output is set
         if not self.add_each_output and not self.combined_output:
-            raise PipeDefinitionError(f"PipeParallel'{self.code}'requires either add_each_output or combined_output to be set")
+            msg = f"PipeParallel'{self.code}'requires either add_each_output or combined_output to be set"
+            raise PipeDefinitionError(msg)
 
         return self
 
@@ -141,7 +142,8 @@ class PipeParallel(PipeController):
     ) -> PipeOutput:
         """Run a list of pipes in parallel."""
         if not self.add_each_output and not self.combined_output:
-            raise PipeDefinitionError("PipeParallel requires either add_each_output or combined_output to be set")
+            msg = "PipeParallel requires either add_each_output or combined_output to be set"
+            raise PipeDefinitionError(msg)
         if pipe_run_params.final_stuff_code:
             log.debug(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
@@ -169,21 +171,20 @@ class PipeParallel(PipeController):
             output_stuff = pipe_output.main_stuff
             sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
             if not sub_pipe_output_name:
-                raise PipeDefinitionError("PipeParallel requires a result specified for each parallel sub pipe")
+                msg = "PipeParallel requires a result specified for each parallel sub pipe"
+                raise PipeDefinitionError(msg)
             if self.add_each_output:
                 working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
             output_stuff_content_items.append(output_stuff.content)
             if sub_pipe_output_name in output_stuffs:
                 # TODO: check that at the blueprint / factory level
-                raise PipeDefinitionError(
-                    f"PipeParallel requires unique output names for each parallel sub pipe, but {sub_pipe_output_name} is already used",
-                )
+                msg = f"PipeParallel requires unique output names for each parallel sub pipe, but {sub_pipe_output_name} is already used"
+                raise PipeDefinitionError(msg)
             output_stuffs[sub_pipe_output_name] = output_stuff
             if sub_pipe_output_name in output_stuff_contents:
                 # TODO: check that at the blueprint / factory level
-                raise PipeDefinitionError(
-                    f"PipeParallel requires unique output names for each parallel sub pipe, but {sub_pipe_output_name} is already used",
-                )
+                msg = f"PipeParallel requires unique output names for each parallel sub pipe, but {sub_pipe_output_name} is already used"
+                raise PipeDefinitionError(msg)
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
             log.debug(f"PipeParallel '{self.code}': output_stuff_contents[{sub_pipe_output_name}]: {output_stuff_contents[sub_pipe_output_name]}")
 
@@ -222,7 +223,8 @@ class PipeParallel(PipeController):
         """
         log.debug(f"PipeParallel: dry run controller pipe: {self.code}")
         if pipe_run_params.run_mode != PipeRunMode.DRY:
-            raise PipeRunParamsError(f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}")
+            msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
+            raise PipeRunParamsError(msg)
 
         # 1. Validate that all required inputs are present in the working memory
         needed_inputs = self.needed_inputs()
@@ -233,9 +235,10 @@ class PipeParallel(PipeController):
                 missing_input_names.append(named_input_requirement.variable_name)
 
         if missing_input_names:
+            msg = f"Dry run failed: missing required inputs: {missing_input_names}"
             log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
             raise DryRunError(
-                message=f"Dry run failed for pipe '{self.code}' (PipeParallel): missing required inputs: {', '.join(missing_input_names)}",
+                message=msg,
                 missing_inputs=missing_input_names,
                 pipe_code=self.code,
             )
@@ -245,7 +248,8 @@ class PipeParallel(PipeController):
             try:
                 get_required_pipe(pipe_code=sub_pipe.pipe_code)
             except Exception as exc:
-                raise PipeDefinitionError(f"PipeParallel'{self.code}'sub-pipe '{sub_pipe.pipe_code}' not found") from exc
+                msg = f"PipeParallel'{self.code}'sub-pipe '{sub_pipe.pipe_code}' not found"
+                raise PipeDefinitionError(msg) from exc
 
         # 3. Run all sub-pipes in dry mode
         tasks: list[Coroutine[Any, Any, PipeOutput]] = []
@@ -263,9 +267,10 @@ class PipeParallel(PipeController):
         try:
             pipe_outputs = await asyncio.gather(*tasks)
         except Exception as exc:
-            log.error(f"Dry run failed: parallel sub-pipe execution failed: {exc}")
+            msg = f"Dry run failed: parallel sub-pipe execution failed: {exc}"
+            log.error(msg)
             raise DryRunError(
-                message=f"Dry run failed for pipe '{self.code}' (PipeParallel): parallel sub-pipe execution failed: {exc}",
+                message=msg,
                 missing_inputs=[],
                 pipe_code=self.code,
             )
@@ -278,8 +283,9 @@ class PipeParallel(PipeController):
             output_stuff = pipe_output.main_stuff
             sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
             if not sub_pipe_output_name:
+                msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe output name not specified"
                 raise DryRunError(
-                    message=f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe output name not specified",
+                    message=msg,
                     missing_inputs=[],
                     pipe_code=self.code,
                 )
@@ -288,8 +294,9 @@ class PipeParallel(PipeController):
                 working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
 
             if sub_pipe_output_name in output_stuffs:
+                msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): duplicate output name '{sub_pipe_output_name}'"
                 raise DryRunError(
-                    message=f"Dry run failed for pipe '{self.code}' (PipeParallel): duplicate output name '{sub_pipe_output_name}'",
+                    message=msg,
                     missing_inputs=[],
                     pipe_code=self.code,
                 )

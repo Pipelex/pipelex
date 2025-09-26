@@ -87,4 +87,5 @@ class PipeJinja2Factory(PipeFactoryProtocol[PipeJinja2Blueprint, PipeJinja2]):
                 jinja2_name=template_name,
                 inputs=inputs or PipeInputSpecFactory.make_empty(),
             )
-        raise PipeDefinitionError("Either template_str or template_name must be provided to make_pipe_jinja2_from_template_str")
+        msg = "Either template_str or template_name must be provided to make_pipe_jinja2_from_template_str"
+        raise PipeDefinitionError(msg)

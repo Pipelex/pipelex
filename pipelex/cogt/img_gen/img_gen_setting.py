@@ -18,7 +18,8 @@ class ImgGenSetting(ConfigModel):
     @model_validator(mode="after")
     def validate_quality_or_nb_steps(self) -> Self:
         if self.quality is not None and self.nb_steps is not None:
-            raise ImgGenSettingsValidationError("ImgGenSetting cannot have both 'quality' and 'nb_steps' specified. Use one or the other.")
+            msg = "ImgGenSetting cannot have both 'quality' and 'nb_steps' specified. Use one or the other."
+            raise ImgGenSettingsValidationError(msg)
         return self
 
     def desc(self) -> str:

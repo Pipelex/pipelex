@@ -1,8 +1,10 @@
 from pathlib import Path
-from typing import Any, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Union, get_args, get_origin
 
 from kajson.kajson_manager import KajsonManager
-from pydantic.fields import FieldInfo
+
+if TYPE_CHECKING:
+    from pydantic.fields import FieldInfo
 
 from pipelex.tools.typing.module_inspector import find_classes_in_module, import_module_from_file
 

@@ -103,9 +103,7 @@ class LogConfig(ConfigModel):
 
     @field_validator("package_log_levels", mode="before")
     def validate_package_log_levels(self, value: dict[str, str]) -> dict[str, LogLevel]:
-        """Validate the package log levels dictionary."""
-        the_dict = cast(
+        return cast(
             "dict[str, LogLevel]",
             ConfigModel.transform_dict_str_to_enum(input_dict=value, value_enum_cls=LogLevel),
         )
-        return the_dict

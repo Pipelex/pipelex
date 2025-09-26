@@ -28,7 +28,8 @@ class PipelineManager(PipelineManagerAbstract, RootModel[PipelineManagerRoot]):
     def get_pipeline(self, pipeline_run_id: str) -> Pipeline:
         pipeline = self.get_optional_pipeline(pipeline_run_id=pipeline_run_id)
         if pipeline is None:
-            raise PipelineManagerNotFoundError(f"Pipeline {pipeline_run_id} not found")
+            msg = f"Pipeline {pipeline_run_id} not found"
+            raise PipelineManagerNotFoundError(msg)
         return pipeline
 
     def _set_pipeline(self, pipeline_run_id: str, pipeline: Pipeline) -> Pipeline:

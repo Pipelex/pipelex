@@ -40,7 +40,8 @@ class PipeLLMBlueprint(PipeBlueprint):
     @field_validator("nb_output", mode="after")
     def validate_nb_output(cls, value: int | None = None) -> int | None:
         if value and value < 1:
-            raise PipeDefinitionError("PipeLLMBlueprint nb_output must be greater than 0")
+            msg = "PipeLLMBlueprint nb_output must be greater than 0"
+            raise PipeDefinitionError(msg)
         return value
 
     @model_validator(mode="after")
@@ -53,5 +54,6 @@ class PipeLLMBlueprint(PipeBlueprint):
                 ["prompt", "prompt_name", "prompt_template", "template_name"],
             ],
         ):
-            raise PipeDefinitionError(f"PipeLLMBlueprint should have no more than one of {excess_attributes_list} among them")
+            msg = f"PipeLLMBlueprint should have no more than one of {excess_attributes_list} among them"
+            raise PipeDefinitionError(msg)
         return self

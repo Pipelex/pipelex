@@ -12,7 +12,8 @@ def create_pydantic_model_from_function(func: Callable[..., Any]) -> type[BaseMo
 
     Parameters
     ----------
-        func (Callable): The function from which to derive the BaseModel.
+        func : Callable[..., Any]
+            The function from which to derive the BaseModel.
 
     Returns
     -------
@@ -32,11 +33,14 @@ def create_openai_schema_from_function(func: Callable[..., Any]) -> dict[str, An
 
     Parameters
     ----------
-        func (Callable): The function from which to derive the OpenAI schema.
+    func : Callable[..., Any]
+        The Python function to introspect and convert into an OpenAI tool schema.
 
     Returns
     -------
-        Dict[str, Any]: The OpenAI schema as a dictionary.
+    dict[str, Any]
+        The OpenAI-compatible schema describing the function's name, description,
+        and parameters.
 
     """
     model: type[BaseModel] = create_pydantic_model_from_function(func)

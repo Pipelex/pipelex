@@ -34,16 +34,14 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
         )
 
         if not isinstance(sdk_instance, BedrockClientProtocol):
-            raise SdkTypeError(
-                f"Provided sdk_instance for {self.__class__.__name__} is not of type BedrockClientProtocol: it's a '{type(sdk_instance)}'",
-            )
+            msg = f"Provided sdk_instance for {self.__class__.__name__} is not of type BedrockClientProtocol: it's a '{type(sdk_instance)}'"
+            raise SdkTypeError(msg)
 
         if default_max_tokens := inference_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise BedrockWorkerConfigurationError(
-                f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Bedrock",
-            )
+            msg = f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Bedrock"
+            raise BedrockWorkerConfigurationError(msg)
         self.bedrock_client_for_text = sdk_instance
 
     @override
@@ -73,4 +71,5 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         # TODO: try with the newest instructor release
-        raise LLMCapabilityError(f"It is not possible to generate objects with a {self.__class__.__name__}.")
+        msg = f"It is not possible to generate objects with a {self.__class__.__name__}."
+        raise LLMCapabilityError(msg)

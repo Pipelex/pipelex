@@ -81,8 +81,9 @@ class Pipelex(metaclass=MetaSingleton):
         try:
             self.pipelex_hub.setup_config(config_cls=config_cls or PipelexConfig)
         except ValidationError as exc:
-            error_msg = format_pydantic_validation_error(exc)
-            raise PipelexConfigError(f"Could not setup config because of: {error_msg}") from exc
+            formatted_error_msg = format_pydantic_validation_error(exc)
+            msg = f"Could not setup config because of: {formatted_error_msg}"
+            raise PipelexConfigError(msg) from exc
 
         for extra_env_file in get_config().pipelex.extra_env_files:
             load_dotenv(dotenv_path=extra_env_file, override=True)
@@ -172,9 +173,8 @@ class Pipelex(metaclass=MetaSingleton):
         try:
             self.models_manager.setup()
         except RoutingProfileLibraryNotFoundError as routing_profile_library_exc:
-            raise PipelexSetupError(
-                "The routing library could not be found, please call `pipelex init config` to create it",
-            ) from routing_profile_library_exc
+            msg = "The routing library could not be found, please call `pipelex init config` to create it"
+            raise PipelexSetupError(msg) from routing_profile_library_exc
         except InferenceBackendCredentialsError as credentials_exc:
             backend_name = credentials_exc.backend_name
             var_name = credentials_exc.key_name
@@ -219,16 +219,18 @@ class Pipelex(metaclass=MetaSingleton):
             self.library_manager.setup()
             self.library_manager.load_libraries()
         except ValidationError as exc:
-            error_msg = format_pydantic_validation_error(exc)
-            raise PipelexSetupError(f"Could not setup libraries because of: {error_msg}") from exc
+            formatted_error_msg = format_pydantic_validation_error(exc)
+            msg = f"Could not setup libraries because of: {formatted_error_msg}"
+            raise PipelexSetupError(msg) from exc
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_config().project_name}")
 
     def validate_libraries(self):
         try:
             self.library_manager.validate_libraries()
         except ValidationError as exc:
-            error_msg = format_pydantic_validation_error(exc)
-            raise PipelexSetupError(f"Could not validate libraries because of: {error_msg}") from exc
+            formatted_error_msg = format_pydantic_validation_error(exc)
+            msg = f"Could not validate libraries because of: {formatted_error_msg}"
+            raise PipelexSetupError(msg) from exc
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_config().project_name}")
 
     def teardown(self):
@@ -286,15 +288,18 @@ class Pipelex(metaclass=MetaSingleton):
 
         """
         if relative_config_folder_path is not None and absolute_config_folder_path is not None:
-            raise PipelexSetupError("Cannot specify both relative_config_folder_path and absolute_config_folder_path")
+            msg = "Cannot specify both relative_config_folder_path and absolute_config_folder_path"
+            raise PipelexSetupError(msg)
 
         if relative_config_folder_path is not None:
             if from_file:
                 current_frame = inspect.currentframe()
                 if current_frame is None:
-                    raise PipelexSetupError("Could not find relative config folder path because of: Failed to get current frame")
+                    msg = "Could not find relative config folder path because of: Failed to get current frame"
+                    raise PipelexSetupError(msg)
                 if current_frame.f_back is None:
-                    raise PipelexSetupError("Could not find relative config folder path because of: Failed to get caller frame")
+                    msg = "Could not find relative config folder path because of: Failed to get caller frame"
+                    raise PipelexSetupError(msg)
                 caller_file = current_frame.f_back.f_code.co_filename
                 caller_dir = os.path.dirname(os.path.abspath(caller_file))
                 config_dir_path = os.path.abspath(os.path.join(caller_dir, relative_config_folder_path))
@@ -319,5 +324,6 @@ class Pipelex(metaclass=MetaSingleton):
     def get_instance(cls) -> Self:
         instance = MetaSingleton.instances.get(cls)
         if instance is None:
-            raise RuntimeError("Pipelex is not initialized")
+            msg = "Pipelex is not initialized"
+            raise RuntimeError(msg)
         return cast("Self", instance)

@@ -37,7 +37,8 @@ class Log:
 
         """
         if self._log_config_instance is None:
-            raise RuntimeError("LogConfig is not set. You must initialize Pipelex first.")
+            msg = "LogConfig is not set. You must initialize Pipelex first."
+            raise RuntimeError(msg)
         return self._log_config_instance
 
     def reset(self):
@@ -80,7 +81,8 @@ class Log:
 
         """
         if self._log_config_instance is not None:
-            raise RuntimeError("LogConfig is already set. You can only call log.configure() once.")
+            msg = "LogConfig is already set. You can only call log.configure() once."
+            raise RuntimeError(msg)
 
         self.log_dispatch.configure(
             project_name=project_name,
@@ -120,7 +122,8 @@ class Log:
 
         """
         if self.poor_handler is None:
-            raise RuntimeError("Poor log handler is not set.")
+            msg = "Poor log handler is not set."
+            raise RuntimeError(msg)
         self.poor_handler.setFormatter(formatter)
 
     def _should_ignore(self, problem_id: str | None = None) -> bool:

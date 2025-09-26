@@ -55,7 +55,8 @@ class PipelineTracker(PipelineTrackerProtocol):
         node_name = node_attributes[NodeAttributeKey.NAME]
         if isinstance(node_name, str):
             return node_name
-        raise JobHistoryError(f"Node name is not a string: {node_name}")
+        msg = f"Node name is not a string: {node_name}"
+        raise JobHistoryError(msg)
 
     def _pipe_layer_to_subgraph_name(self, pipe_layer: list[str]) -> str:
         return "-".join(pipe_layer)
@@ -83,7 +84,8 @@ class PipelineTracker(PipelineTrackerProtocol):
             return f"**{concept_display}** #{as_item_index + 1}"
         name = stuff.stuff_name
         if not name:
-            raise JobHistoryError(f"Stuff name is empty for stuff {stuff}")
+            msg = f"Stuff name is empty for stuff {stuff}"
+            raise JobHistoryError(msg)
         return f"{name}:<br>**{concept_display}**"
 
     def _add_stuff_node(
@@ -135,13 +137,17 @@ class PipelineTracker(PipelineTrackerProtocol):
     ):
         # Ensure both nodes exist with attributes
         if not self.nx_graph.has_node(from_node):
-            raise JobHistoryError(f"Source node '{from_node}' does not exist")
+            msg = f"Source node '{from_node}' does not exist"
+            raise JobHistoryError(msg)
         if not self.nx_graph.has_node(to_node):
-            raise JobHistoryError(f"Target node '{to_node}' does not exist")
+            msg = f"Target node '{to_node}' does not exist"
+            raise JobHistoryError(msg)
         if not self.nx_graph.nodes[from_node]:
-            raise JobHistoryError(f"Source node '{from_node}' exists but has no attributes")
+            msg = f"Source node '{from_node}' exists but has no attributes"
+            raise JobHistoryError(msg)
         if not self.nx_graph.nodes[to_node]:
-            raise JobHistoryError(f"Target node '{to_node}' exists but has no attributes")
+            msg = f"Target node '{to_node}' exists but has no attributes"
+            raise JobHistoryError(msg)
 
         edge_attributes: dict[str, Any] = {
             EdgeAttributeKey.EDGE_CATEGORY: edge_category,
@@ -325,7 +331,8 @@ class PipelineTracker(PipelineTrackerProtocol):
             log.debug("No nodes in the pipeline tracker")
             return
         if self.start_node is None:
-            raise JobHistoryError("Start node is not set")
+            msg = "Start node is not set"
+            raise JobHistoryError(msg)
         flowchart = PipelineFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, tracker_config=self._tracker_config)
         mermaid_code, url = flowchart.generate_mermaid_flowchart(title=title, subtitle=subtitle)
         print(mermaid_code)
@@ -339,7 +346,8 @@ class PipelineTracker(PipelineTrackerProtocol):
             log.debug("No nodes in the pipeline tracker")
             return None
         if self.start_node is None:
-            raise JobHistoryError("Start node is not set")
+            msg = "Start node is not set"
+            raise JobHistoryError(msg)
         flowchart = PipelineFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, tracker_config=self._tracker_config)
         _, url = flowchart.generate_mermaid_flowchart(title=title, subtitle=subtitle)
         title_to_print = "Mermaid flowchart URL"

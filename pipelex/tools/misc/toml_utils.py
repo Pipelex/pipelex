@@ -140,7 +140,7 @@ def make_toml_string(
     ensure_trailing_newline: bool = True,
     ensure_leading_blank_line_in_value: bool = False,
 ):
-    """Build a tomlkit string node.
+    r"""Build a tomlkit string node.
     - If `force_multiline` or the text contains '\\n', we emit a triple-quoted multiline string.
     - When multiline, `ensure_trailing_newline` puts the closing quotes on their own line.
     - When multiline, `ensure_leading_blank_line_in_value` inserts a real blank line at the start of the value.
@@ -163,12 +163,7 @@ def _convert_to_inline(value: Any) -> Any:
     # Handle Pydantic models by converting them to dict first
     if isinstance(value, BaseModel):
         # For RootModel, use the root attribute; for regular models, use model_dump()
-        if hasattr(value, "root"):
-            # This is a RootModel, use its root value
-            value = value.root  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType, reportUnknownVariableType]
-        else:
-            # This is a regular BaseModel, convert to dict
-            value = value.model_dump()
+        value = value.root if hasattr(value, "root") else value.model_dump()  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType, reportUnknownVariableType]
 
     if isinstance(value, Mapping):
         value = cast("Mapping[str, Any]", value)
