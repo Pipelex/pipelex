@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel
 
 from pipelex.core.domains.exceptions import DomainError

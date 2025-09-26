@@ -1,4 +1,3 @@
-
 from pipelex.types import StrEnum
 
 

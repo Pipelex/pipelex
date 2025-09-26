@@ -94,7 +94,7 @@ class AnthropicFactory:
                             "type": "base64",
                             "media_type": mime,
                             "data": prepped_image.base_64.decode("utf-8"),
-                        }, # pyright: ignore[reportAssignmentType]
+                        },  # pyright: ignore[reportAssignmentType]
                     }
                 elif isinstance(prepped_image, str):  # pyright: ignore[reportUnnecessaryIsInstance]
                     url = prepped_image
@@ -137,7 +137,7 @@ class AnthropicFactory:
                             "type": "base64",
                             "media_type": mime,
                             "data": prepped_image.base_64.decode("utf-8"),
-                        }, # pyright: ignore[reportAssignmentType]
+                        },  # pyright: ignore[reportAssignmentType]
                     }
                 elif isinstance(prepped_image, str):  # pyright: ignore[reportUnnecessaryIsInstance]
                     url = prepped_image
@@ -164,7 +164,7 @@ class AnthropicFactory:
                 "content": [text_block_param],
             }
 
-        return message # pyright: ignore[reportReturnType]
+        return message  # pyright: ignore[reportReturnType]
 
     @classmethod
     async def _prep_image_for_anthropic(
@@ -190,8 +190,7 @@ class AnthropicFactory:
         cls,
         llm_job: LLMJob,
     ) -> list[ChatCompletionMessageParam]:
-        """Makes a list of messages with a system message (if provided) and followed by a user message.
-        """
+        """Makes a list of messages with a system message (if provided) and followed by a user message."""
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
         #### System message ####

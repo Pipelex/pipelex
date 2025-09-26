@@ -1,4 +1,3 @@
-
 from pydantic import Field, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint

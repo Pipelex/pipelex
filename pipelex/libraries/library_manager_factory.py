@@ -24,7 +24,11 @@ class LibraryManagerFactory:
 
     @classmethod
     def make(
-        cls, domain_library: DomainLibrary, concept_library: ConceptLibrary, pipe_library: PipeLibrary, config_dir_path: str,
+        cls,
+        domain_library: DomainLibrary,
+        concept_library: ConceptLibrary,
+        pipe_library: PipeLibrary,
+        config_dir_path: str,
     ) -> "LibraryManager":
         """Create a LibraryManager with provided libraries."""
         library_config = LibraryConfig(config_dir_path=config_dir_path)

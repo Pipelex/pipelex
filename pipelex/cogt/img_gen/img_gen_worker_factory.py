@@ -1,4 +1,3 @@
-
 from pipelex.cogt.exceptions import CogtError, MissingDependencyError
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -33,7 +32,9 @@ class ImgGenWorkerFactory:
                     from fal_client import AsyncClient as FalAsyncClient  # pylint: disable=import-outside-toplevel
                 except ImportError as exc:
                     raise MissingDependencyError(
-                        "fal-client", "fal", "The fal-client SDK is required to use FAL models (generation of images).",
+                        "fal-client",
+                        "fal",
+                        "The fal-client SDK is required to use FAL models (generation of images).",
                     ) from exc
 
                 from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker  # pylint: disable=import-outside-toplevel

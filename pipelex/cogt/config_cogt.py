@@ -1,4 +1,3 @@
-
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.plugins.fal.fal_config import FalConfig

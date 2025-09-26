@@ -197,8 +197,7 @@ class PipeCondition(PipeController):
         return self
 
     def _validate_inputs(self):
-        """Validate that the inputs declared for this PipeCondition match what is actually needed.
-        """
+        """Validate that the inputs declared for this PipeCondition match what is actually needed."""
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions

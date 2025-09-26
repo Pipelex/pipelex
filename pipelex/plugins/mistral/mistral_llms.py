@@ -1,4 +1,3 @@
-
 from mistralai.models import Data
 
 from pipelex.hub import get_models_manager

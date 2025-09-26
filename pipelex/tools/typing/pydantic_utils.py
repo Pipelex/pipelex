@@ -84,7 +84,7 @@ def convert_strenum_to_str(
         return [convert_strenum_to_str(item) for item in obj_list]
     if isinstance(obj, StrEnum):
         if hasattr(obj, "display_name"):
-            return obj.display_name() # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType, reportAttributeAccessIssue]
+            return obj.display_name()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType, reportAttributeAccessIssue]
         return str(obj)
     return obj
 
@@ -191,7 +191,7 @@ def serialize_model(
 
         elif is_stringify_enums and isinstance(value, StrEnum):
             if hasattr(value, "display_name"):
-                data[field_name] = value.display_name() # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+                data[field_name] = value.display_name()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
             else:
                 data[field_name] = str(value)
 

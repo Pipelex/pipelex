@@ -79,8 +79,7 @@ class PipeParallel(PipeController):
         pass
 
     def _validate_inputs(self):
-        """Validate that the inputs declared for this PipeParallel match what is actually needed.
-        """
+        """Validate that the inputs declared for this PipeParallel match what is actually needed."""
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
@@ -140,8 +139,7 @@ class PipeParallel(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        """Run a list of pipes in parallel.
-        """
+        """Run a list of pipes in parallel."""
         if not self.add_each_output and not self.combined_output:
             raise PipeDefinitionError("PipeParallel requires either add_each_output or combined_output to be set")
         if pipe_run_params.final_stuff_code:

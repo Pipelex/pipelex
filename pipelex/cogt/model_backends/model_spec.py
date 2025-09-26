@@ -1,4 +1,3 @@
-
 from pydantic import Field
 
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints

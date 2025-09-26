@@ -22,7 +22,6 @@ class GoogleLLMWorkerError(Exception):
     """Base exception for Google LLM Worker errors."""
 
 
-
 class GoogleLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,

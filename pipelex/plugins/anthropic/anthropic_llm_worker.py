@@ -59,7 +59,9 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
 
         # Verify if the sdk_instance is compatible with the current LLM platform
         if isinstance(sdk_instance, (AsyncAnthropic, AsyncAnthropicBedrock)):
-            if (inference_model.sdk == AnthropicSdkVariant.ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropic))) or (inference_model.sdk == AnthropicSdkVariant.BEDROCK_ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropicBedrock))):
+            if (inference_model.sdk == AnthropicSdkVariant.ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropic))) or (
+                inference_model.sdk == AnthropicSdkVariant.BEDROCK_ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropicBedrock))
+            ):
                 msg = f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}"
                 raise SdkTypeError(msg)
         else:

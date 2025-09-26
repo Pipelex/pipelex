@@ -1,4 +1,4 @@
-from typing import Any, cast, Optional
+from typing import Any, cast
 
 import shortuuid
 from polyfactory.factories.pydantic_factory import ModelFactory
@@ -23,7 +23,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         text: str,
         concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT,
-        name: Optional[str] = "text",
+        name: str | None = "text",
     ) -> WorkingMemory:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
         return cls.make_from_single_stuff(
@@ -39,7 +39,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         image_url: str,
         concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptEnum.IMAGE,
-        name: Optional[str] = "image",
+        name: str | None = "image",
     ) -> WorkingMemory:
         # TODO: validate that the concept is compatible with an image concept
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
@@ -55,7 +55,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         pdf_url: str,
         concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptEnum.PDF,
-        name: Optional[str] = "pdf",
+        name: str | None = "pdf",
     ) -> WorkingMemory:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
         return cls.make_from_single_stuff(

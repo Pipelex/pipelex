@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel
 
 from pipelex.tools.environment import get_optional_env
@@ -20,8 +19,7 @@ class RunMode(StrEnum):
 
 
 class WorkerMode(StrEnum):
-    """Used for external worker, note that it can be run "for unit tests" even if it's not a unit test.
-    """
+    """Used for external worker, note that it can be run "for unit tests" even if it's not a unit test."""
 
     NORMAL = "normal"
     UNIT_TEST = "unit_test"

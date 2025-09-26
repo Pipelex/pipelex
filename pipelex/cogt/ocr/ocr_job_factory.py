@@ -1,4 +1,3 @@
-
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams, OcrJobReport

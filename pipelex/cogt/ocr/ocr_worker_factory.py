@@ -1,4 +1,3 @@
-
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
@@ -20,7 +19,7 @@ class OcrWorkerFactory:
         match plugin.sdk:
             case "mistral":
                 try:
-                    import mistralai  # pylint: disable=import-outside-toplevel
+                    import mistralai  # pylint: disable=import-outside-toplevel # noqa: F401
                 except ImportError as exc:
                     raise MissingDependencyError(
                         "mistralai",

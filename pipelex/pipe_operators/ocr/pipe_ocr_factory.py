@@ -1,4 +1,3 @@
-
 from typing_extensions import override
 
 from pipelex.config import get_config
@@ -32,11 +31,14 @@ class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
             definition=blueprint.definition,
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(
-                    domain=output_domain_and_code.domain, concept_code=output_domain_and_code.concept_code,
+                    domain=output_domain_and_code.domain,
+                    concept_code=output_domain_and_code.concept_code,
                 ),
             ),
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+                domain=domain,
+                blueprint=blueprint.inputs or {},
+                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             ocr_choice=blueprint.ocr,
             should_include_images=blueprint.page_images or False,

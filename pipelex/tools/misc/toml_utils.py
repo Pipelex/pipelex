@@ -18,7 +18,6 @@ class TOMLValidationError(Exception):
     """Raised when TOML file has formatting issues that could cause problems."""
 
 
-
 def validate_toml_content(content: str, file_path: str | None = None) -> None:
     """Validate TOML content for common formatting issues."""
     lines = content.splitlines()
@@ -166,7 +165,7 @@ def _convert_to_inline(value: Any) -> Any:
         # For RootModel, use the root attribute; for regular models, use model_dump()
         if hasattr(value, "root"):
             # This is a RootModel, use its root value
-            value = value.root # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType, reportUnknownVariableType]
+            value = value.root  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType, reportUnknownVariableType]
         else:
             # This is a regular BaseModel, convert to dict
             value = value.model_dump()
@@ -208,7 +207,7 @@ def _convert_to_inline(value: Any) -> Any:
             ensure_trailing_newline=True,  # keep closing """ on its own line
             ensure_leading_blank_line_in_value=False,  # flip to True to keep a blank first line
         )
-    return value # pyright: ignore[reportUnknownVariableType]
+    return value  # pyright: ignore[reportUnknownVariableType]
 
 
 def _filter_empty_values(value: Any) -> Any:

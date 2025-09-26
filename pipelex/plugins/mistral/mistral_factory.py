@@ -1,4 +1,3 @@
-
 from mistralai import Mistral, OCRImageObject, OCRResponse
 from mistralai.models import (
     ContentChunk,
@@ -47,8 +46,7 @@ class MistralFactory:
 
     @classmethod
     def make_simple_messages(cls, llm_job: LLMJob) -> list[Messages]:
-        """Makes a list of messages with a system message (if provided) and followed by a user message.
-        """
+        """Makes a list of messages with a system message (if provided) and followed by a user message."""
         messages: list[Messages] = []
         user_content: list[ContentChunk] = []
         if user_text := llm_job.llm_prompt.user_text:
@@ -83,8 +81,7 @@ class MistralFactory:
         cls,
         llm_job: LLMJob,
     ) -> list[ChatCompletionMessageParam]:
-        """Makes a list of messages with a system message (if provided) and followed by a user message.
-        """
+        """Makes a list of messages with a system message (if provided) and followed by a user message."""
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
         user_contents: list[ChatCompletionContentPartParam] = []

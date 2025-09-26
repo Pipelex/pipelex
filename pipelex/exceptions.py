@@ -1,4 +1,3 @@
-
 from click import ClickException
 from typing_extensions import override
 
@@ -204,25 +203,20 @@ class PipeBatchError(PipelexError):
     """Base class for all PipeBatch-related errors."""
 
 
-
 class PipeBatchRecursionError(PipeBatchError):
     """Raised when a PipeBatch attempts to run itself recursively."""
-
 
 
 class PipeBatchInputError(PipeBatchError):
     """Raised when the input to a PipeBatch is not a ListContent or is invalid."""
 
 
-
 class PipeBatchOutputError(PipeBatchError):
     """Raised when there's an error with the output structure of a PipeBatch operation."""
 
 
-
 class PipeBatchBranchError(PipeBatchError):
     """Raised when there's an error with a branch pipe execution in PipeBatch."""
-
 
 
 class JobHistoryError(PipelexError):

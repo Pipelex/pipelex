@@ -1,4 +1,3 @@
-
 from pipelex.tools.exceptions import ToolException
 
 

@@ -1,4 +1,3 @@
-
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -30,11 +29,14 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
             code=pipe_code,
             definition=blueprint.definition,
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+                domain=domain,
+                blueprint=blueprint.inputs or {},
+                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             output=get_concept_provider().get_required_concept(
                 concept_string=ConceptFactory.construct_concept_string_with_domain(
-                    domain=output_domain_and_code.domain, concept_code=output_domain_and_code.concept_code,
+                    domain=output_domain_and_code.domain,
+                    concept_code=output_domain_and_code.concept_code,
                 ),
             ),
             branch_pipe_code=blueprint.branch_pipe_code,

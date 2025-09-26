@@ -1,4 +1,3 @@
-
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, field_validator
 

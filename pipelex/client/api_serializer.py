@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Any, cast, Dict
+from typing import Any, cast
 
 from pipelex.client.protocol import CompactMemory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
@@ -35,8 +35,8 @@ class ApiSerializer:
 
         for stuff_name, stuff in working_memory.root.items():
             if stuff.concept.code == NativeConceptEnum.TEXT:
-                stuff_content = cast(TextContent, stuff.content)
-                item_dict: Dict[str, Any] = {
+                stuff_content = cast("TextContent", stuff.content)
+                item_dict: dict[str, Any] = {
                     "concept_code": stuff.concept.code,
                     "content": stuff_content.text,
                 }

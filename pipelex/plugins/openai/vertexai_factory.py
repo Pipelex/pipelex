@@ -56,14 +56,14 @@ class VertexAIFactory(ConfigModel):
     def _make_api_key(cls, gcp_credentials_file_path: str) -> str:
         """Get GCP credentials and return access token."""
         try:
-            from google.auth.transport.requests import Request # noqa: PLC0415
-            from google.oauth2.service_account import Credentials # noqa: PLC0415
+            from google.auth.transport.requests import Request  # noqa: PLC0415
+            from google.oauth2.service_account import Credentials  # noqa: PLC0415
         except ImportError as exc:
             msg = (
-                    "The google-auth-oauthlib SDK is required to use Google connection. "
-                    "You can install it with 'pip install pipelex[google]', or use this model via another provider "
-                    "(such as Azure OpenAI, OpenAI, anthropic or bedrock)."
-                )
+                "The google-auth-oauthlib SDK is required to use Google connection. "
+                "You can install it with 'pip install pipelex[google]', or use this model via another provider "
+                "(such as Azure OpenAI, OpenAI, anthropic or bedrock)."
+            )
             raise MissingDependencyError(
                 "google-auth-oauthlib",
                 "google",
@@ -77,7 +77,8 @@ class VertexAIFactory(ConfigModel):
             raise VertexAICredentialsError(msg) from exc
 
         credentials = Credentials.from_service_account_info(  # pyright: ignore[reportUnknownMemberType]
-            credentials_dict, scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            credentials_dict,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
         )
         auth_req = Request()
         credentials.refresh(auth_req)  # pyright: ignore[reportUnknownMemberType]

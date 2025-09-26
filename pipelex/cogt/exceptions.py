@@ -1,4 +1,3 @@
-
 from pipelex.tools.exceptions import FatalError, RootException
 from pipelex.types import StrEnum
 

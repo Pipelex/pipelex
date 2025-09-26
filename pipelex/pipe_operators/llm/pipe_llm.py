@@ -77,7 +77,7 @@ class PipeLLM(PipeOperator):
             if self.output.structure_class_name == NativeConceptEnum.TEXT:
                 raise PipeDefinitionError(
                     f"Output concept '{self.output.code}' is considered a Text concept, "
-                    f"so it cannot be structured. Maybe you forgot to add '{NativeConceptEnum.TEXT}' to the class registry?"
+                    f"so it cannot be structured. Maybe you forgot to add '{NativeConceptEnum.TEXT}' to the class registry?",
                 )
         return self
 
@@ -115,7 +115,8 @@ class PipeLLM(PipeOperator):
         for input_name, requirement in self.inputs.items:
             if concept_provider.is_image_concept(concept=requirement.concept):
                 needed_inputs.add_requirement(
-                    variable_name=input_name, concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+                    variable_name=input_name,
+                    concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.IMAGE),
                 )
             else:
                 needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)

@@ -122,8 +122,7 @@ def copy_file_from_package(
     target_path: str,
     overwrite: bool = True,
 ) -> None:
-    """Copies a file from a package to a target directory.
-    """
+    """Copies a file from a package to a target directory."""
     file_path = str(importlib.resources.files(package_name).joinpath(file_path_in_package))
     copy_file(
         source_path=file_path,

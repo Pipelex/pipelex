@@ -284,8 +284,8 @@ class StructurePrinter:
                             field_line += f"  # {field_description}"
                         # Then check if the field type itself has model_fields and a description
                         # This handles nested content types that have field descriptions
-                        elif hasattr(ftype, "model_fields") and fname in ftype.model_fields and hasattr(ftype.model_fields[fname], "description"): # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-                            field_line += f"  # {ftype.model_fields[fname].description}" # pyright: ignore[reportUnknownMemberType]
+                        elif hasattr(ftype, "model_fields") and fname in ftype.model_fields and hasattr(ftype.model_fields[fname], "description"):  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                            field_line += f"  # {ftype.model_fields[fname].description}"  # pyright: ignore[reportUnknownMemberType]
 
                         # Split multi-line field lines
                         if "\n" in field_line:

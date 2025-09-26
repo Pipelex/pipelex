@@ -1,4 +1,3 @@
-
 from jinja2 import BaseLoader, Environment, PackageLoader
 
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory

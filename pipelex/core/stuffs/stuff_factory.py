@@ -125,8 +125,7 @@ class StuffFactory:
         name: str | None = None,
     ) -> Stuff:
         # TODO: Add unit tests for this method
-        """Combine a dictionary of stuffs into a single stuff.
-        """
+        """Combine a dictionary of stuffs into a single stuff."""
         the_subclass = get_class_registry().get_required_subclass(name=concept.structure_class_name, base_class=StuffContent)
         try:
             the_stuff_content = the_subclass.model_validate(obj=stuff_contents)
@@ -278,8 +277,7 @@ class StuffContentFactory:
 
     @classmethod
     def make_stuff_content_from_concept_with_fallback(cls, concept: Concept, value: dict[str, Any] | str) -> StuffContent:
-        """Create StuffContent from concept code, falling back to TextContent if no registry class is found.
-        """
+        """Create StuffContent from concept code, falling back to TextContent if no registry class is found."""
         the_structure_class = get_class_registry().get_class(name=concept.structure_class_name)
 
         if the_structure_class is None:

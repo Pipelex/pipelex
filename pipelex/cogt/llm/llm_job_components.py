@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel, Field
 
 from pipelex.cogt.llm.llm_report import LLMTokensUsage

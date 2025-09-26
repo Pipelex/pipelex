@@ -45,7 +45,15 @@ class PipelexBundleSpecDraft(StructuredContent):
 
 
 PipeSpecUnion = Annotated[
-    PipeFuncSpec | PipeImgGenSpec | PipeJinja2Spec | PipeLLMSpec | PipeOcrSpec | PipeBatchSpec | PipeConditionSpec | PipeParallelSpec | PipeSequenceSpec,
+    PipeFuncSpec
+    | PipeImgGenSpec
+    | PipeJinja2Spec
+    | PipeLLMSpec
+    | PipeOcrSpec
+    | PipeBatchSpec
+    | PipeConditionSpec
+    | PipeParallelSpec
+    | PipeSequenceSpec,
     Field(discriminator="type"),
 ]
 
@@ -147,7 +155,7 @@ def _convert_pipe_spec(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
     if pipe_class is None:
         msg = f"Unknown pipe type: {pipe_spec.type}"
         raise PipeBuilderError(msg)
-    return cast(PipeSpecUnion, pipe_class(**pipe_spec.model_dump(serialize_as_any=True)))
+    return cast("PipeSpecUnion", pipe_class(**pipe_spec.model_dump(serialize_as_any=True)))
 
 
 async def compile_in_pipelex_bundle_spec(working_memory: WorkingMemory) -> PipelexBundleSpec:
@@ -199,7 +207,6 @@ class ValidateDryRunError(Exception):
     """Raised when validating the dry run of a pipelex bundle blueprint."""
 
 
-
 class PipeFailure(StructuredContent):
     """Details of a single pipe failure during dry run."""
 
@@ -212,7 +219,8 @@ class DryRunResult(StructuredContent):
 
     status: DryRunStatus
     failed_pipes: list[PipeFailure] = Field(
-        default_factory=empty_list_factory_of(PipeFailure), description="List of pipes that failed during dry run",
+        default_factory=empty_list_factory_of(PipeFailure),
+        description="List of pipes that failed during dry run",
     )
 
 
@@ -247,14 +255,13 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
                 if not spec_class:
                     msg = f"Unknown pipe type: {pipe_spec.type}"
                     raise ValidateDryRunError(msg)
-                else:
-                    pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
-                    failed_pipes.append(
-                        PipeFailure(
-                            pipe=pipe_spec,
-                            error_message=dry_run_output.error_message or "",
-                        ),
-                    )
+                pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
+                failed_pipes.append(
+                    PipeFailure(
+                        pipe=pipe_spec,
+                        error_message=dry_run_output.error_message or "",
+                    ),
+                )
 
     return ListContent[PipeFailure](items=failed_pipes)
 

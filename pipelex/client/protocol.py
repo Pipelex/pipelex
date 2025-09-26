@@ -16,8 +16,7 @@ COMPACT_MEMORY_KEY = "compact_memory"
 
 
 class PipelineState(StrEnum):
-    """Enum representing the possible states of a pipe execution.
-    """
+    """Enum representing the possible states of a pipe execution."""
 
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"

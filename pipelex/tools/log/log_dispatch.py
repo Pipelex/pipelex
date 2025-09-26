@@ -9,8 +9,7 @@ from pipelex.tools.misc.json_utils import purify_json, purify_json_dict, purify_
 
 
 class LogDispatch:
-    """A class for handling log dispatching to both console and Google Cloud.
-    """
+    """A class for handling log dispatching to both console and Google Cloud."""
 
     ########################################################
     # Init and Configure

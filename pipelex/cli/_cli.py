@@ -1,4 +1,3 @@
-
 import typer
 from click import Command, Context
 from typer.core import TyperGroup

@@ -31,16 +31,14 @@ class PipeAbstract(ABC, BaseModel):
 
     @abstractmethod
     def validate_output(self):
-        """Validate the output for the pipe.
-        """
+        """Validate the output for the pipe."""
 
     @property
     def class_name(self) -> str:
         return self.__class__.__name__
 
     def validate_with_libraries(self):
-        """Validate the pipe with the libraries, after the static validation
-        """
+        """Validate the pipe with the libraries, after the static validation"""
 
     @abstractmethod
     def required_variables(self) -> set[str]:

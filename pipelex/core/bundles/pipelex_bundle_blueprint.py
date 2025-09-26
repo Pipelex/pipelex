@@ -15,7 +15,15 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
 PipeBlueprintUnion = Annotated[
-    PipeFuncBlueprint | PipeImgGenBlueprint | PipeJinja2Blueprint | PipeLLMBlueprint | PipeOcrBlueprint | PipeBatchBlueprint | PipeConditionBlueprint | PipeParallelBlueprint | PipeSequenceBlueprint,
+    PipeFuncBlueprint
+    | PipeImgGenBlueprint
+    | PipeJinja2Blueprint
+    | PipeLLMBlueprint
+    | PipeOcrBlueprint
+    | PipeBatchBlueprint
+    | PipeConditionBlueprint
+    | PipeParallelBlueprint
+    | PipeSequenceBlueprint,
     Field(discriminator="type"),
 ]
 

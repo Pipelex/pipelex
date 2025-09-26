@@ -1,4 +1,3 @@
-
 from pydantic import field_validator
 
 from pipelex.cogt.img_gen.img_gen_job_components import Quality

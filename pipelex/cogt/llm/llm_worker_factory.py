@@ -1,4 +1,3 @@
-
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
@@ -45,7 +44,7 @@ class LLMWorkerFactory:
                 )
             case "anthropic" | "bedrock_anthropic":
                 try:
-                    import anthropic  # pylint: disable=import-outside-toplevel
+                    import anthropic  # pylint: disable=import-outside-toplevel # noqa: F401
                 except ImportError as exc:
                     raise MissingDependencyError(
                         "anthropic",
@@ -74,7 +73,7 @@ class LLMWorkerFactory:
                 )
             case "mistral":
                 try:
-                    import mistralai
+                    import mistralai  # pylint: disable=import-outside-toplevel # noqa: F401
                 except ImportError as exc:
                     raise MissingDependencyError(
                         "mistralai",
@@ -102,11 +101,13 @@ class LLMWorkerFactory:
                 )
             case "bedrock_boto3" | "bedrock_aioboto3":
                 try:
-                    import aioboto3  # pylint: disable=import-outside-toplevel
-                    import boto3  # pylint: disable=import-outside-toplevel
+                    import aioboto3  # pylint: disable=import-outside-toplevel # noqa: F401
+                    import boto3  # pylint: disable=import-outside-toplevel # noqa: F401
                 except ImportError as exc:
                     raise MissingDependencyError(
-                        "boto3,aioboto3", "bedrock", "The boto3 and aioboto3 SDKs are required to use Bedrock models.",
+                        "boto3,aioboto3",
+                        "bedrock",
+                        "The boto3 and aioboto3 SDKs are required to use Bedrock models.",
                     ) from exc
 
                 from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory  # pylint: disable=import-outside-toplevel
@@ -124,7 +125,7 @@ class LLMWorkerFactory:
                 )
             case "google":
                 try:
-                    import google.genai  # pylint: disable=import-outside-toplevel
+                    import google.genai  # pylint: disable=import-outside-toplevel # noqa: F401
                 except ImportError as exc:
                     raise MissingDependencyError(
                         "google-genai",

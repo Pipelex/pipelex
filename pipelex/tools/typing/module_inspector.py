@@ -9,7 +9,6 @@ class ModuleFileError(Exception):
     """Exception raised for errors related to module file operations."""
 
 
-
 def import_module_from_file(file_path: str) -> Any:
     """Imports a module from a file path.
 

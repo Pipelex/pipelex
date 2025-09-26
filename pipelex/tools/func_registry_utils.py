@@ -57,8 +57,7 @@ class FuncRegistryUtils:
 
     @classmethod
     def _find_functions_in_module(cls, module: Any) -> list[Callable[..., Any]]:
-        """Finds all functions in a module (eligibility will be checked during registration).
-        """
+        """Finds all functions in a module (eligibility will be checked during registration)."""
         functions: list[Callable[..., Any]] = []
         module_name = module.__name__
 

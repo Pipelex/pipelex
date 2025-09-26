@@ -352,13 +352,13 @@ class StructureGenerator:
         """Validate that the code executes and creates the expected class."""
         try:
             # Import necessary modules for the execution context
-            from datetime import datetime # noqa: F401
-            from enum import Enum # noqa: F401
-            from typing import Any, Dict, List, Literal, Optional # noqa: F401
+            from datetime import datetime
+            from enum import Enum
+            from typing import Any, Dict, List, Literal, Optional  # noqa: F401
 
-            from pydantic import Field # noqa: F401
+            from pydantic import Field
 
-            from pipelex.core.stuffs.stuff_content import StructuredContent # noqa: F401
+            from pipelex.core.stuffs.stuff_content import StructuredContent
 
             # Provide necessary imports in the execution context
             exec_globals = {

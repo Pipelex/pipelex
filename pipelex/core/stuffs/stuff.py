@@ -39,9 +39,11 @@ class Stuff(CustomBaseModel):
                 return
             if key in artefact_dict:
                 stuff_name = self.stuff_name or f"unnamed using concept code {self.concept.code}"
-                msg =f"""Cannot create stuff artefact for stuff '{stuff_name}' of concept '{self.concept.code}' because reserved field '{key}'
+                msg = (
+                    f"""Cannot create stuff artefact for stuff '{stuff_name}' of concept '{self.concept.code}' because reserved field '{key}'
 in the structured output '{self.content.__class__.__name__}' already exists in the stuff content.
 Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code', 'content'.""",
+                )
                 raise StuffError(msg)
             artefact_dict[key] = value
 
@@ -120,7 +122,9 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         except ValidationError as exc:
             formatted_error = format_pydantic_validation_error(exc)
             raise StuffContentValidationError(
-                original_type=type(content).__name__, target_type=content_type.__name__, validation_error=formatted_error,
+                original_type=type(content).__name__,
+                target_type=content_type.__name__,
+                validation_error=formatted_error,
             ) from exc
 
         raise TypeError(f"Content is of type '{type(content)}', instead of the expected '{content_type}'")

@@ -1,4 +1,3 @@
-
 from pipelex.cogt.exceptions import PromptImageFactoryError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImageBinary, PromptImagePath, PromptImageUrl
 from pipelex.tools.misc.base_64_utils import (

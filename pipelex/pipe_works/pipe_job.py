@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel, Field
 
 from pipelex.core.memory.working_memory import WorkingMemory

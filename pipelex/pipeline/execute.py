@@ -1,4 +1,3 @@
-
 from pipelex.client.protocol import ImplicitMemory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory

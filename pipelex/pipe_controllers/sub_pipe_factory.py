@@ -1,4 +1,3 @@
-
 from pipelex.core.pipes.pipe_run_params import BatchParams, make_output_multiplicity
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint

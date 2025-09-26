@@ -36,7 +36,7 @@ class BedrockClientAioboto3(BedrockClientProtocol):
         if system_text:
             params["system"] = [{"text": system_text}]
 
-        async with self.session.client("bedrock-runtime", region_name=self.aws_region) as aioboto3_session: # pyright: ignore[reportUnknownMemberType]
+        async with self.session.client("bedrock-runtime", region_name=self.aws_region) as aioboto3_session:  # pyright: ignore[reportUnknownMemberType]
             conversation_response: ConverseResponseTypeDef = await aioboto3_session.converse(**params)
             resp_dict: dict[str, Any] = cast("dict[str, Any]", conversation_response)
             usage_dict: dict[str, Any] = resp_dict["usage"]

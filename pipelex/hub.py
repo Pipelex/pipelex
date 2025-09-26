@@ -104,8 +104,7 @@ class PipelexHub:
         self._config = config
 
     def reset_config(self) -> None:
-        """Reset the global configuration instance and the config manager.
-        """
+        """Reset the global configuration instance and the config manager."""
         self._config = None
         log.reset()
 

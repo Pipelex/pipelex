@@ -122,12 +122,16 @@ def output_multiplicity_to_apply(
         if isinstance(base_multiplicity, bool):
             log.debug("base_multiplicity is bool")
             return OutputMultiplicityResolution(
-                resolved_multiplicity=base_multiplicity, enable_multiple_outputs=base_multiplicity, specific_output_count=None,
+                resolved_multiplicity=base_multiplicity,
+                enable_multiple_outputs=base_multiplicity,
+                specific_output_count=None,
             )
         if isinstance(base_multiplicity, int):
             log.debug("base_multiplicity is int")
             return OutputMultiplicityResolution(
-                resolved_multiplicity=base_multiplicity, enable_multiple_outputs=True, specific_output_count=base_multiplicity,
+                resolved_multiplicity=base_multiplicity,
+                enable_multiple_outputs=True,
+                specific_output_count=base_multiplicity,
             )
         log.debug("base_multiplicity is None")
         return OutputMultiplicityResolution(resolved_multiplicity=base_multiplicity, enable_multiple_outputs=False, specific_output_count=None)
@@ -154,7 +158,9 @@ def output_multiplicity_to_apply(
     # Case 3: Override is an integer
     log.debug("override_multiplicity is int - using override value")
     return OutputMultiplicityResolution(
-        resolved_multiplicity=override_multiplicity, enable_multiple_outputs=True, specific_output_count=override_multiplicity,
+        resolved_multiplicity=override_multiplicity,
+        enable_multiple_outputs=True,
+        specific_output_count=override_multiplicity,
     )
 
 

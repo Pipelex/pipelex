@@ -24,7 +24,7 @@ def create_pydantic_model_from_function(func: Callable[..., Any]) -> type[BaseMo
         name: (param.annotation, param.default if param.default is not inspect.Parameter.empty else ...) for name, param in sig.parameters.items()
     }
     model_name = func.__name__
-    return create_model(__model_name=model_name, **fields) # pyright: ignore[reportCallIssue, reportUnknownVariableType]
+    return create_model(__model_name=model_name, **fields)  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
 
 
 def create_openai_schema_from_function(func: Callable[..., Any]) -> dict[str, Any]:

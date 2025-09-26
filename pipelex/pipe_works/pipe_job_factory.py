@@ -1,4 +1,3 @@
-
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract

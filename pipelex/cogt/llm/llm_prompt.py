@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel
 from typing_extensions import override
 

@@ -1,4 +1,3 @@
-
 from pydantic import Field
 from typing_extensions import override
 

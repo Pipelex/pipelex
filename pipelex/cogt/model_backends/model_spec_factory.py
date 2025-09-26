@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints

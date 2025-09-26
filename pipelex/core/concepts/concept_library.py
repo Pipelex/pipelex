@@ -113,7 +113,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         pydantic_model = self.get_class(concept_code=concept.structure_class_name)
         is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
         refines_image = self.is_compatible(
-            tested_concept=concept, wanted_concept=self.get_native_concept(native_concept=NativeConceptEnum.IMAGE), strict=True,
+            tested_concept=concept,
+            wanted_concept=self.get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+            strict=True,
         )
         return is_image_class or refines_image
 

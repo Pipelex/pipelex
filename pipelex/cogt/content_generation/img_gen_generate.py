@@ -1,4 +1,3 @@
-
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
 from pipelex.cogt.image.generated_image import GeneratedImage

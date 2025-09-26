@@ -1,4 +1,3 @@
-
 from typing_extensions import override
 
 from pipelex.tools.environment import EnvVarNotFoundError, get_optional_env, get_required_env

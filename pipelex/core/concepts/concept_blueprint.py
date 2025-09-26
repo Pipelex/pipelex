@@ -1,7 +1,5 @@
-
 from datetime import datetime
-from typing import Any, Dict, Optional, Union
-from typing_extensions import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -123,7 +121,7 @@ class ConceptBlueprint(BaseModel):
 
     definition: str
     # TODO (non-blockiing): define a type for Union[str, ConceptStructureBlueprint] (ConceptChoice to be consistent with LLMChoice)
-    structure: Optional[Union[str, Dict[str, Union[str, ConceptStructureBlueprint]]]] = None
+    structure: str | dict[str, str | ConceptStructureBlueprint] | None = None
     # TODO: restore possibility of multiple refiles
     refines: str | None = None
 
@@ -148,7 +146,7 @@ class ConceptBlueprint(BaseModel):
                 "or be a concept code in PascalCase.",
             )
 
-        elif concept_string_or_code.count(".") == 1:
+        if concept_string_or_code.count(".") == 1:
             domain, concept_code = concept_string_or_code.split(".")
             DomainBlueprint.validate_domain_code(code=domain)
             cls.validate_concept_code(concept_code=concept_code)
@@ -180,7 +178,7 @@ class ConceptBlueprint(BaseModel):
                 raise ConceptStringError(
                     f"Concept string '{concept_string}' is invalid. "
                     f"Concept code '{concept_code}' is a native concept, so the domain must be '{SpecialDomain.NATIVE}', "
-                    f"or nothing, but not '{domain}'"
+                    f"or nothing, but not '{domain}'",
                 )
 
         # Validate that if the domain is native, the concept code is a native concept
@@ -188,7 +186,7 @@ class ConceptBlueprint(BaseModel):
             if concept_code not in [native_concept for native_concept in NativeConceptEnum]:
                 raise ConceptStringError(
                     f"Concept string '{concept_string}' is invalid. "
-                    f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'."
+                    f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'.",
                 )
 
     @field_validator("refines", mode="before")
@@ -201,10 +199,10 @@ class ConceptBlueprint(BaseModel):
         return refines
 
     @model_validator(mode="before")
-    def model_validate_blueprint(cls, values: Union[Dict[str, Any], str]) -> Union[Dict[str, Any], str]:
+    def model_validate_blueprint(cls, values: dict[str, Any] | str) -> dict[str, Any] | str:
         if isinstance(values, dict) and values.get("refines") and values.get("structure"):
             raise ConceptBlueprintError(
                 f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
-                f"and `{values.get('structure')}` for concept that has the definition `{values.get('definition')}`"
+                f"and `{values.get('structure')}` for concept that has the definition `{values.get('definition')}`",
             )
         return values

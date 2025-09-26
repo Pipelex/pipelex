@@ -1,4 +1,3 @@
-
 from jinja2 import meta
 from jinja2.exceptions import (
     TemplateSyntaxError,

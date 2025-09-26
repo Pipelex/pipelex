@@ -126,10 +126,8 @@ class ModelDeck(ConfigModel):
         if inference_model.max_tokens is not None and (llm_setting_max_tokens := llm_setting.max_tokens):
             if llm_setting_max_tokens > inference_model.max_tokens:
                 raise LLMSettingsValidationError(
-
-                        f"LLM setting '{llm_setting.llm_handle}' has a max_tokens of {llm_setting_max_tokens}, "
-                        f"which is greater than the model's max_tokens of {inference_model.max_tokens}",
-
+                    f"LLM setting '{llm_setting.llm_handle}' has a max_tokens of {llm_setting_max_tokens}, "
+                    f"which is greater than the model's max_tokens of {inference_model.max_tokens}",
                 )
         if ModelConstraints.TEMPERATURE_MUST_BE_1 in inference_model.constraints and llm_setting.temperature != 1:
             raise LLMSettingsValidationError(

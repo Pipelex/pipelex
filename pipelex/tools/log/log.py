@@ -8,16 +8,14 @@ from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, L
 
 
 class Log:
-    """A class for managing logging configurations and operations.
-    """
+    """A class for managing logging configurations and operations."""
 
     ########################################################
     # Init and Configure
     ########################################################
 
     def __init__(self):
-        """Initialize the Log class with default attributes.
-        """
+        """Initialize the Log class with default attributes."""
         self.project_name: str | None = None
         self._log_config_instance: LogConfig | None = None
         self.rich_handler: logging.Handler | None = None
@@ -43,8 +41,7 @@ class Log:
         return self._log_config_instance
 
     def reset(self):
-        """Reset the logging system.
-        """
+        """Reset the logging system."""
         # Remove all handlers from the root logger
         root_logger = logging.getLogger()
         for handler in root_logger.handlers[:]:

@@ -38,7 +38,6 @@ class PLXDecodeError(toml.TomlDecodeError):
     """Raised when PLX decoding fails."""
 
 
-
 class PipelexInterpreter(BaseModel):
     """plx -> PipelexBundleBlueprint"""
 

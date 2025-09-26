@@ -61,8 +61,7 @@ class BedrockFactory:
 
     @classmethod
     def make_simple_message(cls, llm_job: LLMJob) -> BedrockMessage:
-        """Makes a list of messages with a system message (if provided) and followed by a user message.
-        """
+        """Makes a list of messages with a system message (if provided) and followed by a user message."""
         message = BedrockMessage(role="user", content=[])
         if user_text := llm_job.llm_prompt.user_text:
             message.content.append(BedrockContentItem(text=user_text))

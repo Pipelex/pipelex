@@ -1,4 +1,3 @@
-
 from openai.types import Model
 
 from pipelex.cogt.model_backends.backend import InferenceBackend
