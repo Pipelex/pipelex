@@ -277,5 +277,4 @@ class ContentGenerator(ContentGeneratorProtocol):
             ocr_job_params=ocr_job_params or OcrJobParams.make_default_ocr_job_params(),
             ocr_job_config=ocr_job_config or OcrJobConfig(),
         )
-        ocr_output = await ocr_gen_extract_pages(ocr_assignment=ocr_assignment)
-        return ocr_output
+        return await ocr_gen_extract_pages(ocr_assignment=ocr_assignment)

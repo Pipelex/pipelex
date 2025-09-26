@@ -27,10 +27,11 @@ class Pypdfium2Worker(OcrWorkerAbstract):
         ocr_job: OcrJob,
     ) -> OcrOutput:
         if ocr_job.ocr_input.image_uri:
-            raise NotImplementedError("Pypdfium2 only extracts text from PDFs, not images")
+            msg = "Pypdfium2 only extracts text from PDFs, not images"
+            raise NotImplementedError(msg)
 
         if pdf_uri := ocr_job.ocr_input.pdf_uri:
-            pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)  # pyright: ignore
+            pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
             ocr_output: OcrOutput
             if pdf_url:
                 ocr_output = await self.extract_from_pdf_url(
@@ -56,10 +57,9 @@ class Pypdfium2Worker(OcrWorkerAbstract):
             pages[page_index + 1] = Page(
                 text=page_text,
             )
-        ocr_output = OcrOutput(
+        return OcrOutput(
             pages=pages,
         )
-        return ocr_output
 
     async def extract_from_pdf_file(
         self,
@@ -71,7 +71,6 @@ class Pypdfium2Worker(OcrWorkerAbstract):
             pages[page_index + 1] = Page(
                 text=page_text,
             )
-        ocr_output = OcrOutput(
+        return OcrOutput(
             pages=pages,
         )
-        return ocr_output

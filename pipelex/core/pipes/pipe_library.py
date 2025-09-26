@@ -32,7 +32,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
                     self.get_required_pipe(pipe_code=pipe_code)
                 pipe.validate_with_libraries()
             except (ConceptLibraryConceptNotFoundError, PipeLibraryPipeNotFoundError) as not_found_error:
-                raise PipeLibraryError(f"Missing dependency for pipe '{pipe.code}': {not_found_error}") from not_found_error
+                msg = f"Missing dependency for pipe '{pipe.code}': {not_found_error}"
+                raise PipeLibraryError(msg) from not_found_error
 
     @classmethod
     def make_empty(cls) -> Self:

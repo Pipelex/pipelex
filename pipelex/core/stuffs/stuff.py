@@ -127,7 +127,8 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
                 validation_error=formatted_error,
             ) from exc
 
-        raise TypeError(f"Content is of type '{type(content)}', instead of the expected '{content_type}'")
+        msg = f"Content is of type '{type(content)}', instead of the expected '{content_type}'"
+        raise TypeError(msg)
 
     def as_list_content(self) -> ListContent:  # pyright: ignore[reportMissingTypeArgument, reportUnknownParameterType]
         """Get content as ListContent with items of any type."""

@@ -2,13 +2,15 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pipelex.client.protocol import CompactMemory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.stuffs.stuff_content import TextContent
+
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.stuff_content import TextContent
 
 
 class ApiSerializer:
@@ -88,8 +90,7 @@ class ApiSerializer:
         if isinstance(content, list):
             cleaned_list: list[Any] = []
             content_list = cast("list[Any]", content)
-            for idx in range(len(content_list)):
-                cleaned_list.append(cls._clean_and_format_content(content_list[idx]))
+            cleaned_list.extend(cls._clean_and_format_content(content_list[idx]) for idx in range(len(content_list)))
             return cleaned_list
         if isinstance(content, datetime):
             return content.strftime(cls.API_DATETIME_FORMAT)

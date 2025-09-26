@@ -11,7 +11,8 @@ class EnvSecretsProvider(SecretsProviderAbstract):
         try:
             return get_required_env(key=secret_id)
         except EnvVarNotFoundError as exc:
-            raise SecretNotFoundError(f"Secret '{secret_id}' not found") from exc
+            msg = f"Secret '{secret_id}' not found"
+            raise SecretNotFoundError(msg) from exc
 
     @override
     def get_optional_secret(self, secret_id: str) -> str | None:

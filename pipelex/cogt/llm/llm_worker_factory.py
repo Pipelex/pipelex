@@ -26,7 +26,7 @@ class LLMWorkerFactory:
                 if get_config().cogt.llm_config.instructor_config.is_openai_structured_output_enabled:
                     structure_method = StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED
 
-                from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker
+                from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker  # pylint: disable=import-outside-toplevel # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,

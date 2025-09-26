@@ -29,7 +29,7 @@ class StuffBlueprint(BaseModel):
     content: dict[str, Any] | str
 
     @field_validator("concept_string")
-    def validate_concept_string(cls, concept_string: str) -> str:
+    def validate_concept_string(self, concept_string: str) -> str:
         ConceptBlueprint.validate_concept_string(concept_string)
         return concept_string
 
@@ -90,7 +90,8 @@ class StuffFactory:
             search_domains=search_domains,
         )
         if not concept:
-            raise StuffFactoryError(f"Could not find a concept named '{concept_name}' in domains {search_domains}")
+            msg = f"Could not find a concept named '{concept_name}' in domains {search_domains}"
+            raise StuffFactoryError(msg)
         return cls.make_stuff(concept=concept, content=content, name=name, code=code)
 
     @classmethod
@@ -130,9 +131,8 @@ class StuffFactory:
         try:
             the_stuff_content = the_subclass.model_validate(obj=stuff_contents)
         except ValidationError as exc:
-            raise StuffFactoryError(
-                f"Error combining stuffs for concept {concept.code}, stuff named `{name}`: {format_pydantic_validation_error(exc=exc)}",
-            ) from exc
+            msg = f"Error combining stuffs for concept {concept.code}, stuff named `{name}`: {format_pydantic_validation_error(exc=exc)}"
+            raise StuffFactoryError(msg) from exc
         return cls.make_stuff(
             concept=concept,
             content=the_stuff_content,
@@ -153,7 +153,8 @@ class StuffFactory:
         if isinstance(stuff_content_or_data, ListContent):
             content = cast("ListContent[Any]", stuff_content_or_data)
             if len(content.items) == 0:
-                raise StuffFactoryError("ListContent in compact memory has no items")
+                msg = "ListContent in compact memory has no items"
+                raise StuffFactoryError(msg)
             concept_name = type(content.items[0]).__name__
             try:
                 return cls.make_stuff_using_concept_name_and_search_domains(
@@ -164,7 +165,8 @@ class StuffFactory:
                     code=stuff_code,
                 )
             except StuffFactoryError as exc:
-                raise StuffFactoryError(f"Could not make stuff for ListContent '{name}': {exc}") from exc
+                msg = f"Could not make stuff for ListContent '{name}': {exc}"
+                raise StuffFactoryError(msg) from exc
         elif isinstance(stuff_content_or_data, StuffContent):
             content = stuff_content_or_data
             concept_class_name = type(content).__name__
@@ -189,11 +191,13 @@ class StuffFactory:
                     code=stuff_code,
                 )
             except StuffFactoryError as exc:
-                raise StuffFactoryError(f"Could not make stuff for StuffContent '{name}': {exc}") from exc
+                msg = f"Could not make stuff for StuffContent '{name}': {exc}"
+                raise StuffFactoryError(msg) from exc
         elif isinstance(stuff_content_or_data, list):
             items = stuff_content_or_data
             if len(items) == 0:
-                raise StuffFactoryError("List in compact memory has no items")
+                msg = "List in compact memory has no items"
+                raise StuffFactoryError(msg)
             first_item = items[0]
             concept_name = type(first_item).__name__
             content = ListContent[Any](items=items)
@@ -206,7 +210,8 @@ class StuffFactory:
                     code=stuff_code,
                 )
             except StuffFactoryError as exc:
-                raise StuffFactoryError(f"Could not make stuff for list of StuffContent '{name}': {exc}") from exc
+                msg = f"Could not make stuff for list of StuffContent '{name}': {exc}"
+                raise StuffFactoryError(msg) from exc
         elif isinstance(stuff_content_or_data, str):
             str_stuff: str = stuff_content_or_data
             return StuffFactory.make_stuff(
@@ -219,7 +224,8 @@ class StuffFactory:
             try:
                 concept_code = stuff_content_dict.get("concept") or stuff_content_dict.get("concept_code")
                 if not concept_code:
-                    raise StuffFactoryError("Stuff content data dict is badly formed: no concept code")
+                    msg = "Stuff content data dict is badly formed: no concept code"
+                    raise StuffFactoryError(msg)
                 content_value = stuff_content_dict["content"]
                 if NativeConceptManager.is_native_concept(concept_string_or_code=concept_code):
                     concept = ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum(concept_code)])
@@ -234,7 +240,8 @@ class StuffFactory:
                         code=stuff_code,
                     )
             except KeyError as exc:
-                raise StuffFactoryError(f"Stuff content data dict is badly formed: {exc}") from exc
+                msg = f"Stuff content data dict is badly formed: {exc}"
+                raise StuffFactoryError(msg) from exc
 
             if isinstance(content_value, StuffContent):
                 return StuffFactory.make_stuff(
@@ -284,6 +291,7 @@ class StuffContentFactory:
             return cls.make_content_from_value(stuff_content_subclass=TextContent, value=value)
 
         if not issubclass(the_structure_class, StuffContent):
-            raise StuffContentFactoryError(f"Concept '{concept.code}', subclass '{the_structure_class}' is not a subclass of StuffContent")
+            msg = f"Concept '{concept.code}', subclass '{the_structure_class}' is not a subclass of StuffContent"
+            raise StuffContentFactoryError(msg)
 
         return cls.make_content_from_value(stuff_content_subclass=the_structure_class, value=value)

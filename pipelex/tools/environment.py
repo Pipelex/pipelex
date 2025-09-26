@@ -15,13 +15,13 @@ class EnvVarNotFoundError(ToolException):
 def get_required_env(key: str) -> str:
     value = os.getenv(key)
     if not value:
-        raise EnvVarNotFoundError(f"Environment variable '{key}' is required but not set")
+        msg = f"Environment variable '{key}' is required but not set"
+        raise EnvVarNotFoundError(msg)
     return value
 
 
 def get_optional_env(key: str) -> str | None:
-    value = os.getenv(key)
-    return value
+    return os.getenv(key)
 
 
 def is_env_var_set(key: str) -> bool:
@@ -29,10 +29,7 @@ def is_env_var_set(key: str) -> bool:
 
 
 def all_env_vars_are_set(keys: list[str]) -> bool:
-    for each_key in keys:
-        if not is_env_var_set(each_key):
-            return False
-    return True
+    return all(is_env_var_set(each_key) for each_key in keys)
 
 
 def any_env_var_is_placeholder(keys: list[str]) -> bool:

@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 
 from anthropic import AsyncAnthropic, AsyncAnthropicBedrock
 from anthropic.types import Usage
-
 from anthropic.types.message_param import MessageParam
 from openai.types.chat import (
     ChatCompletionMessageParam,
@@ -31,8 +30,9 @@ from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
-    from anthropic.types.text_block_param import TextBlockParam
     from anthropic.types.image_block_param import ImageBlockParam
+    from anthropic.types.text_block_param import TextBlockParam
+
 
 class AnthropicFactoryError(CogtError):
     pass

@@ -63,7 +63,8 @@ class PipelexInterpreter(BaseModel):
     def check_file_path_or_file_content(self) -> Self:
         """Need to check if there is at least one of file_path or file_content"""
         if self.file_path is None and self.file_content is None:
-            raise PipelexConfigurationError("Either file_path or file_content must be provided")
+            msg = "Either file_path or file_content must be provided"
+            raise PipelexConfigurationError(msg)
         return self
 
     @model_validator(mode="after")
@@ -88,7 +89,8 @@ class PipelexInterpreter(BaseModel):
                 return cleaned_content
             return file_content
         if self.file_content is None:
-            raise PipelexConfigurationError("file_content must be provided if file_path is not provided")
+            msg = "file_content must be provided if file_path is not provided"
+            raise PipelexConfigurationError(msg)
         return self.file_content
 
     @staticmethod
@@ -132,7 +134,8 @@ class PipelexInterpreter(BaseModel):
             return toml.loads(content)
         except toml.TomlDecodeError as exc:
             file_path_str = str(self.file_path) if self.file_path else "content"
-            raise PLXDecodeError(f"PLX parsing error in '{file_path_str}': {exc}", exc.doc, exc.pos) from exc
+            msg = f"PLX parsing error in '{file_path_str}': {exc}"
+            raise PLXDecodeError(msg, exc.doc, exc.pos) from exc
 
     def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
         """Make a PipelexBundleBlueprint from the file_path or file_content"""
@@ -602,7 +605,8 @@ class PipelexInterpreter(BaseModel):
             return PipelexInterpreter._serialize_parallel_pipe(blueprint)
         if isinstance(blueprint, PipeBatchBlueprint):
             return PipelexInterpreter._serialize_batch_pipe(blueprint)
-        raise PipelexUnknownPipeError(f"Unknown pipe blueprint type: {type(blueprint)}")
+        msg = f"Unknown pipe blueprint type: {type(blueprint)}"
+        raise PipelexUnknownPipeError(msg)
 
     @staticmethod
     def serialize_llm_pipe(pipe: PipeLLMBlueprint) -> dict[str, Any]:

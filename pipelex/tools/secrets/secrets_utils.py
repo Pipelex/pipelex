@@ -67,9 +67,10 @@ def substitute_vars(content: str) -> str:
             try:
                 prefix = VarPrefix(prefix_str)
             except ValueError:
+                msg = f"Unknown variable prefix: '{prefix_str}'"
                 raise UnknownVarPrefixError(
                     var_name=var_name,
-                    message=f"Unknown variable prefix: '{prefix_str}'",
+                    message=msg,
                 )
 
             match prefix:

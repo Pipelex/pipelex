@@ -74,7 +74,8 @@ class PipelexHub:
     @classmethod
     def get_instance(cls) -> "PipelexHub":
         if cls._instance is None:
-            raise RuntimeError("PipelexHub is not initialized")
+            msg = "PipelexHub is not initialized"
+            raise RuntimeError(msg)
         return cls._instance
 
     @classmethod
@@ -182,39 +183,46 @@ class PipelexHub:
 
         """
         if self._config is None:
-            raise RuntimeError("Config instance is not set. You must initialize Pipelex first.")
+            msg = "Config instance is not set. You must initialize Pipelex first."
+            raise RuntimeError(msg)
         return self._config
 
     def get_required_secrets_provider(self) -> SecretsProviderAbstract:
         if self._secrets_provider is None:
-            raise RuntimeError("Secrets provider is not set. You must initialize Pipelex first.")
+            msg = "Secrets provider is not set. You must initialize Pipelex first."
+            raise RuntimeError(msg)
         return self._secrets_provider
 
     def get_required_template_provider(self) -> TemplateProviderAbstract:
         if self._template_provider is None:
-            raise RuntimeError("Template provider is not set. You must initialize Pipelex first.")
+            msg = "Template provider is not set. You must initialize Pipelex first."
+            raise RuntimeError(msg)
         return self._template_provider
 
     def get_required_class_registry(self) -> ClassRegistryAbstract:
         if self._class_registry is None:
-            raise RuntimeError("ClassRegistry is not initialized")
+            msg = "ClassRegistry is not initialized"
+            raise RuntimeError(msg)
         return self._class_registry
 
     def get_storage_provider(self) -> StorageProviderAbstract:
         if self._storage_provider is None:
-            raise RuntimeError("StorageProvider is not initialized")
+            msg = "StorageProvider is not initialized"
+            raise RuntimeError(msg)
         return self._storage_provider
 
     # cogt
 
     def get_required_models_manager(self) -> ModelManagerAbstract:
         if self._models_manager is None:
-            raise RuntimeError("ModelsManager is not initialized")
+            msg = "ModelsManager is not initialized"
+            raise RuntimeError(msg)
         return self._models_manager
 
     def get_plugin_manager(self) -> PluginManager:
         if self._plugin_manager is None:
-            raise RuntimeError("PluginManager2 is not initialized")
+            msg = "PluginManager2 is not initialized"
+            raise RuntimeError(msg)
         return self._plugin_manager
 
     def get_inference_manager(self) -> InferenceManagerProtocol:
@@ -225,14 +233,16 @@ class PipelexHub:
 
     def get_required_content_generator(self) -> ContentGeneratorProtocol:
         if self._content_generator is None:
-            raise RuntimeError("ContentGenerator is not initialized")
+            msg = "ContentGenerator is not initialized"
+            raise RuntimeError(msg)
         return self._content_generator
 
     # pipelex
 
     def get_required_domain_provider(self) -> DomainProviderAbstract:
         if self._domain_provider is None:
-            raise RuntimeError("DomainProvider is not initialized")
+            msg = "DomainProvider is not initialized"
+            raise RuntimeError(msg)
         return self._domain_provider
 
     def get_optional_domain_provider(self) -> DomainProviderAbstract | None:
@@ -240,7 +250,8 @@ class PipelexHub:
 
     def get_required_concept_provider(self) -> ConceptProviderAbstract:
         if self._concept_provider is None:
-            raise RuntimeError("ConceptProvider is not initialized")
+            msg = "ConceptProvider is not initialized"
+            raise RuntimeError(msg)
         return self._concept_provider
 
     def get_optional_concept_provider(self) -> ConceptProviderAbstract | None:
@@ -248,32 +259,38 @@ class PipelexHub:
 
     def get_required_pipe_provider(self) -> PipeProviderAbstract:
         if self._pipe_provider is None:
-            raise RuntimeError("PipeProvider is not initialized")
+            msg = "PipeProvider is not initialized"
+            raise RuntimeError(msg)
         return self._pipe_provider
 
     def get_required_pipe_router(self) -> PipeRouterProtocol:
         if self._pipe_router is None:
-            raise RuntimeError("PipeRouter is not initialized")
+            msg = "PipeRouter is not initialized"
+            raise RuntimeError(msg)
         return self._pipe_router
 
     def get_pipeline_tracker(self) -> PipelineTrackerProtocol:
         if self._pipeline_tracker is None:
-            raise RuntimeError("PipelineTracker is not initialized")
+            msg = "PipelineTracker is not initialized"
+            raise RuntimeError(msg)
         return self._pipeline_tracker
 
     def get_required_pipeline_manager(self) -> PipelineManagerAbstract:
         if self._pipeline_manager is None:
-            raise RuntimeError("PipelineManager is not initialized")
+            msg = "PipelineManager is not initialized"
+            raise RuntimeError(msg)
         return self._pipeline_manager
 
     def get_activity_manager(self) -> ActivityManagerProtocol:
         if self._activity_manager is None:
-            raise RuntimeError("Activity manager is not set. You must initialize Pipelex first.")
+            msg = "Activity manager is not set. You must initialize Pipelex first."
+            raise RuntimeError(msg)
         return self._activity_manager
 
     def get_required_library_manager(self) -> LibraryManagerAbstract:
         if self._library_manager is None:
-            raise RuntimeError("Library manager is not set. You must initialize Pipelex first.")
+            msg = "Library manager is not set. You must initialize Pipelex first."
+            raise RuntimeError(msg)
         return self._library_manager
 
     def get_optional_library_manager(self) -> LibraryManagerAbstract | None:

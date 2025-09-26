@@ -1,6 +1,5 @@
 import asyncio
-from collections.abc import Coroutine
-from typing import Any, Literal, Self, cast
+from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
 import shortuuid
 from pydantic import model_validator
@@ -12,7 +11,6 @@ from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.pipe_input import PipeInputSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
-from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import ListContent, StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
@@ -24,6 +22,11 @@ from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipeline.job_metadata import JobMetadata
 
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+    from pipelex.core.stuffs.stuff import Stuff
+
 
 class PipeBatch(PipeController):
     type: Literal["PipeBatch"] = "PipeBatch"
@@ -33,7 +36,7 @@ class PipeBatch(PipeController):
 
     @override
     def pipe_dependencies(self) -> set[str]:
-        return set([self.branch_pipe_code])
+        return {self.branch_pipe_code}
 
     @override
     def validate_output(self):
@@ -52,8 +55,9 @@ class PipeBatch(PipeController):
         # Now check that the required vairables ARE in the inputs of the pipe
         required_variables = self.required_variables()
         for variable_name in required_variables:
-            if variable_name not in self.inputs.root.keys():
-                raise PipeInputError(f"Input '{variable_name}' of pipe '{self.code}' is not in the inputs of the pipe '{self.branch_pipe_code}'")
+            if variable_name not in self.inputs.root:
+                msg = f"Input '{variable_name}' of pipe '{self.code}' is not in the inputs of the pipe '{self.branch_pipe_code}'"
+                raise PipeInputError(msg)
         return self
 
     @override
@@ -85,9 +89,8 @@ class PipeBatch(PipeController):
         try:
             input_item_concept_code = self.inputs.get_required_input_requirement(input_item_stuff_name)
         except PipeInputNotFoundError as exc:
-            raise PipeInputError(
-                f"Batch input item stuff named '{input_item_stuff_name}' is not in this PipeBatch '{self.code}' input spec: {self.inputs}",
-            ) from exc
+            msg = f"Batch input item stuff named '{input_item_stuff_name}' is not in this PipeBatch '{self.code}' input spec: {self.inputs}"
+            raise PipeInputError(msg) from exc
 
         if pipe_run_params.final_stuff_code:
             method_name = "dry_run_pipe" if pipe_run_params.run_mode == PipeRunMode.DRY else "_run_controller_pipe"
@@ -98,16 +101,17 @@ class PipeBatch(PipeController):
         try:
             input_stuff = working_memory.get_stuff(batch_params.input_list_stuff_name)
         except WorkingMemoryStuffNotFoundError as exc:
-            raise PipeInputError(
-                f"Input list stuff '{batch_params.input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory: {exc}",
-            ) from exc
+            msg = (
+                f"Input list stuff '{batch_params.input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory: {exc}"
+            )
+            raise PipeInputError(msg) from exc
+
         input_stuff_code = input_stuff.stuff_code
         input_content = input_stuff.content
 
         if not isinstance(input_content, ListContent):
-            raise PipeInputError(
-                f"Input of PipeBatch must be ListContent, got {input_stuff.stuff_name or 'unnamed'} = {type(input_content)}. stuff: {input_stuff}",
-            )
+            msg = f"Input of PipeBatch must be ListContent, got {input_stuff.stuff_name or 'unnamed'} = {type(input_content)}. stuff: {input_stuff}"
+            raise PipeInputError(msg)
         input_content = cast("ListContent[StuffContent]", input_content)
 
         # TODO: Make commented code work when inputing images named "a.b.c"
@@ -163,7 +167,7 @@ class PipeBatch(PipeController):
         output_items: list[StuffContent] = []
         output_stuffs: list[Stuff] = []
         output_stuff_code = shortuuid.uuid()[:5]
-        for branch_index, pipe_output in enumerate(pipe_outputs):
+        for pipe_output in pipe_outputs:
             branch_output_stuff = pipe_output.main_stuff
             output_stuffs.append(branch_output_stuff)
             output_items.append(branch_output_stuff.content)

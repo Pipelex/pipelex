@@ -24,7 +24,8 @@ def text_format(context: Context, value: Any, text_format: TextFormat | None = N
         elif isinstance(text_format, TextFormat):  # pyright: ignore[reportUnnecessaryIsInstance]
             applied_text_format = text_format
         else:
-            raise Jinja2ContextError(f"Invalid text format: '{text_format}'")
+            msg = f"Invalid text format: '{text_format}'"
+            raise Jinja2ContextError(msg)
     else:
         applied_text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN))
 

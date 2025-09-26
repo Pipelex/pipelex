@@ -1,6 +1,5 @@
 import asyncio
-from collections.abc import Coroutine
-from typing import Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 from pydantic import model_validator
 from typing_extensions import override
@@ -13,14 +12,18 @@ from pipelex.core.pipes.pipe_input import PipeInputSpec
 from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import DryRunError, PipeDefinitionError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipeline.job_metadata import JobMetadata
+
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+    from pipelex.core.stuffs.stuff import Stuff
+    from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class PipeParallel(PipeController):
@@ -130,7 +133,7 @@ class PipeParallel(PipeController):
 
     @override
     def pipe_dependencies(self) -> set[str]:
-        return set(sub_pipe.pipe_code for sub_pipe in self.parallel_sub_pipes)
+        return {sub_pipe.pipe_code for sub_pipe in self.parallel_sub_pipes}
 
     @override
     async def _run_controller_pipe(

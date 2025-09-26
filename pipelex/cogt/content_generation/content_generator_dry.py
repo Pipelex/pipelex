@@ -41,8 +41,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         func_name = "make_llm_text"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         prompt_truncated = llm_prompt_for_text.desc(truncate_text_length=self._text_gen_truncate_length)
-        generated_text = f"DRY RUN: {func_name} • llm_setting={llm_setting_main.desc()} • prompt={prompt_truncated}"
-        return generated_text
+        return f"DRY RUN: {func_name} • llm_setting={llm_setting_main.desc()} • prompt={prompt_truncated}"
 
     @override
     @update_job_metadata
@@ -66,8 +65,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         # It is that way because the dry run was failing a lot of pipes that had validation test on the
         # field values. For example, if a string requires to be a snake_case, the ObjectFactory would
         # generate something like `DOIJZjoDoIJDZOjDZJo` which is... not a snake_case.
-        obj = ObjectFactory.build(factory_use_construct=True)
-        return obj
+        return ObjectFactory.build(factory_use_construct=True)
 
     @override
     @update_job_metadata
@@ -103,7 +101,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         func_name = "make_object_list_direct"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         nb_list_items = nb_items or get_config().pipelex.dry_run_config.nb_list_items
-        objects = [
+        return [
             await self.make_object_direct(
                 job_metadata=job_metadata,
                 object_class=object_class,
@@ -112,7 +110,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             )
             for _ in range(nb_list_items)
         ]
-        return objects
 
     @override
     @update_job_metadata
@@ -150,12 +147,11 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
         image_url = image_urls[0]
-        generated_image = GeneratedImage(
+        return GeneratedImage(
             url=image_url,
             width=1536,
             height=2752,
         )
-        return generated_image
 
     @override
     @update_job_metadata
@@ -171,7 +167,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         func_name = "make_image_list"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
-        generated_image_list = [
+        return [
             GeneratedImage(
                 url=image_urls[image_index % len(image_urls)],
                 width=1536,
@@ -179,7 +175,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             )
             for image_index in range(nb_images)
         ]
-        return generated_image_list
 
     @override
     async def make_jinja2_text(
@@ -194,11 +189,10 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         func_name = "make_jinja2_text"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         jinja2_truncated = jinja2[: self._text_gen_truncate_length] if jinja2 else None
-        jinja2_text = (
+        return (
             f"DRY RUN: {func_name} • context={context} • jinja2_name={jinja2_name} • "
             f"jinja2={jinja2_truncated} • prompting_style={prompting_style} • template_category={template_category}"
         )
-        return jinja2_text
 
     @override
     async def make_ocr_extract_pages(

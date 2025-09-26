@@ -41,12 +41,11 @@ class ClassRegistryUtils:
         If base_class is None, registers all classes.
 
         Args:
-            folder_paths: List of paths to folders containing Python files
+            folder_path: Path to folder containing Python files
             base_class: Optional base class to filter registerable classes
-            recursive: Whether to search recursively in subdirectories
-            exclude_files: List of filenames to exclude
-            exclude_dirs: List of directory names to exclude
+            is_recursive: Whether to search recursively in subdirectories
             include_imported: Whether to include classes imported from other modules
+            is_include_imported: Whether to include classes imported from other modules
 
         """
         python_files = cls.find_files_in_dir(
@@ -69,7 +68,7 @@ class ClassRegistryUtils:
         Args:
             dir_path: Directory path to search in
             pattern: File pattern to match (e.g. "*.py")
-            recursive: Whether to search recursively in subdirectories
+            is_recursive: Whether to search recursively in subdirectories
 
         Returns:
             List of matching Path objects
@@ -124,7 +123,7 @@ class ClassRegistryUtils:
             return False
 
         fields: dict[str, FieldInfo] = class_1.model_fields
-        for _field_name, field_info in fields.items():
+        for field_info in fields.values():
             field_type = field_info.annotation
 
             # Handle Optional types by extracting the inner type

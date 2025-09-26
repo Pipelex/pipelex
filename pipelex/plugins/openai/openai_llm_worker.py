@@ -49,6 +49,13 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             self.instructor_for_objects = instructor.from_openai(client=sdk_instance)
 
     #########################################################
+    @override
+    def setup(self):
+        pass
+
+    @override
+    def teardown(self):
+        pass
 
     @override
     async def _gen_text(

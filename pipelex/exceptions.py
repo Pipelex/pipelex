@@ -259,7 +259,7 @@ class ApiSerializationError(Exception):
     """Exception raised when API serialization fails."""
 
 
-class StartPipelineException(Exception):
+class StartPipelineError(Exception):
     pass
 
 

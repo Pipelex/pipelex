@@ -41,7 +41,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     @model_validator(mode="after")
     def validate_stuff_names(self) -> Self:
         for key, stuff in self.root.items():
-            if key.startswith("_") and not key == BATCH_ITEM_STUFF_NAME:
+            if key.startswith("_") and key != BATCH_ITEM_STUFF_NAME:
                 log.warning(f"Stuff key '{key}' starts with '_', which is reserved for params")
 
             if not stuff.stuff_name:
@@ -104,10 +104,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         return the_stuffs
 
     def is_stuff_code_used(self, stuff_code: str) -> bool:
-        for stuff in self.root.values():
-            if stuff.concept.code == stuff_code:
-                return True
-        return False
+        return any(stuff.concept.code == stuff_code for stuff in self.root.values())
 
     def get_main_stuff(self) -> Stuff:
         return self.get_stuff(name=MAIN_STUFF_NAME)

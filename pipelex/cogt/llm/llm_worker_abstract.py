@@ -45,7 +45,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         llm_job.validate_before_execution()
 
         # Verify feasibility
-        self._check_can_perform_job(llm_job=llm_job)
+        self._check_can_perform_job()
 
     async def _after_job(
         self,
@@ -56,7 +56,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if self.reporting_delegate:
             self.reporting_delegate.report_inference_job(inference_job=llm_job)
 
-    def _check_can_perform_job(self, llm_job: LLMJob):
+    def _check_can_perform_job(self):
         # This can be overridden by subclasses for specific checks
         pass
 

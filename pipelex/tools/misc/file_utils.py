@@ -14,6 +14,8 @@ def save_bytes_to_binary_file(file_path: str, byte_data: bytes, create_directory
     Args:
         file_path (str): Path where the binary data will be saved
         byte_data (bytes): Binary data to be written
+        create_directory (bool, optional): Whether to create the directory if it doesn't exist.
+            Defaults to False.
 
     Returns:
         str: Path to the saved file
@@ -149,6 +151,7 @@ def copy_folder_from_package(
         folder_path_in_package (str): The path to the folder in the package to copy.
         target_dir (str): The target directory to copy the folder to.
         overwrite (bool, optional): Whether to overwrite existing files. Defaults to True.
+        non_overwrite_files (Optional[List[str]], optional): List of files to not overwrite. Defaults to None.
 
     """
     os.makedirs(target_dir, exist_ok=True)
@@ -308,6 +311,7 @@ def get_incremental_file_path(
         base_name (str): The base name for the file (will be appended with _XX).
         extension (str): The file extension (without the dot).
         start_at (int, optional): The number to start counting from. Defaults to 1.
+        avoid_suffix_if_possible (bool, optional): If True, avoids adding a suffix if possible. Defaults to False.
 
     Returns:
         str: A unique file path that does not exist in the filesystem.
@@ -340,7 +344,7 @@ def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool) -> list[P
     Args:
         dir_path: Directory path to search in
         pattern: File pattern to match (e.g. "*.py")
-        recursive: Whether to search recursively in subdirectories
+        is_recursive: Whether to search recursively in subdirectories
 
     Returns:
         List of matching Path objects

@@ -14,8 +14,7 @@ async def fetch_file_from_url_httpx_async(
         )
         response.raise_for_status()  # Raise exception for 4XX/5XX status codes
 
-        bytes_content: bytes = response.content
-        return bytes_content
+        return response.content
 
 
 def fetch_file_from_url_httpx(

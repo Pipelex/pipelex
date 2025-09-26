@@ -31,7 +31,8 @@ def _detect_non_existent_filters(template_str: str) -> None:
             invalid_filters.append(filter_name)
 
     if invalid_filters:
-        raise Jinja2TemplateError(f"Invalid Jinja2 filters found: {invalid_filters}. Only the following filters are allowed: {ALLOWED_FILTERS}")
+        msg = f"Invalid Jinja2 filters found: {invalid_filters}. Only the following filters are allowed: {ALLOWED_FILTERS}"
+        raise Jinja2TemplateError(msg)
 
 
 # Handle @variable patterns

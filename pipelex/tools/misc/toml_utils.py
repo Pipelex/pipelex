@@ -370,9 +370,7 @@ def dict_to_toml(data: Mapping[str, Any]) -> str:
 
         return "\n".join(processed_lines)
 
-    dumped_content = fix_inline_table_spacing(dumped_content)
-
-    return dumped_content
+    return fix_inline_table_spacing(dumped_content)
 
 
 def save_toml_to_path(data: dict[str, Any], path: str) -> None:

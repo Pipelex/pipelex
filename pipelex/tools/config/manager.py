@@ -19,7 +19,7 @@ CONFIG_TEMPLATE_SUBPATH = "config_template"
 INFERENCE_CONFIG_SUBPATH = "inference"
 
 
-class ConfigException(Exception):
+class ConfigError(Exception):
     pass
 
 
@@ -138,9 +138,12 @@ class ConfigManager:
                 deep_update(pipelex_config, local_config)
 
         #################### 4. Load overrides for the current project ####################
-        list_of_overrides = (
-            CONFIG_BASE_OVERRIDES_BEFORE_ENV + [runtime_manager.environment] + [runtime_manager.run_mode] + CONFIG_BASE_OVERRIDES_AFTER_ENV
-        )
+        list_of_overrides = [
+            *CONFIG_BASE_OVERRIDES_BEFORE_ENV,
+            runtime_manager.environment,
+            runtime_manager.run_mode,
+            *CONFIG_BASE_OVERRIDES_AFTER_ENV,
+        ]
         for override in list_of_overrides:
             if override:
                 if override == runtime_manager.run_mode.UNIT_TEST:
@@ -156,7 +159,8 @@ class ConfigManager:
             if config:
                 deep_update(pipelex_config, config)
             else:
-                raise ConfigException(f"Failed to load specific config from {specific_config_path}")
+                msg = f"Failed to load specific config from {specific_config_path}"
+                raise ConfigError(msg)
 
         return pipelex_config
 
@@ -177,9 +181,8 @@ class ConfigManager:
         pipelex_pyproject_path = os.path.join(os.path.dirname(self.local_root_dir), "pyproject.toml")
         try:
             pyproject = toml.load(pipelex_pyproject_path)
-            if project_name := pyproject.get("project", {}).get("name"):
-                if isinstance(project_name, str):
-                    return project_name
+            if (project_name := pyproject.get("project", {}).get("name")) and isinstance(project_name, str):
+                return project_name
         except FileNotFoundError:
             pass
         except toml.TomlDecodeError as exc:
@@ -191,9 +194,11 @@ class ConfigManager:
         pyproject_path = os.path.join(self.local_root_dir, "pyproject.toml")
         try:
             pyproject = toml.load(pyproject_path)
-            if project_name := pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name"):
-                if isinstance(project_name, str):
-                    return project_name
+            if (project_name := pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name")) and isinstance(
+                project_name,
+                str,
+            ):
+                return project_name
         except FileNotFoundError as exc:
             print(f"Local pyproject.toml not found at {pyproject_path}: {exc}")
         except toml.TomlDecodeError as exc:
@@ -206,9 +211,8 @@ class ConfigManager:
         try:
             config = ConfigParser()
             config.read(setup_cfg_path)
-            if config.has_section("metadata"):
-                if cfg_name := config.get("metadata", "name", fallback=None):
-                    return cfg_name
+            if (cfg_name := config.get("metadata", "name", fallback=None)) and config.has_section("metadata"):
+                return cfg_name
         except FileNotFoundError as exc:
             print(f"setup.cfg not found at {setup_cfg_path}: {exc}")
         except (ValueError, OSError) as exc:

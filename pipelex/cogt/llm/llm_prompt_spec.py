@@ -84,7 +84,7 @@ class LLMPromptSpec(BaseModel):
         return {
             variable_name
             for variable_name in required_variables
-            if not variable_name.startswith("_") and variable_name != "preliminary_text" and variable_name != "place_holder"
+            if not variable_name.startswith("_") and variable_name not in ("preliminary_text", "place_holder")
         }
 
     # TODO: make this consistent with `LLMPromptFactoryAbstract` or `LLMPromptTemplate`,
@@ -150,13 +150,11 @@ class LLMPromptSpec(BaseModel):
         ############################################################
         # Full LLMPrompt
         ############################################################
-        llm_prompt = LLMPrompt(
+        return LLMPrompt(
             system_text=system_text,
             user_text=user_text,
             user_images=prompt_user_images,
         )
-
-        return llm_prompt
 
     async def _unravel_text(
         self,

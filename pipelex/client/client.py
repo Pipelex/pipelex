@@ -33,11 +33,13 @@ class PipelexClient(PipelexProtocol):
         self.api_token = api_token or get_required_env("PIPELEX_API_TOKEN")
 
         if not self.api_token:
-            raise ClientAuthenticationError("API token is required for API execution")
+            msg = "API token is required for API execution"
+            raise ClientAuthenticationError(msg)
 
         self.api_base_url = api_base_url or get_required_env("PIPELEX_API_BASE_URL")
         if not self.api_base_url:
-            raise ClientAuthenticationError("API base URL is required for API execution")
+            msg = "API base URL is required for API execution"
+            raise ClientAuthenticationError(msg)
 
         self.client: httpx.AsyncClient | None = None
 
@@ -85,7 +87,8 @@ class PipelexClient(PipelexProtocol):
         dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
         if working_memory and input_memory:
-            raise ValueError(f"working_memory and input_memory cannot be provided together to the API execute_pipeline {pipe_code=}")
+            msg = f"working_memory and input_memory cannot be provided together to the API execute_pipeline {pipe_code=}"
+            raise ValueError(msg)
 
         if input_memory is not None:
             working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
@@ -109,7 +112,8 @@ class PipelexClient(PipelexProtocol):
         dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
         if working_memory and input_memory:
-            raise ValueError(f"working_memory and input_memory cannot be provided together to the API start_pipeline {pipe_code=}")
+            msg = f"working_memory and input_memory cannot be provided together to the API start_pipeline {pipe_code=}"
+            raise ValueError(msg)
 
         if input_memory is not None:
             working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)

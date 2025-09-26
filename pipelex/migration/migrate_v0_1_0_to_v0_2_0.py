@@ -40,7 +40,8 @@ class TOMLMigrator:
     def find_toml_files(self, directory: Path) -> list[Path]:
         """Find all TOML files in directory and subdirectories."""
         if not directory.exists():
-            raise FileNotFoundError(f"Directory not found: {directory}")
+            msg = f"Directory not found: {directory}"
+            raise FileNotFoundError(msg)
 
         return list(directory.glob("**/*.toml"))
 
@@ -66,11 +67,7 @@ class TOMLMigrator:
 
         # Check pipe patterns
         pipe_matches = list(self.pipe_pattern.finditer(content))
-        for match in pipe_matches:
-            if not self._is_line_inside_multiline_string(content, match.start()):
-                return True
-
-        return False
+        return any(not self._is_line_inside_multiline_string(content, match.start()) for match in pipe_matches)
 
     def get_migration_preview(self, content: str) -> list[dict[str, Any]]:
         """Get preview of changes that would be made."""
@@ -140,9 +137,7 @@ class TOMLMigrator:
         # Apply concept migrations first
         migrated_content = self.concept_pattern.sub(concept_replacement_function, content)
         # Then apply pipe migrations
-        migrated_content = self.pipe_pattern.sub(pipe_replacement_function, migrated_content)
-
-        return migrated_content
+        return self.pipe_pattern.sub(pipe_replacement_function, migrated_content)
 
     def migrate_file(self, file_path: Path, create_backup: bool = True) -> int:
         """Migrate a single file from old to new syntax.
@@ -155,7 +150,8 @@ class TOMLMigrator:
             with open(file_path, encoding="utf-8") as f:
                 original_content = f.read()
         except Exception as e:
-            raise OSError(f"Failed to read file {file_path}: {e}")
+            msg = f"Failed to read file {file_path}: {e}"
+            raise OSError(msg) from e
 
         if not self.needs_migration(original_content):
             return 0
@@ -174,13 +170,15 @@ class TOMLMigrator:
             try:
                 shutil.copy2(file_path, backup_path)
             except Exception as e:
-                raise OSError(f"Failed to create backup for {file_path}: {e}")
+                msg = f"Failed to create backup for {file_path}: {e}"
+                raise OSError(msg) from e
 
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(migrated_content)
         except Exception as e:
-            raise OSError(f"Failed to write migrated content to {file_path}: {e}")
+            msg = f"Failed to write migrated content to {file_path}: {e}"
+            raise OSError(msg) from e
 
         return changes_count
 

@@ -105,8 +105,7 @@ class TextContent(StuffContentInitableFromStr):
     @override
     def rendered_html(self) -> str:
         # Convert a markdown string to HTML and return HTML as a Unicode string.
-        html = markdown.markdown(self.text)
-        return html
+        return markdown.markdown(self.text)
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
@@ -237,24 +236,23 @@ class ImageContent(StuffContentInitableFromStr):
     def save_to_directory(self, directory: str, base_name: str | None = None, extension: str | None = None):
         ensure_directory_exists(directory)
         base_name = base_name or "img"
-        if base_64 := self.base_64:
-            if not extension:
-                match interpret_path_or_url(path_or_uri=self.url):
-                    case InterpretedPathOrUrl.FILE_NAME:
-                        parts = self.url.rsplit(".", 1)
-                        base_name = parts[0]
-                        extension = parts[1]
-                    case _:
-                        file_type = detect_file_type_from_base64(b64=base_64)
-                        base_name = base_name or "img"
-                        extension = file_type.extension
-                file_path = get_incremental_file_path(
-                    base_path=directory,
-                    base_name=base_name,
-                    extension=extension,
-                    avoid_suffix_if_possible=True,
-                )
-                save_base64_to_binary_file(b64=base_64, file_path=file_path)
+        if (base_64 := self.base_64) and not extension:
+            match interpret_path_or_url(path_or_uri=self.url):
+                case InterpretedPathOrUrl.FILE_NAME:
+                    parts = self.url.rsplit(".", 1)
+                    base_name = parts[0]
+                    extension = parts[1]
+                case _:
+                    file_type = detect_file_type_from_base64(b64=base_64)
+                    base_name = base_name or "img"
+                    extension = file_type.extension
+            file_path = get_incremental_file_path(
+                base_path=directory,
+                base_name=base_name,
+                extension=extension,
+                avoid_suffix_if_possible=True,
+            )
+            save_base64_to_binary_file(b64=base_64, file_path=file_path)
 
         if caption := self.caption:
             caption_file_path = get_incremental_file_path(

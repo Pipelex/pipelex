@@ -231,8 +231,7 @@ def remove_none_values_from_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(processed, dict):
         msg = "Removing None values from a dict, we expected a dict in return"
         raise JsonTypeError(msg)
-    processed = cast("dict[str, Any]", processed)  # pyright: ignore[reportUnnecessaryCast]
-    return processed
+    return cast("dict[str, Any]", processed)  # pyright: ignore[reportUnnecessaryCast]
 
 
 def purify_json(
@@ -252,6 +251,7 @@ def purify_json(
     Args:
         data (Any): The data to convert. Can be a Pydantic model, list, dict, or any other type.
         indent (Optional[int], optional): Number of spaces for JSON formatting indentation. Defaults to None.
+        is_truncate_bytes_enabled (bool, optional): If True, truncates bytes values to a string representation. Defaults to False.
         is_warning_enabled (bool, optional): If True, wraps non-serializable data in a warning object.
             Defaults to True.
 
@@ -284,7 +284,7 @@ def purify_json(
         )
 
     if isinstance(data, list):
-        the_list = data  # type: ignore
+        the_list = data  # pyright: ignore[reportUnknownVariableType]
         if not the_list:
             return [], "[]"
         if isinstance(the_list[0], CustomBaseModel) and is_truncate_bytes_enabled:

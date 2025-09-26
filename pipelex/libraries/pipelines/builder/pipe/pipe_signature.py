@@ -67,21 +67,22 @@ class PipeSpec(StructuredContent):
     output: str = Field(description="Output concept code in PascalCase format!! Very important")
 
     @field_validator("type", mode="after")
-    def validate_pipe_type(cls, value: Any) -> Any:
-        allowed_types = [_type.value for _type in AllowedPipeTypes]
-        if value not in allowed_types:
-            raise PipeBlueprintError(f"Invalid pipe type '{value}'. Must be one of: {allowed_types}")
+    def validate_pipe_type(self, value: Any) -> Any:
+        if value not in AllowedPipeTypes.value_list():
+            msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
+            raise PipeBlueprintError(msg)
         return value
 
     @field_validator("output", mode="before")
-    def validate_concept_string_or_concept_code(cls, output: str) -> str:
+    def validate_concept_string_or_concept_code(self, output: str) -> str:
         ConceptBlueprint.validate_concept_string_or_concept_code(concept_string_or_code=output)
         return output
 
     @classmethod
     def validate_pipe_code_syntax(cls, pipe_code: str) -> str:
         if not is_snake_case(pipe_code):
-            raise PipeBlueprintError(f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case.")
+            msg = f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case."
+            raise PipeBlueprintError(msg)
         return pipe_code
 
     def to_blueprint(self) -> PipeBlueprint:

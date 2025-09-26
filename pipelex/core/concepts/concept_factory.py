@@ -108,7 +108,8 @@ class ConceptFactory:
     def make_refine(cls, refine: str) -> str:
         if NativeConceptManager.is_native_concept(concept_string_or_code=refine):
             return NativeConceptManager.get_native_concept_string(concept_string_or_code=refine)
-        raise ConceptFactoryError(f"Refine '{refine}' is not a native concept")
+        msg = f"Refine '{refine}' is not a native concept"
+        raise ConceptFactoryError(msg)
 
     @classmethod
     def make_refines(cls, blueprint: ConceptBlueprint) -> str | None:
@@ -133,10 +134,11 @@ class ConceptFactory:
             if isinstance(blueprint.structure, str):
                 # Structure is defined as a string - check if the class is in the registry and is valid
                 if not Concept.is_valid_structure_class(structure_class_name=blueprint.structure):
-                    raise StructureClassError(
+                    msg = (
                         f"Structure class '{blueprint.structure}' set for concept '{concept_code}' in domain '{domain}' "
-                        "is not a registered subclass of StuffContent",
+                        "is not a registered subclass of StuffContent"
                     )
+                    raise StructureClassError(msg)
                 structure_class_name = blueprint.structure
             else:
                 # Structure is defined as a ConceptStructureBlueprint - run the structure generator and put it in the class registry
@@ -160,16 +162,18 @@ class ConceptFactory:
                     structure_class_name = concept_code
 
                 except Exception as exc:
-                    raise ConceptFactoryError(f"Error generating structure class for concept '{concept_code}' in domain '{domain}': {exc}") from exc
+                    msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain}': {exc}"
+                    raise ConceptFactoryError(msg) from exc
 
         # Handle refines definition
         elif blueprint.refines:
             # If we have refines, validate that there is no structure related to the concept code in the class registry
             if Concept.is_valid_structure_class(structure_class_name=concept_code):
-                raise ConceptFactoryError(
+                msg = (
                     f"Concept '{concept_code}' in domain '{domain}' has refines but also has a structure class registered. "
-                    "A concept cannot have both structure and refines.",
+                    "A concept cannot have both structure and refines."
                 )
+                raise ConceptFactoryError(msg)
             current_refine = cls.make_refines(blueprint=blueprint)
             structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
         # Handle neither structure nor refines - check the class registry

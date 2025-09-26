@@ -217,7 +217,8 @@ class PipeRunParams(BaseModel):
                 # TODO: validate the concept code
                 pass
             if not key.startswith("_"):
-                raise ValueError(f"Parameter key '{key}' must start with an underscore '_'")
+                msg = f"Parameter key '{key}' must start with an underscore '_'"
+                raise ValueError(msg)
         return value
 
     def make_deep_copy(self) -> Self:

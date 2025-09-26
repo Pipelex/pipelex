@@ -37,7 +37,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         try:
             backends_dict = load_toml_from_path(path=backends_library_path)
         except (FileNotFoundError, InferenceBackendLibraryError) as exc:
-            raise InferenceBackendLibraryError(f"Failed to load inference backend library from file '{backends_library_path}': {exc}") from exc
+            msg = f"Failed to load inference backend library from file '{backends_library_path}': {exc}"
+            raise InferenceBackendLibraryError(msg) from exc
         for backend_name, backend_dict in backends_dict.items():
             # We'll split the read settings into standard fields and extra config
             standard_fields = InferenceBackendBlueprint.model_fields.keys()
@@ -90,9 +91,11 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 try:
                     model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, substitute_vars)
                 except (VarNotFoundError, UnknownVarPrefixError) as exc:
-                    raise InferenceModelSpecError(f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}") from exc
+                    msg = f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}"
+                    raise InferenceModelSpecError(msg) from exc
             except (FileNotFoundError, InferenceModelSpecError) as exc:
-                raise InferenceBackendLibraryError(f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}") from exc
+                msg = f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}"
+                raise InferenceBackendLibraryError(msg) from exc
             defaults_dict: dict[str, Any] = model_specs_dict.pop("defaults", {})
             backend_model_specs: dict[str, InferenceModelSpec] = {}
             for model_spec_name, value in model_specs_dict.items():

@@ -25,7 +25,7 @@ class PipeAbstract(ABC, BaseModel):
     output: Concept
 
     @field_validator("code", mode="before")
-    def validate_pipe_code_syntax(cls, code: str) -> str:
+    def validate_pipe_code_syntax(self, code: str) -> str:
         PipeBlueprint.validate_pipe_code_syntax(pipe_code=code)
         return code
 
@@ -74,8 +74,7 @@ class PipeAbstract(ABC, BaseModel):
 
     def concept_dependencies(self) -> list[Concept]:
         required_concepts: list[Concept] = [self.output]
-        for concept in self.inputs.concepts:
-            required_concepts.append(concept)
+        required_concepts.extend(self.inputs.concepts)
         required_concepts.append(self.output)
         return required_concepts
 
@@ -94,7 +93,8 @@ class PipeAbstract(ABC, BaseModel):
         pipe_stack = pipe_run_params.pipe_stack
         limit = pipe_run_params.pipe_stack_limit
         if len(pipe_stack) > limit:
-            raise PipeStackOverflowError(f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{pipe_stack}")
+            msg = f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{pipe_stack}"
+            raise PipeStackOverflowError(msg)
 
 
 PipeAbstractType = type[PipeAbstract]

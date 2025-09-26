@@ -26,7 +26,8 @@ def do_init_libraries(directory: str = ".", overwrite: bool = False) -> None:
         else:
             typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_dir}' (only created non-existing files)")
     except Exception as exc:
-        raise PipelexCLIError(f"Failed to initialize libraries at '{directory}': {exc}") from exc
+        msg = f"Failed to initialize libraries at '{directory}': {exc}"
+        raise PipelexCLIError(msg) from exc
 
 
 def do_init_config(reset: bool = False) -> None:
@@ -73,7 +74,8 @@ def do_init_config(reset: bool = False) -> None:
             typer.echo(f"✅ Configuration directory {target_config_dir} is already up to date")
 
     except Exception as exc:
-        raise PipelexCLIError(f"Failed to initialize configuration: {exc}") from exc
+        msg = f"Failed to initialize configuration: {exc}"
+        raise PipelexCLIError(msg) from exc
 
 
 # Typer group for init commands

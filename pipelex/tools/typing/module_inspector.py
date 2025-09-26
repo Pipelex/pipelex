@@ -24,7 +24,8 @@ def import_module_from_file(file_path: str) -> Any:
     """
     # Validate that the file is a Python file
     if not file_path.endswith(".py"):
-        raise ModuleFileError(f"File {file_path} is not a Python file (must end with .py)")
+        msg = f"File {file_path} is not a Python file (must end with .py)"
+        raise ModuleFileError(msg)
 
     # Convert file path to module-style path to use as the actual module name
     module_name = _convert_file_path_to_module_path(file_path)
@@ -36,7 +37,8 @@ def import_module_from_file(file_path: str) -> Any:
     # Use importlib.util to load the module from file path
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     if spec is None or spec.loader is None:
-        raise ModuleFileError(f"Could not load module from {file_path}")
+        msg = f"Could not load module from {file_path}"
+        raise ModuleFileError(msg)
 
     module = importlib.util.module_from_spec(spec)
 

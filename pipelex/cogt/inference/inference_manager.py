@@ -73,17 +73,14 @@ class InferenceManager(InferenceManagerProtocol):
         if llm_worker := self.llm_workers.get(llm_handle):
             return llm_worker
         if not get_config().cogt.inference_manager_config.is_auto_setup_preset_llm:
-            raise InferenceManagerWorkerSetupError(
-                f"No LLM worker for '{llm_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_llm",
-            )
+            msg = f"No LLM worker for '{llm_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_llm"
+            raise InferenceManagerWorkerSetupError(msg)
 
         inference_model = get_models_manager().get_inference_model(model_handle=llm_handle)
-        llm_worker = self._setup_one_internal_llm_worker(
+        return self._setup_one_internal_llm_worker(
             inference_model=inference_model,
             llm_handle=llm_handle,
         )
-
-        return llm_worker
 
     @override
     def set_llm_worker_from_external_plugin(
@@ -142,9 +139,8 @@ class InferenceManager(InferenceManagerProtocol):
         if ocr_worker := self.ocr_workers.get(model_handle):
             return ocr_worker
         if not get_config().cogt.inference_manager_config.is_auto_setup_preset_ocr:
-            raise InferenceManagerWorkerSetupError(
-                f"Found no OCR worker for '{model_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_ocr",
-            )
+            msg = f"Found no OCR worker for '{model_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_ocr"
+            raise InferenceManagerWorkerSetupError(msg)
 
         inference_model = get_models_manager().get_inference_model(model_handle=model_handle)
         return self._setup_one_ocr_worker(

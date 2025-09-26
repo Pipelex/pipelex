@@ -5,7 +5,6 @@ from pydantic import Field, field_validator
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.tools.config.config_model import ConfigModel
-from pipelex.tools.exceptions import ConfigValidationError
 
 
 class LLMSetting(ConfigModel):
@@ -21,7 +20,6 @@ class LLMSetting(ConfigModel):
             return None
         if isinstance(value, int):  # pyright: ignore[reportUnnecessaryIsInstance]
             return value
-        raise ConfigValidationError(f'Invalid max_tokens shoubd be an int or "auto" but it is a {type(value)}: {value}')
 
     def make_llm_job_params(self) -> LLMJobParams:
         return LLMJobParams(

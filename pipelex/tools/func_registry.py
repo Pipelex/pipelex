@@ -47,7 +47,8 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
             if should_warn_if_already_registered:
                 self.log(f"Function '{key}' already exists in registry")
             else:
-                raise FuncRegistryError(f"Function '{key}' already exists in registry")
+                msg = f"Function '{key}' already exists in registry"
+                raise FuncRegistryError(msg)
         else:
             self.log(f"Registered new single function '{key}' in registry")
         self.root[key] = func
@@ -56,14 +57,16 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         """Unregisters a function from the registry."""
         key = func.__name__
         if key not in self.root:
-            raise FuncRegistryError(f"Function '{key}' not found in registry")
+            msg = f"Function '{key}' not found in registry"
+            raise FuncRegistryError(msg)
         del self.root[key]
         self.log(f"Unregistered single function '{key}' from registry")
 
     def unregister_function_by_name(self, name: str) -> None:
         """Unregisters a function from the registry by its name."""
         if name not in self.root:
-            raise FuncRegistryError(f"Function '{name}' not found in registry")
+            msg = f"Function '{name}' not found in registry"
+            raise FuncRegistryError(msg)
         del self.root[name]
 
     def register_functions_dict(self, functions: dict[str, Callable[..., Any]]) -> None:
@@ -83,10 +86,11 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def get_required_function(self, name: str) -> Callable[..., Any]:
         """Retrieves a function from the registry by its name. Raises an error if not found."""
         if name not in self.root:
-            raise FuncRegistryError(
-                f"Function '{name}' not found in registry: \
-                See how to register a function here: https://docs.pipelex.com/pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc",
+            msg = (
+                f"Function '{name}' not found in registry:"
+                "See how to register a function here: https://docs.pipelex.com/pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc"
             )
+            raise FuncRegistryError(msg)
         return self.root[name]
 
     def get_required_function_with_signature(self, name: str) -> Callable[..., object]:
@@ -94,13 +98,15 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         Raises an error if not found or if signature doesn't match.
         """
         if name not in self.root:
-            raise FuncRegistryError(f"Function '{name}' not found in registry")
+            msg = f"Function '{name}' not found in registry"
+            raise FuncRegistryError(msg)
 
         func = self.root[name]
         # Note: This is a basic signature check. For more thorough type checking,
         # you might want to use typing.get_type_hints() or a more sophisticated type checker
         if not callable(func):
-            raise FuncRegistryError(f"'{name}' is not a callable function")
+            msg = f"'{name}' is not a callable function"
+            raise FuncRegistryError(msg)
         return func
 
     def has_function(self, name: str) -> bool:
@@ -114,8 +120,8 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         """
         try:
             # Import here to avoid circular imports
-            from pipelex.core.memory.working_memory import WorkingMemory
-            from pipelex.core.stuffs.stuff_content import StuffContent
+            from pipelex.core.memory.working_memory import WorkingMemory  # noqa: PLC0415
+            from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
 
             # Get function signature
             sig = inspect.signature(func)

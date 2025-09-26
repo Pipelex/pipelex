@@ -90,8 +90,9 @@ class LibraryManager(LibraryManagerAbstract):
                 try:
                     validate_toml_file(template_path)
                 except TOMLValidationError as exc:
-                    log.error(f"PLX formatting issues in template file '{template_path}': {exc}")
-                    raise LibraryError(f"PLX validation failed for template file '{template_path}': {exc}") from exc
+                    msg = f"PLX validation failed for template file '{template_path}': {exc}"
+                    log.error(msg)
+                    raise LibraryError(msg) from exc
 
     @override
     def setup(self) -> None:
@@ -120,7 +121,8 @@ class LibraryManager(LibraryManagerAbstract):
         all_plx_paths: list[Path] = []
         for dir_path in dirs:
             if not dir_path.exists():
-                raise LibraryError(f"Directory does not exist: {dir_path}")
+                msg = f"Directory does not exist: {dir_path}"
+                raise LibraryError(msg)
 
             # Find all TOML files in the directory
             plx_files = find_files_in_dir(
@@ -142,7 +144,8 @@ class LibraryManager(LibraryManagerAbstract):
     def load_from_file(self, plx_path: Path) -> None:
         """Load a single file - this method is kept for compatibility."""
         if not PipelexInterpreter.is_pipelex_file(plx_path):
-            raise LibraryError(f"File is not a valid Pipelex PLX file: {plx_path}")
+            msg = f"File is not a valid Pipelex PLX file: {plx_path}"
+            raise LibraryError(msg)
 
         blueprint = PipelexInterpreter(file_path=plx_path).make_pipelex_bundle_blueprint()
         self.load_from_blueprint(blueprint)
@@ -173,7 +176,7 @@ class LibraryManager(LibraryManagerAbstract):
         if blueprint.concept is not None:
             concept_codes_to_remove = [
                 ConceptFactory.construct_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
-                for concept_code in blueprint.concept.keys()
+                for concept_code in blueprint.concept
             ]
             self.concept_library.remove_concepts_by_codes(concept_codes=concept_codes_to_remove)
 
@@ -250,10 +253,12 @@ class LibraryManager(LibraryManagerAbstract):
             try:
                 blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
             except FileNotFoundError as exc:
-                raise PipelexSetupError(f"Could not find PLX blueprint at '{plx_file_path}'") from exc
+                msg = f"Could not find PLX blueprint at '{plx_file_path}'"
+                raise PipelexSetupError(msg) from exc
             except ValidationError as exc:
-                error_msg = format_pydantic_validation_error(exc)
-                raise PipelexSetupError(f"Could not load PLX blueprint from '{plx_file_path}' because of: {error_msg}") from exc
+                formatted_error_msg = format_pydantic_validation_error(exc)
+                msg = f"Could not load PLX blueprint from '{plx_file_path}' because of: {formatted_error_msg}"
+                raise PipelexSetupError(msg) from exc
             blueprints.append(blueprint)
 
         # Load all domains first

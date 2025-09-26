@@ -50,7 +50,8 @@ class ReportingManager(ReportingProtocol):
 
     def _get_registry(self, pipeline_run_id: str) -> UsageRegistry:
         if pipeline_run_id not in self._usage_registries:
-            raise ReportingManagerError(f"Registry for pipeline '{pipeline_run_id}' does not exist")
+            msg = f"Registry for pipeline '{pipeline_run_id}' does not exist"
+            raise ReportingManagerError(msg)
         return self._usage_registries[pipeline_run_id]
 
     def _report_llm_job(self, llm_job: LLMJob):
@@ -78,7 +79,8 @@ class ReportingManager(ReportingProtocol):
     @override
     def open_registry(self, pipeline_run_id: str):
         if pipeline_run_id in self._usage_registries:
-            raise ReportingManagerError(f"Registry for pipeline '{pipeline_run_id}' already exists")
+            msg = f"Registry for pipeline '{pipeline_run_id}' already exists"
+            raise ReportingManagerError(msg)
         self._usage_registries[pipeline_run_id] = UsageRegistry()
 
     @override

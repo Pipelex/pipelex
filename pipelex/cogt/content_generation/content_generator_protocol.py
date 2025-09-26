@@ -27,10 +27,12 @@ def update_job_metadata(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P
         # Attempt to get job_metadata from kwargs or from args
         job_metadata = kwargs.get("job_metadata")
         if job_metadata is None:
-            raise RuntimeError("job_metadata argument is required for this decorated function.")
+            msg = "job_metadata argument is required for this decorated function."
+            raise RuntimeError(msg)
 
         if not isinstance(job_metadata, JobMetadata):
-            raise TypeError("The job_metadata argument must be of type JobMetadata.")
+            msg = "The job_metadata argument must be of type JobMetadata."
+            raise TypeError(msg)
 
         updated_metadata = JobMetadata(
             content_generation_job_id=func.__name__,

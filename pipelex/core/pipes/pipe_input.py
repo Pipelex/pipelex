@@ -73,7 +73,8 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
     def get_required_input_requirement(self, variable_name: str) -> InputRequirement:
         requirement = self.root.get(variable_name)
         if not requirement:
-            raise PipeInputNotFoundError(f"Variable '{variable_name}' not found in input spec")
+            msg = f"Variable '{variable_name}' not found in input spec"
+            raise PipeInputNotFoundError(msg)
         return requirement
 
     def add_requirement(self, variable_name: str, concept: Concept, multiplicity: PipeOutputMultiplicity | None = None):
@@ -98,7 +99,7 @@ class PipeInputSpec(RootModel[PipeInputSpecRoot]):
     @property
     def required_names(self) -> list[str]:
         the_required_names: list[str] = []
-        for requirement_expression in self.root.keys():
+        for requirement_expression in self.root:
             required_variable_name = requirement_expression.split(".", 1)[0]
             the_required_names.append(required_variable_name)
         return the_required_names

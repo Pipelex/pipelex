@@ -94,7 +94,7 @@ class PipeFunc(PipeOperator):
         function = func_registry.get_required_function(self.function_name)
         if not callable(function):
             msg = f"Function '{self.function_name}' is not callable"
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         # Check that all needed inputs are present in working memory
         needed_inputs = self.needed_inputs()

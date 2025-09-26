@@ -20,7 +20,8 @@ def do_show_config() -> None:
             title=f"Pipelex configuration for project: {config_manager.get_project_name()}",
         )
     except Exception as exc:
-        raise PipelexConfigError(f"Error loading configuration: {exc}") from exc
+        msg = f"Error loading configuration: {exc}"
+        raise PipelexConfigError(msg) from exc
 
 
 def do_list_pipes(relative_config_folder_path: str = "pipelex_libraries") -> None:
@@ -30,7 +31,8 @@ def do_list_pipes(relative_config_folder_path: str = "pipelex_libraries") -> Non
     try:
         get_pipe_provider().pretty_list_pipes()
     except Exception as exc:
-        raise PipelexCLIError(f"Failed to list pipes: {exc}") from exc
+        msg = f"Failed to list pipes: {exc}"
+        raise PipelexCLIError(msg) from exc
 
 
 def do_show_pipe(pipe_code: str, relative_config_folder_path: str = "./pipelex_libraries") -> None:

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
 from pipelex.cli.commands.common import is_pipelex_libraries_folder
 from pipelex.migration.migrate_v0_1_0_to_v0_2_0 import TOMLMigrator, migrate_concept_syntax
 from pipelex.migration.migration_result import MigrationResult
+
+if TYPE_CHECKING:
+    from pipelex.migration.migration_result import MigrationResult
 
 
 def do_migrate(
@@ -94,10 +97,10 @@ def do_migrate(
             typer.echo("   Run 'pipelex validate all -c pipelex/libraries' to verify the migration")
     except FileNotFoundError as exc:
         typer.echo(f"❌ {exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     except Exception as exc:
         typer.echo(f"❌ Migration failed: {exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
 
 # Typer group for migration commands

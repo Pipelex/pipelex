@@ -106,7 +106,8 @@ def clean_model_to_dict(obj: BaseModel) -> dict[str, Any]:
         is_stringify_enums=True,
     )
     if not isinstance(dict_dump, dict):
-        raise TypeError(f"Expected dict, got {type(dict_dump)}")
+        msg = f"Expected dict, got {type(dict_dump)}"
+        raise TypeError(msg)
     result_dict = cast("dict[str, Any]", dict_dump)
     return result_dict
 

@@ -61,16 +61,14 @@ class VertexAIFactory(ConfigModel):
             from google.auth.transport.requests import Request  # noqa: PLC0415
             from google.oauth2.service_account import Credentials  # noqa: PLC0415
         except ImportError as exc:
+            lib_name = "google-auth-oauthlib"
+            lib_extra_name = "google"
             msg = (
                 "The google-auth-oauthlib SDK is required to use Google connection. "
                 "You can install it with 'pip install pipelex[google]', or use this model via another provider "
                 "(such as Azure OpenAI, OpenAI, anthropic or bedrock)."
             )
-            raise MissingDependencyError(
-                "google-auth-oauthlib",
-                "google",
-                msg,
-            ) from exc
+            raise MissingDependencyError(lib_name, lib_extra_name, msg) from exc
 
         try:
             credentials_dict: dict[str, Any] = load_json_dict_from_path(path=gcp_credentials_file_path)

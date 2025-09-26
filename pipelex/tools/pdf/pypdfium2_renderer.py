@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import pathlib
+from typing import TYPE_CHECKING
 
 import pypdfium2 as pdfium
-from PIL import Image
 from pypdfium2.raw import FPDFBitmap_BGRA
 
 from pipelex.tools.exceptions import ToolException
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 
+if TYPE_CHECKING:
+    from PIL import Image
 PDFIUM2_REFERENCE_DPI = 72
 
 
@@ -81,7 +83,7 @@ class PyPdfium2Renderer:
             return await asyncio.to_thread(self._get_text_from_pdf_pages_sync, pdf_input)
 
     async def render_pdf_pages_from_uri(self, pdf_uri: str, dpi: int) -> list[Image.Image]:
-        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)  # pyright: ignore
+        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
         if pdf_url:
             pdf_bytes = await fetch_file_from_url_httpx_async(url=pdf_url)
             return await self.render_pdf_pages(pdf_input=pdf_bytes, dpi=dpi)
@@ -92,7 +94,7 @@ class PyPdfium2Renderer:
 
     async def get_text_from_pdf_pages_from_uri(self, pdf_uri: str) -> list[str]:
         """Extract text from all pages of a PDF from URI."""
-        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)  # pyright: ignore
+        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
         if pdf_url:
             pdf_bytes = await fetch_file_from_url_httpx_async(url=pdf_url)
             return await self.get_text_from_pdf_pages(pdf_input=pdf_bytes)

@@ -8,16 +8,16 @@ from pydantic import BaseModel, create_model
 
 
 def create_pydantic_model_from_function(func: Callable[..., Any]) -> type[BaseModel]:
-    """Creates a Pydantic BaseModel from a function's signature.
+    """Create a Pydantic BaseModel from a function's signature.
 
-    Parameters
-    ----------
-        func : Callable[..., Any]
-            The function from which to derive the BaseModel.
+    Args:
+        func: The function to inspect. Its parameters become model fields.
 
-    Returns
-    -------
-        Type[BaseModel]: A dynamically created Pydantic BaseModel class.
+    Returns:
+        type[BaseModel]: A dynamically created Pydantic model class.
+
+    Raises:
+        ValueError: If the function has unsupported parameter kinds.
 
     """
     sig = inspect.signature(func)

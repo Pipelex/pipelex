@@ -95,13 +95,10 @@ class ConceptStructureSpec(StructuredContent):
                     self._raise_type_mismatch_error("date", type(self.default_value).__name__)
 
     def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
-        """Raise a type mismatch error with consistent formatting."""
-        raise ConceptStructureBlueprintError(
-            f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}",
-        )
+        msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
+        raise ConceptStructureBlueprintError(msg)
 
     def to_blueprint(self) -> ConceptStructureBlueprint:
-        """Convert this ConceptStructureBlueprint to the core ConceptStructureBlueprint."""
         # Convert the type enum value - self.type is already a ConceptStructureBlueprintFieldType enum
         # We need to get the corresponding value in the core enum
         core_type = None
@@ -176,18 +173,18 @@ class ConceptSpec(StructuredContent):
     @classmethod
     def validate_concept_code(cls, concept_code: str) -> None:
         if not is_pascal_case(concept_code):
-            raise ConceptCodeError(
-                f"Concept code '{concept_code}' must be PascalCase (letters and numbers only, starting with uppercase, without `.`)",
-            )
+            msg = f"Concept code '{concept_code}' must be PascalCase (letters and numbers only, starting with uppercase, without `.`)"
+            raise ConceptCodeError(msg)
 
     @classmethod
     def validate_concept_string_or_concept_code(cls, concept_string_or_code: str) -> None:
         if concept_string_or_code.count(".") > 1:
-            raise ConceptStringOrConceptCodeError(
+            msg = (
                 f"concept_string_or_code '{concept_string_or_code}' is invalid. "
                 "It should either contain a domain in snake_case and a concept code in PascalCase separated by one dot, "
-                "or be a concept code in PascalCase.",
+                "or be a concept code in PascalCase."
             )
+            raise ConceptStringOrConceptCodeError(msg)
 
         if concept_string_or_code.count(".") == 1:
             domain, concept_code = concept_string_or_code.split(".")
@@ -200,51 +197,54 @@ class ConceptSpec(StructuredContent):
     def validate_concept_string(concept_string: str) -> None:
         """Validate that a concept code follows PascalCase convention."""
         if "." not in concept_string or concept_string.count(".") > 1:
-            raise ConceptStringError(
+            msg = (
                 f"Concept string '{concept_string}' is invalid. It should contain a domain in snake_case "
-                "and a concept code in PascalCase separated by one dot.",
+                "and a concept code in PascalCase separated by one dot."
             )
+            raise ConceptStringError(msg)
         domain, concept_code = concept_string.split(".", 1)
 
         DomainBlueprint.validate_domain_code(domain)
         if not is_pascal_case(concept_code):
-            raise ConceptCodeError(
-                f"Concept code '{concept_code}' must be PascalCase (letters and numbers only, starting with uppercase, without `.`)",
-            )
+            msg = f"Concept code '{concept_code}' must be PascalCase (letters and numbers only, starting with uppercase, without `.`)"
+            raise ConceptCodeError(msg)
 
         # Validate that if the concept code is among the native concepts, the domain MUST be native.
         if concept_code in [concept.value for concept in [native_concept for native_concept in NativeConceptEnum]]:
             if domain != SpecialDomain.NATIVE:
-                raise ConceptStringError(
+                msg = (
                     f"Concept string '{concept_string}' is invalid. "
                     f"Concept code '{concept_code}' is a native concept, so the domain must be '{SpecialDomain.NATIVE}', "
-                    f"or nothing, but not '{domain}'",
+                    f"or nothing, but not '{domain}'"
                 )
+                raise ConceptStringError(msg)
 
         # Validate that if the domain is native, the concept code is a native concept
-        if domain == SpecialDomain.NATIVE:
-            if concept_code not in [native_concept for native_concept in NativeConceptEnum]:
-                raise ConceptStringError(
-                    f"Concept string '{concept_string}' is invalid. "
-                    f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'.",
-                )
+        if domain == SpecialDomain.NATIVE and concept_code not in NativeConceptEnum:
+            msg = (
+                f"Concept string '{concept_string}' is invalid. "
+                f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'."
+            )
+            raise ConceptStringError(msg)
 
     @field_validator("refines", mode="before")
     @classmethod
     def validate_refines(cls, refines: str | None = None) -> str | None:
         if refines is not None:
             if not NativeConceptManager.is_native_concept(refines):
-                raise ConceptBlueprintError(f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon.")
+                msg = f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon."
+                raise ConceptBlueprintError(msg)
             cls.validate_concept_string_or_concept_code(concept_string_or_code=refines)
         return refines
 
     @model_validator(mode="before")
-    def model_validate_spec(cls, values: dict[str, Any]) -> dict[str, Any]:
+    def model_validate_spec(self, values: dict[str, Any]) -> dict[str, Any]:
         if values.get("refines") and values.get("structure"):
-            raise ConceptSpecError(
+            msg = (
                 f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
-                f"and `{values.get('structure')}` for concept that has the definition `{values.get('definition')}`",
+                f"and `{values.get('structure')}` for concept that has the definition `{values.get('definition')}`"
             )
+            raise ConceptSpecError(msg)
         return values
 
     def to_blueprint(self) -> ConceptBlueprint:

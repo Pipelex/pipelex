@@ -59,9 +59,11 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     def _check_vision_support(self, llm_job: LLMJob):
         if llm_job.llm_prompt.user_images:
             if not self.inference_model.is_vision_supported:
-                raise LLMCapabilityError(f"LLM Engine '{self.inference_model.tag}' does not support vision.")
+                msg = f"LLM Engine '{self.inference_model.tag}' does not support vision."
+                raise LLMCapabilityError(msg)
 
             nb_images = len(llm_job.llm_prompt.user_images)
             max_prompt_images = self.inference_model.max_prompt_images or 5000
             if nb_images > max_prompt_images:
-                raise LLMCapabilityError(f"LLM Engine '{self.inference_model.tag}' does not accept that many images: {nb_images}.")
+                msg = f"LLM Engine '{self.inference_model.tag}' does not accept that many images: {nb_images}."
+                raise LLMCapabilityError(msg)

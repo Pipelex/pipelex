@@ -41,7 +41,8 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
     def get_required_domain(self, domain: str) -> Domain:
         the_domain = self.get_domain(domain=domain)
         if not the_domain:
-            raise DomainLibraryError(f"Domain '{domain}' not found. Check for typos and make sure it is declared in a pipeline library.")
+            msg = f"Domain '{domain}' not found. Check for typos and make sure it is declared in a pipeline library."
+            raise DomainLibraryError(msg)
         return the_domain
 
     @override

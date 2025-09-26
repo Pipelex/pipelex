@@ -35,7 +35,8 @@ class ConfigModel(BaseModel):
             return {key_enum_cls(key): value for key, value in input_dict.items()}
         if value_enum_cls:
             return {key: value_enum_cls(value) for key, value in input_dict.items()}
-        raise ConfigModelError("Either key_enum_cls or value_enum_cls must be provided.")
+        msg = "Either key_enum_cls or value_enum_cls must be provided."
+        raise ConfigModelError(msg)
 
     @staticmethod
     def transform_dict_of_floats_str_to_enum(

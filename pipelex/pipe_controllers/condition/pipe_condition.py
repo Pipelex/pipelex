@@ -1,4 +1,4 @@
-from typing import Literal, Self, cast
+from typing import TYPE_CHECKING, Literal, Self, cast
 
 import shortuuid
 from pydantic import field_validator, model_validator
@@ -28,11 +28,13 @@ from pipelex.exceptions import (
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2Output
 from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
 from pipelex.pipe_operators.jinja2.pipe_jinja2_factory import PipeJinja2Factory
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
+
+if TYPE_CHECKING:
+    from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2Output
 
 
 class PipeCondition(PipeController):
@@ -63,7 +65,7 @@ class PipeCondition(PipeController):
                 ):
                     msg = (
                         f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
-                        f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'",
+                        f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'"
                     )
                     raise PipeConditionError(msg)
         if self.default_pipe_code:
@@ -74,7 +76,7 @@ class PipeCondition(PipeController):
             ):
                 msg = (
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
-                    f"not matching the output concept code '{default_pipe.output.concept_string}' of the default pipe '{self.default_pipe_code}'",
+                    f"not matching the output concept code '{default_pipe.output.concept_string}' of the default pipe '{self.default_pipe_code}'"
                 )
                 raise PipeConditionError(msg)
 
@@ -85,19 +87,18 @@ class PipeCondition(PipeController):
         expression_results = [pipe_condition_pipe_map.expression_result for pipe_condition_pipe_map in pipe_map]
         pipe_codes = [pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in pipe_map]
         if len(expression_results) != len(set(expression_results)):
-            raise PipeDefinitionError(
-                f"PipeCondition '{cls.code}' must have a unique expression result for each pipe in pipe_map in pipe_map: {pipe_map}",
-            )
+            msg = f"PipeCondition '{cls.code}' must have a unique expression result for each pipe in pipe_map in pipe_map: {pipe_map}"
+            raise PipeDefinitionError(msg)
         if len(pipe_codes) != len(set(pipe_codes)):
-            raise PipeDefinitionError(
-                f"PipeCondition '{cls.code}' must have a unique pipe code for each expression result in pipe_map in pipe_map: {pipe_map}",
-            )
+            msg = f"PipeCondition '{cls.code}' must have a unique pipe code for each expression result in pipe_map in pipe_map: {pipe_map}"
+            raise PipeDefinitionError(msg)
         return pipe_map
 
     @model_validator(mode="after")
     def validate_expression(self) -> Self:
         if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
-            raise PipeDefinitionError("PipeCondition should have exactly one of expression_template or expression")
+            msg = "PipeCondition should have exactly one of expression_template or expression"
+            raise PipeDefinitionError(msg)
         return self
 
     def _make_pipe_condition_details(self, evaluated_expression: str, chosen_pipe_code: str) -> PipeConditionDetails:
@@ -116,7 +117,8 @@ class PipeCondition(PipeController):
             return self.expression_template
         if self.expression:
             return "{{ " + self.expression + " }}"
-        raise PipeExecutionError("No expression or expression_template provided")
+        msg = "No expression or expression_template provided"
+        raise PipeExecutionError(msg)
 
     #########################################################################################
     # Inputs
@@ -141,7 +143,8 @@ class PipeCondition(PipeController):
     def _validate_required_variables(self) -> Self:
         for required_variable_name in self.required_variables():
             if required_variable_name not in self.inputs.variables:
-                raise PipeDefinitionError(f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}")
+                msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}"
+                raise PipeDefinitionError(msg)
         return self
 
     @override
@@ -191,7 +194,8 @@ class PipeCondition(PipeController):
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
         if not self.pipe_map:
-            raise ValueError(f"Pipe'{self.code}'(PipeCondition) must have at least one mapping in pipe_map")
+            msg = f"Pipe'{self.code}'(PipeCondition) must have at least one mapping in pipe_map"
+            raise ValueError(msg)
 
         # Skip validation during model creation - it will be done in validate_with_libraries()
         return self
@@ -349,14 +353,15 @@ class PipeCondition(PipeController):
         )
         required_variables = pipe_jinja2.required_variables()
         log.debug(required_variables, title=f"Required variables for PipeCondition '{self.code}'")
-        required_stuff_names = set([required_variable for required_variable in required_variables if not required_variable.startswith("_")])
+        required_stuff_names = {required_variable for required_variable in required_variables if not required_variable.startswith("_")}
         try:
             required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
         except WorkingMemoryStuffNotFoundError as exc:
-            pipe_condition_path = pipe_run_params.pipe_layers + [self.code]
+            pipe_condition_path = [*pipe_run_params.pipe_layers, self.code]
             pipe_condition_path_str = ".".join(pipe_condition_path)
             error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
-            raise PipeInputError(f"Some required stuff(s) not found: {error_details}") from exc
+            msg = f"Some required stuff(s) not found: {error_details}"
+            raise PipeInputError(msg) from exc
 
         for required_stuff in required_stuffs:
             get_pipeline_tracker().add_condition_step(
@@ -431,10 +436,10 @@ class PipeCondition(PipeController):
                 message=error_msg,
                 missing_inputs=[],
                 pipe_code=self.code,
-            )
+            ) from exc
 
         # 3. Validate that all pipes in the pipe_map exist
-        all_pipe_codes = set([pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in self.pipe_map])
+        all_pipe_codes = {pipe_condition_pipe_map.pipe_code for pipe_condition_pipe_map in self.pipe_map}
         if self.default_pipe_code:
             all_pipe_codes.add(self.default_pipe_code)
 

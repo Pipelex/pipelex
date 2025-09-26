@@ -12,13 +12,13 @@ def load_binary_as_base64(path: str) -> bytes:
 
 
 async def load_binary_as_base64_async(path: str) -> bytes:
-    async with aiofiles.open(path, "rb") as fp:  # type: ignore[reportUnknownMemberType]
+    async with aiofiles.open(path, "rb") as fp:  # pyright: ignore[reportUnknownMemberType]
         data_bytes = await fp.read()
         return base64.b64encode(data_bytes)
 
 
 async def load_binary_async(path: str) -> bytes:
-    async with aiofiles.open(path, "rb") as fp:  # type: ignore[reportUnknownMemberType]
+    async with aiofiles.open(path, "rb") as fp:  # pyright: ignore[reportUnknownMemberType]
         data_bytes = await fp.read()
         return data_bytes
 

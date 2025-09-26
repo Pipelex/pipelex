@@ -45,9 +45,9 @@ class StuffArtefact(RootModel[dict[str, Any]], Jinja2TaggableAbstract):
     def rendered_str(self, text_format: TextFormat) -> str:
         content = self.root["content"]
         if not isinstance(content, StuffContent):
-            raise StuffArtefactError(f"StuffArtefact has no StuffContent, content: {self}")
-        rendered_str = content.rendered_str(text_format=text_format)
-        return rendered_str
+            msg = f"StuffArtefact has no StuffContent, content: {self}"
+            raise StuffArtefactError(msg)
+        return content.rendered_str(text_format=text_format)
 
     @override
     def render_tagged_for_jinja2(self, context: Context, tag_name: str | None = None) -> tuple[Any, str | None]:

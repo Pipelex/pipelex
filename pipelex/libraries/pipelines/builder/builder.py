@@ -248,20 +248,19 @@ async def validate_dry_run(working_memory: WorkingMemory) -> ListContent[PipeFai
 
     failed_pipes: list[PipeFailure] = []
     for pipe_code, dry_run_output in dry_run_result.items():
-        if dry_run_output.status == DryRunStatus.FAILURE:
-            if pipelex_bundle_spec.pipe and pipe_code in pipelex_bundle_spec.pipe:
-                pipe_spec = pipelex_bundle_spec.pipe[pipe_code]
-                spec_class = pipe_type_to_spec_class.get(pipe_spec.type)
-                if not spec_class:
-                    msg = f"Unknown pipe type: {pipe_spec.type}"
-                    raise ValidateDryRunError(msg)
-                pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
-                failed_pipes.append(
-                    PipeFailure(
-                        pipe=pipe_spec,
-                        error_message=dry_run_output.error_message or "",
-                    ),
-                )
+        if dry_run_output.status == DryRunStatus.FAILURE and pipelex_bundle_spec.pipe and pipe_code in pipelex_bundle_spec.pipe:
+            pipe_spec = pipelex_bundle_spec.pipe[pipe_code]
+            spec_class = pipe_type_to_spec_class.get(pipe_spec.type)
+            if not spec_class:
+                msg = f"Unknown pipe type: {pipe_spec.type}"
+                raise ValidateDryRunError(msg)
+            pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
+            failed_pipes.append(
+                PipeFailure(
+                    pipe=pipe_spec,
+                    error_message=dry_run_output.error_message or "",
+                ),
+            )
 
     return ListContent[PipeFailure](items=failed_pipes)
 

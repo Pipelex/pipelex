@@ -69,7 +69,8 @@ class WorkingMemoryFactory(BaseModel):
     @classmethod
     def make_from_single_stuff(cls, stuff: Stuff) -> WorkingMemory:
         if not stuff.stuff_name:
-            raise WorkingMemoryFactoryError(f"Cannot make_from_single_stuff because stuff has no name: {stuff}")
+            msg = f"Cannot make_from_single_stuff because stuff has no name: {stuff}"
+            raise WorkingMemoryFactoryError(msg)
         stuff_dict: StuffDict = {stuff.stuff_name: stuff}
         return WorkingMemory(root=stuff_dict, aliases={MAIN_STUFF_NAME: stuff.stuff_name})
 
@@ -86,14 +87,15 @@ class WorkingMemoryFactory(BaseModel):
             if not name:
                 if is_ignore_unnamed:
                     continue
-                raise WorkingMemoryFactoryError(f"Stuff {stuff} has no name")
+                msg = f"Stuff {stuff} has no name"
+                raise WorkingMemoryFactoryError(msg)
             stuff_dict[name] = stuff
         aliases: dict[str, str] = {}
         if stuff_dict:
             if main_name:
                 aliases[MAIN_STUFF_NAME] = main_name
             else:
-                aliases[MAIN_STUFF_NAME] = list(stuff_dict.keys())[0]
+                aliases[MAIN_STUFF_NAME] = next(iter(stuff_dict.keys()))
         return WorkingMemory(root=stuff_dict, aliases=aliases)
 
     @classmethod
@@ -134,13 +136,14 @@ class WorkingMemoryFactory(BaseModel):
         implicit_memory: ImplicitMemory,
         search_domains: list[str] | None = None,
     ) -> WorkingMemory:
-        """Create a WorkingMemory from a compact memory dictionary.
+        """Create a WorkingMemory from a implicit memory dictionary.
 
         Args:
-            compact_memory: Dictionary in the format from API serialization
+            implicit_memory: Dictionary in the format from API serialization
+            search_domains: List of search domains to use when making stuff
 
         Returns:
-            WorkingMemory object reconstructed from the compact format
+            WorkingMemory object reconstructed from the implicit format
 
         """
         working_memory = cls.make_empty()
