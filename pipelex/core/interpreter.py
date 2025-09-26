@@ -782,7 +782,7 @@ class PipelexInterpreter(BaseModel):
         if pipe.prompting_style:
             result["prompting_style"] = pipe.prompting_style
         # Only include template_category if it's not the default value
-        if pipe.template_category and pipe.template_category.value != "llm_prompt":
+        if pipe.template_category and pipe.template_category != "llm_prompt":
             result["template_category"] = pipe.template_category
 
         return result

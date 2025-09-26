@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any, cast, Optional
 
 import shortuuid
 from polyfactory.factories.pydantic_factory import ModelFactory
@@ -22,8 +22,8 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_text(
         cls,
         text: str,
-        concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value,
-        name: str | None = "text",
+        concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT,
+        name: Optional[str] = "text",
     ) -> WorkingMemory:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
         return cls.make_from_single_stuff(
@@ -38,8 +38,8 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_image(
         cls,
         image_url: str,
-        concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.IMAGE.value,
-        name: str | None = "image",
+        concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptEnum.IMAGE,
+        name: Optional[str] = "image",
     ) -> WorkingMemory:
         # TODO: validate that the concept is compatible with an image concept
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
@@ -54,8 +54,8 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_pdf(
         cls,
         pdf_url: str,
-        concept_string: str = SpecialDomain.NATIVE.value + "." + NativeConceptEnum.PDF.value,
-        name: str | None = "pdf",
+        concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptEnum.PDF,
+        name: Optional[str] = "pdf",
     ) -> WorkingMemory:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
         return cls.make_from_single_stuff(
@@ -105,7 +105,7 @@ class WorkingMemoryFactory(BaseModel):
                 continue
             text_content = TextContent(text=content)
             stuff_dict[name] = StuffFactory.make_stuff(
-                concept=get_required_concept(concept_string=SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value),
+                concept=get_required_concept(concept_string=SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT),
                 content=text_content,
                 name=name,
                 code="",

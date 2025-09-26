@@ -1,10 +1,9 @@
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Dict
 
 import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
-from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import (
     ListContent,
@@ -35,7 +34,7 @@ class TestData:
     EMPTY_LIST_CONTENT: ClassVar[ListContent[TextContent]] = ListContent(items=[])
 
     # Dictionary test data - native concept
-    NATIVE_TEXT_DICT: ClassVar[dict[str, Any]] = {"concept": NativeConceptEnum.TEXT.value, "content": {"text": "Native text content"}}
+    NATIVE_TEXT_DICT: ClassVar[Dict[str, Any]] = {"concept": NativeConceptEnum.TEXT, "content": {"text": "Native text content"}}
 
     # Dictionary test data - custom concept with concept field
     CUSTOM_CONCEPT_DICT: ClassVar[dict[str, Any]] = {
@@ -104,7 +103,7 @@ class TestMakeStuffFromStuffContentUsingSearchDomains:
         """Test StuffContent with native concept class name."""
         mock_provider = mocker.patch("pipelex.core.stuffs.stuff_factory.get_concept_provider").return_value
         mock_concept = mocker.Mock()
-        mock_provider.get_required_concept.return_value = mock_concept
+        mock_provider.get_native_concept.return_value = mock_concept
 
         text_content = TextContent(text="test")
 
@@ -119,7 +118,7 @@ class TestMakeStuffFromStuffContentUsingSearchDomains:
         )
 
         assert result == mock_stuff
-        mock_provider.get_required_concept.assert_called_once_with(concept_string=f"{SpecialDomain.NATIVE.value}.Text")
+        mock_provider.get_native_concept.assert_called_once_with(native_concept=NativeConceptEnum.TEXT)
 
     def test_stuffcontent_with_non_native_concept(self, mocker: MockerFixture):
         """Test StuffContent with non-native concept properly extracts concept name."""

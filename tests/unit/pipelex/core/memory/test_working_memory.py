@@ -58,7 +58,7 @@ class TestWorkingMemory:
     def single_text_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single text content."""
         return WorkingMemoryFactory.make_from_text(
-            text=TestWorkingMemoryData.SAMPLE_TEXT, concept_string=SpecialDomain.NATIVE.value + "." + NativeConceptEnum.TEXT.value, name="sample_text",
+            text=TestWorkingMemoryData.SAMPLE_TEXT, concept_string=SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT, name="sample_text"
         )
 
     @pytest.fixture
@@ -72,7 +72,7 @@ class TestWorkingMemory:
     def single_pdf_memory(self) -> WorkingMemory:
         """Create WorkingMemory with single PDF content."""
         return WorkingMemoryFactory.make_from_pdf(
-            pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL, concept_string=NativeConceptEnum.PDF.value, name="pdf_document",
+            pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL, concept_string=NativeConceptEnum.PDF, name="pdf_document"
         )
 
     @pytest.fixture
@@ -132,7 +132,7 @@ class TestWorkingMemory:
 
         complex_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
-                concept_code="List", domain=SpecialDomain.NATIVE.value, definition="Lorem Ipsum", structure_class_name="ListContent",
+                concept_code="List", domain=SpecialDomain.NATIVE, definition="Lorem Ipsum", structure_class_name="ListContent"
             ),
             name="mixed_list",
             content=complex_content,
@@ -166,7 +166,7 @@ class TestWorkingMemory:
 
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
-                concept_code="Html", domain=SpecialDomain.NATIVE.value, definition="Lorem Ipsum", structure_class_name="HtmlContent",
+                concept_code="Html", domain=SpecialDomain.NATIVE, definition="Lorem Ipsum", structure_class_name="HtmlContent"
             ),
             name="test_report",
             content=html_content,
@@ -195,7 +195,7 @@ class TestWorkingMemory:
 
         # Check stuff retrieval
         stuff = single_text_memory.get_stuff("sample_text")
-        assert stuff.concept.code == NativeConceptEnum.TEXT.value
+        assert stuff.concept.code == NativeConceptEnum.TEXT
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == TestWorkingMemoryData.SAMPLE_TEXT
 

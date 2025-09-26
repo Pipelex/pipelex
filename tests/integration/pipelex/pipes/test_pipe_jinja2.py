@@ -26,7 +26,7 @@ class TestPipeJinja2:
         pipe_jinja2_blueprint = PipeJinja2Blueprint(
             definition="Jinja2 test for any context",
             jinja2=jinja2,
-            output=NativeConceptEnum.TEXT.value,
+            output=NativeConceptEnum.TEXT,
             extra_context={"place_holder": "[some text from test_pipe_jinja2_for_any]"},
         )
 
@@ -54,7 +54,7 @@ class TestPipeJinja2:
             definition="Jinja2 test for stuff context",
             jinja2=jinja2,
             prompting_style=PromptingStyle(tag_style=TagStyle.TICKS, text_format=TextFormat.MARKDOWN),
-            output=NativeConceptEnum.TEXT.value,
+            output=NativeConceptEnum.TEXT,
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(

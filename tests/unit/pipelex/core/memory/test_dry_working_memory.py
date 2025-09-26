@@ -24,7 +24,7 @@ class TestDryWorkingMemory:
             TypedNamedInputRequirement(
                 variable_name="page",
                 concept=ConceptFactory.make(
-                    concept_code=NativeConceptEnum.PAGE.value, domain="test_tricky_questions", definition="Lorem Ipsum", structure_class_name="Page",
+                    concept_code=NativeConceptEnum.PAGE, domain="test_tricky_questions", definition="Lorem Ipsum", structure_class_name="Page"
                 ),
                 structure_class=PageContent,
             ),
@@ -37,7 +37,7 @@ class TestDryWorkingMemory:
 
         # Verify concept code is correct
         page_stuff = dry_memory.get_stuff("page")
-        assert page_stuff.concept.code == NativeConceptEnum.PAGE.value
+        assert page_stuff.concept.code == NativeConceptEnum.PAGE
         assert page_stuff.stuff_name == "page"
 
         # Verify structured content was created properly

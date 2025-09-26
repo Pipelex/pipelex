@@ -20,16 +20,16 @@ class TestCases:
     MAKE_REFINES_TEST_CASES: ClassVar[list[tuple[str, ConceptBlueprint, str]]] = [
         (
             "native_concept_string",
-            ConceptBlueprint(definition="A concept that refines a native text concept", refines=NativeConceptEnum.TEXT.value),
-            f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+            ConceptBlueprint(definition="A concept that refines a native text concept", refines=NativeConceptEnum.TEXT),
+            f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
         ),
         (
             "fully_qualified_native_string",
             ConceptBlueprint(
                 definition="A concept that refines a fully qualified native concept",
-                refines=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+                refines=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             ),
-            f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+            f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
         ),
     ]
 

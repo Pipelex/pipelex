@@ -29,8 +29,8 @@ class TestPipeParallelSimple:
         # Create PipeParallel instance - pipes are loaded from PLX files
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel text analysis pipeline",
-            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")},
-            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}")},
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             parallels=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),
@@ -106,7 +106,7 @@ class TestPipeParallelSimple:
         # Should return one of: positive, negative, neutral
         if pipe_run_mode != PipeRunMode.DRY:
             assert sentiment_result.content.text.lower() in ["positive", "negative", "neutral"]
-        assert f"{sentiment_result.concept.domain}.{sentiment_result.concept.code}" == f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}"
+        assert f"{sentiment_result.concept.domain}.{sentiment_result.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}"
 
         # Verify word count result
         word_count_result = final_working_memory.get_stuff("word_count_result")
@@ -145,8 +145,8 @@ class TestPipeParallelSimple:
         # Create PipeParallel instance
         pipe_parallel_blueprint = PipeParallelBlueprint(
             definition="Parallel text analysis pipeline for short text",
-            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")},
-            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}")},
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             parallels=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),

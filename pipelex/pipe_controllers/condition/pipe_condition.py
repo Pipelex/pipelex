@@ -7,14 +7,14 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
-from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum, NativeConceptManager
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input import PipeInputSpec
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
+from pipelex.core.pipes.specific_pipe import SpecificPipe
 from pipelex.exceptions import (
     DryRunError,
     PipeConditionError,
@@ -27,7 +27,7 @@ from pipelex.exceptions import (
 )
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
-from pipelex.pipe_controllers.pipe_controller import PipeController, SpecificPipeCodesEnum
+from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_operators.jinja2.pipe_jinja2 import PipeJinja2Output
 from pipelex.pipe_operators.jinja2.pipe_jinja2_blueprint import PipeJinja2Blueprint
 from pipelex.pipe_operators.jinja2.pipe_jinja2_factory import PipeJinja2Factory
@@ -55,26 +55,28 @@ class PipeCondition(PipeController):
         # This pipe CONTINUE enables to leave a PipeCondition and continue the sequence.
         # This system though has to be rethink. It might not be the best solution
         for pipe_condition_pipe_map in self.pipe_map:
-            if pipe_condition_pipe_map.pipe_code != SpecificPipeCodesEnum.CONTINUE:
+            if not SpecificPipe.is_continue(pipe_condition_pipe_map.pipe_code):
                 pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
-                if (
-                    self.output.concept_string != pipe.output.concept_string
-                    and self.output.concept_string != SpecialDomain.NATIVE.value + "." + NativeConceptEnum.DYNAMIC.value
+                if self.output.concept_string not in (
+                    pipe.output.concept_string,
+                    NativeConceptManager.get_native_concept_string(NativeConceptEnum.DYNAMIC),
                 ):
-                    raise PipeConditionError(
+                    msg = (
                         f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                         f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'",
                     )
+                    raise PipeConditionError(msg)
         if self.default_pipe_code:
             default_pipe = get_required_pipe(pipe_code=self.default_pipe_code)
-            if (
-                self.output.concept_string != default_pipe.output.concept_string
-                and self.output.concept_string != SpecialDomain.NATIVE.value + "." + NativeConceptEnum.DYNAMIC.value
+            if self.output.concept_string not in (
+                default_pipe.output.concept_string,
+                NativeConceptManager.get_native_concept_string(NativeConceptEnum.DYNAMIC),
             ):
-                raise PipeConditionError(
+                msg = (
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                     f"not matching the output concept code '{default_pipe.output.concept_string}' of the default pipe '{self.default_pipe_code}'",
                 )
+                raise PipeConditionError(msg)
 
     @field_validator("pipe_map")
     @classmethod
@@ -176,7 +178,7 @@ class PipeCondition(PipeController):
 
         # 2. Add the inputs needed by all possible target pipes
         for pipe_condition_pipe_map in self.pipe_map:
-            if pipe_condition_pipe_map.pipe_code != SpecificPipeCodesEnum.CONTINUE:
+            if not SpecificPipe.is_continue(pipe_condition_pipe_map.pipe_code):
                 pipe = get_required_pipe(pipe_code=pipe_condition_pipe_map.pipe_code)
                 # Use the centralized recursion detection
                 pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
@@ -250,7 +252,7 @@ class PipeCondition(PipeController):
         pipe_codes = [
             pipe_condition_pipe_map.pipe_code
             for pipe_condition_pipe_map in self.pipe_map
-            if pipe_condition_pipe_map.pipe_code != SpecificPipeCodesEnum.CONTINUE
+            if not SpecificPipe.is_continue(pipe_condition_pipe_map.pipe_code)
         ]
         if self.default_pipe_code:
             pipe_codes.append(self.default_pipe_code)
@@ -339,7 +341,7 @@ class PipeCondition(PipeController):
             error_msg += f"\n\nPipe map: {self.pipe_map}"
             raise PipeConditionError(error_msg)
 
-        if chosen_pipe_code == SpecificPipeCodesEnum.CONTINUE:
+        if SpecificPipe.is_continue(chosen_pipe_code):
             return PipeOutput(working_memory=working_memory)
 
         condition_details = self._make_pipe_condition_details(

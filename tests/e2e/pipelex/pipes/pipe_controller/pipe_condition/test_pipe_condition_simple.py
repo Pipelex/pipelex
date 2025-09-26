@@ -28,7 +28,7 @@ class TestPipeConditionSimple:
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Test condition that should fail",
             inputs={"user_category": InputRequirementBlueprint(concept="test_pipe_condition.CategoryInput")},
-            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             expression_template="{{ user_category.category }}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"small": "process_small", "medium": "process_medium", "large": "process_large"}),
             default_pipe_code="process_small",
@@ -62,7 +62,7 @@ class TestPipeConditionSimple:
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Test condition that should succeed",
             inputs={"user_status": InputRequirementBlueprint(concept="test_pipe_condition.CategoryInput")},
-            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             expression_template="{{ user_status.category }}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"active": "process_small", "inactive": "process_medium", "pending": "process_large"}),
             default_pipe_code="process_small",

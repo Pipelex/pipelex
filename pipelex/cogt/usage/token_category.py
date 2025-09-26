@@ -17,7 +17,7 @@ class TokenCategory(StrEnum):
 
     @property
     def to_cost_category(self) -> CostCategory:
-        return CostCategory(self.value)
+        return CostCategory(self)
 
 
 NbTokensByCategoryDict = dict[TokenCategory, int]

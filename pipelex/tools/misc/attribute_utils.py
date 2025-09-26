@@ -25,7 +25,7 @@ class AttributePolisher:
         if not isinstance(value, (str, bytes)):
             return False
 
-        return (name == "base_64" and len(value) > cls.base_64_truncate_length) or (name == "url" and isinstance(value, str) and value.startswith("data:image/") and len(value) > cls.url_truncate_length):
+        return (name == "base_64" and len(value) > cls.base_64_truncate_length) or (name == "url" and isinstance(value, str) and value.startswith("data:image/") and len(value) > cls.url_truncate_length)
 
     @classmethod
     def get_truncated_value(cls, name: str, value: str | bytes) -> str | bytes:

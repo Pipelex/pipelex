@@ -34,8 +34,8 @@ class TestPipeConditionSimple:
         """Test PipeCondition with long text that should trigger capitalize_long_text pipe."""
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Text length condition for testing",
-            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")},
-            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}")},
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"long": "capitalize_long_text", "short": "add_prefix_short_text"}),
         )
@@ -99,18 +99,15 @@ class TestPipeConditionSimple:
         assert isinstance(final_result_in_memory.content, TextContent)
         if pipe_run_mode != PipeRunMode.DRY:
             assert final_result_in_memory.content.text == "LONG: HELLO WORLD"
-        assert (
-            f"{final_result_in_memory.concept.domain}.{final_result_in_memory.concept.code}"
-            == f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}"
-        )
+        assert f"{final_result_in_memory.concept.domain}.{final_result_in_memory.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}"
 
     async def test_condition_short_text_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
         """Test PipeCondition with short text that should trigger add_prefix_short_text pipe."""
         # Create PipeCondition instance - pipes are loaded from PLX files
         pipe_condition_blueprint = PipeConditionBlueprint(
             definition="Text length condition for short text testing",
-            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}")},
-            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}")},
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             pipe_map=PipeConditionPipeMapBlueprint(root={"long": "capitalize_long_text", "short": "add_prefix_short_text"}),
         )
@@ -171,10 +168,7 @@ class TestPipeConditionSimple:
         assert isinstance(final_result_in_memory.content, TextContent)
         if pipe_run_mode != PipeRunMode.DRY:
             assert final_result_in_memory.content.text == "SHORT: hi"
-        assert (
-            f"{final_result_in_memory.concept.domain}.{final_result_in_memory.concept.code}"
-            == f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}"
-        )
+        assert f"{final_result_in_memory.concept.domain}.{final_result_in_memory.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}"
 
     async def test_condition_dry_run_success(self, request: FixtureRequest):
         """Test PipeCondition dry run with valid inputs using real pipe - should succeed."""
