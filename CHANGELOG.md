@@ -34,6 +34,7 @@
  - Removed `ENV_DUMMY_PLACEHOLDER_VALUE` constant
  - Removed `get_rooted_path()` and `get_env_rooted_path()` utility functions
  - Removed hardcoded placeholder dictionary in test setup
+ - Removed function `run_pipe_code` in pipe router because it was not relevant (used mostly in tests)
 
 ## [v0.10.2] - 2025-09-18
 
