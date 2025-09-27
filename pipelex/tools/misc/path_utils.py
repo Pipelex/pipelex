@@ -57,11 +57,12 @@ def interpret_path_or_url(path_or_uri: str) -> InterpretedPathOrUrl:
     """
     if path_or_uri.startswith("file://"):
         return InterpretedPathOrUrl.FILE_URI
-    if path_or_uri.startswith("http"):
+    elif path_or_uri.startswith("http"):
         return InterpretedPathOrUrl.URL
-    if os.sep in path_or_uri:
+    elif os.sep in path_or_uri:
         return InterpretedPathOrUrl.FILE_PATH
-    return InterpretedPathOrUrl.FILE_NAME
+    else:
+        return InterpretedPathOrUrl.FILE_NAME
 
 
 def clarify_path_or_url(path_or_uri: str) -> tuple[str | None, str | None]:
