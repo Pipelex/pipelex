@@ -431,7 +431,8 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         nb_classes = len(item_classes_set)
         if nb_classes == 1:
             return item_classes[0]
-        return None
+        else:
+            return None
 
     @override
     def model_dump(self, *args: Any, **kwargs: Any):
