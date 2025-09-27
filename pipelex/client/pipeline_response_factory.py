@@ -61,4 +61,4 @@ class PipelineResponseFactory:
             PipelineResponse instance created from the response data
 
         """
-        return PipelineResponse(**response)
+        return PipelineResponse.model_validate(response)
