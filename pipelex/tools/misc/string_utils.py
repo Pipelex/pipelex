@@ -234,18 +234,18 @@ def matches_wildcard_pattern(text: str, pattern: str) -> bool:
     """
     if pattern == "*":
         return True
-
-    if pattern.startswith("*") and pattern.endswith("*"):
+    elif pattern.startswith("*") and pattern.endswith("*"):
         # Pattern like "*sonnet*"
         middle = pattern[1:-1]
         return middle in text
-    if pattern.startswith("*"):
+    elif pattern.startswith("*"):
         # Pattern like "*sonnet"
         suffix = pattern[1:]
         return text.endswith(suffix)
-    if pattern.endswith("*"):
+    elif pattern.endswith("*"):
         # Pattern like "claude-*"
         prefix = pattern[:-1]
         return text.startswith(prefix)
-    # Exact match
-    return text == pattern
+    else:
+        # Exact match
+        return text == pattern
