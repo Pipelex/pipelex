@@ -263,7 +263,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         else:
             seed = seed_setting
 
-        # Build ImggJobParams from ImgGenSetting + one-time settings
+        # Build ImgGenJobParams from ImgGenSetting + one-time settings
         img_gen_job_params = ImgGenJobParams(
             aspect_ratio=self.aspect_ratio or img_gen_param_defaults.aspect_ratio,
             background=self.background or img_gen_param_defaults.background,

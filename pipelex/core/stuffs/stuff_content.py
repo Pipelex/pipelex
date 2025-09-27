@@ -243,7 +243,7 @@ class ImageContent(StuffContentInitableFromStr):
                     parts = self.url.rsplit(".", 1)
                     base_name = parts[0]
                     extension = parts[1]
-                case _:
+                case InterpretedPathOrUrl.FILE_PATH | InterpretedPathOrUrl.FILE_URI | InterpretedPathOrUrl.URL | InterpretedPathOrUrl.BASE_64:
                     file_type = detect_file_type_from_base64(b64=base_64)
                     base_name = base_name or "img"
                     extension = file_type.extension

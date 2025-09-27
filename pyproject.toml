@@ -115,7 +115,7 @@ module = ["filetype", "json2html", "pypdfium2", "pypdfium2.raw"]
 [tool.pyright]
 pythonVersion = "3.11"
 include = ["pipelex", "tests"]
-exclude = ["**/node_modules", "**/__pycache__", ".venv", ".git", "build", "dist", "node_modules", "**/__init__.py", "tests"]
+exclude = ["**/__pycache__", ".venv", ".git", "build", "dist", "tests"]
 analyzeUnannotatedFunctions = true
 deprecateTypingAliases = false
 disableBytesTypePromotions = true
@@ -242,7 +242,7 @@ exclude_lines = [
 
 [tool.ruff]
 exclude = [
-    "tests", # TO REMOVE
+    "tests",            # TO REMOVE
     ".cursor",
     ".git",
     ".github",
@@ -258,16 +258,16 @@ target-version = "py311"
 [tool.ruff.format]
 
 [tool.ruff.lint]
-select = ["ALL"] 
+select = ["ALL"]
 ignore = [
-    "ANN201", # Missing return type annotation for public function `my_func`
-    "ANN202", # Missing return type annotation for private function `my_func`
-    "ANN204", # Missing return type annotation for special method `my_func`
-    "ANN206", #  Missing return type annotation for classmethod `my_func`
-    "ANN401", # Dynamically typed expressions (typing.Any) are disallowed in `...`
+    "ANN201",   # Missing return type annotation for public function `my_func`
+    "ANN202",   # Missing return type annotation for private function `my_func`
+    "ANN204",   # Missing return type annotation for special method `my_func`
+    "ANN206",   #  Missing return type annotation for classmethod `my_func`
+    "ANN401",   # Dynamically typed expressions (typing.Any) are disallowed in `...`
     "ASYNC230", # Async functions should not open files with blocking methods like `open`
 
-    "C901", # Is to complex
+    "C901",   # Is to complex
     "COM812", # Checks for the absence of trailing commas.
 
     "D100", # Missing docstring in public module
@@ -284,7 +284,7 @@ ignore = [
     "D415", # First line should end with a period, question mark, or exclamation point
 
     "DTZ005", # `datetime.datetime.now()` called without a `tz` argument
-   
+
     "ERA001", # Found commented-out code
 
     "FBT001", # Boolean-typed positional argument in function definition
@@ -302,7 +302,7 @@ ignore = [
     "PLR2004", # Magic value used in comparison, consider replacing `2` with a constant variable
 
     "PT013", # Incorrect import of `pytest`; use `import pytest` instead
-    
+
     "PTH100", # `os.path.abspath()` should be replaced by `Path.resolve()`
     "PTH103", # `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
     "PTH109", # `os.getcwd()` should be replaced by `Path.cwd()`
@@ -332,20 +332,20 @@ ignore = [
 
     "T201", # `print` found
 
-    # TO REMOVE:
-    "BLE001", # Do not catch blind exception: `Exception`
-    "B027", # Checks for empty methods in abstract base classes without an abstract decorator.
-    "UP007", # Use `X | Y` for type annotations
-    "UP036", # Version block is outdated for minimum Python version
-    "SIM102", # Use a single `if` statement instead of nested `if` statements
-    "S701", # Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
-    "N818", # Exception name `RootException` should be named with an Error suffix
-    "TRY301", # Abstract `raise` to an inner function
+    # TODO: stop ignoring these rules
+    "BLE001",  # Do not catch blind exception: `Exception`
+    "B027",    # Checks for empty methods in abstract base classes without an abstract decorator.
+    "UP007",   # Use `X | Y` for type annotations
+    "UP036",   # Version block is outdated for minimum Python version
+    "SIM102",  # Use a single `if` statement instead of nested `if` statements
+    "S701",    # Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+    "N818",    # Exception name `RootException` should be named with an Error suffix
+    "TRY301",  # Abstract `raise` to an inner function
     "PERF401", # Use a list comprehension to create a transformed list
     "PLW2901", # `for` loop variable `line` overwritten by assignment target
-    "TRY300", # Consider moving this statement to an `else` block
-    "UP035", # `typing.List` is deprecated, use `list` instead
-    "RET503", # Missing explicit `return` at the end of function able to return non-`None` value
+    "TRY300",  # Consider moving this statement to an `else` block
+    "UP035",   # `typing.List` is deprecated, use `list` instead
+    "RET503",  # Missing explicit `return` at the end of function able to return non-`None` value
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -383,4 +383,4 @@ disable = ["all"]
 enable = [
     "W0101", # Unreachable code: Used when there is some code behind a "return" or "raise" statement, which will never be accessed.
 ]
-ignore = [".venv", "__pycache__", "build", "dist", "node_modules", ".git"]
+ignore = [".venv", "__pycache__", "build", "dist", ".git"]

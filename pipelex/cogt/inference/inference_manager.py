@@ -112,7 +112,7 @@ class InferenceManager(InferenceManagerProtocol):
         img_gen_worker = self.img_gen_workers.get(img_gen_handle)
         if img_gen_worker is None:
             if not get_config().cogt.inference_manager_config.is_auto_setup_preset_img_gen:
-                msg = f"Found no Imgg worker for '{img_gen_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_img_gen"
+                msg = f"Found no ImgGen worker for '{img_gen_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_img_gen"
                 raise InferenceManagerWorkerSetupError(msg)
 
             img_gen_worker = self._setup_one_img_gen_worker(img_gen_handle=img_gen_handle)

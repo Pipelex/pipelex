@@ -29,7 +29,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
         if not isinstance(sdk_instance, openai.AsyncOpenAI):
-            msg = f"Provided Imgg sdk_instance is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'"
+            msg = f"Provided ImgGen sdk_instance is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'"
             raise SdkTypeError(msg)
 
         self.openai_client = sdk_instance

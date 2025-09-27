@@ -164,7 +164,7 @@ class WorkingMemoryFactory(BaseModel):
         """Helper method to create mock content for a requirement."""
         if requirement.structure_class:
             # Create mock object using polyfactory
-            class MockFactory(ModelFactory[requirement.structure_class]):  # type: ignore[requirement,name-defined]
+            class MockFactory(ModelFactory[requirement.structure_class]):  # type: ignore[name-defined]
                 __model__ = requirement.structure_class
                 __check_model__ = True
                 __use_examples__ = True

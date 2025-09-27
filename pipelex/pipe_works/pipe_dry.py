@@ -27,6 +27,16 @@ class DryRunStatus(StrEnum):
     FAILURE = "FAILURE"
     WARNING = "WARNING"
 
+    @property
+    def is_failure(self) -> bool:
+        match self:
+            case DryRunStatus.FAILURE:
+                return True
+            case DryRunStatus.SUCCESS:
+                return False
+            case DryRunStatus.WARNING:
+                return False
+
 
 class DryRunOutput(BaseModel):
     pipe_code: str
