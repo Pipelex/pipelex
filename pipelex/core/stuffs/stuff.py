@@ -62,11 +62,13 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         concept_display = Concept.sentence_from_concept(concept=self.concept)
         if self.is_list:
             return f"List of [{concept_display}]"
-        if self.stuff_name:
+        elif self.stuff_name:
             if self.stuff_name == name_from_concept:
                 return concept_display
-            return f"{self.stuff_name} (a {concept_display})"
-        return concept_display
+            else:
+                return f"{self.stuff_name} (a {concept_display})"
+        else:
+            return concept_display
 
     @property
     def short_desc(self) -> str:

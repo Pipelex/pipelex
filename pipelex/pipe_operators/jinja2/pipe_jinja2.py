@@ -101,9 +101,10 @@ class PipeJinja2(PipeOperator[PipeJinja2Output]):
     def desc(self) -> str:
         if self.jinja2:
             return f"Jinja2 included template, prompting style {self.prompting_style}"
-        if jinja2_name := self.jinja2_name:
+        elif jinja2_name := self.jinja2_name:
             return f"Jinja2 template '{jinja2_name}', prompting style {self.prompting_style}"
-        return "Jinja2 template not defined"
+        else:
+            return "Jinja2 template not defined"
 
     @override
     def required_variables(self) -> set[str]:

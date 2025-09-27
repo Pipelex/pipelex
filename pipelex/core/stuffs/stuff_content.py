@@ -420,9 +420,10 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         nb_classes = len(item_classes_set)
         if nb_classes == 1:
             return f"list of {len(self.items)} {item_classes[0]}s"
-        if nb_items == nb_classes:
+        elif nb_items == nb_classes:
             return f"list of {len(self.items)} items of different types"
-        return f"list of {len(self.items)} items of {nb_classes} different types"
+        else:
+            return f"list of {len(self.items)} items of {nb_classes} different types"
 
     @property
     def _single_class_name(self) -> str | None:
