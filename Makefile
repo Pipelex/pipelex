@@ -389,7 +389,7 @@ mypy: env
 
 pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
-	$(VENV_PYLINT) --rcfile pyproject.toml pipelex
+	$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests
 
 
 ##########################################################################################
