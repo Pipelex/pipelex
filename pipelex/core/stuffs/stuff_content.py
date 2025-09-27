@@ -243,7 +243,7 @@ class ImageContent(StuffContentInitableFromStr):
                     parts = self.url.rsplit(".", 1)
                     base_name = parts[0]
                     extension = parts[1]
-                case _:
+                case InterpretedPathOrUrl.FILE_PATH | InterpretedPathOrUrl.FILE_URI | InterpretedPathOrUrl.URL | InterpretedPathOrUrl.BASE_64:
                     file_type = detect_file_type_from_base64(b64=base_64)
                     base_name = base_name or "img"
                     extension = file_type.extension
@@ -420,9 +420,10 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         nb_classes = len(item_classes_set)
         if nb_classes == 1:
             return f"list of {len(self.items)} {item_classes[0]}s"
-        if nb_items == nb_classes:
+        elif nb_items == nb_classes:
             return f"list of {len(self.items)} items of different types"
-        return f"list of {len(self.items)} items of {nb_classes} different types"
+        else:
+            return f"list of {len(self.items)} items of {nb_classes} different types"
 
     @property
     def _single_class_name(self) -> str | None:
@@ -431,7 +432,8 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         nb_classes = len(item_classes_set)
         if nb_classes == 1:
             return item_classes[0]
-        return None
+        else:
+            return None
 
     @override
     def model_dump(self, *args: Any, **kwargs: Any):

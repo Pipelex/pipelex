@@ -277,25 +277,26 @@ class PipelexInterpreter(BaseModel):
         """Convert a single pipe blueprint to PLX string."""
         if isinstance(blueprint, PipeLLMBlueprint):
             return PipelexInterpreter.llm_pipe_to_plx_string(pipe_name, blueprint)
-        if isinstance(blueprint, PipeSequenceBlueprint):
+        elif isinstance(blueprint, PipeSequenceBlueprint):
             return PipelexInterpreter.sequence_pipe_to_plx_string(pipe_name, blueprint)
-        if isinstance(blueprint, PipeOcrBlueprint):
+        elif isinstance(blueprint, PipeOcrBlueprint):
             return PipelexInterpreter.ocr_pipe_to_plx_string(pipe_name, blueprint)
-        if isinstance(blueprint, PipeFuncBlueprint):
+        elif isinstance(blueprint, PipeFuncBlueprint):
             return PipelexInterpreter.func_pipe_to_plx_string(pipe_name, blueprint)
-        if isinstance(blueprint, PipeImgGenBlueprint):
+        elif isinstance(blueprint, PipeImgGenBlueprint):
             return PipelexInterpreter.img_gen_pipe_to_plx_string(pipe_name, blueprint)
-        if isinstance(blueprint, PipeJinja2Blueprint):
+        elif isinstance(blueprint, PipeJinja2Blueprint):
             return PipelexInterpreter.jinja2_pipe_to_plx_string(pipe_name, blueprint)
-        if isinstance(blueprint, PipeConditionBlueprint):
+        elif isinstance(blueprint, PipeConditionBlueprint):
             return PipelexInterpreter.condition_pipe_to_plx_string(pipe_name, blueprint)
-        if isinstance(blueprint, PipeParallelBlueprint):
+        elif isinstance(blueprint, PipeParallelBlueprint):
             return PipelexInterpreter.parallel_pipe_to_plx_string(pipe_name, blueprint)
-        if isinstance(blueprint, PipeBatchBlueprint):
+        elif isinstance(blueprint, PipeBatchBlueprint):
             return PipelexInterpreter.batch_pipe_to_plx_string(pipe_name, blueprint)
-        # Fallback to old dict approach for unknown pipe types
-        pipe_dict = PipelexInterpreter.serialize_pipe(blueprint)
-        return f"[pipe.{pipe_name}]\n" + "\n".join([f'{k} = "{v}"' if isinstance(v, str) else f"{k} = {v}" for k, v in pipe_dict.items()])
+        else:
+            # Fallback to old dict approach for unknown pipe types
+            pipe_dict = PipelexInterpreter.serialize_pipe(blueprint)
+            return f"[pipe.{pipe_name}]\n" + "\n".join([f'{k} = "{v}"' if isinstance(v, str) else f"{k} = {v}" for k, v in pipe_dict.items()])
 
     @staticmethod
     def llm_pipe_to_plx_string(pipe_name: str, pipe: PipeLLMBlueprint) -> str:
@@ -585,24 +586,25 @@ class PipelexInterpreter(BaseModel):
     def serialize_pipe(blueprint: Any) -> dict[str, Any]:
         if isinstance(blueprint, PipeLLMBlueprint):
             return PipelexInterpreter.serialize_llm_pipe(blueprint)
-        if isinstance(blueprint, PipeOcrBlueprint):
+        elif isinstance(blueprint, PipeOcrBlueprint):
             return PipelexInterpreter.serialize_ocr_pipe(blueprint)
-        if isinstance(blueprint, PipeFuncBlueprint):
+        elif isinstance(blueprint, PipeFuncBlueprint):
             return PipelexInterpreter._serialize_func_pipe(blueprint)
-        if isinstance(blueprint, PipeImgGenBlueprint):
+        elif isinstance(blueprint, PipeImgGenBlueprint):
             return PipelexInterpreter._serialize_img_gen_pipe(blueprint)
-        if isinstance(blueprint, PipeJinja2Blueprint):
+        elif isinstance(blueprint, PipeJinja2Blueprint):
             return PipelexInterpreter.serialize_jinja2_pipe(blueprint)
-        if isinstance(blueprint, PipeSequenceBlueprint):
+        elif isinstance(blueprint, PipeSequenceBlueprint):
             return PipelexInterpreter.serialize_sequence_pipe(blueprint)
-        if isinstance(blueprint, PipeConditionBlueprint):
+        elif isinstance(blueprint, PipeConditionBlueprint):
             return PipelexInterpreter._serialize_condition_pipe(blueprint)
-        if isinstance(blueprint, PipeParallelBlueprint):
+        elif isinstance(blueprint, PipeParallelBlueprint):
             return PipelexInterpreter._serialize_parallel_pipe(blueprint)
-        if isinstance(blueprint, PipeBatchBlueprint):
+        elif isinstance(blueprint, PipeBatchBlueprint):
             return PipelexInterpreter._serialize_batch_pipe(blueprint)
-        msg = f"Unknown pipe blueprint type: {type(blueprint)}"
-        raise PipelexUnknownPipeError(msg)
+        else:
+            msg = f"Unknown pipe blueprint type: {type(blueprint)}"
+            raise PipelexUnknownPipeError(msg)
 
     @staticmethod
     def serialize_llm_pipe(pipe: PipeLLMBlueprint) -> dict[str, Any]:

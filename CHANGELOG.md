@@ -1,6 +1,6 @@
 # Changelog
 
-## [v0.10.3] - 2025-09-26
+## [Unreleased] - 2025-09-26
 
 ### Highlights
 
@@ -633,7 +633,7 @@ Simplified input memory:
 
 ### Changed
 
-- **Refactored Cognitive Workers**: The abstraction for `LLM`, `Imgg`, and `Ocr` workers has been elegantly simplified. The old decorator-based approach (`..._job_func`) has been replaced with a more robust pattern: a public base method now handles pre- and post-execution logic while calling a private abstract method that each worker implements.
+- **Refactored Cognitive Workers**: The abstraction for `LLM`, `ImgGen`, and `Ocr` workers has been elegantly simplified. The old decorator-based approach (`..._job_func`) has been replaced with a more robust pattern: a public base method now handles pre- and post-execution logic while calling a private abstract method that each worker implements.
 - The `b64_image_bytes` field in `PromptImageBytes` was renamed to `base_64` for better consistency.
 
 ### Fixed
@@ -729,15 +729,15 @@ is_reporting_enabled = true
 ### Tests
 
 - TestTemplatePreprocessor
-- TestImggByOpenAIGpt
+- TestImgGenByOpenAIGpt
 - TestImageGeneration
-- TestPipeImgg
+- TestPipeImgGen
 
 
 ## [v0.2.9] - 2025-05-30
 
 - Include `pyproject.toml` inside the project build.
-- Fix `ImggEngineFactory`: image generation (imgg) handle required format is `platform/model_name`
+- Fix `ImgGenEngineFactory`: image generation (imgg) handle required format is `platform/model_name`
 - pipelex cli: Added `list-pipes` method that can list all the available pipes along with their descriptions.
 - Use a minimum version for `uv` instead of a fixed version
 - Implement `AGENTS.md` for Codex

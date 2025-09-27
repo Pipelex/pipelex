@@ -79,14 +79,16 @@ def convert_strenum_to_str(
     if isinstance(obj, dict):
         obj_dict = cast("dict[str, Any]", obj)
         return {str(key): convert_strenum_to_str(value) for key, value in obj_dict.items()}
-    if isinstance(obj, list):
+    elif isinstance(obj, list):
         obj_list = cast("list[Any]", obj)
         return [convert_strenum_to_str(item) for item in obj_list]
-    if isinstance(obj, StrEnum):
+    elif isinstance(obj, StrEnum):
         if hasattr(obj, "display_name"):
             return obj.display_name()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType, reportAttributeAccessIssue]
-        return str(obj)
-    return obj
+        else:
+            return str(obj)
+    else:
+        return obj
 
 
 class ExtraFieldAttribute(StrEnum):

@@ -1,7 +1,7 @@
 from typing import Any
 
 import instructor
-from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock
+from anthropic import AsyncAnthropic, AsyncAnthropicBedrock, omit
 from typing_extensions import override
 
 from pipelex import log
@@ -100,7 +100,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         max_tokens = self._adapt_max_tokens(max_tokens=llm_job.job_params.max_tokens)
         response = await self.anthropic_async_client.messages.create(
             messages=[message],
-            system=llm_job.llm_prompt.system_text or NOT_GIVEN,
+            system=llm_job.llm_prompt.system_text or omit,
             model=self.inference_model.model_id,
             temperature=llm_job.job_params.temperature,
             max_tokens=max_tokens,

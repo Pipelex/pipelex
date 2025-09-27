@@ -19,12 +19,13 @@ class PromptImageFactory:
     ) -> PromptImage:
         if file_path:
             return PromptImagePath(file_path=file_path)
-        if url:
+        elif url:
             return PromptImageUrl(url=url)
-        if base_64:
+        elif base_64:
             return PromptImageBase64(base_64=base_64)
-        msg = "PromptImageFactory requires one of file_path, url, or image_bytes"
-        raise PromptImageFactoryError(msg)
+        else:
+            msg = "PromptImageFactory requires one of file_path, url, or image_bytes"
+            raise PromptImageFactoryError(msg)
 
     @classmethod
     def make_prompt_image_from_uri(

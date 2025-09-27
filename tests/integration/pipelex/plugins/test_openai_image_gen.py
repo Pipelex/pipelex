@@ -13,7 +13,7 @@ from tests.integration.pipelex.test_data import ImageGenTestCases
 @pytest.mark.img_gen
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestImggByOpenAIGpt:
+class TestImgGenByOpenAIGpt:
     @pytest.mark.parametrize("topic, image_desc", ImageGenTestCases.IMAGE_DESC)
     async def test_gpt_image_generation(self, topic: str, image_desc: str):
         backend = get_models_manager().get_required_inference_backend("openai")

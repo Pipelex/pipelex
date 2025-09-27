@@ -18,21 +18,22 @@ def emoji_for_channel(channel_name: str) -> str | None:
     if emoji == "":
         # blank emoji is OK
         return emoji
-    if emoji:
+    elif emoji:
         return emoji
-    if channel_name.startswith("google"):
+    elif channel_name.startswith("google"):
         return "🌀"
-    if channel_name.startswith("openai"):
+    elif channel_name.startswith("openai"):
         return "⚪️"
-    if channel_name.startswith("kajson"):
+    elif channel_name.startswith("kajson"):
         # space added to make it look better
         return "*️⃣ "
-    if channel_name.startswith("#poor-log"):
+    elif channel_name.startswith("#poor-log"):
         # space added to make it look better
         return "🧿 "
-    if channel_name.startswith("pipelex"):
+    elif channel_name.startswith("pipelex"):
         return "🧠"
-    return None
+    else:
+        return None
 
 
 class EmojiLogFormatter(logging.Formatter):

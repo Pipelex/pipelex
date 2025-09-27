@@ -220,10 +220,11 @@ def remove_none_values(json_content: JsonContent | Any) -> JsonContent | Any:
             if value is not None:
                 cleaned_dict[key] = remove_none_values(json_content=value)
         return cleaned_dict
-    if isinstance(json_content, list):
+    elif isinstance(json_content, list):
         json_content = cast("list[Any]", json_content)  # pyright: ignore[reportUnnecessaryCast]
         return [remove_none_values(item) for item in json_content]
-    return json_content
+    else:
+        return json_content
 
 
 def remove_none_values_from_dict(data: Mapping[str, Any]) -> dict[str, Any]:

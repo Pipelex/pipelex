@@ -28,7 +28,7 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key:
                 dict_result_lines.append(f"{converted_line}: {converted_value}")
         return "\n\n".join(line for line in dict_result_lines if line.strip())
 
-    if isinstance(data, list):
+    elif isinstance(data, list):
         # Treat lists as bullet lists. If list items are complex,
         # they get recursively converted. If they are simple strings,
         # they become list items.
@@ -48,7 +48,7 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key:
             list_result_lines.extend(subsequent_lines)
         return "\n".join(list_result_lines)
 
-    if isinstance(data, (str, int, float, bool)):
+    elif isinstance(data, (str, int, float, bool)):
         # Simple scalar types become paragraphs (strings) or inline text
         # If it's a string with multiple lines, just output them as-is.
         str_value = str(data)
@@ -56,9 +56,10 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key:
             return str(AttributePolisher.get_truncated_value(name=key, value=str_value))
         return str_value
 
-    if data is None:
+    elif data is None:
         # No value
         return "None"
 
-    pure_dict, _ = purify_json_dict(data, is_warning_enabled=False)
-    return convert_to_markdown(pure_dict, level=level)
+    else:
+        pure_dict, _ = purify_json_dict(data, is_warning_enabled=False)
+        return convert_to_markdown(pure_dict, level=level)

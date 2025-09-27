@@ -87,17 +87,18 @@ class ApiSerializer:
                     continue
                 cleaned[key] = cls._clean_and_format_content(content_dict[key])
             return cleaned
-        if isinstance(content, list):
+        elif isinstance(content, list):
             cleaned_list: list[Any] = []
             content_list = cast("list[Any]", content)
             cleaned_list.extend(cls._clean_and_format_content(content_list[idx]) for idx in range(len(content_list)))
             return cleaned_list
-        if isinstance(content, datetime):
+        elif isinstance(content, datetime):
             return content.strftime(cls.API_DATETIME_FORMAT)
-        if isinstance(content, Enum):
+        elif isinstance(content, Enum):
             return content.value  # Convert enum to its value
-        if isinstance(content, Decimal):
+        elif isinstance(content, Decimal):
             return float(content)  # Convert Decimal to float for JSON compatibility
-        if isinstance(content, Path):
+        elif isinstance(content, Path):
             return str(content)  # Convert Path to string representation
-        return content
+        else:
+            return content
