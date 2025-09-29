@@ -72,6 +72,16 @@ llm = { llm_handle = "claude-4-sonnet", temperature = 0.7 }
 # Model automatically routed through Pipelex Inference
 ```
 
+### Model Availability Note
+
+While Pipelex Inference provides access to most AI models through a unified API, certain specialized models require their native backend to be enabled directly:
+
+- **FAL image generation models** (e.g., Flux models) - Enable the FAL backend
+- **OpenAI image generation** (`gpt-image-1`) - Enable the OpenAI backend
+- **Mistral OCR models** - Enable the Mistral backend
+
+These models are not proxied through Pipelex Inference and require direct configuration of their respective backends with appropriate API keys.
+
 ## Inference Backends
 
 Backends represent AI service providers that can offer LLMs, OCR models, or image generation models. Each backend is configured with its endpoint and authentication details.
@@ -101,6 +111,8 @@ api_key = "${FAL_KEY}"
 enabled = true
 # No API key needed for internal/local processing
 ```
+
+Toggle `enabled` whether you want to use this backend or not. If it is `enabled`, you need to set the API key in your env.
 
 ### Model Specifications
 
