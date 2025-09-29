@@ -129,6 +129,7 @@ class LLMPromptSpec(BaseModel):
             extra_params=extra_params,
         )
         if not user_text:
+            # TODO: link to docs
             msg = "Could not unravel user_text, we need either a jinja2_blueprint, a text_verbatim_name or a fixed user_text"
             raise LLMPromptSpecError(msg)
 
