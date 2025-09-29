@@ -77,7 +77,7 @@ llm = { llm_handle = "claude-4-sonnet", temperature = 0.7 }
 While Pipelex Inference provides access to most AI models through a unified API, certain specialized models require their native backend to be enabled directly:
 
 - **FAL image generation models** (e.g., Flux models) - Enable the FAL backend
-- **OpenAI image generation** (`gpt-image-1`) - Enable the OpenAI backend
+- **OpenAI image generation** (`gpt-image-1`) - Enable the OpenAI backend (should also work via Azure OpenAI, but we haven't been able to test this - if you've successfully used it on Azure, please let us know on [Discord](https://go.pipelex.com/discord) so we can validate this configuration)
 - **Mistral OCR models** - Enable the Mistral backend
 
 These models are not proxied through Pipelex Inference and require direct configuration of their respective backends with appropriate API keys.
