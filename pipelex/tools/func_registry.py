@@ -1,7 +1,7 @@
 import inspect
 import logging
 from collections.abc import Callable
-from typing import Any, TypeVar, get_type_hints
+from typing import Any, TypeVar, cast, get_type_hints
 
 from pydantic import Field, PrivateAttr, RootModel
 
@@ -113,18 +113,25 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         """Checks if a function is in the registry by its name."""
         return name in self.root
 
-    def is_eligible_function(self, func: Callable[..., Any]) -> bool:
+    def is_eligible_function(self, func: Any) -> bool:
         """Checks if a function matches the criteria for PipeFunc registration:
+        - Must be callable
         - Exactly 1 parameter named "working_memory" with type WorkingMemory
         - Return type that is a subclass of StuffContent
         """
+        if not callable(func):
+            return False
+
+        the_function = cast("Callable[..., Any]", func)
+
         try:
             # Import here to avoid circular imports
+            # TODO: code-smell
             from pipelex.core.memory.working_memory import WorkingMemory  # noqa: PLC0415
             from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
 
             # Get function signature
-            sig = inspect.signature(func)
+            sig = inspect.signature(the_function)
             params = list(sig.parameters.values())
 
             # Check parameter count and name
@@ -136,7 +143,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
                 return False
 
             # Get type hints
-            type_hints = get_type_hints(func)
+            type_hints = get_type_hints(the_function)
 
             # Check parameter type
             if "working_memory" not in type_hints:

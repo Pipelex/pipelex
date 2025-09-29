@@ -1,3 +1,4 @@
+import asyncio
 from typing import Literal, cast, get_type_hints
 
 from typing_extensions import override
@@ -48,11 +49,12 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         log.debug(f"Applying function '{self.function_name}'")
 
         function = func_registry.get_required_function(self.function_name)
-        if not callable(function):
-            msg = f"Function '{self.function_name}' is not callable"
-            raise TypeError(msg)
 
-        func_output_object = await function(working_memory=working_memory)
+        if asyncio.iscoroutinefunction(function):
+            func_output_object = await function(working_memory=working_memory)
+        else:
+            func_output_object = await asyncio.to_thread(function, working_memory=working_memory)
+
         the_content: StuffContent
         if isinstance(func_output_object, StuffContent):
             the_content = func_output_object
@@ -92,9 +94,6 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         log.debug(f"Dry run for PipeFunc '{self.function_name}'")
 
         function = func_registry.get_required_function(self.function_name)
-        if not callable(function):
-            msg = f"Function '{self.function_name}' is not callable"
-            raise TypeError(msg)
 
         # Check that all needed inputs are present in working memory
         needed_inputs = self.needed_inputs()
