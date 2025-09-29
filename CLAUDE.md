@@ -43,13 +43,13 @@ This document outlines the core coding standards, best practices, and quality co
    
    ```python
    try:
-       from fal_client import AsyncClient as FalAsyncClient
-   except ImportError as exc:
-       raise MissingDependencyError(
-           "fal-client", "fal", 
-           "The fal-client SDK is required to use FAL models."
-       ) from exc
+       self.models_manager.setup()
+   except RoutingProfileLibraryNotFoundError as exc:
+       msg = "The routing library could not be found, please call `pipelex init config` to create it"
+       raise PipelexSetupError(msg) from exc
    ```
+
+   **Note**: Following Ruff rules, we set the error message as a variable before raising it, for cleaner error traces.
 
 ## Documentation
 
