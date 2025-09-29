@@ -32,17 +32,17 @@ If you already have API keys from LLM providers, you can use them directly:
 
 ```bash
 # Add to your .env file
-# To directly use models on OpenAI, you will need to set the following variables
+# To directly use models on OpenAI, you will need to set the following variable
 OPENAI_API_KEY=your-openai-key
-# To directly use models on Anthropic, you will need to set the following variables
+# To directly use models on Anthropic, you will need to set the following variable
 ANTHROPIC_API_KEY=your-anthropic-key
-# To directly use models on Google, you will need to set the following variables
+# To directly use models on Google, you will need to set the following variable
 GOOGLE_API_KEY=your-google-key
-# To directly use models on Mistral, you will need to set the following variables
+# To directly use models on Mistral, you will need to set the following variable
 MISTRAL_API_KEY=your-mistral-key
-# To directly use models on FAL, you will need to set the following variables
+# To directly use models on FAL, you will need to set the following variable
 FAL_API_KEY=your-fal-key
-# To directly use models on XAI, you will need to set the following variables
+# To directly use models on XAI, you will need to set the following variable
 XAI_API_KEY=your-xai-key
 
 # To use models via Ollama, you will need to set the following variables

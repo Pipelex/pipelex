@@ -112,7 +112,7 @@ enabled = true
 # No API key needed for internal/local processing
 ```
 
-Toggle `enabled` whether you want to use this backend or not. If it is `enabled`, you need to set the API key in your env.
+Set `enabled` to `true` to activate a backend, or `false` to disable it. When a backend is enabled, you must set its corresponding API key as an environment variable.
 
 ### Model Specifications
 
