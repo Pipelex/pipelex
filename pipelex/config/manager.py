@@ -70,7 +70,6 @@ class ConfigManager:
 
         """
         config_path = os.path.join(self.pipelex_config_dir, CONFIG_NAME)
-        print(f"Getting local config from {config_path}")
         return load_toml_from_path_if_exists(config_path) or {}
 
     def load_config(self, specific_config_path: str | None = None) -> dict[str, Any]:
