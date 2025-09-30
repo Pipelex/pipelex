@@ -281,14 +281,12 @@ class PipeCondition(PipeController):
         """
         content_generator = get_content_generator()
         # Evaluate the expression using Jinja2 templating
-        print("contextttttttojdqosjqjdo", working_memory.generate_jinja2_context())
 
         evaluated_expression = await content_generator.make_jinja2_text(
             context=working_memory.generate_jinja2_context(),
             jinja2=self.applied_expression_template,
             template_category=Jinja2TemplateCategory.LLM_PROMPT,
         )
-        print("ojdqosjqjdo", evaluated_expression)
 
         # Validate the evaluated expression
         if not evaluated_expression or evaluated_expression == "None":
