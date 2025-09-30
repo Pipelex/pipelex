@@ -26,6 +26,7 @@
  - Modified `any_env_var_is_placeholder()` to use new placeholder detection logic
  - Updated test environment setup to use dynamic placeholder generation instead of hardcoded values
  - Restructured test classes and methods in environment tests
+ - Lint and tests GHA should run on every PR
 
 ### Fixed
  - Fixed logic error in `any_env_var_is_placeholder()` function - now correctly returns False when no placeholders are found
