@@ -5,6 +5,8 @@ from pydantic import field_validator, model_validator
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.content_generation.assignment_models import Jinja2Assignment
+from pipelex.cogt.content_generation.jinja2_generate import jinja2_gen_text
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum, NativeConceptManager
@@ -28,10 +30,10 @@ from pipelex.exceptions import (
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
-from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
+from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 from pipelex.types import Self
 
@@ -261,6 +263,63 @@ class PipeCondition(PipeController):
             pipe_codes.append(self.default_pipe_code)
         return set(pipe_codes)
 
+    async def _evaluate_expression_and_select_pipe(
+        self,
+        working_memory: WorkingMemory,
+    ) -> tuple[str, str]:
+        """Evaluate the conditional expression and select the appropriate pipe.
+
+        Args:
+            working_memory: The working memory context for evaluation
+
+        Returns:
+            A tuple of (evaluated_expression, chosen_pipe_code)
+
+        Raises:
+            PipeConditionError: If expression evaluation fails or no matching pipe is found
+        """
+        # Evaluate the expression using Jinja2 templating
+        jinja2_assignment = Jinja2Assignment(
+            context=working_memory.generate_jinja2_context(),
+            jinja2=self.applied_expression_template,
+            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+        )
+        evaluated_expression = await jinja2_gen_text(jinja2_assignment=jinja2_assignment)
+
+        # Validate the evaluated expression
+        if not evaluated_expression or evaluated_expression == "None":
+            error_msg = f"Conditional expression returned an empty string in pipe {self.code}:"
+            error_msg += f"\n\nExpression: {self.applied_expression_template}"
+            raise PipeConditionError(error_msg)
+        log.debug(f"evaluated_expression: '{evaluated_expression}'")
+
+        # Add alias if configured
+        log.debug(f"add_alias: {evaluated_expression} -> {self.add_alias_from_expression_to}")
+        if self.add_alias_from_expression_to:
+            working_memory.add_alias(
+                alias=evaluated_expression,
+                target=self.add_alias_from_expression_to,
+            )
+
+        # Select the pipe based on the evaluated expression
+        chosen_pipe_code = next(
+            (
+                pipe_condition_pipe_map.pipe_code
+                for pipe_condition_pipe_map in self.pipe_map
+                if pipe_condition_pipe_map.expression_result == evaluated_expression
+            ),
+            self.default_pipe_code,
+        )
+
+        # Validate that a pipe was found
+        if not chosen_pipe_code:
+            error_msg = f"No pipe code found for evaluated expression '{evaluated_expression}' in pipe {self.code}:"
+            error_msg += f"\n\nExpression: {self.applied_expression_template}"
+            error_msg += f"\n\nPipe map: {self.pipe_map}"
+            raise PipeConditionError(error_msg)
+
+        return evaluated_expression, chosen_pipe_code
+
     @override
     async def _run_controller_pipe(
         self,
@@ -282,68 +341,21 @@ class PipeCondition(PipeController):
                 multiplicity=requirement.multiplicity,
             )
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            definition="Jinja2 template for pipe condition evaluation",
-            jinja2=self.applied_expression_template,
-            inputs=inputs_blueprint,
-            output=self.output.code,
-        )
+        # Evaluate expression and select pipe
+        evaluated_expression, chosen_pipe_code = await self._evaluate_expression_and_select_pipe(working_memory=working_memory)
 
-        # TODO: use jinja2 directly without going though a pipe
-        pipe_compose = PipeComposeFactory.make_from_blueprint(
-            domain=self.domain,
-            pipe_code="evaluation_for_pipe_condition",
-            blueprint=pipe_compose_blueprint,
-        )
-        jinja2_job_metadata = job_metadata.copy_with_update(
-            updated_metadata=JobMetadata(
-                job_category=JobCategory.JINJA2_JOB,
-            ),
-        )
-        log.debug(f"Jinja2 expression: {self.applied_expression_template}")
-        evaluated_expression = (
-            await pipe_compose.run_pipe(
-                job_metadata=jinja2_job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
-            )
-        ).main_stuff_as_str.strip()
-
-        if not evaluated_expression or evaluated_expression == "None":
-            error_msg = f"Conditional expression returned an empty string in pipe {self.code}:"
-            error_msg += f"\n\nExpression: {self.applied_expression_template}"
-            raise PipeConditionError(error_msg)
-        log.debug(f"evaluated_expression: '{evaluated_expression}'")
-
-        log.debug(f"add_alias: {evaluated_expression} -> {self.add_alias_from_expression_to}")
-        if self.add_alias_from_expression_to:
-            working_memory.add_alias(
-                alias=evaluated_expression,
-                target=self.add_alias_from_expression_to,
-            )
-
-        chosen_pipe_code = next(
-            (
-                pipe_condition_pipe_map.pipe_code
-                for pipe_condition_pipe_map in self.pipe_map
-                if pipe_condition_pipe_map.expression_result == evaluated_expression
-            ),
-            self.default_pipe_code,
-        )
-        if not chosen_pipe_code:
-            error_msg = f"No pipe code found for evaluated expression '{evaluated_expression}' in pipe {self.code}:"
-            error_msg += f"\n\nExpression: {self.applied_expression_template}"
-            error_msg += f"\n\nPipe map: {self.pipe_map}"
-            raise PipeConditionError(error_msg)
-
+        # Handle continue case
         if SpecificPipe.is_continue(chosen_pipe_code):
             return PipeOutput(working_memory=working_memory)
 
+        # Create condition details for tracking
         condition_details = self._make_pipe_condition_details(
             evaluated_expression=evaluated_expression,
             chosen_pipe_code=chosen_pipe_code,
         )
-        required_variables = pipe_compose.required_variables()
+
+        # Get required variables and validate they exist in working memory
+        required_variables = get_required_pipe(pipe_code=chosen_pipe_code).required_variables()
         log.debug(required_variables, title=f"Required variables for PipeCondition '{self.code}'")
         required_stuff_names = {required_variable for required_variable in required_variables if not required_variable.startswith("_")}
         try:
@@ -355,6 +367,7 @@ class PipeCondition(PipeController):
             msg = f"Some required stuff(s) not found: {error_details}"
             raise PipeInputError(msg) from exc
 
+        # Track condition steps
         for required_stuff in required_stuffs:
             get_pipeline_tracker().add_condition_step(
                 from_stuff=required_stuff,
@@ -364,6 +377,7 @@ class PipeCondition(PipeController):
                 comment="PipeCondition required for condition",
             )
 
+        # Execute the chosen pipe
         log.debug(f"Chosen pipe: {chosen_pipe_code}")
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
@@ -374,6 +388,8 @@ class PipeCondition(PipeController):
                 output_name=output_name,
             ),
         )
+
+        # Track choice step
         get_pipeline_tracker().add_choice_step(
             from_condition=condition_details,
             to_stuff=pipe_output.main_stuff,
