@@ -19,6 +19,7 @@ from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import PipelexConfig, get_pipelex_config
+from pipelex.config.config_root import ConfigRoot
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
@@ -44,7 +45,6 @@ from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.test_extras.registry_test_models import PipelexTestModels
-from pipelex.tools.config.config_root import ConfigRoot
 from pipelex.tools.func_registry import func_registry
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider

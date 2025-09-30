@@ -1,4 +1,4 @@
-from pipelex.tools.config.config_model import ConfigModel
+from pipelex.config.config_model import ConfigModel
 
 
 class PlxConfigStrings(ConfigModel):

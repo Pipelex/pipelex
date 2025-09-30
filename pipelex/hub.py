@@ -12,6 +12,8 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
+from pipelex.config.config_root import ConfigRoot
+from pipelex.config.manager import config_manager
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.domains.domain import Domain
@@ -27,8 +29,6 @@ from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.config.config_root import ConfigRoot
-from pipelex.tools.config.manager import config_manager
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.templating.template_provider_abstract import TemplateProviderAbstract

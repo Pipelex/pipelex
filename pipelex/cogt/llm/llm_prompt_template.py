@@ -115,7 +115,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
 
     @classmethod
     def for_structure_from_preliminary_text(cls) -> "LLMPromptTemplate":
-        generic_template_names = get_pipelex_config().generic_template_names
+        generic_template_names = get_pipelex_config().templates_config.generic_templates
         proto_prompt = LLMPrompt(
             system_text=get_template(generic_template_names.structure_from_preliminary_text_system),
             user_text=get_template(generic_template_names.structure_from_preliminary_text_user),

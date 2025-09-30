@@ -16,7 +16,7 @@ from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoice
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
-from pipelex.tools.config.config_model import ConfigModel
+from pipelex.config.config_model import ConfigModel
 from pipelex.tools.exceptions import ConfigValidationError
 from pipelex.types import Self
 

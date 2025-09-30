@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import ClassVar
 
-from pipelex.tools.config.config_model import ConfigModel
+from pipelex.config.config_model import ConfigModel
 from pipelex.tools.misc.file_utils import copy_file_from_package, copy_folder_from_package
 
 PIPELEX_LIBRARIES_PATH = "libraries"

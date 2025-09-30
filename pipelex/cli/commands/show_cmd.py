@@ -5,10 +5,10 @@ from typing import Annotated
 import typer
 
 from pipelex import pretty_print
+from pipelex.config.manager import config_manager
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
 from pipelex.hub import get_pipe_provider, get_required_pipe
 from pipelex.pipelex import Pipelex
-from pipelex.tools.config.manager import config_manager
 
 
 def do_show_config() -> None:

@@ -5,9 +5,9 @@ from typing import Annotated
 
 import typer
 
+from pipelex.config.manager import config_manager
 from pipelex.exceptions import PipelexCLIError
 from pipelex.libraries.library_config import LibraryConfig
-from pipelex.tools.config.manager import config_manager
 
 PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
 PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]

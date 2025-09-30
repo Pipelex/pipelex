@@ -10,7 +10,8 @@ from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background,
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
-from pipelex.config import StaticValidationReaction, get_pipelex_config
+from pipelex.config import get_pipelex_config
+from pipelex.config.core.dry_run import StaticValidationReaction
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
