@@ -11,6 +11,7 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices
+from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -390,7 +391,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
             output_structure_prompt: str | None = None
             if get_config().cogt.llm_config.is_structure_prompt_enabled:
-                output_structure_prompt = PipeLLM.get_output_structure_prompt(
+                output_structure_prompt = await PipeLLM.get_output_structure_prompt(
                     concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
                     is_with_preliminary_text=is_with_preliminary_text,
                 )
@@ -529,7 +530,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         )
 
     @staticmethod
-    def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
+    async def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
         concept = get_required_concept(concept_string=concept_string)
         class_name = concept.structure_class_name
         output_class = get_class_registry().get_class(class_name)
@@ -544,27 +545,15 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             return None
         class_structure_str = "\n".join(class_structure)
 
-        # TODO: use proper prompt templating for this
-        if is_with_preliminary_text:
-            output_structure_prompt = f"""
+        a =  await get_content_generator().make_jinja2_text(
+            context={
+                "class_structure_str": class_structure_str,
+            },
+            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+            jinja2_name="output_structure_prompt" if is_with_preliminary_text else "output_structure_prompt_no_preliminary_text",
+        )
+        from pipelex import pretty_print
+        pretty_print(a, "djqdsojo")
+        return a
+        
 
----
-The instance we want to generate will be for the following class:
-{class_structure_str}
-
-Don't bother with JSON formatting, we'll do that as a second step.
-For now, just output markdown with the details of the instance.
-DO NOT create information.
-If some information is not present for an attribute, output the default value or None according to the attribute definition.
-"""
-        else:
-            output_structure_prompt = f"""
-
----
-The instance we want to generate will be for the following class:
-{class_structure_str}
-
-DO NOT create information.
-If some information is not present for an attribute, output the default value or None according to the attribute definition.
-"""
-        return output_structure_prompt

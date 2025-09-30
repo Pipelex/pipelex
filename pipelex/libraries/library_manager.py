@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import ClassVar
 
@@ -37,7 +36,6 @@ from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
-from pipelex.tools.misc.toml_utils import TOMLValidationError, validate_toml_file
 from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import StrEnum
@@ -84,21 +82,6 @@ class LibraryManager(LibraryManagerAbstract):
         self.concept_library.validate_with_libraries()
         self.pipe_library.validate_with_libraries()
         self.domain_library.validate_with_libraries()
-
-    def _validate_toml_files(self):
-        """Validate all TOML files used by the library manager for formatting issues."""
-        log.debug("LibraryManager validating TOML file formatting")
-
-        # Validation of template paths
-        template_paths = self.library_config.get_templates_paths()
-        for template_path in template_paths:
-            if os.path.exists(template_path):
-                try:
-                    validate_toml_file(template_path)
-                except TOMLValidationError as exc:
-                    msg = f"PLX validation failed for template file '{template_path}': {exc}"
-                    log.error(msg)
-                    raise LibraryError(msg) from exc
 
     @override
     def setup(self) -> None:
