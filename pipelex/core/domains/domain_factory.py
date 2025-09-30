@@ -20,4 +20,4 @@ class DomainFactory:
         except ValidationError as exc:
             formatted_error_msg = format_pydantic_validation_error(exc)
             msg = f"Could not make domain from blueprint: {formatted_error_msg}"
-            raise DomainDefinitionError(msg) from exc
+            raise DomainDefinitionError(message=msg, domain_code=blueprint.code, description=blueprint.definition) from exc

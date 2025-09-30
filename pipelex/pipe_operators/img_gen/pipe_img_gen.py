@@ -138,44 +138,20 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
         # check that we have either an img_gen_prompt passed as attribute or as a single text input
+        nb_inputs = self.inputs.nb_inputs
         if self.img_gen_prompt:
-            if self.inputs.items:
-                msg = "img_gen_prompt_var_name must be None if img_gen_prompt is provided"
+            if nb_inputs > 0:
+                msg = "There must be no inputs if img_gen_prompt is provided"
                 raise PipeDefinitionError(msg)
             # we're good with the prompt provided as attribute
             return
 
-        candidate_prompt_var_names: list[str] = []
-        for input_name, requirement in self.inputs.items:
-            log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
-            if concept_provider.is_compatible(
-                tested_concept=requirement.concept,
-                wanted_concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
-            ):
-                self.img_gen_prompt_var_name = input_name
-                candidate_prompt_var_names.append(input_name)
-            else:
-                inadequate_input_concept_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[input_name],
-                    provided_concept_code=requirement.concept.code,
-                    explanation="Only a text input can be provided for image gen prompt",
-                )
-                match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(inadequate_input_concept_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise inadequate_input_concept_error
-        if len(candidate_prompt_var_names) > 1:
+        if nb_inputs > 1:
             too_many_candidate_inputs_error = StaticValidationError(
                 error_type=StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS,
                 domain=self.domain,
                 pipe_code=self.code,
-                variable_names=candidate_prompt_var_names,
+                variable_names=self.inputs.variables,
                 explanation="Only one text input can be provided for image gen prompt",
             )
             match reactions.get(StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS, default_reaction):
@@ -185,7 +161,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                     log.error(too_many_candidate_inputs_error.desc())
                 case StaticValidationReaction.RAISE:
                     raise too_many_candidate_inputs_error
-        elif len(candidate_prompt_var_names) == 0:
+        elif nb_inputs < 1:
             missing_input_var_error = StaticValidationError(
                 error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
                 domain=self.domain,
@@ -199,8 +175,32 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                     log.error(missing_input_var_error.desc())
                 case StaticValidationReaction.RAISE:
                     raise missing_input_var_error
+
+        # We have confirmed right above that we have exactly one input
+        # get input_name, requirement from single item in inputs
+        input_name, requirement = self.inputs.items[0]
+        log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
+        if concept_provider.is_compatible(
+            tested_concept=requirement.concept,
+            wanted_concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+        ):
+            self.img_gen_prompt_var_name = input_name
         else:
-            self.img_gen_prompt_var_name = candidate_prompt_var_names[0]
+            inadequate_input_concept_error = StaticValidationError(
+                error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
+                domain=self.domain,
+                pipe_code=self.code,
+                variable_names=[input_name],
+                provided_concept_code=requirement.concept.code,
+                explanation="For PipeImgGen you must provide a text input or a concept that refines text",
+            )
+            match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
+                case StaticValidationReaction.IGNORE:
+                    pass
+                case StaticValidationReaction.LOG:
+                    log.error(inadequate_input_concept_error.desc())
+                case StaticValidationReaction.RAISE:
+                    raise inadequate_input_concept_error
 
     @override
     async def _run_operator_pipe(

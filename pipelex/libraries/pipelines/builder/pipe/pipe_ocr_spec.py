@@ -1,16 +1,34 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
+from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
+from pipelex.exceptions import PipeDefinitionError
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 from pipelex.types import StrEnum
 
+if TYPE_CHECKING:
+    from pipelex.cogt.ocr.ocr_setting import OcrChoice
 
-class RecommendedOcrPreset(StrEnum):
+
+class AvailableOcr(StrEnum):
     BASE_OCR_MISTRAL = "base_ocr_mistral"
     BASE_OCR_PYPDFIUM2 = "base_ocr_pypdfium2"
+
+
+class OcrSkill(StrEnum):
+    EXTRACT_TEXT_FROM_VISUALS = "extract_text_from_visuals"
+    EXTARCT_TEXT_FROM_PDF = "extract_text_from_pdf"
+
+    @property
+    def ocr_recommendation(self) -> AvailableOcr:
+        match self:
+            case OcrSkill.EXTRACT_TEXT_FROM_VISUALS:
+                return AvailableOcr.BASE_OCR_MISTRAL
+            case OcrSkill.EXTARCT_TEXT_FROM_PDF:
+                return AvailableOcr.BASE_OCR_PYPDFIUM2
 
 
 class PipeOcrSpec(PipeSpec):
@@ -20,49 +38,55 @@ class PipeOcrSpec(PipeSpec):
     Supports various OCR platforms and output configurations including image detection,
     caption generation, and page rendering.
 
-    VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE either an image or a pdf or a concept which refines one of them.
-
-    Attributes:
-        the_pipe_code: Pipe code. Must be snake_case.
-        type: Fixed to "PipeOcr" for this pipe type.
-        ocr: name of the OCR model or handle or preset or setting
-        page_images: Whether to include detected images in the OCR output. When enabled,
-                    extracts and returns embedded images found in documents.
-        page_image_captions: Whether to generate captions for detected images using AI.
-                            Useful for understanding image content in documents.
-        page_views: Whether to include rendered page views in the output. Provides
-                   visual representation of document pages.
-        page_views_dpi: DPI (dots per inch) resolution for rendered page views.
-                       Higher values provide better quality but larger file sizes.
-                       Defaults to configuration setting.
+    Validation Rules:
+        - inputs dict must have exactly one input entry, and the value must be either `Image` or `PDF`.
     """
 
-    type: Literal["PipeOcr"] = "PipeOcr"
-    category: Literal["PipeOperator"] = "PipeOperator"
+    type: SkipJsonSchema[Literal["PipeOcr"]] = "PipeOcr"
+    category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
-    ocr: RecommendedOcrPreset | str = Field(description="Use one of the recommended OCR presets")
-    page_images: bool | None = None
-    page_image_captions: bool | None = None
-    page_views: bool | None = None
-    page_views_dpi: int | None = None
+    ocr: OcrSkill | str = Field(description="Use one of the recommended OCR choices")
+    page_images: bool | None = Field(default=None, description="Whether to include detected images in the OCR output.")
+    page_image_captions: bool | None = Field(default=None, description="Whether to generate captions for detected images using AI.")
+    page_views: bool | None = Field(default=None, description="Whether to include rendered page views in the output.")
 
     @field_validator("ocr", mode="before")
     @classmethod
-    def validate_ocr(cls, ocr_value: str | None) -> RecommendedOcrPreset | None:
-        if ocr_value is None:
-            return None
-        else:
-            return RecommendedOcrPreset(ocr_value)
+    def validate_ocr(cls, ocr_value: str) -> OcrSkill:
+        return OcrSkill(ocr_value)
+
+    @field_validator("inputs", mode="before")
+    @classmethod
+    def validate_ocr_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
+        if inputs_value is None:
+            msg = "PipeOcr must have exactly one input which must be either`Image` or `PDF`."
+            raise PipeDefinitionError(msg)
+        if len(inputs_value) != 1:
+            msg = "PipeOcr must have exactly one input which must be either`Image` or `PDF`."
+            raise PipeDefinitionError(msg)
+        return inputs_value
 
     @override
     def to_blueprint(self) -> PipeOcrBlueprint:
         base_blueprint = super().to_blueprint()
 
+        # create ocr choice as a str
+        ocr: OcrChoice
+        if isinstance(self.ocr, OcrSkill):
+            ocr = self.ocr.ocr_recommendation.value
+        else:
+            ocr = OcrSkill(self.ocr).ocr_recommendation.value
+
         return PipeOcrBlueprint(
+            source="PipeOcrSpec",
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             type=self.type,
             category=self.category,
-            ocr=self.ocr,
+            ocr=ocr,
+            page_images=self.page_images,
+            page_image_captions=self.page_image_captions,
+            page_views=self.page_views,
+            page_views_dpi=None,
         )

@@ -3,7 +3,7 @@ import pytest
 from pipelex.libraries.pipelines.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 
-from .test_data import PipeComposeTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_operators.pipe_jinja2.test_data import PipeComposeTestCases
 
 
 class TestPipeComposeBlueprintConversion:

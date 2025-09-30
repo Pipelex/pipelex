@@ -1,7 +1,10 @@
+import pytest
+
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.structure_generator import StructureGenerator
+from pipelex.core.concepts.structure_generator import ConceptStructureValidationError, StructureGenerator
+from pipelex.core.stuffs.stuff_content import StructuredContent
 
 
 class TestStructureGenerator:
@@ -15,7 +18,7 @@ class TestStructureGenerator:
             ),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("TestModel", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("TestModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -50,7 +53,7 @@ class TestStructureGenerator:
             ),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("ComplexModel", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("ComplexModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -79,7 +82,7 @@ class TestStructureGenerator:
             "size": ConceptStructureBlueprint(definition="Size of the product", choices=["XS", "S", "M", "L", "XL"], required=False),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("Product", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("Product", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -104,7 +107,7 @@ class TestStructureGenerator:
         """Test generation of structure with no fields."""
         structure_blueprint: dict[str, ConceptStructureBlueprint] = {}
 
-        result = StructureGenerator().generate_from_structure_blueprint("EmptyModel", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("EmptyModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -130,7 +133,7 @@ class TestStructureGenerator:
             "page_count": ConceptStructureBlueprint(definition="Number of pages", type=ConceptStructureBlueprintFieldType.INTEGER, required=False),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("DocumentInfo", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("DocumentInfo", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -156,7 +159,7 @@ class TestStructureGenerator:
             "value": ConceptStructureBlueprint(definition="Test value", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("ConvenienceTest", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("ConvenienceTest", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -190,7 +193,7 @@ class TestStructureGenerator:
             ),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("TypeMappingTest", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("TypeMappingTest", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -221,7 +224,7 @@ class TestStructureGenerator:
             "optional_field": ConceptStructureBlueprint(definition="Optional field", type=ConceptStructureBlueprintFieldType.TEXT, required=False),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("RequiredFieldsModel", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("RequiredFieldsModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -255,7 +258,7 @@ class TestStructureGenerator:
             ),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("PersonWithDefaults", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("PersonWithDefaults", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -290,7 +293,7 @@ class TestStructureGenerator:
             ),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("ListTypesModel", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("ListTypesModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -337,7 +340,7 @@ class TestStructureGenerator:
             ),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("DictTypesModel", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("DictTypesModel", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -377,7 +380,7 @@ class TestStructureGenerator:
             ),
         }
 
-        result = StructureGenerator().generate_from_structure_blueprint("ComplexItem", structure_blueprint)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("ComplexItem", structure_blueprint)
 
         pretty_print(structure_blueprint, title="Source Blueprint")
         pretty_print(result, title="Generated Result")
@@ -414,7 +417,7 @@ class TestStructureGenerator:
 
         normalized_structure = ConceptFactory.normalize_structure_blueprint(mixed_structure_blueprint)
 
-        result = StructureGenerator().generate_from_structure_blueprint("PersonInfo", normalized_structure)
+        result, _ = StructureGenerator().generate_from_structure_blueprint("PersonInfo", normalized_structure)
 
         pretty_print(mixed_structure_blueprint, title="Source Mixed Blueprint")
         pretty_print(normalized_structure, title="Normalized Blueprint")
@@ -450,13 +453,15 @@ class TestStructureGenerator:
         }
 
         generator = StructureGenerator()
-        result = generator.generate_from_structure_blueprint("ValidTestModel", structure_blueprint)
+        python_code, the_class = generator.generate_from_structure_blueprint("ValidTestModel", structure_blueprint)
 
         # The generation should succeed (validation happens internally)
-        assert "class ValidTestModel(StructuredContent):" in result
+        assert "class ValidTestModel(StructuredContent):" in python_code
+        assert isinstance(the_class, type)
+        assert issubclass(the_class, StructuredContent)
 
         # Test validation directly
-        assert generator.validate_generated_code(result, "ValidTestModel") is True
+        generator.validate_generated_code(python_code=python_code, expected_class_name="ValidTestModel", required_base_class=StructuredContent)
 
     def test_code_validation_syntax_error(self):
         """Test that invalid syntax fails validation."""
@@ -469,7 +474,8 @@ class InvalidModel(StructuredContent):
     name: str = Field(..., description="Name field"  # Missing closing parenthesis
 """
 
-        assert generator.validate_generated_code(invalid_code, "InvalidModel") is False
+        with pytest.raises(SyntaxError):
+            generator.validate_generated_code(python_code=invalid_code, expected_class_name="InvalidModel", required_base_class=StructuredContent)
 
     def test_code_validation_missing_class(self):
         """Test that code without the expected class fails validation."""
@@ -482,4 +488,5 @@ class WrongClassName(StructuredContent):
     name: str = Field(..., description="Name field")
 """
 
-        assert generator.validate_generated_code(code_without_expected_class, "ExpectedClassName") is False
+        with pytest.raises(ConceptStructureValidationError):
+            generator.validate_generated_code(python_code=code_without_expected_class, expected_class_name="ExpectedClassName", required_base_class=StructuredContent)

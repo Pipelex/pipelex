@@ -3,7 +3,7 @@ import pytest
 from pipelex.libraries.pipelines.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
-from .test_data import PipeLLMTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_operators.pipe_llm.test_data import PipeLLMTestCases
 
 
 class TestPipeLLMBlueprintConversion:

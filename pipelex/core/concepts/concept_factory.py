@@ -1,5 +1,3 @@
-from typing import Any
-
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
 
@@ -13,7 +11,7 @@ from pipelex.core.concepts.concept_native import NativeConceptEnumData, NativeCo
 from pipelex.core.concepts.structure_generator import StructureGenerator
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.stuff_content import TextContent
-from pipelex.exceptions import ConceptCodeError, ConceptDefinitionError, ConceptRefineError, StructureClassError
+from pipelex.exceptions import ConceptCodeError, ConceptDefinitionError, ConceptRefineError, ConceptStructureGeneratorError, StructureClassError
 
 
 class DomainAndConceptCode(BaseModel):
@@ -138,7 +136,9 @@ class ConceptFactory:
             ConceptBlueprint.validate_concept_code(concept_code=concept_code)
         except ConceptCodeError as exc:
             msg = f"Could not validate concept code '{concept_code}' in domain '{domain}': {exc}"
-            raise ConceptDefinitionError(msg) from exc
+            raise ConceptDefinitionError(
+                message=msg, domain_code=domain, concept_code=concept_code, description=blueprint.definition, source=blueprint.source
+            ) from exc
         structure_class_name: str
         current_refine: str | None = None
 
@@ -155,43 +155,53 @@ class ConceptFactory:
                 structure_class_name = blueprint.structure
             else:
                 # Structure is defined as a ConceptStructureBlueprint - run the structure generator and put it in the class registry
-                try:
-                    # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
-                    normalized_structure = cls.normalize_structure_blueprint(blueprint.structure)
+                # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
+                normalized_structure = cls.normalize_structure_blueprint(blueprint.structure)
 
-                    python_code = StructureGenerator().generate_from_structure_blueprint(
+                try:
+                    _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint=normalized_structure,
                     )
+                except ConceptStructureGeneratorError as exc:
+                    msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{domain}': {exc}"
+                    raise ConceptDefinitionError(
+                        msg,
+                        domain_code=domain,
+                        concept_code=concept_code,
+                        description=blueprint.definition,
+                        structure_class_python_code=exc.structure_class_python_code,
+                        source=blueprint.source,
+                    ) from exc
 
-                    # Execute the generated Python code to register the class
-                    exec_globals: dict[str, Any] = {}
-                    exec(python_code, exec_globals)
+                # Execute the generated Python code to register the class
+                # exec_globals: dict[str, Any] = {}
+                # exec(python_code, exec_globals)
 
-                    # Register the generated class
-                    KajsonManager.get_class_registry().register_class(exec_globals[concept_code])
+                # Register the generated class
+                KajsonManager.get_class_registry().register_class(the_generated_class)
 
-                    # The structure_class_name of the concept is the concept_code
-                    structure_class_name = concept_code
-
-                except Exception as exc:
-                    msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain}': {exc}"
-                    raise ConceptDefinitionError(msg) from exc
+                # The structure_class_name of the concept is the concept_code
+                structure_class_name = concept_code
 
         # Handle refines definition
         elif blueprint.refines:
-            # If we have refines, validate that there is no structure related to the concept code in the class registry
+            # If we have refines, validate that there is not already a structure related to this concept code in the class registry
             if Concept.is_valid_structure_class(structure_class_name=concept_code):
                 msg = (
                     f"Concept '{concept_code}' in domain '{domain}' has refines but also has a structure class registered. "
                     "A concept cannot have both structure and refines."
                 )
-                raise ConceptDefinitionError(msg)
+                raise ConceptDefinitionError(
+                    msg, domain_code=domain, concept_code=concept_code, description=blueprint.definition, source=blueprint.source
+                )
             try:
                 current_refine = cls.make_refine(refine=blueprint.refines)
             except ConceptRefineError as exc:
                 msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain}': {exc}"
-                raise ConceptDefinitionError(msg) from exc
+                raise ConceptDefinitionError(
+                    msg, domain_code=domain, concept_code=concept_code, description=blueprint.definition, source=blueprint.source
+                ) from exc
             structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
         # Handle neither structure nor refines - check the class registry
         # If there is a class, use it. structure_class_name is then the concept_code

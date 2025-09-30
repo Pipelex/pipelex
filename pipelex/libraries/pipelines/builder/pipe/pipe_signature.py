@@ -7,23 +7,27 @@ from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipe
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec
-from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
 from pipelex.tools.misc.string_utils import is_snake_case
 
 
 class PipeSignature(StructuredContent):
-    code: str = Field(description="Pipe code. Must be snake_case.")
-    type: AllowedPipeTypes = Field(description="Pipe type.")
+    """PipeSignature is a contract for a pipe.
+    It defines the inputs, outputs, and the purpose of the pipe.
+    It doesn't go into the details of how it does it.
+    """
+
+    code: str = Field(description="Pipe code identifying the pipe. Must be snake_case.")
     category: AllowedPipeCategories = Field(description="Pipe category.")
+    type: AllowedPipeTypes = Field(description="Pipe type.")
     description: str = Field(description="What the pipe does")
-    inputs: dict[str, str] = Field(description="Pipe inputs: key is the concept code in snake_case, value is the ConceptCode in PascalCase.")
-    result: str = Field(description="The name of the result of the pipe. Must be snake_case. It could be referenced as input in a following pipe.")
-    output: str = Field(description="ConceptCode in PascalCase")
-    # important_features: dict[str, Any] | None = Field(
-    #     default=None,
-    #     description="Important features specific to this pipe type "
-    #     "(e.g., referenced pipe codes for controllers, specific configuration for operators)",
-    # )
+    inputs: dict[str, str] = Field(
+        description="Pipe inputs: keys are the input variable_names in snake_case, values are the ConceptCodes in PascalCase."
+    )
+    result: str = Field(
+        description="variable_name for the result of the pipe. Must be snake_case. It could be referenced as input in a following pipe."
+    )
+    output: str = Field(description="Just the output ConceptCode in PascalCase")
+    pipe_dependencies: list[str] = Field(description="List of pipe codes that this pipe depends on. This is for the PipeControllers")
 
 
 class PipeSpec(StructuredContent):
@@ -37,11 +41,8 @@ class PipeSpec(StructuredContent):
         description=f"Pipe category. It is defined with type `Any` but validated at runtime and it must be one of: {AllowedPipeCategories}"
     )
     definition: str | None = Field(description="Natural language description of what the pipe does.")
-    inputs: dict[str, str | InputRequirementSpec] | None = Field(
-        description=(
-            "Input concept specifications. The keys are input names in snake_case. "
-            "Each value is aither the ConceptCode in PascalCase or an InputRequirementSpec with additional constraints"
-        ),
+    inputs: dict[str, str] = Field(
+        description=("Input concept specifications. The keys are input names in snake_case. Each value must be a ConceptCode in PascalCase"),
     )
     output: str = Field(description="Output concept code in PascalCase format!! Very important")
 
@@ -53,11 +54,23 @@ class PipeSpec(StructuredContent):
             raise PipeBlueprintError(msg)
         return value
 
-    @field_validator("output", mode="before")
+    @field_validator("output", mode="after")
     @staticmethod
     def validate_concept_string_or_code(output: str) -> str:
         ConceptSpec.validate_concept_string_or_code(concept_string_or_code=output)
         return output
+
+    @field_validator("inputs", mode="after")
+    @staticmethod
+    def validate_inputs(inputs: dict[str, str] | None) -> dict[str, str] | None:
+        if inputs is None:
+            return None
+        for input_name, concept_code in inputs.items():
+            if not is_snake_case(input_name):
+                msg = f"Invalid input name syntax '{input_name}'. Must be in snake_case."
+                raise PipeBlueprintError(msg)
+            ConceptSpec.validate_concept_string_or_code(concept_string_or_code=concept_code)
+        return inputs
 
     @classmethod
     def validate_pipe_code_syntax(cls, pipe_code: str) -> str:
@@ -67,14 +80,13 @@ class PipeSpec(StructuredContent):
         return pipe_code
 
     def to_blueprint(self) -> PipeBlueprint:
-        converted_inputs: dict[str, str | InputRequirementBlueprint] | None = None
-        if self.inputs is not None:
+        converted_inputs: dict[str, str | InputRequirementBlueprint] | None
+        if not self.inputs:
+            converted_inputs = None
+        else:
             converted_inputs = {}
-            for input_name, input_spec in self.inputs.items():
-                if isinstance(input_spec, InputRequirementSpec):
-                    converted_inputs[input_name] = input_spec.to_blueprint()
-                else:
-                    converted_inputs[input_name] = InputRequirementBlueprint(concept=input_spec)
+            for input_name, concept_code in self.inputs.items():
+                converted_inputs[input_name] = InputRequirementBlueprint(concept=concept_code)
 
         return PipeBlueprint(
             definition=self.definition,

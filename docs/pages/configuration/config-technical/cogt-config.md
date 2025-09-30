@@ -31,6 +31,7 @@ Configuration for all Language Model interactions:
 ```toml
 [cogt.llm_config]
 default_max_images = 100  # Maximum number of images in prompts
+is_structure_prompt_enabled = false
 
 # Job configuration
 [cogt.llm_config.llm_job_config]
@@ -172,6 +173,7 @@ is_auto_setup_preset_ocr = true
 
 [cogt.llm_config]
 default_max_images = 100
+is_structure_prompt_enabled = false
 
 [cogt.llm_config.llm_job_config]
 is_streaming_enabled = false

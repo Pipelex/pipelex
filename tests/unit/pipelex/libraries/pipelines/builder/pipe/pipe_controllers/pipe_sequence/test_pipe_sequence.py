@@ -3,7 +3,7 @@ import pytest
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 
-from .test_data import PipeSequenceTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_controllers.pipe_sequence.test_data import PipeSequenceTestCases
 
 
 class TestPipeSequenceBlueprintConversion:

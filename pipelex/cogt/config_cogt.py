@@ -21,12 +21,15 @@ class ImgGenConfig(ConfigModel):
 
 class InstructorConfig(ConfigModel):
     is_openai_structured_output_enabled: bool
+    is_dump_kwargs_enabled: bool
+    is_dump_response_enabled: bool
+    is_dump_error_enabled: bool
 
 
 class LLMConfig(ConfigModel):
     instructor_config: InstructorConfig
     llm_job_config: LLMJobConfig
-
+    is_structure_prompt_enabled: bool
     default_max_images: int
 
 

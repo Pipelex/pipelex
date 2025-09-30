@@ -87,9 +87,13 @@ is_auto_setup_preset_ocr = true
 
 [cogt.llm_config]
 default_max_images = 100
+is_structure_prompt_enabled = false
 
 [cogt.llm_config.instructor_config]
 is_openai_structured_output_enabled = false
+is_dump_kwargs_enabled = true
+is_dump_response_enabled = false
+is_dump_error_enabled = false
 
 [cogt.llm_config.llm_job_config]
 max_retries = 3
@@ -234,4 +238,3 @@ structure_field_ordering = ["type", "definition", "choices", "required"]
 
 [pipelex.plx_config.pipes]
 field_ordering = ["type", "definition", "inputs", "output"]
-

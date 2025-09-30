@@ -1,8 +1,8 @@
 from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
-from pipelex.libraries.pipelines.builder.pipe.pipe_compose_spec import PipeComposeSpec, PromptingStyleSpec
+
+from pipelex.libraries.pipelines.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
@@ -14,9 +14,10 @@ class PipeComposeTestCases:
         PipeComposeSpec(
             the_pipe_code="template_renderer",
             definition="Render a template",
-            inputs={"data": InputRequirementSpec(concept="Data")},
+            inputs={"data": "Data"},
             output="RenderedText",
             jinja2="Hello {{ data.name }}!",
+            target_format="markdown",
         ),
         PipeComposeBlueprint(
             definition="Render a template",
@@ -26,45 +27,15 @@ class PipeComposeTestCases:
             category="PipeOperator",
             jinja2_name=None,
             jinja2="Hello {{ data.name }}!",
-            prompting_style=None,
-            template_category=Jinja2TemplateCategory.LLM_PROMPT,
-            extra_context=None,
-        ),
-    )
-
-    JINJA2_WITH_STYLE = (
-        "jinja2_with_style",
-        PipeComposeSpec(
-            the_pipe_code="styled_template",
-            definition="Template with prompting style",
-            inputs={"input": InputRequirementSpec(concept="Input")},
-            output="Output",
-            jinja2_name="custom_template",
-            prompting_style=PromptingStyleSpec(
-                tag_style=TagStyle.XML,
-                text_format=TextFormat.MARKDOWN,
-            ),
-            template_category=Jinja2TemplateCategory.MARKDOWN,
-            extra_context={"version": "1.0"},
-        ),
-        PipeComposeBlueprint(
-            definition="Template with prompting style",
-            inputs={"input": InputRequirementBlueprint(concept="Input")},
-            output="Output",
-            type="PipeCompose",
-            category="PipeOperator",
-            jinja2_name="custom_template",
-            jinja2=None,
             prompting_style=PromptingStyle(
-                tag_style=TagStyle.XML,
+                tag_style=TagStyle.TICKS,
                 text_format=TextFormat.MARKDOWN,
             ),
             template_category=Jinja2TemplateCategory.MARKDOWN,
-            extra_context={"version": "1.0"},
+            extra_context=None,
         ),
     )
 
     TEST_CASES: ClassVar[list[tuple[str, PipeComposeSpec, PipeComposeBlueprint]]] = [
         SIMPLE_JINJA2,
-        JINJA2_WITH_STYLE,
     ]

@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
+
 from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_spec import PipeOcrSpec
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
@@ -12,11 +12,12 @@ class PipeOcrTestCases:
         PipeOcrSpec(
             the_pipe_code="ocr_extractor",
             definition="Extract text from image",
-            inputs={"image": InputRequirementSpec(concept="Image")},
+            inputs={"image": "Image"},
             output="ExtractedText",
-            ocr="base_ocr_mistral",
+            ocr="extract_text_from_visuals",
         ),
         PipeOcrBlueprint(
+            source="PipeOcrSpec",
             definition="Extract text from image",
             inputs={"image": InputRequirementBlueprint(concept="Image")},
             output="ExtractedText",
@@ -31,21 +32,25 @@ class PipeOcrTestCases:
         PipeOcrSpec(
             the_pipe_code="advanced_ocr",
             definition="OCR with page options",
-            inputs={"document": InputRequirementSpec(concept="PDF")},
+            inputs={"document": "PDF"},
             output="PageContent",
-            ocr="base_ocr_mistral",
+            ocr="extract_text_from_pdf",
             page_images=True,
             page_image_captions=True,
             page_views=True,
-            page_views_dpi=300,
         ),
         PipeOcrBlueprint(
+            source="PipeOcrSpec",
             definition="OCR with page options",
             inputs={"document": InputRequirementBlueprint(concept="PDF")},
             output="PageContent",
             type="PipeOcr",
             category="PipeOperator",
-            ocr="base_ocr_mistral",
+            ocr="base_ocr_pypdfium2",
+            page_images=True,
+            page_image_captions=True,
+            page_views=True,
+            page_views_dpi=None,
         ),
     )
 

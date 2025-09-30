@@ -140,14 +140,36 @@ class LibraryParsingError(LibraryError):
     pass
 
 
-# TODO: add details from all cases raising this error
 class DomainDefinitionError(PipelexError):
-    pass
+    def __init__(self, message: str, domain_code: str, description: str, source: str | None = None):
+        self.domain_code = domain_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
 
 
-# TODO: add details from all cases raising this error
 class ConceptDefinitionError(PipelexError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        domain_code: str,
+        concept_code: str,
+        description: str,
+        structure_class_python_code: str | None = None,
+        source: str | None = None,
+    ):
+        self.domain_code = domain_code
+        self.concept_code = concept_code
+        self.description = description
+        self.structure_class_python_code = structure_class_python_code
+        self.source = source
+        super().__init__(message)
+
+
+class ConceptStructureGeneratorError(PipelexError):
+    def __init__(self, message: str, structure_class_python_code: str | None = None):
+        self.structure_class_python_code = structure_class_python_code
+        super().__init__(message)
 
 
 # TODO: add details from all cases raising this error
@@ -155,12 +177,12 @@ class PipeDefinitionError(PipelexError):
     def __init__(
         self,
         message: str,
-        domain: str | None = None,
+        domain_code: str | None = None,
         pipe_code: str | None = None,
         description: str | None = None,
         source: str | None = None,
     ):
-        self.domain = domain
+        self.domain_code = domain_code
         self.pipe_code = pipe_code
         self.description = description
         self.source = source
@@ -168,11 +190,11 @@ class PipeDefinitionError(PipelexError):
         super().__init__(message)
 
     def pipe_details(self) -> str:
-        if not self.domain and not self.pipe_code and not self.description and not self.source:
+        if not self.domain_code and not self.pipe_code and not self.description and not self.source:
             return "No pipe details provided"
         details = "Pipe details:"
-        if self.domain:
-            details += f" • domain='{self.domain}'"
+        if self.domain_code:
+            details += f" • domain='{self.domain_code}'"
         if self.pipe_code:
             details += f" • pipe='{self.pipe_code}'"
         if self.description:
@@ -180,6 +202,34 @@ class PipeDefinitionError(PipelexError):
         if self.source:
             details += f" • source='{self.source}'"
         return details
+
+
+class DomainLoadingError(LibraryLoadingError):
+    def __init__(self, message: str, domain_code: str, description: str, source: str | None = None):
+        self.domain_code = domain_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
+
+
+class ConceptLoadingError(LibraryLoadingError):
+    def __init__(
+        self, message: str, concept_definition_error: ConceptDefinitionError, concept_code: str, description: str, source: str | None = None
+    ):
+        self.concept_definition_error = concept_definition_error
+        self.concept_code = concept_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
+
+
+class PipeLoadingError(LibraryLoadingError):
+    def __init__(self, message: str, pipe_definition_error: PipeDefinitionError, pipe_code: str, description: str, source: str | None = None):
+        self.pipe_definition_error = pipe_definition_error
+        self.pipe_code = pipe_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
 
 
 class UnexpectedPipeDefinitionError(PipeDefinitionError):

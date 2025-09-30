@@ -18,16 +18,6 @@ class PipeBatchSpec(PipeSpec):
     where the batch configuration is specified directly in the sequence step using
     batch_over and batch_as parameters in SubPipeBlueprint.
 
-    Attributes:
-        the_pipe_code: Pipe code. Must be snake_case.
-        type: Fixed to "PipeBatch" for this pipe type.
-        branch_pipe_code: The pipe code to execute for each item in the input list.
-                         This pipe is instantiated once per item in parallel.
-        input_list_name: Name of the list in WorkingMemory to iterate over.
-                        Defaults to the PipeBatch's main input name if not specified.
-        input_item_name: Name assigned to individual items within each execution branch.
-                        This is how the branch pipe accesses its specific input item.
-
     Validation Rules:
         1. branch_pipe_code must reference an existing pipe in the pipeline.
         2. When input_list_name is specified, it must reference a list in context.
@@ -38,9 +28,14 @@ class PipeBatchSpec(PipeSpec):
     type: Literal["PipeBatch"] = "PipeBatch"
     category: Literal["PipeController"] = "PipeController"
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
-    branch_pipe_code: str
-    input_list_name: str | None = None
-    input_item_name: str | None = None
+    branch_pipe_code: str = Field(
+        description="The pipe code to execute for each item in the input list. This pipe is instantiated once per item in parallel."
+    )
+    input_list_name: str | None = Field(default=None, description="Name of the list in WorkingMemory to iterate over, if needed.")
+    input_item_name: str | None = Field(
+        default=None,
+        description="Name assigned to individual items within each execution branch. This is how the branch pipe accesses its specific input item.",
+    )
 
     @override
     def to_blueprint(self) -> PipeBatchBlueprint:

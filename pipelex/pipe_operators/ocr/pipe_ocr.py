@@ -111,8 +111,6 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
         # We have confirmed right above that we have exactly one input
         # get input_name, requirement from single item in inputs
         input_name, requirement = self.inputs.items[0]
-        log.debug(f"{input_name=}")
-        log.debug(f"{requirement=}")
         log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
         if concept_provider.is_compatible(
             tested_concept=requirement.concept,
@@ -133,7 +131,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
                 pipe_code=self.code,
                 variable_names=[input_name],
                 provided_concept_code=requirement.concept.code,
-                explanation="For OCR you must provide either a pdf or an image or a concept that refines one of them",
+                explanation="For PipeOcr you must provide either a pdf or an image or a concept that refines one of them",
             )
             match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
                 case StaticValidationReaction.IGNORE:

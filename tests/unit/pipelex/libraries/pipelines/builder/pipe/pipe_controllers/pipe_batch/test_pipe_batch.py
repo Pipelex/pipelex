@@ -3,7 +3,7 @@ import pytest
 from pipelex.libraries.pipelines.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 
-from .test_data import PipeBatchTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_controllers.pipe_batch.test_data import PipeBatchTestCases
 
 
 class TestPipeBatchBlueprintConversion:

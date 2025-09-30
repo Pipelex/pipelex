@@ -9,6 +9,7 @@ from pipelex.tools.templating.templating_models import TextFormat
 from pipelex.types import StrEnum
 
 
+# TODO: add more categories
 class Jinja2TemplateCategory(StrEnum):
     HTML = "html"
     MARKDOWN = "markdown"

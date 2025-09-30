@@ -49,18 +49,6 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return cls(root={})
 
     @override
-    def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
-        try:
-            return self.root[f"{SpecialDomain.NATIVE}.{native_concept}"]
-        except KeyError as key_error:
-            msg = f"Native concept '{native_concept}' not found in the library"
-            raise ConceptLibraryConceptNotFoundError(msg) from key_error
-
-    def get_native_concepts(self) -> list[Concept]:
-        """Create all native concepts from the hardcoded data"""
-        return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptEnum.values_list()]
-
-    @override
     def list_concepts(self) -> list[Concept]:
         return list(self.root.values())
 
@@ -89,6 +77,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
     def is_compatible(self, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
         return Concept.are_concept_compatible(concept_1=tested_concept, concept_2=wanted_concept, strict=strict)
 
+    def get_optional_concept(self, concept_string: str) -> Concept | None:
+        return self.root.get(concept_string)
+
     @override
     def get_required_concept(self, concept_string: str) -> Concept:
         """`concept_string` can have the domain or not. If it doesn't have the domain, it is assumed to be native.
@@ -97,7 +88,23 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         if Concept.is_implicit_concept(concept_string=concept_string):
             return ConceptFactory.make_implicit_concept(concept_string=concept_string)
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
-        return self.root[concept_string]
+        the_concept = self.get_optional_concept(concept_string=concept_string)
+        if not the_concept:
+            msg = f"Concept '{concept_string}' not found in the library"
+            raise ConceptLibraryConceptNotFoundError(msg)
+        return the_concept
+
+    @override
+    def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
+        the_native_concept = self.get_optional_concept(f"{SpecialDomain.NATIVE}.{native_concept}")
+        if not the_native_concept:
+            msg = f"Native concept '{native_concept}' not found in the library"
+            raise ConceptLibraryConceptNotFoundError(msg)
+        return the_native_concept
+
+    def get_native_concepts(self) -> list[Concept]:
+        """Create all native concepts from the hardcoded data"""
+        return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptEnum.values_list()]
 
     @override
     def get_class(self, concept_code: str) -> type[Any] | None:

@@ -23,11 +23,14 @@ from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.exceptions import (
     ConceptDefinitionError,
     ConceptLibraryError,
+    ConceptLoadingError,
     DomainDefinitionError,
+    DomainLoadingError,
     LibraryError,
     LibraryLoadingError,
     PipeDefinitionError,
     PipeLibraryError,
+    PipeLoadingError,
 )
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
@@ -151,7 +154,7 @@ class LibraryManager(LibraryManagerAbstract):
             domain = self._load_domain_from_blueprint(blueprint)
         except DomainDefinitionError as exc:
             msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
-            raise LibraryLoadingError(msg) from exc
+            raise DomainLoadingError(message=msg, domain_code=exc.domain_code, description=exc.description, source=exc.source) from exc
         self.domain_library.add_domain(domain=domain)
 
         # Create and load concepts
@@ -159,7 +162,9 @@ class LibraryManager(LibraryManagerAbstract):
             concepts = self._load_concepts_from_blueprint(blueprint)
         except ConceptDefinitionError as exc:
             msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
-            raise LibraryLoadingError(msg) from exc
+            raise ConceptLoadingError(
+                message=msg, concept_definition_error=exc, concept_code=exc.concept_code, description=exc.description, source=exc.source
+            ) from exc
         self.concept_library.add_concepts(concepts=concepts)
 
         # Create and load pipes
@@ -167,7 +172,9 @@ class LibraryManager(LibraryManagerAbstract):
             pipes = self._load_pipes_from_blueprint(blueprint)
         except PipeDefinitionError as exc:
             msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
-            raise LibraryLoadingError(msg) from exc
+            raise PipeLoadingError(
+                message=msg, pipe_definition_error=exc, pipe_code=exc.pipe_code or "", description=exc.description or "", source=exc.source
+            ) from exc
         self.pipe_library.add_pipes(pipes=pipes)
 
         return pipes
@@ -190,8 +197,9 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_domain_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> Domain:
         return DomainFactory.make_from_blueprint(
             blueprint=DomainBlueprint(
+                source=blueprint.source,
                 code=blueprint.domain,
-                definition=blueprint.definition,
+                definition=blueprint.definition or "",
                 system_prompt=blueprint.system_prompt,
                 system_prompt_to_structure=blueprint.system_prompt_to_structure,
                 prompt_template_to_structure=blueprint.prompt_template_to_structure,

@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
+
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.libraries.pipelines.builder.pipe.sub_pipe_spec import SubPipeSpec
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
@@ -14,7 +14,7 @@ class PipeSequenceTestCases:
         PipeSequenceSpec(
             the_pipe_code="sequence_processor",
             definition="A sequence of operations",
-            inputs={"input_data": InputRequirementSpec(concept="Text")},
+            inputs={"input_data": "Text"},
             output="ProcessedData",
             steps=[
                 SubPipeSpec(the_pipe_code="step1", result="result1"),
@@ -41,7 +41,7 @@ class PipeSequenceTestCases:
         PipeSequenceSpec(
             the_pipe_code="batch_sequence",
             definition="Sequence with batch",
-            inputs={"items": InputRequirementSpec(concept="ItemList")},
+            inputs={"items": "ItemList"},
             output="ProcessedItems",
             steps=[
                 SubPipeSpec(the_pipe_code="prepare", result="prepared_items"),

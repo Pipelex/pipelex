@@ -1,19 +1,21 @@
 import ast
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal, Optional, cast
+from typing import Any, Literal, Optional
 
 from pydantic import Field
 
-from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.exceptions import ConceptStructureGeneratorError, PipelexError
+
+
+class ConceptStructureValidationError(PipelexError):
+    pass
 
 
 class StructureGenerator:
     """Generate Pydantic BaseModel classes from concept structure blueprints."""
-
-    # TODO: The methods that return False for a failed validation should just raise (proper errors).
 
     def __init__(self):
         self.imports = {
@@ -24,13 +26,7 @@ class StructureGenerator:
         }
         self.enum_definitions: dict[str, dict[str, Any]] = {}  # Store enum definitions
 
-    def _format_default_value(self, value: Any) -> str:
-        """Format default value for Python code, ensuring strings use double quotes."""
-        if isinstance(value, str):
-            return f'"{value}"'
-        return repr(value)
-
-    def generate_from_structure_blueprint(self, class_name: str, structure_blueprint: dict[str, ConceptStructureBlueprint]) -> str:
+    def generate_from_structure_blueprint(self, class_name: str, structure_blueprint: dict[str, ConceptStructureBlueprint]) -> tuple[str, type]:
         """Generate Python module content from structure blueprint.
 
         Args:
@@ -38,11 +34,14 @@ class StructureGenerator:
             structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
 
         Returns:
-            Generated Python module content
+            Generated Python module content, the generated class
+
+        Raises:
+            ConceptStructureGeneratorError: If the generated code is not syntactically correct or does not inherit from the required base class
 
         """
         # Generate the class
-        class_code = self._generate_class_from_blueprint(class_name, structure_blueprint)
+        class_code = self._generate_class_source_code_from_blueprint(class_name, structure_blueprint)
 
         # Generate the complete module
         imports_section = "\n".join(sorted(self.imports))
@@ -50,13 +49,46 @@ class StructureGenerator:
         generated_code = f"{imports_section}\n\n\n{class_code}\n"
 
         # Validate the generated code
-        if not self.validate_generated_code(generated_code, class_name):
-            msg = f"Generated code for class '{class_name}' failed validation"
-            raise ValueError(msg)
+        try:
+            the_class = self.validate_generated_code(
+                python_code=generated_code, expected_class_name=class_name, required_base_class=StructuredContent
+            )
+        except (ConceptStructureValidationError, SyntaxError, ValueError, ImportError, Exception) as exc:
+            msg = f"Error validating generated code: {exc}"
+            raise ConceptStructureGeneratorError(msg, structure_class_python_code=generated_code) from exc
 
-        return generated_code
+        return generated_code, the_class
 
-    def _generate_class_from_blueprint(self, class_name: str, structure_blueprint: dict[str, ConceptStructureBlueprint]) -> str:
+    def validate_generated_code(self, python_code: str, expected_class_name: str, required_base_class: type) -> type:
+        """Validate that the generated Python code is syntactically correct and executable.
+
+        Args:
+            python_code: The generated Python code to validate
+            expected_class_name: The name of the class that should be created
+            required_base_class: The base class that the generated class should inherit from
+
+        """
+        ast.parse(python_code)
+
+        compile(python_code, "<generated>", "exec")
+
+        return self._validate_execution(
+            python_code=python_code,
+            expected_class_name=expected_class_name,
+            required_base_class=required_base_class,
+        )
+
+    ############################################################
+    # Private methods
+    ############################################################
+
+    def _format_default_value(self, value: Any) -> str:
+        """Format default value for Python code, ensuring strings use double quotes."""
+        if isinstance(value, str):
+            return f'"{value}"'
+        return repr(value)
+
+    def _generate_class_source_code_from_blueprint(self, class_name: str, structure_blueprint: dict[str, ConceptStructureBlueprint]) -> str:
         """Generate a class definition from ConceptStructureBlueprint.
 
         Args:
@@ -302,142 +334,42 @@ class StructureGenerator:
                 # Unknown FieldType, assume it's a custom type
                 return str(field_type)
 
-    def validate_generated_code(self, python_code: str, expected_class_name: str) -> bool:
-        """Validate that the generated Python code is syntactically correct and executable.
-
-        Args:
-            python_code: The generated Python code to validate
-            expected_class_name: The name of the class that should be created
-
-        Returns:
-            True if the code is valid, False otherwise
-
-        """
-        # Step 1: Syntax validation
-        if not self._validate_syntax(python_code):
-            return False
-
-        # Step 2: Compilation validation
-        if not self._validate_compilation(python_code):
-            return False
-
-        # Step 3: Execution and class creation validation
-        if not self._validate_execution(python_code, expected_class_name):
-            return False
-
-        # Step 4: Class instantiation validation
-        return self._validate_instantiation(python_code, expected_class_name)
-
-    def _validate_syntax(self, python_code: str) -> bool:
-        """Validate that the code has valid Python syntax."""
-        try:
-            ast.parse(python_code)
-            return True
-        except SyntaxError as e:
-            log.error(f"Syntax error in generated code: {e}")
-            return False
-
-    def _validate_compilation(self, python_code: str) -> bool:
-        """Validate that the code can be compiled."""
-        try:
-            compile(python_code, "<generated>", "exec")
-            return True
-        except Exception as e:
-            log.error(f"Compilation error in generated code: {e}")
-            return False
-
-    def _validate_execution(self, python_code: str, expected_class_name: str) -> bool:
+    def _validate_execution(self, python_code: str, expected_class_name: str, required_base_class: type) -> type:
         """Validate that the code executes and creates the expected class."""
-        try:
-            # Import necessary modules for the execution context
-            from datetime import datetime  # noqa: PLC0415
-            from enum import Enum  # noqa: PLC0415
-            from typing import Any, Dict, List, Literal, Optional  # noqa: PLC0415,F401
+        # Import necessary modules for the execution context
+        from typing import Any  # noqa: PLC0415
 
-            from pydantic import Field  # noqa: PLC0415
+        # Provide necessary imports in the execution context
+        exec_globals = {
+            "__builtins__": __builtins__,
+            "datetime": datetime,
+            "Enum": Enum,
+            "Optional": Optional,
+            "List": list,
+            "Dict": dict,
+            "Any": Any,
+            "Literal": Literal,
+            "Field": Field,
+            "StructuredContent": StructuredContent,
+        }
+        exec_locals: dict[str, Any] = {}
+        exec(python_code, exec_globals, exec_locals)
 
-            from pipelex.core.stuffs.stuff_content import StructuredContent  # noqa: PLC0415
+        # Verify the expected class was created
+        if expected_class_name not in exec_locals:
+            msg = f"Expected class '{expected_class_name}' not found in generated code"
+            raise ConceptStructureValidationError(msg)
 
-            # Provide necessary imports in the execution context
-            exec_globals = {
-                "__builtins__": __builtins__,
-                "datetime": datetime,
-                "Enum": Enum,
-                "Optional": Optional,
-                "List": list,
-                "Dict": dict,
-                "Any": Any,
-                "Literal": Literal,
-                "Field": Field,
-                "StructuredContent": StructuredContent,
-            }
-            exec_locals: dict[str, Any] = {}
-            exec(python_code, exec_globals, exec_locals)
+        the_class = exec_locals[expected_class_name]
 
-            # Verify the expected class was created
-            if expected_class_name not in exec_locals:
-                log.error(f"Expected class '{expected_class_name}' not found in generated code")
-                return False
+        # Verify it's actually a class
+        if not isinstance(the_class, type):
+            msg = f"'{expected_class_name}' is not a class"
+            raise ConceptStructureValidationError(msg)
 
-            # Verify it's actually a class
-            if not isinstance(exec_locals[expected_class_name], type):
-                log.error(f"'{expected_class_name}' is not a class")
-                return False
+        # Verify it inherits from the required base class
+        if not issubclass(the_class, required_base_class):
+            msg = f"'{expected_class_name}' does not inherit from {required_base_class.__name__}"
+            raise ConceptStructureValidationError(msg)
 
-            return True
-
-        except ImportError as e:
-            log.error(f"Import error in generated code: {e}")
-            return False
-        except Exception as e:
-            log.error(f"Execution error in generated code: {e}")
-            return False
-
-    def _validate_instantiation(self, python_code: str, expected_class_name: str) -> bool:
-        try:
-            exec_globals = {
-                "__builtins__": __builtins__,
-                "datetime": datetime,
-                "Enum": Enum,
-                "Optional": Optional,
-                "List": list,
-                "Dict": dict,
-                "Any": Any,
-                "Literal": Literal,
-                "Field": Field,
-                "StructuredContent": StructuredContent,
-            }
-            exec_locals: dict[str, Any] = {}
-            exec(python_code, exec_globals, exec_locals)
-
-            generated_class = cast("type[Any]", exec_locals[expected_class_name])
-
-            # Try to create an instance (this will catch Pydantic validation issues)
-            # For validation purposes, we'll try to create an instance with minimal valid data
-            instance: Any = None
-            try:
-                # First try with no arguments (works for classes with all optional fields)
-                instance = generated_class()
-            except Exception:
-                # If that fails, try with empty dict (some models accept this)
-                try:
-                    instance = generated_class()
-                except Exception:
-                    # If that fails too, the class structure is probably fine but requires specific data
-                    # For validation purposes, we'll just check that it's a valid Pydantic model class
-                    if not hasattr(generated_class, "model_fields"):
-                        log.error("Generated class doesn't appear to be a Pydantic model")
-                        return False
-                    # Class structure is valid, just requires specific data to instantiate
-                    return True
-
-            # Verify it's a Pydantic model with the expected structure
-            if instance is not None and not hasattr(instance, "model_fields"):
-                log.error("Generated class doesn't appear to be a Pydantic model")
-                return False
-
-            return True
-
-        except Exception as e:
-            log.error(f"Instantiation error in generated code: {e}")
-            return False
+        return the_class

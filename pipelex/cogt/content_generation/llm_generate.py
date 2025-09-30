@@ -52,6 +52,13 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseM
     class ListSchema(BaseModel):
         items: list[item_class]  # type: ignore[valid-type] # pyright: ignore[reportInvalidTypeForm]
 
+    ListSchema.__name__ = f"ListOf{item_class_name}"
+
+    if item_class.__doc__:
+        ListSchema.__doc__ = f"List wrapper for {item_class_name}.\n\nItem description:\n{item_class.__doc__}"
+    else:
+        ListSchema.__doc__ = f"A list of {item_class_name}."
+
     wrapped_list: ListSchema = await llm_worker.gen_object(
         llm_job=llm_job,
         schema=ListSchema,

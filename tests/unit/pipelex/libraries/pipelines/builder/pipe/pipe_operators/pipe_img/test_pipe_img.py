@@ -3,7 +3,7 @@ import pytest
 from pipelex.libraries.pipelines.builder.pipe.pipe_img_spec import PipeImgGenSpec
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
-from .test_data import PipeImgGenTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_operators.pipe_img.test_data import PipeImgGenTestCases
 
 
 class TestPipeImgGenBlueprintConversion:

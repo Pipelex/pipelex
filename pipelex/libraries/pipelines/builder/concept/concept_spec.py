@@ -33,9 +33,7 @@ class ConceptSpecError(Exception):
 
 
 class ConceptStructureSpec(StructuredContent):
-    """Spec defining a field in the structure of a concept.
-
-    This class represents the schema for a single field in a concept's structure. It supports
+    """ConceptStructureSpec represents the schema for a single field in a concept's structure. It supports
     various field types including text, integer, boolean, number, and date.
 
     Attributes:
@@ -160,45 +158,22 @@ class ConceptSpec(StructuredContent):
         ),
     )
 
-    @classmethod
-    def _post_validate_concept_code(cls, concept_code: str) -> None:
-        if not is_pascal_case(concept_code):
-            msg = f"Concept code '{concept_code}' must be PascalCase (letters and numbers only, starting with uppercase, without `.`)"
-            raise ConceptCodeError(msg)
-
-    @classmethod
-    def validate_concept_string_or_code(cls, concept_string_or_code: str) -> None:
-        if concept_string_or_code.count(".") > 1:
-            msg = (
-                f"concept_string_or_code '{concept_string_or_code}' is invalid. "
-                "It should either contain a domain in snake_case and a concept code in PascalCase separated by one dot, "
-                "or be a concept code in PascalCase."
-            )
-            raise ConceptStringOrConceptCodeError(msg)
-
-        if concept_string_or_code.count(".") == 1:
-            domain, concept_code = concept_string_or_code.split(".")
-            DomainBlueprint.validate_domain_code(code=domain)
-            cls._post_validate_concept_code(concept_code=concept_code)
-        else:
-            cls._post_validate_concept_code(concept_code=concept_string_or_code)
-
     @field_validator("the_concept_code", mode="before")
     @classmethod
-    def validate_concept_code(cls, concept_code: str) -> str:
-        if "." in concept_code:
-            domain, concept_code = concept_code.split(".")
+    def validate_concept_code(cls, value: str) -> str:
+        if "." in value:
+            domain, concept_code = value.split(".")
             if not is_pascal_case(concept_code):
-                log.warning(f"Concept code '{concept_code}' is not PascalCase, converting to PascalCase")
-                pascal_cased = snake_to_pascal_case(concept_code)
-                return f"{domain}.{pascal_cased}"
+                log.warning(f"Concept code '{value}' is not PascalCase, converting to PascalCase")
+                pascal_cased_value = snake_to_pascal_case(concept_code)
+                return f"{domain}.{pascal_cased_value}"
             else:
-                return concept_code
-        elif not is_pascal_case(concept_code):
-            log.warning(f"Concept code '{concept_code}' is not PascalCase, converting to PascalCase")
-            return snake_to_pascal_case(concept_code)
+                return value
+        elif not is_pascal_case(value):
+            log.warning(f"Concept code '{value}' is not PascalCase, converting to PascalCase")
+            return snake_to_pascal_case(value)
         else:
-            return concept_code
+            return value
 
     @field_validator("refines", mode="before")
     @classmethod
@@ -220,6 +195,32 @@ class ConceptSpec(StructuredContent):
             )
             raise ConceptSpecError(msg)
         return values
+
+    @classmethod
+    def _post_validate_concept_code(cls, concept_code: str) -> None:
+        if not is_pascal_case(concept_code):
+            msg = (
+                f"ConceptSpec _post_validate_concept_code: Concept code '{concept_code}' must be PascalCase "
+                f"(letters and numbers only, starting with uppercase, without `.`)"
+            )
+            raise ConceptCodeError(msg)
+
+    @classmethod
+    def validate_concept_string_or_code(cls, concept_string_or_code: str) -> None:
+        if concept_string_or_code.count(".") > 1:
+            msg = (
+                f"concept_string_or_code '{concept_string_or_code}' is invalid. "
+                "It should either contain a domain in snake_case and a concept code in PascalCase separated by one dot, "
+                "or be a concept code in PascalCase."
+            )
+            raise ConceptStringOrConceptCodeError(msg)
+
+        if concept_string_or_code.count(".") == 1:
+            domain, concept_code = concept_string_or_code.split(".")
+            DomainBlueprint.validate_domain_code(code=domain)
+            cls._post_validate_concept_code(concept_code=concept_code)
+        else:
+            cls._post_validate_concept_code(concept_code=concept_string_or_code)
 
     def to_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""

@@ -17,6 +17,10 @@ class StructuringMethod(StrEnum):
 class PipeLLMBlueprint(PipeBlueprint):
     type: Literal["PipeLLM"] = "PipeLLM"
     category: Literal["PipeOperator"] = "PipeOperator"
+
+    llm: LLMChoice | None = None
+    llm_to_structure: LLMChoice | None = None
+
     system_prompt_template: str | None = None
     system_prompt_template_name: str | None = None
     system_prompt_name: str | None = None
@@ -27,9 +31,6 @@ class PipeLLMBlueprint(PipeBlueprint):
     prompt_name: str | None = None
     prompt: str | None = None
 
-    llm: LLMChoice | None = None
-    llm_to_structure: LLMChoice | None = None
-
     structuring_method: StructuringMethod | None = None
     prompt_template_to_structure: str | None = None
     system_prompt_to_structure: str | None = None
@@ -38,8 +39,8 @@ class PipeLLMBlueprint(PipeBlueprint):
     multiple_output: bool | None = None
 
     @field_validator("nb_output", mode="after")
-    @staticmethod
-    def validate_nb_output(value: int | None = None) -> int | None:
+    @classmethod
+    def validate_nb_output(cls, value: int | None = None) -> int | None:
         if value and value < 1:
             msg = "PipeLLMBlueprint nb_output must be greater than 0"
             raise PipeDefinitionError(msg)

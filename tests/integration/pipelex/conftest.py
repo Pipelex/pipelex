@@ -51,7 +51,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gpt-4o-mini",
         # "gpt-5-mini",
         # "gpt-5-chat",
-        # "claude-4-sonnet",
+        "claude-4-sonnet",
         # "claude-4.1-opus",
         # "claude-3.5-sonnet",
         # "claude-3.5-sonnet-v2"
@@ -59,7 +59,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "grok-3",
         # "grok-3-mini",
         # "base-claude",
-        "gemini-2.5-flash-lite",
+        # "gemini-2.5-flash-lite",
         # "gemini-2.5-flash",
         # "gemini-2.5-pro",
     ],

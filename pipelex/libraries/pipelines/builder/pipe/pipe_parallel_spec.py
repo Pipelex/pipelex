@@ -18,34 +18,24 @@ class PipeParallelSpec(PipeSpec):
     for independent operations. All parallel pipes receive the same input context
     and their outputs can be combined or kept separate.
 
-    Attributes:
-        the_pipe_code: Pipe code. Must be snake_case.
-        type: Fixed to "PipeParallel" for this pipe type.
-        parallels: List of SubPipeSpec instances to execute concurrently.
-                  All pipes run simultaneously with access to the same input context.
-        add_each_output: Whether to include individual pipe outputs in the combined
-                        result. Default is True. When False, only combined_output is used.
-        combined_output: Optional concept string/code for the combined output structure.
-                        When specified, all parallel outputs are merged into this concept.
-
     Validation Rules:
         1. Parallels list must not be empty.
         2. Each parallel step must be a valid SubPipeSpec.
-        3. combined_output, when specified, must be a valid concept string or code.
-        4. Pipe codes in parallels must reference existing pipes.
+        3. combined_output, when specified, must be a valid ConceptCode in PascalCase.
+        4. Pipe codes in parallels must reference existing pipes (snake_case).
 
     """
 
     type: Literal["PipeParallel"] = "PipeParallel"
     category: Literal["PipeController"] = "PipeController"
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
-    parallels: list[SubPipeSpec]
-    add_each_output: bool = False
-    combined_output: str | None = None
+    parallels: list[SubPipeSpec] = Field(description="List of SubPipeSpec instances to execute concurrently.")
+    add_each_output: bool = Field(description="Whether to include individual pipe outputs in the combined result.")
+    combined_output: str | None = Field(default=None, description="Optional ConceptCode in PascalCasefor the combined output structure.")
 
     @field_validator("combined_output", mode="before")
-    @staticmethod
-    def validate_combined_output(combined_output: str) -> str:
+    @classmethod
+    def validate_combined_output(cls, combined_output: str) -> str:
         if combined_output:
             ConceptSpec.validate_concept_string_or_code(concept_string_or_code=combined_output)
         return combined_output

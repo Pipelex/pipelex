@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.inputs_spec import InputRequirementSpec
+
 from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.libraries.pipelines.builder.pipe.sub_pipe_spec import SubPipeSpec
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -14,7 +14,7 @@ class PipeParallelTestCases:
         PipeParallelSpec(
             the_pipe_code="parallel_processor",
             definition="Run pipes in parallel",
-            inputs={"data": InputRequirementSpec(concept="Data")},
+            inputs={"data": "Data"},
             output="Results",
             parallels=[
                 SubPipeSpec(the_pipe_code="analyze_data", result="analysis"),
@@ -45,7 +45,7 @@ class PipeParallelTestCases:
         PipeParallelSpec(
             the_pipe_code="combined_parallel",
             definition="Parallel with combined output",
-            inputs={"input": InputRequirementSpec(concept="Input")},
+            inputs={"input": "Input"},
             output="CombinedResult",
             parallels=[
                 SubPipeSpec(the_pipe_code="pipe1", result="result1"),
@@ -75,7 +75,7 @@ class PipeParallelTestCases:
         PipeParallelSpec(
             the_pipe_code="combined_parallel",
             definition="Parallel with combined output",
-            inputs={"input": InputRequirementSpec(concept="Input")},
+            inputs={"input": "Input"},
             output="CombinedResult",
             parallels=[
                 SubPipeSpec(the_pipe_code="pipe1", result="result1"),

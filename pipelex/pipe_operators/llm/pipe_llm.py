@@ -388,10 +388,12 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             else:
                 llm_prompt_2_factory = None
 
-            output_structure_prompt: str | None = PipeLLM.get_output_structure_prompt(
-                concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
-                is_with_preliminary_text=is_with_preliminary_text,
-            )
+            output_structure_prompt: str | None = None
+            if get_config().cogt.llm_config.is_structure_prompt_enabled:
+                output_structure_prompt = PipeLLM.get_output_structure_prompt(
+                    concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
+                    is_with_preliminary_text=is_with_preliminary_text,
+                )
             llm_prompt_1_for_object = await self.llm_prompt_spec.make_llm_prompt(
                 output_concept_string=output_concept.concept_string,
                 context_provider=working_memory,
@@ -528,7 +530,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @staticmethod
     def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
-        return None
         concept = get_required_concept(concept_string=concept_string)
         class_name = concept.structure_class_name
         output_class = get_class_registry().get_class(class_name)

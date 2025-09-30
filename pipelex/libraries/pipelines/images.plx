@@ -26,7 +26,6 @@ type = "PipeImgGen"
 definition = "Generate an image"
 inputs = { prompt = "ImgGenPrompt" }
 output = "Image"
-nb_steps = 2
 
 
 [pipe.generate_photo]
@@ -34,5 +33,4 @@ type = "PipeImgGen"
 definition = "Generate a photo"
 inputs = { prompt = "ImgGenPrompt" }
 output = "images.Photo"
-nb_steps = 8
 

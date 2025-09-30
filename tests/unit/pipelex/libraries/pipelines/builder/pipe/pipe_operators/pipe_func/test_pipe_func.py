@@ -3,7 +3,7 @@ import pytest
 from pipelex.libraries.pipelines.builder.pipe.pipe_func_spec import PipeFuncSpec
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 
-from .test_data import PipeFuncTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_operators.pipe_func.test_data import PipeFuncTestCases
 
 
 class TestPipeFuncBlueprintConversion:

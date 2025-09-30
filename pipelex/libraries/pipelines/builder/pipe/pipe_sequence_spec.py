@@ -1,6 +1,7 @@
 from typing import Literal
 
 from pydantic import Field
+from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
@@ -9,30 +10,17 @@ from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequen
 
 
 class PipeSequenceSpec(PipeSpec):
-    """Spec for sequential pipe execution in the Pipelex framework.
-
-    PipeSequence orchestrates the execution of multiple pipes in a defined order,
+    """PipeSequenceSpec orchestrates the execution of multiple pipes in a defined order,
     where each pipe's output can be used as input for subsequent pipes. This enables
     building complex data processing workflows with step-by-step transformations.
-
-    Attributes:
-        the_pipe_code: Pipe code. Must be snake_case.
-        type: Fixed to "PipeSequence" for this pipe type.
-        steps: Ordered list of SubPipeSpec instances referencing the pipes
-              to execute. Each step runs after the previous one completes,
-              with access to all prior outputs in the context.
-
-    Validation Rules:
-        1. Steps list must not be empty.
-        2. Each step must be a valid SubPipeBlueprint instance.
-        3. Pipe codes referenced in steps must exist in the pipeline.
-
     """
 
-    type: Literal["PipeSequence"] = "PipeSequence"
-    category: Literal["PipeController"] = "PipeController"
+    type: SkipJsonSchema[Literal["PipeSequence"]] = "PipeSequence"
+    category: SkipJsonSchema[Literal["PipeController"]] = "PipeController"
     the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
-    steps: list[SubPipeSpec]
+    steps: list[SubPipeSpec] = Field(
+        description=("List of SubPipeSpec instances to execute sequentially. Each step runs after the previous one completes.")
+    )
 
     @override
     def to_blueprint(self) -> PipeSequenceBlueprint:

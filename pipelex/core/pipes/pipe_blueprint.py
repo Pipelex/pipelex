@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.exceptions import PipeBlueprintError
@@ -37,6 +37,7 @@ class AllowedPipeTypes(StrEnum):
 
 
 class PipeBlueprint(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     source: str | None = None
     category: Any
     type: Any  # TODO: Find a better way to handle this.
