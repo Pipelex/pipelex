@@ -6,6 +6,10 @@ class SpecificPipeCodesEnum(StrEnum):
     # TODO: Implement the break pipe: It should enable to leave the current sequence.
     # BREAK = "break"
 
+    @classmethod
+    def value_list(cls) -> list[str]:
+        return list(cls)
+
 
 # TODO: Rethink this class. They are not pipes really.
 class SpecificPipe:

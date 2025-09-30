@@ -5,18 +5,17 @@ from pydantic import field_validator, model_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.assignment_models import Jinja2Assignment
-from pipelex.cogt.content_generation.jinja2_generate import jinja2_gen_text
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum, NativeConceptManager
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_input import PipeInputSpec
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
-from pipelex.core.pipes.specific_pipe import SpecificPipe
+from pipelex.core.pipes.specific_pipe import SpecificPipe, SpecificPipeCodesEnum
 from pipelex.exceptions import (
     DryRunError,
     PipeConditionError,
@@ -27,12 +26,12 @@ from pipelex.exceptions import (
     StaticValidationErrorType,
     WorkingMemoryStuffNotFoundError,
 )
-from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
+from pipelex.hub import get_content_generator, get_pipe_router, get_pipeline_tracker, get_required_pipe, get_template_provider
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 from pipelex.types import Self
@@ -69,7 +68,7 @@ class PipeCondition(PipeController):
                         f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_condition_pipe_map.pipe_code}'"
                     )
                     raise PipeConditionError(msg)
-        if self.default_pipe_code:
+        if self.default_pipe_code and self.default_pipe_code not in SpecificPipeCodesEnum.value_list():
             default_pipe = get_required_pipe(pipe_code=self.default_pipe_code)
             if self.output.concept_string not in (
                 default_pipe.output.concept_string,
@@ -130,12 +129,13 @@ class PipeCondition(PipeController):
         required_variables: set[str] = set()
         # TODO: use jinja2 directly without going though a pipe
         # Variables from the expression/expression_template
-        pipe_compose = PipeComposeFactory.make_pipe_compose_from_template_str(
-            domain=self.domain,
-            template_str=self.applied_expression_template,
-            inputs=self.inputs,
+        expression_required_variables = detect_jinja2_required_variables(
+            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+            template_provider=get_template_provider(),
+            jinja2_name=None,
+            jinja2=self.applied_expression_template,
         )
-        required_variables.update(pipe_compose.required_variables())
+        required_variables.update(expression_required_variables)
 
         # Variables from the pipe_map
         for pipe_code in self.pipe_dependencies():
@@ -164,13 +164,14 @@ class PipeCondition(PipeController):
         needed_inputs = PipeInputSpecFactory.make_empty()
 
         # 1. Add the variables from the expression/expression_template
-        pipe_compose = PipeComposeFactory.make_pipe_compose_from_template_str(
-            domain=self.domain,
-            template_str=self.applied_expression_template,
-            inputs=self.inputs,
+        required_variables = detect_jinja2_required_variables(
+            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+            template_provider=get_template_provider(),
+            jinja2_name=None,
+            jinja2=self.applied_expression_template,
         )
 
-        for var_name in pipe_compose.required_variables():
+        for var_name in required_variables:
             if not var_name.startswith("_"):  # exclude internal variables starting with `_`
                 # We don't know the concept code from just the variable name,
                 # so we'll use a generic placeholder that will be validated later
@@ -259,14 +260,14 @@ class PipeCondition(PipeController):
             for pipe_condition_pipe_map in self.pipe_map
             if not SpecificPipe.is_continue(pipe_condition_pipe_map.pipe_code)
         ]
-        if self.default_pipe_code:
+        if self.default_pipe_code and self.default_pipe_code not in SpecificPipeCodesEnum.value_list():
             pipe_codes.append(self.default_pipe_code)
         return set(pipe_codes)
 
     async def _evaluate_expression_and_select_pipe(
         self,
         working_memory: WorkingMemory,
-    ) -> tuple[str, str]:
+    ) -> PipeAbstract:
         """Evaluate the conditional expression and select the appropriate pipe.
 
         Args:
@@ -278,13 +279,16 @@ class PipeCondition(PipeController):
         Raises:
             PipeConditionError: If expression evaluation fails or no matching pipe is found
         """
+        content_generator = get_content_generator()
         # Evaluate the expression using Jinja2 templating
-        jinja2_assignment = Jinja2Assignment(
+        print("contextttttttojdqosjqjdo", working_memory.generate_jinja2_context())
+
+        evaluated_expression = await content_generator.make_jinja2_text(
             context=working_memory.generate_jinja2_context(),
             jinja2=self.applied_expression_template,
             template_category=Jinja2TemplateCategory.LLM_PROMPT,
         )
-        evaluated_expression = await jinja2_gen_text(jinja2_assignment=jinja2_assignment)
+        print("ojdqosjqjdo", evaluated_expression)
 
         # Validate the evaluated expression
         if not evaluated_expression or evaluated_expression == "None":
@@ -310,7 +314,6 @@ class PipeCondition(PipeController):
             ),
             self.default_pipe_code,
         )
-
         # Validate that a pipe was found
         if not chosen_pipe_code:
             error_msg = f"No pipe code found for evaluated expression '{evaluated_expression}' in pipe {self.code}:"
@@ -318,7 +321,7 @@ class PipeCondition(PipeController):
             error_msg += f"\n\nPipe map: {self.pipe_map}"
             raise PipeConditionError(error_msg)
 
-        return evaluated_expression, chosen_pipe_code
+        return get_required_pipe(pipe_code=chosen_pipe_code)
 
     @override
     async def _run_controller_pipe(
@@ -341,21 +344,20 @@ class PipeCondition(PipeController):
                 multiplicity=requirement.multiplicity,
             )
 
-        # Evaluate expression and select pipe
-        evaluated_expression, chosen_pipe_code = await self._evaluate_expression_and_select_pipe(working_memory=working_memory)
+        chosen_pipe = await self._evaluate_expression_and_select_pipe(working_memory=working_memory)
 
         # Handle continue case
-        if SpecificPipe.is_continue(chosen_pipe_code):
+        if SpecificPipe.is_continue(chosen_pipe.code):
             return PipeOutput(working_memory=working_memory)
 
         # Create condition details for tracking
         condition_details = self._make_pipe_condition_details(
-            evaluated_expression=evaluated_expression,
-            chosen_pipe_code=chosen_pipe_code,
+            evaluated_expression=self.applied_expression_template,
+            chosen_pipe_code=chosen_pipe.code,
         )
 
         # Get required variables and validate they exist in working memory
-        required_variables = get_required_pipe(pipe_code=chosen_pipe_code).required_variables()
+        required_variables = chosen_pipe.required_variables()
         log.debug(required_variables, title=f"Required variables for PipeCondition '{self.code}'")
         required_stuff_names = {required_variable for required_variable in required_variables if not required_variable.startswith("_")}
         try:
@@ -378,10 +380,10 @@ class PipeCondition(PipeController):
             )
 
         # Execute the chosen pipe
-        log.debug(f"Chosen pipe: {chosen_pipe_code}")
+        log.debug(f"Chosen pipe: {chosen_pipe.code}")
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code=chosen_pipe_code),
+                pipe=chosen_pipe,
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
@@ -429,13 +431,12 @@ class PipeCondition(PipeController):
 
         # 2. Validate that the expression template is valid
         try:
-            pipe_compose = PipeComposeFactory.make_pipe_compose_from_template_str(
-                domain=self.domain,
-                template_str=self.applied_expression_template,
-                inputs=self.inputs,
+            required_variables = detect_jinja2_required_variables(
+                template_category=Jinja2TemplateCategory.LLM_PROMPT,
+                template_provider=get_template_provider(),
+                jinja2_name=None,
+                jinja2=self.applied_expression_template,
             )
-            # Get required variables to validate the template syntax
-            required_variables = pipe_compose.required_variables()
             log.debug(f"Expression template is valid, requires variables: {required_variables}")
         except Exception as exc:
             log.error(f"Dry run failed: invalid expression template: {exc}")
@@ -455,6 +456,8 @@ class PipeCondition(PipeController):
 
         missing_pipes: list[str] = []
         for pipe_code in all_pipe_codes:
+            if pipe_code in SpecificPipeCodesEnum.value_list():
+                continue
             try:
                 get_required_pipe(pipe_code=pipe_code)
                 log.debug(f"Pipe '{pipe_code}' exists and is accessible")

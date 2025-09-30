@@ -25,6 +25,7 @@ definition = "Route by signature.type to the correct spec emitter."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "ConceptSpec" }
 output = "Dynamic"
 expression = "pipe_signature.type"
+default_pipe_code = "continue"
 
 [pipe.detail_pipe_spec.pipe_map]
 PipeSequence  = "detail_pipe_sequence"
@@ -33,7 +34,6 @@ PipeCondition = "detail_pipe_condition"
 PipeLLM       = "detail_pipe_llm"
 PipeOcr       = "detail_pipe_ocr"
 PipeImgGen    = "detail_pipe_img_gen"
-# PipeCompose   = "detail_pipe_compose"
 
 # ────────────────────────────────────────────────────────────────────────────────
 # PIPE CONTROLLERS
