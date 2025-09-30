@@ -11,7 +11,6 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -50,6 +49,7 @@ from pipelex.hub import (
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.typing.structure_printer import StructurePrinter
 from pipelex.types import Self
 
@@ -532,8 +532,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     @staticmethod
     async def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
         concept = get_required_concept(concept_string=concept_string)
-        class_name = concept.structure_class_name
-        output_class = get_class_registry().get_class(class_name)
+        output_class = get_class_registry().get_class(concept.structure_class_name)
         log.debug(f"get_output_structure_prompt for {concept_string} with {is_with_preliminary_text=}")
         log.debug(f"output_class: {output_class}")
         if not output_class:
@@ -545,15 +544,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             return None
         class_structure_str = "\n".join(class_structure)
 
-        a =  await get_content_generator().make_jinja2_text(
+        return await get_content_generator().make_jinja2_text(
             context={
                 "class_structure_str": class_structure_str,
             },
             template_category=Jinja2TemplateCategory.LLM_PROMPT,
             jinja2_name="output_structure_prompt" if is_with_preliminary_text else "output_structure_prompt_no_preliminary_text",
         )
-        from pipelex import pretty_print
-        pretty_print(a, "djqdsojo")
-        return a
-        
-
