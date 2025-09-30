@@ -26,6 +26,7 @@
  - Modified `any_env_var_is_placeholder()` to use new placeholder detection logic
  - Updated test environment setup to use dynamic placeholder generation instead of hardcoded values
  - Restructured test classes and methods in environment tests
+ - Remove the use of `PipeCompose` in `PipeCondition`, to only use jinja2 with the `ContentGenerator`
 
 ### Fixed
  - Fixed logic error in `any_env_var_is_placeholder()` function - now correctly returns False when no placeholders are found
