@@ -1,16 +1,13 @@
-
-
-[pipelex]
-[pipelex.observer_config]
+[observer_config]
 observer_dir = "results/observer"
 
-[pipelex.feature_config]
+[feature_config]
 # WIP/Experimental feature flags
 is_pipeline_tracking_enabled = false
 is_activity_tracking_enabled = false
 is_reporting_enabled = true
 
-[pipelex.reporting_config]
+[reporting_config]
 is_log_costs_to_console = false
 is_generate_cost_report_file_enabled = true
 cost_report_dir_path = "reports"
@@ -22,7 +19,7 @@ cost_report_unit_scale = 1.0
 # Log config
 ####################################################################################################
 
-[pipelex.log_config]
+[log_config]
 default_log_level = "INFO"
 
 is_console_logging_enabled = true
@@ -38,7 +35,7 @@ log_mode = "rich"
 poor_loggers = []
 generic_poor_logger = "#poor-log"
 
-[pipelex.log_config.package_log_levels]
+[log_config.package_log_levels]
 # for logger names, the dots "." have been replaced by "-" to avoid toml parsing issues
 # TODO: use quotes to re-enable names with dots
 anthropic = "INFO"
@@ -56,7 +53,7 @@ urllib3-util-retry = "INFO"
 pipelex = "INFO"
 
 
-[pipelex.log_config.rich_log_config]
+[log_config.rich_log_config]
 is_show_time = false
 is_show_level = true
 is_link_path_enabled = true
@@ -68,7 +65,7 @@ is_tracebacks_show_locals = false
 tracebacks_suppress = []
 keywords_to_hilight = []
 
-[pipelex.aws_config]
+[aws_config]
 api_key_method = "env"
 
 ####################################################################################################
@@ -134,16 +131,16 @@ default_page_views_dpi = 72
 # Pipelex prompting config
 ####################################################################################################
 
-[pipelex.prompting_config]
+[prompting_config]
 default_prompting_style = { tag_style = "ticks" }
 
-[pipelex.prompting_config.prompting_styles]
+[prompting_config.prompting_styles]
 openai = { tag_style = "ticks" }
 anthropic = { tag_style = "xml" }
 mistral = { tag_style = "square_brackets" }
 gemini = { tag_style = "xml" }
 
-[pipelex.structure_config]
+[structure_config]
 is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
 
 
@@ -151,9 +148,9 @@ is_default_text_then_structure = false # turn this to true to get better results
 # Pipelex libraries config
 ####################################################################################################
 
-[pipelex.library_config]
+[library_config]
 
-[pipelex.generic_template_names]
+[generic_template_names]
 structure_from_preliminary_text_system = "structure_from_preliminary_text_system"
 structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
 
@@ -161,10 +158,10 @@ structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
 # Static validation config
 ####################################################################################################
 
-[pipelex.static_validation_config]
+[static_validation_config]
 default_reaction = "raise"
 
-[pipelex.static_validation_config.reactions]
+[static_validation_config.reactions]
 # default_reaction is on raise
 # missing_input_variable = "log"
 # extraneous_input_variable = "log"
@@ -174,7 +171,7 @@ default_reaction = "raise"
 # History graph config
 ####################################################################################################
 
-[pipelex.tracker_config]
+[tracker_config]
 is_debug_mode = false
 is_include_text_preview = false
 is_include_interactivity = false
@@ -195,14 +192,14 @@ choice_edge_style = "-----"
 # Pipelex run config
 ####################################################################################################
 
-[pipelex.pipe_run_config]
+[pipe_run_config]
 pipe_stack_limit = 20
 
 ####################################################################################################
 # Dry run config
 ####################################################################################################
 
-[pipelex.dry_run_config]
+[dry_run_config]
 apply_to_jinja2_rendering = false
 text_gen_truncate_length = 256
 nb_list_items = 3
@@ -223,18 +220,18 @@ image_urls = [
 # PLX config
 ####################################################################################################
 
-[pipelex.plx_config.inline_tables]
+[plx_config.inline_tables]
 spaces_inside_curly_braces = true
 
-[pipelex.plx_config.strings]
+[plx_config.strings]
 prefer_literal = false
 force_multiline = false
 length_limit_to_multiline = 100
 ensure_trailing_newline = true
 ensure_leading_blank_line = true
 
-[pipelex.plx_config.concepts]
+[plx_config.concepts]
 structure_field_ordering = ["type", "definition", "choices", "required"]
 
-[pipelex.plx_config.pipes]
+[plx_config.pipes]
 field_ordering = ["type", "definition", "inputs", "output"]

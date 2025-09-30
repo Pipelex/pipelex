@@ -1,0 +1,19 @@
+# To learn more about the configuration, please refer to the documentation:
+# https://docs.pipelex.com/pages/configuration/
+
+[observer_config]
+observer_dir = "results/observer"
+
+[feature_config]
+is_pipeline_tracking_enabled = false
+is_activity_tracking_enabled = false
+is_reporting_enabled = true
+
+[log_config.package_log_levels]
+pipelex = "INFO"
+
+[pipe_run_config]
+pipe_stack_limit = 20
+
+[cogt.llm_config]
+is_structure_prompt_enabled = true

@@ -53,8 +53,8 @@ class DryRunConfig(ConfigModel):
     allowed_to_fail_pipes: list[str] = Field(default_factory=list)
 
     @field_validator("image_urls", mode="before")
-    @staticmethod
-    def validate_image_urls(value: list[str]) -> list[str]:
+    @classmethod
+    def validate_image_urls(cls, value: list[str]) -> list[str]:
         if not value:
             msg = "dry_run_config.image_urls must be a non-empty list"
             raise PipelexConfigError(msg)

@@ -1,22 +1,17 @@
-import importlib
 import os
-from configparser import ConfigParser
 from typing import Any
 
-import toml
-
-from pipelex.tools.config.config_root import (
-    CONFIG_BASE_OVERRIDES_AFTER_ENV,
-    CONFIG_BASE_OVERRIDES_BEFORE_ENV,
-)
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
 from pipelex.tools.runtime_manager import runtime_manager
 
 CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
-CONFIG_TEMPLATE_SUBPATH = "config_template"
+CONFIG_TEMPLATE_PATH = "pipelex/tools/config/template"
 INFERENCE_CONFIG_SUBPATH = "inference"
+
+CONFIG_BASE_OVERRIDES_BEFORE_ENV = ["local"]
+CONFIG_BASE_OVERRIDES_AFTER_ENV = ["super"]
 
 
 class ConfigError(Exception):
@@ -78,38 +73,6 @@ class ConfigManager:
         print(f"Getting local config from {config_path}")
         return load_toml_from_path_if_exists(config_path) or {}
 
-    def load_inheritance_config(self, the_pipelex_config: dict[str, Any]):
-        """Load the config by inheritance in a pyproject.toml file.
-        This will be removed in the future.
-        Requires to have a pyproject.toml file in the project root.
-        """
-        pyproject_path = os.path.join(self.local_root_dir, "pyproject.toml")
-        if not os.path.exists(pyproject_path):
-            print(f"pyproject.toml not found in {self.local_root_dir}")
-            return
-
-        def _find_package_path(package_name: str) -> str | None:
-            """Find package path by importing it"""
-            try:
-                module = importlib.import_module(package_name)
-                if hasattr(module, "__file__") and module.__file__:
-                    return os.path.dirname(module.__file__)
-            except ImportError:
-                pass
-
-            return None
-
-        pyproject = toml.load(pyproject_path)
-        if "tool" in pyproject and "pipelex" in pyproject["tool"] and "config_inheritance" in pyproject["tool"]["pipelex"]:
-            for config_name in pyproject["tool"]["pipelex"]["config_inheritance"]:
-                package_path = _find_package_path(config_name)
-                if package_path:
-                    config_path = os.path.join(package_path, "pipelex.toml")
-                    if os.path.exists(config_path):
-                        config = load_toml_from_path_if_exists(config_path)
-                        if config:
-                            deep_update(the_pipelex_config, config)
-
     def load_config(self, specific_config_path: str | None = None) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
 
@@ -127,10 +90,6 @@ class ConfigManager:
         """
         #################### 1. Load pipelex config ####################
         pipelex_config = self.get_pipelex_config()
-
-        #################### 2. Load inheritance config for internal use ####################
-        # TODO: Undocumented feature, soon to be removed.
-        self.load_inheritance_config(pipelex_config)
 
         #################### 3. Load local (current project) config ####################
         if not self.is_in_pipelex_config:
@@ -164,81 +123,6 @@ class ConfigManager:
                 raise ConfigError(msg)
 
         return pipelex_config
-
-    def get_project_name(self) -> str | None:
-        """Get the project name from configuration files.
-
-        Checks the following files in order:
-        1. pipelex's pyproject.toml
-        2. Local pyproject.toml
-        3. setup.cfg
-        4. setup.py
-
-        Returns:
-            str | None: The project name or None if not found
-
-        """
-        # First check pipelex's pyproject.toml
-        pipelex_pyproject_path = os.path.join(os.path.dirname(self.local_root_dir), "pyproject.toml")
-        try:
-            pyproject = toml.load(pipelex_pyproject_path)
-            if (project_name := pyproject.get("project", {}).get("name")) and isinstance(project_name, str):
-                return str(project_name)
-        except FileNotFoundError:
-            pass
-        except toml.TomlDecodeError as exc:
-            print(f"Failed to parse pipelex pyproject.toml at {pipelex_pyproject_path}: {exc}")
-        except (KeyError, TypeError, AttributeError) as exc:
-            print(f"Invalid structure in pipelex pyproject.toml at {pipelex_pyproject_path}: {exc}")
-
-        # Check local pyproject.toml
-        pyproject_path = os.path.join(self.local_root_dir, "pyproject.toml")
-        try:
-            pyproject = toml.load(pyproject_path)
-            name_obj: object = pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name")
-            if isinstance(name_obj, str):
-                return name_obj
-        except FileNotFoundError as exc:
-            print(f"Local pyproject.toml not found at {pyproject_path}: {exc}")
-        except toml.TomlDecodeError as exc:
-            print(f"Failed to parse local pyproject.toml at {pyproject_path}: {exc}")
-        except (KeyError, TypeError, AttributeError) as exc:
-            print(f"Invalid structure in local pyproject.toml at {pyproject_path}: {exc}")
-
-        # Check setup.cfg
-        setup_cfg_path = os.path.join(self.local_root_dir, "setup.cfg")
-        try:
-            config = ConfigParser()
-            config.read(setup_cfg_path)
-            if (cfg_name := config.get("metadata", "name", fallback=None)) and config.has_section("metadata"):
-                return cfg_name
-        except FileNotFoundError as exc:
-            print(f"setup.cfg not found at {setup_cfg_path}: {exc}")
-        except (ValueError, OSError) as exc:
-            print(f"Failed to parse setup.cfg at {setup_cfg_path}: {exc}")
-
-        # Check setup.py as last resort
-        setup_py_path = os.path.join(self.local_root_dir, "setup.py")
-        try:
-            with open(setup_py_path) as f:
-                content = f.read()
-                # Simple string search for name parameter
-                for line in content.splitlines():
-                    if "name=" in line or "name =" in line:
-                        # Extract value between quotes
-                        for quote in ['"', "'"]:
-                            start = line.find(quote)
-                            if start != -1:
-                                end = line.find(quote, start + 1)
-                                if end != -1:
-                                    return line[start + 1 : end]
-        except FileNotFoundError as exc:
-            print(f"setup.py not found at {setup_py_path}: {exc}")
-        except (OSError, UnicodeDecodeError) as exc:
-            print(f"Failed to read setup.py at {setup_py_path}: {exc}")
-
-        print("Could not find project name in any of the configuration files")
-        return None
 
 
 config_manager = ConfigManager()

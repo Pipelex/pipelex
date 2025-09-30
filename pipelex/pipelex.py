@@ -87,7 +87,7 @@ class Pipelex(metaclass=MetaSingleton):
             raise PipelexConfigError(msg) from exc
 
         log.configure(
-            project_name=get_pipelex_config().project_name or "unknown_project",
+            project_name="pipelex",
             log_config=get_pipelex_config().log_config,
         )
         log.debug("Logs are configured")
@@ -211,7 +211,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipeline_tracker.setup()
         self.pipeline_manager.setup()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_pipelex_config().project_name}")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
     def setup_libraries(self):
         try:
@@ -222,7 +222,7 @@ class Pipelex(metaclass=MetaSingleton):
             formatted_error_msg = format_pydantic_validation_error(exc)
             msg = f"Could not setup libraries because of: {formatted_error_msg}"
             raise PipelexSetupError(msg) from exc
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_pipelex_config().project_name}")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done")
 
     def validate_libraries(self):
         try:
@@ -231,7 +231,7 @@ class Pipelex(metaclass=MetaSingleton):
             formatted_error_msg = format_pydantic_validation_error(exc)
             msg = f"Could not validate libraries because of: {formatted_error_msg}"
             raise PipelexSetupError(msg) from exc
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_pipelex_config().project_name}")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done")
 
     def teardown(self):
         # pipelex
@@ -251,7 +251,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.class_registry.teardown()
         func_registry.teardown()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_pipelex_config().project_name} (except config & logs)")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         self.pipelex_hub.reset_config()
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:

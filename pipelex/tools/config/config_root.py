@@ -7,9 +7,6 @@ from pipelex.tools.exceptions import ConfigValidationError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import StrEnum
 
-CONFIG_BASE_OVERRIDES_BEFORE_ENV = ["local"]
-CONFIG_BASE_OVERRIDES_AFTER_ENV = ["super"]
-
 
 class SecretMethod(StrEnum):
     NONE = "none"
@@ -18,14 +15,7 @@ class SecretMethod(StrEnum):
 
 
 class ConfigRoot(ConfigModel):
-    """Main configuration class for the project.
-
-    Attributes:
-        project_name (str): Name of the current project.
-
-    """
-
-    project_name: str | None = None
+    """Main configuration class for the project."""
 
     def __init__(self, **kwargs: Any):
         """Initialize the Config instance.
