@@ -49,6 +49,7 @@ from pipelex.hub import (
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.typing.structure_printer import StructurePrinter
 from pipelex.types import Self
 
@@ -390,7 +391,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
             output_structure_prompt: str | None = None
             if get_config().cogt.llm_config.is_structure_prompt_enabled:
-                output_structure_prompt = PipeLLM.get_output_structure_prompt(
+                output_structure_prompt = await PipeLLM.get_output_structure_prompt(
                     concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
                     is_with_preliminary_text=is_with_preliminary_text,
                 )
@@ -529,10 +530,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         )
 
     @staticmethod
-    def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
+    async def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
         concept = get_required_concept(concept_string=concept_string)
-        class_name = concept.structure_class_name
-        output_class = get_class_registry().get_class(class_name)
+        output_class = get_class_registry().get_class(concept.structure_class_name)
         log.debug(f"get_output_structure_prompt for {concept_string} with {is_with_preliminary_text=}")
         log.debug(f"output_class: {output_class}")
         if not output_class:
@@ -544,27 +544,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             return None
         class_structure_str = "\n".join(class_structure)
 
-        # TODO: use proper prompt templating for this
-        if is_with_preliminary_text:
-            output_structure_prompt = f"""
-
----
-The instance we want to generate will be for the following class:
-{class_structure_str}
-
-Don't bother with JSON formatting, we'll do that as a second step.
-For now, just output markdown with the details of the instance.
-DO NOT create information.
-If some information is not present for an attribute, output the default value or None according to the attribute definition.
-"""
-        else:
-            output_structure_prompt = f"""
-
----
-The instance we want to generate will be for the following class:
-{class_structure_str}
-
-DO NOT create information.
-If some information is not present for an attribute, output the default value or None according to the attribute definition.
-"""
-        return output_structure_prompt
+        return await get_content_generator().make_jinja2_text(
+            context={
+                "class_structure_str": class_structure_str,
+            },
+            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+            jinja2_name="output_structure_prompt" if is_with_preliminary_text else "output_structure_prompt_no_preliminary_text",
+        )
