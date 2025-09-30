@@ -6,8 +6,8 @@ observer_dir = "results/observer"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags
-is_pipeline_tracking_enabled = true
-is_activity_tracking_enabled = true
+is_pipeline_tracking_enabled = false
+is_activity_tracking_enabled = false
 is_reporting_enabled = true
 
 [pipelex.reporting_config]
