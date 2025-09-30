@@ -12,12 +12,14 @@ from pipelex.config import get_config
 from pipelex.hub import get_template
 from pipelex.tools.misc.string_utils import is_none_or_has_text
 
+
 def make_empty_prompt() -> LLMPrompt:
     return LLMPrompt(
         system_text=None,
         user_text=None,
         user_images=[],
     )
+
 
 class LLMPromptTemplate(LLMPromptFactoryAbstract):
     proto_prompt: LLMPrompt = make_empty_prompt()

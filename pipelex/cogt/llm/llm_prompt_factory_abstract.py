@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 
+
 class LLMPromptFactoryAbstract(ABC, BaseModel):
     @abstractmethod
     async def make_llm_prompt_from_args(
