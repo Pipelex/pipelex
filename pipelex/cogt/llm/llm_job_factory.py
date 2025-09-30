@@ -7,7 +7,7 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 
 
@@ -21,7 +21,7 @@ class LLMJobFactory:
         llm_job_config: LLMJobConfig | None = None,
         job_metadata: JobMetadata | None = None,
     ) -> LLMJob:
-        config = get_config()
+        config = get_pipelex_config()
         llm_config = config.cogt.llm_config
         if job_metadata:
             job_metadata.update(
@@ -94,7 +94,7 @@ class LLMJobFactory:
         llm_job_config: LLMJobConfig | None = None,
         job_metadata: JobMetadata | None = None,
     ) -> LLMJob:
-        config = get_config()
+        config = get_pipelex_config()
         llm_config = config.cogt.llm_config
         if job_metadata:
             job_metadata.update(

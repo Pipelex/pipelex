@@ -5,18 +5,18 @@ from pipelex.cogt.exceptions import ImgGenGeneratedTypeError, ImgGenParameterErr
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat, Quality
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 
 
 class FalFactory:
     @classmethod
     def make_nb_steps_from_quality_for_flux_pro(cls, quality: Quality) -> int:
-        flux_map_quality_to_steps = get_config().cogt.img_gen_config.fal_config.flux_map_quality_to_steps
+        flux_map_quality_to_steps = get_pipelex_config().cogt.img_gen_config.fal_config.flux_map_quality_to_steps
         return flux_map_quality_to_steps[quality]
 
     @classmethod
     def make_nb_steps_from_quality_for_sdxl_lightning(cls, quality: Quality) -> int:
-        sdxl_lightning_map_quality_to_steps = get_config().cogt.img_gen_config.fal_config.sdxl_lightning_map_quality_to_steps
+        sdxl_lightning_map_quality_to_steps = get_pipelex_config().cogt.img_gen_config.fal_config.sdxl_lightning_map_quality_to_steps
         return sdxl_lightning_map_quality_to_steps[quality]
 
     @classmethod

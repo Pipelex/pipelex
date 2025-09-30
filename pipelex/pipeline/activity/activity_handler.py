@@ -2,7 +2,7 @@ import os
 from typing import cast
 
 from pipelex import log
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import (
     HtmlContent,
@@ -25,7 +25,7 @@ class ActivityHandlerForResultFiles:
         self.result_dir_path = result_dir_path
         self.images_dir_path = os.path.join(result_dir_path, "images")
         ensure_path(self.images_dir_path)
-        img_gen_config = get_config().cogt.img_gen_config
+        img_gen_config = get_pipelex_config().cogt.img_gen_config
         img_gen_param_defaults = img_gen_config.img_gen_param_defaults
         self.image_output_format = img_gen_param_defaults.output_format
         self.already_handled_stuff: set[str] = set()

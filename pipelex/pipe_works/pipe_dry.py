@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pydantic import BaseModel
 
 from pipelex import log
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_input import PipeInputSpec, TypedNamedInputRequirement
@@ -47,7 +47,7 @@ class DryRunOutput(BaseModel):
 
 async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> DryRunOutput:
     """Dry run a single pipe directly without parallelization."""
-    allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
+    allowed_to_fail_pipes = get_pipelex_config().dry_run_config.allowed_to_fail_pipes
     # TODO: fail and raise properly
     try:
         needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
@@ -97,7 +97,7 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
     """
     start_time = time.time()
     results: dict[str, DryRunOutput] = {}
-    allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
+    allowed_to_fail_pipes = get_pipelex_config().dry_run_config.allowed_to_fail_pipes
 
     if run_in_parallel:
 

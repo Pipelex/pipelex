@@ -7,7 +7,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
@@ -170,7 +170,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         output_name: str | None = None,
     ) -> PipeComposeOutput:
         content_generator_used: ContentGeneratorProtocol
-        if get_config().pipelex.dry_run_config.apply_to_jinja2_rendering:
+        if get_pipelex_config().dry_run_config.apply_to_jinja2_rendering:
             log.debug(f"PipeCompose: using dry run operator pipe for jinja2 rendering: {self.code}")
             content_generator_used = ContentGeneratorDry()
         else:

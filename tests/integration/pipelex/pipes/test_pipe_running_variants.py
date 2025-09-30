@@ -5,7 +5,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -120,7 +120,7 @@ class TestPipeRunningVariants:
         exception: type[Exception],
         expected_error_message: str,
     ):
-        failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
+        failing_pipelines_file_paths = get_pipelex_config().library_config.failing_pipelines_file_paths
         library_manager = get_library_manager()
         library_manager.load_libraries(
             library_file_paths=[Path(failing_pipeline_file_path) for failing_pipeline_file_path in failing_pipelines_file_paths],

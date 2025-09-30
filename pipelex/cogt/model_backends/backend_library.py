@@ -12,7 +12,7 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.runtime_manager import runtime_manager
@@ -36,7 +36,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         return cls(root={})
 
     def load(self):
-        backends_library_path = get_config().cogt.inference_config.backends_library_path
+        backends_library_path = get_pipelex_config().cogt.inference_config.backends_library_path
         try:
             backends_dict = load_toml_from_path(path=backends_library_path)
         except (FileNotFoundError, InferenceBackendLibraryError) as exc:
@@ -89,7 +89,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     extra_config[key] = inference_backend_blueprint_dict.pop(key)
             backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
 
-            path_to_model_specs_toml = get_config().cogt.inference_config.model_specs_path(backend_name=backend_name)
+            path_to_model_specs_toml = get_pipelex_config().cogt.inference_config.model_specs_path(backend_name=backend_name)
             try:
                 model_specs_dict_raw = load_toml_from_path(
                     path=path_to_model_specs_toml,

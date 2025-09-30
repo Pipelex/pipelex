@@ -27,7 +27,7 @@ class LLMPromptTemplateInputs(RootModel[LLMPromptTemplateInputsDict]):
     @model_validator(mode="after")
     def validate_template_inputs(self) -> Self:
         if not self.root:
-            # It's important to exit this func before calling get_config() because empty template inputs
+            # It's important to exit this func before calling get_pipelex_config() because empty template inputs
             # are created during imports (before Pipelex is fully initialized)
             return self
         template_inputs_reaction = runtime_manager.problem_reactions.template_inputs

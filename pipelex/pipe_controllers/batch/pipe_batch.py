@@ -6,7 +6,7 @@ from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.pipe_input import PipeInputSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -117,7 +117,7 @@ class PipeBatch(PipeController):
 
         # TODO: Make commented code work when inputing images named "a.b.c"
         sub_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
-        nb_history_items_limit = get_config().pipelex.tracker_config.applied_nb_items_limit
+        nb_history_items_limit = get_pipelex_config().tracker_config.applied_nb_items_limit
         batch_output_stuff_code = shortuuid.uuid()
         tasks: list[Coroutine[Any, Any, PipeOutput]] = []
         item_stuffs: list[Stuff] = []

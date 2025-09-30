@@ -27,7 +27,7 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
@@ -204,7 +204,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> GeneratedImage:
-        img_gen_config = get_config().cogt.img_gen_config
+        img_gen_config = get_pipelex_config().cogt.img_gen_config
         img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
             img_gen_handle=img_gen_handle,
@@ -228,7 +228,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> list[GeneratedImage]:
-        img_gen_config = get_config().cogt.img_gen_config
+        img_gen_config = get_pipelex_config().cogt.img_gen_config
         img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
             img_gen_handle=img_gen_handle,

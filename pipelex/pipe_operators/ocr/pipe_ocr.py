@@ -10,7 +10,7 @@ from pipelex.cogt.models.model_deck_check import check_ocr_choice_with_deck
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
-from pipelex.config import StaticValidationReaction, get_config
+from pipelex.config import StaticValidationReaction, get_pipelex_config
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input import PipeInputSpec
@@ -72,7 +72,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()
-        static_validation_config = get_config().pipelex.static_validation_config
+        static_validation_config = get_pipelex_config().static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
 

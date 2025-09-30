@@ -1,6 +1,6 @@
 from typing import Any
 
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
 
 
@@ -15,7 +15,7 @@ class PipeRunParamsFactory:
         batch_params: BatchParams | None = None,
         params: dict[str, Any] | None = None,
     ) -> PipeRunParams:
-        pipe_stack_limit = pipe_stack_limit or get_config().pipelex.pipe_run_config.pipe_stack_limit
+        pipe_stack_limit = pipe_stack_limit or get_pipelex_config().pipe_run_config.pipe_stack_limit
         return PipeRunParams(
             run_mode=pipe_run_mode,
             pipe_stack_limit=pipe_stack_limit,

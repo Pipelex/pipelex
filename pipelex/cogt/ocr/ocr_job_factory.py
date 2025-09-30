@@ -14,7 +14,7 @@ class OcrJobFactory:
         job_metadata: JobMetadata | None = None,
     ) -> OcrJob:
         # TODO: manage the param default through the config
-        # ocr_config = get_config().cogt.ocr_config
+        # ocr_config = get_pipelex_config().cogt.ocr_config
         job_metadata = job_metadata or JobMetadata(
             job_category=JobCategory.OCR_JOB,
         )

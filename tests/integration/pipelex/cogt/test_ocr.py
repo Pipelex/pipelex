@@ -4,7 +4,7 @@ from pipelex import pretty_print
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobParams
 from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.hub import get_ocr_worker
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from tests.cases import ImageTestCases, PDFTestCases
@@ -78,5 +78,5 @@ class TestOcr:
         )
         ocr_output.save_to_directory(
             directory=directory,
-            page_text_file_name=get_config().cogt.ocr_config.page_output_text_file_name,
+            page_text_file_name=get_pipelex_config().cogt.ocr_config.page_output_text_file_name,
         )

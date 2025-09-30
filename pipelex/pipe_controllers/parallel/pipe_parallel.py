@@ -5,7 +5,7 @@ from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import StaticValidationReaction, get_config
+from pipelex.config import StaticValidationReaction, get_pipelex_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_input import PipeInputSpec
@@ -85,7 +85,7 @@ class PipeParallel(PipeController):
 
     def _validate_inputs(self):
         """Validate that the inputs declared for this PipeParallel match what is actually needed."""
-        static_validation_config = get_config().pipelex.static_validation_config
+        static_validation_config = get_pipelex_config().static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
 

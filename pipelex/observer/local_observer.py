@@ -3,13 +3,13 @@ import os
 import kajson
 from typing_extensions import override
 
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
 
 
 class LocalObserver(ObserverProtocol):
     def __init__(self, storage_dir: str | None = None) -> None:
-        self.storage_dir = storage_dir or get_config().pipelex.observer_config.observer_dir
+        self.storage_dir = storage_dir or get_pipelex_config().observer_config.observer_dir
         os.makedirs(self.storage_dir, exist_ok=True)
 
     def _write_to_jsonl(self, event_type: str, payload: PayloadType) -> None:

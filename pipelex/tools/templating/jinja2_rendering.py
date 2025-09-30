@@ -89,11 +89,11 @@ async def render_jinja2(
         )
 
     # TODO: restore preferences using templating manager
-    # if get_config().pipelex.preferences.is_include_prefs_in_jinja2_context:
+    # if get_pipelex_config().preferences.is_include_prefs_in_jinja2_context:
     #     _add_to_templating_context(
     #         temlating_context=temlating_context,
     #         jinja2_context_key=Jinja2ContextKey.PREFERENCES,
-    #         value=get_config().pipelex.preferences,
+    #         value=get_pipelex_config().preferences,
     #     )
 
     try:

@@ -14,7 +14,7 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
@@ -28,7 +28,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @property
     def _text_gen_truncate_length(self) -> int:
-        return get_config().pipelex.dry_run_config.text_gen_truncate_length
+        return get_pipelex_config().dry_run_config.text_gen_truncate_length
 
     @override
     @update_job_metadata
@@ -100,7 +100,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> list[BaseModelTypeVar]:
         func_name = "make_object_list_direct"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        nb_list_items = nb_items or get_config().pipelex.dry_run_config.nb_list_items
+        nb_list_items = nb_items or get_pipelex_config().dry_run_config.nb_list_items
         return [
             await self.make_object_direct(
                 job_metadata=job_metadata,
@@ -145,7 +145,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> GeneratedImage:
         func_name = "make_single_image"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        image_urls = get_config().pipelex.dry_run_config.image_urls
+        image_urls = get_pipelex_config().dry_run_config.image_urls
         image_url = image_urls[0]
         return GeneratedImage(
             url=image_url,
@@ -166,7 +166,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> list[GeneratedImage]:
         func_name = "make_image_list"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        image_urls = get_config().pipelex.dry_run_config.image_urls
+        image_urls = get_pipelex_config().dry_run_config.image_urls
         return [
             GeneratedImage(
                 url=image_urls[image_index % len(image_urls)],
@@ -215,7 +215,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                 pages={1: ocr_image_as_page},
             )
         else:
-            nb_pages = get_config().pipelex.dry_run_config.nb_ocr_pages
+            nb_pages = get_pipelex_config().dry_run_config.nb_ocr_pages
             pages = {
                 page_index: Page(
                     text="DRY RUN: OCR text",

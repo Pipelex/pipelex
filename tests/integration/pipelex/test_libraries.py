@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex import pretty_print
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.libraries.library_manager_factory import LibraryManagerFactory
@@ -90,7 +90,7 @@ class TestLibraries:
         known_pipe: str,
     ):
         library_manager = LibraryManagerFactory.make_empty(config_dir_path="pipelex/libraries")
-        test_pipelines_dir = [Path(get_config().pipelex.library_config.test_pipelines_dir_path)]
+        test_pipelines_dir = [Path(get_pipelex_config().library_config.test_pipelines_dir_path)]
         library_manager.load_libraries(library_dirs=test_pipelines_dir)
         # Verify that libraries were loaded
         assert len(library_manager.concept_library.root) > 0, "No concepts were loaded"

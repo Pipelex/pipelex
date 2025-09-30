@@ -8,7 +8,7 @@ from pipelex.cogt.model_routing.routing_profile_factory import (
     RoutingProfileFactory,
     RoutingProfileLibraryBlueprint,
 )
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path
 from pipelex.types import Self
 
@@ -40,7 +40,7 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
 
     def load(self) -> None:
         """Load the routing profile library configuration from TOML file."""
-        routing_profile_library_path = get_config().cogt.inference_config.routing_profile_library_path
+        routing_profile_library_path = get_pipelex_config().cogt.inference_config.routing_profile_library_path
 
         try:
             catalog_dict = load_toml_from_path(path=routing_profile_library_path)

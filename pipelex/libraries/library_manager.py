@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -236,7 +236,7 @@ class LibraryManager(LibraryManagerAbstract):
         else:
             all_plx_paths: list[Path] = self._get_pipelex_plx_files_from_dirs(dirs_to_use)
             # Remove failing pipelines from the list
-            failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
+            failing_pipelines_file_paths = get_pipelex_config().library_config.failing_pipelines_file_paths
             valid_plx_paths = [path for path in all_plx_paths if path not in failing_pipelines_file_paths]
 
         # Register classes in the directories

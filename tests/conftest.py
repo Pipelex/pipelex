@@ -5,7 +5,7 @@ from rich.traceback import Traceback
 import pipelex.config
 import pipelex.pipelex
 from pipelex import log
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.hub import get_concept_provider, get_report_delegate
 from tests.cases.registry import Fruit
@@ -23,7 +23,7 @@ def reset_pipelex_config_fixture():
     Console().print("[magenta]pipelex setup[/magenta]")
     try:
         pipelex_instance = pipelex.pipelex.Pipelex.make(relative_config_folder_path="../pipelex/libraries")
-        config = get_config()
+        config = get_pipelex_config()
         log.verbose(config, title="Test config")
         assert isinstance(config, pipelex.config.PipelexConfig)
         assert config.project_name == "pipelex"

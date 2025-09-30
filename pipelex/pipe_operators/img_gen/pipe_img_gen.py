@@ -10,7 +10,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background,
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
-from pipelex.config import StaticValidationReaction, get_config
+from pipelex.config import StaticValidationReaction, get_pipelex_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -134,7 +134,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()
-        static_validation_config = get_config().pipelex.static_validation_config
+        static_validation_config = get_pipelex_config().static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
         # check that we have either an img_gen_prompt passed as attribute or as a single text input
@@ -232,7 +232,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             msg = "You must provide an image gen prompt either as attribute of the pipe or as a single text input"
             raise UnexpectedPipeDefinitionError(msg)
 
-        img_gen_config = get_config().cogt.img_gen_config
+        img_gen_config = get_pipelex_config().cogt.img_gen_config
         img_gen_param_defaults = img_gen_config.img_gen_param_defaults
         model_deck = get_model_deck()
 

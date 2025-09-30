@@ -7,7 +7,7 @@ from tomlkit import array, document, inline_table, table
 from tomlkit import string as tomlkit_string
 
 from pipelex import log
-from pipelex.config import PlxConfig, get_config
+from pipelex.config import PlxConfig, get_pipelex_config
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 from pipelex.types import StrEnum
 
@@ -26,7 +26,7 @@ CONCEPT_STRUCTURE_FIELD_KEY = "structure"
 class PlxFactory:
     @classmethod
     def _plx_config(cls) -> PlxConfig:
-        return get_config().pipelex.plx_config
+        return get_pipelex_config().plx_config
 
     @classmethod
     def format_tomlkit_string(cls, text: str) -> Any:  # Can't type this because of tomlkit

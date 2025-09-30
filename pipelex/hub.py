@@ -177,7 +177,7 @@ class PipelexHub:
 
     def get_required_config(self) -> ConfigRoot:
         """Get the current configuration instance as an instance of a particular subclass of ConfigRoot. This should be used only from pipelex.tools.
-            when getting the config from other projects, use their own project.get_config() method to get the Config
+            when getting the config from other projects, use their own project.get_pipelex_config() method to get the Config
             with the proper subclass which is required for proper type checking.
 
         Returns:

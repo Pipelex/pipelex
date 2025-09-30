@@ -1,6 +1,5 @@
 from typing import cast
 
-import shortuuid
 from pydantic import Field, field_validator
 
 from pipelex.cogt.config_cogt import Cogt
@@ -100,7 +99,8 @@ class ObserverConfig(ConfigModel):
     observer_dir: str
 
 
-class Pipelex(ConfigModel):
+class PipelexConfig(ConfigRoot):
+    cogt: Cogt
     feature_config: FeatureConfig
     log_config: LogConfig
     aws_config: AwsConfig
@@ -119,13 +119,7 @@ class Pipelex(ConfigModel):
     observer_config: ObserverConfig
 
 
-class PipelexConfig(ConfigRoot):
-    session_id: str = shortuuid.uuid()
-    cogt: Cogt
-    pipelex: Pipelex
-
-
-def get_config() -> PipelexConfig:
+def get_pipelex_config() -> PipelexConfig:
     singleton_config = get_required_config()
     if not isinstance(singleton_config, PipelexConfig):
         msg = f"Expected {PipelexConfig}, but got {type(singleton_config)}"

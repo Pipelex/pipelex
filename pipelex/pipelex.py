@@ -18,7 +18,7 @@ from pipelex.cogt.exceptions import InferenceBackendCredentialsError, RoutingPro
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.config import PipelexConfig, get_config
+from pipelex.config import PipelexConfig, get_pipelex_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
@@ -87,8 +87,8 @@ class Pipelex(metaclass=MetaSingleton):
             raise PipelexConfigError(msg) from exc
 
         log.configure(
-            project_name=get_config().project_name or "unknown_project",
-            log_config=get_config().pipelex.log_config,
+            project_name=get_pipelex_config().project_name or "unknown_project",
+            log_config=get_pipelex_config().log_config,
         )
         log.debug("Logs are configured")
 
@@ -111,8 +111,8 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
         self.reporting_delegate: ReportingProtocol
-        if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager(reporting_config=get_config().pipelex.reporting_config)
+        if get_pipelex_config().feature_config.is_reporting_enabled:
+            self.reporting_delegate = reporting_delegate or ReportingManager(reporting_config=get_pipelex_config().reporting_config)
         else:
             self.reporting_delegate = ReportingNoOp()
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
@@ -137,8 +137,8 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipeline_tracker: PipelineTrackerProtocol
         if pipeline_tracker:
             self.pipeline_tracker = pipeline_tracker
-        elif get_config().pipelex.feature_config.is_pipeline_tracking_enabled:
-            self.pipeline_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
+        elif get_pipelex_config().feature_config.is_pipeline_tracking_enabled:
+            self.pipeline_tracker = PipelineTracker(tracker_config=get_pipelex_config().tracker_config)
         else:
             self.pipeline_tracker = PipelineTrackerNoOp()
         self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
@@ -148,7 +148,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.activity_manager: ActivityManagerProtocol
         if activity_manager:
             self.activity_manager = activity_manager
-        elif get_config().pipelex.feature_config.is_activity_tracking_enabled:
+        elif get_pipelex_config().feature_config.is_activity_tracking_enabled:
             self.activity_manager = ActivityManager()
         else:
             self.activity_manager = ActivityManagerNoOp()
@@ -211,7 +211,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipeline_tracker.setup()
         self.pipeline_manager.setup()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_pipelex_config().project_name}")
 
     def setup_libraries(self):
         try:
@@ -222,7 +222,7 @@ class Pipelex(metaclass=MetaSingleton):
             formatted_error_msg = format_pydantic_validation_error(exc)
             msg = f"Could not setup libraries because of: {formatted_error_msg}"
             raise PipelexSetupError(msg) from exc
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_config().project_name}")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_pipelex_config().project_name}")
 
     def validate_libraries(self):
         try:
@@ -231,7 +231,7 @@ class Pipelex(metaclass=MetaSingleton):
             formatted_error_msg = format_pydantic_validation_error(exc)
             msg = f"Could not validate libraries because of: {formatted_error_msg}"
             raise PipelexSetupError(msg) from exc
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_config().project_name}")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_pipelex_config().project_name}")
 
     def teardown(self):
         # pipelex
@@ -251,7 +251,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.class_registry.teardown()
         func_registry.teardown()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_config().project_name} (except config & logs)")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_pipelex_config().project_name} (except config & logs)")
         self.pipelex_hub.reset_config()
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:

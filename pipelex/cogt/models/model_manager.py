@@ -12,7 +12,7 @@ from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile_library import RoutingProfileLibrary
 from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.exceptions import LibraryError
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path, validate_toml_file
@@ -48,7 +48,7 @@ class ModelManager(ModelManagerAbstract):
         log.debug("LibraryManager deck TOML file formatting")
 
         # Validation of LLM deck paths
-        deck_paths = get_config().cogt.inference_config.get_model_deck_paths()
+        deck_paths = get_pipelex_config().cogt.inference_config.get_model_deck_paths()
         for deck_path in deck_paths:
             if os.path.exists(deck_path):
                 try:
@@ -60,7 +60,7 @@ class ModelManager(ModelManagerAbstract):
 
     @classmethod
     def load_deck_blueprint(cls) -> ModelDeckBlueprint:
-        deck_paths = get_config().cogt.inference_config.get_model_deck_paths()
+        deck_paths = get_pipelex_config().cogt.inference_config.get_model_deck_paths()
         full_deck_dict: dict[str, Any] = {}
         if not deck_paths:
             msg = "No LLM deck paths found. Please run `pipelex init-libraries` to create it."

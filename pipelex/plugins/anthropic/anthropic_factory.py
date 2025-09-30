@@ -23,7 +23,7 @@ from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.config import get_config
+from pipelex.config import get_pipelex_config
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
@@ -62,7 +62,7 @@ class AnthropicFactory:
                     base_url=backend.endpoint,
                 )
             case AnthropicSdkVariant.BEDROCK_ANTHROPIC:
-                aws_config = get_config().pipelex.aws_config
+                aws_config = get_pipelex_config().aws_config
                 aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()
                 return AsyncAnthropicBedrock(
                     aws_secret_key=aws_secret_access_key,

@@ -12,7 +12,7 @@ from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
-from pipelex.config import StaticValidationReaction, get_config
+from pipelex.config import StaticValidationReaction, get_pipelex_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import Domain, SpecialDomain
@@ -144,7 +144,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     def _validate_inputs(self):
         concept_provider = get_concept_provider()
-        static_validation_config = get_config().pipelex.static_validation_config
+        static_validation_config = get_pipelex_config().static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
 
@@ -291,13 +291,13 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             # Note: the case where we don't get an inference model corresponds to the use of an external LLM Plugin
             # TODO: improve this by making it possible to get the inference model for external LLM Plugins
             prompting_target = llm_setting_main.prompting_target or inference_model.prompting_target
-            self.llm_prompt_spec.prompting_style = get_config().pipelex.prompting_config.get_prompting_style(
+            self.llm_prompt_spec.prompting_style = get_pipelex_config().prompting_config.get_prompting_style(
                 prompting_target=prompting_target,
             )
 
         is_with_preliminary_text = (
             self.structuring_method == StructuringMethod.PRELIMINARY_TEXT
-        ) or get_config().pipelex.structure_config.is_default_text_then_structure
+        ) or get_pipelex_config().structure_config.is_default_text_then_structure
         log.verbose(
             f"is_with_preliminary_text: {is_with_preliminary_text} for pipe {self.code} because the structuring_method is {self.structuring_method}",
         )
@@ -365,7 +365,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                         llm_prompt_2_factory = LLMPromptTemplate(
                             proto_prompt=llm_prompt_2_proto,
                         )
-            elif get_config().pipelex.structure_config.is_default_text_then_structure:
+            elif get_pipelex_config().structure_config.is_default_text_then_structure:
                 log.debug(f"PipeLLM pipe_code is '{self.code}' and is_default_text_then_structure")
                 # TODO: run_pipe() should get the domain along with the pip_code
                 if the_pipe := get_optional_pipe(pipe_code=self.code):
@@ -390,7 +390,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 llm_prompt_2_factory = None
 
             output_structure_prompt: str | None = None
-            if get_config().cogt.llm_config.is_structure_prompt_enabled:
+            if get_pipelex_config().cogt.llm_config.is_structure_prompt_enabled:
                 output_structure_prompt = await PipeLLM.get_output_structure_prompt(
                     concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
                     is_with_preliminary_text=is_with_preliminary_text,
