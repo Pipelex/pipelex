@@ -121,5 +121,7 @@ class PipelexInterpreter(BaseModel):
     def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
         """Make a PipelexBundleBlueprint from the file_path or file_content"""
         file_content = self._read_and_reformat()
-        plx_data = self._parse_plx_content(file_content)
-        return PipelexBundleBlueprint.model_validate(plx_data)
+        blueprint_dict = self._parse_plx_content(file_content)
+        if self.file_path:
+            blueprint_dict.update(source=str(self.file_path))
+        return PipelexBundleBlueprint.model_validate(blueprint_dict)

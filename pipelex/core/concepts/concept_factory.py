@@ -125,6 +125,26 @@ class ConceptFactory:
         return NativeConceptManager.get_native_concept_string(concept_string_or_code=refine)
 
     @classmethod
+    def make_from_blueprint_or_description(
+        cls,
+        domain: str,
+        concept_code: str,
+        concept_blueprint_or_description: ConceptBlueprint | str,
+        concept_codes_from_the_same_domain: list[str] | None = None,
+    ) -> Concept:
+        blueprint: ConceptBlueprint
+        if isinstance(concept_blueprint_or_description, str):
+            blueprint = ConceptBlueprint(definition=concept_blueprint_or_description)
+        else:
+            blueprint = concept_blueprint_or_description
+        return cls.make_from_blueprint(
+            domain=domain,
+            concept_code=concept_code,
+            blueprint=blueprint,
+            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+        )
+
+    @classmethod
     def make_from_blueprint(
         cls,
         domain: str,

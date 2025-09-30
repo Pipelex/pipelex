@@ -28,16 +28,18 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         parallel_sub_pipes: list[SubPipe] = []
         for sub_pipe_blueprint in blueprint.parallels:
             if not sub_pipe_blueprint.result:
-                msg = "PipeParallel requires a result specified for each parallel sub pipe"
-                raise PipeDefinitionError(msg)
+                msg = "Unexpected error in pipe '{pipe_code}': PipeParallel requires a result specified for each parallel sub pipe"
+                raise PipeDefinitionError(
+                    message=msg, domain_code=domain, pipe_code=pipe_code, description=blueprint.definition, source=blueprint.source
+                )
             sub_pipe = SubPipeFactory.make_from_blueprint(sub_pipe_blueprint, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain)
             parallel_sub_pipes.append(sub_pipe)
         if not blueprint.add_each_output and not blueprint.combined_output:
             msg = (
-                "Unexpected error:PipeParallel requires either add_each_output to be True or combined_output to be set, "
+                f"Unexpected error in pipe '{pipe_code}': PipeParallel requires either add_each_output to be True or combined_output to be set, "
                 "or both, otherwise the pipe won't output anything"
             )
-            raise PipeDefinitionError(msg)
+            raise PipeDefinitionError(message=msg, domain_code=domain, pipe_code=pipe_code, description=blueprint.definition, source=blueprint.source)
 
         if blueprint.combined_output:
             combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
