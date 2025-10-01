@@ -19,7 +19,6 @@ class PipeLLMTestCases:
             prompt_template="Write about $topic",
         ),
         PipeLLMBlueprint(
-            source="PipeLLMSpec",
             type="PipeLLM",
             definition="Generate text",
             inputs={"topic": InputRequirementBlueprint(concept="Text")},
@@ -40,7 +39,6 @@ class PipeLLMTestCases:
             prompt_template="Generate something interesting",
         ),
         PipeLLMBlueprint(
-            source="PipeLLMSpec",
             type="PipeLLM",
             definition="Generate without inputs",
             output="Text",
@@ -60,7 +58,6 @@ class PipeLLMTestCases:
             llm="llm_to_reason",
         ),
         PipeLLMBlueprint(
-            source="PipeLLMSpec",
             type="PipeLLM",
             definition="Generate with preset",
             llm="claude-4-sonnet",
@@ -81,7 +78,6 @@ class PipeLLMTestCases:
             temperature=0.7,
         ),
         PipeLLMBlueprint(
-            source="PipeLLMSpec",
             type="PipeLLM",
             definition="Generate with settings",
             llm=LLMSetting(
@@ -106,7 +102,6 @@ class PipeLLMTestCases:
             llm="llm_to_analyze_data",
         ),
         PipeLLMBlueprint(
-            source="PipeLLMSpec",
             type="PipeLLM",
             definition="Generate with system prompt",
             inputs={"data": InputRequirementBlueprint(concept="Data")},
@@ -129,7 +124,6 @@ class PipeLLMTestCases:
             llm="llm_cheap_for_easy_questions",
         ),
         PipeLLMBlueprint(
-            source="PipeLLMSpec",
             type="PipeLLM",
             definition="Generate multiple items",
             multiple_output=True,
@@ -152,7 +146,6 @@ class PipeLLMTestCases:
             llm="llm_cheap_for_easy_questions",
         ),
         PipeLLMBlueprint(
-            source="PipeLLMSpec",
             type="PipeLLM",
             definition="Generate exactly 5 items",
             nb_output=5,
