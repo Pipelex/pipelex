@@ -17,6 +17,22 @@ class AllowedPipeCategories(StrEnum):
     def value_list(cls) -> list[str]:
         return list(cls)
 
+    @property
+    def is_controller(self) -> bool:
+        match self:
+            case AllowedPipeCategories.PIPE_CONTROLLER:
+                return True
+            case AllowedPipeCategories.PIPE_OPERATOR:
+                return False
+
+    @classmethod
+    def is_controller_by_str(cls, category_str: str) -> bool:
+        try:
+            category = cls(category_str)
+            return category.is_controller
+        except ValueError:
+            return False
+
 
 class AllowedPipeTypes(StrEnum):
     # Pipe Operators

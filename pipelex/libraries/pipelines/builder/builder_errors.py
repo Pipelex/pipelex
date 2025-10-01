@@ -186,5 +186,9 @@ class PipelexBundleError(PipelexError):
         )
 
 
+class PipelexBundleNoFixForError(PipelexError):
+    """Raised when no fix is found for a static validation error."""
+
+
 class PipelexBundleUnexpectedError(PipelexError):
     """Raised when an unexpected error occurs during validation."""

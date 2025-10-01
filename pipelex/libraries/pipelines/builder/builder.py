@@ -311,13 +311,13 @@ async def validate_bundle_spec(pipelex_bundle_spec: PipelexBundleSpec):
 async def reconstruct_bundle_with_pipe_fixes_from_memory(working_memory: WorkingMemory) -> PipelexBundleSpec:
     pipelex_bundle_spec = working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
     fixed_pipes_list = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="fixed_pipes").content)
-    return await reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes_list.items)
+    return reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes_list.items)
 
 
-async def reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec: PipelexBundleSpec, fixed_pipes: list[PipeSpecUnion]) -> PipelexBundleSpec:
+def reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec: PipelexBundleSpec, fixed_pipes: list[PipeSpecUnion]) -> PipelexBundleSpec:
     if not pipelex_bundle_spec.pipe:
         msg = "No pipes section found in bundle spec"
-        raise PipeBuilderError(msg)
+        raise PipelexBundleUnexpectedError(msg)
 
     for fixed_pipe_blueprint in fixed_pipes:
         pipe_code = fixed_pipe_blueprint.the_pipe_code

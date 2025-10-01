@@ -17,7 +17,7 @@ build_app = typer.Typer(help="Build artifacts like pipelines", no_args_is_help=T
 
 """
 Today's example:
-pipelex build pipe "Given a scanned invoice, extract employee and articles"
+pipelex build pipe "Given an expense report, apply company rules"
 
 Other ideas:
 pipelex build pipe "Take a photo as input, and render the opposite of the photo"
