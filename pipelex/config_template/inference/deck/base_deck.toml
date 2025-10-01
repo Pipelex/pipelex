@@ -71,7 +71,7 @@ llm_to_enrich = { llm_handle = "base-claude", temperature = 0.1 }
 llm_for_question_and_excerpt_reformulation = { llm_handle = "gpt-4o", temperature = 0.9 }
 
 # Engineering skills
-llm_to_engineer = { llm_handle = "base-claude", temperature = 0.2 }
+llm_to_engineer = { llm_handle = "smart_llm", temperature = 0.2 }
 llm_to_write = { llm_handle = "base-gemini", temperature = 0.2 }
 llm_to_pipelex = { llm_handle = "base-claude", temperature = 0.2 }
 
@@ -126,4 +126,3 @@ img_gen_for_diagram = { img_gen_handle = "base-img-gen", quality = "medium", gui
 img_gen_for_mockup = { img_gen_handle = "base-img-gen", quality = "medium", guidance_scale = 6.5, is_moderated = true, safety_tolerance = 3 }
 img_gen_for_product = { img_gen_handle = "best-img-gen", quality = "high", guidance_scale = 8.5, is_moderated = true, safety_tolerance = 2 }
 img_gen_for_testing = { img_gen_handle = "fast-img-gen", nb_steps = 4, guidance_scale = 4.0, is_moderated = true, safety_tolerance = 4 }
-
