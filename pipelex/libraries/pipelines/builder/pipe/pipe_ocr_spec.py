@@ -79,7 +79,7 @@ class PipeOcrSpec(PipeSpec):
             ocr = OcrSkill(self.ocr).ocr_recommendation.value
 
         return PipeOcrBlueprint(
-            source="PipeOcrSpec",
+            source=None,
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
