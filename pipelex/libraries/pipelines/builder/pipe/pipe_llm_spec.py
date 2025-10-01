@@ -140,7 +140,6 @@ class PipeLLMSpec(PipeSpec):
             llm_choice = LLMSetting(llm_handle=llm_choice, temperature=self.temperature)
 
         return PipeLLMBlueprint(
-            source="PipeLLMSpec",
             type="PipeLLM",
             category="PipeOperator",
             definition=base_blueprint.definition,
