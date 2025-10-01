@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from anthropic import AuthenticationError
@@ -303,7 +303,7 @@ class ModelLister:
         for model in models:
             # Convert Unix timestamp to formatted date
             if hasattr(model, "created") and model.created:
-                created = datetime.fromtimestamp(model.created, tz=UTC).strftime("%Y-%m-%d")
+                created = datetime.fromtimestamp(model.created, tz=timezone.utc).strftime("%Y-%m-%d")  # noqa: UP017 # Python 3.10 compatibility
             else:
                 created = "N/A"
             owned_by = model.owned_by if hasattr(model, "owned_by") else "N/A"
