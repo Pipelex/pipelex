@@ -95,3 +95,11 @@ outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
+# --- Claude 4.5 Series --------------------------------------------------------
+["claude-4.5-sonnet"]
+model_id = "claude-sonnet-4-5-20250919"
+max_tokens = 64000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }

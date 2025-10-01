@@ -44,7 +44,7 @@ class LLMWorkerFactory:
                 )
             case "anthropic" | "bedrock_anthropic":
                 try:
-                    import anthropic  # noqa: PLC0415,F401
+                    import anthropic  # noqa: PLC0415
                 except ImportError as exc:
                     lib_name = "anthropic"
                     lib_extra_name = "anthropic"
@@ -76,7 +76,7 @@ class LLMWorkerFactory:
                 )
             case "mistral":
                 try:
-                    import mistralai  # noqa: PLC0415,F401
+                    import mistralai  # noqa: PLC0415
                 except ImportError as exc:
                     lib_name = "mistralai"
                     lib_extra_name = "mistral"
@@ -107,8 +107,8 @@ class LLMWorkerFactory:
                 )
             case "bedrock_boto3" | "bedrock_aioboto3":
                 try:
-                    import aioboto3  # noqa: PLC0415,F401
-                    import boto3  # noqa: PLC0415,F401
+                    import aioboto3  # noqa: PLC0415
+                    import boto3  # noqa: PLC0415
                 except ImportError as exc:
                     lib_name = "boto3,aioboto3"
                     lib_extra_name = "bedrock"
@@ -134,7 +134,7 @@ class LLMWorkerFactory:
                 )
             case "google":
                 try:
-                    import google.genai  # noqa: PLC0415,F401
+                    import google.genai  # noqa: PLC0415
                 except ImportError as exc:
                     lib_name = "google-genai"
                     lib_extra_name = "google"

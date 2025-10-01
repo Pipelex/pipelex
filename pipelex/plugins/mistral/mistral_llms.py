@@ -5,7 +5,7 @@ from pipelex.plugins.mistral.mistral_exceptions import MistralModelListingError
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 
 
-def list_mistral_models() -> list[Data]:
+def mistral_list_available_models() -> list[Data]:
     backend = get_models_manager().get_required_inference_backend("mistral")
     mistral_client = MistralFactory.make_mistral_client(backend=backend)
     models_list_response = mistral_client.models.list()

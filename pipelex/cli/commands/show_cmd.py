@@ -1,13 +1,28 @@
 from __future__ import annotations
 
-from typing import Annotated
+import asyncio
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
 import typer
+from anthropic import AuthenticationError
+from rich import box
+from rich.console import Console
+from rich.table import Table
 
 from pipelex import pretty_print
+from pipelex.cogt.exceptions import MissingDependencyError
+from pipelex.cogt.model_backends.model_lists import do_show_models
+from pipelex.config import get_config
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
-from pipelex.hub import get_pipe_provider, get_required_pipe
+from pipelex.hub import get_models_manager, get_pipe_provider, get_required_pipe
 from pipelex.pipelex import Pipelex
+from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError
+from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_available_models
+from pipelex.plugins.mistral.mistral_llms import mistral_list_available_models
+from pipelex.plugins.openai.openai_llms import openai_list_available_models
+from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.tools.aws.aws_config import AwsCredentialsError
 from pipelex.tools.config.manager import config_manager
 
 
@@ -70,3 +85,24 @@ def show_pipe_cmd(
     ] = "./pipelex_libraries",
 ) -> None:
     do_show_pipe(pipe_code=pipe_code, relative_config_folder_path=relative_config_folder_path)
+
+
+@show_app.command("models")
+def show_models_cmd(
+    backend_name: Annotated[str, typer.Argument(help="Backend name to list models for")],
+    relative_config_folder_path: Annotated[
+        str,
+        typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path"),
+    ] = "./pipelex_libraries",
+    flat: Annotated[
+        bool,
+        typer.Option("--flat", "-f", help="Output in flat CSV format for easy copy-pasting"),
+    ] = False,
+) -> None:
+    asyncio.run(
+        do_show_models(
+            backend_name=backend_name,
+            relative_config_folder_path=relative_config_folder_path,
+            flat=flat,
+        )
+    )

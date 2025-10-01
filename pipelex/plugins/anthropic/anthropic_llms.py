@@ -7,7 +7,7 @@ from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
-async def anthropic_list_anthropic_models(plugin: Plugin, backend: InferenceBackend) -> list[ModelInfo]:
+async def anthropic_list_available_models(plugin: Plugin, backend: InferenceBackend) -> list[ModelInfo]:
     """List available Anthropic models.
 
     Returns:

@@ -6,7 +6,7 @@ from rich.table import Table
 
 from pipelex.hub import get_models_manager
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError
-from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_anthropic_models
+from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_available_models
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.environment import all_env_vars_are_set, any_env_var_is_placeholder
 
@@ -32,7 +32,7 @@ class TestAnthropic:
             pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         try:
             backend = get_models_manager().get_required_inference_backend("anthropic")
-            anthropic_models_list = await anthropic_list_anthropic_models(
+            anthropic_models_list = await anthropic_list_available_models(
                 plugin=plugin_for_anthropic,
                 backend=backend,
             )
