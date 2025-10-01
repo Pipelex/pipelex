@@ -26,9 +26,6 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "o3-mini",
         # "gpt-5-mini", # TODO: fix this
         # "gpt-5-nano", # TODO: fix this
-        # "claude-3-haiku",
-        # "claude-3-5-sonnet",
-        # "claude-3-7-sonnet",
         # "mistral-large",
         # "ministral-3b",
         # "ministral-8b",
@@ -50,11 +47,9 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gpt-4o-mini",
         # "gpt-5-mini",
         # "gpt-5-chat",
-        "claude-4-sonnet",
+        # "claude-4-sonnet",
         # "claude-4.1-opus",
-        # "claude-3.5-sonnet",
-        # "claude-3.5-sonnet-v2"
-        # "claude-3.7-sonnet",
+        "claude-4.5-sonnet",
         # "grok-3",
         # "grok-3-mini",
         # "base-claude",

@@ -53,24 +53,6 @@ outputs = ["text"]
 costs = { input = 3.0, output = 15.0 }
 
 # --- Claude LLMs --------------------------------------------------------------
-["claude-3.5-sonnet"]
-sdk = "bedrock_anthropic"
-model_id = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
-max_tokens = 8192
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-max_prompt_images = 100
-costs = { input = 3.0, output = 15.0 }
-
-["claude-3.5-sonnet-v2"]
-sdk = "bedrock_anthropic"
-model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"
-max_tokens = 8192
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-max_prompt_images = 100
-costs = { input = 3.0, output = 15.0 }
-
 ["claude-3.7-sonnet"]
 sdk = "bedrock_anthropic"
 model_id = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
@@ -107,3 +89,13 @@ outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
+# anthropic.claude-sonnet-4-5-20250929-v1:0,Anthropic,arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0,
+
+["claude-4.5-sonnet"]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }

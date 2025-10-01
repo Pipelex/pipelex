@@ -88,6 +88,12 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 15, output = 75 }
 
+["claude-4.5-sonnet"]
+model_id = "pipelex/claude-4.5-sonnet"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
 # --- Gemini LLMs --------------------------------------------------------------
 ["gemini-2.0-flash"]
 model_id = "gemini/gemini-2.0-flash"
@@ -127,4 +133,3 @@ costs = { input = 0.3, output = 0.5 }
 
 # We are still working in giving you acces to OCR and image generation models
 # and to the best models from Mistral through the Pipelex Inference backend.
-

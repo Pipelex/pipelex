@@ -37,6 +37,10 @@ default = "pipelex_inference"
 "gpt-image-1" = "openai"
 "mistral-ocr" = "mistral"
 
+[profiles.all_bedrock]
+description = "Use Bedrock backend for all its supported models"
+default = "bedrock"
+
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"
 default = "anthropic"
@@ -73,8 +77,6 @@ description = "Route models to various backends"
 "gpt-5-chat" = "azure_openai"
 
 "claude-4-sonnet" = "pipelex_inference"
-"claude-3.5-sonnet" = "bedrock"
-"claude-3.5-sonnet-v2" = "anthropic"
 "claude-3.7-sonnet" = "blackboxai"
 
 "gemini-2.5-flash-lite" = "pipelex_inference"
@@ -99,4 +101,3 @@ description = "Route models to various backends"
 # - Exact names: "gpt-4o-mini"
 # - Wildcards: "claude-*" (matches all models starting with claude-)
 # - Partial wildcards: "*-sonnet" (matches all sonnet variants)
-
