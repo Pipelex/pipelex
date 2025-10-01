@@ -17,7 +17,7 @@ from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import DryRunError
 from pipelex.hub import get_pipe_router, get_required_pipe
-from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -35,7 +35,7 @@ class TestPipeConditionSimple:
             inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}")},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
-            pipe_map=PipeConditionPipeMapBlueprint(root={"long": "capitalize_long_text", "short": "add_prefix_short_text"}),
+            pipe_map={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
         )
 
         pipe_condition = PipeConditionFactory.make_from_blueprint(
@@ -53,10 +53,7 @@ class TestPipeConditionSimple:
 
         assert pipe_condition.domain == "test_integration"
         assert pipe_condition.code == "text_length_condition"
-        assert pipe_condition.pipe_map[0].expression_result == "long"
-        assert pipe_condition.pipe_map[0].pipe_code == "capitalize_long_text"
-        assert pipe_condition.pipe_map[1].expression_result == "short"
-        assert pipe_condition.pipe_map[1].pipe_code == "add_prefix_short_text"
+        assert pipe_condition.pipe_map == {"long": "capitalize_long_text", "short": "add_prefix_short_text"}
 
         input_text = working_memory.get_stuff("input_text")
         assert input_text is not None
@@ -107,7 +104,7 @@ class TestPipeConditionSimple:
             inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}")},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
-            pipe_map=PipeConditionPipeMapBlueprint(root={"long": "capitalize_long_text", "short": "add_prefix_short_text"}),
+            pipe_map={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
         )
 
         pipe_condition = PipeConditionFactory.make_from_blueprint(

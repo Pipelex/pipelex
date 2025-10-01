@@ -1,14 +1,8 @@
 from typing import Literal
 
-from pydantic import Field, RootModel
+from pydantic import Field
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-
-PipeConditionPipeMapRoot = dict[str, str]
-
-
-class PipeConditionPipeMapBlueprint(RootModel[PipeConditionPipeMapRoot]):
-    root: PipeConditionPipeMapRoot = Field(default_factory=dict)
 
 
 class PipeConditionBlueprint(PipeBlueprint):
@@ -16,6 +10,6 @@ class PipeConditionBlueprint(PipeBlueprint):
     category: Literal["PipeController"] = "PipeController"
     expression_template: str | None = None
     expression: str | None = None
-    pipe_map: PipeConditionPipeMapBlueprint = Field(default_factory=PipeConditionPipeMapBlueprint)
+    pipe_map: dict[str, str] = Field(default_factory=dict)
     default_pipe_code: str | None = None
     add_alias_from_expression_to: str | None = None
