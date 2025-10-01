@@ -16,6 +16,8 @@
  - Added new observer system to log events and metrics from pipe runs: Added an extract point before running a pipe, and after running a pipe. Added a local observer that dumps the payload to a local JSONL file.
  - Added new test cases for environment variable functions
  - Added new documentation for `PipeFunc` on how to register functions.
+ - Added `claude-4.5-sonnet` to the model deck.
+ - Added `pipelex show models [BACKEND_NAME]` command to list models for a specific backend.
 
 ### Changed 
  - Renamed `llm_deck` terminology to `model_deck` throughout codebase and documentation
@@ -38,6 +40,7 @@
  - Removed function `run_pipe_code` in pipe router because it was not relevant (used mostly in tests)
  - Remove the use of `PipeCompose` in `PipeCondition`, to only use jinja2 with the `ContentGenerator`
  - Remove the template libraries from the pipelex libraries.
+ - Removed `claude-3.5-sonnet` and `claude-3.5-sonnet-v2` from the model deck.
 
 ## [v0.10.2] - 2025-09-18
 
