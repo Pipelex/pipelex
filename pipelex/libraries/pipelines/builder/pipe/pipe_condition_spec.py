@@ -5,7 +5,7 @@ from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
-from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 
 
 class PipeConditionSpec(PipeSpec):
@@ -31,7 +31,6 @@ class PipeConditionSpec(PipeSpec):
     @override
     def to_blueprint(self) -> PipeConditionBlueprint:
         base_blueprint = super().to_blueprint()
-        pipe_map_blueprint = PipeConditionPipeMapBlueprint(root=dict(self.pipe_map))
         return PipeConditionBlueprint(
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
@@ -40,7 +39,7 @@ class PipeConditionSpec(PipeSpec):
             category=self.category,
             expression_template=self.jinja2_expression_template,
             expression=None,
-            pipe_map=pipe_map_blueprint,
+            pipe_map=self.pipe_map,
             default_pipe_code=self.default_pipe_code,
             add_alias_from_expression_to=None,
         )

@@ -7,8 +7,8 @@ class SpecificPipeCodesEnum(StrEnum):
     # BREAK = "break"
 
     @classmethod
-    def value_list(cls) -> list[str]:
-        return list(cls)
+    def value_list(cls) -> set[str]:
+        return set(cls)
 
 
 # TODO: Rethink this class. They are not pipes really.

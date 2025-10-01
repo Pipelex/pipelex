@@ -2,7 +2,7 @@ from typing import ClassVar
 
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.pipe_condition_spec import PipeConditionSpec
-from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 
 
 class PipeConditionTestCases:
@@ -29,13 +29,11 @@ class PipeConditionTestCases:
             category="PipeController",
             expression=None,
             expression_template="{{ item.category }}",
-            pipe_map=PipeConditionPipeMapBlueprint(
-                root={
-                    "A": "process_a",
-                    "B": "process_b",
-                    "C": "process_c",
-                },
-            ),
+            pipe_map={
+                "A": "process_a",
+                "B": "process_b",
+                "C": "process_c",
+            },
             default_pipe_code="process_default",
             add_alias_from_expression_to=None,
         ),

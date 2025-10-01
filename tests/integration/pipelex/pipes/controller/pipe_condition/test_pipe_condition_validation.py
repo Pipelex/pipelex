@@ -1,7 +1,7 @@
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.hub import get_concept_provider
-from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 
 
@@ -31,7 +31,7 @@ class TestPipeConditionValidation:
             inputs={"input_var": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             expression="input_var",
-            pipe_map=PipeConditionPipeMapBlueprint(root={"value1": "pipe_a", "value2": "pipe_b"}),
+            pipe_map={"value1": "pipe_a", "value2": "pipe_b"},
             default_pipe_code="default_pipe",
         )
 
@@ -73,7 +73,7 @@ class TestPipeConditionValidation:
             inputs={"var": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             expression_template="{{ var }}",
-            pipe_map=PipeConditionPipeMapBlueprint(root={"value": "target_pipe"}),
+            pipe_map={"value": "target_pipe"},
         )
 
         pipe_condition_template = PipeConditionFactory.make_from_blueprint(
@@ -88,7 +88,7 @@ class TestPipeConditionValidation:
             inputs={"var": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             expression="var",
-            pipe_map=PipeConditionPipeMapBlueprint(root={"value": "target_pipe"}),
+            pipe_map={"value": "target_pipe"},
         )
 
         pipe_condition_expr = PipeConditionFactory.make_from_blueprint(
