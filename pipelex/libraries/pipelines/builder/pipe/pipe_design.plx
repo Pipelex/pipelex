@@ -12,7 +12,7 @@ PipeSequenceSpec = "A structured spec for a pipe sequence."
 # Pipe operators
 PipeFuncSpec = "A structured spec for a pipe func."
 PipeImgGenSpec = "A structured spec for a pipe img gen."
-PipeComposeSpec = "A structured spec for a pipe jinja2."
+# PipeComposeSpec = "A structured spec for a pipe jinja2."
 PipeLLMSpec = "A structured spec for a pipe llm."
 PipeOcrSpec = "A structured spec for a pipe ocr."
 PipeFailure = "Details of a single pipe failure during dry run."
@@ -21,10 +21,11 @@ PipeFailure = "Details of a single pipe failure during dry run."
 
 [pipe.detail_pipe_spec]
 type = "PipeCondition"
-description = "Route by signature.type to the correct spec emitter."
+definition = "Route by signature.type to the correct spec emitter."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "ConceptSpec" }
 output = "Dynamic"
 expression = "pipe_signature.type"
+default_pipe_code = "continue"
 
 [pipe.detail_pipe_spec.pipe_map]
 PipeSequence  = "detail_pipe_sequence"
@@ -33,7 +34,6 @@ PipeCondition = "detail_pipe_condition"
 PipeLLM       = "detail_pipe_llm"
 PipeOcr       = "detail_pipe_ocr"
 PipeImgGen    = "detail_pipe_img_gen"
-PipeCompose   = "detail_pipe_compose"
 
 # ────────────────────────────────────────────────────────────────────────────────
 # PIPE CONTROLLERS
@@ -41,7 +41,7 @@ PipeCompose   = "detail_pipe_compose"
 
 [pipe.detail_pipe_sequence]
 type = "PipeLLM"
-description = "Build a PipeSequenceSpec from the signature (children referenced by code)."
+definition = "Build a PipeSequenceSpec from the signature (children referenced by code)."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeSequenceSpec"
 llm = "llm_to_engineer"
@@ -57,7 +57,7 @@ You will specifically generate the PipeSequence related to this signature:
 
 [pipe.detail_pipe_parallel]
 type = "PipeLLM"
-description = "Build a PipeParallelSpec from the signature."
+definition = "Build a PipeParallelSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeParallelSpec"
 llm = "llm_to_engineer"
@@ -73,7 +73,7 @@ You will specifically generate the PipeParallel related to this signature:
 
 [pipe.detail_pipe_condition]
 type = "PipeLLM"
-description = "Build a PipeConditionSpec from the signature (provide expression/pipe_map consistent with children)."
+definition = "Build a PipeConditionSpec from the signature (provide expression/pipe_map consistent with children)."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeConditionSpec"
 llm = "llm_to_engineer"
@@ -93,7 +93,7 @@ You will specifically generate the PipeCondition related to this signature:
 
 [pipe.detail_pipe_llm]
 type = "PipeLLM"
-description = "Build a PipeLLMSpec from the signature."
+definition = "Build a PipeLLMSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeLLMSpec"
 llm = "llm_to_engineer"
@@ -114,7 +114,7 @@ If it's to generate an image generation, the prompt_template should indicate to 
 
 [pipe.detail_pipe_ocr]
 type = "PipeLLM"
-description = "Build a PipeOcrSpec from the signature."
+definition = "Build a PipeOcrSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeOcrSpec"
 llm = "llm_to_engineer"
@@ -130,7 +130,7 @@ You will specifically generate the PipeOcr related to this signature:
 
 [pipe.detail_pipe_img_gen]
 type = "PipeLLM"
-description = "Build a PipeImgGenSpec from the signature."
+definition = "Build a PipeImgGenSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeImgGenSpec"
 llm = "llm_to_engineer"
@@ -148,7 +148,7 @@ The inputs for the image has to be a single input which must be a Text or anothe
 
 [pipe.detail_pipe_compose]
 type = "PipeLLM"
-description = "Build a PipeComposeSpec from the signature."
+definition = "Build a PipeComposeSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeComposeSpec"
 llm = "llm_to_engineer"
@@ -160,4 +160,14 @@ This PipeCompose is part of a larger pipeline:
 
 You will specifically generate the PipeCompose related to this signature:
 @pipe_signature
+
+You can ONLY USE THE INPUTS IN THIS PIPE SIGNATURE.
+
+Here are the Jinja2 filters that are supported:
+default — Returns a fallback value if the input is undefined (or falsey if enabled).
+tag - Returns by tagging it with a title.
+format - Apply the given values to a printf-style format string, like string % values.
+length — Returns the number of items (alias: count).
+upper — Converts a string to uppercase.
+lower — Converts a string to lowercase.
 """

@@ -173,7 +173,7 @@ class LLMPromptSpec(BaseModel):
                 jinja2_blueprint.prompting_style = prompting_style
                 log.verbose(f"Setting prompting style to {prompting_style}")
 
-            context: dict[str, Any] = context_provider.generate_context()
+            context: dict[str, Any] = context_provider.generate_jinja2_context()
             if extra_params:
                 context.update(**extra_params)
             if jinja2_blueprint.extra_context:

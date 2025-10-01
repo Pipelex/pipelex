@@ -8,7 +8,7 @@ ConceptSpecDraft = "A specification for a concept including its code, descriptio
 
 [pipe.build_concept_spec]
 type = "PipeSequence"
-description = "Create a ConceptSpec from a brief, existing concepts, and concept rules."
+definition = "Create a ConceptSpec from a brief, existing concepts, and concept rules."
 inputs = { concept_spec_draft = "ConceptSpecDraft"}
 output = "ConceptSpec"
 steps = [
@@ -18,7 +18,7 @@ steps = [
 
 [pipe.spec_draft_to_structure]
 type = "PipeLLM"
-description = "Convert the ConceptSpec (with its structure draft) into a proper ConceptStructureSpec."
+definition = "Convert the ConceptSpec (with its structure draft) into a proper ConceptStructureSpec."
 inputs = { concept_spec_draft = "ConceptSpecDraft" }
 output = "ConceptStructureSpec"
 multiple_output = true
@@ -36,7 +36,7 @@ ConceptSpecDraft:
 
 [pipe.spec_draft_to_concept_spec]
 type = "PipeFunc"
-description = "Generate the final ConceptSpec using the spec and structure manually."
+definition = "Generate the final ConceptSpec using the spec and structure manually."
 inputs = { concept_spec_draft = "ConceptSpecDraft", concept_spec_structures = "ConceptStructureSpec"}
 output = "ConceptSpec"
 function_name = "create_concept_spec"

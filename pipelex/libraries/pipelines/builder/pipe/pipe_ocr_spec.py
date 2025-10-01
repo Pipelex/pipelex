@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 class AvailableOcr(StrEnum):
     BASE_OCR_MISTRAL = "base_ocr_mistral"
-    BASE_OCR_PYPDFIUM2 = "base_ocr_pypdfium2"
+    # BASE_OCR_PYPDFIUM2 = "base_ocr_pypdfium2"
 
 
 class OcrSkill(StrEnum):
@@ -28,7 +28,8 @@ class OcrSkill(StrEnum):
             case OcrSkill.EXTRACT_TEXT_FROM_VISUALS:
                 return AvailableOcr.BASE_OCR_MISTRAL
             case OcrSkill.EXTARCT_TEXT_FROM_PDF:
-                return AvailableOcr.BASE_OCR_PYPDFIUM2
+                # TODO: Debug the BaseOcrPypdfium2
+                return AvailableOcr.BASE_OCR_MISTRAL
 
 
 class PipeOcrSpec(PipeSpec):
@@ -78,7 +79,7 @@ class PipeOcrSpec(PipeSpec):
             ocr = OcrSkill(self.ocr).ocr_recommendation.value
 
         return PipeOcrBlueprint(
-            source="PipeOcrSpec",
+            source=None,
             definition=base_blueprint.definition,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,

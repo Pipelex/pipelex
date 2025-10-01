@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, ClassVar, cast
 
 from jinja2 import TemplateSyntaxError
@@ -7,6 +8,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.tools.exceptions import ToolException
+from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
@@ -32,9 +34,10 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
 
     @override
     def setup(self) -> None:
-        template_toml_paths = self.library_config.get_templates_paths()
+        templates_dir = Path(__file__).parent / "templates"
+        template_toml_paths = find_files_in_dir(dir_path=str(templates_dir), pattern="*.toml", is_recursive=True)
         for template_toml_path in template_toml_paths:
-            self._load_from_toml(toml_path=template_toml_path)
+            self._load_from_toml(toml_path=str(template_toml_path))
         self.validate_templates(template_category=Jinja2TemplateCategory.LLM_PROMPT)
 
     @override

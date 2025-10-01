@@ -8,7 +8,6 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain import Domain
@@ -194,17 +193,12 @@ class LibraryManager(LibraryManagerAbstract):
             return []
 
         concepts: list[Concept] = []
-        for concept_code, concept_blueprint_or_str in blueprint.concept.items():
-            concept_blueprint: ConceptBlueprint
-            if isinstance(concept_blueprint_or_str, str):
-                concept_blueprint = ConceptBlueprint(definition=concept_blueprint_or_str)
-            else:
-                concept_blueprint = concept_blueprint_or_str
-            concept = ConceptFactory.make_from_blueprint(
+        for concept_code, concept_blueprint_or_description in blueprint.concept.items():
+            concept = ConceptFactory.make_from_blueprint_or_description(
                 domain=blueprint.domain,
                 concept_code=concept_code,
                 concept_codes_from_the_same_domain=list(blueprint.concept.keys()),
-                blueprint=concept_blueprint,
+                concept_blueprint_or_description=concept_blueprint_or_description,
             )
             concepts.append(concept)
         return concepts

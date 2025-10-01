@@ -12,7 +12,7 @@ from pipelex.types import StrEnum
 # Jinja2 filters
 ########################################################################################
 
-ALLOWED_FILTERS = ["tag", "format"]
+ALLOWED_FILTERS = ["tag", "format", "default"]
 
 
 # Filter to format some Stuff or any object with the appropriate text formatting methods

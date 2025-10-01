@@ -373,11 +373,11 @@ cm: cov-missing
 
 format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	$(VENV_RUFF) format .
+	$(VENV_RUFF) format . --config pyproject.toml
 
 lint: env
 	$(call PRINT_TITLE,"Linting with ruff")
-	$(VENV_RUFF) check . --fix
+	$(VENV_RUFF) check . --fix --config pyproject.toml
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
@@ -385,7 +385,7 @@ pyright: env
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY)
+	$(VENV_MYPY) --config-file pyproject.toml
 
 pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
@@ -398,11 +398,11 @@ pylint: env
 
 merge-check-ruff-format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	$(VENV_RUFF) format --check .
+	$(VENV_RUFF) format --check . --config pyproject.toml
 
 merge-check-ruff-lint: env check-unused-imports
 	$(call PRINT_TITLE,"Linting with ruff without fixing files")
-	$(VENV_RUFF) check .
+	$(VENV_RUFF) check . --config pyproject.toml
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
@@ -455,7 +455,7 @@ docs-deploy: env
 ### SHORTHANDS
 ##########################################################################################
 
-c: format lint pyright mypy pylint
+c: format lint pyright pylint mypy
 	@echo "> done: c = check"
 
 cc: cleanderived c

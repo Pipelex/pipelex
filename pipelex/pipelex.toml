@@ -6,8 +6,8 @@ observer_dir = "results/observer"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags
-is_pipeline_tracking_enabled = true
-is_activity_tracking_enabled = true
+is_pipeline_tracking_enabled = false
+is_activity_tracking_enabled = false
 is_reporting_enabled = true
 
 [pipelex.reporting_config]
@@ -87,11 +87,11 @@ is_auto_setup_preset_ocr = true
 
 [cogt.llm_config]
 default_max_images = 100
-is_structure_prompt_enabled = false
+is_structure_prompt_enabled = true
 
 [cogt.llm_config.instructor_config]
 is_openai_structured_output_enabled = false
-is_dump_kwargs_enabled = true
+is_dump_kwargs_enabled = false
 is_dump_response_enabled = false
 is_dump_error_enabled = false
 

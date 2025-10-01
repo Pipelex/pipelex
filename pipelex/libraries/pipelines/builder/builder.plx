@@ -17,7 +17,7 @@ DomainInformation = "A domain information object."
 [pipe]
 [pipe.pipe_builder]
 type = "PipeSequence"
-description = "This pipe is going to be the entry point for the builder. It will take a UserBrief and return a PipelexBundleSpec."
+definition = "This pipe is going to be the entry point for the builder. It will take a UserBrief and return a PipelexBundleSpec."
 inputs = { brief = "UserBrief" }
 output = "PipelexBundleSpec"
 steps = [
@@ -33,7 +33,7 @@ steps = [
 
 [pipe.pipe_builder_domain_information]
 type = "PipeLLM"
-description = "Turn the brief into a DomainInformation object."
+definition = "Turn the brief into a DomainInformation object."
 inputs = { brief = "UserBrief" }
 output = "DomainInformation"
 llm = "llm_to_engineer"
@@ -49,7 +49,7 @@ For the definition, be concise.
 
 [pipe.draft_the_plan]
 type = "PipeLLM"
-description = "Turn the brief into a pseudo-code plan describing controllers, pipes, their inputs/outputs."
+definition = "Turn the brief into a pseudo-code plan describing controllers, pipes, their inputs/outputs."
 inputs = { brief = "UserBrief" }
 output = "PlanDraft"
 llm = "llm_to_engineer"
@@ -83,7 +83,6 @@ Available pipe operators:
   That means that in the MAIN pipeline, the prompt MUST NOT be considered as an input. It should be the output of a step that generates the prompt.
 - PipeOcr: A pipe that uses an OCR technology to extract text from an image or a pdf.
   VERY IMPORTANT: THE INPUT OF THE PIPEOCR MUST BE either an image or a pdf or a concept which refines one of them.
-- PipeCompose: A pipe that uses Jinja2 to render a template.
 
 
 Be smart about splitting the workflow into steps (sequence or parallel):
@@ -98,7 +97,7 @@ Do not write any intro or outro, just write the plan.
 
 [pipe.draft_the_concepts]
 type = "PipeLLM"
-description = "Interpret the draft of a plan to create an AI pipeline, and define the needed concepts."
+definition = "Interpret the draft of a plan to create an AI pipeline, and define the needed concepts."
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief" }
 output = "ConceptDrafts"
 llm = "llm_to_engineer"
@@ -143,7 +142,7 @@ List the concept drafts in Markdown format with a heading 3 for each, e.g. `### 
 
 [pipe.structure_concepts]
 type = "PipeLLM"
-description = "Structure the concept definitions."
+definition = "Structure the concept definitions."
 inputs = { concept_drafts = "ConceptDrafts", brief = "UserBrief" }
 output = "concept.ConceptSpec"
 multiple_output = true
@@ -159,7 +158,7 @@ Your job is to extract a list of ConceptSpec from these concept drafts:
 
 [pipe.design_pipe_signatures]
 type = "PipeLLM"
-description = "Write the pipe signatures for the plan."
+definition = "Write the pipe signatures for the plan."
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeSignature"
 multiple_output = true
@@ -205,7 +204,6 @@ Available pipe operators:
 - PipeImgGen: A pipe that uses an AI model to generate an image.
   VERY IMPORTANT: IF YOU DECIDE TO CREATE A PipeImgGen, YOU ALSO HAVE TO CREATE A PIPELLM THAT WILL WRITE THE PROMPT, AND THAT NEEDS TO PRECEED THE PIPEIMGEN, based on the necessary elements.
   That means that in the MAIN pipeline, the prompt MUST NOT be considered as an input. It should be the output of a step that generates the prompt.
-- PipeCompose: A pipe that renders a Jinja2 template.
 - PipeOcr: A pipe that extracts text from an image or a pdf. PipeOcr must have a exactly one input which must be either an `Image` or a `PDF`.
 
 Be smart about splitting the workflow into steps (sequence or parallel):
@@ -215,93 +213,7 @@ Be smart about splitting the workflow into steps (sequence or parallel):
 
 [pipe.assemble_pipelex_bundle_spec]
 type = "PipeFunc"
-description = "Compile the pipelex bundle spec."
+definition = "Compile the pipelex bundle spec."
 inputs = { pipe_specs = "PipeSpec", concept_specs = "ConceptSpec", domain_information = "DomainInformation" }
 output = "PipelexBundleSpec"
 function_name = "assemble_pipelex_bundle_spec"
-
-# [pipe.validate_pipelex_bundle_loading]
-# type = "PipeSequence"
-# description = "Validate the pipelex bundle spec with iterative fixing."
-# inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_concepts = "ConceptFailure", fixed_concepts = "ConceptSpec", fixed_pipes = "PipeSpec", failed_pipes = "PipeFailure" }
-# output = "PipelexBundleSpec"
-# steps = [
-#     { pipe = "validate_loading", result = "validation_result" }
-#     { pipe = "handle_validation_result", result = "pipelex_bundle_spec" }
-# ]
-
-# [pipe.validate_pipelex_bundle_dry_run]
-# type = "PipeSequence"
-# description = "Validate the pipelex bundle spec with iterative fixing."
-# inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_concepts = "ConceptFailure", fixed_concepts = "ConceptSpec", fixed_pipes = "PipeSpec", failed_pipes = "PipeFailure" }
-# output = "PipelexBundleSpec"
-# steps = [
-#     { pipe = "validate_bundle_spec", result = "validation_result" },
-#     { pipe = "handle_validation_result", result = "pipelex_bundle_spec" }
-# ]
-
-
-# [pipe.handle_validation_result]
-# type = "PipeCondition"
-# description = "Handle validation result - continue if success or fix failures once."
-# inputs = { pipelex_bundle_spec = "PipelexBundleSpec", validation_result = "ValidationResult", failed_concepts = "ConceptFailure", fixed_concepts = "ConceptSpec", fixed_pipes = "PipeSpec", failed_pipes = "PipeFailure" }
-# output = "PipelexBundleSpec"
-# expression_template = "{% if validation_result.failed_concepts %}fix_concepts{% elif validation_result.failed_pipes %}fix_pipes{% else %}continue{% endif %}"
-
-# [pipe.handle_validation_result.pipe_map]
-# fix_concepts = "fix_failing_concepts_once"
-# fix_pipes = "fix_failing_pipes_once"
-# continue = "continue"
-
-# [pipe.fix_failing_concepts_once]
-# type = "PipeSequence"
-# description = "Fix failing concepts once and return the result."
-# inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_concepts = "ConceptFailure", fixed_pipes = "PipeSpec", failed_pipes = "PipeFailure" }
-# output = "PipelexBundleSpec"
-# steps = [
-#     { pipe = "fix_failing_concept", batch_over = "failed_concepts", batch_as = "failed_concept", result = "fixed_concepts" },
-#     { pipe = "reconstruct_bundle_with_all_fixes", result = "pipelex_bundle_spec" },
-#     { pipe = "validate_pipelex_bundle_loading", result = "pipelex_bundle_spec" },
-#     { pipe = "validate_pipelex_bundle_dry_run", result = "pipelex_bundle_spec" }
-# ]
-
-# [pipe.fix_failing_pipes_once]
-# type = "PipeSequence"
-# description = "Fix failing pipes once and return the result."
-# inputs = { pipelex_bundle_spec = "PipelexBundleSpec", failed_pipes = "PipeFailure", fixed_concepts = "ConceptSpec", failed_concepts = "ConceptFailure" }
-# output = "PipelexBundleSpec"
-# steps = [
-#     { pipe = "fix_failing_pipe", batch_over = "failed_pipes", batch_as = "failed_pipe", result = "fixed_pipes" },
-#     { pipe = "reconstruct_bundle_with_all_fixes", result = "pipelex_bundle_spec" },
-#     { pipe = "validate_pipelex_bundle_loading", result = "pipelex_bundle_spec" },
-#     { pipe = "validate_pipelex_bundle_dry_run", result = "pipelex_bundle_spec" }
-# ]
-
-# [pipe.validate_loading]
-# type = "PipeFunc"
-# description = "Validate loading of the bundle spec and return the first error."
-# inputs = { pipelex_bundle_spec = "PipelexBundleSpec" }
-# output = "ValidationResult"
-# function_name = "validate_loading"
-
-# [pipe.validate_bundle_spec]
-# type = "PipeFunc"
-# description = "Validate the dry running the bundle's pipes and report only failed pipes."
-# inputs = { pipelex_bundle_spec = "PipelexBundleSpec" }
-# output = "ValidationResult"
-# function_name = "validate_bundle_spec"
-
-# [pipe.continue]
-# type = "PipeCompose"
-# description = "Continue with successful validation - return the bundle unchanged."
-# inputs = { pipelex_bundle_spec = "PipelexBundleSpec" }
-# output = "PipelexBundleSpec"
-# jinja2 = "{{ pipelex_bundle_spec }}"
-
-# [pipe.reconstruct_bundle_with_all_fixes]
-# type = "PipeFunc"
-# description = "Reconstruct the bundle spec with all the fixed pipes."
-# inputs = { pipelex_bundle_spec = "PipelexBundleSpec", fixed_pipes = "Dynamic", fixed_concepts = "Dynamic" }
-# output = "PipelexBundleSpec"
-# function_name = "reconstruct_bundle_with_all_fixes"
-

@@ -27,6 +27,7 @@ class PipeSignature(StructuredContent):
         description="variable_name for the result of the pipe. Must be snake_case. It could be referenced as input in a following pipe."
     )
     output: str = Field(description="Just the output ConceptCode in PascalCase")
+    pipe_dependencies: list[str] = Field(description="List of pipe codes that this pipe depends on. This is for the PipeControllers")
 
 
 class PipeSpec(StructuredContent):

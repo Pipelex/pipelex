@@ -26,6 +26,7 @@
  - Modified `any_env_var_is_placeholder()` to use new placeholder detection logic
  - Updated test environment setup to use dynamic placeholder generation instead of hardcoded values
  - Restructured test classes and methods in environment tests
+ - Lint and tests GHA should run on every PR
 
 ### Fixed
  - Fixed logic error in `any_env_var_is_placeholder()` function - now correctly returns False when no placeholders are found
@@ -35,6 +36,8 @@
  - Removed `get_rooted_path()` and `get_env_rooted_path()` utility functions
  - Removed hardcoded placeholder dictionary in test setup
  - Removed function `run_pipe_code` in pipe router because it was not relevant (used mostly in tests)
+ - Remove the use of `PipeCompose` in `PipeCondition`, to only use jinja2 with the `ContentGenerator`
+ - Remove the template libraries from the pipelex libraries.
 
 ## [v0.10.2] - 2025-09-18
 

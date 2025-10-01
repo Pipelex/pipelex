@@ -132,7 +132,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             msg = f"PipeCompose does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
             raise PipeRunParamsError(msg)
 
-        context: dict[str, Any] = working_memory.generate_context()
+        context: dict[str, Any] = working_memory.generate_jinja2_context()
         if pipe_run_params:
             context.update(**pipe_run_params.params)
         if self.extra_context:

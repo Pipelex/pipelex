@@ -20,5 +20,5 @@ class ContextProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def generate_context(self) -> dict[str, Any]:
+    def generate_jinja2_context(self) -> dict[str, Any]:
         pass

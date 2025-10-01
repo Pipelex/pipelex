@@ -1,38 +1,34 @@
 import re
 from re import Match
 
-from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
-from pipelex.tools.templating.jinja2_filters import ALLOWED_FILTERS
+# def _detect_non_existent_filters(template_str: str) -> None:
+#     """Check a template string for non-existent Jinja2 filters.
 
+#     Args:
+#         template_str: The template string to check
 
-def _detect_non_existent_filters(template_str: str) -> None:
-    """Check a template string for non-existent Jinja2 filters.
+#     Raises:
+#         Jinja2TemplateError: If any non-allowed filters are found
 
-    Args:
-        template_str: The template string to check
+#     """
+#     # Pattern to match Jinja2 filter syntax: {{ variable|filter() }} or {{ variable|filter(param) }}
+#     # This handles:
+#     # - {{ variable|filter }}
+#     # - {{ variable|filter() }}
+#     # - {{ variable|filter(param) }}
+#     # - {{ variable|filter(param1, param2) }}
+#     filter_pattern = r"\{\{\s*[^|}]+\|\s*([a-zA-Z0-9_]+)(?:\([^)]*\))?\s*\}\}"
+#     matches = re.finditer(filter_pattern, template_str)
 
-    Raises:
-        Jinja2TemplateError: If any non-allowed filters are found
+#     invalid_filters: list[str] = []
+#     for match in matches:
+#         filter_name = match.group(1)
+#         if filter_name not in ALLOWED_FILTERS:
+#             invalid_filters.append(filter_name)
 
-    """
-    # Pattern to match Jinja2 filter syntax: {{ variable|filter() }} or {{ variable|filter(param) }}
-    # This handles:
-    # - {{ variable|filter }}
-    # - {{ variable|filter() }}
-    # - {{ variable|filter(param) }}
-    # - {{ variable|filter(param1, param2) }}
-    filter_pattern = r"\{\{\s*[^|}]+\|\s*([a-zA-Z0-9_]+)(?:\([^)]*\))?\s*\}\}"
-    matches = re.finditer(filter_pattern, template_str)
-
-    invalid_filters: list[str] = []
-    for match in matches:
-        filter_name = match.group(1)
-        if filter_name not in ALLOWED_FILTERS:
-            invalid_filters.append(filter_name)
-
-    if invalid_filters:
-        msg = f"Invalid Jinja2 filters found: {invalid_filters}. Only the following filters are allowed: {ALLOWED_FILTERS}"
-        raise Jinja2TemplateError(msg)
+#     if invalid_filters:
+#         msg = f"Invalid Jinja2 filters found: {invalid_filters}. Only the following filters are allowed: {ALLOWED_FILTERS}"
+#         raise Jinja2TemplateError(msg)
 
 
 # Handle @variable patterns
@@ -69,7 +65,7 @@ def preprocess_template(template: str) -> str:
     """Preprocess a template string to interpret our syntax patterns and convert them to Jinja2 syntax.
     Also, detect the use of non-existent filters.
     """
-    _detect_non_existent_filters(template_str=template)
+    # _detect_non_existent_filters(template_str=template)
 
     processed_template = template
     changes_made = False

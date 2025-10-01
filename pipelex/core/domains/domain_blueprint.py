@@ -1,10 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from pipelex.core.domains.exceptions import DomainError
 from pipelex.tools.misc.string_utils import is_snake_case
 
 
 class DomainBlueprint(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     source: str | None = None
     code: str
     definition: str

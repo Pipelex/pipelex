@@ -47,7 +47,11 @@ class PipeParallelSpec(PipeSpec):
                 "PipeParallel requires either add_each_output to be True or combined_output to be set, "
                 "or both, otherwise the pipe won't output anything"
             )
-            raise PipeDefinitionError(msg)
+            raise PipeDefinitionError(
+                message=msg,
+                pipe_code=self.the_pipe_code,
+                description=self.definition,
+            )
         return self
 
     @override
