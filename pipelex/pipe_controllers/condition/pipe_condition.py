@@ -9,7 +9,6 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum, NativeConceptManager
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_input import PipeInputSpec
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
@@ -264,17 +263,17 @@ class PipeCondition(PipeController):
             pipe_codes.append(self.default_pipe_code)
         return set(pipe_codes)
 
-    async def _evaluate_expression_and_select_pipe(
+    async def _evaluate_expression(
         self,
         working_memory: WorkingMemory,
-    ) -> PipeAbstract:
+    ) -> str:
         """Evaluate the conditional expression and select the appropriate pipe.
 
         Args:
             working_memory: The working memory context for evaluation
 
         Returns:
-            A tuple of (evaluated_expression, chosen_pipe_code)
+            The evaluated expression
 
         Raises:
             PipeConditionError: If expression evaluation fails or no matching pipe is found
@@ -303,23 +302,7 @@ class PipeCondition(PipeController):
                 target=self.add_alias_from_expression_to,
             )
 
-        # Select the pipe based on the evaluated expression
-        chosen_pipe_code = next(
-            (
-                pipe_condition_pipe_map.pipe_code
-                for pipe_condition_pipe_map in self.pipe_map
-                if pipe_condition_pipe_map.expression_result == evaluated_expression
-            ),
-            self.default_pipe_code,
-        )
-        # Validate that a pipe was found
-        if not chosen_pipe_code:
-            error_msg = f"No pipe code found for evaluated expression '{evaluated_expression}' in pipe {self.code}:"
-            error_msg += f"\n\nExpression: {self.applied_expression_template}"
-            error_msg += f"\n\nPipe map: {self.pipe_map}"
-            raise PipeConditionError(error_msg)
-
-        return get_required_pipe(pipe_code=chosen_pipe_code)
+        return evaluated_expression
 
     @override
     async def _run_controller_pipe(
@@ -342,11 +325,30 @@ class PipeCondition(PipeController):
                 multiplicity=requirement.multiplicity,
             )
 
-        chosen_pipe = await self._evaluate_expression_and_select_pipe(working_memory=working_memory)
+        evaluated_expression = await self._evaluate_expression(working_memory=working_memory)
+
+        # Select the pipe based on the evaluated expression
+        chosen_pipe_code = next(
+            (
+                pipe_condition_pipe_map.pipe_code
+                for pipe_condition_pipe_map in self.pipe_map
+                if pipe_condition_pipe_map.expression_result == evaluated_expression
+            ),
+            self.default_pipe_code,
+        )
+
+        # Validate that a pipe code was found
+        if not chosen_pipe_code:
+            error_msg = f"No pipe code found for evaluated expression '{evaluated_expression}' in pipe {self.code}:"
+            error_msg += f"\n\nExpression: {self.applied_expression_template}"
+            error_msg += f"\n\nPipe map: {self.pipe_map}"
+            raise PipeConditionError(error_msg)
 
         # Handle continue case
-        if SpecificPipe.is_continue(chosen_pipe.code):
+        if SpecificPipe.is_continue(chosen_pipe_code):
             return PipeOutput(working_memory=working_memory)
+
+        chosen_pipe = get_required_pipe(pipe_code=chosen_pipe_code)
 
         # Create condition details for tracking
         condition_details = self._make_pipe_condition_details(
