@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, ClassVar, cast
 
 from jinja2 import TemplateSyntaxError
@@ -33,7 +34,8 @@ class TemplateLibrary(TemplateProviderAbstract, RootModel[TemplateLibraryRoot]):
 
     @override
     def setup(self) -> None:
-        template_toml_paths = find_files_in_dir(dir_path="pipelex/tools/templating/templates", pattern="*.toml", is_recursive=True)
+        templates_dir = Path(__file__).parent / "templates"
+        template_toml_paths = find_files_in_dir(dir_path=str(templates_dir), pattern="*.toml", is_recursive=True)
         for template_toml_path in template_toml_paths:
             self._load_from_toml(toml_path=str(template_toml_path))
         self.validate_templates(template_category=Jinja2TemplateCategory.LLM_PROMPT)

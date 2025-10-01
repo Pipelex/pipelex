@@ -194,10 +194,6 @@ class ConceptFactory:
                         source=blueprint.source,
                     ) from exc
 
-                # Execute the generated Python code to register the class
-                # exec_globals: dict[str, Any] = {}
-                # exec(python_code, exec_globals)
-
                 # Register the generated class
                 KajsonManager.get_class_registry().register_class(the_generated_class)
 

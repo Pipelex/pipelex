@@ -5,7 +5,6 @@ from typing import Final
 
 REQUIRED_PIPELEX_SUBDIRS: Final[list[str]] = [
     "pipelines",
-    "templates",
 ]
 
 

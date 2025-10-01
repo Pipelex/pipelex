@@ -9,7 +9,7 @@ from pipelex.cogt.model_routing.routing_profile_factory import (
     RoutingProfileLibraryBlueprint,
 )
 from pipelex.config import get_pipelex_config
-from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.types import Self
 
 RoutingProfileLibraryRoot = dict[str, RoutingProfile]
@@ -47,9 +47,6 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         except FileNotFoundError as not_found_exc:
             msg = f"Failed to load routing profile library from file '{routing_profile_library_path}': {not_found_exc}"
             raise RoutingProfileLibraryNotFoundError(msg) from not_found_exc
-        except TOMLValidationError as toml_validation_exc:
-            msg = f"Failed to load routing profile library from file '{routing_profile_library_path}': {toml_validation_exc}"
-            raise RoutingProfileLibraryError(msg) from toml_validation_exc
 
         try:
             catalog_blueprint = RoutingProfileLibraryBlueprint.model_validate(catalog_dict)

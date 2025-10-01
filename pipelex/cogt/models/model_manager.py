@@ -15,7 +15,7 @@ from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_pipelex_config
 from pipelex.exceptions import LibraryError
 from pipelex.tools.misc.json_utils import deep_update
-from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path, validate_toml_file
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
 class ModelManager(ModelManagerAbstract):
@@ -42,21 +42,6 @@ class ModelManager(ModelManagerAbstract):
         self.inference_backend_library.load()
         deck_blueprint = self.load_deck_blueprint()
         self.model_deck = self.build_deck(model_deck_blueprint=deck_blueprint)
-
-    @classmethod
-    def _validate_toml_files(cls) -> None:
-        log.debug("LibraryManager deck TOML file formatting")
-
-        # Validation of LLM deck paths
-        deck_paths = get_pipelex_config().cogt.inference_config.get_model_deck_paths()
-        for deck_path in deck_paths:
-            if os.path.exists(deck_path):
-                try:
-                    validate_toml_file(deck_path)
-                except TOMLValidationError as exc:
-                    msg = f"TOML validation failed for LLM deck file '{deck_path}': {exc}"
-                    log.error(msg)
-                    raise LibraryError(msg) from exc
 
     @classmethod
     def load_deck_blueprint(cls) -> ModelDeckBlueprint:

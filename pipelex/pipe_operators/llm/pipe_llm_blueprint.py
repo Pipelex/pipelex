@@ -41,9 +41,9 @@ class PipeLLMBlueprint(PipeBlueprint):
     @field_validator("nb_output", mode="after")
     @classmethod
     def validate_nb_output(cls, value: int | None = None) -> int | None:
-        if value and value < 1:
-            msg = "PipeLLMBlueprint nb_output must be greater than 0"
-            raise PipeDefinitionError(msg)
+        if value and value < 2:
+            msg = "PipeLLMBlueprint nb_output must be at least 2"
+            raise PipeDefinitionError(message=msg)
         return value
 
     @model_validator(mode="after")

@@ -8,11 +8,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.exceptions import (
     PipelexConfigurationError,
 )
-from pipelex.tools.misc.toml_utils import (
-    clean_trailing_whitespace,
-    validate_toml_content,
-    validate_toml_file,
-)
+from pipelex.tools.misc.file_utils import load_text_from_path
 from pipelex.types import Self
 
 
@@ -48,31 +44,15 @@ class PipelexInterpreter(BaseModel):
             raise PipelexConfigurationError(msg)
         return self
 
-    @model_validator(mode="after")
-    def validate_file_path(self) -> Self:
-        if self.file_path:
-            validate_toml_file(path=str(self.file_path))
-        if self.file_content:
-            validate_toml_content(content=self.file_content, file_path=str(self.file_path))
-        return self
-
-    def _read_and_reformat(self) -> str:
+    def _get_content(self) -> str:
         """Load PLX content from file_path or use file_content directly."""
         if self.file_path:
-            with open(self.file_path, encoding="utf-8") as file:
-                file_content = file.read()
-
-            # Clean trailing whitespace and write back if needed
-            cleaned_content = clean_trailing_whitespace(file_content)
-            if file_content != cleaned_content:
-                with open(self.file_path, "w", encoding="utf-8") as file:
-                    file.write(cleaned_content)
-                return cleaned_content
-            return file_content
-        if self.file_content is None:
+            return load_text_from_path(path=str(self.file_path))
+        elif self.file_content:
+            return self.file_content
+        else:
             msg = "file_content must be provided if file_path is not provided"
             raise PipelexConfigurationError(msg)
-        return self.file_content
 
     @staticmethod
     def is_pipelex_file(file_path: Path) -> bool:
@@ -120,7 +100,7 @@ class PipelexInterpreter(BaseModel):
 
     def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
         """Make a PipelexBundleBlueprint from the file_path or file_content"""
-        file_content = self._read_and_reformat()
+        file_content = self._get_content()
         blueprint_dict = self._parse_plx_content(file_content)
         if self.file_path:
             blueprint_dict.update(source=str(self.file_path))

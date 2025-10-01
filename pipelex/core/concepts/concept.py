@@ -80,7 +80,7 @@ class Concept(BaseModel):
             except TypeError:
                 pass
 
-            # Check if concept_1 has a field that is of type concept_2_class
+            # Check if concept_1 has compatible fields with concept_2
             return ClassRegistryUtils.has_compatible_field(concept_1_class, concept_2_class)
         return False
 
