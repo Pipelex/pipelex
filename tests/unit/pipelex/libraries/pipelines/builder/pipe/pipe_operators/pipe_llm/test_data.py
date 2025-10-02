@@ -84,7 +84,7 @@ class PipeLLMTestCases:
             type="PipeLLM",
             description="Generate with settings",
             llm=LLMSetting(
-                llm_handle="gpt-5-mini",
+                llm_handle="claude-4-sonnet",
                 temperature=0.7,
                 max_tokens=None,  # "auto" is handled at conversion to core
             ),
@@ -135,7 +135,7 @@ class PipeLLMTestCases:
             nb_output=None,
             output="Item",
             prompt_template="Generate items",
-            llm="gpt-5-mini",
+            llm="claude-4-sonnet",
         ),
     )
 
@@ -158,7 +158,7 @@ class PipeLLMTestCases:
             multiple_output=None,
             output="Item",
             prompt_template="Generate items",
-            llm="gpt-5-mini",
+            llm="claude-4-sonnet",
         ),
     )
 
