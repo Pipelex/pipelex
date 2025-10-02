@@ -24,7 +24,7 @@ def make_mermaid_url(mermaid_code: str) -> str:
         },
     }
     encoded = encode_pako_from_string(json.dumps(as_dict))
-    return f"https://mermaid.ink/img/{encoded}"
+    return f"https://mermaid.ink/svg/{encoded}"
 
 
 def clean_str_for_mermaid_node_title(text: str) -> str:
