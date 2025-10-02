@@ -7,71 +7,83 @@ from pipelex.exceptions import PipeDefinitionError
 def sort_pipes_by_dependencies(
     pipes: dict[str, PipeBlueprintUnion],
 ) -> list[tuple[str, PipeBlueprintUnion]]:
-    """Sort pipes by their dependencies using topological sort.
+    """Sort pipes by their dependencies using depth-first pre-order traversal.
 
-    Uses Kahn's algorithm to ensure pipes are ordered so that all dependencies
-    come before the pipes that depend on them. This is essential for proper
-    pipe initialization and validation.
+    This performs a depth-first traversal where controllers appear before their dependencies,
+    and dependencies are visited in the order specified by the controller (e.g., step order
+    for PipeSequence). This ordering is intuitive for understanding pipeline structure.
 
     Args:
         pipes: Dictionary mapping pipe_code to PipeBlueprintUnion
 
     Returns:
-        List of (pipe_code, pipe_blueprint) tuples sorted by dependencies.
-        Pipes with no dependencies come first, followed by pipes that depend
-        on them, and so on.
+        List of (pipe_code, pipe_blueprint) tuples sorted with controllers before dependencies.
+        For PipeSequence, dependencies follow step order. For others, alphabetical order.
 
     Raises:
         PipeDefinitionError: If circular dependencies are detected among pipes
 
     Example:
         >>> pipes = {
-        ...     "pipe_c": pipe_c_blueprint,  # depends on pipe_a and pipe_b
+        ...     "pipe_c": pipe_c_blueprint,  # sequence with steps: pipe_a, pipe_b
         ...     "pipe_a": pipe_a_blueprint,  # no dependencies
-        ...     "pipe_b": pipe_b_blueprint,  # depends on pipe_a
+        ...     "pipe_b": pipe_b_blueprint,  # no dependencies
         ... }
         >>> sorted_pipes = sort_pipes_by_dependencies(pipes)
         >>> [code for code, _ in sorted_pipes]
-        ['pipe_a', 'pipe_b', 'pipe_c']
+        ['pipe_c', 'pipe_a', 'pipe_b']
     """
-    # Build dependency graph
-    in_degree: dict[str, int] = {}
-    adjacency_list: dict[str, set[str]] = {}
+    # Find root pipes (those not depended upon by anyone)
+    all_dependencies: set[str] = set()
+    for pipe_blueprint in pipes.values():
+        all_dependencies.update(pipe_blueprint.pipe_dependencies)
 
-    # Initialize all pipes
-    for pipe_code in pipes:
-        in_degree[pipe_code] = 0
-        adjacency_list[pipe_code] = set()
+    root_pipes = [code for code in pipes if code not in all_dependencies]
 
-    # Build the graph: if pipe A depends on pipe B, then B -> A (B must come before A)
-    for pipe_code, pipe_blueprint in pipes.items():
-        dependencies = pipe_blueprint.pipe_dependencies
-        for dep_code in dependencies:
-            # Only track dependencies on pipes that exist in this bundle
-            if dep_code in pipes:
-                adjacency_list[dep_code].add(pipe_code)
-                in_degree[pipe_code] += 1
-
-    # Kahn's algorithm for topological sort
-    queue: list[str] = [pipe_code for pipe_code, degree in in_degree.items() if degree == 0]
+    # Depth-first traversal to order pipes
+    visited: set[str] = set()
+    visiting: set[str] = set()  # For cycle detection
     sorted_pipes: list[tuple[str, PipeBlueprintUnion]] = []
 
-    while queue:
-        # Sort queue to ensure deterministic ordering for pipes at the same level
-        queue.sort()
-        current = queue.pop(0)
-        sorted_pipes.append((current, pipes[current]))
+    def visit(pipe_code: str) -> None:
+        if pipe_code in visited:
+            return
+        if pipe_code in visiting:
+            msg = f"Circular dependency detected involving pipe: {pipe_code}"
+            raise PipeDefinitionError(message=msg)
+        if pipe_code not in pipes:
+            # Dependency not in this bundle, skip it
+            return
 
-        # Process all pipes that depend on the current pipe
-        for dependent in sorted(adjacency_list[current]):
-            in_degree[dependent] -= 1
-            if in_degree[dependent] == 0:
-                queue.append(dependent)
+        visiting.add(pipe_code)
+        pipe_blueprint = pipes[pipe_code]
 
-    # Check for circular dependencies
-    if len(sorted_pipes) != len(pipes):
-        remaining_pipes = set(pipes.keys()) - {code for code, _ in sorted_pipes}
-        msg = f"Circular dependency detected among pipes: {remaining_pipes}"
-        raise PipeDefinitionError(message=msg)
+        # Add current pipe first (pre-order)
+        sorted_pipes.append((pipe_code, pipe_blueprint))
+
+        # Visit dependencies in order
+        ordered_deps = pipe_blueprint.ordered_pipe_dependencies
+        if ordered_deps:
+            # Use ordered dependencies (e.g., PipeSequence steps)
+            for dep_code in ordered_deps:
+                if dep_code in pipes:
+                    visit(dep_code)
+        else:
+            # Use alphabetical order for determinism
+            for dep_code in sorted(pipe_blueprint.pipe_dependencies):
+                if dep_code in pipes:
+                    visit(dep_code)
+
+        visited.add(pipe_code)
+        visiting.remove(pipe_code)
+
+    # Start traversal from root pipes (sorted for determinism)
+    for pipe_code in sorted(root_pipes):
+        visit(pipe_code)
+
+    # Ensure all pipes are included (handle disconnected components)
+    for pipe_code in sorted(pipes.keys()):
+        if pipe_code not in visited:
+            visit(pipe_code)
 
     return sorted_pipes

@@ -16,3 +16,12 @@ class PipeSequenceBlueprint(PipeBlueprint):
     def pipe_dependencies(self) -> set[str]:
         """Return the set of pipe codes from the sequence steps."""
         return {step.pipe for step in self.steps}
+
+    @property
+    @override
+    def ordered_pipe_dependencies(self) -> list[str]:
+        """Return the ordered list of pipe codes from the sequence steps.
+
+        For sequences, the order of steps matters, so we preserve it.
+        """
+        return [step.pipe for step in self.steps]

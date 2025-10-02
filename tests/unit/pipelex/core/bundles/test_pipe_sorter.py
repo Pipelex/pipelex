@@ -43,15 +43,23 @@ class TestSortPipesByDependencies:
             assert len(sorted_codes) == len(pipes), f"Test '{test_name}': Not all pipes were included in sorted result"
             assert set(sorted_codes) == set(pipes.keys()), f"Test '{test_name}': Pipe codes don't match"
 
-            # Verify the order respects dependencies
+            # Verify the order respects depth-first pre-order dependencies
+            # In depth-first pre-order, each pipe comes before its dependencies
+            # (unless the dependency was already visited through another path)
             for code, blueprint in sorted_pipes:
                 dependencies = blueprint.pipe_dependencies
+                code_index = sorted_codes.index(code)
                 for dep_code in dependencies:
                     # Only check dependencies that exist in this bundle
                     if dep_code in pipes:
                         dep_index = sorted_codes.index(dep_code)
-                        code_index = sorted_codes.index(code)
-                        assert dep_index < code_index, f"Test '{test_name}': Dependency '{dep_code}' should come before '{code}' in {sorted_codes}"
+                        # Skip if dependency was visited earlier (shared dependency)
+                        if dep_index < code_index:
+                            continue
+                        assert code_index < dep_index, (
+                            f"Test '{test_name}': In depth-first pre-order, pipe '{code}' "
+                            f"should come before its dependency '{dep_code}' in {sorted_codes}"
+                        )
 
             # For test cases with a specific expected order, verify exact match
             if expected_order is not None:

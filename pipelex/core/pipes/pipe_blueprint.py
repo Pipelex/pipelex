@@ -73,6 +73,18 @@ class PipeBlueprint(BaseModel):
         """
         return set()
 
+    @property
+    def ordered_pipe_dependencies(self) -> list[str] | None:
+        """Return ordered dependencies if order matters (e.g., for PipeSequence steps).
+
+        This is overridden by controllers where dependency order is significant,
+        such as PipeSequence where steps should be processed in order.
+
+        Returns:
+            Ordered list of pipe codes if order matters, None otherwise
+        """
+        return None
+
     @field_validator("type", mode="after")
     @staticmethod
     def validate_pipe_type(value: Any) -> Any:
