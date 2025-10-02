@@ -37,6 +37,10 @@ default = "pipelex_inference"
 "gpt-image-1" = "openai"
 "mistral-ocr" = "mistral"
 
+[profiles.all_bedrock]
+description = "Use Bedrock backend for all its supported models"
+default = "bedrock"
+
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"
 default = "anthropic"
@@ -48,6 +52,7 @@ default = "google"
 [profiles.all_azure_openai]
 description = "Use Azure OpenAI backend for all its supported models"
 default = "azure_openai"
+
 [profiles.custom_routing]
 description = "Custom routing"
 default = "pipelex_inference"
@@ -72,8 +77,6 @@ description = "Route models to various backends"
 "gpt-5-chat" = "azure_openai"
 
 "claude-4-sonnet" = "pipelex_inference"
-"claude-3.5-sonnet" = "bedrock"
-"claude-3.5-sonnet-v2" = "anthropic"
 "claude-3.7-sonnet" = "blackboxai"
 
 "gemini-2.5-flash-lite" = "pipelex_inference"

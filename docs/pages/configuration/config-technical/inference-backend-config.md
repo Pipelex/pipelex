@@ -187,6 +187,13 @@ base-claude = "claude-4-sonnet"
 base-gpt = "gpt-5"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"
+smart_llm = [
+    "claude-4.5-sonnet",
+    "claude-4.1-opus",
+    "claude-4-sonnet",
+    "gpt-5",
+    "gemini-2.5-pro",
+]
 
 # OCR aliases
 best-ocr = "mistral-ocr"
@@ -198,7 +205,7 @@ best-img-gen = "flux-pro/v1.1-ultra"
 fast-img-gen = "fast-lightning-sdxl"
 
 # Aliases can also define fallback chains
-llm_to_engineer = ["claude-4.1-opus", "gemini-2.5-pro"]
+llm_to_engineer = { llm_handle = "smart_llm", temperature = 0.2 }
 ```
 
 ### LLM Presets
