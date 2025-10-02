@@ -35,4 +35,4 @@ class Flow(StructuredContent):
 
     domain: str
     description: str | None = None
-    flow_element: dict[str, FlowElementUnion] = Field(default_factory=dict)
+    flow_elements: dict[str, FlowElementUnion] = Field(default_factory=dict)

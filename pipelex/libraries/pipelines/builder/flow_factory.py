@@ -44,7 +44,7 @@ class FlowFactory:
         Returns:
             Flow with controllers preserved and operators as signatures.
         """
-        pipes: dict[str, FlowElementUnion] = {}
+        flow_elements: dict[str, FlowElementUnion] = {}
 
         if bundle_blueprint.pipe:
             for pipe_code, pipe_blueprint in bundle_blueprint.pipe.items():
@@ -55,15 +55,15 @@ class FlowFactory:
                         pipe_blueprint,
                         PipeBatchBlueprint | PipeConditionBlueprint | PipeParallelBlueprint | PipeSequenceBlueprint,
                     ):  # pyright: ignore[reportUnnecessaryIsInstance]
-                        pipes[pipe_code] = pipe_blueprint
+                        flow_elements[pipe_code] = pipe_blueprint
                 else:
                     # Convert operators to signatures
-                    pipes[pipe_code] = FlowFactory._convert_blueprint_to_signature(pipe_code, pipe_blueprint)
+                    flow_elements[pipe_code] = FlowFactory._convert_blueprint_to_signature(pipe_code, pipe_blueprint)
 
         return Flow(
             domain=bundle_blueprint.domain,
             description=bundle_blueprint.description,
-            flow_element=pipes,
+            flow_elements=flow_elements,
         )
 
     @staticmethod
