@@ -16,8 +16,7 @@ class SubPipeSpec(StructuredContent):
 
     Attributes:
         the_pipe_code: The pipe code to execute. Must reference an existing pipe in the pipeline.
-        result: Optional name to assign to the pipe's output in the context.
-               If not specified, output is added directly to context.
+        result: Name to assign to the pipe's output in the context.
         nb_output: Fixed number of outputs to generate. Mutually exclusive with
                   multiple_output.
         multiple_output: When true, allows LLM to determine the number of outputs.
@@ -39,7 +38,7 @@ class SubPipeSpec(StructuredContent):
     model_config = ConfigDict(extra="forbid")
 
     the_pipe_code: str
-    result: str | None = None
+    result: str
     nb_output: int | None = None
     multiple_output: bool | None = None
     batch_over: str | None = None
