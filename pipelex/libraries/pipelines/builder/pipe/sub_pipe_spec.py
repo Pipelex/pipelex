@@ -15,7 +15,7 @@ class SubPipeSpec(StructuredContent):
     cardinality control and batch processing configuration.
 
     Attributes:
-        the_pipe_code: The pipe code to execute. Must reference an existing pipe in the pipeline.
+        pipe_code: The pipe code to execute. Must reference an existing pipe in the pipeline.
         result: Name to assign to the pipe's output in the context.
         nb_output: Fixed number of outputs to generate. Mutually exclusive with
                   multiple_output.
@@ -37,7 +37,7 @@ class SubPipeSpec(StructuredContent):
 
     model_config = ConfigDict(extra="forbid")
 
-    the_pipe_code: str
+    pipe_code: str
     result: str
     nb_output: int | None = None
     multiple_output: bool | None = None
@@ -54,18 +54,18 @@ class SubPipeSpec(StructuredContent):
     @model_validator(mode="after")
     def validate_batch_params(self) -> Self:
         if self.batch_over and not self.batch_as:
-            msg = f"In pipe '{self.the_pipe_code}': When 'batch_over' is specified, 'batch_as' must also be provided"
+            msg = f"In pipe '{self.pipe_code}': When 'batch_over' is specified, 'batch_as' must also be provided"
             raise PipeDefinitionError(msg)
 
         if self.batch_as and not self.batch_over:
-            msg = f"In pipe '{self.the_pipe_code}': When 'batch_as' is specified, 'batch_over' must also be provided"
+            msg = f"In pipe '{self.pipe_code}': When 'batch_as' is specified, 'batch_over' must also be provided"
             raise PipeDefinitionError(msg)
 
         return self
 
     def to_blueprint(self) -> SubPipeBlueprint:
         return SubPipeBlueprint(
-            pipe=self.the_pipe_code,
+            pipe=self.pipe_code,
             result=self.result,
             nb_output=self.nb_output,
             multiple_output=self.multiple_output,

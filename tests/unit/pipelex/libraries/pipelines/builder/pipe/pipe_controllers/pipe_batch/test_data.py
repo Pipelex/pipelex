@@ -9,7 +9,7 @@ class PipeBatchTestCases:
     SIMPLE_BATCH = (
         "simple_batch",
         PipeBatchSpec(
-            the_pipe_code="batch_processor",
+            pipe_code="batch_processor",
             description="Process items in batch",
             inputs={"items": "ItemList"},
             output="ProcessedItems",
@@ -30,7 +30,7 @@ class PipeBatchTestCases:
     BATCH_WITH_NAMES = (
         "batch_with_names",
         PipeBatchSpec(
-            the_pipe_code="named_batch",
+            pipe_code="named_batch",
             description="Batch with custom names",
             inputs={"data": "DataList"},
             output="Results",

@@ -48,7 +48,7 @@ class PipeParallelSpec(PipeSpec):
             )
             raise PipeDefinitionError(
                 message=msg,
-                pipe_code=self.the_pipe_code,
+                pipe_code=self.pipe_code,
                 description=self.description,
             )
         return self

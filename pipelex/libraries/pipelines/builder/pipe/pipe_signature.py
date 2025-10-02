@@ -37,7 +37,7 @@ class PipeSpec(StructuredContent):
     Controllers are used to control the flow of the pipeline, and operators are used to perform specific tasks.
     """
 
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
+    pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     type: Any = Field(description=f"Pipe type. It is defined with type `Any` but validated at runtime and it must be one of: {AllowedPipeTypes}")
     category: Any = Field(
         description=f"Pipe category. It is defined with type `Any` but validated at runtime and it must be one of: {AllowedPipeCategories}"
@@ -48,9 +48,9 @@ class PipeSpec(StructuredContent):
     )
     output: str = Field(description="Output concept code in PascalCase format!! Very important")
 
-    @field_validator("the_pipe_code", mode="before")
+    @field_validator("pipe_code", mode="before")
     @classmethod
-    def validate_the_pipe_code(cls, value: str) -> str:
+    def validate_pipe_code(cls, value: str) -> str:
         return cls.validate_pipe_code_syntax(value)
 
     @field_validator("type", mode="after")
