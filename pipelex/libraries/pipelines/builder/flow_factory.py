@@ -5,8 +5,8 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
 from pipelex.libraries.pipelines.builder.builder import PipelexBundleSpec
+from pipelex.libraries.pipelines.builder.flow import Flow, FlowElementUnion
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSignature
-from pipelex.libraries.pipelines.builder.pipeline_orchestration import PipelineOrchestration, PipeOrchestrationUnion
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -16,12 +16,12 @@ from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequen
 class PipelineOrchestrationFactory:
     """Factory for creating PipelineOrchestration from PipelexBundleSpec or PLX files.
 
-    Converts a complete bundle specification into a simplified orchestration view
+    Converts a complete bundle specification into a simplified flow view
     by keeping pipe controllers as-is and converting pipe operators to signatures.
     """
 
     @staticmethod
-    def make_from_plx_file(plx_file_path: Path | str) -> PipelineOrchestration:
+    def make_from_plx_file(plx_file_path: Path | str) -> Flow:
         """Create PipelineOrchestration from a PLX file.
 
         Args:
@@ -35,7 +35,7 @@ class PipelineOrchestrationFactory:
         return PipelineOrchestrationFactory.make_from_bundle_blueprint(bundle_blueprint)
 
     @staticmethod
-    def make_from_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint) -> PipelineOrchestration:
+    def make_from_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint) -> Flow:
         """Convert a PipelexBundleBlueprint to a PipelineOrchestration.
 
         Args:
@@ -44,7 +44,7 @@ class PipelineOrchestrationFactory:
         Returns:
             PipelineOrchestration with controllers preserved and operators as signatures.
         """
-        pipes: dict[str, PipeOrchestrationUnion] = {}
+        pipes: dict[str, FlowElementUnion] = {}
 
         if bundle_blueprint.pipe:
             for pipe_code, pipe_blueprint in bundle_blueprint.pipe.items():
@@ -60,10 +60,10 @@ class PipelineOrchestrationFactory:
                     # Convert operators to signatures
                     pipes[pipe_code] = PipelineOrchestrationFactory._convert_blueprint_to_signature(pipe_code, pipe_blueprint)
 
-        return PipelineOrchestration(
+        return Flow(
             domain=bundle_blueprint.domain,
             description=bundle_blueprint.description,
-            pipes=pipes,
+            flow_element=pipes,
         )
 
     @staticmethod
@@ -98,7 +98,7 @@ class PipelineOrchestrationFactory:
         )
 
     @staticmethod
-    def make_from_bundle_spec(bundle_spec: PipelexBundleSpec) -> PipelineOrchestration:
+    def make_from_bundle_spec(bundle_spec: PipelexBundleSpec) -> Flow:
         """Convert a PipelexBundleSpec to a PipelineOrchestration.
 
         Args:

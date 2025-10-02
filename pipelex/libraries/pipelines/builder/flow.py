@@ -7,13 +7,13 @@ from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeCond
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 
-# Union of possible pipe representations in orchestration view
+# Union of possible pipe representations in flow view
 # Controllers keep their full blueprint, operators are converted to signatures
-PipeOrchestrationUnion = PipeSignature | PipeBatchBlueprint | PipeConditionBlueprint | PipeParallelBlueprint | PipeSequenceBlueprint
+FlowElementUnion = PipeSignature | PipeBatchBlueprint | PipeConditionBlueprint | PipeParallelBlueprint | PipeSequenceBlueprint
 
 
-class PipelineOrchestration(StructuredContent):
-    """Simplified view of a pipeline's orchestration structure.
+class Flow(StructuredContent):
+    """Simplified view of a pipeline's flow structure.
 
     This class provides a high-level overview of a pipeline's flow without
     implementation details. It shows:
@@ -35,4 +35,4 @@ class PipelineOrchestration(StructuredContent):
 
     domain: str
     description: str | None = None
-    pipes: dict[str, PipeOrchestrationUnion] = Field(default_factory=dict)
+    flow_element: dict[str, FlowElementUnion] = Field(default_factory=dict)

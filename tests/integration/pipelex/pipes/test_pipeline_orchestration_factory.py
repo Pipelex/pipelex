@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.libraries.pipelines.builder.pipeline_orchestration_factory import PipelineOrchestrationFactory
+from pipelex.libraries.pipelines.builder.flow_factory import PipelineOrchestrationFactory
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, remove_folder
 from pipelex.tools.misc.json_utils import save_as_json_to_path
@@ -13,7 +13,7 @@ from tests.conftest import TEST_OUTPUTS_DIR
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipelineOrchestrationFactory:
-    """Test PipelineOrchestrationFactory loading PLX files and converting to orchestration view."""
+    """Test PipelineOrchestrationFactory loading PLX files and converting to flow view."""
 
     @pytest.mark.parametrize(
         ("plx_name", "plx_file"),
@@ -31,10 +31,10 @@ class TestPipelineOrchestrationFactory:
 
         This test demonstrates the PipelineOrchestrationFactory's ability to:
         1. Load a PLX file
-        2. Convert it to a simplified orchestration view
+        2. Convert it to a simplified flow view
         3. Serialize the result to JSON for inspection
 
-        The orchestration view shows:
+        The flow view shows:
         - Pipe controllers with full details (sequence, parallel, condition, batch)
         - Pipe operators as signatures only (contract without implementation)
         """
@@ -51,31 +51,29 @@ class TestPipelineOrchestrationFactory:
 
             log.info(f"Loading PLX file: {plx_file_path}")
 
-            # Convert to pipeline orchestration
-            orchestration = PipelineOrchestrationFactory.make_from_plx_file(plx_file_path)
+            # Convert to pipeline flow
+            flow = PipelineOrchestrationFactory.make_from_plx_file(plx_file_path)
 
             # Pretty print for console output
-            pretty_print(orchestration, title=f"Pipeline Orchestration: {plx_name}")
+            pretty_print(flow, title=f"Pipeline flow: {plx_name}")
 
             # Save as JSON to results directory
             json_output_path = os.path.join(result_dir_path, "pipeline_orchestration.json")
-            save_as_json_to_path(object_to_save=orchestration, path=json_output_path)
+            save_as_json_to_path(object_to_save=flow, path=json_output_path)
 
-            log.info(f"Saved orchestration to: {json_output_path}")
+            log.info(f"Saved flow to: {json_output_path}")
 
-            # Verify the orchestration was created correctly
-            assert orchestration is not None
-            assert orchestration.domain is not None
-            assert orchestration.pipes is not None
-            assert len(orchestration.pipes) > 0
+            # Verify the flow was created correctly
+            assert flow is not None
+            assert flow.domain is not None
+            assert flow.flow_element is not None
+            assert len(flow.flow_element) > 0
 
             # Log some details about what we found
-            controller_count = sum(1 for pipe in orchestration.pipes.values() if pipe.category == "PipeController")
-            operator_count = sum(1 for pipe in orchestration.pipes.values() if pipe.category == "PipeSignature")
+            controller_count = sum(1 for pipe in flow.flow_element.values() if pipe.category == "PipeController")
+            operator_count = sum(1 for pipe in flow.flow_element.values() if pipe.category == "PipeSignature")
 
-            log.info(
-                f"Orchestration contains {len(orchestration.pipes)} pipes: {controller_count} controllers, {operator_count} operators (as signatures)"
-            )
+            log.info(f"flow contains {len(flow.flow_element)} pipes: {controller_count} controllers, {operator_count} operators (as signatures)")
 
         finally:
             # Cleanup - remove the temporary result directory
@@ -86,10 +84,10 @@ class TestPipelineOrchestrationFactory:
         test_pipelines_dir = Path(__file__).parent.parent.parent.parent / "test_pipelines"
         plx_file_path = test_pipelines_dir / "discord_newsletter.plx"
 
-        orchestration = PipelineOrchestrationFactory.make_from_plx_file(plx_file_path)
+        flow = PipelineOrchestrationFactory.make_from_plx_file(plx_file_path)
 
         # Find the sequence pipe
-        sequence_pipe = orchestration.pipes.get("write_discord_newsletter")
+        sequence_pipe = flow.flow_element.get("write_discord_newsletter")
         assert sequence_pipe is not None
         assert sequence_pipe.type == "PipeSequence"
 
@@ -108,10 +106,10 @@ class TestPipelineOrchestrationFactory:
         test_pipelines_dir = Path(__file__).parent.parent.parent.parent / "test_pipelines"
         plx_file_path = test_pipelines_dir / "discord_newsletter.plx"
 
-        orchestration = PipelineOrchestrationFactory.make_from_plx_file(plx_file_path)
+        flow = PipelineOrchestrationFactory.make_from_plx_file(plx_file_path)
 
         # Find an operator pipe (LLM pipe) - converted to signature
-        operator_pipe = orchestration.pipes.get("summarize_discord_channel_update_for_new_members")
+        operator_pipe = flow.flow_element.get("summarize_discord_channel_update_for_new_members")
         assert operator_pipe is not None
         assert operator_pipe.category == "PipeSignature"
         assert operator_pipe.type == "PipeLLM"
