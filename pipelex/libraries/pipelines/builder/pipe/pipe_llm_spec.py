@@ -19,7 +19,6 @@ class AvailableLLM(StrEnum):
     CLAUDE_4_SONNET = "claude-4-sonnet"
     CLAUDE_4_1_OPUS = "claude-4.1-opus"
     GPT_5 = "gpt-5"
-    GPT_5_MINI = "gpt-5-mini"
     GEMINI_2_5_PRO = "gemini-2.5-pro"
     GEMINI_2_5_FLASH = "gemini-2.5-flash"
 
@@ -43,7 +42,7 @@ class LLMSkill(StrEnum):
             case LLMSkill.LLM_TO_RETRIEVE:
                 return AvailableLLM.GEMINI_2_5_FLASH
             case LLMSkill.LLM_CHEAP_FOR_EASY_QUESTIONS:
-                return AvailableLLM.GPT_5_MINI
+                return AvailableLLM.CLAUDE_4_SONNET
             case LLMSkill.LLM_TO_ANSWER_HARD_QUESTIONS:
                 return AvailableLLM.GPT_5
             case LLMSkill.LLM_FOR_VISUAL_ANALYSIS:
