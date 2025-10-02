@@ -66,14 +66,14 @@ class TestFlowFactory:
             # Verify the flow was created correctly
             assert flow is not None
             assert flow.domain is not None
-            assert flow.flow_element is not None
-            assert len(flow.flow_element) > 0
+            assert flow.flow_elements is not None
+            assert len(flow.flow_elements) > 0
 
             # Log some details about what we found
-            controller_count = sum(1 for pipe in flow.flow_element.values() if pipe.category == "PipeController")
-            operator_count = sum(1 for pipe in flow.flow_element.values() if pipe.category == "PipeSignature")
+            controller_count = sum(1 for pipe in flow.flow_elements.values() if pipe.category == "PipeController")
+            operator_count = sum(1 for pipe in flow.flow_elements.values() if pipe.category == "PipeSignature")
 
-            log.info(f"flow contains {len(flow.flow_element)} pipes: {controller_count} controllers, {operator_count} operators (as signatures)")
+            log.info(f"flow contains {len(flow.flow_elements)} pipes: {controller_count} controllers, {operator_count} operators (as signatures)")
 
         finally:
             # Cleanup - remove the temporary result directory
@@ -87,7 +87,7 @@ class TestFlowFactory:
         flow = FlowFactory.make_from_plx_file(plx_file_path)
 
         # Find the sequence pipe
-        sequence_pipe = flow.flow_element.get("write_discord_newsletter")
+        sequence_pipe = flow.flow_elements.get("write_discord_newsletter")
         assert sequence_pipe is not None
         assert sequence_pipe.type == "PipeSequence"
 
@@ -109,7 +109,7 @@ class TestFlowFactory:
         flow = FlowFactory.make_from_plx_file(plx_file_path)
 
         # Find an operator pipe (LLM pipe) - converted to signature
-        operator_pipe = flow.flow_element.get("summarize_discord_channel_update_for_new_members")
+        operator_pipe = flow.flow_elements.get("summarize_discord_channel_update_for_new_members")
         assert operator_pipe is not None
         assert operator_pipe.category == "PipeSignature"
         assert operator_pipe.type == "PipeLLM"
