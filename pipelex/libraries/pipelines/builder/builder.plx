@@ -28,7 +28,6 @@ steps = [
     { pipe = "detail_pipe_spec", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_specs" },
     { pipe = "pipe_builder_domain_information", result = "domain_information" },
     { pipe = "assemble_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
-    { pipe = "assemble_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
 ]
 
 [pipe.pipe_builder_domain_information]
