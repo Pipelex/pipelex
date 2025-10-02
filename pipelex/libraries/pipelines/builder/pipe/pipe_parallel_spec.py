@@ -28,7 +28,6 @@ class PipeParallelSpec(PipeSpec):
 
     type: Literal["PipeParallel"] = "PipeParallel"
     category: Literal["PipeController"] = "PipeController"
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     parallels: list[SubPipeSpec] = Field(description="List of SubPipeSpec instances to execute concurrently.")
     add_each_output: bool = Field(description="Whether to include individual pipe outputs in the combined result.")
     combined_output: str | None = Field(default=None, description="Optional ConceptCode in PascalCasefor the combined output structure.")

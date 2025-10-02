@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from typing import Any
 
 
@@ -204,6 +205,45 @@ def is_snake_case(word: str) -> bool:
 
 def is_pascal_case(word: str) -> bool:
     return re.match(r"^[A-Z][a-zA-Z0-9]*$", word) is not None
+
+
+def normalize_to_ascii(text: str) -> str:
+    """Normalize Unicode to ASCII, converting lookalikes and removing non-ASCII characters.
+
+    Uses NFKD (Compatibility Decomposition) to convert accented characters and
+    Unicode lookalikes to their ASCII equivalents, then strips remaining non-ASCII
+    characters. This prevents homograph/confusable attacks where visually identical
+    characters from different Unicode blocks (Cyrillic, Greek, etc.) are used.
+
+    Args:
+        text: String that may contain Unicode characters including confusables.
+
+    Returns:
+        ASCII-only string safe for identifiers (letters, numbers, underscores only).
+
+    Examples:
+        >>> normalize_to_ascii("OppositeConcept")  # Example with mixed text
+        'OppositeConcept'
+        >>> normalize_to_ascii("Café")
+        'Cafe'
+        >>> normalize_to_ascii("Naïve")
+        'Naive'
+        >>> normalize_to_ascii("hello_world")
+        'hello_world'
+        >>> normalize_to_ascii("Test123")
+        'Test123'
+
+    Note:
+        Cyrillic/Greek letters that look like Latin but don't decompose to ASCII
+        equivalents will be removed entirely (e.g., Cyrillic C (U+0421) looks like Latin C
+        but is a different base character). This is intentional to prevent security
+        issues from homograph attacks.
+
+    """
+    # NFKD: Compatibility decomposition (e.g., é -> e + combining accent)
+    normalized = unicodedata.normalize("NFKD", text)
+    # Keep only ASCII letters, numbers, and underscores
+    return "".join(c for c in normalized if ord(c) < 128 and (c.isalnum() or c == "_"))
 
 
 def matches_wildcard_pattern(text: str, pattern: str) -> bool:

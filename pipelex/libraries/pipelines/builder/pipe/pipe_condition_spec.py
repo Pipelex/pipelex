@@ -21,7 +21,6 @@ class PipeConditionSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeCondition"]] = "PipeCondition"
     category: SkipJsonSchema[Literal["PipeController"]] = "PipeController"
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     jinja2_expression_template: str = Field(description="Jinja2 expression to evaluate.")
     pipe_map: dict[str, str] = Field(..., description="Mapping `dict[str, str]` of condition results to pipe codes.")
     default_pipe_code: str | None = Field(

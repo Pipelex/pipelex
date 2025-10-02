@@ -27,7 +27,6 @@ class PipeBatchSpec(PipeSpec):
 
     type: Literal["PipeBatch"] = "PipeBatch"
     category: Literal["PipeController"] = "PipeController"
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     branch_pipe_code: str = Field(
         description="The pipe code to execute for each item in the input list. This pipe is instantiated once per item in parallel."
     )

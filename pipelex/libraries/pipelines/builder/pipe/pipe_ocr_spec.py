@@ -45,7 +45,6 @@ class PipeOcrSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeOcr"]] = "PipeOcr"
     category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     ocr: OcrSkill | str = Field(description="Use one of the recommended OCR choices")
     page_images: bool | None = Field(default=None, description="Whether to include detected images in the OCR output.")
     page_image_captions: bool | None = Field(default=None, description="Whether to generate captions for detected images using AI.")

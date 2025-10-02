@@ -16,7 +16,7 @@ from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringOrCo
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import StructuredContent
-from pipelex.tools.misc.string_utils import is_pascal_case, snake_to_pascal_case
+from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
 from pipelex.types import Self, StrEnum
 
 
@@ -161,19 +161,35 @@ class ConceptSpec(StructuredContent):
     @field_validator("the_concept_code", mode="before")
     @classmethod
     def validate_concept_code(cls, value: str) -> str:
+        # Split first to handle domain.ConceptCode format
         if "." in value:
             domain, concept_code = value.split(".")
-            if not is_pascal_case(concept_code):
-                log.warning(f"Concept code '{value}' is not PascalCase, converting to PascalCase")
-                pascal_cased_value = snake_to_pascal_case(concept_code)
+            # Only normalize the concept code part (not the domain)
+            normalized_concept_code = normalize_to_ascii(concept_code)
+
+            if normalized_concept_code != concept_code:
+                log.warning(
+                    f"Concept code '{value}' contained non-ASCII characters in concept part, normalized to '{domain}.{normalized_concept_code}'"
+                )
+
+            if not is_pascal_case(normalized_concept_code):
+                log.warning(f"Concept code '{domain}.{normalized_concept_code}' is not PascalCase, converting to PascalCase")
+                pascal_cased_value = snake_to_pascal_case(normalized_concept_code)
                 return f"{domain}.{pascal_cased_value}"
             else:
-                return value
-        elif not is_pascal_case(value):
-            log.warning(f"Concept code '{value}' is not PascalCase, converting to PascalCase")
-            return snake_to_pascal_case(value)
+                return f"{domain}.{normalized_concept_code}"
         else:
-            return value
+            # No dot, normalize the whole thing
+            normalized_value = normalize_to_ascii(value)
+
+            if normalized_value != value:
+                log.warning(f"Concept code '{value}' contained non-ASCII characters, normalized to '{normalized_value}'")
+
+            if not is_pascal_case(normalized_value):
+                log.warning(f"Concept code '{normalized_value}' is not PascalCase, converting to PascalCase")
+                return snake_to_pascal_case(normalized_value)
+            else:
+                return normalized_value
 
     @field_validator("refines", mode="before")
     @classmethod
@@ -217,6 +233,7 @@ class ConceptSpec(StructuredContent):
 
         if concept_string_or_code.count(".") == 1:
             domain, concept_code = concept_string_or_code.split(".")
+            # Validate domain code
             DomainBlueprint.validate_domain_code(code=domain)
             cls._post_validate_concept_code(concept_code=concept_code)
         else:
