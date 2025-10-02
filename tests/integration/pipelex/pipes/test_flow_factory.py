@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.libraries.pipelines.builder.flow_factory import PipelineOrchestrationFactory
+from pipelex.libraries.pipelines.builder.flow_factory import FlowFactory
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, remove_folder
 from pipelex.tools.misc.json_utils import save_as_json_to_path
@@ -12,8 +12,8 @@ from tests.conftest import TEST_OUTPUTS_DIR
 
 
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipelineOrchestrationFactory:
-    """Test PipelineOrchestrationFactory loading PLX files and converting to flow view."""
+class TestFlowFactory:
+    """Test FlowFactory loading PLX files and converting to flow view."""
 
     @pytest.mark.parametrize(
         ("plx_name", "plx_file"),
@@ -22,14 +22,14 @@ class TestPipelineOrchestrationFactory:
             ("tricky_questions", "tricky_questions.plx"),
         ],
     )
-    async def test_load_plx_and_convert_to_orchestration(
+    async def test_load_plx_and_convert_to_flow(
         self,
         plx_name: str,
         plx_file: str,
     ):
-        """Load a PLX file, convert to PipelineOrchestration, and save as JSON.
+        """Load a PLX file, convert to Flow, and save as JSON.
 
-        This test demonstrates the PipelineOrchestrationFactory's ability to:
+        This test demonstrates the FlowFactory's ability to:
         1. Load a PLX file
         2. Convert it to a simplified flow view
         3. Serialize the result to JSON for inspection
@@ -41,7 +41,7 @@ class TestPipelineOrchestrationFactory:
         # Setup result directory
         result_dir_path = get_incremental_directory_path(
             base_path=TEST_OUTPUTS_DIR,
-            base_name=f"orchestration_{plx_name}",
+            base_name=f"flow_{plx_name}",
         )
 
         try:
@@ -52,13 +52,13 @@ class TestPipelineOrchestrationFactory:
             log.info(f"Loading PLX file: {plx_file_path}")
 
             # Convert to pipeline flow
-            flow = PipelineOrchestrationFactory.make_from_plx_file(plx_file_path)
+            flow = FlowFactory.make_from_plx_file(plx_file_path)
 
             # Pretty print for console output
             pretty_print(flow, title=f"Pipeline flow: {plx_name}")
 
             # Save as JSON to results directory
-            json_output_path = os.path.join(result_dir_path, "pipeline_orchestration.json")
+            json_output_path = os.path.join(result_dir_path, "pipeline_flow.json")
             save_as_json_to_path(object_to_save=flow, path=json_output_path)
 
             log.info(f"Saved flow to: {json_output_path}")
@@ -79,12 +79,12 @@ class TestPipelineOrchestrationFactory:
             # Cleanup - remove the temporary result directory
             remove_folder(result_dir_path)
 
-    async def test_orchestration_preserves_sequence_structure(self):
+    async def test_flow_preserves_sequence_structure(self):
         """Verify that PipeSequence controllers preserve their step structure."""
         test_pipelines_dir = Path(__file__).parent.parent.parent.parent / "test_pipelines"
         plx_file_path = test_pipelines_dir / "discord_newsletter.plx"
 
-        flow = PipelineOrchestrationFactory.make_from_plx_file(plx_file_path)
+        flow = FlowFactory.make_from_plx_file(plx_file_path)
 
         # Find the sequence pipe
         sequence_pipe = flow.flow_element.get("write_discord_newsletter")
@@ -101,12 +101,12 @@ class TestPipelineOrchestrationFactory:
         for step in sequence_pipe.steps:
             log.info(f"  - {step.pipe} -> {step.result}")
 
-    async def test_orchestration_converts_operators_to_signatures(self):
+    async def test_flow_converts_operators_to_signatures(self):
         """Verify that pipe operators are converted to signatures (simplified view)."""
         test_pipelines_dir = Path(__file__).parent.parent.parent.parent / "test_pipelines"
         plx_file_path = test_pipelines_dir / "discord_newsletter.plx"
 
-        flow = PipelineOrchestrationFactory.make_from_plx_file(plx_file_path)
+        flow = FlowFactory.make_from_plx_file(plx_file_path)
 
         # Find an operator pipe (LLM pipe) - converted to signature
         operator_pipe = flow.flow_element.get("summarize_discord_channel_update_for_new_members")

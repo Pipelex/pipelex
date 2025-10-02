@@ -9,7 +9,7 @@ from pipelex.hub import get_report_delegate
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.libraries.pipelines.builder.builder import PipelexBundleSpec
 from pipelex.libraries.pipelines.builder.builder_loop import BuilderLoop
-from pipelex.libraries.pipelines.builder.flow_factory import PipelineOrchestrationFactory
+from pipelex.libraries.pipelines.builder.flow_factory import FlowFactory
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, save_text_to_path
@@ -181,7 +181,7 @@ def build_partial_cmd(
 
 
 @build_app.command("flow")
-def build_orchestration_cmd(
+def build_flow_cmd(
     brief: Annotated[
         str,
         typer.Argument(help="Brief description of what the pipeline should do"),
@@ -218,7 +218,7 @@ def build_orchestration_cmd(
             typer.echo(typer.style("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW))
             return
         pipelex_bundle_spec = pipe_output.main_stuff_as(content_type=PipelexBundleSpec)
-        flow = PipelineOrchestrationFactory.make_from_bundle_spec(bundle_spec=pipelex_bundle_spec)
+        flow = FlowFactory.make_from_bundle_spec(bundle_spec=pipelex_bundle_spec)
         json_output = flow.smart_dump()
         save_as_json_to_path(object_to_save=json_output, path=output_path)
         typer.echo(typer.style(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN))

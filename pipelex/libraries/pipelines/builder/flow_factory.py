@@ -13,8 +13,8 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParall
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 
 
-class PipelineOrchestrationFactory:
-    """Factory for creating PipelineOrchestration from PipelexBundleSpec or PLX files.
+class FlowFactory:
+    """Factory for creating Flow from PipelexBundleSpec or PLX files.
 
     Converts a complete bundle specification into a simplified flow view
     by keeping pipe controllers as-is and converting pipe operators to signatures.
@@ -22,27 +22,27 @@ class PipelineOrchestrationFactory:
 
     @staticmethod
     def make_from_plx_file(plx_file_path: Path | str) -> Flow:
-        """Create PipelineOrchestration from a PLX file.
+        """Create Flow from a PLX file.
 
         Args:
             plx_file_path: Path to the PLX file to load.
 
         Returns:
-            PipelineOrchestration with controllers preserved and operators as signatures.
+            Flow with controllers preserved and operators as signatures.
         """
         plx_path = Path(plx_file_path) if isinstance(plx_file_path, str) else plx_file_path
         bundle_blueprint = PipelexInterpreter(file_path=plx_path).make_pipelex_bundle_blueprint()
-        return PipelineOrchestrationFactory.make_from_bundle_blueprint(bundle_blueprint)
+        return FlowFactory.make_from_bundle_blueprint(bundle_blueprint)
 
     @staticmethod
     def make_from_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint) -> Flow:
-        """Convert a PipelexBundleBlueprint to a PipelineOrchestration.
+        """Convert a PipelexBundleBlueprint to a Flow.
 
         Args:
             bundle_blueprint: The bundle blueprint to convert.
 
         Returns:
-            PipelineOrchestration with controllers preserved and operators as signatures.
+            Flow with controllers preserved and operators as signatures.
         """
         pipes: dict[str, FlowElementUnion] = {}
 
@@ -58,7 +58,7 @@ class PipelineOrchestrationFactory:
                         pipes[pipe_code] = pipe_blueprint
                 else:
                     # Convert operators to signatures
-                    pipes[pipe_code] = PipelineOrchestrationFactory._convert_blueprint_to_signature(pipe_code, pipe_blueprint)
+                    pipes[pipe_code] = FlowFactory._convert_blueprint_to_signature(pipe_code, pipe_blueprint)
 
         return Flow(
             domain=bundle_blueprint.domain,
@@ -99,14 +99,14 @@ class PipelineOrchestrationFactory:
 
     @staticmethod
     def make_from_bundle_spec(bundle_spec: PipelexBundleSpec) -> Flow:
-        """Convert a PipelexBundleSpec to a PipelineOrchestration.
+        """Convert a PipelexBundleSpec to a Flow.
 
         Args:
             bundle_spec: The complete bundle specification to convert.
 
         Returns:
-            PipelineOrchestration with controllers preserved and operators as signatures.
+            Flow with controllers preserved and operators as signatures.
         """
         # Convert the spec to blueprint first, then use the blueprint converter
         bundle_blueprint = bundle_spec.to_blueprint()
-        return PipelineOrchestrationFactory.make_from_bundle_blueprint(bundle_blueprint)
+        return FlowFactory.make_from_bundle_blueprint(bundle_blueprint)
