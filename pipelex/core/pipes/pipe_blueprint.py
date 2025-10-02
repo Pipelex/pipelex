@@ -61,6 +61,18 @@ class PipeBlueprint(BaseModel):
     inputs: dict[str, str | InputRequirementBlueprint] | None = None
     output: str
 
+    @property
+    def pipe_dependencies(self) -> set[str]:
+        """Return the set of pipe codes that this pipe depends on.
+
+        This is overridden by PipeController subclasses to return their dependencies.
+        PipeOperators have no dependencies, so return an empty set.
+
+        Returns:
+            Set of pipe codes this pipe depends on
+        """
+        return set()
+
     @field_validator("type", mode="after")
     @staticmethod
     def validate_pipe_type(value: Any) -> Any:
