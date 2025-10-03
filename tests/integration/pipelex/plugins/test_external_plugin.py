@@ -6,6 +6,7 @@ from pipelex import log, pretty_print
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
+from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
@@ -61,9 +62,11 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
 class TestExternalPlugin:
     async def test_external_llm_worker(self):
         llm_worker = MockExternalLLMWorker(reporting_delegate=get_report_delegate())
-        llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
-            system_text=None,
-            user_text=LLMTestConstants.USER_TEXT_SHORT,
+        llm_job = LLMJobFactory.make_llm_job(
+            llm_prompt=LLMPrompt(
+                system_text=None,
+                user_text=LLMTestConstants.USER_TEXT_SHORT,
+            ),
             llm_job_params=LLMJobParams(
                 temperature=0.5,
                 max_tokens=None,

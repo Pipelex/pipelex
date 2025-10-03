@@ -3,7 +3,9 @@ import asyncio
 import pytest
 
 from pipelex import pretty_print
+from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
+from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker, get_model_deck, get_report_delegate
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
@@ -30,8 +32,14 @@ class TestLLMReport:
         pretty_print(prompt_text)
         llm_worker = get_llm_worker(llm_handle=llm_setting.llm_handle)
         llm_job_params = llm_setting.make_llm_job_params()
-        llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
-            user_text=prompt_text,
+        llm_job = LLMJobFactory.make_llm_job(
+            llm_prompt=LLMPrompt(
+                user_text=prompt_text,
+            ),
+            llm_job_config=LLMJobConfig(
+                is_streaming_enabled=False,
+                max_retries=3,
+            ),
             llm_job_params=llm_job_params,
         )
         return llm_worker, llm_job

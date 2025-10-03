@@ -1,8 +1,9 @@
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.cogt.llm.llm_job_components import LLMJobParams
+from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
+from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker
 from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec
 from tests.integration.pipelex.libraries.pipelines.builder.concept.integration_test_data import ConceptSpecGenerationTestCases
@@ -38,9 +39,15 @@ class TestConceptSpecGeneration:
         log.info(f"Using llm_worker: {llm_worker.desc}")
 
         # Create the LLM job with the prompt
-        llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
-            system_text="You are an expert at generating concept specifications for a data modeling system.",
-            user_text=user_prompt,
+        llm_job = LLMJobFactory.make_llm_job(
+            llm_prompt=LLMPrompt(
+                system_text="You are an expert at generating concept specifications for a data modeling system.",
+                user_text=user_prompt,
+            ),
+            llm_job_config=LLMJobConfig(
+                is_streaming_enabled=False,
+                max_retries=3,
+            ),
             llm_job_params=llm_job_params,
         )
 
