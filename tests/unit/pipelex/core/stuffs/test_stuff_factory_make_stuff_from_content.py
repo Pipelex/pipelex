@@ -102,9 +102,7 @@ class TestMakeStuffFromStuffContentUsingSearchDomains:
     def test_stuffcontent_with_native_concept(self, mocker: MockerFixture):
         """Test StuffContent with native concept class name."""
         mock_concept = mocker.Mock()
-        mock_get_native_concept = mocker.patch(
-            "pipelex.core.stuffs.stuff_factory.get_native_concept", return_value=mock_concept
-        )
+        mock_get_native_concept = mocker.patch("pipelex.core.stuffs.stuff_factory.get_native_concept", return_value=mock_concept)
 
         text_content = TextContent(text="test")
 
