@@ -2,6 +2,7 @@ from typing import Annotated, cast
 
 from pydantic import ConfigDict, Field, ValidationError, field_validator
 
+from pipelex.core.bundles.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
@@ -128,14 +129,25 @@ class PipelexBundleSpec(StructuredContent):
 
         pipe: dict[str, PipeBlueprintUnion] | None = None
         if self.pipe:
-            pipe = {}
+            # First, convert all specs to blueprints
+            pipe_blueprints: dict[str, PipeBlueprintUnion] = {}
             for pipe_code, pipe_spec in self.pipe.items():
                 try:
-                    pipe[pipe_code] = pipe_spec.to_blueprint()
+                    pipe_blueprints[pipe_code] = pipe_spec.to_blueprint()
                 except ValidationError as exc:
                     msg = f"Failed to create pipe blueprint from spec for pipe code {pipe_code}: {format_pydantic_validation_error(exc)}"
                     pipe_failure = PipeFailure(pipe_spec=pipe_spec, error_message=msg)
                     raise PipeSpecError(message=msg, pipe_failure=pipe_failure) from exc
+
+            # Then, sort blueprints by dependencies
+            try:
+                sorted_pipe_items = sort_pipes_by_dependencies(pipe_blueprints)
+            except Exception as exc:
+                msg = f"Failed to sort pipes by dependencies: {exc}"
+                raise PipeBuilderError(msg) from exc
+
+            # Finally, create the ordered dict
+            pipe = dict(sorted_pipe_items)
 
         return PipelexBundleBlueprint(
             domain=self.domain,
