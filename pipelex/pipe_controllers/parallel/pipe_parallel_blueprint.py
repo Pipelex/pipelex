@@ -1,6 +1,7 @@
 from typing import Literal
 
 from pydantic import field_validator, model_validator
+from typing_extensions import override
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -15,6 +16,12 @@ class PipeParallelBlueprint(PipeBlueprint):
     parallels: list[SubPipeBlueprint]
     add_each_output: bool = False
     combined_output: str | None = None
+
+    @property
+    @override
+    def pipe_dependencies(self) -> set[str]:
+        """Return the set of pipe codes from the parallel branches."""
+        return {parallel.pipe for parallel in self.parallels}
 
     @field_validator("combined_output", mode="before")
     @classmethod
