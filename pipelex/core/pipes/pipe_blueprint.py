@@ -61,6 +61,30 @@ class PipeBlueprint(BaseModel):
     inputs: dict[str, str | InputRequirementBlueprint] | None = None
     output: str
 
+    @property
+    def pipe_dependencies(self) -> set[str]:
+        """Return the set of pipe codes that this pipe depends on.
+
+        This is overridden by PipeController subclasses to return their dependencies.
+        PipeOperators have no dependencies, so return an empty set.
+
+        Returns:
+            Set of pipe codes this pipe depends on
+        """
+        return set()
+
+    @property
+    def ordered_pipe_dependencies(self) -> list[str] | None:
+        """Return ordered dependencies if order matters (e.g., for PipeSequence steps).
+
+        This is overridden by controllers where dependency order is significant,
+        such as PipeSequence where steps should be processed in order.
+
+        Returns:
+            Ordered list of pipe codes if order matters, None otherwise
+        """
+        return None
+
     @field_validator("type", mode="after")
     @staticmethod
     def validate_pipe_type(value: Any) -> Any:
