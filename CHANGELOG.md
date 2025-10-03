@@ -14,7 +14,7 @@
 
 ### Changed
 
-- In the `PipeLLM`, the images inputs are now used just like other concepts.
+- In the `PipeLLM`, the image inputs can now be used and tagged in the prompt like all other concepts.
 
 ### Removed
 
