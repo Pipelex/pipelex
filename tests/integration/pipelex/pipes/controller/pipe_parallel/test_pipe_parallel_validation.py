@@ -1,6 +1,6 @@
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input import PipeInput
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.hub import get_concept_provider, get_pipe_provider
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -194,8 +194,8 @@ class TestPipeParallelValidation:
         # Test that needed_inputs method can be called
         needed_inputs = pipe_parallel.needed_inputs()
 
-        # Verify it returns a PipeInputSpec object
-        assert isinstance(needed_inputs, PipeInputSpec)
+        # Verify it returns a PipeInput object
+        assert isinstance(needed_inputs, PipeInput)
         assert hasattr(needed_inputs, "root")
         assert isinstance(needed_inputs.root, dict)
         # With no sub-pipes, should return empty inputs

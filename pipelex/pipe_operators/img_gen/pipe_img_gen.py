@@ -14,8 +14,8 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input import PipeInputSpec
-from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input import PipeInput
+from pipelex.core.pipes.pipe_input_factory import PipeInputFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, PipeRunParams, output_multiplicity_to_apply
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -30,7 +30,7 @@ from pipelex.exceptions import (
     UnexpectedPipeDefinitionError,
     WorkingMemoryStuffNotFoundError,
 )
-from pipelex.hub import get_concept_provider, get_content_generator, get_model_deck
+from pipelex.hub import get_concept_provider, get_content_generator, get_model_deck, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
@@ -102,7 +102,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     def validate_output(self):
         if not get_concept_provider().is_compatible(
             tested_concept=self.output,
-            wanted_concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
             strict=True,
         ):
             msg = (
@@ -112,8 +112,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             raise PipeDefinitionError(msg)
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
-        needed_inputs = PipeInputSpecFactory.make_empty()
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
+        needed_inputs = PipeInputFactory.make_empty()
         if self.img_gen_prompt:
             needed_inputs.add_requirement(
                 variable_name="img_gen_prompt",

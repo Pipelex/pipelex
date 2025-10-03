@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input import PipeInput
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
 from pipelex.exceptions import PipeStackOverflowError
@@ -21,7 +21,7 @@ class PipeAbstract(ABC, BaseModel):
     code: str
     domain: str
     description: str | None = None
-    inputs: PipeInputSpec = Field(default_factory=PipeInputSpec)
+    inputs: PipeInput = Field(default_factory=PipeInput)
     output: Concept
 
     @field_validator("code", mode="before")
@@ -49,7 +49,7 @@ class PipeAbstract(ABC, BaseModel):
         """
 
     @abstractmethod
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
         """Return the inputs that are needed for the pipe to run.
 
         Args:
@@ -57,7 +57,7 @@ class PipeAbstract(ABC, BaseModel):
                           If None, starts recursion detection with an empty set.
 
         Returns:
-            PipeInputSpec containing all needed inputs for this pipe
+            PipeInput containing all needed inputs for this pipe
 
         """
 

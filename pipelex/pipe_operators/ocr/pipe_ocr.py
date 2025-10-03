@@ -13,7 +13,7 @@ from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input import PipeInput
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, PageContent, TextAndImagesContent, TextContent
@@ -27,6 +27,7 @@ from pipelex.hub import (
     get_concept_provider,
     get_content_generator,
     get_model_deck,
+    get_native_concept,
 )
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -66,7 +67,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
 
     @override
     def validate_output(self):
-        if self.output != get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.PAGE):
+        if self.output != get_native_concept(native_concept=NativeConceptEnum.PAGE):
             msg = f"PipeOcr output should be a Page concept, but is {self.output.concept_string}"
             raise PipeDefinitionError(msg)
 
@@ -114,13 +115,13 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
         log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
         if concept_provider.is_compatible(
             tested_concept=requirement.concept,
-            wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
             strict=True,
         ):
             self.image_stuff_name = input_name
         elif concept_provider.is_compatible(
             tested_concept=requirement.concept,
-            wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptEnum.PDF),
+            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.PDF),
             strict=True,
         ):
             self.pdf_stuff_name = input_name
@@ -142,7 +143,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
                     raise inadequate_input_concept_error
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
         return self.inputs
 
     @override

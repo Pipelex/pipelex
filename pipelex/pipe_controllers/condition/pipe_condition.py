@@ -9,9 +9,9 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum, NativeConceptManager
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input import PipeInput
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input_factory import PipeInputFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
 from pipelex.core.pipes.specific_pipe import SpecificPipe, SpecificPipeCodesEnum
@@ -127,18 +127,18 @@ class PipeCondition(PipeController):
         return self
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
         if visited_pipes is None:
             visited_pipes = set()
 
         # If we've already visited this pipe, stop recursion
         if self.code in visited_pipes:
-            return PipeInputSpecFactory.make_empty()
+            return PipeInputFactory.make_empty()
 
         # Add this pipe to visited set for recursive calls
         visited_pipes_with_current = visited_pipes | {self.code}
 
-        needed_inputs = PipeInputSpecFactory.make_empty()
+        needed_inputs = PipeInputFactory.make_empty()
 
         # 1. Add the variables from the expression/expression_template
         required_variables = detect_jinja2_required_variables(
@@ -288,7 +288,7 @@ class PipeCondition(PipeController):
         # TODO: restore pipe_layer feature
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
 
-        # Convert PipeInputSpec to blueprint format
+        # Convert PipeInput to blueprint format
         inputs_blueprint: dict[str, str | InputRequirementBlueprint] = {}
         for var_name, requirement in self.inputs.root.items():
             inputs_blueprint[var_name] = InputRequirementBlueprint(

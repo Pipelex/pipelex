@@ -8,8 +8,8 @@ from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input import PipeInputSpec
-from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input import PipeInput
+from pipelex.core.pipes.pipe_input_factory import PipeInputFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -39,18 +39,18 @@ class PipeParallel(PipeController):
         return set()
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
         if visited_pipes is None:
             visited_pipes = set()
 
         # If we've already visited this pipe, stop recursion
         if self.code in visited_pipes:
-            return PipeInputSpecFactory.make_empty()
+            return PipeInputFactory.make_empty()
 
         # Add this pipe to visited set for recursive calls
         visited_pipes_with_current = visited_pipes | {self.code}
 
-        needed_inputs = PipeInputSpecFactory.make_empty()
+        needed_inputs = PipeInputFactory.make_empty()
 
         for sub_pipe in self.parallel_sub_pipes:
             pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)

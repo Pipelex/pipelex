@@ -41,7 +41,6 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
         user_text: str | None = arguments_dict.pop("user_text", None)
         if not user_text:
             user_text = self.proto_prompt.user_text
-
         # user_images is Optional here: None means the template is not altering the user_images field
         user_images: list[PromptImage] | None = None
         if "user_images" in arguments_dict:
@@ -50,7 +49,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
             user_images = [arguments_dict.pop("user_image")]
         is_user_images_append: bool | None = arguments_dict.pop("is_user_images_append", None)
 
-        return self.make_llm_prompt(
+        return self._make_llm_prompt(
             system_text=system_text,
             user_text=user_text,
             user_images=user_images,
@@ -58,7 +57,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
             template_inputs=LLMPromptTemplateInputs(root=arguments_dict),
         )
 
-    def make_llm_prompt(
+    def _make_llm_prompt(
         self,
         system_text: str | None = None,
         user_text: str | None = None,

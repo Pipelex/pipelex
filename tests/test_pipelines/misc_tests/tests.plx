@@ -15,6 +15,7 @@ inputs = { image = "Image" }
 output = "Text"
 prompt_template = """
 Describe the using rap lyrics, including puns and references to the image.
+@image
 """
 
 [pipe.test_no_input]

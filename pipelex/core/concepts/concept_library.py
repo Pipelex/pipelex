@@ -1,5 +1,8 @@
+import types
+import typing
 from typing import Any
 
+from kajson.kajson_manager import KajsonManager
 from pydantic import Field, RootModel
 from typing_extensions import override
 
@@ -9,7 +12,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.stuffs.stuff_content import ImageContent
+from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, StuffContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
 from pipelex.types import Self
@@ -124,6 +127,112 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
             strict=True,
         )
         return is_image_class or refines_image
+
+    @override
+    # TODO: Refactor this function. Codesmell, it is not a proper way to do this.
+    def find_image_field_paths(self, concept: Concept) -> list[str]:
+        """Find all field paths in the concept's structure that are strictly compatible with Image concept.
+
+        Args:
+            concept: The concept to analyze for image field paths
+
+        Returns:
+            List of dotted field paths (e.g., ["field1", "field2.subfield"]) that contain Image content.
+        """
+        # Get the structure class
+        structure_class = KajsonManager.get_class_registry().get_class(name=concept.structure_class_name)
+        if structure_class is None or not hasattr(structure_class, "model_fields"):
+            return []
+
+        image_concept = self.get_native_concept(NativeConceptEnum.IMAGE)
+        paths: list[str] = []
+
+        def find_image_fields_in_class(cls: type[StuffContent], current_path: str = "") -> None:
+            """Recursively find image fields in a structure class."""
+            # Check if the class has model_fields (is a Pydantic model)
+            if not hasattr(cls, "model_fields"):
+                return
+
+            # Iterate through all fields
+            for field_name, field_info in cls.model_fields.items():
+                # Build the path for this field
+                field_path = f"{current_path}.{field_name}" if current_path else field_name
+
+                # Get the field type annotation
+                field_type = field_info.annotation
+
+                # Handle Optional types (Union with None)
+                is_union = False
+                union_args = None
+
+                # Check for typing.Union (typing.Optional)
+                is_typing_union = hasattr(field_type, "__origin__") and field_type.__origin__ is typing.Union  # type: ignore[union-attr] # pyright: ignore[reportOptionalMemberAccess]
+                is_types_union = hasattr(types, "UnionType") and isinstance(field_type, types.UnionType)  # pyright: ignore[reportUnnecessaryIsInstance]
+                if is_typing_union or is_types_union:
+                    is_union = True
+                    union_args = field_type.__args__  # type: ignore[union-attr]
+
+                if is_union and union_args:
+                    # Get non-None types from the Union
+                    args = [arg for arg in union_args if arg is not type(None)]
+                    if len(args) == 1:
+                        field_type = args[0]
+                    elif len(args) == 0:
+                        continue  # All args were None, skip this field
+
+                # Skip if field type is not a class
+                if not isinstance(field_type, type):
+                    continue
+
+                # Check if it's a ListContent - skip it
+                try:
+                    if issubclass(field_type, ListContent):
+                        continue
+                except (TypeError, AttributeError):
+                    pass
+
+                # Get the class name
+                field_class_name = field_type.__name__
+
+                # Check if it's a direct ImageContent first
+                try:
+                    if issubclass(field_type, ImageContent):
+                        paths.append(field_path)
+                        continue
+                except TypeError:
+                    pass
+
+                # Try to find a concept for this field type
+                try:
+                    # Look for a concept with this structure class
+                    matching_concept = None
+                    for existing_concept in self.list_concepts():
+                        if existing_concept.structure_class_name == field_class_name:
+                            matching_concept = existing_concept
+                            break
+
+                    if matching_concept:
+                        # Check if this concept is strictly compatible with Image
+                        if Concept.are_concept_compatible(
+                            concept_1=matching_concept,
+                            concept_2=image_concept,
+                            strict=True,
+                        ):
+                            paths.append(field_path)
+                            continue  # Found an image field, no need to recurse deeper
+
+                except Exception:  # noqa: S110
+                    pass  # If we can't find a concept, continue with recursive search
+
+                # If it's a StuffContent subclass, recurse into it
+                try:
+                    if issubclass(field_type, StuffContent):
+                        find_image_fields_in_class(field_type, field_path)  # pyright: ignore[reportUnknownArgumentType]
+                except TypeError:
+                    pass
+
+        find_image_fields_in_class(structure_class)
+        return paths
 
     @override
     def search_for_concept_in_domains(self, concept_code: str, search_domains: list[str]) -> Concept | None:

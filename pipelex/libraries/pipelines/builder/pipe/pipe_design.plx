@@ -53,6 +53,9 @@ This PipeSequence is part of a larger pipeline:
 
 You will specifically generate the PipeSequence related to this signature:
 @pipe_signature
+
+Here are the concepts you can use for inputs/outputs:
+@concept_specs
 """
 
 [pipe.detail_pipe_parallel]
@@ -69,6 +72,9 @@ This PipeParallel is part of a larger pipeline:
 
 You will specifically generate the PipeParallel related to this signature:
 @pipe_signature
+
+Here are the concepts you can use for inputs/outputs:
+@concept_specs
 """
 
 [pipe.detail_pipe_condition]
@@ -85,6 +91,9 @@ This PipeCondition is part of a larger pipeline:
 
 You will specifically generate the PipeCondition related to this signature:
 @pipe_signature
+
+Here are the concepts you can use for inputs/outputs:
+@concept_specs
 """
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -110,6 +119,9 @@ You will specifically generate the PipeLLM related to this signature:
 If it's a structured generation, indicate it in the system_prompt to clarify the task.
 If it's to generate free form text, the prompt_template should indicate to be concise.
 If it's to generate an image generation, the prompt_template should indicate to be VERY concise and focus and apply the best practice for image generation.
+
+Here are the concepts you can use for inputs/outputs:
+@concept_specs
 """
 
 [pipe.detail_pipe_ocr]
@@ -126,6 +138,9 @@ This PipeOcr is part of a larger pipeline:
 
 You will specifically generate the PipeOcr related to this signature:
 @pipe_signature
+
+Here are the concepts you can use for inputs/outputs:
+@concept_specs
 """
 
 [pipe.detail_pipe_img_gen]
@@ -144,6 +159,9 @@ You will specifically generate the PipeImgGen related to this signature:
 @pipe_signature
 
 The inputs for the image has to be a single input which must be a Text or another concept which refines Text.
+
+Here are the concepts you can use for inputs/outputs:
+@concept_specs
 """
 
 [pipe.detail_pipe_compose]
@@ -170,4 +188,7 @@ format - Apply the given values to a printf-style format string, like string % v
 length — Returns the number of items (alias: count).
 upper — Converts a string to uppercase.
 lower — Converts a string to lowercase.
+
+Here are the concepts you can use for inputs/outputs:
+@concept_specs
 """

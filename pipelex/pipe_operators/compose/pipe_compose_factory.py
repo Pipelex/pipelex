@@ -2,8 +2,8 @@ from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input import PipeInputSpec
-from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input import PipeInput
+from pipelex.core.pipes.pipe_input_factory import PipeInputFactory
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
@@ -42,7 +42,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             domain=domain,
             code=pipe_code,
             description=blueprint.description,
-            inputs=PipeInputSpecFactory.make_from_blueprint(
+            inputs=PipeInputFactory.make_from_blueprint(
                 domain=domain,
                 blueprint=blueprint.inputs or {},
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
@@ -64,7 +64,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
     def make_pipe_compose_from_template_str(
         cls,
         domain: str,
-        inputs: PipeInputSpec | None = None,
+        inputs: PipeInput | None = None,
         template_str: str | None = None,
         template_name: str | None = None,
     ) -> PipeCompose:
@@ -78,14 +78,14 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
                 domain=domain,
                 code="adhoc_pipe_compose_from_template_str",
                 jinja2=preprocessed_template,
-                inputs=inputs or PipeInputSpecFactory.make_empty(),
+                inputs=inputs or PipeInputFactory.make_empty(),
             )
         elif template_name:
             return PipeCompose(
                 domain=domain,
                 code="adhoc_pipe_compose_from_template_name",
                 jinja2_name=template_name,
-                inputs=inputs or PipeInputSpecFactory.make_empty(),
+                inputs=inputs or PipeInputFactory.make_empty(),
             )
         else:
             msg = "Could not make a PipeCompose because neither template_str nor template_name were provided"
