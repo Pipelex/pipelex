@@ -101,9 +101,8 @@ class TestMakeStuffFromStuffContentUsingSearchDomains:
 
     def test_stuffcontent_with_native_concept(self, mocker: MockerFixture):
         """Test StuffContent with native concept class name."""
-        mock_provider = mocker.patch("pipelex.core.stuffs.stuff_factory.get_concept_provider").return_value
         mock_concept = mocker.Mock()
-        mock_provider.get_native_concept.return_value = mock_concept
+        mock_get_native_concept = mocker.patch("pipelex.core.stuffs.stuff_factory.get_native_concept", return_value=mock_concept)
 
         text_content = TextContent(text="test")
 
@@ -118,7 +117,7 @@ class TestMakeStuffFromStuffContentUsingSearchDomains:
         )
 
         assert result == mock_stuff
-        mock_provider.get_native_concept.assert_called_once_with(native_concept=NativeConceptEnum.TEXT)
+        mock_get_native_concept.assert_called_once_with(native_concept=NativeConceptEnum.TEXT)
 
     def test_stuffcontent_with_non_native_concept(self, mocker: MockerFixture):
         """Test StuffContent with non-native concept properly extracts concept name."""
