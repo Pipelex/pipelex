@@ -93,7 +93,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     ),
                 )
 
-                # This section handles the user_images. The goal is to pass to the field `user_images` the 
+                # This section handles the user_images. The goal is to pass to the field `user_images` the
                 # path attribute of the ImageContent.
                 # Case 1: the concept is strictly compatible with the Image concept: we pass the stuff_name as is.
                 # Case 2: the concept is compatible with the Image concept: We know there is an image somwhere in the concept.
