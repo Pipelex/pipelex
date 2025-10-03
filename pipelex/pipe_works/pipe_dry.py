@@ -9,7 +9,7 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_input import PipeInputSpec, TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_input import PipeInput, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import StuffContent, TextContent
@@ -136,11 +136,11 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
     return results
 
 
-def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> list[TypedNamedInputRequirement]:
-    """Convert PipeInputSpec to the format needed by WorkingMemoryFactory.make_for_dry_run.
+def _convert_to_working_memory_format(needed_inputs_spec: PipeInput) -> list[TypedNamedInputRequirement]:
+    """Convert PipeInput to the format needed by WorkingMemoryFactory.make_for_dry_run.
 
     Args:
-        needed_inputs_spec: PipeInputSpec with detailed_requirements
+        needed_inputs_spec: PipeInput with detailed_requirements
 
     Returns:
         List of tuples (variable_name, concept_code, structure_class)

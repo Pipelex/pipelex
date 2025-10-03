@@ -3,7 +3,7 @@ from typing_extensions import override
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input_factory import PipeInputFactory
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_operators.ocr.pipe_ocr import PipeOcr
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
@@ -35,7 +35,7 @@ class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
                     concept_code=output_domain_and_code.concept_code,
                 ),
             ),
-            inputs=PipeInputSpecFactory.make_from_blueprint(
+            inputs=PipeInputFactory.make_from_blueprint(
                 domain=domain,
                 blueprint=blueprint.inputs or {},
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,

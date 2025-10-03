@@ -13,7 +13,7 @@ from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input import PipeInput
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, PageContent, TextAndImagesContent, TextContent
@@ -142,7 +142,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
                     raise inadequate_input_concept_error
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
         return self.inputs
 
     @override

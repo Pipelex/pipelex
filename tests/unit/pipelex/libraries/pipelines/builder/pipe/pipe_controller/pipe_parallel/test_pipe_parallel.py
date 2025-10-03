@@ -3,7 +3,7 @@ import pytest
 from pipelex import log
 from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
-from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_controllers.pipe_parallel.test_data import PipeParallelTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_controller.pipe_parallel.test_data import PipeParallelTestCases
 
 
 class TestPipeParallelBlueprintConversion:

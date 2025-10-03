@@ -12,8 +12,8 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input import PipeInputSpec
-from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input import PipeInput
+from pipelex.core.pipes.pipe_input_factory import PipeInputFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -89,8 +89,8 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             log.debug(f"Validated jinja2 template '{self.jinja2_name}':\n{the_template}")
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
-        needed_inputs = PipeInputSpecFactory.make_empty()
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
+        needed_inputs = PipeInputFactory.make_empty()
         for input_name, requirement in self.inputs.root.items():
             needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
         return needed_inputs

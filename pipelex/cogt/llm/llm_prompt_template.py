@@ -41,7 +41,6 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
         user_text: str | None = arguments_dict.pop("user_text", None)
         if not user_text:
             user_text = self.proto_prompt.user_text
-
         # user_images is Optional here: None means the template is not altering the user_images field
         user_images: list[PromptImage] | None = None
         if "user_images" in arguments_dict:

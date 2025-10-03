@@ -11,6 +11,7 @@ from pipelex.hub import get_content_generator, get_template, get_template_provid
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
 from pipelex.types import Self
@@ -75,12 +76,12 @@ class LLMPromptSpec(BaseModel):
             user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
             required_variables.update(user_images_top_object_name)
 
-        if self.user_text_jinja2_blueprint:
+        if self.user_text_jinja2_blueprint and self.user_text_jinja2_blueprint.jinja2:
+            template_source = preprocess_template(self.user_text_jinja2_blueprint.jinja2)
             required_variables = detect_jinja2_required_variables(
                 template_category=self.user_text_jinja2_blueprint.template_category,
                 template_provider=get_template_provider(),
-                jinja2_name=self.user_text_jinja2_blueprint.jinja2_name,
-                jinja2=self.user_text_jinja2_blueprint.jinja2,
+                jinja2=template_source,
             )
         return {
             variable_name

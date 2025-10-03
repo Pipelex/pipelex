@@ -3,7 +3,7 @@ import pytest
 from pipelex import log
 from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_spec import PipeOcrSpec
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
-from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_operators.pipe_ocr.test_data import PipeOcrTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_operator.pipe_ocr.test_data import PipeOcrTestCases
 
 
 class TestPipeOcrBlueprintConversion:

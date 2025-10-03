@@ -1,14 +1,14 @@
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_input import InputRequirement, PipeInputSpec
+from pipelex.core.pipes.pipe_input import InputRequirement, PipeInput
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.hub import get_required_concept
 
 
-class PipeInputSpecFactory:
+class PipeInputFactory:
     @classmethod
-    def make_empty(cls) -> PipeInputSpec:
-        return PipeInputSpec(root={})
+    def make_empty(cls) -> PipeInput:
+        return PipeInput(root={})
 
     @classmethod
     def make_from_blueprint(
@@ -16,7 +16,7 @@ class PipeInputSpecFactory:
         domain: str,
         blueprint: dict[str, str | InputRequirementBlueprint],
         concept_codes_from_the_same_domain: list[str] | None = None,
-    ) -> PipeInputSpec:
+    ) -> PipeInput:
         inputs: dict[str, InputRequirement] = {}
         for var_name, input_requirement_blueprint in blueprint.items():
             if isinstance(input_requirement_blueprint, str):
@@ -34,4 +34,4 @@ class PipeInputSpecFactory:
                 concept=get_required_concept(concept_string=concept_string_with_domain),
                 multiplicity=input_requirement_blueprint.multiplicity,
             )
-        return PipeInputSpec(root=inputs)
+        return PipeInput(root=inputs)

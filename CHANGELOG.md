@@ -314,11 +314,11 @@ Simplified input memory:
 - New method `create_mock_content` in `WorkingMemoryFactory` for creating mock content for requirements.
 
 ### Changed
-- Refactored `PipeInputSpec` to use `InputRequirement` and `TypedNamedInputRequirement` classes instead of plain strings for input specifications.
+- Refactored `PipeInput` to use `InputRequirement` and `TypedNamedInputRequirement` classes instead of plain strings for input specifications.
 - Updated `WorkingMemoryFactory` to handle `ImplicitMemory` instead of `CompactMemory`.
 - Replaced `ExecutePipelineException` with `PipelineInputError` in `execute_pipeline` function.
 - Updated `PipeBatch`, `PipeCondition`, `PipeParallel`, `PipeSequence`, `PipeFunc`, `PipeImgGen`, `PipeCompose`, `PipeLLM`, and `PipeOcr` classes to use `InputRequirement` for input handling.
-- Updated `PipeInputSpec` creation in various test files to use `make_from_dict` method.
+- Updated `PipeInput` creation in various test files to use `make_from_dict` method.
 - Updated `pyproject.toml` to exclude `pypdfium2` version `4.30.1`.
 - Updated `Jinja2TemplateCategory` to handle HTML and Markdown templates differently.
 

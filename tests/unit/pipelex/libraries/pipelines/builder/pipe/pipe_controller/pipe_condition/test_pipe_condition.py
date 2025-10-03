@@ -2,7 +2,7 @@ import pytest
 
 from pipelex.libraries.pipelines.builder.pipe.pipe_condition_spec import PipeConditionSpec
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_controllers.pipe_condition.test_data import PipeConditionTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_controller.pipe_condition.test_data import PipeConditionTestCases
 
 
 class TestPipeConditionBlueprintConversion:

@@ -44,7 +44,6 @@ def detect_jinja2_required_variables(
     else:
         msg = "No jinja2 or jinja2_name provided"
         raise Jinja2StuffError(msg)
-
     try:
         parsed_ast = jinja2_env.parse(template_source)
         undeclared_variables = meta.find_undeclared_variables(parsed_ast)

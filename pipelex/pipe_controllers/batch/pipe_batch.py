@@ -8,7 +8,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
-from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input import PipeInput
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
 from pipelex.core.stuffs.stuff_content import ListContent, StuffContent
@@ -74,7 +74,7 @@ class PipeBatch(PipeController):
         return required_variables
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInputSpec:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
         return self.inputs
 
     async def _run_batch_pipe(

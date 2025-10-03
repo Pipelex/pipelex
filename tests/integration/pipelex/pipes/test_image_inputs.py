@@ -4,6 +4,8 @@ from pytest import FixtureRequest
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import ImageContent, PageContent, TextAndImagesContent, TextContent
@@ -93,3 +95,23 @@ class TestImageInputs:
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
+
+    async def test_impage_input_within_concept_with_text(self, request: FixtureRequest, pipe_run_mode: PipeRunMode) -> None:
+        """Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes,
+        But also accepts basic objects
+        """
+
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes",
+            inputs={"page": "Page"},
+            output="Text",
+            prompt_template="Describe the page: @page",
+        )
+
+        pipe_llm = PipeLLMFactory.make_from_blueprint(
+            domain="test_pipes",
+            pipe_code="test_image_input_within_concept_with_text",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        assert pipe_llm.llm_prompt_spec.user_images == ["page.page_view"]

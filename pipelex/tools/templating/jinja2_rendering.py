@@ -63,7 +63,6 @@ async def render_jinja2(
         explanation = make_jinja2_error_explanation(jinja2_name=jinja2_name, template_text=jinja2)
         msg = f"Jinja2 render error: '{exc}' {explanation}"
         raise Jinja2RenderError(msg) from exc
-
     template_source = preprocess_template(template_source)
     check_jinja2_parsing(
         jinja2_template_source=template_source,
