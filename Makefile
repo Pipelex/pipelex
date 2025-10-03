@@ -381,7 +381,7 @@ lint: env
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	@$(VENV_PYRIGHT) . --project pyproject.toml
+	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
