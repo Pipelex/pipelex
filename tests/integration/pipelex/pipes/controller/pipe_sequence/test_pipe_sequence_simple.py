@@ -15,7 +15,7 @@ from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_concept_provider
+from pipelex.hub import get_concept_provider, get_native_concept
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
@@ -39,7 +39,7 @@ class TestPipeSequenceSimple:
         )
         concept_library = get_concept_provider()
         concept_library.add_concepts([concept_1])
-        concept_2 = concept_library.get_native_concept(native_concept=NativeConceptEnum.TEXT)
+        concept_2 = get_native_concept(native_concept=NativeConceptEnum.TEXT)
 
         # Create PipeSequence instance - pipes are loaded from PLX files
         pipe_sequence_blueprint = PipeSequenceBlueprint(

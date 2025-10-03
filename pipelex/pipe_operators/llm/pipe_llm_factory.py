@@ -10,7 +10,7 @@ from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_input_factory import PipeInputFactory
 from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.hub import get_concept_provider, get_optional_domain
+from pipelex.hub import get_concept_provider, get_native_concept, get_optional_domain
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
@@ -93,13 +93,9 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     ),
                 )
 
-                if Concept.are_concept_compatible(
-                    concept_1=concept, concept_2=get_concept_provider().get_native_concept(NativeConceptEnum.IMAGE), strict=True
-                ):
+                if Concept.are_concept_compatible(concept_1=concept, concept_2=get_native_concept(NativeConceptEnum.IMAGE), strict=True):
                     user_images.append(stuff_name)
-                elif Concept.are_concept_compatible(
-                    concept_1=concept, concept_2=get_concept_provider().get_native_concept(NativeConceptEnum.IMAGE), strict=False
-                ):
+                elif Concept.are_concept_compatible(concept_1=concept, concept_2=get_native_concept(NativeConceptEnum.IMAGE), strict=False):
                     # Get image field paths relative to the concept
                     image_field_paths = get_concept_provider().find_image_field_paths(concept=concept)
                     # Prefix each path with the stuff_name to make them absolute

@@ -38,6 +38,7 @@ from pipelex.hub import (
     get_concept_provider,
     get_content_generator,
     get_model_deck,
+    get_native_concept,
     get_optional_pipe,
     get_required_concept,
     get_required_domain,
@@ -96,7 +97,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def validate_output(self):
         if get_concept_provider().is_compatible(
             tested_concept=self.output,
-            wanted_concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
         ):
             msg = (
                 f"The output of a LLM pipe cannot be compatible with the Image concept. In the "

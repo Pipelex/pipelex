@@ -15,7 +15,7 @@ from pipelex.core.stuffs.stuff_content import (
     TextContent,
 )
 from pipelex.exceptions import PipelexError
-from pipelex.hub import get_class_registry, get_concept_provider
+from pipelex.hub import get_class_registry, get_concept_provider, get_native_concept
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -100,10 +100,10 @@ class StuffFactory:
         concept_library = get_concept_provider()
         if isinstance(blueprint.content, str) and concept_library.is_compatible(
             tested_concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
-            wanted_concept=concept_library.get_native_concept(native_concept=NativeConceptEnum.TEXT),
+            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.TEXT),
         ):
             the_stuff = cls.make_stuff(
-                concept=concept_library.get_native_concept(native_concept=NativeConceptEnum.TEXT),
+                concept=get_native_concept(native_concept=NativeConceptEnum.TEXT),
                 content=TextContent(text=blueprint.content),
                 name=blueprint.stuff_name,
             )
@@ -174,7 +174,7 @@ class StuffFactory:
             native_concept_class_names = [data.content_class_name for data in NATIVE_CONCEPTS_DATA.values()]
 
             if concept_class_name in native_concept_class_names:
-                concept = get_concept_provider().get_native_concept(native_concept=NativeConceptEnum(concept_class_name.split("Content")[0]))
+                concept = get_native_concept(native_concept=NativeConceptEnum(concept_class_name.split("Content")[0]))
                 return cls.make_stuff(
                     concept=concept,
                     content=content,
