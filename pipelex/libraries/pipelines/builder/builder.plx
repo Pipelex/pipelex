@@ -142,7 +142,7 @@ List the concept drafts in Markdown format with a heading 3 for each, e.g. `### 
 [pipe.structure_concepts]
 type = "PipeLLM"
 description = "Structure the concept definitions."
-inputs = { concept_drafts = "ConceptDrafts", brief = "UserBrief" }
+inputs = { concept_drafts = "ConceptDrafts" }
 output = "concept.ConceptSpec"
 multiple_output = true
 llm = "llm_to_engineer"
@@ -150,11 +150,8 @@ system_prompt = """
 You are an expert at data extraction and json formatting.
 """
 prompt_template = """
-You are on a big journey to construct a pipeline, and this is one of the steps.
-Here is the overall mission of the user:
-@brief
+Your job is to extract a list of ConceptSpec from these concept drafts:
 
-Your task here is to extract a list of ConceptSpec from these concept drafts:
 @concept_drafts
 """
 

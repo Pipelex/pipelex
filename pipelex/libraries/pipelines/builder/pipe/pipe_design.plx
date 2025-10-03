@@ -56,6 +56,8 @@ You will specifically generate the PipeSequence related to this signature:
 
 Here are the concepts you can use for inputs/outputs:
 @concept_specs
+
+Important: Do not add in the prompt how to fill the output concept. It will be automatically added.
 """
 
 [pipe.detail_pipe_parallel]
@@ -75,6 +77,8 @@ You will specifically generate the PipeParallel related to this signature:
 
 Here are the concepts you can use for inputs/outputs:
 @concept_specs
+
+Important: Do not add in the prompt how to fill the output concept. It will be automatically added.
 """
 
 [pipe.detail_pipe_condition]
@@ -94,6 +98,8 @@ You will specifically generate the PipeCondition related to this signature:
 
 Here are the concepts you can use for inputs/outputs:
 @concept_specs
+
+Important: Do not add in the prompt how to fill the output concept. It will be automatically added.
 """
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -122,6 +128,8 @@ If it's to generate an image generation, the prompt_template should indicate to 
 
 Here are the concepts you can use for inputs/outputs:
 @concept_specs
+
+Important: Do not add in the prompt how to fill the output concept. It will be automatically added.
 """
 
 [pipe.detail_pipe_ocr]
@@ -141,6 +149,8 @@ You will specifically generate the PipeOcr related to this signature:
 
 Here are the concepts you can use for inputs/outputs:
 @concept_specs
+
+Important: Do not add in the prompt how to fill the output concept. It will be automatically added.
 """
 
 [pipe.detail_pipe_img_gen]
@@ -162,6 +172,8 @@ The inputs for the image has to be a single input which must be a Text or anothe
 
 Here are the concepts you can use for inputs/outputs:
 @concept_specs
+
+Important: Do not add in the prompt how to fill the output concept. It will be automatically added.
 """
 
 [pipe.detail_pipe_compose]
@@ -191,4 +203,6 @@ lower — Converts a string to lowercase.
 
 Here are the concepts you can use for inputs/outputs:
 @concept_specs
+
+Important: Do not add in the prompt how to fill the output concept. It will be automatically added.
 """
