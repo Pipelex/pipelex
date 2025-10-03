@@ -13,6 +13,7 @@ from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_provider_abstract import DomainProviderAbstract
@@ -460,3 +461,7 @@ def get_library_manager() -> LibraryManagerAbstract:
 
 def get_observer_provider() -> ObserverProtocol:
     return get_pipelex_hub().get_observer_provider()
+
+
+def get_native_concept(native_concept: NativeConceptEnum) -> Concept:
+    return get_pipelex_hub().get_required_concept_provider().get_native_concept(native_concept=native_concept)

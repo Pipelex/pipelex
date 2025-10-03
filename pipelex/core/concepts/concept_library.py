@@ -129,6 +129,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         return is_image_class or refines_image
 
     @override
+    # TODO: Refactor this function. Codesmell, it is not a proper way to do this.
     def find_image_field_paths(self, concept: Concept) -> list[str]:
         """Find all field paths in the concept's structure that are strictly compatible with Image concept.
 

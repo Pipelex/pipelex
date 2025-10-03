@@ -4,7 +4,7 @@ from pipelex.core.concepts.concept import Concept  # noqa: TC001
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.stuffs.stuff_content import StructuredContent
-from pipelex.hub import get_concept_provider
+from pipelex.hub import get_concept_provider, get_native_concept
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from tests.unit.pipelex.core.concepts import data
 from tests.unit.pipelex.core.concepts.data import TestData
@@ -190,7 +190,7 @@ class TestConceptFindImageFieldPaths:
     def test_direct_image_concept(self):
         """Test with a concept that is directly an Image."""
         # Get concept
-        concept = get_concept_provider().get_native_concept(NativeConceptEnum.IMAGE)
+        concept = get_native_concept(NativeConceptEnum.IMAGE)
 
         # Find image paths
         image_paths = get_concept_provider().find_image_field_paths(concept=concept)

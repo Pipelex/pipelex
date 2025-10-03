@@ -30,7 +30,7 @@ from pipelex.exceptions import (
     UnexpectedPipeDefinitionError,
     WorkingMemoryStuffNotFoundError,
 )
-from pipelex.hub import get_concept_provider, get_content_generator, get_model_deck
+from pipelex.hub import get_concept_provider, get_content_generator, get_model_deck, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
@@ -102,7 +102,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     def validate_output(self):
         if not get_concept_provider().is_compatible(
             tested_concept=self.output,
-            wanted_concept=get_concept_provider().get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
             strict=True,
         ):
             msg = (
