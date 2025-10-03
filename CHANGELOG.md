@@ -2,7 +2,19 @@
 
 ## [Unreleased]
 
+### Fixed
 - Fix Makefile target `pyright`
+- Fix a bug with the inputs of the `PipeLLM`.
+
+### Added
+- The pipe builder will now sort pipes by dependencies.
+- Added the class `Flow` that represent the flow of pipe signatures.
+
+### Changed
+- In the `PipeLLM`, the images inputs are now used just like other concepts
+
+### Removed
+- Removed `gpt-5-mini` from the possible models in the pipe-builder.
 
 ## [v0.11.0] - 2025-10-01
 
