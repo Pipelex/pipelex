@@ -93,8 +93,18 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     ),
                 )
 
-                if Concept.are_concept_compatible(concept_1=concept, concept_2=get_concept_provider().get_native_concept(NativeConceptEnum.IMAGE), strict=True):
+                if Concept.are_concept_compatible(
+                    concept_1=concept, concept_2=get_concept_provider().get_native_concept(NativeConceptEnum.IMAGE), strict=True
+                ):
                     user_images.append(stuff_name)
+                elif Concept.are_concept_compatible(
+                    concept_1=concept, concept_2=get_concept_provider().get_native_concept(NativeConceptEnum.IMAGE), strict=False
+                ):
+                    # Get image field paths relative to the concept
+                    image_field_paths = get_concept_provider().find_image_field_paths(concept=concept)
+                    # Prefix each path with the stuff_name to make them absolute
+                    for field_path in image_field_paths:
+                        user_images.append(f"{stuff_name}.{field_path}")
 
         llm_prompt_spec = LLMPromptSpec(
             system_prompt_jinja2_blueprint=system_prompt_jinja2_blueprint,

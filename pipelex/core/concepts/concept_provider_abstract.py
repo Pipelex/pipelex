@@ -59,3 +59,7 @@ class ConceptProviderAbstract(ABC):
     @abstractmethod
     def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
         pass
+
+    @abstractmethod
+    def find_image_field_paths(self, concept: Concept) -> list[str]:
+        pass
