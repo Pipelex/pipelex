@@ -150,8 +150,8 @@ system_prompt = """
 You are an expert at data extraction and json formatting.
 """
 prompt_template = """
-You are on a big journey to construct a pipeline, and this is one of the steps. 
-Here is the overalle mission of the user:
+You are on a big journey to construct a pipeline, and this is one of the steps.
+Here is the overall mission of the user:
 @brief
 
 Your task here is to extract a list of ConceptSpec from these concept drafts:
