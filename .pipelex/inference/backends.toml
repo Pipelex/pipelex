@@ -56,4 +56,3 @@ api_key = "${FAL_API_KEY}"
 
 [internal] # software-only backend, runs internally, without AI
 enabled = true
-
