@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Fix Makefile target `pyright`
+
 ## [v0.11.0] - 2025-10-01
 
 ### Highlights
