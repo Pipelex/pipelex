@@ -96,7 +96,7 @@ class TestImageInputs:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
 
-    async def test_impage_input_within_concept_with_text(self, request: FixtureRequest, pipe_run_mode: PipeRunMode) -> None:
+    async def test_image_input_within_concept_with_text(self, request: FixtureRequest, pipe_run_mode: PipeRunMode) -> None:
         """Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes,
         But also accepts basic objects
         """
