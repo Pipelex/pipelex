@@ -1,44 +1,41 @@
 # Changelog
 
+## [Unreleased]
+
+- Fix Makefile target `pyright`
+
 ## [v0.11.0] - 2025-10-01
 
 ### Highlights
 
 - **New pipe builder** pipeline to generate Pipes based on a brief in natural language: use the cli `pipelex build pipe "Your task"` to build the pipe.
+- **New observer system:** inject your own class to observe and trace all details before and after each pipe run. We also provide a local observer that dumps the payloads to local JSONL files = new-line delilmited json, i.e. one json object per line.
 - **Full refactoring of OCR and Image Generation** to use the same patterns as `LLM` workers and pipes.
-- **New observer system** to log events and metrics from pipe runs.
 
 ### Added
 
+ - Added `claude-4.5-sonnet` to the model deck.
  - Added a badge on the `README.md` to display the number of tests.
- - Added new placeholder utility module with `make_placeholder_value()` and `value_is_placeholder()` functions
- - Added comprehensive test suite for placeholder functionality
- - Added new observer system to log events and metrics from pipe runs: Added an extract point before running a pipe, and after running a pipe. Added a local observer that dumps the payload to a local JSONL file.
  - Added new test cases for environment variable functions
  - Added new documentation for `PipeFunc` on how to register functions.
- - Added `claude-4.5-sonnet` to the model deck.
- - Added `pipelex show models [BACKEND_NAME]` command to list models for a specific backend.
+ - Added `pipelex show models [BACKEND_NAME]` command to list available models from a specific backend.
 
 ### Changed 
- - Renamed `llm_deck` terminology to `model_deck` throughout codebase and documentation
- - Renamed `get_llm_deck_paths()` method to `get_model_deck_paths()`
+
+ - Renamed `llm_deck` terminology to `model_deck` throughout codebase and documentation, now that it's also used for OCR and Image Generation models
  - Renamed `is_gha_testing` property to `is_ci_testing` in RuntimeManager
- - Updated environment variable handling to use new placeholder utility functions
  - Refactored `all_env_vars_are_set()` function to only accept a list of keys, single string support now uses `is_env_var_set()`
  - Modified `any_env_var_is_placeholder()` to use new placeholder detection logic
  - Updated test environment setup to use dynamic placeholder generation instead of hardcoded values
- - Restructured test classes and methods in environment tests
- - Lint and tests GHA should run on every PR
 
 ### Fixed
  - Fixed logic error in `any_env_var_is_placeholder()` function - now correctly returns False when no placeholders are found
 
 ### Removed
- - Removed `ENV_DUMMY_PLACEHOLDER_VALUE` constant
- - Removed `get_rooted_path()` and `get_env_rooted_path()` utility functions
- - Removed hardcoded placeholder dictionary in test setup
+ - Removed `get_rooted_path()` and `get_env_rooted_path()` utility functions which were not used
+ - Removed hardcoded placeholder dictionary and `ENV_DUMMY_PLACEHOLDER_VALUE` constant in test setup
  - Removed function `run_pipe_code` in pipe router because it was not relevant (used mostly in tests)
- - Remove the use of `PipeCompose` in `PipeCondition`, to only use jinja2 with the `ContentGenerator`
+ - Remove the use of `PipeCompose` in `PipeCondition`, to only use jinja2 directly, through the `ContentGenerator`
  - Remove the template libraries from the pipelex libraries.
  - Removed `claude-3.5-sonnet` and `claude-3.5-sonnet-v2` from the model deck.
 

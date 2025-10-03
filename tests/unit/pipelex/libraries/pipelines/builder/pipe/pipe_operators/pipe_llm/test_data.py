@@ -10,7 +10,7 @@ class PipeLLMTestCases:
     SIMPLE_LLM = (
         "simple_llm",
         PipeLLMSpec(
-            the_pipe_code="test_pipe",
+            pipe_code="test_pipe",
             description="Generate text",
             inputs={"topic": "Text"},
             output="Text",
@@ -31,7 +31,7 @@ class PipeLLMTestCases:
     LLM_NO_INPUTS = (
         "llm_no_inputs",
         PipeLLMSpec(
-            the_pipe_code="generate_pipe",
+            pipe_code="generate_pipe",
             description="Generate without inputs",
             inputs={},
             output="Text",
@@ -51,7 +51,7 @@ class PipeLLMTestCases:
     LLM_WITH_PRESET = (
         "llm_with_preset",
         PipeLLMSpec(
-            the_pipe_code="generate",
+            pipe_code="generate",
             description="Generate with preset",
             inputs={},
             output="Text",
@@ -71,7 +71,7 @@ class PipeLLMTestCases:
     LLM_WITH_SETTINGS = (
         "llm_with_settings",
         PipeLLMSpec(
-            the_pipe_code="generate",
+            pipe_code="generate",
             description="Generate with settings",
             inputs={},
             output="Text",
@@ -96,7 +96,7 @@ class PipeLLMTestCases:
     LLM_WITH_SYSTEM_PROMPT = (
         "llm_with_system_prompt",
         PipeLLMSpec(
-            the_pipe_code="analyze",
+            pipe_code="analyze",
             description="Generate with system prompt",
             inputs={"data": "Data"},
             output="Analysis",
@@ -119,7 +119,7 @@ class PipeLLMTestCases:
     LLM_WITH_MULTIPLE_OUTPUT = (
         "llm_with_multiple_output",
         PipeLLMSpec(
-            the_pipe_code="generate_items",
+            pipe_code="generate_items",
             description="Generate multiple items",
             inputs={},
             output="Item",
@@ -142,7 +142,7 @@ class PipeLLMTestCases:
     LLM_WITH_FIXED_OUTPUT = (
         "llm_with_fixed_output",
         PipeLLMSpec(
-            the_pipe_code="generate_items",
+            pipe_code="generate_items",
             description="Generate exactly 5 items",
             inputs={},
             output="Item",

@@ -77,7 +77,6 @@ class PipeComposeSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeCompose"]] = "PipeCompose"
     category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     jinja2: str | None = Field(default=None, description="Jinja2 template string")
     target_format: TargetFormat | str = Field(description="Target format for the output")
 

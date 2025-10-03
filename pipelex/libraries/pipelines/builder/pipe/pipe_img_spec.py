@@ -24,7 +24,6 @@ class PipeImgGenSpec(PipeSpec):
 
     type: Literal["PipeImgGen"] = "PipeImgGen"
     category: Literal["PipeOperator"] = "PipeOperator"
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     img_gen: RecommendedImgGen | None = None
     nb_output: int | None = Field(default=None, ge=1)
 

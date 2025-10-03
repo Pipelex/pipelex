@@ -13,7 +13,6 @@ class PipeFuncSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeFunc"]] = "PipeFunc"
     category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     function_name: str = Field(description="The name of the function to call.")
 
     @override

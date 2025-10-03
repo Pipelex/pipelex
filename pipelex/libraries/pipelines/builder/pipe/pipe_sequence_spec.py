@@ -17,7 +17,6 @@ class PipeSequenceSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeSequence"]] = "PipeSequence"
     category: SkipJsonSchema[Literal["PipeController"]] = "PipeController"
-    the_pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     steps: list[SubPipeSpec] = Field(
         description=("List of SubPipeSpec instances to execute sequentially. Each step runs after the previous one completes.")
     )

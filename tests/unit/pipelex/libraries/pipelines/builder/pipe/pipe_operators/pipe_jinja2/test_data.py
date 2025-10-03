@@ -11,7 +11,7 @@ class PipeComposeTestCases:
     SIMPLE_JINJA2 = (
         "simple_jinja2",
         PipeComposeSpec(
-            the_pipe_code="template_renderer",
+            pipe_code="template_renderer",
             description="Render a template",
             inputs={"data": "Data"},
             output="RenderedText",
