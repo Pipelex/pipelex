@@ -93,6 +93,11 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     ),
                 )
 
+                # This section handles the user_images. The goal is to pass to the field `user_images` the 
+                # path attribute of the ImageContent.
+                # Case 1: the concept is strictly compatible with the Image concept: we pass the stuff_name as is.
+                # Case 2: the concept is compatible with the Image concept: We know there is an image somwhere in the concept.
+                # we need to find the path to the image.
                 if Concept.are_concept_compatible(
                     concept_1=concept, concept_2=get_concept_provider().get_native_concept(NativeConceptEnum.IMAGE), strict=True
                 ):
