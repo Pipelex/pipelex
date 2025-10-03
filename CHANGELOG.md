@@ -4,6 +4,10 @@
 
 - Fix Makefile target `pyright`
 
+### Removed
+
+- Removed useless functions in `LLMJobFactory`.
+
 ## [v0.11.0] - 2025-10-01
 
 ### Highlights
