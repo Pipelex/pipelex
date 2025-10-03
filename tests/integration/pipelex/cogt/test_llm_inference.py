@@ -5,6 +5,7 @@ from pipelex.cogt.exceptions import LLMCapabilityError, PromptImageFormatError
 from pipelex.cogt.image.prompt_image import PromptImagePath
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
+from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_inference_manager
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, LLMVisionTestCases, Person
 
@@ -17,9 +18,11 @@ class TestLLMInference:
         log.info(f"test_simple_gen_text_from_text: Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
-        llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
-            system_text=None,
-            user_text=LLMTestConstants.USER_TEXT_SHORT,
+        llm_job = LLMJobFactory.make_llm_job(
+            llm_prompt=LLMPrompt(
+                system_text=None,
+                user_text=LLMTestConstants.USER_TEXT_SHORT,
+            ),
             llm_job_params=llm_job_params,
         )
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -30,9 +33,11 @@ class TestLLMInference:
         log.info(f"test_simple_gen_object_from_text: Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
-        llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
-            system_text=None,
-            user_text=LLMTestConstants.USER_TEXT_SHORT,
+        llm_job = LLMJobFactory.make_llm_job(
+            llm_prompt=LLMPrompt(
+                system_text=None,
+                user_text=LLMTestConstants.USER_TEXT_SHORT,
+            ),
             llm_job_params=llm_job_params,
         )
         if not llm_worker.is_gen_object_supported:
@@ -46,9 +51,11 @@ class TestLLMInference:
         log.info(f"test_gen_text_from_image: Testing llm_handle '{llm_handle}'")
         prompt_image = PromptImagePath(file_path=image_path)
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
-        llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
-            user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
-            user_images=[prompt_image],
+        llm_job = LLMJobFactory.make_llm_job(
+            llm_prompt=LLMPrompt(
+                user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
+                user_images=[prompt_image],
+            ),
             llm_job_params=llm_job_params,
         )
         try:

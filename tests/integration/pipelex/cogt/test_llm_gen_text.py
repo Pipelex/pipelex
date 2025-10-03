@@ -4,8 +4,9 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_job_components import LLMJobParams
+from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
+from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
@@ -19,9 +20,15 @@ def get_worker_and_job(llm_preset_id: str, user_text: str) -> tuple[LLMWorkerAbs
     pretty_print(user_text)
     llm_worker = get_llm_worker(llm_handle=llm_setting.llm_handle)
     llm_job_params = llm_setting.make_llm_job_params()
-    llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
-        user_text=user_text,
+    llm_job = LLMJobFactory.make_llm_job(
+        llm_prompt=LLMPrompt(
+            user_text=user_text,
+        ),
         llm_job_params=llm_job_params,
+        llm_job_config=LLMJobConfig(
+            is_streaming_enabled=False,
+            max_retries=3,
+        ),
     )
     return llm_worker, llm_job
 
@@ -34,9 +41,15 @@ class TestLLMGenText:
     async def test_gen_text_using_handle(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str):
         pretty_print(prompt_text, title=f"Generating text about '{topic}' using '{llm_handle}'")
         llm_worker = get_llm_worker(llm_handle=llm_handle)
-        llm_job = LLMJobFactory.make_llm_job_from_prompt_contents(
-            user_text=prompt_text,
+        llm_job = LLMJobFactory.make_llm_job(
+            llm_prompt=LLMPrompt(
+                user_text=prompt_text,
+            ),
             llm_job_params=llm_job_params,
+            llm_job_config=LLMJobConfig(
+                is_streaming_enabled=False,
+                max_retries=3,
+            ),
         )
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text

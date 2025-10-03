@@ -4,13 +4,13 @@ from pytest import FixtureRequest
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import ImageContent, PageContent, TextAndImagesContent, TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipe_router, get_required_pipe
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import ImageTestCases
@@ -96,11 +96,11 @@ class TestImageInputs:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
 
-    async def test_image_input_within_concept_with_text(self, request: FixtureRequest, pipe_run_mode: PipeRunMode) -> None:
+    @pytest.mark.usefixtures("request")
+    async def test_image_input_within_concept_with_text(self) -> None:
         """Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes,
         But also accepts basic objects
         """
-
         pipe_llm_blueprint = PipeLLMBlueprint(
             description="Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes",
             inputs={"page": "Page"},

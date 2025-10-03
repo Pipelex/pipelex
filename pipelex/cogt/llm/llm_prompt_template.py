@@ -49,7 +49,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
             user_images = [arguments_dict.pop("user_image")]
         is_user_images_append: bool | None = arguments_dict.pop("is_user_images_append", None)
 
-        return self.make_llm_prompt(
+        return self._make_llm_prompt(
             system_text=system_text,
             user_text=user_text,
             user_images=user_images,
@@ -57,7 +57,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
             template_inputs=LLMPromptTemplateInputs(root=arguments_dict),
         )
 
-    def make_llm_prompt(
+    def _make_llm_prompt(
         self,
         system_text: str | None = None,
         user_text: str | None = None,

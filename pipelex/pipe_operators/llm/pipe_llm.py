@@ -116,8 +116,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     @override
     def required_variables(self) -> set[str]:
         """Required variables are the variables that are used in the current prompt template or system prompt"""
-        if self.code == "structure_concepts":
-            print("qdjsoijiqdojioz,:", self.llm_prompt_spec.required_variables())
         return {variable_name for variable_name in self.llm_prompt_spec.required_variables() if not variable_name.startswith("_")}
 
     def validate_inputs(self):
