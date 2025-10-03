@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
@@ -18,7 +18,7 @@ class PipeSignature(StructuredContent):
     """
 
     code: str = Field(description="Pipe code identifying the pipe. Must be snake_case.")
-    category: AllowedPipeCategories = Field(description="Pipe category.")
+    category: Literal["PipeSignature"] = "PipeSignature"
     type: AllowedPipeTypes = Field(description="Pipe type.")
     description: str = Field(description="What the pipe does")
     inputs: dict[str, str] = Field(
