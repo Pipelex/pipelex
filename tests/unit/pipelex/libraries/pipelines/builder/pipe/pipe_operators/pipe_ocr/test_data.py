@@ -9,7 +9,7 @@ class PipeOcrTestCases:
     SIMPLE_OCR = (
         "simple_ocr",
         PipeOcrSpec(
-            the_pipe_code="ocr_extractor",
+            pipe_code="ocr_extractor",
             description="Extract text from image",
             inputs={"image": "Image"},
             output="ExtractedText",
@@ -29,7 +29,7 @@ class PipeOcrTestCases:
     OCR_WITH_OPTIONS = (
         "ocr_with_options",
         PipeOcrSpec(
-            the_pipe_code="advanced_ocr",
+            pipe_code="advanced_ocr",
             description="OCR with page options",
             inputs={"document": "PDF"},
             output="PageContent",

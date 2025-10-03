@@ -9,7 +9,7 @@ class PipeFuncTestCases:
     SIMPLE_FUNC = (
         "simple_func",
         PipeFuncSpec(
-            the_pipe_code="func_processor",
+            pipe_code="func_processor",
             description="Execute a function",
             inputs={"data": "Data"},
             output="ProcessedData",
@@ -28,7 +28,7 @@ class PipeFuncTestCases:
     FUNC_NO_INPUTS = (
         "func_no_inputs",
         PipeFuncSpec(
-            the_pipe_code="generator_func",
+            pipe_code="generator_func",
             description="Generate data",
             inputs={},
             output="GeneratedData",

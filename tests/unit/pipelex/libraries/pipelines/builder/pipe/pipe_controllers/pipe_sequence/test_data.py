@@ -11,14 +11,14 @@ class PipeSequenceTestCases:
     SIMPLE_SEQUENCE = (
         "simple_sequence",
         PipeSequenceSpec(
-            the_pipe_code="sequence_processor",
+            pipe_code="sequence_processor",
             description="A sequence of operations",
             inputs={"input_data": "Text"},
             output="ProcessedData",
             steps=[
-                SubPipeSpec(the_pipe_code="step1", result="result1"),
-                SubPipeSpec(the_pipe_code="step2", result="result2"),
-                SubPipeSpec(the_pipe_code="step3", result="final_result"),
+                SubPipeSpec(pipe_code="step1", result="result1"),
+                SubPipeSpec(pipe_code="step2", result="result2"),
+                SubPipeSpec(pipe_code="step3", result="final_result"),
             ],
         ),
         PipeSequenceBlueprint(
@@ -38,14 +38,14 @@ class PipeSequenceTestCases:
     SEQUENCE_WITH_BATCH = (
         "sequence_with_batch",
         PipeSequenceSpec(
-            the_pipe_code="batch_sequence",
+            pipe_code="batch_sequence",
             description="Sequence with batch",
             inputs={"items": "ItemList"},
             output="ProcessedItems",
             steps=[
-                SubPipeSpec(the_pipe_code="prepare", result="prepared_items"),
+                SubPipeSpec(pipe_code="prepare", result="prepared_items"),
                 SubPipeSpec(
-                    the_pipe_code="process_item",
+                    pipe_code="process_item",
                     result="processed_items",
                     batch_over="prepared_items",
                     batch_as="current_item",

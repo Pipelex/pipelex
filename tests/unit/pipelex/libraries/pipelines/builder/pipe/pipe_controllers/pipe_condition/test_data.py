@@ -9,7 +9,7 @@ class PipeConditionTestCases:
     CONDITION_WITH_TEMPLATE = (
         "condition_with_template",
         PipeConditionSpec(
-            the_pipe_code="template_condition",
+            pipe_code="template_condition",
             description="Conditional with template",
             inputs={"item": "Item"},
             output="ProcessedItem",

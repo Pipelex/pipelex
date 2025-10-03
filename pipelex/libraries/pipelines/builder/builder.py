@@ -205,7 +205,7 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
         domain=domain_information.domain,
         description=domain_information.description,
         concept=validated_concepts,
-        pipe={pipe_spec.the_pipe_code: _convert_pipe_spec(pipe_spec) for pipe_spec in pipe_specs.items},
+        pipe={pipe_spec.pipe_code: _convert_pipe_spec(pipe_spec) for pipe_spec in pipe_specs.items},
     )
 
 
@@ -320,7 +320,7 @@ def reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec: PipelexBundleSpec, f
         raise PipelexBundleUnexpectedError(msg)
 
     for fixed_pipe_blueprint in fixed_pipes:
-        pipe_code = fixed_pipe_blueprint.the_pipe_code
+        pipe_code = fixed_pipe_blueprint.pipe_code
         pipelex_bundle_spec.pipe[pipe_code] = fixed_pipe_blueprint
 
     return pipelex_bundle_spec
@@ -336,7 +336,7 @@ async def reconstruct_bundle_with_all_fixes(working_memory: WorkingMemory) -> Pi
             raise PipeBuilderError(msg)
 
         for fixed_pipe_blueprint in fixed_pipes_list.items:
-            pipe_code = fixed_pipe_blueprint.the_pipe_code
+            pipe_code = fixed_pipe_blueprint.pipe_code
             pipelex_bundle_spec.pipe[pipe_code] = fixed_pipe_blueprint
 
     if fixed_concepts := working_memory.get_optional_stuff(name="fixed_concepts"):

@@ -26,37 +26,15 @@ prompting_target = "gemini"
 # LANGUAGE MODELS
 ################################################################################
 
-# --- Gemini 2.0 Series --------------------------------------------------------
-["gemini-2.0-flash-exp"]
-model_id = "gemini-2.0-flash-exp"
+# --- Gemini 2.0 Series ----------------------------------------
+["gemini-2.0-flash"]
+model_id = "gemini-2.0-flash"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
-costs = { input = 0.0, output = 0.0 } # Free tier during experimental phase
+costs = { input = 0.10, output = 0.40 }
 
-# --- Gemini 1.5 Series --------------------------------------------------------
-["gemini-1.5-pro"]
-model_id = "gemini-1.5-pro"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-max_prompt_images = 3000
-costs = { input = 1.25, output = 5.0 } # Updated pricing
-
-["gemini-1.5-flash"]
-model_id = "gemini-1.5-flash"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-max_prompt_images = 3000
-costs = { input = 0.075, output = 0.30 } # Updated pricing
-
-["gemini-1.5-flash-8b"]
-model_id = "gemini-1.5-flash-8b"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-max_prompt_images = 3000
-costs = { input = 0.0375, output = 0.15 } # Updated pricing
-
-# --- Gemini 2.5 Series (when available) ----------------------------------------
+# --- Gemini 2.5 Series ----------------------------------------
 ["gemini-2.5-pro"]
 model_id = "gemini-2.5-pro"
 inputs = ["text", "images"]
@@ -77,4 +55,3 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 0.10, output = 0.40 }
-

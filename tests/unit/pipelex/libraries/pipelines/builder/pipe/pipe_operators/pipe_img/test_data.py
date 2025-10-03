@@ -9,7 +9,7 @@ class PipeImgGenTestCases:
     SIMPLE_IMG_GEN = (
         "simple_img_gen",
         PipeImgGenSpec(
-            the_pipe_code="img_generator",
+            pipe_code="img_generator",
             description="Generate an image",
             inputs={},
             output="GeneratedImage",
@@ -35,7 +35,7 @@ class PipeImgGenTestCases:
     IMG_GEN_WITH_OPTIONS = (
         "img_gen_with_options",
         PipeImgGenSpec(
-            the_pipe_code="advanced_img_gen",
+            pipe_code="advanced_img_gen",
             description="Generate image with options",
             inputs={"description": "Text"},
             output="Image",

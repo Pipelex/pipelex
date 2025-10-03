@@ -8,6 +8,7 @@ from pipelex.tools.misc.string_utils import (
     is_pascal_case,
     is_snake_case,
     matches_wildcard_pattern,
+    normalize_to_ascii,
     pascal_case_to_sentence,
     pascal_case_to_snake_case,
     snake_to_capitalize_first_letter,
@@ -196,6 +197,53 @@ def test_is_snake_case(word: str, expected: bool) -> None:
 )
 def test_is_pascal_case(word: str, expected: bool) -> None:
     assert is_pascal_case(word) is expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # ASCII strings (should remain unchanged)
+        ("Hello", "Hello"),
+        ("HelloWorld", "HelloWorld"),
+        ("hello_world", "hello_world"),
+        ("Test123", "Test123"),
+        ("my_variable_name", "my_variable_name"),
+        ("", ""),
+        # Accented characters (should be normalized)
+        ("Café", "Cafe"),
+        ("Naïve", "Naive"),
+        ("résumé", "resume"),
+        ("Über", "Uber"),
+        ("crème_brûlée", "creme_brulee"),
+        # Cyrillic lookalikes (should be removed)
+        ("OppositeСoncept", "Oppositeoncept"),  # Cyrillic С (U+0421) removed, leaving Latin letters
+        ("HelloМorld", "Helloorld"),  # Cyrillic М (U+041C) removed
+        ("Concept_Идея", "Concept_"),  # Cyrillic letters removed
+        # Greek lookalikes (should be removed)
+        ("HelloΩorld", "Helloorld"),  # Greek Ω removed
+        # Mixed scenarios
+        ("Hëllo_Wörld123", "Hello_World123"),
+        ("Test_Café_Naïve", "Test_Cafe_Naive"),
+        # Special characters (should be removed, except underscores)
+        ("Hello-World", "HelloWorld"),
+        ("Hello World", "HelloWorld"),
+        ("Hello.World", "HelloWorld"),
+        ("Hello@World", "HelloWorld"),
+        ("Hello$World", "HelloWorld"),
+        ("Hello_World", "Hello_World"),  # Underscores are kept
+        # Numbers
+        ("123Test", "123Test"),
+        # Edge cases
+        ("_", "_"),
+        ("___", "___"),
+        ("123", "123"),
+        ("абвгд", ""),  # All Cyrillic, all removed
+        ("αβγδε", ""),  # All Greek, all removed
+        ("café_résumé_123", "cafe_resume_123"),
+    ],
+)
+def test_normalize_to_ascii(text: str, expected: str) -> None:
+    assert normalize_to_ascii(text) == expected
 
 
 class TestMatchesWildcardPattern:

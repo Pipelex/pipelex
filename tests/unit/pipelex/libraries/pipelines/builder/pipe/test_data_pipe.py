@@ -9,6 +9,7 @@ class PipeBlueprintTestCases:
     SIMPLE_PIPE = (
         "simple_pipe",
         PipeSpec(
+            pipe_code="simple_pipe",
             type="PipeLLM",
             category="PipeOperator",
             description="A simple pipe",
@@ -27,6 +28,7 @@ class PipeBlueprintTestCases:
     PIPE_WITH_INPUT_REQUIREMENTS = (
         "pipe_with_requirements",
         PipeSpec(
+            pipe_code="pipe_with_requirements",
             type="PipeFunc",
             category="PipeOperator",
             description="Pipe with input requirements",
@@ -51,6 +53,7 @@ class PipeBlueprintTestCases:
     PIPE_NO_INPUTS = (
         "pipe_no_inputs",
         PipeSpec(
+            pipe_code="pipe_no_inputs",
             type="PipeFunc",
             category="PipeOperator",
             description="Pipe without inputs",

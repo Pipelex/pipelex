@@ -2,12 +2,13 @@ from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
+from pipelex import log
 from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
 from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec
-from pipelex.tools.misc.string_utils import is_snake_case
+from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
 
 
 class PipeSignature(StructuredContent):
@@ -36,6 +37,7 @@ class PipeSpec(StructuredContent):
     Controllers are used to control the flow of the pipeline, and operators are used to perform specific tasks.
     """
 
+    pipe_code: str = Field(description="Pipe code. Must be snake_case.")
     type: Any = Field(description=f"Pipe type. It is defined with type `Any` but validated at runtime and it must be one of: {AllowedPipeTypes}")
     category: Any = Field(
         description=f"Pipe category. It is defined with type `Any` but validated at runtime and it must be one of: {AllowedPipeCategories}"
@@ -45,6 +47,11 @@ class PipeSpec(StructuredContent):
         description=("Input concept specifications. The keys are input names in snake_case. Each value must be a ConceptCode in PascalCase"),
     )
     output: str = Field(description="Output concept code in PascalCase format!! Very important")
+
+    @field_validator("pipe_code", mode="before")
+    @classmethod
+    def validate_pipe_code(cls, value: str) -> str:
+        return cls.validate_pipe_code_syntax(value)
 
     @field_validator("type", mode="after")
     @staticmethod
@@ -74,10 +81,16 @@ class PipeSpec(StructuredContent):
 
     @classmethod
     def validate_pipe_code_syntax(cls, pipe_code: str) -> str:
-        if not is_snake_case(pipe_code):
-            msg = f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case."
+        # First, normalize Unicode to ASCII to prevent homograph attacks
+        normalized_pipe_code = normalize_to_ascii(pipe_code)
+
+        if normalized_pipe_code != pipe_code:
+            log.warning(f"Pipe code '{pipe_code}' contained non-ASCII characters, normalized to '{normalized_pipe_code}'")
+
+        if not is_snake_case(normalized_pipe_code):
+            msg = f"Invalid pipe code syntax '{normalized_pipe_code}'. Must be in snake_case."
             raise PipeBlueprintError(msg)
-        return pipe_code
+        return normalized_pipe_code
 
     def to_blueprint(self) -> PipeBlueprint:
         converted_inputs: dict[str, str | InputRequirementBlueprint] | None

@@ -17,7 +17,6 @@ inputs = { document = "PDF" }
 output = "Page"
 page_images = true
 page_views = false
-ocr = "mistral-ocr"
 
 [pipe.ocr_page_contents_and_views_from_pdf]
 type = "PipeOcr"
@@ -26,5 +25,4 @@ inputs = { document = "PDF" }
 output = "Page"
 page_images = true
 page_views = true
-ocr = "mistral-ocr"
 
