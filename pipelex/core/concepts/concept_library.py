@@ -144,15 +144,11 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         if structure_class is None or not hasattr(structure_class, "model_fields"):
             return []
 
-        image_concept = self.get_native_concept(NativeConceptEnum.IMAGE)
+        # image_concept = self.get_native_concept(NativeConceptEnum.IMAGE)
         paths: list[str] = []
 
         def find_image_fields_in_class(cls: type[StuffContent], current_path: str = "") -> None:
             """Recursively find image fields in a structure class."""
-            # Check if the class has model_fields (is a Pydantic model)
-            if not hasattr(cls, "model_fields"):
-                return
-
             # Iterate through all fields
             for field_name, field_info in cls.model_fields.items():
                 # Build the path for this field
@@ -172,64 +168,31 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
                     is_union = True
                     union_args = field_type.__args__  # type: ignore[union-attr]
 
+                potential_types: list[Any] = []
                 if is_union and union_args:
-                    # Get non-None types from the Union
-                    args = [arg for arg in union_args if arg is not type(None)]
-                    if len(args) == 1:
-                        field_type = args[0]
-                    elif len(args) == 0:
-                        continue  # All args were None, skip this field
+                    potential_types = union_args
+                else:
+                    potential_types = [field_type]
 
-                # Skip if field type is not a class
-                if not isinstance(field_type, type):
-                    continue
-
-                # Check if it's a ListContent - skip it
-                try:
-                    if issubclass(field_type, ListContent):
+                for field_specific_type in potential_types:
+                    # Skip if field type is not a class
+                    if not isinstance(field_specific_type, type):
                         continue
-                except (TypeError, AttributeError):
-                    pass
+                    if field_specific_type is type(None):
+                        continue
 
-                # Get the class name
-                field_class_name = field_type.__name__
+                    # Check if it's a ListContent - skip it
+                    if issubclass(field_specific_type, ListContent):
+                        continue
 
-                # Check if it's a direct ImageContent first
-                try:
-                    if issubclass(field_type, ImageContent):
+                    # Check if it's a direct ImageContent first
+                    if issubclass(field_specific_type, ImageContent):
                         paths.append(field_path)
                         continue
-                except TypeError:
-                    pass
 
-                # Try to find a concept for this field type
-                try:
-                    # Look for a concept with this structure class
-                    matching_concept = None
-                    for existing_concept in self.list_concepts():
-                        if existing_concept.structure_class_name == field_class_name:
-                            matching_concept = existing_concept
-                            break
-
-                    if matching_concept:
-                        # Check if this concept is strictly compatible with Image
-                        if Concept.are_concept_compatible(
-                            concept_1=matching_concept,
-                            concept_2=image_concept,
-                            strict=True,
-                        ):
-                            paths.append(field_path)
-                            continue  # Found an image field, no need to recurse deeper
-
-                except Exception:  # noqa: S110
-                    pass  # If we can't find a concept, continue with recursive search
-
-                # If it's a StuffContent subclass, recurse into it
-                try:
-                    if issubclass(field_type, StuffContent):
-                        find_image_fields_in_class(field_type, field_path)  # pyright: ignore[reportUnknownArgumentType]
-                except TypeError:
-                    pass
+                    # If it's a StuffContent subclass, recurse into it
+                    if issubclass(field_specific_type, StuffContent):
+                        find_image_fields_in_class(field_specific_type, field_path)  # pyright: ignore[reportUnknownArgumentType]
 
         find_image_fields_in_class(structure_class)
         return paths
