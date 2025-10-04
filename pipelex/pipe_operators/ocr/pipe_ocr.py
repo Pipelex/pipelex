@@ -216,7 +216,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
                     page_views = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=pdf_uri, dpi=self.page_views_dpi)
                     page_view_contents = [ImageContent.make_from_image(image=img) for img in page_views]
             elif image_uri:
-                page_view_contents = [ImageContent.make_from_str(str_value=image_uri)]
+                page_view_contents = [ImageContent(url=image_uri)]
 
         page_contents: list[PageContent] = []
         for page_index, page in ocr_output.pages.items():

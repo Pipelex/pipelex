@@ -27,8 +27,6 @@ from pipelex.types import Self
 ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
-# TODO: split in separate files
-
 
 class StuffContent(ABC, CustomBaseModel):
     @property
@@ -123,14 +121,7 @@ class StuffContent(ABC, CustomBaseModel):
         return paths
 
 
-class StuffContentInitableFromStr(StuffContent):
-    @classmethod
-    @abstractmethod
-    def make_from_str(cls, str_value: str) -> "StuffContentInitableFromStr":
-        pass
-
-
-class TextContent(StuffContentInitableFromStr):
+class TextContent(StuffContent):
     text: str
 
     @override
@@ -141,11 +132,6 @@ class TextContent(StuffContentInitableFromStr):
     @override
     def short_desc(self) -> str:
         return f"some text ({len(self.text)} chars)"
-
-    @classmethod
-    @override
-    def make_from_str(cls, str_value: str) -> "TextContent":
-        return TextContent(text=str_value)
 
     @override
     def __str__(self) -> str:
@@ -189,7 +175,7 @@ class DynamicContent(StuffContent):
         return str(self.smart_dump())
 
 
-class NumberContent(StuffContentInitableFromStr):
+class NumberContent(StuffContent):
     number: int | float
 
     @override
@@ -200,16 +186,6 @@ class NumberContent(StuffContentInitableFromStr):
     @override
     def short_desc(self) -> str:
         return f"some number ({self.number})"
-
-    @classmethod
-    @override
-    def make_from_str(cls, str_value: str) -> "NumberContent":
-        try:
-            int_value = int(str_value)
-            return NumberContent(number=int_value)
-        except ValueError:
-            float_value = float(str_value)
-            return NumberContent(number=float_value)
 
     @override
     def __str__(self) -> str:
@@ -232,7 +208,7 @@ class NumberContent(StuffContentInitableFromStr):
         return json.dumps({"number": self.number})
 
 
-class ImageContent(StuffContentInitableFromStr):
+class ImageContent(StuffContent):
     url: str
     source_prompt: str | None = None
     caption: str | None = None
@@ -243,11 +219,6 @@ class ImageContent(StuffContentInitableFromStr):
     def short_desc(self) -> str:
         url_desc = interpret_path_or_url(path_or_uri=self.url).desc
         return f"{url_desc} or an image"
-
-    @classmethod
-    @override
-    def make_from_str(cls, str_value: str) -> "ImageContent":
-        return ImageContent(url=str_value)
 
     @override
     def rendered_plain(self) -> str:
@@ -325,7 +296,7 @@ class ImageContent(StuffContentInitableFromStr):
             save_text_to_path(text=source_prompt, path=source_prompt_file_path)
 
 
-class PDFContent(StuffContentInitableFromStr):
+class PDFContent(StuffContent):
     url: str
 
     @property
@@ -333,11 +304,6 @@ class PDFContent(StuffContentInitableFromStr):
     def short_desc(self) -> str:
         url_desc = interpret_path_or_url(path_or_uri=self.url).desc
         return f"{url_desc} of a PDF document"
-
-    @classmethod
-    @override
-    def make_from_str(cls, str_value: str) -> "PDFContent":
-        return PDFContent(url=str_value)
 
     @override
     def rendered_plain(self) -> str:

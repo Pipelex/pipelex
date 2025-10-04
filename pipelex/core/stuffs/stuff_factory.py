@@ -41,14 +41,6 @@ class StuffFactory:
         return Stuff.make_stuff_name(concept=concept)
 
     @classmethod
-    def make_from_str(cls, str_value: str, name: str) -> Stuff:
-        return cls.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NativeConceptManager.get_native_concept_data(NativeConceptEnum.TEXT)),
-            content=TextContent(text=str_value),
-            name=name,
-        )
-
-    @classmethod
     def make_from_concept_string(cls, concept_string: str, name: str, content: StuffContent) -> Stuff:
         ConceptBlueprint.validate_concept_string(concept_string)
         concept = get_concept_provider().get_required_concept(concept_string=concept_string)
@@ -94,30 +86,6 @@ class StuffFactory:
             msg = f"Could not find a concept named '{concept_name}' in domains {search_domains}"
             raise StuffFactoryError(msg)
         return cls.make_stuff(concept=concept, content=content, name=name, code=code)
-
-    @classmethod
-    def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
-        concept_library = get_concept_provider()
-        if isinstance(blueprint.content, str) and concept_library.is_compatible(
-            tested_concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
-            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.TEXT),
-        ):
-            the_stuff = cls.make_stuff(
-                concept=get_native_concept(native_concept=NativeConceptEnum.TEXT),
-                content=TextContent(text=blueprint.content),
-                name=blueprint.stuff_name,
-            )
-        else:
-            the_stuff_content = StuffContentFactory.make_stuff_content_from_concept_required(
-                concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
-                value=blueprint.content,
-            )
-            the_stuff = cls.make_stuff(
-                concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
-                content=the_stuff_content,
-                name=blueprint.stuff_name,
-            )
-        return the_stuff
 
     @classmethod
     def combine_stuffs(
