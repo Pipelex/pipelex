@@ -54,7 +54,7 @@ class PersonWithOptionalImage(StructuredContent):
 
 
 class TestData:
-    """Test data for find_image_field_paths tests."""
+    """Test data for find_nested_image_fields_in_structure_class tests."""
 
     DOMAIN: ClassVar[str] = "test_images"
 

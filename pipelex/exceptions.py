@@ -6,7 +6,11 @@ from pipelex.tools.misc.context_provider_abstract import ContextProviderExceptio
 from pipelex.types import StrEnum
 
 
-class PipelexError(RootException):
+class PipelexException(RootException):
+    pass
+
+
+class PipelexUnexpectedError(PipelexException):
     pass
 
 
@@ -60,11 +64,11 @@ class StaticValidationError(Exception):
         return self.desc()
 
 
-class WorkingMemoryFactoryError(PipelexError):
+class WorkingMemoryFactoryError(PipelexException):
     pass
 
 
-class WorkingMemoryError(PipelexError):
+class WorkingMemoryError(PipelexException):
     pass
 
 
@@ -88,27 +92,27 @@ class WorkingMemoryStuffNotFoundError(WorkingMemoryVariableError):
     pass
 
 
-class PipelexCLIError(PipelexError, ClickException):
+class PipelexCLIError(PipelexException, ClickException):
     """Raised when there's an error in CLI usage or operation."""
 
 
-class PipelexConfigError(PipelexError):
+class PipelexConfigError(PipelexException):
     pass
 
 
-class PipelexSetupError(PipelexError):
+class PipelexSetupError(PipelexException):
     pass
 
 
-class ClientAuthenticationError(PipelexError):
+class ClientAuthenticationError(PipelexException):
     pass
 
 
-class ConceptLibraryConceptNotFoundError(PipelexError):
+class ConceptLibraryConceptNotFoundError(PipelexException):
     pass
 
 
-class LibraryError(PipelexError):
+class LibraryError(PipelexException):
     pass
 
 
@@ -132,7 +136,7 @@ class PipeLibraryPipeNotFoundError(PipeLibraryError):
     pass
 
 
-class PipeFactoryError(PipelexError):
+class PipeFactoryError(PipelexException):
     pass
 
 
@@ -140,7 +144,7 @@ class LibraryParsingError(LibraryError):
     pass
 
 
-class DomainDefinitionError(PipelexError):
+class DomainDefinitionError(PipelexException):
     def __init__(self, message: str, domain_code: str, description: str, source: str | None = None):
         self.domain_code = domain_code
         self.description = description
@@ -148,7 +152,7 @@ class DomainDefinitionError(PipelexError):
         super().__init__(message)
 
 
-class ConceptDefinitionError(PipelexError):
+class ConceptDefinitionError(PipelexException):
     def __init__(
         self,
         message: str,
@@ -166,14 +170,14 @@ class ConceptDefinitionError(PipelexError):
         super().__init__(message)
 
 
-class ConceptStructureGeneratorError(PipelexError):
+class ConceptStructureGeneratorError(PipelexException):
     def __init__(self, message: str, structure_class_python_code: str | None = None):
         self.structure_class_python_code = structure_class_python_code
         super().__init__(message)
 
 
 # TODO: add details from all cases raising this error
-class PipeDefinitionError(PipelexError):
+class PipeDefinitionError(PipelexException):
     def __init__(
         self,
         message: str,
@@ -236,7 +240,7 @@ class UnexpectedPipeDefinitionError(PipeDefinitionError):
     pass
 
 
-class StuffError(PipelexError):
+class StuffError(PipelexException):
     pass
 
 
@@ -250,7 +254,7 @@ class StuffContentValidationError(StuffError):
         super().__init__(f"Failed to validate content from {original_type} to {target_type}: {validation_error}")
 
 
-class PipeExecutionError(PipelexError):
+class PipeExecutionError(PipelexException):
     pass
 
 
@@ -271,23 +275,23 @@ class DryRunError(PipeExecutionError):
         super().__init__(message)
 
 
-class BatchParamsError(PipelexError):
+class BatchParamsError(PipelexException):
     pass
 
 
-class PipeConditionError(PipelexError):
+class PipeConditionError(PipelexException):
     pass
 
 
-class StructureClassError(PipelexError):
+class StructureClassError(PipelexException):
     pass
 
 
-class PipeRunParamsError(PipelexError):
+class PipeRunParamsError(PipelexException):
     pass
 
 
-class PipeBatchError(PipelexError):
+class PipeBatchError(PipelexException):
     """Base class for all PipeBatch-related errors."""
 
 
@@ -307,15 +311,15 @@ class PipeBatchBranchError(PipeBatchError):
     """Raised when there's an error with a branch pipe execution in PipeBatch."""
 
 
-class JobHistoryError(PipelexError):
+class JobHistoryError(PipelexException):
     pass
 
 
-class PipeInputError(PipelexError):
+class PipeInputError(PipelexException):
     pass
 
 
-class StuffArtefactError(PipelexError):
+class StuffArtefactError(PipelexException):
     pass
 
 
@@ -331,19 +335,19 @@ class ConceptRefineError(ConceptError):
     pass
 
 
-class PipelineManagerNotFoundError(PipelexError):
+class PipelineManagerNotFoundError(PipelexException):
     pass
 
 
-class PipeInputSpecError(PipelexError):
+class PipeInputSpecError(PipelexException):
     pass
 
 
-class PipeInputNotFoundError(PipelexError):
+class PipeInputNotFoundError(PipelexException):
     pass
 
 
-class PipeInputDetailsError(PipelexError):
+class PipeInputDetailsError(PipelexException):
     pass
 
 

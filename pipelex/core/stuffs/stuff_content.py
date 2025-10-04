@@ -1,5 +1,7 @@
 import base64
 import json
+import types
+import typing
 from abc import ABC, abstractmethod
 from io import BytesIO
 from typing import Any, Generic, TypeVar
@@ -69,6 +71,56 @@ class StuffContent(ABC, CustomBaseModel):
 
     def rendered_json(self) -> str:
         return kajson.dumps(self.smart_dump(), indent=4)
+
+    @classmethod
+    def search_for_nested_image_fields(cls, current_path: str, paths: list[str]) -> list[str]:
+        """Recursively search for image fields in a structure class."""
+        # Iterate through all fields
+        for field_name, field_info in cls.model_fields.items():
+            # Build the path for this field
+            field_path = f"{current_path}.{field_name}" if current_path else field_name
+
+            # Get the field type annotation
+            field_type = field_info.annotation
+
+            # Handle Optional types (Union with None)
+            is_union = False
+            union_args = None
+
+            # Check for typing.Union (typing.Optional)
+            is_typing_union = hasattr(field_type, "__origin__") and field_type.__origin__ is typing.Union  # type: ignore[union-attr] # pyright: ignore[reportOptionalMemberAccess]
+            is_types_union = hasattr(types, "UnionType") and isinstance(field_type, types.UnionType)  # pyright: ignore[reportUnnecessaryIsInstance]
+            if is_typing_union or is_types_union:
+                is_union = True
+                union_args = field_type.__args__  # type: ignore[union-attr]
+
+            potential_types: list[Any] = []
+            if is_union and union_args:
+                potential_types = union_args
+            else:
+                potential_types = [field_type]
+
+            for field_specific_type in potential_types:
+                # Skip if field type is not a class
+                if not isinstance(field_specific_type, type):
+                    continue
+                if field_specific_type is type(None):
+                    continue
+
+                # Check if it's a ListContent - skip it
+                if issubclass(field_specific_type, ListContent):
+                    continue
+
+                # Check if it's a direct ImageContent first
+                if issubclass(field_specific_type, ImageContent):
+                    paths.append(field_path)
+                    continue
+
+                # If it's a StuffContent subclass, recurse into it
+                if issubclass(field_specific_type, StuffContent):
+                    paths = field_specific_type.search_for_nested_image_fields(current_path=field_path, paths=paths)
+
+        return paths
 
 
 class StuffContentInitableFromStr(StuffContent):

@@ -97,7 +97,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     user_images.append(stuff_name)
                 elif Concept.are_concept_compatible(concept_1=concept, concept_2=get_native_concept(NativeConceptEnum.IMAGE), strict=False):
                     # Get image field paths relative to the concept
-                    image_field_paths = get_concept_provider().find_image_field_paths(concept=concept)
+                    image_field_paths = concept.search_for_nested_image_fields_in_structure_class()
                     # Prefix each path with the stuff_name to make them absolute
                     for field_path in image_field_paths:
                         user_images.append(f"{stuff_name}.{field_path}")

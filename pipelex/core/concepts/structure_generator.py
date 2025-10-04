@@ -7,10 +7,10 @@ from pydantic import Field
 
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.stuffs.stuff_content import StructuredContent
-from pipelex.exceptions import ConceptStructureGeneratorError, PipelexError
+from pipelex.exceptions import ConceptStructureGeneratorError, PipelexException
 
 
-class ConceptStructureValidationError(PipelexError):
+class ConceptStructureValidationError(PipelexException):
     pass
 
 

@@ -96,7 +96,7 @@ def register_test_concepts():
 
 
 class TestConceptFindImageFieldPaths:
-    """Test ConceptLibrary.find_image_field_paths() method."""
+    """Test Concept.find_nested_image_fields_in_structure_class() method."""
 
     def test_direct_image_field(self):
         """Test finding a direct image field."""
@@ -104,7 +104,7 @@ class TestConceptFindImageFieldPaths:
         concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithDirectImage")
 
         # Find image paths
-        image_paths = get_concept_provider().find_image_field_paths(concept=concept)
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
         # Assert
         assert len(image_paths) == 1
@@ -116,7 +116,7 @@ class TestConceptFindImageFieldPaths:
         concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithRefinedImage")
 
         # Find image paths
-        image_paths = get_concept_provider().find_image_field_paths(concept=concept)
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
         # Assert
         assert len(image_paths) == 1
@@ -128,7 +128,7 @@ class TestConceptFindImageFieldPaths:
         concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithText")
 
         # Find image paths
-        image_paths = get_concept_provider().find_image_field_paths(concept=concept)
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
         # Assert
         assert len(image_paths) == 0
@@ -139,7 +139,7 @@ class TestConceptFindImageFieldPaths:
         concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.CompanyInfo")
 
         # Find image paths
-        image_paths = get_concept_provider().find_image_field_paths(concept=concept)
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
         # Assert
         assert len(image_paths) == 1
@@ -151,7 +151,7 @@ class TestConceptFindImageFieldPaths:
         concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.NestedComplex")
 
         # Find image paths
-        image_paths = get_concept_provider().find_image_field_paths(concept=concept)
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
         # Assert - should find both the logo and the nested CEO photo
         assert len(image_paths) == 2
@@ -164,7 +164,7 @@ class TestConceptFindImageFieldPaths:
         concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithOptionalImage")
 
         # Find image paths
-        image_paths = get_concept_provider().find_image_field_paths(concept=concept)
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
         # Assert
         assert len(image_paths) == 1
@@ -173,14 +173,14 @@ class TestConceptFindImageFieldPaths:
     def test_optional_image_field_without_value(self):
         """Test finding an optional image field that is None.
 
-        Note: Since find_image_field_paths() works at the concept/class level (not instance level),
+        Note: Since find_nested_image_fields_in_structure_class() works at the concept/class level (not instance level),
         it returns all fields typed as Images, regardless of whether they have values in a specific instance.
         """
         # Get concept
         concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithOptionalImage")
 
         # Find image paths
-        image_paths = get_concept_provider().find_image_field_paths(concept=concept)
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
         # Assert - should find the photo field even though it's None in this instance
         # because we're analyzing the class structure, not instance values
@@ -193,7 +193,7 @@ class TestConceptFindImageFieldPaths:
         concept = get_native_concept(NativeConceptEnum.IMAGE)
 
         # Find image paths
-        image_paths = get_concept_provider().find_image_field_paths(concept=concept)
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
         # Assert - should return empty because the concept itself is an image, not a structured type with image fields
         assert len(image_paths) == 0

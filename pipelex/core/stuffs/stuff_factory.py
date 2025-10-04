@@ -14,12 +14,12 @@ from pipelex.core.stuffs.stuff_content import (
     StuffContent,
     TextContent,
 )
-from pipelex.exceptions import PipelexError
+from pipelex.exceptions import PipelexException
 from pipelex.hub import get_class_registry, get_concept_provider, get_native_concept
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
-class StuffFactoryError(PipelexError):
+class StuffFactoryError(PipelexException):
     pass
 
 
@@ -263,7 +263,7 @@ class StuffFactory:
             )
 
 
-class StuffContentFactoryError(PipelexError):
+class StuffContentFactoryError(PipelexException):
     pass
 
 

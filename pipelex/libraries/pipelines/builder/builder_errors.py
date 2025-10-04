@@ -4,7 +4,7 @@ from pydantic import Field
 
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.exceptions import (
-    PipelexError,
+    PipelexException,
     StaticValidationErrorType,
 )
 from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec
@@ -124,7 +124,7 @@ class PipeBuilderError(Exception):
     """Base exception for pipe builder errors."""
 
 
-class ConceptSpecError(PipelexError):
+class ConceptSpecError(PipelexException):
     """Details of a single concept failure during dry run."""
 
     def __init__(self: Self, message: str, concept_failure: ConceptFailure) -> None:
@@ -136,7 +136,7 @@ class ConceptSpecError(PipelexError):
         return self.concept_failure
 
 
-class PipeSpecError(PipelexError):
+class PipeSpecError(PipelexException):
     """Details of a single pipe failure during dry run."""
 
     def __init__(self: Self, message: str, pipe_failure: PipeFailure) -> None:
@@ -152,7 +152,7 @@ class ValidateDryRunError(Exception):
     """Raised when validating the dry run of a pipe."""
 
 
-class PipelexBundleError(PipelexError):
+class PipelexBundleError(PipelexException):
     """Main bundle error that aggregates multiple types of errors."""
 
     def __init__(
@@ -186,9 +186,9 @@ class PipelexBundleError(PipelexError):
         )
 
 
-class PipelexBundleNoFixForError(PipelexError):
+class PipelexBundleNoFixForError(PipelexException):
     """Raised when no fix is found for a static validation error."""
 
 
-class PipelexBundleUnexpectedError(PipelexError):
+class PipelexBundleUnexpectedError(PipelexException):
     """Raised when an unexpected error occurs during validation."""
