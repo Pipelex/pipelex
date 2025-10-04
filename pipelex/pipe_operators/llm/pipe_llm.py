@@ -17,8 +17,8 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import Domain, SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input import PipeInput
-from pipelex.core.pipes.pipe_input_factory import PipeInputFactory
+from pipelex.core.pipes.input_requirements import InputRequirements
+from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import (
     PipeOutputMultiplicity,
@@ -106,9 +106,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             raise PipeDefinitionError(msg)
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
-        needed_inputs = PipeInputFactory.make_empty()
+        needed_inputs = InputRequirementsFactory.make_empty()
 
         for input_name, requirement in self.inputs.items:
             needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)

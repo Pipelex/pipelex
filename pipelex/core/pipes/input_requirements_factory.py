@@ -1,14 +1,14 @@
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_input import InputRequirement, PipeInput
-from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.input_requirements import InputRequirement, InputRequirements
 from pipelex.hub import get_required_concept
 
 
-class PipeInputFactory:
+class InputRequirementsFactory:
     @classmethod
-    def make_empty(cls) -> PipeInput:
-        return PipeInput(root={})
+    def make_empty(cls) -> InputRequirements:
+        return InputRequirements(root={})
 
     @classmethod
     def make_from_blueprint(
@@ -16,8 +16,8 @@ class PipeInputFactory:
         domain: str,
         blueprint: dict[str, str | InputRequirementBlueprint],
         concept_codes_from_the_same_domain: list[str] | None = None,
-    ) -> PipeInput:
-        inputs: dict[str, InputRequirement] = {}
+    ) -> InputRequirements:
+        input_requirements_dict: dict[str, InputRequirement] = {}
         for var_name, input_requirement_blueprint in blueprint.items():
             if isinstance(input_requirement_blueprint, str):
                 input_requirement_blueprint = InputRequirementBlueprint(concept=input_requirement_blueprint)
@@ -30,8 +30,8 @@ class PipeInputFactory:
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             )
 
-            inputs[var_name] = InputRequirement(
+            input_requirements_dict[var_name] = InputRequirement(
                 concept=get_required_concept(concept_string=concept_string_with_domain),
                 multiplicity=input_requirement_blueprint.multiplicity,
             )
-        return PipeInput(root=inputs)
+        return InputRequirements(root=input_requirements_dict)

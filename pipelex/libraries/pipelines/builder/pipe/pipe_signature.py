@@ -4,8 +4,8 @@ from pydantic import Field, field_validator
 
 from pipelex import log
 from pipelex.core.pipes.exceptions import PipeBlueprintError
+from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
-from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff_content import StructuredContent
 from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii

@@ -31,11 +31,11 @@ class TypedNamedInputRequirement(NamedInputRequirement):
         return cls(**named.model_dump(), structure_class=structure_class)
 
 
-PipeInputRoot = dict[str, InputRequirement]
+InputRequirementsRoot = dict[str, InputRequirement]
 
 
-class PipeInput(RootModel[PipeInputRoot]):
-    root: PipeInputRoot = Field(default_factory=dict)
+class InputRequirements(RootModel[InputRequirementsRoot]):
+    root: InputRequirementsRoot = Field(default_factory=dict)
 
     @field_validator("root", mode="wrap")
     @classmethod

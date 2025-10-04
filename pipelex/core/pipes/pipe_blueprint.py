@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.exceptions import PipeBlueprintError
-from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import StrEnum
 

@@ -14,8 +14,8 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_input import PipeInput
-from pipelex.core.pipes.pipe_input_factory import PipeInputFactory
+from pipelex.core.pipes.input_requirements import InputRequirements
+from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, PipeRunParams, output_multiplicity_to_apply
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
@@ -112,8 +112,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             raise PipeDefinitionError(msg)
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
-        needed_inputs = PipeInputFactory.make_empty()
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+        needed_inputs = InputRequirementsFactory.make_empty()
         if self.img_gen_prompt:
             needed_inputs.add_requirement(
                 variable_name="img_gen_prompt",

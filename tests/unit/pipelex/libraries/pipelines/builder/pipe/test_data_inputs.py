@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 
 
 class InputRequirementTestCases:
