@@ -128,8 +128,54 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         )
         return is_image_class or refines_image
 
+    def _find_image_fields_in_class(self, cls: type[StuffContent], current_path: str, paths: list[str]) -> None:
+        """Recursively find image fields in a structure class."""
+        # Iterate through all fields
+        for field_name, field_info in cls.model_fields.items():
+            # Build the path for this field
+            field_path = f"{current_path}.{field_name}" if current_path else field_name
+
+            # Get the field type annotation
+            field_type = field_info.annotation
+
+            # Handle Optional types (Union with None)
+            is_union = False
+            union_args = None
+
+            # Check for typing.Union (typing.Optional)
+            is_typing_union = hasattr(field_type, "__origin__") and field_type.__origin__ is typing.Union  # type: ignore[union-attr] # pyright: ignore[reportOptionalMemberAccess]
+            is_types_union = hasattr(types, "UnionType") and isinstance(field_type, types.UnionType)  # pyright: ignore[reportUnnecessaryIsInstance]
+            if is_typing_union or is_types_union:
+                is_union = True
+                union_args = field_type.__args__  # type: ignore[union-attr]
+
+            potential_types: list[Any] = []
+            if is_union and union_args:
+                potential_types = union_args
+            else:
+                potential_types = [field_type]
+
+            for field_specific_type in potential_types:
+                # Skip if field type is not a class
+                if not isinstance(field_specific_type, type):
+                    continue
+                if field_specific_type is type(None):
+                    continue
+
+                # Check if it's a ListContent - skip it
+                if issubclass(field_specific_type, ListContent):
+                    continue
+
+                # Check if it's a direct ImageContent first
+                if issubclass(field_specific_type, ImageContent):
+                    paths.append(field_path)
+                    continue
+
+                # If it's a StuffContent subclass, recurse into it
+                if issubclass(field_specific_type, StuffContent):
+                    self._find_image_fields_in_class(cls=field_specific_type, current_path=field_path, paths=paths)  # pyright: ignore[reportUnknownArgumentType]
+
     @override
-    # TODO: Refactor this function. Codesmell, it is not a proper way to do this.
     def find_image_field_paths(self, concept: Concept) -> list[str]:
         """Find all field paths in the concept's structure that are strictly compatible with Image concept.
 
@@ -146,55 +192,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
 
         # image_concept = self.get_native_concept(NativeConceptEnum.IMAGE)
         paths: list[str] = []
-
-        def find_image_fields_in_class(cls: type[StuffContent], current_path: str = "") -> None:
-            """Recursively find image fields in a structure class."""
-            # Iterate through all fields
-            for field_name, field_info in cls.model_fields.items():
-                # Build the path for this field
-                field_path = f"{current_path}.{field_name}" if current_path else field_name
-
-                # Get the field type annotation
-                field_type = field_info.annotation
-
-                # Handle Optional types (Union with None)
-                is_union = False
-                union_args = None
-
-                # Check for typing.Union (typing.Optional)
-                is_typing_union = hasattr(field_type, "__origin__") and field_type.__origin__ is typing.Union  # type: ignore[union-attr] # pyright: ignore[reportOptionalMemberAccess]
-                is_types_union = hasattr(types, "UnionType") and isinstance(field_type, types.UnionType)  # pyright: ignore[reportUnnecessaryIsInstance]
-                if is_typing_union or is_types_union:
-                    is_union = True
-                    union_args = field_type.__args__  # type: ignore[union-attr]
-
-                potential_types: list[Any] = []
-                if is_union and union_args:
-                    potential_types = union_args
-                else:
-                    potential_types = [field_type]
-
-                for field_specific_type in potential_types:
-                    # Skip if field type is not a class
-                    if not isinstance(field_specific_type, type):
-                        continue
-                    if field_specific_type is type(None):
-                        continue
-
-                    # Check if it's a ListContent - skip it
-                    if issubclass(field_specific_type, ListContent):
-                        continue
-
-                    # Check if it's a direct ImageContent first
-                    if issubclass(field_specific_type, ImageContent):
-                        paths.append(field_path)
-                        continue
-
-                    # If it's a StuffContent subclass, recurse into it
-                    if issubclass(field_specific_type, StuffContent):
-                        find_image_fields_in_class(field_specific_type, field_path)  # pyright: ignore[reportUnknownArgumentType]
-
-        find_image_fields_in_class(structure_class)
+        self._find_image_fields_in_class(cls=structure_class, current_path="", paths=paths)
         return paths
 
     @override
