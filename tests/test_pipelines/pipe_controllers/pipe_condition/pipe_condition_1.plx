@@ -11,8 +11,9 @@ description = "Route based on category field"
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression_template = "{{ input_data.category }}"
+default_outcome = "continue"
 
-[pipe.basic_condition_by_category.pipe_map]
+[pipe.basic_condition_by_category.outcomes]
 small = "process_small"
 medium = "process_medium"
 large = "process_large"

@@ -14,7 +14,6 @@ from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
-from pipelex.core.pipes.specific_pipe import SpecificPipe, SpecificPipeCodesEnum
 from pipelex.exceptions import (
     DryRunError,
     PipeConditionError,
@@ -26,7 +25,8 @@ from pipelex.exceptions import (
     WorkingMemoryStuffNotFoundError,
 )
 from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe, get_template_provider
-from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails, PipeConditionPipeMap
+from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
+from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -35,21 +35,23 @@ from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCate
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 from pipelex.types import Self
 
+ConditionOutcomeMap = dict[str, str | SpecialOutcome]
+
 
 class PipeCondition(PipeController):
     type: Literal["PipeCondition"] = "PipeCondition"
     expression_template: str | None = None
     expression: str | None = None
-    pipe_map: PipeConditionPipeMap
-    default_pipe_code: str | None = None
+    outcome_map: ConditionOutcomeMap
+    default_outcome: str | SpecialOutcome
     add_alias_from_expression_to: str | None = None
 
     @property
     def mapped_pipe_codes(self) -> set[str]:
-        codes = set(self.pipe_map.values())
-        if self.default_pipe_code:
-            codes.add(self.default_pipe_code)
-        return codes - set(SpecificPipeCodesEnum.value_list())
+        codes = set(self.outcome_map.values())
+        if self.default_outcome:
+            codes.add(self.default_outcome)
+        return codes - set(SpecialOutcome.value_list())
 
     #########################################################################################
     # Validation
@@ -82,8 +84,8 @@ class PipeCondition(PipeController):
         return PipeConditionDetails(
             code=shortuuid.uuid()[:5],
             test_expression=self.expression or self.applied_expression_template,
-            pipe_map=self.pipe_map,
-            default_pipe_code=self.default_pipe_code,
+            outcomes=self.outcome_map,
+            default_pipe_code=self.default_outcome,
             evaluated_expression=evaluated_expression,
             chosen_pipe_code=chosen_pipe_code,
         )
@@ -114,7 +116,7 @@ class PipeCondition(PipeController):
         )
         required_variables.update(expression_required_variables)
 
-        # Variables from the pipe_map
+        # Variables from the outcomes map and default_outcome
         for pipe_code in self.pipe_dependencies():
             required_variables.update(get_required_pipe(pipe_code=pipe_code).required_variables())
         return required_variables
@@ -172,8 +174,8 @@ class PipeCondition(PipeController):
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
-        if not self.pipe_map:
-            msg = f"Pipe'{self.code}'(PipeCondition) must have at least one mapping in pipe_map"
+        if not self.outcome_map:
+            msg = f"Pipe'{self.code}'(PipeCondition) must have at least one mapping in outcomes"
             raise PipeDefinitionError(message=msg, domain_code=self.domain, pipe_code=self.code, description=self.description)
 
         # Skip validation during model creation - it will be done in validate_with_libraries()
@@ -298,21 +300,14 @@ class PipeCondition(PipeController):
 
         evaluated_expression = await self._evaluate_expression(working_memory=working_memory)
 
-        # Select the pipe based on the evaluated expression
-        chosen_pipe_code = self.pipe_map.get(evaluated_expression, self.default_pipe_code)
-
-        # Validate that a pipe code was found
-        if not chosen_pipe_code:
-            error_msg = f"No pipe code found for evaluated expression '{evaluated_expression}' in pipe {self.code}:"
-            error_msg += f"\n\nExpression: {self.applied_expression_template}"
-            error_msg += f"\n\nPipe map: {self.pipe_map}"
-            raise PipeConditionError(error_msg)
+        # Select the outcome based on the evaluated expression
+        outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
 
         # Handle continue case
-        if SpecificPipe.is_continue(chosen_pipe_code):
+        if SpecialOutcome.is_continue(outcome):
             return PipeOutput(working_memory=working_memory)
 
-        chosen_pipe = get_required_pipe(pipe_code=chosen_pipe_code)
+        chosen_pipe = get_required_pipe(pipe_code=outcome)
 
         # Create condition details for tracking
         condition_details = self._make_pipe_condition_details(
@@ -413,22 +408,22 @@ class PipeCondition(PipeController):
                 pipe_code=self.code,
             ) from exc
 
-        # 3. Validate that all pipes in the pipe_map exist
-        all_pipe_codes = set(self.pipe_map.values())
-        if self.default_pipe_code:
-            all_pipe_codes.add(self.default_pipe_code)
-        all_pipe_codes -= set(SpecificPipeCodesEnum.value_list())
+        # 3. Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
+        all_pipe_codes = set(self.outcome_map.values())
+        if self.default_outcome:
+            all_pipe_codes.add(self.default_outcome)
+        all_pipe_codes -= set(SpecialOutcome.value_list())
 
         missing_pipes = [pipe_code for pipe_code in all_pipe_codes if not get_optional_pipe(pipe_code=pipe_code)]
 
         if missing_pipes:
             error_msg = (
                 f"Dry run failed for PipeCondition '{self.code}': missing pipes: {', '.join(missing_pipes)}. "
-                f"Pipe map: {self.pipe_map}, default: {self.default_pipe_code}"
+                f"Pipe map: {self.outcome_map}, default: {self.default_outcome}"
             )
             raise DryRunError(message=error_msg, pipe_code=self.code)
 
-        # Here, it should launch the dry run of all the pipes in the pipe_map
+        # Here, it should launch the dry run of all the pipes in the outcomes map
         for pipe_code in self.mapped_pipe_codes:
             pipe = get_required_pipe(pipe_code=pipe_code)
             await pipe.run_pipe(

@@ -14,12 +14,12 @@ class PipeConditionTestCases:
             inputs={"item": "Item"},
             output="ProcessedItem",
             jinja2_expression_template="{{ item.category }}",
-            pipe_map={
+            outcomes={
                 "A": "process_a",
                 "B": "process_b",
                 "C": "process_c",
             },
-            default_pipe_code="process_default",
+            default_outcome="process_default",
         ),
         PipeConditionBlueprint(
             description="Conditional with template",
@@ -29,12 +29,12 @@ class PipeConditionTestCases:
             category="PipeController",
             expression=None,
             expression_template="{{ item.category }}",
-            pipe_map={
+            outcomes={
                 "A": "process_a",
                 "B": "process_b",
                 "C": "process_c",
             },
-            default_pipe_code="process_default",
+            default_outcome="process_default",
             add_alias_from_expression_to=None,
         ),
     )

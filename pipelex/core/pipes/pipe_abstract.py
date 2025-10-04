@@ -44,7 +44,7 @@ class PipeAbstract(ABC, BaseModel):
         # 1 - The inputs of dependency pipes
         # 2 - The variables in the pipe definition
             - PipeConditon : Variables in the expression
-            - PipeBatch : Variables in the batch_params
+            - PipeBatch: Variables in the batch_params
             - PipeLLM : Variables in the prompt
         """
 
@@ -63,9 +63,9 @@ class PipeAbstract(ABC, BaseModel):
 
     def pipe_dependencies(self) -> set[str]:
         """Return the pipes that are dependencies of the pipe.
-        - PipeBatch : The pipe that is being batched
-        - PipeCondition : The pipes in the pipe_map
-        - PipeSequence : The pipes in the steps
+        - PipeBatch: The pipe that is being batched
+        - PipeCondition: The pipes in the outcome_map
+        - PipeSequence: The pipes in the steps
         """
         return set()
 

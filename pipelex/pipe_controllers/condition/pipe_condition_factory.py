@@ -40,7 +40,7 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
             ),
             expression_template=blueprint.expression_template,
             expression=blueprint.expression,
-            pipe_map=blueprint.pipe_map,
-            default_pipe_code=blueprint.default_pipe_code,
+            outcome_map=blueprint.outcomes,
+            default_outcome=blueprint.default_outcome,
             add_alias_from_expression_to=blueprint.add_alias_from_expression_to,
         )

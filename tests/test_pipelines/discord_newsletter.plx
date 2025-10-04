@@ -24,8 +24,8 @@ description = "Select the appropriate summary pipe based on the channel name"
 inputs = { discord_channel_update = "DiscordChannelUpdate" }
 output = "ChannelSummary"
 expression = "discord_channel_update.name"
-pipe_map = { "Introduce-Yourself" = "summarize_discord_channel_update_for_new_members" }
-default_pipe_code = "summarize_discord_channel_update_general"
+outcomes = { "Introduce-Yourself" = "summarize_discord_channel_update_for_new_members" }
+default_outcome = "summarize_discord_channel_update_general"
 
 [pipe.summarize_discord_channel_update_for_new_members]
 type = "PipeLLM"

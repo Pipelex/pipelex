@@ -3,6 +3,7 @@ from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBluep
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
+from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 
 
 class TestPipeConditionValidation:
@@ -31,8 +32,8 @@ class TestPipeConditionValidation:
             inputs={"input_var": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             expression="input_var",
-            pipe_map={"value1": "pipe_a", "value2": "pipe_b"},
-            default_pipe_code="default_pipe",
+            outcomes={"value1": "pipe_a", "value2": "pipe_b"},
+            default_outcome="default_pipe",
         )
 
         pipe_condition = PipeConditionFactory.make_from_blueprint(
@@ -43,9 +44,9 @@ class TestPipeConditionValidation:
 
         assert pipe_condition.code == "test_condition"
         assert pipe_condition.domain == domain
-        assert len(pipe_condition.pipe_map) == 2
+        assert len(pipe_condition.outcome_map) == 2
         assert pipe_condition.expression == "input_var"
-        assert pipe_condition.default_pipe_code == "default_pipe"
+        assert pipe_condition.default_outcome == "default_pipe"
 
         concept_library.teardown()
 
@@ -73,7 +74,8 @@ class TestPipeConditionValidation:
             inputs={"var": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             expression_template="{{ var }}",
-            pipe_map={"value": "target_pipe"},
+            outcomes={"value": "target_pipe"},
+            default_outcome=SpecialOutcome.CONTINUE,
         )
 
         pipe_condition_template = PipeConditionFactory.make_from_blueprint(
@@ -88,7 +90,8 @@ class TestPipeConditionValidation:
             inputs={"var": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             expression="var",
-            pipe_map={"value": "target_pipe"},
+            outcomes={"value": "target_pipe"},
+            default_outcome=SpecialOutcome.CONTINUE,
         )
 
         pipe_condition_expr = PipeConditionFactory.make_from_blueprint(

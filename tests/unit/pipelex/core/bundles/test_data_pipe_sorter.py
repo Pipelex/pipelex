@@ -136,11 +136,11 @@ class PipeSorterTestCases:
             inputs={},
             output="Text",
             expression="category",
-            pipe_map={
+            outcomes={
                 "small": "process_small",
                 "large": "process_large",
             },
-            default_pipe_code="process_default",
+            default_outcome="process_default",
         ),
         "process_large": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="Large", inputs={}, output="Text"),
         "process_small": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="Small", inputs={}, output="Text"),
@@ -282,11 +282,11 @@ class PipeSorterTestCases:
             inputs={"prepared": "Text"},
             output="Text",
             expression="size",
-            pipe_map={
+            outcomes={
                 "small": "process_small",
                 "large": "process_large",
             },
-            default_pipe_code="process_default",
+            default_outcome="process_default",
         ),
         # LLM operators
         "prepare_data": PipeLLMBlueprint(

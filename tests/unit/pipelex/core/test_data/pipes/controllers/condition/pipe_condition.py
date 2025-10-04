@@ -1,5 +1,6 @@
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
+from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 
 PIPE_CONDITION = (
     "pipe_condition",
@@ -11,7 +12,8 @@ type = "PipeCondition"
 description = "Process based on condition"
 output = "ProcessedData"
 expression = "input_data.category"
-pipe_map = { small = "process_small", large = "process_large" }
+outcomes = { small = "process_small", large = "process_large" }
+default_outcome = "continue"
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -22,10 +24,11 @@ pipe_map = { small = "process_small", large = "process_large" }
                 description="Process based on condition",
                 output="ProcessedData",
                 expression="input_data.category",
-                pipe_map={
+                outcomes={
                     "small": "process_small",
                     "large": "process_large",
                 },
+                default_outcome=SpecialOutcome.CONTINUE,
             ),
         },
     ),

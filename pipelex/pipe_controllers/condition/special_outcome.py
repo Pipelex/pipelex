@@ -1,7 +1,8 @@
 from pipelex.types import StrEnum
 
 
-class SpecificPipeCodesEnum(StrEnum):
+class SpecialOutcome(StrEnum):
+    FAIL = "fail"
     CONTINUE = "continue"
     # TODO: Implement the break pipe: It should enable to leave the current sequence.
     # BREAK = "break"
@@ -10,18 +11,17 @@ class SpecificPipeCodesEnum(StrEnum):
     def value_list(cls) -> set[str]:
         return set(cls)
 
-
-# TODO: Rethink this class. They are not pipes really.
-class SpecificPipe:
-    @staticmethod
-    def is_continue(pipe_code: str) -> bool:
+    @classmethod
+    def is_continue(cls, outcome: str) -> bool:
         try:
-            enum_value = SpecificPipeCodesEnum(pipe_code)
+            enum_value = SpecialOutcome(outcome)
         except ValueError:
             return False
 
         match enum_value:
-            case SpecificPipeCodesEnum.CONTINUE:
+            case SpecialOutcome.FAIL:
+                return False
+            case SpecialOutcome.CONTINUE:
                 return True
             # case SpecificPipeCodesEnum.BREAK:  # Uncomment when BREAK is implemented
             #     return False

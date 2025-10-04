@@ -30,8 +30,8 @@ class TestPipeConditionSimple:
             inputs={"user_category": InputRequirementBlueprint(concept="test_pipe_condition.CategoryInput")},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             expression_template="{{ user_category.category }}",
-            pipe_map={"small": "process_small", "medium": "process_medium", "large": "process_large"},
-            default_pipe_code="process_small",
+            outcomes={"small": "process_small", "medium": "process_medium", "large": "process_large"},
+            default_outcome="process_small",
         )
 
         pipe_condition = PipeConditionFactory.make_from_blueprint(
@@ -64,8 +64,8 @@ class TestPipeConditionSimple:
             inputs={"user_status": InputRequirementBlueprint(concept="test_pipe_condition.CategoryInput")},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             expression_template="{{ user_status.category }}",
-            pipe_map={"active": "process_small", "inactive": "process_medium", "pending": "process_large"},
-            default_pipe_code="process_small",
+            outcomes={"active": "process_small", "inactive": "process_medium", "pending": "process_large"},
+            default_outcome="process_small",
         )
 
         pipe_condition = PipeConditionFactory.make_from_blueprint(

@@ -6,6 +6,7 @@ from typing_extensions import override
 
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
+from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 
 
 class PipeConditionSpec(PipeSpec):
@@ -14,18 +15,16 @@ class PipeConditionSpec(PipeSpec):
 
     Validation Rules:
         1. Either expression or expression_template should be provided, not both.
-        2. pipe_map keys must be strings representing possible condition outcomes.
-        3. All pipe codes in pipe_map and default_pipe_code must be valid pipe references.
+        2. outcomes map keys, must be strings representing possible valmes from expression.
+        3. All values in outcomes map and default_outcome must be either valid pipe_code references or special outcomes "fail" or "continue".
 
     """
 
     type: SkipJsonSchema[Literal["PipeCondition"]] = "PipeCondition"
     category: SkipJsonSchema[Literal["PipeController"]] = "PipeController"
     jinja2_expression_template: str = Field(description="Jinja2 expression to evaluate.")
-    pipe_map: dict[str, str] = Field(..., description="Mapping `dict[str, str]` of condition results to pipe codes.")
-    default_pipe_code: str | None = Field(
-        default=None, description="The fallback pipe code to execute if the expression result does not match any key in pipe_map."
-    )
+    outcomes: dict[str, str] = Field(..., description="Mapping `dict[str, str]` of condition to outcomes.")
+    default_outcome: str | SpecialOutcome = Field(description="The fallback outcome if the expression result does not match any key in outcome map.")
 
     @override
     def to_blueprint(self) -> PipeConditionBlueprint:
@@ -38,7 +37,7 @@ class PipeConditionSpec(PipeSpec):
             category=self.category,
             expression_template=self.jinja2_expression_template,
             expression=None,
-            pipe_map=self.pipe_map,
-            default_pipe_code=self.default_pipe_code,
+            outcomes=self.outcomes,
+            default_outcome=self.default_outcome,
             add_alias_from_expression_to=None,
         )

@@ -25,9 +25,9 @@ description = "Route by signature.type to the correct spec emitter."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "ConceptSpec" }
 output = "Dynamic"
 expression = "pipe_signature.type"
-default_pipe_code = "continue"
+default_outcome = "continue"
 
-[pipe.detail_pipe_spec.pipe_map]
+[pipe.detail_pipe_spec.outcomes]
 PipeSequence  = "detail_pipe_sequence"
 PipeParallel  = "detail_pipe_parallel"
 PipeCondition = "detail_pipe_condition"
@@ -79,7 +79,7 @@ Here are the concepts you can use for inputs/outputs:
 
 [pipe.detail_pipe_condition]
 type = "PipeLLM"
-description = "Build a PipeConditionSpec from the signature (provide expression/pipe_map consistent with children)."
+description = "Build a PipeConditionSpec from the signature (provide expression/outcome consistent with children)."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeConditionSpec"
 llm = "llm_to_engineer"
