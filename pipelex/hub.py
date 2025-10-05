@@ -16,7 +16,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import Domain
-from pipelex.core.domains.domain_provider_abstract import DomainProviderAbstract
+from pipelex.core.domains.domain_library_abstract import DomainLibraryAbstract
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
@@ -58,7 +58,7 @@ class PipelexHub:
         self._content_generator: ContentGeneratorProtocol | None = None
 
         # pipelex
-        self._domain_provider: DomainProviderAbstract | None = None
+        self._domain_library: DomainLibraryAbstract | None = None
         self._concept_library: ConceptLibraryAbstract | None = None
         self._pipe_library: PipeLibraryAbstract | None = None
         self._pipe_router: PipeRouterProtocol | None = None
@@ -143,8 +143,8 @@ class PipelexHub:
 
     # pipelex
 
-    def set_domain_provider(self, domain_provider: DomainProviderAbstract):
-        self._domain_provider = domain_provider
+    def set_domain_library(self, domain_library: DomainLibraryAbstract):
+        self._domain_library = domain_library
 
     def set_concept_library(self, concept_library: ConceptLibraryAbstract):
         self._concept_library = concept_library
@@ -245,14 +245,14 @@ class PipelexHub:
 
     # pipelex
 
-    def get_required_domain_provider(self) -> DomainProviderAbstract:
-        if self._domain_provider is None:
-            msg = "DomainProvider is not initialized"
+    def get_required_domain_library(self) -> DomainLibraryAbstract:
+        if self._domain_library is None:
+            msg = "DomainLibrary is not initialized"
             raise RuntimeError(msg)
-        return self._domain_provider
+        return self._domain_library
 
-    def get_optional_domain_provider(self) -> DomainProviderAbstract | None:
-        return self._domain_provider
+    def get_optional_domain_library(self) -> DomainLibraryAbstract | None:
+        return self._domain_library
 
     def get_required_concept_library(self) -> ConceptLibraryAbstract:
         if self._concept_library is None:
@@ -402,12 +402,12 @@ def get_secret(secret_id: str) -> str:
 
 
 def get_required_domain(domain: str) -> Domain:
-    return get_pipelex_hub().get_required_domain_provider().get_required_domain(domain=domain)
+    return get_pipelex_hub().get_required_domain_library().get_required_domain(domain=domain)
 
 
 def get_optional_domain(domain: str) -> Domain | None:
-    if domain_provider := get_pipelex_hub().get_optional_domain_provider():
-        return domain_provider.get_domain(domain=domain)
+    if domain_library := get_pipelex_hub().get_optional_domain_library():
+        return domain_library.get_domain(domain=domain)
     return None
 
 

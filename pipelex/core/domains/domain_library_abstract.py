@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from pipelex.core.domains.domain import Domain
 
 
-class DomainProviderAbstract(ABC):
+class DomainLibraryAbstract(ABC):
     @abstractmethod
     def get_domain(self, domain: str) -> Domain | None:
         pass
