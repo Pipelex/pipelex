@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from pipelex.core.stuffs.stuff_content import ImageContent, StructuredContent, TextContent
+from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, StructuredContent, TextContent
 
 
 # Test structures
@@ -119,6 +119,14 @@ class ComplexNestedGallery(StructuredContent):
     # collection has: thumbnail + sections -> frames -> frame_image
     # album_items are PhotoAlbumItem with photo field
     gallery_entries: list[tuple[MediaCollection, list[PhotoAlbumItem]]]
+
+
+class GalleryWithListContent(StructuredContent):
+    """A gallery using ListContent to hold items with nested images."""
+
+    title: TextContent
+    # ListContent containing items with images
+    album_list: ListContent[PhotoAlbumItem]
 
 
 class TestData:

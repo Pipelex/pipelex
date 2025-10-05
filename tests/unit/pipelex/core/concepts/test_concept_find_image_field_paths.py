@@ -161,6 +161,15 @@ def register_test_concepts():
     )
     concepts_to_register.append(complex_gallery_concept)
 
+    # GalleryWithListContent concept
+    list_content_gallery_concept = ConceptFactory.make(
+        domain=TestData.DOMAIN,
+        concept_code="GalleryWithListContent",
+        description="A gallery using ListContent",
+        structure_class_name="GalleryWithListContent",
+    )
+    concepts_to_register.append(list_content_gallery_concept)
+
     # Add all concepts to the provider
     concept_provider.add_concepts(concepts_to_register)
 
@@ -349,3 +358,21 @@ class TestConceptFindImageFieldPaths:
         # 2. list[PhotoAlbumItem] has nested 'photo' field
         assert len(image_paths) == 1
         assert "gallery_entries" in image_paths
+
+    def test_list_content_with_nested_images(self):
+        """Test finding images in ListContent items.
+
+        Structure being tested: ListContent[PhotoAlbumItem]
+
+        This tests that ListContent is not skipped, and that we check its generic argument
+        to see if the items (PhotoAlbumItem) contain images.
+        """
+        # Get concept
+        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.GalleryWithListContent")
+
+        # Find image paths
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+
+        # Assert - should find album_list because PhotoAlbumItem contains an ImageContent
+        assert len(image_paths) == 1
+        assert "album_list" in image_paths

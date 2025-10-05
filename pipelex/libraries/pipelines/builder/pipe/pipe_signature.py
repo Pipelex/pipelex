@@ -54,22 +54,22 @@ class PipeSpec(StructuredContent):
         return cls.validate_pipe_code_syntax(value)
 
     @field_validator("type", mode="after")
-    @staticmethod
-    def validate_pipe_type(value: Any) -> Any:
+    @classmethod
+    def validate_pipe_type(cls, value: Any) -> Any:
         if value not in AllowedPipeTypes.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
             raise PipeBlueprintError(msg)
         return value
 
     @field_validator("output", mode="after")
-    @staticmethod
-    def validate_concept_string_or_code(output: str) -> str:
+    @classmethod
+    def validate_concept_string_or_code(cls, output: str) -> str:
         ConceptSpec.validate_concept_string_or_code(concept_string_or_code=output)
         return output
 
     @field_validator("inputs", mode="after")
-    @staticmethod
-    def validate_inputs(inputs: dict[str, str] | None) -> dict[str, str] | None:
+    @classmethod
+    def validate_inputs(cls, inputs: dict[str, str] | None) -> dict[str, str] | None:
         if inputs is None:
             return None
         for input_name, concept_code in inputs.items():
