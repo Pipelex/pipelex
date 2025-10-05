@@ -68,6 +68,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         for concept in concepts:
             self.add_new_concept(concept=concept)
 
+    @override
     def remove_concepts_by_codes(self, concept_codes: list[str]) -> None:
         for concept_code in concept_codes:
             if concept_code in self.root:

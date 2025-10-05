@@ -141,3 +141,29 @@ class TestData:
     COMPANY_NAME: ClassVar[TextContent] = TextContent(text="Tech Corp")
     LOGO_IMAGE: ClassVar[ImageContent] = ImageContent(url="https://example.com/logo.png", base_64="logobase64")
     TITLE_TEXT: ClassVar[TextContent] = TextContent(text="Company Profile")
+
+    # Test cases for image field search: (concept_code, expected_image_paths)
+    IMAGE_FIELD_TEST_CASES: ClassVar[list[tuple[str, list[str]]]] = [
+        # Direct image field
+        ("PersonWithDirectImage", ["photo"]),
+        # Refined image field (ProfilePhoto refines Image)
+        ("PersonWithRefinedImage", ["profile_photo"]),
+        # No image fields
+        ("PersonWithText", []),
+        # Nested image field
+        ("CompanyInfo", ["ceo.photo"]),
+        # Multiple levels with multiple images
+        ("NestedComplex", ["company.ceo.photo", "logo"]),
+        # Optional image field
+        ("PersonWithOptionalImage", ["photo"]),
+        # List of images
+        ("GalleryWithImageList", ["photos"]),
+        # Tuple of images
+        ("PersonWithImageTuple", ["before_after"]),
+        # List with nested images in items
+        ("PhotoAlbumWithNestedImages", ["album_items"]),
+        # Complex deeply nested structure
+        ("ComplexNestedGallery", ["gallery_entries"]),
+        # ListContent with nested images
+        ("GalleryWithListContent", ["album_list"]),
+    ]

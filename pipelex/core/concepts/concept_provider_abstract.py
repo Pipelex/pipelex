@@ -17,6 +17,10 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
+    def remove_concepts_by_codes(self, concept_codes: list[str]) -> None:
+        pass
+
+    @abstractmethod
     def list_concepts_by_domain(self, domain: str) -> list[Concept]:
         pass
 

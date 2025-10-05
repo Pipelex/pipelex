@@ -12,7 +12,16 @@ from tests.unit.pipelex.core.concepts.data import TestData
 
 @pytest.fixture(scope="module", autouse=True)
 def register_test_concepts():
-    """Register test concepts for the module."""
+    """Register test concepts for the module.
+
+    This fixture:
+    1. Registers test structure classes in the class registry
+    2. Creates and registers test concepts in the concept provider
+    3. Yields to run tests
+    4. Cleans up by removing test concepts from the provider
+
+    The cleanup ensures test isolation between modules.
+    """
     concept_provider = get_concept_provider()
 
     # Register the test structure classes
@@ -173,138 +182,71 @@ def register_test_concepts():
     # Add all concepts to the provider
     concept_provider.add_concepts(concepts_to_register)
 
-    # Cleanup after tests (optional)
+    # Yield to run tests
+    yield
+
+    # Cleanup: Remove test concepts from provider
+    concept_strings = [concept.concept_string for concept in concepts_to_register]
+    concept_provider.remove_concepts_by_codes(concept_strings)
 
 
 class TestConceptFindImageFieldPaths:
-    """Test Concept.find_nested_image_fields_in_structure_class() method."""
+    """Test Concept.search_for_nested_image_fields_in_structure_class() method."""
 
-    def test_direct_image_field(self):
-        """Test finding a direct image field."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithDirectImage")
+    @pytest.mark.parametrize(
+        ("concept_code", "expected_paths"),
+        TestData.IMAGE_FIELD_TEST_CASES,
+        ids=[case[0] for case in TestData.IMAGE_FIELD_TEST_CASES],
+    )
+    def test_find_image_fields(self, concept_code: str, expected_paths: list[str]):
+        """Test finding image fields in various structure classes.
 
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+        This parametrized test covers:
+        - Direct image fields
+        - Refined image fields (concepts that refine Image)
+        - No image fields
+        - Nested image fields at various depths
+        - Multiple image fields at different levels
+        - Optional image fields
+        - Lists of images
+        - Tuples of images
+        - Lists with nested structures containing images
+        - Complex deeply nested structures
+        - ListContent with nested images
 
-        # Assert
-        assert len(image_paths) == 1
-        assert "photo" in image_paths
-
-    def test_refined_image_field(self):
-        """Test finding an image field that uses a concept refining Image."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithRefinedImage")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert
-        assert len(image_paths) == 1
-        assert "profile_photo" in image_paths
-
-    def test_no_image_fields(self):
-        """Test with content that has no image fields."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithText")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert
-        assert len(image_paths) == 0
-
-    def test_nested_image_field(self):
-        """Test finding image fields in nested structures."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.CompanyInfo")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert
-        assert len(image_paths) == 1
-        assert "ceo.photo" in image_paths
-
-    def test_multiple_nested_levels_with_multiple_images(self):
-        """Test finding multiple image fields at different nesting levels."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.NestedComplex")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert - should find both the logo and the nested CEO photo
-        assert len(image_paths) == 2
-        assert "logo" in image_paths
-        assert "company.ceo.photo" in image_paths
-
-    def test_optional_image_field_with_value(self):
-        """Test finding an optional image field that has a value."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithOptionalImage")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert
-        assert len(image_paths) == 1
-        assert "photo" in image_paths
-
-    def test_optional_image_field_without_value(self):
-        """Test finding an optional image field that is None.
-
-        Note: Since find_nested_image_fields_in_structure_class() works at the concept/class level (not instance level),
-        it returns all fields typed as Images, regardless of whether they have values in a specific instance.
+        Args:
+            concept_code: The code of the concept to test
+            expected_paths: The expected list of image field paths
         """
         # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithOptionalImage")
+        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.{concept_code}")
 
         # Find image paths
         image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
-        # Assert - should find the photo field even though it's None in this instance
-        # because we're analyzing the class structure, not instance values
-        assert len(image_paths) == 1
-        assert "photo" in image_paths
+        # Assert exact match of paths (order-independent)
+        assert sorted(image_paths) == sorted(expected_paths), f"Expected paths {sorted(expected_paths)}, but got {sorted(image_paths)}"
 
     def test_direct_image_concept(self):
-        """Test with a concept that is directly an Image."""
+        """Test with a concept that is directly an Image.
+
+        The native Image concept itself should return empty paths because
+        the concept is an image, not a structured type with image fields.
+        """
         # Get concept
         concept = get_native_concept(NativeConceptEnum.IMAGE)
 
         # Find image paths
         image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
-        # Assert - should return empty because the concept itself is an image, not a structured type with image fields
-        assert len(image_paths) == 0
-
-    def test_list_of_images(self):
-        """Test finding a field that is a list of images."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.GalleryWithImageList")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert - should find the photos field which contains a list of images
-        assert len(image_paths) == 1
-        assert "photos" in image_paths
-
-    def test_tuple_of_images(self):
-        """Test finding a field that is a tuple of images."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithImageTuple")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert - should find the before_after field which contains a tuple of images
-        assert len(image_paths) == 1
-        assert "before_after" in image_paths
+        # Assert - should return empty because the concept itself is an image
+        assert image_paths == []
 
     def test_native_text_and_images_content(self):
-        """Test the native TextAndImagesContent which has list[ImageContent] | None."""
+        """Test the native TextAndImagesContent which has list[ImageContent] | None.
+
+        This tests the native concept that combines text and images.
+        """
         # Get the native TextAndImages concept
         concept = get_native_concept(NativeConceptEnum.TEXT_AND_IMAGES)
 
@@ -312,67 +254,4 @@ class TestConceptFindImageFieldPaths:
         image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
         # Assert - should find the images field which is list[ImageContent] | None
-        assert len(image_paths) == 1
-        assert "images" in image_paths
-
-    def test_list_with_nested_images(self):
-        """Test finding images nested inside structures within a list.
-
-        This tests the recursive detection: list[PhotoAlbumItem] where PhotoAlbumItem has an ImageContent field.
-        """
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PhotoAlbumWithNestedImages")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert - should find album_items because PhotoAlbumItem contains an ImageContent
-        assert len(image_paths) == 1
-        assert "album_items" in image_paths
-
-    def test_complex_deeply_nested_images(self):
-        """Test finding images in a deeply nested, complex structure.
-
-        Structure being tested: list[tuple[MediaCollection, list[PhotoAlbumItem]]]
-
-        This tests multiple levels of nesting:
-        - Level 1: list container
-        - Level 2: tuple with two items
-        - Level 3a: MediaCollection (has direct 'thumbnail' + nested 'sections')
-        - Level 4a: sections -> list[MediaSection]
-        - Level 5a: MediaSection.frames -> list[MediaFrame]
-        - Level 6a: MediaFrame.frame_image -> ImageContent
-        - Level 3b: list[PhotoAlbumItem]
-        - Level 4b: PhotoAlbumItem.photo -> ImageContent
-
-        The field should be detected because both tuple items contain images at various nesting levels.
-        """
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.ComplexNestedGallery")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert - should find gallery_entries because:
-        # 1. MediaCollection has 'thumbnail' (direct) and 'sections->frames->frame_image' (nested)
-        # 2. list[PhotoAlbumItem] has nested 'photo' field
-        assert len(image_paths) == 1
-        assert "gallery_entries" in image_paths
-
-    def test_list_content_with_nested_images(self):
-        """Test finding images in ListContent items.
-
-        Structure being tested: ListContent[PhotoAlbumItem]
-
-        This tests that ListContent is not skipped, and that we check its generic argument
-        to see if the items (PhotoAlbumItem) contain images.
-        """
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.GalleryWithListContent")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert - should find album_list because PhotoAlbumItem contains an ImageContent
-        assert len(image_paths) == 1
-        assert "album_list" in image_paths
+        assert image_paths == ["images"]
