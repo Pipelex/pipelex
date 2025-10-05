@@ -4,7 +4,7 @@ import pytest
 from pytest import FixtureRequest, Parser
 from rich import print  # noqa: A004
 
-from pipelex.core.pipes.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.tools.environment import is_env_var_set, set_env
 from pipelex.tools.misc.placeholder import make_placeholder_value, value_is_placeholder
 from pipelex.tools.runtime_manager import RunMode, runtime_manager

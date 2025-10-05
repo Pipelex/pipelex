@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.core.pipes.pipe_run_params import (
+from pipelex.pipe_run.pipe_run_params import (
     OutputMultiplicityResolution,
     PipeOutputMultiplicity,
     make_output_multiplicity,

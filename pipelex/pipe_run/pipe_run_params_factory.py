@@ -1,7 +1,7 @@
 from typing import Any
 
 from pipelex.config import get_config
-from pipelex.core.pipes.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
 
 
 class PipeRunParamsFactory:

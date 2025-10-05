@@ -3,10 +3,10 @@ from typing_extensions import override
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_run_params import BatchParams
 from pipelex.hub import get_required_concept
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
+from pipelex.pipe_run.pipe_run_params import BatchParams
 
 
 class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):

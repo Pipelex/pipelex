@@ -13,7 +13,6 @@ from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBluep
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.pipe_run_params import PipeRunParams
 from pipelex.exceptions import (
     DryRunError,
     PipeConditionError,
@@ -28,7 +27,8 @@ from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_route
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory

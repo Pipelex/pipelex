@@ -5,12 +5,12 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_run_params import PipeRunMode
-from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
-from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
 from tests.cases import JINJA2TestCases
 

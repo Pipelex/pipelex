@@ -15,13 +15,13 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
 from pipelex.hub import get_content_generator, get_template, get_template_provider
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing

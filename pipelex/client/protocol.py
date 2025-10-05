@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from typing_extensions import runtime_checkable
 
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity
 from pipelex.types import StrEnum
 
 StuffContentOrData = dict[str, Any] | StuffContent | list[Any] | str

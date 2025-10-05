@@ -2,8 +2,8 @@ from typing_extensions import override
 
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverProtocol
-from pipelex.pipe_works.pipe_job import PipeJob
-from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 
 
 class PipeRouter(PipeRouterProtocol):

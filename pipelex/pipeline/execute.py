@@ -2,12 +2,6 @@ from pipelex.client.protocol import ImplicitMemory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.pipe_run_params import (
-    FORCE_DRY_RUN_MODE_ENV_KEY,
-    PipeOutputMultiplicity,
-    PipeRunMode,
-)
-from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.exceptions import PipelineInputError
 from pipelex.hub import (
     get_pipe_router,
@@ -15,7 +9,13 @@ from pipelex.hub import (
     get_report_delegate,
     get_required_pipe,
 )
-from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_run_params import (
+    FORCE_DRY_RUN_MODE_ENV_KEY,
+    PipeOutputMultiplicity,
+    PipeRunMode,
+)
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.environment import get_optional_env
 

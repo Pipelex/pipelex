@@ -8,13 +8,13 @@ from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeCon
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_run_params import PipeRunMode
-from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
+from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 
 

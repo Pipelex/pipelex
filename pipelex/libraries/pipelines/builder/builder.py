@@ -41,7 +41,7 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_spec import PipeOcrSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
-from pipelex.pipe_works.pipe_dry import dry_run_pipes
+from pipelex.pipe_run.dry_run import dry_run_pipes
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:

@@ -1,4 +1,4 @@
-from pipelex.core.pipes.pipe_run_params import OutputMultiplicityResolution, PipeOutputMultiplicity
+from pipelex.pipe_run.pipe_run_params import OutputMultiplicityResolution, PipeOutputMultiplicity
 
 # Test cases format: (nb_output, multiple_output, expected_result, test_description)
 MAKE_OUTPUT_MULTIPLICITY_TEST_CASES: list[tuple[int | None, bool | None, PipeOutputMultiplicity | None, str]] = [

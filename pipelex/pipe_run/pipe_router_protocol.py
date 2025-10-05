@@ -2,7 +2,7 @@ from typing import Protocol
 
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
-from pipelex.pipe_works.pipe_job import PipeJob
+from pipelex.pipe_run.pipe_job import PipeJob
 
 
 class PipeRouterProtocol(Protocol):

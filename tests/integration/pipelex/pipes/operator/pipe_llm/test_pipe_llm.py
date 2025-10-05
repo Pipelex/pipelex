@@ -4,13 +4,13 @@ from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_run_params import PipeRunMode
-from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.hub import get_class_registry, get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
-from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, ComplexStructuredDataTestCases, PipeTestCases
 
 

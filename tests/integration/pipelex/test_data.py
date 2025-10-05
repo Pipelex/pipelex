@@ -2,7 +2,6 @@ from typing import ClassVar
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
-from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.pdf_content import PDFContent
@@ -11,6 +10,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipeStackOverflowError
+from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity
 from tests.cases import ImageTestCases, PDFTestCases
 
 

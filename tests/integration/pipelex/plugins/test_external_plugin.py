@@ -14,7 +14,7 @@ from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.hub import get_inference_manager, get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
-from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
 from tests.integration.pipelex.test_data import PipeTestCases

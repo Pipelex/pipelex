@@ -6,11 +6,11 @@ from pytest import FixtureRequest
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_run_params import PipeRunMode
-from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipe_router, get_required_pipe
-from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.test_pipelines.pipe_controllers.pipe_parallel.pipe_parallel import ContentAnalysis, DocumentInput, LengthAnalysis
 

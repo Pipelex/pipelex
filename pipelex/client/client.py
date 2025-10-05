@@ -8,8 +8,8 @@ from pipelex.client.pipeline_response_factory import PipelineResponseFactory
 from pipelex.client.protocol import CompactMemory, PipelexProtocol, PipelineResponse
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
 from pipelex.exceptions import ClientAuthenticationError
+from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity
 from pipelex.tools.environment import get_required_env
 
 

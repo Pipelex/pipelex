@@ -8,11 +8,11 @@ from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_native_concept, get_optional_domain, get_required_concept
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_run.pipe_run_params import make_output_multiplicity
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
 

@@ -21,7 +21,7 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
-from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerProtocol
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract

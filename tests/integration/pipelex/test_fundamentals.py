@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex.hub import get_pipes
-from pipelex.pipe_works.pipe_dry import DryRunStatus, dry_run_pipes
+from pipelex.pipe_run.dry_run import DryRunStatus, dry_run_pipes
 from pipelex.pipelex import Pipelex
 
 

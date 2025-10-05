@@ -1,7 +1,7 @@
 from pydantic import BaseModel, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity
+from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity
 
 
 class InputRequirementBlueprint(BaseModel):

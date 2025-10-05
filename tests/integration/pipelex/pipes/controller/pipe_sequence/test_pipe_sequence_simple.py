@@ -11,14 +11,14 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_run_params import PipeRunMode
-from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_concept_library, get_native_concept
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 
 

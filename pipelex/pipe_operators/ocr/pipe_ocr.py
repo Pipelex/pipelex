@@ -15,7 +15,6 @@ from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.page_content import PageContent
@@ -34,6 +33,7 @@ from pipelex.hub import (
     get_native_concept,
 )
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 from pipelex.types import Self
