@@ -1,7 +1,8 @@
 from pydantic import Field
 
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 
 
 class FilePath(StructuredContent):

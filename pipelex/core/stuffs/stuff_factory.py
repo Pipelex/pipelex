@@ -8,12 +8,10 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum, NativeConceptManager
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_content import (
-    ListContent,
-    StuffContent,
-    TextContent,
-)
+from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipelexException
 from pipelex.hub import get_class_registry, get_concept_library, get_native_concept, get_required_concept
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error

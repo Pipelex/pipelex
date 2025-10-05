@@ -5,19 +5,16 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.stuffs.html_content import HtmlContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.mermaid_content import MermaidContent
+from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
-from pipelex.core.stuffs.stuff_content import (
-    HtmlContent,
-    ImageContent,
-    ListContent,
-    MermaidContent,
-    NumberContent,
-    PDFContent,
-    StuffContent,
-    StuffContentType,
-    TextAndImagesContent,
-    TextContent,
-)
+from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
+from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import StuffContentValidationError, StuffError
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error

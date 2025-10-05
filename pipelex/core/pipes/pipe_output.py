@@ -3,17 +3,15 @@ from typing import TypeVar
 from pydantic import BaseModel, Field
 
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.html_content import HtmlContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.mermaid_content import MermaidContent
+from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_content import (
-    HtmlContent,
-    ImageContent,
-    ListContent,
-    MermaidContent,
-    NumberContent,
-    StuffContentType,
-    TextAndImagesContent,
-    TextContent,
-)
+from pipelex.core.stuffs.stuff_content import StuffContentType
+from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 
 

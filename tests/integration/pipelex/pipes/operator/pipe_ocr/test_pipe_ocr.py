@@ -8,7 +8,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuffs.stuff_content import PageContent
+from pipelex.core.stuffs.page_content import PageContent
 from pipelex.hub import get_concept_library, get_pipe_router
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 from pipelex.pipe_operators.ocr.pipe_ocr_factory import PipeOcrFactory

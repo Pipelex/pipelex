@@ -10,7 +10,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 
 if TYPE_CHECKING:
-    from pipelex.core.stuffs.stuff_content import TextContent
+    from pipelex.core.stuffs.text_content import TextContent
 
 
 class ApiSerializer:

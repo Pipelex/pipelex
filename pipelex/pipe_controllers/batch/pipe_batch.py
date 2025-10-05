@@ -11,7 +11,7 @@ from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
-from pipelex.core.stuffs.stuff_content import ListContent, StuffContent
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeInputError,
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine
 
     from pipelex.core.stuffs.stuff import Stuff
+    from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class PipeBatch(PipeController):

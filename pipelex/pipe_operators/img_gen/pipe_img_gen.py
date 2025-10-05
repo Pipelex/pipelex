@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
@@ -19,7 +19,8 @@ from pipelex.core.pipes.input_requirements_factory import InputRequirementsFacto
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, PipeRunParams, output_multiplicity_to_apply
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, StuffContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeDefinitionError,
@@ -34,6 +35,9 @@ from pipelex.hub import get_concept_library, get_content_generator, get_model_de
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
+
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class PipeImgGenOutput(PipeOutput):

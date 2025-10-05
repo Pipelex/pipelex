@@ -2,20 +2,18 @@ from typing import Any, ClassVar
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstractType
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.stuffs.dynamic_content import DynamicContent
+from pipelex.core.stuffs.html_content import HtmlContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.pdf_content import PDFContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_content import (
-    DynamicContent,
-    HtmlContent,
-    ImageContent,
-    ListContent,
-    NumberContent,
-    PageContent,
-    PDFContent,
-    StructuredContent,
-    StuffContent,
-    TextAndImagesContent,
-    TextContent,
-)
+from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition

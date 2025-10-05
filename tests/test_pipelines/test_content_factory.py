@@ -1,4 +1,4 @@
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 
 
 class MockRegisteredContent(StructuredContent):

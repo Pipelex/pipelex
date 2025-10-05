@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.registry_models import ModelType, RegistryModels
 
 

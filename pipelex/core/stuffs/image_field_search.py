@@ -2,7 +2,9 @@ import types
 import typing
 from typing import Any
 
-from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, StuffContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 def search_for_nested_image_fields(

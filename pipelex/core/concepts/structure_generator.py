@@ -6,7 +6,7 @@ from typing import Any, Literal, Optional
 from pydantic import Field
 
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.exceptions import ConceptStructureGeneratorError, PipelexException
 
 
@@ -17,11 +17,12 @@ class ConceptStructureValidationError(PipelexException):
 class StructureGenerator:
     """Generate Pydantic BaseModel classes from concept structure blueprints."""
 
+    # TODO: use StrEnum instead of Enum
     def __init__(self):
         self.imports = {
             "from typing import Optional, List, Dict, Any, Literal",
             "from enum import Enum",
-            "from pipelex.core.stuffs.stuff_content import StructuredContent",
+            "from pipelex.core.stuffs.structured_content import StructuredContent",
             "from pydantic import Field",
         }
         self.enum_definitions: dict[str, dict[str, Any]] = {}  # Store enum definitions

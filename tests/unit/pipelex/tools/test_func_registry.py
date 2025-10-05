@@ -6,7 +6,7 @@ import pytest
 from pytest import LogCaptureFixture
 
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.func_registry import FuncRegistry, FuncRegistryError
 
 

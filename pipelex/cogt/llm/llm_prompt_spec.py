@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptSpecError
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.core.stuffs.stuff_content import ImageContent
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator, get_template, get_template_provider
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
 
 
+# TODO: move this to pipe operators
 class LLMPromptSpec(BaseModel):
     prompting_style: PromptingStyle | None = None
 

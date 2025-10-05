@@ -3,7 +3,7 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.stuffs.stuff_content import ImageContent
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipeline.execute import execute_pipeline
 from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 

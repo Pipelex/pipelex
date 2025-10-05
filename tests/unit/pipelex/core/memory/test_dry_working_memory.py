@@ -5,7 +5,8 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
-from pipelex.core.stuffs.stuff_content import PageContent, TextContent
+from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.text_content import TextContent
 from tests.test_pipelines.tricky_questions import ThoughtfulAnswer
 
 

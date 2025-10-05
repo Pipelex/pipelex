@@ -6,8 +6,9 @@ from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.stuffs.stuff_content import StructuredContent, TextContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffContentFactory
+from pipelex.core.stuffs.text_content import TextContent
 
 
 class TestCases:

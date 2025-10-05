@@ -1,4 +1,4 @@
-from typing import Annotated, cast
+from typing import TYPE_CHECKING, Annotated, cast
 
 from pydantic import ConfigDict, Field, ValidationError, field_validator
 
@@ -7,7 +7,8 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, Pi
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.exceptions import (
     ConceptLoadingError,
     DomainLoadingError,
@@ -42,6 +43,9 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequ
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
 from pipelex.pipe_works.pipe_dry import dry_run_pipes
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.list_content import ListContent
 
 
 class DomainInformation(StructuredContent):

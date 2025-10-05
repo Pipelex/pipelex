@@ -9,7 +9,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.stuffs.stuff_content import ImageContent
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
 from pipelex.types import Self

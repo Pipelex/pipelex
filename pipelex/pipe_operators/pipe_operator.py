@@ -8,7 +8,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_activity_manager
 from pipelex.pipeline.activity.activity_models import ActivityReport
 from pipelex.pipeline.job_metadata import JobMetadata

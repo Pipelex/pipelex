@@ -26,8 +26,10 @@ from pipelex.core.pipes.pipe_run_params import (
     PipeRunParams,
     output_multiplicity_to_apply,
 )
-from pipelex.core.stuffs.stuff_content import ListContent, StuffContent, TextContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import (
     PipeDefinitionError,
     StaticValidationError,
