@@ -58,7 +58,7 @@ class LLMVisionTestCases:
     PATH_IMG_PNG_3 = f"{TEST_IMAGE_DIRECTORY}/eiffel_tower.png"
     PATH_IMG_JPEG_3 = f"{TEST_IMAGE_DIRECTORY}/eiffel_tower.jpg"
 
-    PATH_IMG_GANTT_1 = f"{TEST_IMAGE_DIRECTORY}/gantt_tree_house.png"
+    PATH_IMG_GANTT_1 = f"{TEST_IMAGE_DIRECTORY}/diagram.png"
 
     IMAGE_PATHS: ClassVar[list[tuple[str, str]]] = [  # topic, image_path
         ("AI Lympics PNG", PATH_IMG_PNG_1),

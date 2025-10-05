@@ -7,7 +7,7 @@ from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBluep
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.hub import get_class_registry, get_pipe_provider, get_pipe_router
+from pipelex.hub import get_class_registry, get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -34,8 +34,8 @@ class TestPipeLLM:
             pipe_code="adhoc_for_test_pipe_llm",
             blueprint=pipe_llm_blueprint,
         )
-        pipe_provider = get_pipe_provider()
-        pipe_provider.add_new_pipe(pipe)
+        pipe_library = get_pipe_library()
+        pipe_library.add_new_pipe(pipe)
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
@@ -100,8 +100,8 @@ class TestPipeLLM:
             pipe_code=pipe_code,
             blueprint=pipe_llm_blueprint,
         )
-        pipe_provider = get_pipe_provider()
-        pipe_provider.add_new_pipe(pipe)
+        pipe_library = get_pipe_library()
+        pipe_library.add_new_pipe(pipe)
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
@@ -119,17 +119,6 @@ class TestPipeLLM:
 
         # Pretty print the structured output
         pretty_print(main_stuff.content, title=f"{topic} - {concept} - {structuring_method}")
-
-        # If using PRELIMINARY_TEXT, also print the preliminary text
-        # if structuring_method == StructuringMethod.PRELIMINARY_TEXT:
-        #     # Get preliminary text from working memory
-        #     preliminary_stuff = pipe_llm_output.working_memory.get_optional_stuff("preliminary_text")
-        #     if preliminary_stuff:
-        #         content = preliminary_stuff.content
-        #         if hasattr(content, "text"):
-        #             pretty_print(content.text, title="Preliminary Text")
-        #         else:
-        #             pretty_print(str(content), title="Preliminary Text")
 
         # Verify the output type matches expected structure
         structure_class = get_class_registry().get_class(concept)

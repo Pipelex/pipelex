@@ -48,6 +48,7 @@ class SubPipe(BaseModel):
                 )
                 raise PipeInputError(msg) from exc
 
+            item_stuff_requirement = sub_pipe.inputs.get_required_input_requirement(variable_name=batch_params.input_item_stuff_name)
             pipe_batch_blueprint = PipeBatchBlueprint(
                 description=f"Batch processing for {self.pipe_code}",
                 branch_pipe_code=self.pipe_code,
@@ -56,7 +57,7 @@ class SubPipe(BaseModel):
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
                     batch_params.input_item_stuff_name: InputRequirementBlueprint(
-                        concept=sub_pipe.inputs.root[batch_params.input_item_stuff_name].concept.concept_string,
+                        concept=item_stuff_requirement.concept.concept_string,
                     ),
                 },
             )

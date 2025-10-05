@@ -1,6 +1,6 @@
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
-from pipelex.hub import get_concept_provider
+from pipelex.hub import get_concept_library
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
@@ -24,7 +24,7 @@ class TestPipeSequenceValidation:
             blueprint=ConceptBlueprint(description="Lorem Ipsum"),
             concept_codes_from_the_same_domain=["ProcessedText"],
         )
-        concept_library = get_concept_provider()
+        concept_library = get_concept_library()
         concept_library.add_concepts([concept_1, concept_2])
 
         pipe_sequence_blueprint = PipeSequenceBlueprint(
@@ -63,7 +63,7 @@ class TestPipeSequenceValidation:
             blueprint=ConceptBlueprint(description="Lorem Ipsum"),
             concept_codes_from_the_same_domain=["ProcessedText"],
         )
-        concept_library = get_concept_provider()
+        concept_library = get_concept_library()
         concept_library.add_concepts([concept_1, concept_2])
 
         pipe_sequence_blueprint = PipeSequenceBlueprint(

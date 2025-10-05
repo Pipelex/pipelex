@@ -212,6 +212,9 @@ typeCheckingMode = "strict"
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib -ra -m 'not (inference or llm or img_gen or ocr or needs_output or pipelex_api)'"
 asyncio_default_fixture_loop_scope = "session"
+filterwarnings = [
+    "ignore:Support for class-based `config` is deprecated:DeprecationWarning",
+]
 markers = [
     "needs_output: tests that need output to be displayed",
     "inference: slow and costly due to inference calls",

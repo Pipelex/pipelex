@@ -35,7 +35,7 @@ from pipelex.exceptions import (
 )
 from pipelex.hub import (
     get_class_registry,
-    get_concept_provider,
+    get_concept_library,
     get_content_generator,
     get_model_deck,
     get_native_concept,
@@ -95,7 +95,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     def validate_output(self):
-        if get_concept_provider().is_compatible(
+        if get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
         ):
@@ -144,13 +144,22 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                         raise missing_input_var_error
 
         # 2: Check that all inputs are in the required variables
-        for input_name in self.needed_inputs().variables:
+        for input_name, requirement in self.needed_inputs().items:
             if input_name not in required_variables:
+                explanation: str | None = None
+                if get_concept_library().is_image_concept(concept=requirement.concept):
+                    # We have an exraneous image input, the user probably forgot to add it into the prompt template
+                    explanation = (
+                        f"You have provided an image input named '{input_name}', but it is not referenced in the prompt template. "
+                        "Please add it to the prompt template."
+                    )
+
                 extraneous_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
                     domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
+                    explanation=explanation,
                 )
                 match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, default_reaction):
                     case StaticValidationReaction.IGNORE:
@@ -181,7 +190,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             if not output_concept_code:
                 output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT
             else:
-                output_concept = get_concept_provider().get_required_concept(
+                output_concept = get_required_concept(
                     concept_string=ConceptFactory.make_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code),
                 )
 
@@ -189,7 +198,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             base_multiplicity=self.output_multiplicity,
             override_multiplicity=pipe_run_params.output_multiplicity,
         )
-        log.debug(f"multiplicity_resolution: {multiplicity_resolution}")
         applied_output_multiplicity = multiplicity_resolution.resolved_multiplicity
         is_multiple_output = multiplicity_resolution.is_multiple_outputs_enabled
         fixed_nb_output = multiplicity_resolution.specific_output_count
@@ -249,7 +257,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         log.debug(f"TextContent.__class__.__name__: {TextContent.__class__.__name__}")
         log.debug(f"is_multiple_output: {is_multiple_output}")
         if output_concept.structure_class_name == "TextContent" and not is_multiple_output:
-            log.debug(f"PipeLLM generating a single text output: {self.__class__.__name__}_gen_text")
+            log.info(f"PipeLLM generating a single text output: {self.__class__.__name__}_gen_text")
             llm_prompt_1_for_text = await self.llm_prompt_spec.make_llm_prompt(
                 output_concept_string=output_concept.concept_string,
                 context_provider=working_memory,

@@ -21,7 +21,7 @@ An llm_handle can be either:
 
 ```toml
 [aliases]
-base-claude = "claude-4-sonnet"
+base-claude = "claude-4.5-sonnet"
 base-gpt = "gpt-5"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"

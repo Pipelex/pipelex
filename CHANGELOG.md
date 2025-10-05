@@ -2,27 +2,69 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- Fix Makefile target `pyright`
-- Fix a bug with the inputs of the `PipeLLM`.
-
-### Added
-
-- The `pipe-builder` will now sort pipes by dependencies.
-- Added the class `Flow` that represents the flow of pipe signatures.
-
-### Changed
+### Highlights
 
 - In the `PipeLLM`, the image inputs can now be used and tagged in the prompt like all other concepts.
+- Use claude-4.5-sonnet instead of claude-4-sonnet in the base deck.
+
+### Added
+ - Added `Flow` class that represents the flow of pipe signatures
+ - Added `pipe-builder` command `flow` to generate flow view from pipeline brief
+ - Added `FlowFactory` class to create Flow from PipelexBundleSpec or PLX files
+ - Added `sort_pipes_by_dependencies()` function for topological sorting of pipes
+ - Added `pipe_sorter.py` module for pipe dependency sorting utilities
+ - Added `search_for_nested_image_fields_in_structure_class()` method to Concept class
+ - Added `image_field_search.py` module with utilities to search for image fields in structure classes
+ - Added `pipe_dependencies` property to PipeBlueprint and controller blueprints
+ - Added `ordered_pipe_dependencies` property to PipeBlueprint for ordered dependencies
+ - Added `get_native_concept()` function to hub
+ - Added `get_pipes()` function to hub
+ - Added `remove_concepts_by_codes()` method to ConceptLibraryAbstract
+ - Added `remove_pipes_by_codes()` method to PipeLibraryAbstract
+ - Added template preprocessing with `preprocess_template()` function
+ - Added better dependency checking for optional SDK packages (anthropic, mistralai, boto3, aioboto3)
+ - Added `MissingDependencyError` exception for missing optional dependencies
+
+### Changed
+ - Cleanup env example and better explain how to set up keys in README and docs
+ - Changed Gemini model configuration from `gemini-2.0-flash-exp` (free tier) to `gemini-2.0-flash` with pricing ($0.10 input, $0.40 output per million tokens)
+ - Removed Gemini 1.5 series models (gemini-1.5-pro, gemini-1.5-flash, gemini-1.5-flash-8b) from configuration
+ - Changed Gemini routing from `google` backend to `pipelex_inference` backend
+ - Renamed `ConceptProviderAbstract` to `ConceptLibraryAbstract`
+ - Renamed `DomainProviderAbstract` to `DomainLibraryAbstract`
+ - Renamed `PipeProviderAbstract` to `PipeLibraryAbstract`
+ - Renamed `PipeInputSpec` to `InputRequirements`
+ - Renamed `PipeInputSpecFactory` to `InputRequirementsFactory`
+ - Renamed `pipe_input.py` to `input_requirements.py`
+ - Renamed `pipe_input_factory.py` to `input_requirements_factory.py`
+ - Renamed `pipe_input_blueprint.py` to `input_requirement_blueprint.py`
+ - Changed hub methods from `get_*_provider()` to `get_*_library()` pattern
+ - Changed hub methods from `set_*_provider()` to `set_*_library()` pattern
+ - Changed `PipeLLM` validation to check all inputs are in required variables
+ - Updated `LLMPromptSpec` to handle image collections (lists/tuples) in addition to single images
+ - Changed Mermaid diagram URL generation from `/img/` to `/svg/` endpoint
+ - Updated kajson dependency from 0.3.0 to 0.3.1
+ - Changed `PipeLLMPromptTemplate.make_llm_prompt()` to private method `_make_llm_prompt()`
+ - Updated pipe-builder prompts to include concept specs for better context
+ - Updated `PipelexBundleSpec.to_blueprint()` to sort pipes by dependencies before creating bundle
+ - Changed exception base class from `PipelexError` to `PipelexException` throughout codebase
+ - Updated Makefile pyright target to use `--pythonpath` flag correctly
+
+### Fixed
+ - Fixed Makefile target `pyright` to use correct pythonpath flag
+ - Fixed bug with inputs of the `PipeLLM` where image inputs couldn't be used and tagged in prompts
+ - Fixed image input handling in `LLMPromptSpec` to support both single images and image collections
+ - Fixed template preprocessing to handle jinja2 templates correctly
+ - Fixed hard dependencies by moving imports to function scope in model_lists.py
+ - Updated README badge URL to point to main branch instead of feature/pipe-builder branch
 
 ### Removed
-
-- Removed `gpt-5-mini` from the possible models in the `pipe-builder`.
-
-### Removed
-
-- Removed useless functions in `LLMJobFactory`.
+ - Removed `gpt-5-mini` from possible models in pipe-builder
+ - Removed useless functions in `LLMJobFactory`: `make_llm_job_from_prompt_factory()`, `make_llm_job_from_prompt_template()`, `make_llm_job_from_prompt_contents()`
+ - Removed `add_or_update_pipe()` method from PipeLibrary
+ - Removed `get_optional_library_manager()` method from PipelexHub
+ - Removed `get_optional_domain_provider()` and `get_optional_concept_provider()` methods from hub
+ - Removed unused test fixtures (apple, cherry, blueberry, concept_provider, pretty) from conftest.py
 
 ## [v0.11.0] - 2025-10-01
 

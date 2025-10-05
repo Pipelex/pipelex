@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.hub import get_pipe_provider
+from pipelex.hub import get_pipes
 from pipelex.pipe_works.pipe_dry import DryRunStatus, dry_run_pipes
 from pipelex.pipelex import Pipelex
 
@@ -18,7 +18,7 @@ class TestFundamentals:
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_dry_run_all_pipes(self):
-        results = await dry_run_pipes(pipes=get_pipe_provider().get_pipes(), raise_on_failure=False)
+        results = await dry_run_pipes(pipes=get_pipes(), raise_on_failure=False)
 
         # Check if there were any failures
 

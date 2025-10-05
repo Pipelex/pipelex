@@ -250,6 +250,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         prompting_style: PromptingStyle | None = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
     ) -> str:
+        log.debug(f"context: {context}")
         jinja2_assignment = Jinja2Assignment(
             context=context,
             jinja2_name=jinja2_name,

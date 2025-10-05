@@ -2,6 +2,43 @@
 
 The Inference Backend Configuration System manages how Pipelex handles AI model providers, model routing, and inference settings across LLMs, OCR, and image generation. This unified system provides a flexible and scalable way to configure multiple inference backends and route different types of AI models to the appropriate providers.
 
+## Configuration Approaches
+
+Pipelex supports three flexible approaches for accessing AI models:
+
+### Option A: Pipelex Inference (Optional & Free)
+
+Get a single API key that works with all major providers (OpenAI, Anthropic, Google, Mistral, FAL, and more). This is the **recommended approach for getting started quickly**.
+
+- ✅ Single API key for all providers
+- ✅ Simplified configuration
+- ✅ Automatic model routing
+- ✅ Free on Discord (limited time offer)
+
+See [Pipelex Inference](#pipelex-inference) section below for setup details.
+
+### Option B: Bring Your Own Keys
+
+Use your own API keys from individual providers for full control and direct billing. Ideal for production deployments with existing provider relationships.
+
+- ✅ Direct provider relationships
+- ✅ Full control over billing
+- ✅ No intermediary
+- ✅ Support for all provider-specific features
+
+See [Inference Backends](#inference-backends) section below for configuration.
+
+### Option C: Mix & Match (Custom Routing)
+
+Configure custom routing profiles to use your own keys for some models and Pipelex Inference for others. This gives you full flexibility to optimize for cost, performance, or rate limits.
+
+- ✅ Hybrid approach
+- ✅ Cost optimization
+- ✅ Performance tuning
+- ✅ Gradual migration between approaches
+
+See [Routing Profiles](#routing-profiles) section below for setup.
+
 ## Overview
 
 The inference backend system is built around four key concepts:
@@ -34,31 +71,57 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
         └── overrides.toml      # Custom overrides
 ```
 
-## Pipelex Inference
+## Pipelex Inference (Optional & Free)
 
-Pipelex Inference is a unified inference backend that provides access to all major LLM providers through a single API key. This is the recommended approach for getting started quickly with Pipelex.
+Pipelex Inference is a unified inference backend that provides access to all major AI providers through a single API key. This is the **recommended approach for getting started quickly** with Pipelex, and it's **completely optional**.
 
 ### Benefits
 
 - **Single API Key**: Access OpenAI, Anthropic, Google, Mistral, FAL, and more with one key
+- **Free to Get Started**: Available free on Discord (no credit card required, limited time offer)
 - **Simplified Configuration**: No need to manage multiple provider credentials
 - **Automatic Routing**: All AI models (LLMs, OCR, image generation) are automatically routed to their respective providers
 - **Unified Interface**: Same configuration system for text generation, OCR, and image generation
 
 ### Setup
 
-1. Join our Discord community to get your free Pipelex Inference API key (no credit card required, limited time offer):
-   - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join
-   - Request your API key in the appropriate channel once you're in
-2. Set the environment variable:
+1. **Get your API key:**
+   - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join our Discord
+   - Request your free API key in the appropriate channel
+   - No credit card required (limited time offer)
+
+2. **Configure environment variables:**
    ```bash
-   export PIPELEX_INFERENCE_API_KEY="your-api-key"
+   # Copy the example environment file
+   cp .env.example .env
+   
+   # Edit .env and add your Pipelex Inference API key
+   # PIPELEX_INFERENCE_API_KEY="your-api-key"
    ```
-3. Configure in `.pipelex/inference/backends.toml`:
+
+3. **Verify backend configuration:**
+   
+   The `pipelex_inference` backend should already be enabled in `.pipelex/inference/backends.toml`:
+   
    ```toml
    [pipelex_inference]
    enabled = true
+   endpoint = "https://inference.pipelex.com/v1"
    api_key = "${PIPELEX_INFERENCE_API_KEY}"
+   ```
+   
+   The environment variable `${PIPELEX_INFERENCE_API_KEY}` will be automatically loaded from your `.env` file.
+
+4. **Verify routing configuration:**
+   
+   The default routing profile in `.pipelex/inference/routing_profiles.toml` should be set to `pipelex_first`:
+   
+   ```toml
+   active = "pipelex_first"
+   
+   [profiles.pipelex_first]
+   description = "Use Pipelex Inference backend for all its supported models"
+   default = "pipelex_inference"
    ```
 
 ### Usage
@@ -68,7 +131,7 @@ Once configured, all models are available through the unified backend. Use stand
 ```plx
 [pipe.example]
 type = "PipeLLM"
-llm = { llm_handle = "claude-4-sonnet", temperature = 0.7 }
+llm = { llm_handle = "claude-4.5-sonnet", temperature = 0.7 }
 # Model automatically routed through Pipelex Inference
 ```
 
@@ -88,11 +151,55 @@ Backends represent AI service providers that can offer LLMs, OCR models, or imag
 
 ### Backend Configuration
 
-Configure backends in `.pipelex/inference/backends.toml`:
+#### Step 1: Configure Environment Variables
+
+First, set up your API keys in the `.env` file:
+
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit .env and add your provider API keys
+```
+
+> **Note:** Pipelex automatically loads environment variables from `.env` files using python-dotenv. No need to manually source or export them.
+
+The `.env.example` file contains all available providers with helpful comments:
+
+```bash
+# [OPTIONAL] Free Pipelex Inference API key - Get yours on Discord: https://go.pipelex.com/discord
+PIPELEX_INFERENCE_API_KEY=
+
+OPENAI_API_KEY=
+
+# AWS Bedrock - For accessing models via Amazon Bedrock
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=
+
+ANTHROPIC_API_KEY=
+MISTRAL_API_KEY=
+
+# Google AI Studio - Use GOOGLE_API_KEY for direct API access (simpler, rate-limited)
+GOOGLE_API_KEY=
+
+# Google Cloud Platform (GCP) - Use these for production Vertex AI access
+# Choose GOOGLE_API_KEY OR GCP credentials, not both
+GCP_PROJECT_ID=
+GCP_LOCATION=
+GCP_CREDENTIALS_FILE_PATH=gcp_credentials.json
+
+FAL_API_KEY=
+# ... (see .env.example for full list)
+```
+
+#### Step 2: Enable/Disable Backends
+
+Configure which backends to use in `.pipelex/inference/backends.toml`:
 
 ```toml
 [openai]
-enabled = true
+enabled = true  # Set to false to disable
 api_key = "${OPENAI_API_KEY}"
 
 [anthropic]
@@ -105,14 +212,14 @@ api_key = "${MISTRAL_API_KEY}"
 
 [fal]
 enabled = true
-api_key = "${FAL_KEY}"
+api_key = "${FAL_API_KEY}"
 
 [internal]
 enabled = true
 # No API key needed for internal/local processing
 ```
 
-Set `enabled` to `true` to activate a backend, or `false` to disable it. When a backend is enabled, you must set its corresponding API key as an environment variable.
+The `${VARIABLE_NAME}` syntax automatically loads values from your `.env` file. Set `enabled = true` to activate a backend, or `false` to disable it.
 
 ### Model Specifications
 
@@ -144,33 +251,101 @@ costs = { input = 0.04, output = 0.0 }
 
 ## Routing Profiles
 
-Routing profiles determine which backend handles specific models. Configure them in `.pipelex/inference/routing_profiles.toml`:
+Routing profiles determine which backend handles specific models. This is where you configure the **Mix & Match approach** (Option C) to optimize your setup. Configure them in `.pipelex/inference/routing_profiles.toml`:
 
+### Profile Examples
+
+**All Pipelex Inference (Option A):**
+
+Setup:
+```bash
+# In .env
+PIPELEX_INFERENCE_API_KEY="your-pipelex-key"
+```
+
+In `.pipelex/inference/routing_profiles.toml`:
 ```toml
 # Which profile to use
-active = "all_pipelex"
+active = "pipelex_first"
 
-[profiles.all_pipelex]
-description = "Use Pipelex Inference backend for all models"
+[profiles.pipelex_first]
+description = "Use Pipelex Inference backend for all its supported models"
 default = "pipelex_inference"
+```
 
-[profiles.mixed]
+**Native Providers Only (Option B):**
+
+Setup:
+```bash
+# In .env - add all provider keys you need
+OPENAI_API_KEY="your-openai-key"
+ANTHROPIC_API_KEY="your-anthropic-key"
+GOOGLE_API_KEY="your-google-key"
+FAL_API_KEY="your-fal-key"
+```
+
+In `.pipelex/inference/routing_profiles.toml`:
+```toml
+active = "custom_routing"
+
+[profiles.custom_routing]
 description = "Route models to their native providers"
 default = "openai"
 
-[profiles.mixed.routes]
+[profiles.custom_routing.routes]
 "claude-*" = "anthropic"
-"gemini-*" = "vertexai"
+"gemini-*" = "google"
 "mistral-*" = "mistral"
 "gpt-*" = "openai"
 "gpt-image-*" = "openai"
 "flux-*" = "fal"
 ```
 
+**Mix & Match (Option C):**
+
+Setup:
+```bash
+# In .env - combine Pipelex with specific provider keys
+PIPELEX_INFERENCE_API_KEY="your-pipelex-key"
+OPENAI_API_KEY="your-openai-key"  # For GPT models
+FAL_API_KEY="your-fal-key"        # For image generation
+```
+
+In `.pipelex/inference/routing_profiles.toml`:
+```toml
+active = "hybrid"
+
+[profiles.hybrid]
+description = "Use Pipelex for most models, native providers for specific ones"
+default = "pipelex_inference"
+
+[profiles.hybrid.routes]
+# Use your own OpenAI key for GPT models (better rate limits)
+"gpt-*" = "openai"
+# Use your own FAL key for image generation (direct billing)
+"flux-*" = "fal"
+# All other models use Pipelex Inference (claude, gemini, mistral, etc.)
+```
+
+### Routing System Features
+
 The routing system supports:
-- Exact matches
-- Wildcard patterns (prefix: `pattern*`, suffix: `*pattern`, contains: `*pattern*`)
-- Default fallback
+
+- **Exact matches**: `"gpt-4o-mini" = "openai"`
+- **Wildcard patterns**: 
+  - Prefix: `"gpt-*" = "openai"`
+  - Suffix: `"*-turbo" = "openai"`
+  - Contains: `"*-vision-*" = "openai"`
+- **Default fallback**: `default = "pipelex_inference"`
+
+### Use Cases for Mix & Match
+
+Common scenarios for hybrid routing:
+
+1. **Cost Optimization**: Use Pipelex Inference for expensive models, your own keys for cheaper ones
+2. **Rate Limits**: Use your own keys for high-volume models to avoid shared rate limits
+3. **Gradual Migration**: Start with Pipelex Inference, gradually move to your own keys as usage grows
+4. **Provider Features**: Use native providers for models requiring specific features not proxied through Pipelex Inference
 
 ## Model Deck
 
@@ -183,14 +358,14 @@ Define user-friendly names that map to model names in `.pipelex/inference/deck/b
 ```toml
 [aliases]
 # LLM aliases
-base-claude = "claude-4-sonnet"
+base-claude = "claude-4.5-sonnet"
 base-gpt = "gpt-5"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"
 smart_llm = [
     "claude-4.5-sonnet",
     "claude-4.1-opus",
-    "claude-4-sonnet",
+    "claude-4.5-sonnet",
     "gpt-5",
     "gemini-2.5-pro",
 ]
@@ -219,8 +394,8 @@ cheap_llm_for_text = { llm_handle = "cheap_llm_for_text", temperature = 0.5 }
 cheap_llm_for_object = { llm_handle = "cheap_llm_for_object", temperature = 0.5 }
 
 # Task-specific presets
-llm_for_creative_writing = { llm_handle = "claude-4-sonnet", temperature = 0.9 }
-llm_to_extract_invoice = { llm_handle = "claude-4-sonnet", temperature = 0.1 }
+llm_for_creative_writing = { llm_handle = "claude-4.5-sonnet", temperature = 0.9 }
+llm_to_extract_invoice = { llm_handle = "claude-4.5-sonnet", temperature = 0.1 }
 llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
 
 ### OCR Presets
@@ -318,25 +493,33 @@ Common error types:
 
 ## Best Practices
 
-1. **Backend Management**:
-   - Keep API keys in environment variables
-   - Enable only the backends you need
-   - Document custom backend configurations
+1. **Choosing Your Configuration Approach**:
+   - **Starting out?** Use Pipelex Inference (Option A) to get running quickly
+   - **Production deployment?** Consider bringing your own keys (Option B) for direct billing control
+   - **Optimizing costs/performance?** Use Mix & Match (Option C) for maximum flexibility
+   - You can switch between approaches at any time by changing your routing profile
 
-2. **Model Routing**:
-   - Use specific routing profiles for different environments
+2. **Backend Management**:
+   - Keep API keys in environment variables (never commit them)
+   - Enable only the backends you need to reduce configuration complexity
+   - Document custom backend configurations for your team
+
+3. **Model Routing**:
+   - Use specific routing profiles for different environments (dev, staging, prod)
    - Test routing rules before production deployment
-   - Consider cost implications when routing models
+   - Consider cost implications when routing models (some providers are cheaper for certain models)
+   - Monitor usage patterns to optimize your routing strategy
 
-3. **Presets and Aliases**:
-   - Create task-specific presets for consistency
-   - Use meaningful alias names
-   - Document custom presets and their use cases
+4. **Presets and Aliases**:
+   - Create task-specific presets for consistency across your pipelines
+   - Use meaningful alias names that describe the use case (e.g., `llm_to_extract_invoice`)
+   - Document custom presets and their use cases in your team documentation
 
-4. **Customization**:
+5. **Customization**:
    - Use `overrides.toml` for project-specific settings
-   - Keep base configurations unchanged
+   - Keep base configurations unchanged to make upgrades easier
    - Version control your custom configurations
+   - Share routing profiles and presets across your team
 
 ## Validation
 

@@ -101,20 +101,20 @@ class LLMPromptSpec(BaseModel):
         ############################################################
         # User images
         ############################################################
-        prompt_user_images: list[PromptImage] = []
+        prompt_user_images: dict[str, PromptImage] = {}
         if self.user_images:
             for user_image_name in self.user_images:
                 log.debug(f"Getting user image '{user_image_name}' from context")
                 # Try to get as a single ImageContent first
                 try:
                     prompt_image_content = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=ImageContent)
-                    if prompt_image_content is not None:  # An ImageContent can be optional..
+                    if prompt_image_content is not None:  # An ImageContent can be optional
                         if base_64 := prompt_image_content.base_64:
                             user_image = PromptImageFactory.make_prompt_image(base_64=base_64)
                         else:
                             image_uri = prompt_image_content.url
                             user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
-                        prompt_user_images.append(user_image)
+                        prompt_user_images[user_image_name] = user_image
                 except ContextProviderException:
                     # If single image failed, try to get as a collection (list or tuple)
                     try:
@@ -129,7 +129,7 @@ class LLMPromptSpec(BaseModel):
                                     else:
                                         image_uri = image_item.url
                                         user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
-                                    prompt_user_images.append(user_image)
+                                    prompt_user_images[user_image_name] = user_image
                         else:
                             msg = (
                                 f"Could not find a valid user image or image collection named '{user_image_name}' from the provided context_provider"
@@ -142,6 +142,13 @@ class LLMPromptSpec(BaseModel):
         ############################################################
         # User text
         ############################################################
+        # replace the image variables with numbered tags
+        if prompt_user_images:
+            if not extra_params:
+                extra_params = {}
+            for image_index, image_name in enumerate(prompt_user_images.keys()):
+                extra_params[image_name] = f"[Image {image_index + 1}]"
+                log.warning(f"Replacing image variable '{image_name}' with numbered tag '[Image {image_index + 1}]'")
         user_text = await self._unravel_text(
             context_provider=context_provider,
             jinja2_blueprint=self.user_text_jinja2_blueprint,
@@ -176,7 +183,7 @@ class LLMPromptSpec(BaseModel):
         return LLMPrompt(
             system_text=system_text,
             user_text=user_text,
-            user_images=prompt_user_images,
+            user_images=list(prompt_user_images.values()),
         )
 
     async def _unravel_text(
@@ -193,6 +200,9 @@ class LLMPromptSpec(BaseModel):
             if (prompting_style := self.prompting_style) and not jinja2_blueprint.prompting_style:
                 jinja2_blueprint.prompting_style = prompting_style
                 log.verbose(f"Setting prompting style to {prompting_style}")
+
+            log.info(f"extra_params: {extra_params}")
+            log.info(f"jinja2_blueprint.extra_context: {jinja2_blueprint.extra_context}")
 
             context: dict[str, Any] = context_provider.generate_jinja2_context()
             if extra_params:

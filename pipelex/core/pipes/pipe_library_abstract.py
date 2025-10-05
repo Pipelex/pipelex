@@ -2,10 +2,8 @@ from abc import ABC, abstractmethod
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
-PipeLibraryRoot = dict[str, PipeAbstract]
 
-
-class PipeProviderAbstract(ABC):
+class PipeLibraryAbstract(ABC):
     @abstractmethod
     def validate_with_libraries(self) -> None:
         pass
@@ -24,6 +22,9 @@ class PipeProviderAbstract(ABC):
 
     @abstractmethod
     def get_pipes_dict(self) -> dict[str, PipeAbstract]:
+        pass
+
+    def remove_pipes_by_codes(self, pipe_codes: list[str]) -> None:
         pass
 
     @abstractmethod

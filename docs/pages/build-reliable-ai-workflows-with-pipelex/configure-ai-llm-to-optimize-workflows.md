@@ -51,7 +51,7 @@ llm_to_reason = {
 }
 
 llm_to_extract = { 
-    llm_handle = "claude-4-sonnet", 
+    llm_handle = "claude-4.5-sonnet", 
     temperature = 0.1, 
     max_tokens = "auto" 
 }
