@@ -26,6 +26,7 @@
  - Added `MissingDependencyError` exception for missing optional dependencies
 
 ### Changed
+ - Cleanup env example and better explain how to set up keys in README and docs
  - Changed Gemini model configuration from `gemini-2.0-flash-exp` (free tier) to `gemini-2.0-flash` with pricing ($0.10 input, $0.40 output per million tokens)
  - Removed Gemini 1.5 series models (gemini-1.5-pro, gemini-1.5-flash, gemini-1.5-flash-8b) from configuration
  - Changed Gemini routing from `google` backend to `pipelex_inference` backend
