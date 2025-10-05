@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_provider_abstract import PipeProviderAbstract
+from pipelex.core.pipes.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.exceptions import ConceptError, ConceptLibraryConceptNotFoundError, PipeLibraryError, PipeLibraryPipeNotFoundError
 from pipelex.hub import get_concept_library
 from pipelex.types import Self
@@ -15,7 +15,7 @@ from pipelex.types import Self
 PipeLibraryRoot = dict[str, PipeAbstract]
 
 
-class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
+class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     @override
     def validate_with_libraries(self):
         concept_library = get_concept_library()
@@ -51,13 +51,6 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
         for pipe in pipes:
             self.add_new_pipe(pipe=pipe)
 
-    def add_or_update_pipe(self, pipe: PipeAbstract):
-        name = pipe.code
-        pipe.inputs.set_default_domain(domain=pipe.domain)
-        if pipe.output.code and "." not in pipe.output.code:
-            pipe.output.code = f"{pipe.domain}.{pipe.output.code}"
-        self.root[name] = pipe
-
     @override
     def get_optional_pipe(self, pipe_code: str) -> PipeAbstract | None:
         return self.root.get(pipe_code)
@@ -78,6 +71,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     def get_pipes_dict(self) -> dict[str, PipeAbstract]:
         return self.root
 
+    @override
     def remove_pipes_by_codes(self, pipe_codes: list[str]) -> None:
         # TODO: We should create a separate library, that copies the original one, and then removes the pipes from it
         # Then run the dry run + validation to see if removing those pipe has not broken any other pipe.

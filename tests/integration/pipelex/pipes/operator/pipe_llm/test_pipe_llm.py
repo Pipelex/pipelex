@@ -7,7 +7,7 @@ from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBluep
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.hub import get_class_registry, get_pipe_provider, get_pipe_router
+from pipelex.hub import get_class_registry, get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -34,8 +34,8 @@ class TestPipeLLM:
             pipe_code="adhoc_for_test_pipe_llm",
             blueprint=pipe_llm_blueprint,
         )
-        pipe_provider = get_pipe_provider()
-        pipe_provider.add_new_pipe(pipe)
+        pipe_library = get_pipe_library()
+        pipe_library.add_new_pipe(pipe)
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
@@ -100,8 +100,8 @@ class TestPipeLLM:
             pipe_code=pipe_code,
             blueprint=pipe_llm_blueprint,
         )
-        pipe_provider = get_pipe_provider()
-        pipe_provider.add_new_pipe(pipe)
+        pipe_library = get_pipe_library()
+        pipe_library.add_new_pipe(pipe)
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,

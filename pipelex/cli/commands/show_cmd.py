@@ -8,7 +8,7 @@ import typer
 from pipelex import pretty_print
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
-from pipelex.hub import get_pipe_provider, get_required_pipe
+from pipelex.hub import get_pipe_library, get_required_pipe
 from pipelex.pipelex import Pipelex
 from pipelex.tools.config.manager import config_manager
 
@@ -31,7 +31,7 @@ def do_list_pipes(relative_config_folder_path: str = "pipelex_libraries") -> Non
     Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
 
     try:
-        get_pipe_provider().pretty_list_pipes()
+        get_pipe_library().pretty_list_pipes()
     except Exception as exc:
         msg = f"Failed to list pipes: {exc}"
         raise PipelexCLIError(msg) from exc

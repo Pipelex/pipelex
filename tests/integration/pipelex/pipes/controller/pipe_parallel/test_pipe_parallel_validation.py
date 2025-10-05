@@ -2,7 +2,7 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.hub import get_concept_library, get_pipe_provider
+from pipelex.hub import get_concept_library, get_pipe_library
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
@@ -55,8 +55,8 @@ class TestPipeParallelValidation:
             blueprint=pipe_llm_blueprint,
         )
 
-        pipe_provider = get_pipe_provider()
-        pipe_provider.add_new_pipe(pipe=real_pipe)
+        pipe_library = get_pipe_library()
+        pipe_library.add_new_pipe(pipe=real_pipe)
 
         # Verify the real pipe was created successfully
         assert real_pipe.domain == domain

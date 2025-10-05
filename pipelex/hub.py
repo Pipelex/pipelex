@@ -18,7 +18,7 @@ from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_provider_abstract import DomainProviderAbstract
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_provider_abstract import PipeProviderAbstract
+from pipelex.core.pipes.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
@@ -60,7 +60,7 @@ class PipelexHub:
         # pipelex
         self._domain_provider: DomainProviderAbstract | None = None
         self._concept_library: ConceptLibraryAbstract | None = None
-        self._pipe_provider: PipeProviderAbstract | None = None
+        self._pipe_library: PipeLibraryAbstract | None = None
         self._pipe_router: PipeRouterProtocol | None = None
         self._library_manager: LibraryManagerAbstract | None = None
 
@@ -149,8 +149,8 @@ class PipelexHub:
     def set_concept_library(self, concept_library: ConceptLibraryAbstract):
         self._concept_library = concept_library
 
-    def set_pipe_provider(self, pipe_provider: PipeProviderAbstract):
-        self._pipe_provider = pipe_provider
+    def set_pipe_library(self, pipe_library: PipeLibraryAbstract):
+        self._pipe_library = pipe_library
 
     def set_pipe_router(self, pipe_router: PipeRouterProtocol):
         self._pipe_router = pipe_router
@@ -263,11 +263,11 @@ class PipelexHub:
     def get_optional_concept_library(self) -> ConceptLibraryAbstract | None:
         return self._concept_library
 
-    def get_required_pipe_provider(self) -> PipeProviderAbstract:
-        if self._pipe_provider is None:
-            msg = "PipeProvider is not initialized"
+    def get_required_pipe_library(self) -> PipeLibraryAbstract:
+        if self._pipe_library is None:
+            msg = "PipeLibrary is not initialized"
             raise RuntimeError(msg)
-        return self._pipe_provider
+        return self._pipe_library
 
     def get_required_pipe_router(self) -> PipeRouterProtocol:
         if self._pipe_router is None:
@@ -411,16 +411,16 @@ def get_optional_domain(domain: str) -> Domain | None:
     return None
 
 
-def get_pipe_provider() -> PipeProviderAbstract:
-    return get_pipelex_hub().get_required_pipe_provider()
+def get_pipe_library() -> PipeLibraryAbstract:
+    return get_pipelex_hub().get_required_pipe_library()
 
 
 def get_required_pipe(pipe_code: str) -> PipeAbstract:
-    return get_pipelex_hub().get_required_pipe_provider().get_required_pipe(pipe_code=pipe_code)
+    return get_pipelex_hub().get_required_pipe_library().get_required_pipe(pipe_code=pipe_code)
 
 
 def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
-    return get_pipelex_hub().get_required_pipe_provider().get_optional_pipe(pipe_code=pipe_code)
+    return get_pipelex_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
 
 
 def get_concept_library() -> ConceptLibraryAbstract:
