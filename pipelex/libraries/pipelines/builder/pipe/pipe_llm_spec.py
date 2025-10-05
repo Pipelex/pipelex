@@ -89,9 +89,10 @@ class PipeLLMSpec(PipeSpec):
     prompt_template: str | None = Field(
         description=(
             "A template for the user prompt. Use `$` prefix for inline variables (e.g., `$topic`) and `@` prefix "
-            "to insert the content of an entire input (e.g., `@extracted_text`). "
-            "**Notes**: • Do not use `@` or `$` for image variables, declaring them as inputs is enough."
-            "• You can also use jinja2 syntax for conditional logic and for loops, but prefer `$` and `@` for simple variable insertions."
+            "to insert content as a block with delimiters (e.g., `@extracted_text` --> extracted_text: ```\n[the extracted_text goes here]\n```). "
+            "**Notes**: • Image variables must be inserted too. They can be simply added with the `$` prefix on a line, e.g. `$image_1`."
+            "Or you can mention them by their number in order in the inputs section, starting from 1. Example: "
+            "`Only analyze the colors from $image_1 and the shapes from $image_2."
         )
     )
 

@@ -222,7 +222,6 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
         description=domain_information.description,
         concept=validated_concepts,
         pipe={pipe_spec.pipe_code: _convert_pipe_spec(pipe_spec) for pipe_spec in pipe_specs},
-        # pipe={pipe_spec.pipe_code: pipe_spec for pipe_spec in pipe_specs},
     )
 
 
