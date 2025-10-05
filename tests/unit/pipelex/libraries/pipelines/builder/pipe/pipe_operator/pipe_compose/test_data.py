@@ -8,8 +8,8 @@ from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle,
 
 
 class PipeComposeTestCases:
-    SIMPLE_JINJA2 = (
-        "simple_jinja2",
+    SIMPLE_COMPOSE = (
+        "simple_compose",
         PipeComposeSpec(
             pipe_code="template_renderer",
             description="Render a template",
@@ -36,5 +36,5 @@ class PipeComposeTestCases:
     )
 
     TEST_CASES: ClassVar[list[tuple[str, PipeComposeSpec, PipeComposeBlueprint]]] = [
-        SIMPLE_JINJA2,
+        SIMPLE_COMPOSE,
     ]
