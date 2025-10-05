@@ -251,16 +251,10 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._domain_library
 
-    def get_optional_domain_library(self) -> DomainLibraryAbstract | None:
-        return self._domain_library
-
     def get_required_concept_library(self) -> ConceptLibraryAbstract:
         if self._concept_library is None:
             msg = "ConceptLibrary is not initialized"
             raise RuntimeError(msg)
-        return self._concept_library
-
-    def get_optional_concept_library(self) -> ConceptLibraryAbstract | None:
         return self._concept_library
 
     def get_required_pipe_library(self) -> PipeLibraryAbstract:
@@ -297,9 +291,6 @@ class PipelexHub:
         if self._library_manager is None:
             msg = "Library manager is not set. You must initialize Pipelex first."
             raise RuntimeError(msg)
-        return self._library_manager
-
-    def get_optional_library_manager(self) -> LibraryManagerAbstract | None:
         return self._library_manager
 
     def get_observer_provider(self) -> ObserverProtocol:
@@ -406,9 +397,7 @@ def get_required_domain(domain: str) -> Domain:
 
 
 def get_optional_domain(domain: str) -> Domain | None:
-    if domain_library := get_pipelex_hub().get_optional_domain_library():
-        return domain_library.get_domain(domain=domain)
-    return None
+    return get_pipelex_hub().get_required_domain_library().get_domain(domain=domain)
 
 
 def get_pipe_library() -> PipeLibraryAbstract:
@@ -425,10 +414,6 @@ def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
 
 def get_concept_library() -> ConceptLibraryAbstract:
     return get_pipelex_hub().get_required_concept_library()
-
-
-def get_optional_concept_library() -> ConceptLibraryAbstract | None:
-    return get_pipelex_hub().get_optional_concept_library()
 
 
 def get_required_concept(concept_string: str) -> Concept:

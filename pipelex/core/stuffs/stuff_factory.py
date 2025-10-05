@@ -15,7 +15,7 @@ from pipelex.core.stuffs.stuff_content import (
     TextContent,
 )
 from pipelex.exceptions import PipelexException
-from pipelex.hub import get_class_registry, get_concept_library, get_native_concept
+from pipelex.hub import get_class_registry, get_concept_library, get_native_concept, get_required_concept
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -51,7 +51,7 @@ class StuffFactory:
     @classmethod
     def make_from_concept_string(cls, concept_string: str, name: str, content: StuffContent) -> Stuff:
         ConceptBlueprint.validate_concept_string(concept_string)
-        concept = get_concept_library().get_required_concept(concept_string=concept_string)
+        concept = get_required_concept(concept_string=concept_string)
         return cls.make_stuff(
             concept=concept,
             content=content,
@@ -244,19 +244,22 @@ class StuffFactory:
                 msg = f"Stuff content data dict is badly formed: {exc}"
                 raise StuffFactoryError(msg) from exc
 
+            concept_library = get_concept_library()
+            concept = concept_library.get_required_concept(concept_string=concept_code)
+
             if isinstance(content_value, StuffContent):
                 return StuffFactory.make_stuff(
-                    concept=get_concept_library().get_required_concept(concept_string=concept_code),
+                    concept=concept,
                     name=name,
                     content=content_value,
                     code=stuff_code,
                 )
             content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-                concept=get_concept_library().get_required_concept(concept_string=concept_code),
+                concept=concept,
                 value=content_value,
             )
             return StuffFactory.make_stuff(
-                concept=get_concept_library().get_required_concept(concept_string=concept_code),
+                concept=concept,
                 name=name,
                 content=content,
                 code=stuff_code,

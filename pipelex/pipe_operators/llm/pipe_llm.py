@@ -181,7 +181,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             if not output_concept_code:
                 output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT
             else:
-                output_concept = get_concept_library().get_required_concept(
+                output_concept = get_required_concept(
                     concept_string=ConceptFactory.make_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code),
                 )
 
