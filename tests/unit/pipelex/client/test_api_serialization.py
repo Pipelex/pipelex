@@ -14,7 +14,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_content import NumberContent, TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from tests.test_pipelines.datetime import DateTimeEvent
+from tests.test_pipelines.concepts.datetime import DateTimeEvent
 
 
 # Test models for complex scenarios

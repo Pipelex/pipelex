@@ -144,13 +144,22 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                         raise missing_input_var_error
 
         # 2: Check that all inputs are in the required variables
-        for input_name in self.needed_inputs().variables:
+        for input_name, requirement in self.needed_inputs().items:
             if input_name not in required_variables:
+                explanation: str | None = None
+                if get_concept_library().is_image_concept(concept=requirement.concept):
+                    # We have an exraneous image input, the user probably forgot to add it into the prompt template
+                    explanation = (
+                        f"You have provided an image input named '{input_name}', but it is not referenced in the prompt template. "
+                        "Please add it to the prompt template."
+                    )
+
                 extraneous_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
                     domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
+                    explanation=explanation,
                 )
                 match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, default_reaction):
                     case StaticValidationReaction.IGNORE:

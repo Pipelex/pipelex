@@ -30,7 +30,6 @@
  - Changed Gemini model configuration from `gemini-2.0-flash-exp` (free tier) to `gemini-2.0-flash` with pricing ($0.10 input, $0.40 output per million tokens)
  - Removed Gemini 1.5 series models (gemini-1.5-pro, gemini-1.5-flash, gemini-1.5-flash-8b) from configuration
  - Changed Gemini routing from `google` backend to `pipelex_inference` backend
- - Updated README badge URL to point to main branch instead of feature/pipe-builder branch
  - Renamed `ConceptProviderAbstract` to `ConceptLibraryAbstract`
  - Renamed `DomainProviderAbstract` to `DomainLibraryAbstract`
  - Renamed `PipeProviderAbstract` to `PipeLibraryAbstract`
@@ -57,6 +56,7 @@
  - Fixed image input handling in `LLMPromptSpec` to support both single images and image collections
  - Fixed template preprocessing to handle jinja2 templates correctly
  - Fixed hard dependencies by moving imports to function scope in model_lists.py
+ - Updated README badge URL to point to main branch instead of feature/pipe-builder branch
 
 ### Removed
  - Removed `gpt-5-mini` from possible models in pipe-builder

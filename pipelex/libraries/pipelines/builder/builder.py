@@ -39,6 +39,7 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_spec import PipeOcrSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
 from pipelex.pipe_works.pipe_dry import dry_run_pipes
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -160,7 +161,7 @@ class PipelexBundleSpec(StructuredContent):
         )
 
 
-# TODO: Put this in a factory. Investigate why it is necessary.
+# # TODO: Put this in a factory. Investigate why it is necessary.
 def _convert_pipe_spec(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
     pipe_type_to_class: dict[str, type] = {
         "PipeFunc": PipeFuncSpec,
@@ -178,7 +179,10 @@ def _convert_pipe_spec(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
     if pipe_class is None:
         msg = f"Unknown pipe type: {pipe_spec.type}"
         raise PipeBuilderError(msg)
-    return cast("PipeSpecUnion", pipe_class(**pipe_spec.model_dump(serialize_as_any=True)))
+    if not issubclass(pipe_class, PipeSpec):
+        msg = f"Pipe class {pipe_class} is not a subclass of PipeSpec"
+        raise PipeBuilderError(msg)
+    return cast("PipeSpecUnion", pipe_class.model_validate(pipe_spec.model_dump(serialize_as_any=True)))
 
 
 async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> PipelexBundleSpec:
@@ -198,7 +202,7 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
         item_type=ConceptSpec,
     )
 
-    pipe_specs = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="pipe_specs").content)
+    pipe_specs: list[PipeSpecUnion] = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="pipe_specs").content).items
     domain_information = working_memory.get_stuff_as(name="domain_information", content_type=DomainInformation)
 
     # Properly validate and reconstruct concept specs to ensure proper Pydantic validation
@@ -217,7 +221,8 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
         domain=domain_information.domain,
         description=domain_information.description,
         concept=validated_concepts,
-        pipe={pipe_spec.pipe_code: _convert_pipe_spec(pipe_spec) for pipe_spec in pipe_specs.items},
+        pipe={pipe_spec.pipe_code: _convert_pipe_spec(pipe_spec) for pipe_spec in pipe_specs},
+        # pipe={pipe_spec.pipe_code: pipe_spec for pipe_spec in pipe_specs},
     )
 
 
