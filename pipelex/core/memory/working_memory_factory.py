@@ -9,7 +9,7 @@ from pipelex.client.protocol import CompactMemory, ImplicitMemory
 from pipelex.core.concepts.concept import ConceptBlueprint, SpecialDomain
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
-from pipelex.core.pipes.pipe_input import TypedNamedInputRequirement
+from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, PDFContent, StuffContent, TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory

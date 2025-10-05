@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory

@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from pipelex.core.stuffs.stuff_content import ImageContent, StructuredContent, TextContent
+from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, StructuredContent, TextContent
 
 
 # Test structures
@@ -51,6 +51,82 @@ class PersonWithOptionalImage(StructuredContent):
 
     name: TextContent
     photo: ImageContent | None = None
+
+
+class GalleryWithImageList(StructuredContent):
+    """A gallery with a list of images."""
+
+    title: TextContent
+    photos: list[ImageContent]
+
+
+class PersonWithImageTuple(StructuredContent):
+    """A person with a tuple of images (before/after photos)."""
+
+    name: TextContent
+    before_after: tuple[ImageContent, ImageContent]
+
+
+class PhotoAlbumItem(StructuredContent):
+    """An item in a photo album with nested image."""
+
+    photo: ImageContent
+    caption: TextContent
+
+
+class PhotoAlbumWithNestedImages(StructuredContent):
+    """A photo album with a list of items that contain nested images."""
+
+    title: TextContent
+    album_items: list[PhotoAlbumItem]
+
+
+class MediaFrame(StructuredContent):
+    """A frame containing an image."""
+
+    frame_image: ImageContent
+    border_style: TextContent
+
+
+class MediaSection(StructuredContent):
+    """A section with multiple frames."""
+
+    section_title: TextContent
+    frames: list[MediaFrame]
+
+
+class MediaCollection(StructuredContent):
+    """A collection with sections and thumbnails."""
+
+    collection_name: TextContent
+    thumbnail: ImageContent
+    sections: list[MediaSection]
+
+
+class ComplexNestedGallery(StructuredContent):
+    """A deeply nested gallery structure.
+
+    Structure: list[tuple[MediaCollection, list[PhotoAlbumItem]]]
+    This tests:
+    - list containing tuples
+    - tuples containing objects with nested images
+    - objects containing lists of objects with images
+    - multiple levels of nesting (4+ levels deep)
+    """
+
+    title: TextContent
+    # Each gallery entry is a tuple of (collection, album_items)
+    # collection has: thumbnail + sections -> frames -> frame_image
+    # album_items are PhotoAlbumItem with photo field
+    gallery_entries: list[tuple[MediaCollection, list[PhotoAlbumItem]]]
+
+
+class GalleryWithListContent(StructuredContent):
+    """A gallery using ListContent to hold items with nested images."""
+
+    title: TextContent
+    # ListContent containing items with images
+    album_list: ListContent[PhotoAlbumItem]
 
 
 class TestData:

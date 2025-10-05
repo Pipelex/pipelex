@@ -1,8 +1,8 @@
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input_factory import PipeInputFactory
 from pipelex.hub import get_concept_provider
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
@@ -27,7 +27,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             domain=domain,
             code=pipe_code,
             description=blueprint.description,
-            inputs=PipeInputFactory.make_from_blueprint(
+            inputs=InputRequirementsFactory.make_from_blueprint(
                 domain=domain,
                 blueprint=blueprint.inputs or {},
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,

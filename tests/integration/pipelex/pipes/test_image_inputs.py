@@ -114,4 +114,5 @@ class TestImageInputs:
             blueprint=pipe_llm_blueprint,
         )
 
-        assert pipe_llm.llm_prompt_spec.user_images == ["page.page_view"]
+        # Should find both the list of images in text_and_images and the single page_view image
+        assert pipe_llm.llm_prompt_spec.user_images == ["page.text_and_images.images", "page.page_view"]

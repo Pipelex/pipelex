@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.libraries.pipelines.builder.pipe.sub_pipe_spec import SubPipeSpec
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint

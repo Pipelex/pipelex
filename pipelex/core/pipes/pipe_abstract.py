@@ -5,8 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.core.pipes.pipe_input import PipeInput
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunParams
 from pipelex.exceptions import PipeStackOverflowError
@@ -21,7 +21,7 @@ class PipeAbstract(ABC, BaseModel):
     code: str
     domain: str
     description: str | None = None
-    inputs: PipeInput = Field(default_factory=PipeInput)
+    inputs: InputRequirements = Field(default_factory=InputRequirements)
     output: Concept
 
     @field_validator("code", mode="before")
@@ -49,7 +49,7 @@ class PipeAbstract(ABC, BaseModel):
         """
 
     @abstractmethod
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> PipeInput:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         """Return the inputs that are needed for the pipe to run.
 
         Args:

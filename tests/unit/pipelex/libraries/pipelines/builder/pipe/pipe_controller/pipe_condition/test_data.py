@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.pipe_condition_spec import PipeConditionSpec
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 
