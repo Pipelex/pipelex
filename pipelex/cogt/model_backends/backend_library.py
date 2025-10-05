@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import Field, RootModel, ValidationError
 
-from pipelex import log
 from pipelex.cogt.exceptions import (
     InferenceBackendCredentialsError,
     InferenceBackendCredentialsErrorType,

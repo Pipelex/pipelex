@@ -1,6 +1,5 @@
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_setting import LLMSettingChoices
 from pipelex.core.concepts.concept import Concept
