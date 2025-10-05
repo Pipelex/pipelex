@@ -5,6 +5,7 @@
 ### Highlights
 
 - In the `PipeLLM`, the image inputs can now be used and tagged in the prompt like all other concepts.
+- Use claude-4.5-sonnet instead of claude-4-sonnet in the base deck.
 
 ### Added
  - Added `Flow` class that represents the flow of pipe signatures
