@@ -1,5 +1,3 @@
-import os
-import shutil
 import sys
 import types
 from pathlib import Path
@@ -19,104 +17,86 @@ class TestModuleFileError:
 
 class TestImportModuleFromFile:
     @pytest.fixture(autouse=True)
-    def cleanup_test_files(self):
-        """Clean up test files and sys.modules after each test."""
+    def cleanup_sys_modules(self):
+        """Clean up sys.modules entries after each test."""
         yield
-        # Clean up test files
-        test_files = ["test_module.py", "test_file.txt", "syntax_error.py", "import_error.py", "nested/subdir/test_module.py"]
-        for file_path in test_files:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
-        # Clean up nested directories and __pycache__ directories
-        directories_to_remove = ["nested/subdir", "nested", "__pycache__", "nested/__pycache__", "nested/subdir/__pycache__"]
-        for dir_path in directories_to_remove:
-            if Path(dir_path).exists():
-                shutil.rmtree(dir_path)
-
         # Clean up sys.modules entries for test modules
-        modules_to_remove = [name for name in sys.modules if name.startswith("test_module")]
+        modules_to_remove = [name for name in sys.modules if "test_module_" in name or name == "test_module"]
         for module_name in modules_to_remove:
             del sys.modules[module_name]
 
-    def test_import_valid_python_file(self):
+    def test_import_valid_python_file(self, tmp_path: Path):
         """Test importing a valid Python file."""
-        test_file_path = "test_module.py"
-        with open(test_file_path, "w") as test_file:
-            test_file.write("""
+        test_file_path = tmp_path / "test_module_valid.py"
+        test_file_path.write_text("""
 def test_function():
     return "test_value"
 
 class TestClass:
     pass
 """)
-        module = import_module_from_file(test_file_path)
+        module = import_module_from_file(str(test_file_path))
         assert hasattr(module, "test_function")
         assert hasattr(module, "TestClass")
         assert module.test_function() == "test_value"
 
-    def test_import_non_python_file_raises_error(self):
+    def test_import_non_python_file_raises_error(self, tmp_path: Path):
         """Test that importing a non-Python file raises ModuleFileError."""
-        test_file_path = "test_file.txt"
-        with open(test_file_path, "w") as test_file:
-            test_file.write("This is not Python code")
+        test_file_path = tmp_path / "test_file.txt"
+        test_file_path.write_text("This is not Python code")
         with pytest.raises(ModuleFileError) as excinfo:
-            import_module_from_file(test_file_path)
+            import_module_from_file(str(test_file_path))
         assert "is not a Python file" in str(excinfo.value)
 
-    def test_import_nonexistent_file_raises_error(self):
+    def test_import_nonexistent_file_raises_error(self, tmp_path: Path):
         """Test that importing a nonexistent file raises FileNotFoundError."""
-        nonexistent_file_path = "nonexistent.py"
+        nonexistent_file_path = tmp_path / "nonexistent.py"
         with pytest.raises(FileNotFoundError):
-            import_module_from_file(nonexistent_file_path)
+            import_module_from_file(str(nonexistent_file_path))
 
-    def test_import_file_with_syntax_error_raises_error(self):
+    def test_import_file_with_syntax_error_raises_error(self, tmp_path: Path):
         """Test that importing a file with syntax errors raises SyntaxError."""
-        test_file_path = "syntax_error.py"
-        with open(test_file_path, "w") as test_file:
-            test_file.write("""
+        test_file_path = tmp_path / "syntax_error.py"
+        test_file_path.write_text("""
 def test_function(
     return "missing closing parenthesis"
 """)
         with pytest.raises(SyntaxError):
-            import_module_from_file(test_file_path)
+            import_module_from_file(str(test_file_path))
 
-    def test_import_file_with_import_error_raises_error(self):
+    def test_import_file_with_import_error_raises_error(self, tmp_path: Path):
         """Test that importing a file with import errors raises ImportError."""
-        test_file_path = "import_error.py"
-        with open(test_file_path, "w") as test_file:
-            test_file.write("""
+        test_file_path = tmp_path / "import_error.py"
+        test_file_path.write_text("""
 import nonexistent_module
 """)
         with pytest.raises(ImportError):
-            import_module_from_file(test_file_path)
+            import_module_from_file(str(test_file_path))
 
-    def test_module_added_to_sys_modules(self):
+    def test_module_added_to_sys_modules(self, tmp_path: Path):
         """Test that imported module is added to sys.modules."""
-        test_file_path = "test_module.py"
-        with open(test_file_path, "w") as test_file:
-            test_file.write("""
+        test_file_path = tmp_path / "test_module_sys.py"
+        test_file_path.write_text("""
 def test_function():
     return "test_value"
 """)
-        module = import_module_from_file(test_file_path)
-        # The module name should be the actual module path derived from the file path
-        expected_module_name = "test_module"
-        assert module.__name__ == expected_module_name
-        assert expected_module_name in sys.modules
-        assert sys.modules[expected_module_name] is module
+        module = import_module_from_file(str(test_file_path))
+        # The module name is derived from the full file path
+        module_name = module.__name__
+        assert module_name.endswith("test_module_sys")
+        assert module_name in sys.modules
+        assert sys.modules[module_name] is module
 
-    def test_module_name_with_path_separators(self):
+    def test_module_name_with_path_separators(self, tmp_path: Path):
         """Test that module name is correctly formatted with path separators (should use file basename)."""
-        test_file_path = "nested/subdir/test_module.py"
-        # Create nested directories
-        os.makedirs("nested/subdir", exist_ok=True)
-        with open(test_file_path, "w") as test_file:
-            test_file.write("""
+        nested_dir = tmp_path / "nested" / "subdir"
+        nested_dir.mkdir(parents=True)
+        test_file_path = nested_dir / "test_module_nested.py"
+        test_file_path.write_text("""
 def test_function():
     return "test_value"
 """)
-        module = import_module_from_file(test_file_path)
+        module = import_module_from_file(str(test_file_path))
         assert hasattr(module, "test_function")
         assert module.test_function() == "test_value"
 

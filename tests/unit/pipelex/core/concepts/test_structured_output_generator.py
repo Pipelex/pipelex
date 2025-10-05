@@ -4,7 +4,7 @@ from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.structure_generator import ConceptStructureValidationError, StructureGenerator
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 
 
 class TestStructureGenerator:
@@ -29,7 +29,7 @@ class TestStructureGenerator:
         # Check the complete generated structure
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -74,7 +74,7 @@ class TestStructureGenerator:
         # Check the complete generated structure
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -105,7 +105,7 @@ class TestStructureGenerator:
         # Check the complete generated structure with Literal types
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -130,7 +130,7 @@ class TestStructureGenerator:
         # Check the complete generated structure for empty model
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -156,7 +156,7 @@ class TestStructureGenerator:
         # Check the complete generated structure
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -182,7 +182,7 @@ class TestStructureGenerator:
         # Check the complete generated structure
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -223,7 +223,7 @@ class TestStructureGenerator:
         # Check the complete generated structure with all field types
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -254,7 +254,7 @@ class TestStructureGenerator:
         # Check the complete generated structure with required vs optional fields
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -297,7 +297,7 @@ class TestStructureGenerator:
         # Check the complete generated structure with default values
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -341,7 +341,7 @@ class TestStructureGenerator:
         # Check the complete generated structure with nested list types
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -388,7 +388,7 @@ class TestStructureGenerator:
         # Check the complete generated structure with nested dict types
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -441,7 +441,7 @@ class TestStructureGenerator:
         # Check the complete generated structure with mixed complexity
         expected_result = (
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -482,7 +482,7 @@ class TestStructureGenerator:
         expected_result = (
             "from datetime import datetime\n"
             "from enum import Enum\n"
-            "from pipelex.core.stuffs.stuff_content import StructuredContent\n"
+            "from pipelex.core.stuffs.structured_content import StructuredContent\n"
             "from pydantic import Field\n"
             "from typing import Optional, List, Dict, Any, Literal\n"
             "\n\n"
@@ -523,7 +523,7 @@ class TestStructureGenerator:
         generator = StructureGenerator()
         invalid_code = """
 from pydantic import Field
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 
 class InvalidModel(StructuredContent):
     name: str = Field(..., description="Name field"  # Missing closing parenthesis
@@ -537,7 +537,7 @@ class InvalidModel(StructuredContent):
         generator = StructureGenerator()
         code_without_expected_class = """
 from pydantic import Field
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 
 class WrongClassName(StructuredContent):
     name: str = Field(..., description="Name field")

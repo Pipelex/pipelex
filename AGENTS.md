@@ -245,7 +245,7 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import Field
 
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 
 # IMPORTANT: THE CLASS MUST BE A SUBCLASS OF StructuredContent
 class YourModel(StructuredContent): # Always be a subclass of StructuredContent
@@ -798,7 +798,7 @@ An llm_handle can be either:
 
 ```toml
 [aliases]
-base-claude = "claude-4-sonnet"
+base-claude = "claude-4.5-sonnet"
 base-gpt = "gpt-5"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"

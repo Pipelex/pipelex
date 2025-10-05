@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept_blueprint import (
 from pipelex.core.concepts.concept_native import NativeConceptEnumData, NativeConceptManager
 from pipelex.core.concepts.structure_generator import StructureGenerator
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import ConceptCodeError, ConceptDefinitionError, ConceptRefineError, ConceptStructureGeneratorError, StructureClassError
 
 

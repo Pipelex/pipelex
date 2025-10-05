@@ -7,8 +7,13 @@ from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeCon
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.stuffs.stuff_content import HtmlContent, ImageContent, ListContent, NumberContent, TextAndImagesContent, TextContent
+from pipelex.core.stuffs.html_content import HtmlContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.core.stuffs.text_content import TextContent
 
 
 class TestWorkingMemoryData:

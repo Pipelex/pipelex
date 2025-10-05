@@ -6,7 +6,8 @@ import pytest
 from pydantic import Field
 
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.stuff_content import StructuredContent, TextContent
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.func_registry import func_registry
 from pipelex.tools.func_registry_utils import FuncRegistryUtils
 
@@ -122,7 +123,9 @@ from typing import List
 from pydantic import Field
 
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.stuff_content import ListContent, StructuredContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.stuffs.text_content import TextContent
 
 
 class FilePath(StructuredContent):
@@ -168,7 +171,7 @@ class CodebaseFileContent(StructuredContent):
             root_file = Path(temp_dir) / "root_functions.py"
             root_file.write_text("""
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.text_content import TextContent
 
 async def root_function(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text="root")
@@ -178,7 +181,7 @@ async def root_function(working_memory: WorkingMemory) -> TextContent:
             nested_file = nested_dir / "nested_functions.py"
             nested_file.write_text("""
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.text_content import TextContent
 
 async def nested_function(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text="nested")

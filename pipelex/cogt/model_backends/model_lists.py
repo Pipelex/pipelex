@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import importlib.util
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from anthropic import AuthenticationError
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
+from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.config import get_config
 
 if TYPE_CHECKING:
@@ -18,10 +19,6 @@ if TYPE_CHECKING:
 from pipelex.exceptions import PipelexCLIError
 from pipelex.hub import get_models_manager
 from pipelex.pipelex import Pipelex
-from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError
-from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_available_models
-from pipelex.plugins.bedrock.bedrock_llms import bedrock_list_available_models
-from pipelex.plugins.mistral.mistral_llms import mistral_list_available_models
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.aws.aws_config import AwsCredentialsError
@@ -86,6 +83,22 @@ class ModelLister:
                         any_listed = True
 
                     case "anthropic" | "bedrock_anthropic":
+                        if importlib.util.find_spec("anthropic") is None:
+                            lib_name = "anthropic"
+                            lib_extra_name = "anthropic"
+                            msg = (
+                                "The anthropic SDK is required to use Anthropic models via the anthropic client. "
+                                "However, you can use Anthropic models through bedrock directly "
+                                "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
+                            )
+                            raise MissingDependencyError(
+                                lib_name,
+                                lib_extra_name,
+                                msg,
+                            )
+
+                        from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError  # noqa: PLC0415
+
                         try:
                             await cls._list_anthropic_models(
                                 sdk=sdk,
@@ -101,6 +114,20 @@ class ModelLister:
                             continue
 
                     case "mistral":
+                        if importlib.util.find_spec("mistralai") is None:
+                            lib_name = "mistralai"
+                            lib_extra_name = "mistral"
+                            msg = (
+                                "The mistralai SDK is required to use Mistral models through the mistralai client. "
+                                "However, you can use Mistral models through bedrock directly "
+                                "by using the 'bedrock-mistral' llm family. (eg: bedrock-mistral-large)"
+                            )
+                            raise MissingDependencyError(
+                                lib_name,
+                                lib_extra_name,
+                                msg,
+                            )
+
                         cls._list_mistral_models(
                             sdk=sdk,
                             backend_name=backend_name,
@@ -111,6 +138,16 @@ class ModelLister:
                         any_listed = True
 
                     case "bedrock" | "bedrock_aioboto3":
+                        if importlib.util.find_spec("boto3") is None or importlib.util.find_spec("aioboto3") is None:
+                            lib_name = "boto3,aioboto3"
+                            lib_extra_name = "bedrock"
+                            msg = "The boto3 and aioboto3 SDKs are required to use Bedrock models."
+                            raise MissingDependencyError(
+                                lib_name,
+                                lib_extra_name,
+                                msg,
+                            )
+
                         await cls._list_bedrock_models(
                             sdk=sdk,
                             backend_name=backend_name,
@@ -186,6 +223,24 @@ class ModelLister:
         any_listed: bool,
     ) -> None:
         """List Anthropic models."""
+        if importlib.util.find_spec("anthropic") is None:
+            lib_name = "anthropic"
+            lib_extra_name = "anthropic"
+            msg = (
+                "The anthropic SDK is required to use Anthropic models via the anthropic client. "
+                "However, you can use Anthropic models through bedrock directly "
+                "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
+            )
+            raise MissingDependencyError(
+                lib_name,
+                lib_extra_name,
+                msg,
+            )
+
+        from anthropic import AuthenticationError  # noqa: PLC0415
+
+        from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_available_models  # noqa: PLC0415
+
         plugin = Plugin(sdk=sdk, backend=backend_name)
         try:
             anthropic_models = await anthropic_list_available_models(
@@ -222,6 +277,22 @@ class ModelLister:
         any_listed: bool,
     ) -> None:
         """List Mistral models."""
+        if importlib.util.find_spec("mistralai") is None:
+            lib_name = "mistralai"
+            lib_extra_name = "mistral"
+            msg = (
+                "The mistralai SDK is required to use Mistral models through the mistralai client. "
+                "However, you can use Mistral models through bedrock directly "
+                "by using the 'bedrock-mistral' llm family. (eg: bedrock-mistral-large)"
+            )
+            raise MissingDependencyError(
+                lib_name,
+                lib_extra_name,
+                msg,
+            )
+
+        from pipelex.plugins.mistral.mistral_llms import mistral_list_available_models  # noqa: PLC0415
+
         mistral_models = mistral_list_available_models()
 
         if flat:
@@ -251,6 +322,18 @@ class ModelLister:
         any_listed: bool,
     ) -> None:
         """List Bedrock models."""
+        if importlib.util.find_spec("boto3") is None or importlib.util.find_spec("aioboto3") is None:
+            lib_name = "boto3,aioboto3"
+            lib_extra_name = "bedrock"
+            msg = "The boto3 and aioboto3 SDKs are required to use Bedrock models."
+            raise MissingDependencyError(
+                lib_name,
+                lib_extra_name,
+                msg,
+            )
+
+        from pipelex.plugins.bedrock.bedrock_llms import bedrock_list_available_models  # noqa: PLC0415
+
         plugin = Plugin(sdk=sdk, backend=backend_name)
 
         try:

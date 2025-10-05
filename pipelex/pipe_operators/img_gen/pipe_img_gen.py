@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
@@ -19,7 +19,8 @@ from pipelex.core.pipes.input_requirements_factory import InputRequirementsFacto
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, PipeRunParams, output_multiplicity_to_apply
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, StuffContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeDefinitionError,
@@ -30,10 +31,13 @@ from pipelex.exceptions import (
     UnexpectedPipeDefinitionError,
     WorkingMemoryStuffNotFoundError,
 )
-from pipelex.hub import get_concept_provider, get_content_generator, get_model_deck, get_native_concept
+from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
+
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class PipeImgGenOutput(PipeOutput):
@@ -100,7 +104,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     @override
     def validate_output(self):
-        if not get_concept_provider().is_compatible(
+        if not get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
             strict=True,
@@ -133,7 +137,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         return {DEFAULT_PROMPT_VAR_NAME}
 
     def _validate_inputs(self):
-        concept_provider = get_concept_provider()
+        concept_library = get_concept_library()
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
@@ -179,8 +183,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # We have confirmed right above that we have exactly one input
         # get input_name, requirement from single item in inputs
         input_name, requirement = self.inputs.items[0]
-        log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
-        if concept_provider.is_compatible(
+        if concept_library.is_compatible(
             tested_concept=requirement.concept,
             wanted_concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
         ):

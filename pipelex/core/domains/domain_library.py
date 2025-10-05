@@ -2,14 +2,14 @@ from pydantic import RootModel
 from typing_extensions import override
 
 from pipelex.core.domains.domain import Domain
-from pipelex.core.domains.domain_provider_abstract import DomainProviderAbstract
+from pipelex.core.domains.domain_library_abstract import DomainLibraryAbstract
 from pipelex.exceptions import DomainLibraryError
 from pipelex.types import Self
 
 DomainLibraryRoot = dict[str, Domain]
 
 
-class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
+class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
     def validate_with_libraries(self):
         pass
 

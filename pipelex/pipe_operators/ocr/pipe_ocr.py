@@ -16,15 +16,19 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.core.stuffs.stuff_content import ImageContent, ListContent, PageContent, TextAndImagesContent, TextContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import (
     PipeDefinitionError,
     StaticValidationError,
     StaticValidationErrorType,
 )
 from pipelex.hub import (
-    get_concept_provider,
+    get_concept_library,
     get_content_generator,
     get_model_deck,
     get_native_concept,
@@ -72,7 +76,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
             raise PipeDefinitionError(msg)
 
     def _validate_inputs(self):
-        concept_provider = get_concept_provider()
+        concept_library = get_concept_library()
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
@@ -113,13 +117,13 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
         # get input_name, requirement from single item in inputs
         input_name, requirement = self.inputs.items[0]
         log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
-        if concept_provider.is_compatible(
+        if concept_library.is_compatible(
             tested_concept=requirement.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
             strict=True,
         ):
             self.image_stuff_name = input_name
-        elif concept_provider.is_compatible(
+        elif concept_library.is_compatible(
             tested_concept=requirement.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptEnum.PDF),
             strict=True,
@@ -216,7 +220,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
                     page_views = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=pdf_uri, dpi=self.page_views_dpi)
                     page_view_contents = [ImageContent.make_from_image(image=img) for img in page_views]
             elif image_uri:
-                page_view_contents = [ImageContent.make_from_str(str_value=image_uri)]
+                page_view_contents = [ImageContent(url=image_uri)]
 
         page_contents: list[PageContent] = []
         for page_index, page in ocr_output.pages.items():

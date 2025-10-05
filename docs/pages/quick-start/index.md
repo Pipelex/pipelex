@@ -166,7 +166,7 @@ Using the [Pydantic BaseModel](https://docs.pydantic.dev/latest/) syntax, define
 
 `pipelex_libraries/pipelines/characters.py`
 ```python
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 
 # Define the structure of your output here
 # This class must inherit from StructuredContent
@@ -221,7 +221,7 @@ We want to extract structured information from the description field. Thus we ha
 
 ```python
 # pipelex_libraries/pipelines/character_model.py
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 
 # input class
 class Character(StructuredContent):

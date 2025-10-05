@@ -25,6 +25,7 @@ pipelex build partial "Given an expense report, apply company rules" -o results/
 pipelex build flow "Given an expense report, apply company rules" -o results/flow.json
 
 Other ideas:
+pipelex build pipe "Take a photo as input, and render the opposite of the photo, don't structure anything, use only text content, be super concise"
 pipelex build pipe "Take a photo as input, and render the opposite of the photo"
 pipelex build pipe "Given an RDFP PDF, build a compliance matrix"
 """

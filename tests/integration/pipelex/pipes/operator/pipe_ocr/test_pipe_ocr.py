@@ -8,8 +8,8 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuffs.stuff_content import PageContent
-from pipelex.hub import get_concept_provider, get_pipe_router
+from pipelex.core.stuffs.page_content import PageContent
+from pipelex.hub import get_concept_library, get_pipe_router
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 from pipelex.pipe_operators.ocr.pipe_ocr_factory import PipeOcrFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -23,18 +23,18 @@ from tests.integration.pipelex.test_data import PipeOcrTestCases
 class TestPipeOCR:
     @pytest.fixture(scope="class", autouse=True)
     def setup(self):
-        concept_provider = get_concept_provider()
+        concept_library = get_concept_library()
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="PageScan",
             domain="ocr",
             blueprint=ConceptBlueprint(description="Lorem Ipsum"),
             concept_codes_from_the_same_domain=["PageScan"],
         )
-        concept_provider.add_new_concept(concept=concept_1)
+        concept_library.add_new_concept(concept=concept_1)
 
         yield
 
-        concept_provider.teardown()
+        concept_library.teardown()
 
     @pytest.mark.usefixtures("setup")
     @pytest.mark.parametrize("image_url", PipeOcrTestCases.PIPE_OCR_IMAGE_TEST_CASES)

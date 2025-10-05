@@ -6,10 +6,10 @@ from typing_extensions import override
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
-from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.stuffs.stuff_content import ImageContent
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
 from pipelex.types import Self
@@ -17,7 +17,7 @@ from pipelex.types import Self
 ConceptLibraryRoot = dict[str, Concept]
 
 
-class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
+class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     root: ConceptLibraryRoot = Field(default_factory=dict)
 
     def validate_with_libraries(self):
@@ -68,6 +68,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptProviderAbstract):
         for concept in concepts:
             self.add_new_concept(concept=concept)
 
+    @override
     def remove_concepts_by_codes(self, concept_codes: list[str]) -> None:
         for concept_code in concept_codes:
             if concept_code in self.root:

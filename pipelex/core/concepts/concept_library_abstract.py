@@ -4,16 +4,18 @@ from typing import Any
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 
-ConceptLibraryRoot = dict[str, Concept]
 
-
-class ConceptProviderAbstract(ABC):
+class ConceptLibraryAbstract(ABC):
     @abstractmethod
     def add_new_concept(self, concept: Concept) -> None:
         pass
 
     @abstractmethod
     def add_concepts(self, concepts: list[Concept]) -> None:
+        pass
+
+    @abstractmethod
+    def remove_concepts_by_codes(self, concept_codes: list[str]) -> None:
         pass
 
     @abstractmethod

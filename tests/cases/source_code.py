@@ -1,7 +1,7 @@
 """Source code manipulation functions for testing."""
 
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.text_content import TextContent
 
 
 def wrap_lines(working_memory: WorkingMemory) -> TextContent:

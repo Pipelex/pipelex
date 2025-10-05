@@ -4,14 +4,12 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_content import (
-    ListContent,
-    StructuredContent,
-    StuffContent,
-    TextContent,
-)
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory, StuffFactoryError
+from pipelex.core.stuffs.text_content import TextContent
 
 
 class MockCustomContent(StructuredContent):
@@ -229,7 +227,8 @@ class TestMakeStuffFromStuffContentUsingSearchDomains:
 
     def test_dict_with_custom_concept_and_stuffcontent_value(self, mocker: MockerFixture):
         """Test dictionary with custom concept and StuffContent as content value."""
-        mock_provider = mocker.patch("pipelex.core.stuffs.stuff_factory.get_concept_provider").return_value
+        # Patch where it's used (stuff_factory imports from hub), not where it's defined
+        mock_provider = mocker.patch("pipelex.core.stuffs.stuff_factory.get_concept_library").return_value
         mock_concept = mocker.Mock()
         mock_provider.get_required_concept.return_value = mock_concept
 
@@ -251,7 +250,8 @@ class TestMakeStuffFromStuffContentUsingSearchDomains:
 
     def test_dict_with_custom_concept_and_dict_value(self, mocker: MockerFixture):
         """Test dictionary with custom concept and dict as content value."""
-        mock_provider = mocker.patch("pipelex.core.stuffs.stuff_factory.get_concept_provider").return_value
+        # Patch where it's used (stuff_factory imports from hub), not where it's defined
+        mock_provider = mocker.patch("pipelex.core.stuffs.stuff_factory.get_concept_library").return_value
         mock_concept = mocker.Mock()
         mock_provider.get_required_concept.return_value = mock_concept
 
@@ -278,7 +278,8 @@ class TestMakeStuffFromStuffContentUsingSearchDomains:
 
     def test_dict_with_concept_code_field(self, mocker: MockerFixture):
         """Test dictionary with concept_code field instead of concept."""
-        mock_provider = mocker.patch("pipelex.core.stuffs.stuff_factory.get_concept_provider").return_value
+        # Patch where it's used (stuff_factory imports from hub), not where it's defined
+        mock_provider = mocker.patch("pipelex.core.stuffs.stuff_factory.get_concept_library").return_value
         mock_concept = mocker.Mock()
         mock_provider.get_required_concept.return_value = mock_concept
 

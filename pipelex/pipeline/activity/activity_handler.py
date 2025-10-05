@@ -3,17 +3,15 @@ from typing import cast
 
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.core.stuffs.html_content import HtmlContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.mermaid_content import MermaidContent
+from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_content import (
-    HtmlContent,
-    ImageContent,
-    ListContent,
-    MermaidContent,
-    NumberContent,
-    StructuredContent,
-    StuffContent,
-    TextContent,
-)
+from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.activity.activity_models import ActivityReport
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.file_utils import ensure_path, save_text_to_path

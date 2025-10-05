@@ -8,14 +8,12 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum, NativeConceptManager
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_content import (
-    ListContent,
-    StuffContent,
-    TextContent,
-)
+from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipelexException
-from pipelex.hub import get_class_registry, get_concept_provider, get_native_concept
+from pipelex.hub import get_class_registry, get_concept_library, get_native_concept, get_required_concept
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -29,8 +27,8 @@ class StuffBlueprint(BaseModel):
     content: dict[str, Any] | str
 
     @field_validator("concept_string")
-    @staticmethod
-    def validate_concept_string(concept_string: str) -> str:
+    @classmethod
+    def validate_concept_string(cls, concept_string: str) -> str:
         ConceptBlueprint.validate_concept_string(concept_string)
         return concept_string
 
@@ -41,17 +39,9 @@ class StuffFactory:
         return Stuff.make_stuff_name(concept=concept)
 
     @classmethod
-    def make_from_str(cls, str_value: str, name: str) -> Stuff:
-        return cls.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NativeConceptManager.get_native_concept_data(NativeConceptEnum.TEXT)),
-            content=TextContent(text=str_value),
-            name=name,
-        )
-
-    @classmethod
     def make_from_concept_string(cls, concept_string: str, name: str, content: StuffContent) -> Stuff:
         ConceptBlueprint.validate_concept_string(concept_string)
-        concept = get_concept_provider().get_required_concept(concept_string=concept_string)
+        concept = get_required_concept(concept_string=concept_string)
         return cls.make_stuff(
             concept=concept,
             content=content,
@@ -85,8 +75,8 @@ class StuffFactory:
         code: str | None = None,
     ) -> Stuff:
         # TODO: Add unit tests for this method
-        concept_provider = get_concept_provider()
-        concept = concept_provider.search_for_concept_in_domains(
+        concept_library = get_concept_library()
+        concept = concept_library.search_for_concept_in_domains(
             concept_code=concept_name,
             search_domains=search_domains,
         )
@@ -97,7 +87,7 @@ class StuffFactory:
 
     @classmethod
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
-        concept_library = get_concept_provider()
+        concept_library = get_concept_library()
         if isinstance(blueprint.content, str) and concept_library.is_compatible(
             tested_concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
             wanted_concept=get_native_concept(native_concept=NativeConceptEnum.TEXT),
@@ -244,19 +234,22 @@ class StuffFactory:
                 msg = f"Stuff content data dict is badly formed: {exc}"
                 raise StuffFactoryError(msg) from exc
 
+            concept_library = get_concept_library()
+            concept = concept_library.get_required_concept(concept_string=concept_code)
+
             if isinstance(content_value, StuffContent):
                 return StuffFactory.make_stuff(
-                    concept=get_concept_provider().get_required_concept(concept_string=concept_code),
+                    concept=concept,
                     name=name,
                     content=content_value,
                     code=stuff_code,
                 )
             content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-                concept=get_concept_provider().get_required_concept(concept_string=concept_code),
+                concept=concept,
                 value=content_value,
             )
             return StuffFactory.make_stuff(
-                concept=get_concept_provider().get_required_concept(concept_string=concept_code),
+                concept=concept,
                 name=name,
                 content=content,
                 code=stuff_code,

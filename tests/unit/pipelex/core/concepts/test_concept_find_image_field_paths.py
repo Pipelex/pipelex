@@ -1,19 +1,32 @@
+from typing import TYPE_CHECKING
+
 import pytest
 
-from pipelex.core.concepts.concept import Concept  # noqa: TC001
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
-from pipelex.core.stuffs.stuff_content import StructuredContent
-from pipelex.hub import get_concept_provider, get_native_concept
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from tests.unit.pipelex.core.concepts import data
 from tests.unit.pipelex.core.concepts.data import TestData
 
+if TYPE_CHECKING:
+    from pipelex.core.concepts.concept import Concept
+
 
 @pytest.fixture(scope="module", autouse=True)
 def register_test_concepts():
-    """Register test concepts for the module."""
-    concept_provider = get_concept_provider()
+    """Register test concepts for the module.
+
+    This fixture:
+    1. Registers test structure classes in the class registry
+    2. Creates and registers test concepts in the concept library
+    3. Yields to run tests
+    4. Cleans up by removing test concepts from the library
+
+    The cleanup ensures test isolation between modules.
+    """
+    concept_library = get_concept_library()
 
     # Register the test structure classes
     ClassRegistryUtils.register_classes_in_file(
@@ -22,178 +35,111 @@ def register_test_concepts():
         is_include_imported=False,
     )
 
+    # Define concept specifications: (code, description, structure_class_name, refines)
+    concept_specs: list[tuple[str, str, str, str | None]] = [
+        ("ProfilePhoto", "A profile photo", "ProfilePhoto", f"native.{NativeConceptEnum.IMAGE}"),
+        ("PersonWithDirectImage", "A person with a direct image field", "PersonWithDirectImage", None),
+        ("PersonWithRefinedImage", "A person with a refined image field", "PersonWithRefinedImage", None),
+        ("PersonWithText", "A person with only text", "PersonWithText", None),
+        ("CompanyInfo", "Company information", "CompanyInfo", None),
+        ("NestedComplex", "Complex nested structure", "NestedComplex", None),
+        ("PersonWithOptionalImage", "A person with optional image", "PersonWithOptionalImage", None),
+        ("GalleryWithImageList", "A gallery with a list of images", "GalleryWithImageList", None),
+        ("PersonWithImageTuple", "A person with a tuple of images", "PersonWithImageTuple", None),
+        ("PhotoAlbumItem", "An item in a photo album", "PhotoAlbumItem", None),
+        ("PhotoAlbumWithNestedImages", "A photo album with nested images in list items", "PhotoAlbumWithNestedImages", None),
+        ("MediaFrame", "A frame containing an image", "MediaFrame", None),
+        ("MediaSection", "A section with multiple frames", "MediaSection", None),
+        ("MediaCollection", "A collection with sections and thumbnails", "MediaCollection", None),
+        ("ComplexNestedGallery", "A deeply nested gallery structure", "ComplexNestedGallery", None),
+        ("GalleryWithListContent", "A gallery using ListContent", "GalleryWithListContent", None),
+    ]
+
     # Create and register concepts
-    concepts_to_register: list[Concept] = []
+    concepts_to_register: list[Concept] = [
+        ConceptFactory.make(
+            domain=TestData.DOMAIN,
+            concept_code=code,
+            description=description,
+            structure_class_name=structure_class_name,
+            refines=refines,
+        )
+        for code, description, structure_class_name, refines in concept_specs
+    ]
 
-    # ProfilePhoto concept that refines Image
-    profile_photo_concept = ConceptFactory.make(
-        domain=TestData.DOMAIN,
-        concept_code="ProfilePhoto",
-        description="A profile photo",
-        structure_class_name="ProfilePhoto",
-        refines=f"native.{NativeConceptEnum.IMAGE}",
-    )
-    concepts_to_register.append(profile_photo_concept)
+    # Add all concepts to the library
+    concept_library.add_concepts(concepts_to_register)
 
-    # PersonWithDirectImage concept
-    person_direct_concept = ConceptFactory.make(
-        domain=TestData.DOMAIN,
-        concept_code="PersonWithDirectImage",
-        description="A person with a direct image field",
-        structure_class_name="PersonWithDirectImage",
-    )
-    concepts_to_register.append(person_direct_concept)
+    # Yield to run tests
+    yield
 
-    # PersonWithRefinedImage concept
-    person_refined_concept = ConceptFactory.make(
-        domain=TestData.DOMAIN,
-        concept_code="PersonWithRefinedImage",
-        description="A person with a refined image field",
-        structure_class_name="PersonWithRefinedImage",
-    )
-    concepts_to_register.append(person_refined_concept)
-
-    # PersonWithText concept
-    person_text_concept = ConceptFactory.make(
-        domain=TestData.DOMAIN,
-        concept_code="PersonWithText",
-        description="A person with only text",
-        structure_class_name="PersonWithText",
-    )
-    concepts_to_register.append(person_text_concept)
-
-    # CompanyInfo concept
-    company_concept = ConceptFactory.make(
-        domain=TestData.DOMAIN,
-        concept_code="CompanyInfo",
-        description="Company information",
-        structure_class_name="CompanyInfo",
-    )
-    concepts_to_register.append(company_concept)
-
-    # NestedComplex concept
-    nested_concept = ConceptFactory.make(
-        domain=TestData.DOMAIN,
-        concept_code="NestedComplex",
-        description="Complex nested structure",
-        structure_class_name="NestedComplex",
-    )
-    concepts_to_register.append(nested_concept)
-
-    # PersonWithOptionalImage concept
-    person_optional_concept = ConceptFactory.make(
-        domain=TestData.DOMAIN,
-        concept_code="PersonWithOptionalImage",
-        description="A person with optional image",
-        structure_class_name="PersonWithOptionalImage",
-    )
-    concepts_to_register.append(person_optional_concept)
-
-    # Add all concepts to the provider
-    concept_provider.add_concepts(concepts_to_register)
-
-    # Cleanup after tests (optional)
+    # Cleanup: Remove test concepts from library
+    concept_strings = [concept.concept_string for concept in concepts_to_register]
+    concept_library.remove_concepts_by_codes(concept_strings)
 
 
 class TestConceptFindImageFieldPaths:
-    """Test Concept.find_nested_image_fields_in_structure_class() method."""
+    """Test Concept.search_for_nested_image_fields_in_structure_class() method."""
 
-    def test_direct_image_field(self):
-        """Test finding a direct image field."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithDirectImage")
+    @pytest.mark.parametrize(
+        ("concept_code", "expected_paths"),
+        TestData.IMAGE_FIELD_TEST_CASES,
+        ids=[case[0] for case in TestData.IMAGE_FIELD_TEST_CASES],
+    )
+    def test_find_image_fields(self, concept_code: str, expected_paths: list[str]):
+        """Test finding image fields in various structure classes.
 
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+        This parametrized test covers:
+        - Direct image fields
+        - Refined image fields (concepts that refine Image)
+        - No image fields
+        - Nested image fields at various depths
+        - Multiple image fields at different levels
+        - Optional image fields
+        - Lists of images
+        - Tuples of images
+        - Lists with nested structures containing images
+        - Complex deeply nested structures
+        - ListContent with nested images
 
-        # Assert
-        assert len(image_paths) == 1
-        assert "photo" in image_paths
-
-    def test_refined_image_field(self):
-        """Test finding an image field that uses a concept refining Image."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithRefinedImage")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert
-        assert len(image_paths) == 1
-        assert "profile_photo" in image_paths
-
-    def test_no_image_fields(self):
-        """Test with content that has no image fields."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithText")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert
-        assert len(image_paths) == 0
-
-    def test_nested_image_field(self):
-        """Test finding image fields in nested structures."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.CompanyInfo")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert
-        assert len(image_paths) == 1
-        assert "ceo.photo" in image_paths
-
-    def test_multiple_nested_levels_with_multiple_images(self):
-        """Test finding multiple image fields at different nesting levels."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.NestedComplex")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert - should find both the logo and the nested CEO photo
-        assert len(image_paths) == 2
-        assert "logo" in image_paths
-        assert "company.ceo.photo" in image_paths
-
-    def test_optional_image_field_with_value(self):
-        """Test finding an optional image field that has a value."""
-        # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithOptionalImage")
-
-        # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
-
-        # Assert
-        assert len(image_paths) == 1
-        assert "photo" in image_paths
-
-    def test_optional_image_field_without_value(self):
-        """Test finding an optional image field that is None.
-
-        Note: Since find_nested_image_fields_in_structure_class() works at the concept/class level (not instance level),
-        it returns all fields typed as Images, regardless of whether they have values in a specific instance.
+        Args:
+            concept_code: The code of the concept to test
+            expected_paths: The expected list of image field paths
         """
         # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithOptionalImage")
+        concept = get_required_concept(f"{TestData.DOMAIN}.{concept_code}")
 
         # Find image paths
         image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
-        # Assert - should find the photo field even though it's None in this instance
-        # because we're analyzing the class structure, not instance values
-        assert len(image_paths) == 1
-        assert "photo" in image_paths
+        # Assert exact match of paths (order-independent)
+        assert sorted(image_paths) == sorted(expected_paths), f"Expected paths {sorted(expected_paths)}, but got {sorted(image_paths)}"
 
     def test_direct_image_concept(self):
-        """Test with a concept that is directly an Image."""
+        """Test with a concept that is directly an Image.
+
+        The native Image concept itself should return empty paths because
+        the concept is an image, not a structured type with image fields.
+        """
         # Get concept
         concept = get_native_concept(NativeConceptEnum.IMAGE)
 
         # Find image paths
         image_paths = concept.search_for_nested_image_fields_in_structure_class()
 
-        # Assert - should return empty because the concept itself is an image, not a structured type with image fields
-        assert len(image_paths) == 0
+        # Assert - should return empty because the concept itself is an image
+        assert image_paths == []
+
+    def test_native_text_and_images_content(self):
+        """Test the native TextAndImagesContent which has list[ImageContent] | None.
+
+        This tests the native concept that combines text and images.
+        """
+        # Get the native TextAndImages concept
+        concept = get_native_concept(NativeConceptEnum.TEXT_AND_IMAGES)
+
+        # Find image paths
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+
+        # Assert - should find the images field which is list[ImageContent] | None
+        assert image_paths == ["images"]

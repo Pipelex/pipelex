@@ -53,6 +53,7 @@ Stop reinventing AI workflows from scratch. With Pipelex, your proven methods be
 - [Quick start](#-quick-start)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
+  - [API Key Configuration](#api-key-configuration)
   - [Optional features](#optional-features)
 - [Contributing](#-contributing)
 - [Support](#-support)
@@ -121,6 +122,79 @@ poetry add pipelex
 uv pip install pipelex
 ```
 
+### API Key Configuration
+
+Pipelex supports two approaches for accessing AI models:
+
+#### Option A: Pipelex Inference (Optional & Free)
+
+Get a single API key that works with all providers (OpenAI, Anthropic, Google, Mistral, FAL, and more):
+
+1. **Get your API key:**
+   - Join our Discord community: [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
+   - Request your free API key (no credit card required, limited time offer) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel
+
+2. **Configure environment variables:**
+   ```bash
+   # Copy the example file
+   cp .env.example .env
+   
+   # Edit .env and add your Pipelex Inference API key
+   # PIPELEX_INFERENCE_API_KEY="your-api-key"
+   ```
+   
+   > **Note:** Pipelex automatically loads environment variables from `.env` files. No need to manually source or export them.
+
+3. **Verify backend configuration:**
+   - The `pipelex_inference` backend is already enabled in `.pipelex/inference/backends.toml`
+   - The default routing profile `pipelex_first` is configured to use Pipelex Inference
+
+#### Option B: Bring Your Own Keys
+
+Use your own API keys from individual providers (OpenAI, Anthropic, Google, Mistral, AWS Bedrock, Azure OpenAI, FAL):
+
+1. **Configure environment variables:**
+   ```bash
+   # Copy the example file
+   cp .env.example .env
+   
+   # Edit .env and add your provider API keys
+   # OPENAI_API_KEY="your-openai-key"
+   # ANTHROPIC_API_KEY="your-anthropic-key"
+   # GOOGLE_API_KEY="your-google-key"
+   # ... (add the keys you need)
+   ```
+
+2. **Configure backends:**
+   - Edit `.pipelex/inference/backends.toml` to enable/disable backends
+   - Set `enabled = true` for the backends you want to use
+   - Set `enabled = false` for backends you don't need
+
+3. **Select routing profile:**
+   - Edit `.pipelex/inference/routing_profiles.toml`
+   - Set `active = "custom_routing"` or create your own profile
+   - Configure which backend handles which models
+
+#### Option C: Mix & Match (Custom Routing)
+
+Combine Pipelex Inference with your own keys for maximum flexibility:
+
+1. **Configure environment variables:**
+   ```bash
+   # Copy and edit .env with both Pipelex and provider keys
+   cp .env.example .env
+   ```
+
+2. **Enable multiple backends:**
+   - Keep `pipelex_inference` enabled in `.pipelex/inference/backends.toml`
+   - Enable specific provider backends (e.g., `openai`, `fal`)
+
+3. **Create custom routing:**
+   - Edit `.pipelex/inference/routing_profiles.toml`
+   - Set up a hybrid profile routing some models to Pipelex, others to your backends
+
+See the [configuration documentation](https://docs.pipelex.com/pages/configuration/config-technical/inference-backend-config/) for detailed setup instructions.
+
 ### Optional Features
 
 The package supports the following additional features:
@@ -135,17 +209,17 @@ Install all extras:
 
 Using `pip`:
 ```bash
-pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
+pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 ```
 
 Using `poetry`:
 ```bash
-poetry add "pipelex[anthropic,google,mistralai,bedrock,fal,pypdfium2]"
+poetry add "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 ```
 
 Using `uv`:
 ```bash
-uv pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
+uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 ```
 
 ---

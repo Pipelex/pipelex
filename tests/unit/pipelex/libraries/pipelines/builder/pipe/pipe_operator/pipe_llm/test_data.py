@@ -48,6 +48,27 @@ class PipeLLMTestCases:
         ),
     )
 
+    LLM_WITH_VISION_INPUT = (
+        "llm_with_vision_input",
+        PipeLLMSpec(
+            pipe_code="analyze_image",
+            description="Analyze image",
+            inputs={"image": "Image"},
+            output="Text",
+            prompt_template="Analyze the image: $image",
+            llm="llm_cheap_for_vision",
+        ),
+        PipeLLMBlueprint(
+            source=None,
+            type="PipeLLM",
+            description="Analyze image",
+            inputs={"image": InputRequirementBlueprint(concept="Image")},
+            output="Text",
+            prompt_template="Analyze the image: $image",
+            llm="gemini-2.5-flash-lite",
+        ),
+    )
+
     LLM_WITH_PRESET = (
         "llm_with_preset",
         PipeLLMSpec(
@@ -62,7 +83,7 @@ class PipeLLMTestCases:
             source=None,
             type="PipeLLM",
             description="Generate with preset",
-            llm="claude-4-sonnet",
+            llm="claude-4.5-sonnet",
             output="Text",
             prompt_template="Generate text",
         ),
@@ -84,7 +105,7 @@ class PipeLLMTestCases:
             type="PipeLLM",
             description="Generate with settings",
             llm=LLMSetting(
-                llm_handle="claude-4-sonnet",
+                llm_handle="claude-4.5-sonnet",
                 temperature=0.7,
                 max_tokens=None,  # "auto" is handled at conversion to core
             ),
@@ -112,7 +133,7 @@ class PipeLLMTestCases:
             system_prompt="You are a data analyst",
             prompt_template="Analyze: @data",
             output="Analysis",
-            llm="claude-4-sonnet",
+            llm="claude-4.5-sonnet",
         ),
     )
 
@@ -135,7 +156,7 @@ class PipeLLMTestCases:
             nb_output=None,
             output="Item",
             prompt_template="Generate items",
-            llm="claude-4-sonnet",
+            llm="claude-4.5-sonnet",
         ),
     )
 
@@ -158,13 +179,14 @@ class PipeLLMTestCases:
             multiple_output=None,
             output="Item",
             prompt_template="Generate items",
-            llm="claude-4-sonnet",
+            llm="claude-4.5-sonnet",
         ),
     )
 
     TEST_CASES: ClassVar[list[tuple[str, PipeLLMSpec, PipeLLMBlueprint]]] = [
         SIMPLE_LLM,
         LLM_NO_INPUTS,
+        LLM_WITH_VISION_INPUT,
         LLM_WITH_PRESET,
         LLM_WITH_SETTINGS,
         LLM_WITH_SYSTEM_PROMPT,

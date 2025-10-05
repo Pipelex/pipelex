@@ -1,6 +1,6 @@
 from pydantic import ConfigDict, Field
 
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSignature
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint

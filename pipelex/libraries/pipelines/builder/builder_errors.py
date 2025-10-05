@@ -2,7 +2,7 @@
 
 from pydantic import Field
 
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.exceptions import (
     PipelexException,
     StaticValidationErrorType,

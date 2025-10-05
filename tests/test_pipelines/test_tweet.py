@@ -1,4 +1,4 @@
-from pipelex.core.stuffs.stuff_content import TextContent
+from pipelex.core.stuffs.text_content import TextContent
 
 
 class OptimizedTweet(TextContent):

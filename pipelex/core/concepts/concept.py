@@ -6,6 +6,7 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptManager
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.exceptions import PipelexUnexpectedError
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
@@ -101,4 +102,4 @@ class Concept(BaseModel):
         if not issubclass(structure_class, StuffContent):
             msg = f"Concept class '{self.structure_class_name}' is not a subclass of StuffContent"
             raise PipelexUnexpectedError(msg)
-        return structure_class.search_for_nested_image_fields(current_path="", paths=[])
+        return search_for_nested_image_fields(content_class=structure_class)

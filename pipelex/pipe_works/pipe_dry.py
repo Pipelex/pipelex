@@ -12,7 +12,8 @@ from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedI
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuffs.stuff_content import StuffContent, TextContent
+from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import StrEnum

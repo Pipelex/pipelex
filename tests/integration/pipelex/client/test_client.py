@@ -9,8 +9,8 @@ from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeCon
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.stuffs.text_content import TextContent
 
 
 class Example(BaseModel):

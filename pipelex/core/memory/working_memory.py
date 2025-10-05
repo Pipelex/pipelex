@@ -5,19 +5,17 @@ from pydantic import BaseModel, Field, model_validator
 from typing_extensions import override
 
 from pipelex import log, pretty_print
+from pipelex.core.stuffs.html_content import HtmlContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.mermaid_content import MermaidContent
+from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
-from pipelex.core.stuffs.stuff_content import (
-    HtmlContent,
-    ImageContent,
-    ListContent,
-    MermaidContent,
-    NumberContent,
-    PDFContent,
-    StuffContentType,
-    TextAndImagesContent,
-    TextContent,
-)
+from pipelex.core.stuffs.stuff_content import StuffContentType
+from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import (
     WorkingMemoryConsistencyError,
     WorkingMemoryStuffAttributeNotFoundError,
@@ -122,7 +120,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
     def add_new_stuff(self, name: str, stuff: Stuff, aliases: list[str] | None = None):
         # TODO: Add unit tests for this method
-        log.debug(f"Adding new stuff '{name}' to WorkingMemory with aliases: {aliases}")
         if self.is_stuff_code_used(stuff_code=stuff.stuff_code):
             msg = f"Stuff code '{stuff.stuff_code}' is already used by another stuff"
             raise WorkingMemoryConsistencyError(msg)

@@ -8,7 +8,7 @@ from pipelex.core.concepts.concept_blueprint import (
     ConceptStructureBlueprintFieldType,
 )
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.stuffs.stuff_content import StructuredContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.exceptions import StructureClassError
 from pipelex.hub import get_class_registry
 
