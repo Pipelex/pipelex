@@ -107,49 +107,12 @@ class StuffContent(ABC, CustomBaseModel):
                 # Get the corresponding field type with full generic info
                 current_field_type = potential_field_types[idx]
 
-                # Check if it's a ListContent generic type (e.g., ListContent[PhotoAlbumItem])
-                if hasattr(field_specific_type, "__origin__"):  # type: ignore[union-attr]
-                    origin = field_specific_type.__origin__  # type: ignore[union-attr]
-                    # Check for list, tuple, or ListContent
-                    try:
-                        is_list_or_tuple = origin in (list, tuple)
-                        is_list_content = isinstance(origin, type) and issubclass(origin, ListContent)
-                    except TypeError:
-                        is_list_or_tuple = False
-                        is_list_content = False
-
-                    if is_list_or_tuple or is_list_content:
-                        # Get the args (item types) from the generic
-                        container_args = getattr(field_specific_type, "__args__", ())
-                        # Check if any of the args contain images (directly or nested)
-                        has_images = False
-                        for arg_type in container_args:
-                            # Check if arg_type is itself a generic (nested list/tuple)
-                            if hasattr(arg_type, "__origin__") and arg_type.__origin__ in (list, tuple):  # type: ignore[union-attr]
-                                # Recursively check nested generics (e.g., list[tuple[A, B]])
-                                # Create a temporary field to check
-                                temp_paths = cls._check_container_for_images(arg_type)
-                                if temp_paths:
-                                    has_images = True
-                            elif isinstance(arg_type, type):
-                                try:
-                                    # Check if it's directly ImageContent
-                                    if issubclass(arg_type, ImageContent):
-                                        has_images = True
-                                    # Check if it's a StuffContent that might have nested images
-                                    elif issubclass(arg_type, StuffContent) and not issubclass(arg_type, ListContent):
-                                        # Recursively check if this type has nested images
-                                        nested_paths = arg_type.search_for_nested_image_fields(current_path="", paths=[])
-                                        if nested_paths:
-                                            # Found nested images in the container's item type
-                                            has_images = True
-                                except TypeError:
-                                    # Handle edge cases where issubclass fails
-                                    continue
-                        # Add the field path once if any of the container items have images
-                        if has_images:
-                            paths.append(field_path)
-                        continue  # Move to next field after handling list/tuple/ListContent
+                # Check if it's a list or tuple generic type (e.g., list[ImageContent], tuple[ImageContent, ...])
+                if hasattr(field_specific_type, "__origin__") and field_specific_type.__origin__ in (list, tuple):  # type: ignore[union-attr]
+                    # Check if this container or its nested contents have images
+                    if cls._check_generic_container_for_images(field_specific_type):
+                        paths.append(field_path)
+                    continue  # Move to next field after handling list/tuple
 
                 # Skip if field type is not a class
                 if not isinstance(field_specific_type, type):
@@ -209,38 +172,36 @@ class StuffContent(ABC, CustomBaseModel):
         return paths
 
     @classmethod
-    def _check_container_for_images(cls, container_type: Any) -> bool:
-        """Helper method to recursively check if a container type (list/tuple) contains images.
+    def _check_generic_container_for_images(cls, container_type: Any) -> bool:
+        """Recursively check if a generic container type contains images at any depth.
+
+        Handles nested generics like list[tuple[list[MediaCollection]]] with arbitrary depth.
 
         Args:
-            container_type: A generic type like list[...], tuple[...], or ListContent[...]
+            container_type: A generic type like list[...], tuple[...]
 
         Returns:
             True if the container or its nested contents contain ImageContent
         """
-        if not hasattr(container_type, "__origin__") or container_type.__origin__ not in (list, tuple):  # type: ignore[union-attr]
+        if not hasattr(container_type, "__origin__"):
             return False
 
+        # Get the args (item types) from the generic
         container_args = getattr(container_type, "__args__", ())
         for arg_type in container_args:
-            # Check if arg_type is itself a generic (nested list/tuple)
+            # Check if arg_type is itself a generic (nested list/tuple) - recurse!
             if hasattr(arg_type, "__origin__") and arg_type.__origin__ in (list, tuple):  # type: ignore[union-attr]
-                if cls._check_container_for_images(arg_type):
+                if cls._check_generic_container_for_images(arg_type):
                     return True
+            # Check if it's a regular type
             elif isinstance(arg_type, type):
                 try:
                     # Check if it's directly ImageContent
                     if issubclass(arg_type, ImageContent):
                         return True
-                    # Check if it's a ListContent - need to check its items
-                    if issubclass(arg_type, ListContent):
-                        # For ListContent, we'd need the field_type with generic args
-                        # For now, conservatively assume it might have images
-                        # This is safe because we're just deciding whether to include the field path
-                        return True
                     # Check if it's a StuffContent that might have nested images
-                    if issubclass(arg_type, StuffContent):
-                        # Recursively check if this type has nested images
+                    if issubclass(arg_type, StuffContent) and not issubclass(arg_type, ListContent):
+                        # Check if this type has nested image fields
                         nested_paths = arg_type.search_for_nested_image_fields(current_path="", paths=[])
                         if nested_paths:
                             return True
