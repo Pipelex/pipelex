@@ -89,6 +89,78 @@ def register_test_concepts():
     )
     concepts_to_register.append(person_optional_concept)
 
+    # GalleryWithImageList concept
+    gallery_list_concept = ConceptFactory.make(
+        domain=TestData.DOMAIN,
+        concept_code="GalleryWithImageList",
+        description="A gallery with a list of images",
+        structure_class_name="GalleryWithImageList",
+    )
+    concepts_to_register.append(gallery_list_concept)
+
+    # PersonWithImageTuple concept
+    person_tuple_concept = ConceptFactory.make(
+        domain=TestData.DOMAIN,
+        concept_code="PersonWithImageTuple",
+        description="A person with a tuple of images",
+        structure_class_name="PersonWithImageTuple",
+    )
+    concepts_to_register.append(person_tuple_concept)
+
+    # PhotoAlbumItem concept
+    album_item_concept = ConceptFactory.make(
+        domain=TestData.DOMAIN,
+        concept_code="PhotoAlbumItem",
+        description="An item in a photo album",
+        structure_class_name="PhotoAlbumItem",
+    )
+    concepts_to_register.append(album_item_concept)
+
+    # PhotoAlbumWithNestedImages concept
+    album_concept = ConceptFactory.make(
+        domain=TestData.DOMAIN,
+        concept_code="PhotoAlbumWithNestedImages",
+        description="A photo album with nested images in list items",
+        structure_class_name="PhotoAlbumWithNestedImages",
+    )
+    concepts_to_register.append(album_concept)
+
+    # MediaFrame concept
+    media_frame_concept = ConceptFactory.make(
+        domain=TestData.DOMAIN,
+        concept_code="MediaFrame",
+        description="A frame containing an image",
+        structure_class_name="MediaFrame",
+    )
+    concepts_to_register.append(media_frame_concept)
+
+    # MediaSection concept
+    media_section_concept = ConceptFactory.make(
+        domain=TestData.DOMAIN,
+        concept_code="MediaSection",
+        description="A section with multiple frames",
+        structure_class_name="MediaSection",
+    )
+    concepts_to_register.append(media_section_concept)
+
+    # MediaCollection concept
+    media_collection_concept = ConceptFactory.make(
+        domain=TestData.DOMAIN,
+        concept_code="MediaCollection",
+        description="A collection with sections and thumbnails",
+        structure_class_name="MediaCollection",
+    )
+    concepts_to_register.append(media_collection_concept)
+
+    # ComplexNestedGallery concept
+    complex_gallery_concept = ConceptFactory.make(
+        domain=TestData.DOMAIN,
+        concept_code="ComplexNestedGallery",
+        description="A deeply nested gallery structure",
+        structure_class_name="ComplexNestedGallery",
+    )
+    concepts_to_register.append(complex_gallery_concept)
+
     # Add all concepts to the provider
     concept_provider.add_concepts(concepts_to_register)
 
@@ -197,3 +269,83 @@ class TestConceptFindImageFieldPaths:
 
         # Assert - should return empty because the concept itself is an image, not a structured type with image fields
         assert len(image_paths) == 0
+
+    def test_list_of_images(self):
+        """Test finding a field that is a list of images."""
+        # Get concept
+        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.GalleryWithImageList")
+
+        # Find image paths
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+
+        # Assert - should find the photos field which contains a list of images
+        assert len(image_paths) == 1
+        assert "photos" in image_paths
+
+    def test_tuple_of_images(self):
+        """Test finding a field that is a tuple of images."""
+        # Get concept
+        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PersonWithImageTuple")
+
+        # Find image paths
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+
+        # Assert - should find the before_after field which contains a tuple of images
+        assert len(image_paths) == 1
+        assert "before_after" in image_paths
+
+    def test_native_text_and_images_content(self):
+        """Test the native TextAndImagesContent which has list[ImageContent] | None."""
+        # Get the native TextAndImages concept
+        concept = get_native_concept(NativeConceptEnum.TEXT_AND_IMAGES)
+
+        # Find image paths
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+
+        # Assert - should find the images field which is list[ImageContent] | None
+        assert len(image_paths) == 1
+        assert "images" in image_paths
+
+    def test_list_with_nested_images(self):
+        """Test finding images nested inside structures within a list.
+
+        This tests the recursive detection: list[PhotoAlbumItem] where PhotoAlbumItem has an ImageContent field.
+        """
+        # Get concept
+        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.PhotoAlbumWithNestedImages")
+
+        # Find image paths
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+
+        # Assert - should find album_items because PhotoAlbumItem contains an ImageContent
+        assert len(image_paths) == 1
+        assert "album_items" in image_paths
+
+    def test_complex_deeply_nested_images(self):
+        """Test finding images in a deeply nested, complex structure.
+
+        Structure being tested: list[tuple[MediaCollection, list[PhotoAlbumItem]]]
+
+        This tests multiple levels of nesting:
+        - Level 1: list container
+        - Level 2: tuple with two items
+        - Level 3a: MediaCollection (has direct 'thumbnail' + nested 'sections')
+        - Level 4a: sections -> list[MediaSection]
+        - Level 5a: MediaSection.frames -> list[MediaFrame]
+        - Level 6a: MediaFrame.frame_image -> ImageContent
+        - Level 3b: list[PhotoAlbumItem]
+        - Level 4b: PhotoAlbumItem.photo -> ImageContent
+
+        The field should be detected because both tuple items contain images at various nesting levels.
+        """
+        # Get concept
+        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.ComplexNestedGallery")
+
+        # Find image paths
+        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+
+        # Assert - should find gallery_entries because:
+        # 1. MediaCollection has 'thumbnail' (direct) and 'sections->frames->frame_image' (nested)
+        # 2. list[PhotoAlbumItem] has nested 'photo' field
+        assert len(image_paths) == 1
+        assert "gallery_entries" in image_paths
