@@ -404,6 +404,10 @@ def get_pipe_library() -> PipeLibraryAbstract:
     return get_pipelex_hub().get_required_pipe_library()
 
 
+def get_pipes() -> list[PipeAbstract]:
+    return get_pipelex_hub().get_required_pipe_library().get_pipes()
+
+
 def get_required_pipe(pipe_code: str) -> PipeAbstract:
     return get_pipelex_hub().get_required_pipe_library().get_required_pipe(pipe_code=pipe_code)
 

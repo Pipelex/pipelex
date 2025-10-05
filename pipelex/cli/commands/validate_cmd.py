@@ -7,7 +7,7 @@ import typer
 
 from pipelex import log
 from pipelex.cli.commands.common import is_pipelex_libraries_folder
-from pipelex.hub import get_pipe_library, get_pipeline_tracker
+from pipelex.hub import get_pipeline_tracker, get_pipes, get_required_pipe
 from pipelex.pipe_works.pipe_dry import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
 
@@ -21,7 +21,7 @@ def do_validate_all_libraries_and_dry_run(relative_config_folder_path: str = "./
 
     pipelex_instance = Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
     pipelex_instance.validate_libraries()
-    asyncio.run(dry_run_pipes(pipes=get_pipe_library().get_pipes(), raise_on_failure=True))
+    asyncio.run(dry_run_pipes(pipes=get_pipes(), raise_on_failure=True))
     log.info("Setup sequence passed OK, config and pipelines are validated.")
 
 
@@ -37,7 +37,7 @@ def do_dry_run_pipe(pipe_code: str, relative_config_folder_path: str = "./pipele
 
     asyncio.run(
         dry_run_pipe(
-            get_pipe_library().get_required_pipe(pipe_code=pipe_code),
+            get_required_pipe(pipe_code=pipe_code),
             raise_on_failure=True,
         ),
     )
