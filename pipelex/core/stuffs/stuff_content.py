@@ -107,18 +107,23 @@ class StuffContent(ABC, CustomBaseModel):
                 if field_specific_type is type(None):
                     continue
 
-                # Check if it's a ListContent - skip it
-                if issubclass(field_specific_type, ListContent):
-                    continue
+                # Try-except to handle Python 3.10 compatibility with generic types
+                try:
+                    # Check if it's a ListContent - skip it
+                    if issubclass(field_specific_type, ListContent):
+                        continue
 
-                # Check if it's a direct ImageContent first
-                if issubclass(field_specific_type, ImageContent):
-                    paths.append(field_path)
-                    continue
+                    # Check if it's a direct ImageContent first
+                    if issubclass(field_specific_type, ImageContent):
+                        paths.append(field_path)
+                        continue
 
-                # If it's a StuffContent subclass, recurse into it
-                if issubclass(field_specific_type, StuffContent):
-                    paths = field_specific_type.search_for_nested_image_fields(current_path=field_path, paths=paths)
+                    # If it's a StuffContent subclass, recurse into it
+                    if issubclass(field_specific_type, StuffContent):
+                        paths = field_specific_type.search_for_nested_image_fields(current_path=field_path, paths=paths)
+                except TypeError:
+                    # In Python 3.10, some generic types may pass isinstance(type) but fail issubclass()
+                    continue
 
         return paths
 
