@@ -132,7 +132,7 @@ Get a single API key that works with all providers (OpenAI, Anthropic, Google, M
 
 1. **Get your API key:**
    - Join our Discord community: [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
-   - Request your free API key (no credit card required, limited time offer)
+   - Request your free API key (no credit card required, limited time offer) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel
 
 2. **Configure environment variables:**
    ```bash
@@ -209,17 +209,17 @@ Install all extras:
 
 Using `pip`:
 ```bash
-pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
+pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 ```
 
 Using `poetry`:
 ```bash
-poetry add "pipelex[anthropic,google,mistralai,bedrock,fal]"
+poetry add "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 ```
 
 Using `uv`:
 ```bash
-uv pip install "pipelex[anthropic,google,mistralai,bedrock,fal]"
+uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 ```
 
 ---
