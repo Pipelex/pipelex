@@ -6,7 +6,7 @@
 ####################################################################################################
 
 [aliases]
-base-claude = "claude-4-sonnet"
+base-claude = "claude-4.5-sonnet"
 base-gpt = "gpt-5"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"
@@ -30,7 +30,7 @@ smart_llm = [
     "gpt-5",
     "gemini-2.5-pro",
 ]
-llm_for_large_codebase = ["gemini-2.5-pro", "claude-4-sonnet", "gpt-5"]
+llm_for_large_codebase = ["gemini-2.5-pro", "claude-4.5-sonnet", "gpt-5"]
 
 # Image generation aliases
 base-img-gen = "flux-pro/v1.1"
@@ -62,7 +62,7 @@ llm_cheap = { llm_handle = "base-gemini", temperature = 0.1 }
 
 # Generation skills
 llm_for_factual_writing = { llm_handle = "base-gpt", temperature = 0.1 }
-llm_for_creative_writing = { llm_handle = "claude-4-sonnet", temperature = 0.9 }
+llm_for_creative_writing = { llm_handle = "claude-4.5-sonnet", temperature = 0.9 }
 
 # Reasoning skills
 llm_to_reason_short = { llm_handle = "base-claude", temperature = 0.5, max_tokens = 500 }
@@ -89,7 +89,7 @@ llm_for_img_to_text = { llm_handle = "base-claude", temperature = 0.1 }
 
 # Extraction skills
 llm_to_extract_diagram = { llm_handle = "base-claude", temperature = 0.5 }
-llm_to_extract_invoice = { llm_handle = "claude-4-sonnet", temperature = 0.1 }
+llm_to_extract_invoice = { llm_handle = "claude-4.5-sonnet", temperature = 0.1 }
 llm_to_extract_invoice_from_scan = { llm_handle = "base-claude", temperature = 0.5 }
 llm_to_extract_legal_terms = { llm_handle = "base-claude", temperature = 0.1 }
 llm_to_extract_tables = { llm_handle = "base-claude", temperature = 0.1 }

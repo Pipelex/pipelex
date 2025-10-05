@@ -68,7 +68,7 @@ Once configured, all models are available through the unified backend. Use stand
 ```plx
 [pipe.example]
 type = "PipeLLM"
-llm = { llm_handle = "claude-4-sonnet", temperature = 0.7 }
+llm = { llm_handle = "claude-4.5-sonnet", temperature = 0.7 }
 # Model automatically routed through Pipelex Inference
 ```
 
@@ -183,14 +183,14 @@ Define user-friendly names that map to model names in `.pipelex/inference/deck/b
 ```toml
 [aliases]
 # LLM aliases
-base-claude = "claude-4-sonnet"
+base-claude = "claude-4.5-sonnet"
 base-gpt = "gpt-5"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"
 smart_llm = [
     "claude-4.5-sonnet",
     "claude-4.1-opus",
-    "claude-4-sonnet",
+    "claude-4.5-sonnet",
     "gpt-5",
     "gemini-2.5-pro",
 ]
@@ -219,8 +219,8 @@ cheap_llm_for_text = { llm_handle = "cheap_llm_for_text", temperature = 0.5 }
 cheap_llm_for_object = { llm_handle = "cheap_llm_for_object", temperature = 0.5 }
 
 # Task-specific presets
-llm_for_creative_writing = { llm_handle = "claude-4-sonnet", temperature = 0.9 }
-llm_to_extract_invoice = { llm_handle = "claude-4-sonnet", temperature = 0.1 }
+llm_for_creative_writing = { llm_handle = "claude-4.5-sonnet", temperature = 0.9 }
+llm_to_extract_invoice = { llm_handle = "claude-4.5-sonnet", temperature = 0.1 }
 llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
 
 ### OCR Presets

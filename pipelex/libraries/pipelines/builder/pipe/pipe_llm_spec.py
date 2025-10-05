@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 class AvailableLLM(StrEnum):
-    CLAUDE_4_SONNET = "claude-4-sonnet"
+    CLAUDE_4_SONNET = "claude-4.5-sonnet"
     CLAUDE_4_1_OPUS = "claude-4.1-opus"
     GPT_5 = "gpt-5"
     GEMINI_2_5_PRO = "gemini-2.5-pro"

@@ -47,7 +47,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gpt-4o-mini",
         # "gpt-5-mini",
         # "gpt-5-chat",
-        # "claude-4-sonnet",
+        # "claude-4.5-sonnet",
         # "claude-4.1-opus",
         "claude-4.5-sonnet",
         # "grok-3",

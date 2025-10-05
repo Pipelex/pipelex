@@ -62,7 +62,7 @@ class PipeLLMTestCases:
             source=None,
             type="PipeLLM",
             description="Generate with preset",
-            llm="claude-4-sonnet",
+            llm="claude-4.5-sonnet",
             output="Text",
             prompt_template="Generate text",
         ),
@@ -84,7 +84,7 @@ class PipeLLMTestCases:
             type="PipeLLM",
             description="Generate with settings",
             llm=LLMSetting(
-                llm_handle="claude-4-sonnet",
+                llm_handle="claude-4.5-sonnet",
                 temperature=0.7,
                 max_tokens=None,  # "auto" is handled at conversion to core
             ),
@@ -112,7 +112,7 @@ class PipeLLMTestCases:
             system_prompt="You are a data analyst",
             prompt_template="Analyze: @data",
             output="Analysis",
-            llm="claude-4-sonnet",
+            llm="claude-4.5-sonnet",
         ),
     )
 
@@ -135,7 +135,7 @@ class PipeLLMTestCases:
             nb_output=None,
             output="Item",
             prompt_template="Generate items",
-            llm="claude-4-sonnet",
+            llm="claude-4.5-sonnet",
         ),
     )
 
@@ -158,7 +158,7 @@ class PipeLLMTestCases:
             multiple_output=None,
             output="Item",
             prompt_template="Generate items",
-            llm="claude-4-sonnet",
+            llm="claude-4.5-sonnet",
         ),
     )
 
