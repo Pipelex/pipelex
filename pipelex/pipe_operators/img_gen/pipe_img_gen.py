@@ -30,7 +30,7 @@ from pipelex.exceptions import (
     UnexpectedPipeDefinitionError,
     WorkingMemoryStuffNotFoundError,
 )
-from pipelex.hub import get_concept_provider, get_content_generator, get_model_deck, get_native_concept
+from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
@@ -100,7 +100,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     @override
     def validate_output(self):
-        if not get_concept_provider().is_compatible(
+        if not get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
             strict=True,
@@ -133,7 +133,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         return {DEFAULT_PROMPT_VAR_NAME}
 
     def _validate_inputs(self):
-        concept_provider = get_concept_provider()
+        concept_library = get_concept_library()
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
@@ -180,7 +180,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # get input_name, requirement from single item in inputs
         input_name, requirement = self.inputs.items[0]
         log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
-        if concept_provider.is_compatible(
+        if concept_library.is_compatible(
             tested_concept=requirement.concept,
             wanted_concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
         ):

@@ -24,7 +24,7 @@ from pipelex.exceptions import (
     StaticValidationErrorType,
 )
 from pipelex.hub import (
-    get_concept_provider,
+    get_concept_library,
     get_content_generator,
     get_model_deck,
     get_native_concept,
@@ -72,7 +72,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
             raise PipeDefinitionError(msg)
 
     def _validate_inputs(self):
-        concept_provider = get_concept_provider()
+        concept_library = get_concept_library()
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
@@ -113,13 +113,13 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
         # get input_name, requirement from single item in inputs
         input_name, requirement = self.inputs.items[0]
         log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
-        if concept_provider.is_compatible(
+        if concept_library.is_compatible(
             tested_concept=requirement.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
             strict=True,
         ):
             self.image_stuff_name = input_name
-        elif concept_provider.is_compatible(
+        elif concept_library.is_compatible(
             tested_concept=requirement.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptEnum.PDF),
             strict=True,

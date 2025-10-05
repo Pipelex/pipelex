@@ -14,7 +14,7 @@ from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import ListContent, StuffContent, TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_concept_provider
+from pipelex.hub import get_concept_library
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -42,7 +42,7 @@ class TestPipeBatchSimple:
             blueprint=ConceptBlueprint(description="Lorem Ipsum"),
             concept_codes_from_the_same_domain=["TestConcept2"],
         )
-        concept_library = get_concept_provider()
+        concept_library = get_concept_library()
         concept_library.add_concepts([concept_1, concept_2])
 
         pipe_batch_blueprint = PipeBatchBlueprint(

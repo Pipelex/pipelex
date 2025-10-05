@@ -9,7 +9,7 @@ from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_provider_abstract import PipeProviderAbstract
 from pipelex.exceptions import ConceptError, ConceptLibraryConceptNotFoundError, PipeLibraryError, PipeLibraryPipeNotFoundError
-from pipelex.hub import get_concept_provider
+from pipelex.hub import get_concept_library
 from pipelex.types import Self
 
 PipeLibraryRoot = dict[str, PipeAbstract]
@@ -18,13 +18,13 @@ PipeLibraryRoot = dict[str, PipeAbstract]
 class PipeLibrary(RootModel[PipeLibraryRoot], PipeProviderAbstract):
     @override
     def validate_with_libraries(self):
-        concept_provider = get_concept_provider()
+        concept_library = get_concept_library()
         for pipe in self.root.values():
             pipe.validate_output()
             try:
                 for concept in pipe.concept_dependencies():
                     try:
-                        concept_provider.get_required_concept(concept_string=concept.concept_string)
+                        concept_library.get_required_concept(concept_string=concept.concept_string)
                     except ConceptError as concept_error:
                         msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
                         raise PipeLibraryError(msg) from concept_error

@@ -35,7 +35,7 @@ from pipelex.exceptions import (
 )
 from pipelex.hub import (
     get_class_registry,
-    get_concept_provider,
+    get_concept_library,
     get_content_generator,
     get_model_deck,
     get_native_concept,
@@ -95,7 +95,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     def validate_output(self):
-        if get_concept_provider().is_compatible(
+        if get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
         ):
@@ -181,7 +181,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             if not output_concept_code:
                 output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT
             else:
-                output_concept = get_concept_provider().get_required_concept(
+                output_concept = get_concept_library().get_required_concept(
                     concept_string=ConceptFactory.make_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code),
                 )
 

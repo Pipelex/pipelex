@@ -10,7 +10,7 @@ from pipelex.core.pipes.input_requirements_factory import InputRequirementsFacto
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.hub import get_concept_provider, get_native_concept, get_optional_domain
+from pipelex.hub import get_concept_library, get_native_concept, get_optional_domain
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
@@ -86,7 +86,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     concept_string_or_code=concept_string,
                     concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
                 )
-                concept = get_concept_provider().get_required_concept(
+                concept = get_concept_library().get_required_concept(
                     concept_string=ConceptFactory.make_concept_string_with_domain(
                         domain=domain_and_code.domain,
                         concept_code=domain_and_code.concept_code,
@@ -139,7 +139,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 blueprint=blueprint.inputs or {},
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
-            output=get_concept_provider().get_required_concept(
+            output=get_concept_library().get_required_concept(
                 concept_string=ConceptFactory.make_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code),
             ),
             llm_prompt_spec=llm_prompt_spec,

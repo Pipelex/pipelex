@@ -4,7 +4,7 @@ from pipelex.core.concepts.concept import Concept  # noqa: TC001
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.stuffs.stuff_content import StructuredContent
-from pipelex.hub import get_concept_provider, get_native_concept
+from pipelex.hub import get_concept_library, get_native_concept
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from tests.unit.pipelex.core.concepts import data
 from tests.unit.pipelex.core.concepts.data import TestData
@@ -22,7 +22,7 @@ def register_test_concepts():
 
     The cleanup ensures test isolation between modules.
     """
-    concept_provider = get_concept_provider()
+    concept_library = get_concept_library()
 
     # Register the test structure classes
     ClassRegistryUtils.register_classes_in_file(
@@ -180,14 +180,14 @@ def register_test_concepts():
     concepts_to_register.append(list_content_gallery_concept)
 
     # Add all concepts to the provider
-    concept_provider.add_concepts(concepts_to_register)
+    concept_library.add_concepts(concepts_to_register)
 
     # Yield to run tests
     yield
 
     # Cleanup: Remove test concepts from provider
     concept_strings = [concept.concept_string for concept in concepts_to_register]
-    concept_provider.remove_concepts_by_codes(concept_strings)
+    concept_library.remove_concepts_by_codes(concept_strings)
 
 
 class TestConceptFindImageFieldPaths:
@@ -219,7 +219,7 @@ class TestConceptFindImageFieldPaths:
             expected_paths: The expected list of image field paths
         """
         # Get concept
-        concept = get_concept_provider().get_required_concept(f"{TestData.DOMAIN}.{concept_code}")
+        concept = get_concept_library().get_required_concept(f"{TestData.DOMAIN}.{concept_code}")
 
         # Find image paths
         image_paths = concept.search_for_nested_image_fields_in_structure_class()
