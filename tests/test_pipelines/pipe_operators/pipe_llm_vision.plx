@@ -1,31 +1,54 @@
 domain = "pipe_llm_vision"
 description = "Test PipeLLM with vision capabilities"
 
+[concept]
+VisionAnalysis = "Some analysis based on the image"
+BasicDescription = "Basic description of the image"
+
 [pipe.describe_image]
 type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { image = "Image" }
 output = "Text"
-llm = { llm_handle = "gpt-4o-mini", temperature = 0.3, max_tokens = 200 }
+llm = "llm_for_testing_vision"
 prompt_template = """
-Describe what you see in this image in 2-3 sentences.
+Describe what you see in this image in 1-2 sentences, be concise.
 $image
 """
 
-[pipe.analyze_image_detailed]
+[pipe.describe_image_number_1_only]
+type = "PipeLLM"
+description = "Describe what is in the image"
+inputs = { imageA = "Image", imageB = "Image" }
+output = "BasicDescription"
+llm = "llm_to_extract_diagram"
+prompt_template = """
+Describe what you see in $imageA only.
+Completely ignore $imageB.
+"""
+
+[pipe.describe_image_number_2_only]
+type = "PipeLLM"
+description = "Describe what is in the image"
+inputs = { imageA = "Image", imageB = "Image" }
+output = "BasicDescription"
+llm = "llm_to_extract_diagram"
+prompt_template = """
+Describe what you see in $imageB only.
+Completely ignore $imageA.
+"""
+
+
+[pipe.vision_analysis]
 type = "PipeLLM"
 description = "Provide detailed analysis of the image"
-inputs = { photo = "Image" }
-output = "Text"
-llm = { llm_handle = "gpt-4o-mini", temperature = 0.5, max_tokens = 300 }
+inputs = { image = "images.Photo" }
+output = "VisionAnalysis"
+llm = "llm_to_extract_diagram"
 system_prompt = "You are an expert image analyst. Provide detailed, accurate descriptions."
 prompt_template = """
-Analyze this image and describe:
-1. The main subject or objects
-2. The setting and environment
-3. Colors and visual style
-4. Any notable details or patterns
-
-$photo
+Analyze this image and describe what's the main topic etc.
+$image
+--------------------------------
 """
 

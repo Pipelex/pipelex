@@ -1,5 +1,6 @@
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_setting import LLMSettingChoices
 from pipelex.core.concepts.concept import Concept
@@ -15,7 +16,6 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
-from pipelex.tools.templating.template_provider_abstract import TemplateNotFoundError
 
 
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
@@ -62,20 +62,12 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 else:
                     error_msg += "The prompt template is not provided."
                 raise PipeDefinitionError(error_msg) from exc
-        elif blueprint.prompt is None and blueprint.prompt_name is None:
-            # no jinja2 provided, no verbatim name, no fixed text, let's try and use the pipe code as jinja2 name
-            try:
-                user_text_jinja2_blueprint = Jinja2Blueprint(
-                    jinja2_name=pipe_code,
-                )
-            except TemplateNotFoundError as exc:
-                error_msg = f"Jinja2 template not found for pipe '{pipe_code}' in domain '{domain}': {exc}."
-                raise PipeDefinitionError(error_msg) from exc
 
         user_images: list[str] = []
         if blueprint.inputs:
             for stuff_name, requirement in blueprint.inputs.items():
                 if isinstance(requirement, str):
+                    # if it's just a concept string, it's a concept, we make a basic input requirement from it
                     input_requirement_blueprint = InputRequirementBlueprint(concept=requirement)
                 else:
                     input_requirement_blueprint = requirement

@@ -179,7 +179,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # We have confirmed right above that we have exactly one input
         # get input_name, requirement from single item in inputs
         input_name, requirement = self.inputs.items[0]
-        log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
         if concept_library.is_compatible(
             tested_concept=requirement.concept,
             wanted_concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),

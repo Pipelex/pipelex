@@ -133,7 +133,6 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 model_specs=backend_model_specs,
             )
             self.root[backend_name] = backend
-            log.debug(f"Loaded inference backend '{backend_name}'")
 
     def list_backend_names(self) -> list[str]:
         return list(self.root.keys())

@@ -48,6 +48,27 @@ class PipeLLMTestCases:
         ),
     )
 
+    LLM_WITH_VISION_INPUT = (
+        "llm_with_vision_input",
+        PipeLLMSpec(
+            pipe_code="analyze_image",
+            description="Analyze image",
+            inputs={"image": "Image"},
+            output="Text",
+            prompt_template="Analyze the image: $image",
+            llm="llm_cheap_for_vision",
+        ),
+        PipeLLMBlueprint(
+            source=None,
+            type="PipeLLM",
+            description="Analyze image",
+            inputs={"image": InputRequirementBlueprint(concept="Image")},
+            output="Text",
+            prompt_template="Analyze the image: $image",
+            llm="gemini-2.5-flash-lite",
+        ),
+    )
+
     LLM_WITH_PRESET = (
         "llm_with_preset",
         PipeLLMSpec(
@@ -165,6 +186,7 @@ class PipeLLMTestCases:
     TEST_CASES: ClassVar[list[tuple[str, PipeLLMSpec, PipeLLMBlueprint]]] = [
         SIMPLE_LLM,
         LLM_NO_INPUTS,
+        LLM_WITH_VISION_INPUT,
         LLM_WITH_PRESET,
         LLM_WITH_SETTINGS,
         LLM_WITH_SYSTEM_PROMPT,

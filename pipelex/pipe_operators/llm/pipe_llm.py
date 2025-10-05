@@ -198,7 +198,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             base_multiplicity=self.output_multiplicity,
             override_multiplicity=pipe_run_params.output_multiplicity,
         )
-        log.debug(f"multiplicity_resolution: {multiplicity_resolution}")
         applied_output_multiplicity = multiplicity_resolution.resolved_multiplicity
         is_multiple_output = multiplicity_resolution.is_multiple_outputs_enabled
         fixed_nb_output = multiplicity_resolution.specific_output_count
@@ -258,7 +257,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         log.debug(f"TextContent.__class__.__name__: {TextContent.__class__.__name__}")
         log.debug(f"is_multiple_output: {is_multiple_output}")
         if output_concept.structure_class_name == "TextContent" and not is_multiple_output:
-            log.debug(f"PipeLLM generating a single text output: {self.__class__.__name__}_gen_text")
+            log.info(f"PipeLLM generating a single text output: {self.__class__.__name__}_gen_text")
             llm_prompt_1_for_text = await self.llm_prompt_spec.make_llm_prompt(
                 output_concept_string=output_concept.concept_string,
                 context_provider=working_memory,

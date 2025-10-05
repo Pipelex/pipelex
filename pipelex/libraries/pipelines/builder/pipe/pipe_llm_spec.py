@@ -21,12 +21,14 @@ class AvailableLLM(StrEnum):
     GPT_5 = "gpt-5"
     GEMINI_2_5_PRO = "gemini-2.5-pro"
     GEMINI_2_5_FLASH = "gemini-2.5-flash"
+    GEMINI_2_5_FLASH_LITE = "gemini-2.5-flash-lite"
 
 
 class LLMSkill(StrEnum):
     LLM_TO_RETRIEVE = "llm_to_retrieve"
     LLM_CHEAP_FOR_EASY_QUESTIONS = "llm_cheap_for_easy_questions"
     LLM_TO_ANSWER_HARD_QUESTIONS = "llm_to_answer_hard_questions"
+    LLM_CHEAP_FOR_VISION = "llm_cheap_for_vision"
     LLM_FOR_VISUAL_ANALYSIS = "llm_for_visual_analysis"
     LLM_FOR_VISUAL_DESIGN = "llm_for_visual_design"
     LLM_FOR_CREATIVE_WRITING = "llm_for_creative_writing"
@@ -45,6 +47,8 @@ class LLMSkill(StrEnum):
                 return AvailableLLM.CLAUDE_4_SONNET
             case LLMSkill.LLM_TO_ANSWER_HARD_QUESTIONS:
                 return AvailableLLM.GPT_5
+            case LLMSkill.LLM_CHEAP_FOR_VISION:
+                return AvailableLLM.GEMINI_2_5_FLASH_LITE
             case LLMSkill.LLM_FOR_VISUAL_ANALYSIS:
                 return AvailableLLM.GEMINI_2_5_FLASH
             case LLMSkill.LLM_FOR_VISUAL_DESIGN:

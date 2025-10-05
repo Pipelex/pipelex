@@ -122,7 +122,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
     def add_new_stuff(self, name: str, stuff: Stuff, aliases: list[str] | None = None):
         # TODO: Add unit tests for this method
-        log.debug(f"Adding new stuff '{name}' to WorkingMemory with aliases: {aliases}")
         if self.is_stuff_code_used(stuff_code=stuff.stuff_code):
             msg = f"Stuff code '{stuff.stuff_code}' is already used by another stuff"
             raise WorkingMemoryConsistencyError(msg)

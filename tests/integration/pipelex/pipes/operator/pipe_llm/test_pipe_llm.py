@@ -120,17 +120,6 @@ class TestPipeLLM:
         # Pretty print the structured output
         pretty_print(main_stuff.content, title=f"{topic} - {concept} - {structuring_method}")
 
-        # If using PRELIMINARY_TEXT, also print the preliminary text
-        # if structuring_method == StructuringMethod.PRELIMINARY_TEXT:
-        #     # Get preliminary text from working memory
-        #     preliminary_stuff = pipe_llm_output.working_memory.get_optional_stuff("preliminary_text")
-        #     if preliminary_stuff:
-        #         content = preliminary_stuff.content
-        #         if hasattr(content, "text"):
-        #             pretty_print(content.text, title="Preliminary Text")
-        #         else:
-        #             pretty_print(str(content), title="Preliminary Text")
-
         # Verify the output type matches expected structure
         structure_class = get_class_registry().get_class(concept)
         assert structure_class is not None, f"Structure class {concept} not found in registry"
