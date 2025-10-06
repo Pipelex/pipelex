@@ -1,3 +1,5 @@
+import importlib.util
+
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.ocr.ocr_worker_abstract import ExtractWorkerAbstract
@@ -18,9 +20,7 @@ class ExtractWorkerFactory:
         extract_worker: ExtractWorkerAbstract
         match plugin.sdk:
             case "mistral":
-                try:
-                    import mistralai  # noqa: PLC0415,F401
-                except ImportError as exc:
+                if importlib.util.find_spec("mistralai") is None:
                     lib_name = "mistralai"
                     lib_extra_name = "mistral"
                     msg = "The mistralai SDK is required to use Mistral OCR models through the mistralai client."
@@ -28,17 +28,17 @@ class ExtractWorkerFactory:
                         lib_name,
                         lib_extra_name,
                         msg,
-                    ) from exc
+                    )
 
                 from pipelex.plugins.mistral.mistral_factory import MistralFactory  # noqa: PLC0415
-                from pipelex.plugins.mistral.mistral_ocr_worker import MistralOcrWorker  # noqa: PLC0415
+                from pipelex.plugins.mistral.mistral_ocr_worker import MistralExtractWorker  # noqa: PLC0415
 
                 extract_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
                     sdk_instance=MistralFactory.make_mistral_client(backend=backend),
                 )
 
-                extract_worker = MistralOcrWorker(
+                extract_worker = MistralExtractWorker(
                     sdk_instance=extract_sdk_instance,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,
