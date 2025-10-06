@@ -122,7 +122,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             needed_inputs.add_requirement(
                 variable_name="img_gen_prompt",
                 concept=ConceptFactory.make_native_concept_from_enum(
-                    native_concept_enum=NativeConceptCode.TEXT,
+                    native_concept_code=NativeConceptCode.TEXT,
                 ),
             )
         else:
@@ -185,7 +185,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         input_name, requirement = self.inputs.items[0]
         if concept_library.is_compatible(
             tested_concept=requirement.concept,
-            wanted_concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            wanted_concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
         ):
             self.img_gen_prompt_var_name = input_name
         else:

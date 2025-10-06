@@ -86,19 +86,19 @@ class TestWorkingMemory:
     def multiple_stuff_memory(self) -> WorkingMemory:
         """Create WorkingMemory with multiple stuff items."""
         text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             name="question",
             content=TextContent(text="What are the aerodynamic features?"),
         )
 
         document_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             name="document",
             content=TextContent(text=TestWorkingMemoryData.SAMPLE_TEXT),
         )
 
         image_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.IMAGE),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.IMAGE),
             name="diagram",
             content=ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
         )
@@ -109,13 +109,13 @@ class TestWorkingMemory:
     def memory_with_aliases(self) -> WorkingMemory:
         """Create WorkingMemory with aliases."""
         text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             name="primary_text",
             content=TextContent(text="Primary content"),
         )
 
         secondary_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             name="secondary_text",
             content=TextContent(text="Secondary content"),
         )
@@ -156,7 +156,7 @@ class TestWorkingMemory:
         )
 
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT_AND_IMAGES),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT_AND_IMAGES),
             name="project_overview",
             content=text_and_images_content,
         )
@@ -187,7 +187,7 @@ class TestWorkingMemory:
         number_content = NumberContent(number=3.14159)
 
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.NUMBER),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.NUMBER),
             name="pi_value",
             content=number_content,
         )

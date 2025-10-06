@@ -46,7 +46,7 @@ class TestPipeParallelSimple:
 
         # Create test data
         input_text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             content=TextContent(text="The weather is beautiful today. I love sunny days and outdoor activities."),
             name="input_text",
         )
@@ -161,7 +161,7 @@ class TestPipeParallelSimple:
         )
         # Create test data - shorter text
         input_text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             content=TextContent(text="Hello world"),
             name="input_text",
         )

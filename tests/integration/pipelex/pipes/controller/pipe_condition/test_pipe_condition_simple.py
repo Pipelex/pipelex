@@ -46,7 +46,7 @@ class TestPipeConditionSimple:
             blueprint=pipe_condition_blueprint,
         )
         input_text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             content=TextContent(text="hello world"),  # 11 characters
             name="input_text",
         )
@@ -118,7 +118,7 @@ class TestPipeConditionSimple:
 
         # Create test data - short text input (<= 5 characters)
         input_text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             content=TextContent(text="hi"),  # 2 characters
             name="input_text",
         )

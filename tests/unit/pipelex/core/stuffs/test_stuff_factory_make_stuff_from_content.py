@@ -199,7 +199,7 @@ class TestMakeStuffFromStuffContentUsingSearchDomains:
         )
 
         assert result == mock_stuff
-        mock_concept_factory.make_native_concept_from_enum.assert_called_once_with(native_concept_enum=NativeConceptCode.TEXT)
+        mock_concept_factory.make_native_concept_from_enum.assert_called_once_with(native_concept_code=NativeConceptCode.TEXT)
 
     def test_dict_with_native_concept(self, mocker: MockerFixture):
         """Test dictionary with native concept."""

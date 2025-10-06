@@ -157,7 +157,7 @@ class PipeCondition(PipeController):
                 needed_inputs.add_requirement(
                     variable_name=var_name,
                     concept=ConceptFactory.make_native_concept_from_enum(
-                        native_concept_enum=NativeConceptCode.ANYTHING,
+                        native_concept_code=NativeConceptCode.ANYTHING,
                     ),
                 )
 

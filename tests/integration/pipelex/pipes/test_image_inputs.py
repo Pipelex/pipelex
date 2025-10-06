@@ -67,7 +67,7 @@ class TestImageInputs:
 
         # Create stuff from page content
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.PAGE),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.PAGE),
             content=page_content,
             name="page",
         )

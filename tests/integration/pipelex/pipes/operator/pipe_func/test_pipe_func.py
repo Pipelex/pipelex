@@ -45,7 +45,7 @@ if __name__ == "__main__":
         # Create stuff with the source code
         source_text_stuff = StuffFactory.make_stuff(
             name="source_text",
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             content=TextContent(text=sample_code),
         )
 

@@ -42,7 +42,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     adhoc_pipe_code: ClassVar[str] = "jinja2_render"
     output: Concept = ConceptFactory.make_native_concept_from_enum(
-        native_concept_enum=NativeConceptCode.TEXT,
+        native_concept_code=NativeConceptCode.TEXT,
     )
 
     jinja2_name: str | None = None

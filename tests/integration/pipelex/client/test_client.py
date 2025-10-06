@@ -29,7 +29,7 @@ class TestPipelexApiClient:
                 pipe_code="retrieve_excerpts",
                 memory=[
                     StuffFactory.make_stuff(
-                        concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+                        concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
                         name="text",
                         content=TextContent(
                             text="""

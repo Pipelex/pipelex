@@ -7,7 +7,7 @@ from pipelex.hub import get_concept_library
 class TestConceptLibrary:
     def test_is_image_concept(self):
         concept_library = get_concept_library()
-        native_image_concept = ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.IMAGE)
+        native_image_concept = ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.IMAGE)
 
         concept_1 = ConceptFactory.make_from_blueprint(
             domain="test",

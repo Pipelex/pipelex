@@ -41,7 +41,7 @@ class StuffFactory:
     @classmethod
     def make_from_str(cls, str_value: str, name: str) -> Stuff:
         return cls.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             content=TextContent(text=str_value),
             name=name,
         )
@@ -214,7 +214,7 @@ class StuffFactory:
         elif isinstance(stuff_content_or_data, str):
             str_stuff: str = stuff_content_or_data
             return StuffFactory.make_stuff(
-                concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+                concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
                 content=TextContent(text=str_stuff),
                 name=name,
             )
@@ -227,7 +227,7 @@ class StuffFactory:
                     raise StuffFactoryError(msg)
                 content_value = stuff_content_dict["content"]
                 if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_code):
-                    concept = ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode(concept_code))
+                    concept = ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode(concept_code))
                     content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
                         concept=concept,
                         value=content_value,

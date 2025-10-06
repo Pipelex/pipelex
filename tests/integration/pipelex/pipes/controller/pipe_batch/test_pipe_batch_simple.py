@@ -74,7 +74,7 @@ class TestPipeBatchSimple:
         ]
 
         text_list_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             content=ListContent[StuffContent](items=cast("list[StuffContent]", text_items)),
             name="text_list",
         )

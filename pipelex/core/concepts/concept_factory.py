@@ -69,68 +69,68 @@ class ConceptFactory:
         )
 
     @classmethod
-    def make_native_concept_from_enum(cls, native_concept_enum: NativeConceptCode) -> Concept:
-        structure_class_name = native_concept_enum.structure_class_name
-        match native_concept_enum:
+    def make_native_concept_from_enum(cls, native_concept_code: NativeConceptCode) -> Concept:
+        structure_class_name = native_concept_code.structure_class_name
+        match native_concept_code:
             case NativeConceptCode.DYNAMIC:
                 return Concept(
-                    code=native_concept_enum,
+                    code=native_concept_code,
                     domain=SpecialDomain.NATIVE,
                     description="A dynamic concept",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.TEXT:
                 return Concept(
-                    code=native_concept_enum,
+                    code=native_concept_code,
                     domain=SpecialDomain.NATIVE,
                     description="A text",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.IMAGE:
                 return Concept(
-                    code=native_concept_enum,
+                    code=native_concept_code,
                     domain=SpecialDomain.NATIVE,
                     description="An image",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.PDF:
                 return Concept(
-                    code=native_concept_enum,
+                    code=native_concept_code,
                     domain=SpecialDomain.NATIVE,
                     description="A PDF",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.TEXT_AND_IMAGES:
                 return Concept(
-                    code=native_concept_enum,
+                    code=native_concept_code,
                     domain=SpecialDomain.NATIVE,
                     description="A text and an image",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.NUMBER:
                 return Concept(
-                    code=native_concept_enum,
+                    code=native_concept_code,
                     domain=SpecialDomain.NATIVE,
                     description="A number",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.LLM_PROMPT:
                 return Concept(
-                    code=native_concept_enum,
+                    code=native_concept_code,
                     domain=SpecialDomain.NATIVE,
                     description="A prompt for an LLM",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.PAGE:
                 return Concept(
-                    code=native_concept_enum,
+                    code=native_concept_code,
                     domain=SpecialDomain.NATIVE,
                     description="The content of a page of a document, comprising text and linked images and an optional page view image",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.ANYTHING:
                 return Concept(
-                    code=native_concept_enum,
+                    code=native_concept_code,
                     domain=SpecialDomain.NATIVE,
                     description="Anything",
                     structure_class_name=structure_class_name,
@@ -138,7 +138,7 @@ class ConceptFactory:
 
     @classmethod
     def make_all_native_concepts(cls) -> list[Concept]:
-        return [cls.make_native_concept_from_enum(native_concept_enum=native_concept) for native_concept in NativeConceptCode.values_list()]
+        return [cls.make_native_concept_from_enum(native_concept_code=native_concept) for native_concept in NativeConceptCode.values_list()]
 
     @classmethod
     def make_domain_and_concept_code_from_concept_string_or_code(

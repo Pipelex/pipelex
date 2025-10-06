@@ -60,7 +60,7 @@ class TestPipeSequenceSimple:
 
         # Create test data - single text input
         input_text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             content=TextContent(text="hello world"),
             name="input_text",
         )

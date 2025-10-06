@@ -73,7 +73,7 @@ class TestApiSerialization:
     @pytest.fixture
     def text_content_memory(self) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.TEXT),
             name="sample_text",
             content=TextContent(text="Sample text content"),
         )
@@ -83,7 +83,7 @@ class TestApiSerialization:
     def number_content_memory(self) -> WorkingMemory:
         number_content = NumberContent(number=3.14159)
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.NUMBER),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_code=NativeConceptCode.NUMBER),
             name="pi_value",
             content=number_content,
         )
