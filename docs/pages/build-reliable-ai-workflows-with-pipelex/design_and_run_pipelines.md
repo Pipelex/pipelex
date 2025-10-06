@@ -8,7 +8,7 @@ This guide provides an overview of how to design your pipelines and execute them
 
 A pipeline is composed of pipes. There are two fundamental types of pipes you will use to build your workflows:
 
-*   **[Pipe Operators](pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeOcr`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
+*   **[Pipe Operators](pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
 *   **[Pipe Controllers](pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your workflow, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
 
 ## Designing a Pipeline: Composition in PLX

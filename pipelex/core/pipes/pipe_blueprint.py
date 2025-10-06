@@ -40,7 +40,7 @@ class AllowedPipeTypes(StrEnum):
     PIPE_IMG_GEN = "PipeImgGen"
     PIPE_COMPOSE = "PipeCompose"
     PIPE_LLM = "PipeLLM"
-    PIPE_OCR = "PipeOcr"
+    PIPE_OCR = "PipeExtract"
     # Pipe Controller
     PIPE_BATCH = "PipeBatch"
     PIPE_CONDITION = "PipeCondition"

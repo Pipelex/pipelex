@@ -66,7 +66,7 @@ The **Model Deck** (`ModelDeck`) is the final, unified collection of all configu
 - **Common SDKs**: `mistral` (for Mistral OCR models), `pypdfium2` (for local PDF text extraction)
 - **Inputs**: `pdf`, `image`
 - **Outputs**: `pages` (structured page data with text and images)
-- **Usage**: OCR models are referenced by their `ocr_handle` in `PipeOcr` operations and can use OCR presets for common configurations
+- **Usage**: OCR models are referenced by their `ocr_handle` in `PipeExtract` operations and can use OCR presets for common configurations
 
 Example OCR model configuration:
 ```toml

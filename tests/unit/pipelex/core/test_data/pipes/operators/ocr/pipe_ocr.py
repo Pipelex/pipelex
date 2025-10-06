@@ -8,7 +8,7 @@ PIPE_OCR = (
 description = "Domain with OCR pipe"
 
 [pipe.extract_text]
-type = "PipeOcr"
+type = "PipeExtract"
 description = "Extract text from document"
 output = "Page"
 ocr = "base_ocr_pypdfium2"
@@ -18,7 +18,7 @@ ocr = "base_ocr_pypdfium2"
         description="Domain with OCR pipe",
         pipe={
             "extract_text": PipeExtractBlueprint(
-                type="PipeOcr",
+                type="PipeExtract",
                 description="Extract text from document",
                 output=NativeConceptCode.PAGE,
                 ocr="base_ocr_pypdfium2",
@@ -27,7 +27,7 @@ ocr = "base_ocr_pypdfium2"
     ),
 )
 
-# Export all PipeOcr test cases
+# Export all PipeExtract test cases
 PIPE_OCR_TEST_CASES = [
     PIPE_OCR,
 ]

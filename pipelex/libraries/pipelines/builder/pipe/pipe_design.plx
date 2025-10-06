@@ -14,7 +14,7 @@ PipeFuncSpec = "A structured spec for a pipe func."
 PipeImgGenSpec = "A structured spec for a pipe img gen."
 # PipeComposeSpec = "A structured spec for a pipe jinja2."
 PipeLLMSpec = "A structured spec for a pipe llm."
-PipeOcrSpec = "A structured spec for a pipe ocr."
+PipeExtractSpec = "A structured spec for a pipe ocr."
 PipeFailure = "Details of a single pipe failure during dry run."
 
 [pipe]
@@ -32,7 +32,7 @@ PipeSequence  = "detail_pipe_sequence"
 PipeParallel  = "detail_pipe_parallel"
 PipeCondition = "detail_pipe_condition"
 PipeLLM       = "detail_pipe_llm"
-PipeOcr       = "detail_pipe_ocr"
+PipeExtract       = "detail_pipe_ocr"
 PipeImgGen    = "detail_pipe_img_gen"
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -126,17 +126,17 @@ Here are the concepts you can use for inputs/outputs:
 
 [pipe.detail_pipe_ocr]
 type = "PipeLLM"
-description = "Build a PipeOcrSpec from the signature."
+description = "Build a PipeExtractSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
-output = "PipeOcrSpec"
+output = "PipeExtractSpec"
 llm = "llm_to_engineer"
 prompt_template = """
-Your job is to design a PipeOcrSpec to extract text from an image or a pdf.
+Your job is to design a PipeExtractSpec to extract text from an image or a pdf.
 
-This PipeOcr is part of a larger pipeline:
+This PipeExtract is part of a larger pipeline:
 @plan_draft
 
-You will specifically generate the PipeOcr related to this signature:
+You will specifically generate the PipeExtract related to this signature:
 @pipe_signature
 
 Here are the concepts you can use for inputs/outputs:

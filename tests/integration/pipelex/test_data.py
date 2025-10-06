@@ -174,7 +174,7 @@ class LibraryTestCases:
     ]
 
 
-class PipeOcrTestCases:
+class PipeExtractTestCases:
     PIPE_OCR_IMAGE_TEST_CASES: ClassVar[list[str]] = [
         ImageTestCases.IMAGE_FILE_PATH_PNG,
         ImageTestCases.IMAGE_URL_PNG,

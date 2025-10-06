@@ -14,7 +14,7 @@ api_key_method = "env"
 # OCR config
 ####################################################################################################
 
-[cogt.ocr_config]
+[cogt.extract_config]
 page_output_text_file_name = "page_text.md"
 
 [pipelex.feature_config]

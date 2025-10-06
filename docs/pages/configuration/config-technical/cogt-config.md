@@ -10,7 +10,7 @@ The Cogt configuration manages all cognitive tools in Pipelex, including LLM (La
 [cogt.inference_manager_config]
 [cogt.llm_config]
 [cogt.img_gen_config]
-[cogt.ocr_config]
+[cogt.extract_config]
 ```
 
 ## Inference Manager Configuration
@@ -21,7 +21,7 @@ Controls automatic setup of various cognitive tools:
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
 is_auto_setup_preset_img_gen = true
-is_auto_setup_preset_ocr = true
+is_auto_setup_preset_extract = true
 ```
 
 ## LLM Configuration
@@ -105,7 +105,7 @@ Image generation jobs support these parameters:
 Configuration for Optical Character Recognition:
 
 ```toml
-[cogt.ocr_config]
+[cogt.extract_config]
 page_output_text_file_name = "page_text.md"
 default_page_views_dpi = 72
 
@@ -169,7 +169,7 @@ All model types support the same routing, aliasing, and preset systems.
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
 is_auto_setup_preset_img_gen = true
-is_auto_setup_preset_ocr = true
+is_auto_setup_preset_extract = true
 
 [cogt.llm_config]
 default_max_images = 100
@@ -197,6 +197,6 @@ is_raw = false
 output_format = "jpg"
 seed = "auto"
 
-[cogt.ocr_config]
+[cogt.extract_config]
 page_output_text_file_name = "page_text.md"
 ```

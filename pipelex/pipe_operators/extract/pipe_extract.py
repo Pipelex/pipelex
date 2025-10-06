@@ -44,7 +44,7 @@ class PipeExtractOutput(PipeOutput):
 
 
 class PipeExtract(PipeOperator[PipeExtractOutput]):
-    type: Literal["PipeOcr"] = "PipeOcr"
+    type: Literal["PipeExtract"] = "PipeExtract"
     extract_choice: ExtractChoice | None
     should_caption_images: bool
     should_include_images: bool
@@ -72,7 +72,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     @override
     def validate_output(self):
         if self.output != get_native_concept(native_concept=NativeConceptCode.PAGE):
-            msg = f"PipeOcr output should be a Page concept, but is {self.output.concept_string}"
+            msg = f"PipeExtract output should be a Page concept, but is {self.output.concept_string}"
             raise PipeDefinitionError(msg)
 
     def _validate_inputs(self):
@@ -136,7 +136,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
                 pipe_code=self.code,
                 variable_names=[input_name],
                 provided_concept_code=requirement.concept.code,
-                explanation="For PipeOcr you must provide either a pdf or an image or a concept that refines one of them",
+                explanation="For PipeExtract you must provide either a pdf or an image or a concept that refines one of them",
             )
             match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
                 case StaticValidationReaction.IGNORE:
@@ -170,7 +170,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             pdf_stuff = working_memory.get_stuff_as_pdf(name=self.pdf_stuff_name)
             pdf_uri = pdf_stuff.url
         else:
-            msg = "PipeOcr should have a non-None image_stuff_name or pdf_stuff_name"
+            msg = "PipeExtract should have a non-None image_stuff_name or pdf_stuff_name"
             raise PipeDefinitionError(msg)
 
         extract_choice: ExtractChoice = self.extract_choice or get_model_deck().extract_choice_default
@@ -263,9 +263,9 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeExtractOutput:
-        log.debug(f"PipeOcr: dry run operator pipe: {self.code}")
+        log.debug(f"PipeExtract: dry run operator pipe: {self.code}")
         if pipe_run_params.run_mode != PipeRunMode.DRY:
-            msg = f"Running pipe '{self.code}' (PipeOcr) _dry_run_operator_pipe() in non-dry mode is not allowed."
+            msg = f"Running pipe '{self.code}' (PipeExtract) _dry_run_operator_pipe() in non-dry mode is not allowed."
             raise PipeDefinitionError(msg)
 
         content_generator_dry = ContentGeneratorDry()

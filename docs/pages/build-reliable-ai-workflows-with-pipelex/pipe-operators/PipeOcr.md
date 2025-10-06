@@ -1,10 +1,10 @@
-# PipeOcr
+# PipeExtract
 
-The `PipeOcr` operator performs Optical Character Recognition (OCR) on images and PDF documents. It extracts text, embedded images, and provides full-page renderings.
+The `PipeExtract` operator performs Optical Character Recognition (OCR) on images and PDF documents. It extracts text, embedded images, and provides full-page renderings.
 
 ## How it works
 
-`PipeOcr` takes a single input, which must be either an `Image` or a `Pdf`. It processes the document page by page and produces a list of `PageContent` objects. Each `PageContent` object encapsulates all the information extracted from a single page.
+`PipeExtract` takes a single input, which must be either an `Image` or a `Pdf`. It processes the document page by page and produces a list of `PageContent` objects. Each `PageContent` object encapsulates all the information extracted from a single page.
 
 The output is always a list, even if the input is a single image (in which case the list will contain just one item).
 
@@ -19,11 +19,11 @@ The `PageContent` object has the following structure:
 
 ## Configuration
 
-`PipeOcr` is configured in your pipeline's `.plx` file.
+`PipeExtract` is configured in your pipeline's `.plx` file.
 
 ### OCR Models and Backend System
 
-PipeOcr uses the unified inference backend system to manage OCR models. This means you can:
+PipeExtract uses the unified inference backend system to manage OCR models. This means you can:
 
 - Use different OCR providers (Mistral OCR, local PDF extraction via internal backend, etc.)
 - Configure OCR models through the same backend system as LLMs and image generation models
@@ -40,7 +40,7 @@ OCR presets are defined in your model deck configuration and can include paramet
 
 | Parameter                   | Type    | Description                                                                                                                              | Required |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `type`                      | string  | The type of the pipe: `PipeOcr`                                                                          | Yes      |
+| `type`                      | string  | The type of the pipe: `PipeExtract`                                                                          | Yes      |
 | `description`               | string  | A description of the OCR operation.                                                                   | Yes      |
 | `inputs`                    | Fixed  | The value is either of concept `Image` or `Pdf`.                                                     | Yes       |
 | `output`                    | string  | The output concept produced by the OCR operation.                                                | Yes      |
@@ -63,7 +63,7 @@ description = "A list of pages extracted from a document by OCR"
 refines = "Page"
 
 [pipe.extract_text_from_document]
-type = "PipeOcr"
+type = "PipeExtract"
 description = "Extract text from a scanned document"
 inputs = { document = "ScannedDocument" }
 output = "Page"
@@ -71,6 +71,6 @@ page_views = true
 page_views_dpi = 200
 ```
 
-The output of the PipeOcr must be exactly the native `Page` concept.
+The output of the PipeExtract must be exactly the native `Page` concept.
 
 To use this pipe, you would first need to load a PDF into the `ScannedDocument` concept. After the pipe runs, the `ExtractedPages` concept will contain a list of `PageContent` objects, where each object has the extracted text and a 200 DPI image of the corresponding page.

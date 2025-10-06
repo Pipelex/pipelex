@@ -3,13 +3,13 @@ import pytest
 from pipelex import log
 from pipelex.libraries.pipelines.builder.pipe.pipe_extract_spec import PipeExtractSpec
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
-from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_operator.pipe_ocr.test_data import PipeOcrTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_operator.pipe_ocr.test_data import PipeExtractTestCases
 
 
-class TestPipeOcrBlueprintConversion:
+class TestPipeExtractBlueprintConversion:
     @pytest.mark.parametrize(
         ("test_name", "pipe_spec", "expected_blueprint"),
-        PipeOcrTestCases.TEST_CASES,
+        PipeExtractTestCases.TEST_CASES,
     )
     def test_pipe_ocr_spec_to_blueprint(
         self,

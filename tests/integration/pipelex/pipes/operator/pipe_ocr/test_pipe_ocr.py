@@ -13,7 +13,7 @@ from pipelex.pipe_operators.extract.pipe_extract_factory import PipeExtractFacto
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from tests.integration.pipelex.test_data import PipeOcrTestCases
+from tests.integration.pipelex.test_data import PipeExtractTestCases
 
 
 @pytest.mark.dry_runnable
@@ -37,7 +37,7 @@ class TestPipeOCR:
         concept_library.teardown()
 
     @pytest.mark.usefixtures("setup")
-    @pytest.mark.parametrize("image_url", PipeOcrTestCases.PIPE_OCR_IMAGE_TEST_CASES)
+    @pytest.mark.parametrize("image_url", PipeExtractTestCases.PIPE_OCR_IMAGE_TEST_CASES)
     async def test_pipe_ocr_image(
         self,
         extract_choice_for_image: str,
@@ -74,7 +74,7 @@ class TestPipeOCR:
         ocr_text = pipe_ocr_output.main_stuff_as_list(item_type=PageContent)
         pretty_print(ocr_text, title="ocr_text")
 
-    @pytest.mark.parametrize("pdf_url", PipeOcrTestCases.PIPE_OCR_PDF_TEST_CASES)
+    @pytest.mark.parametrize("pdf_url", PipeExtractTestCases.PIPE_OCR_PDF_TEST_CASES)
     async def test_pipe_ocr_pdf(
         self,
         extract_choice_for_pdf: str,

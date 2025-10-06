@@ -41,7 +41,7 @@ Let's imagine a pipeline that first extracts text from an image, then summarizes
 
 ```plx
 [pipe.extract_text_from_image]
-type = "PipeOcr"
+type = "PipeExtract"
 description = "Extract text from an image"
 output = "Text"
 ocr = "mistral-ocr"

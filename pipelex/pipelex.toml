@@ -83,7 +83,7 @@ inference_config_path = ".pipelex/inference"
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
 is_auto_setup_preset_img_gen = true
-is_auto_setup_preset_ocr = true
+is_auto_setup_preset_extract = true
 
 [cogt.llm_config]
 default_max_images = 100
@@ -126,7 +126,7 @@ sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
 # OCR config
 ####################################################################################################
 
-[cogt.ocr_config]
+[cogt.extract_config]
 page_output_text_file_name = "page_text.md"
 default_page_views_dpi = 72
 
@@ -206,7 +206,7 @@ pipe_stack_limit = 20
 apply_to_jinja2_rendering = false
 text_gen_truncate_length = 256
 nb_list_items = 3
-nb_ocr_pages = 4
+nb_extract_pages = 4
 allowed_to_fail_pipes = [
     "infinite_loop_1",              # Loop but only for testing purposes
     "fix_failing_pipes_once",       # Loop but its normal

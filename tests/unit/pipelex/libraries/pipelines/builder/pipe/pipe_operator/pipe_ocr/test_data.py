@@ -5,7 +5,7 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_extract_spec import PipeExtra
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 
 
-class PipeOcrTestCases:
+class PipeExtractTestCases:
     SIMPLE_OCR = (
         "simple_ocr",
         PipeExtractSpec(
@@ -20,7 +20,7 @@ class PipeOcrTestCases:
             description="Extract text from image",
             inputs={"image": InputRequirementBlueprint(concept="Image")},
             output="ExtractedText",
-            type="PipeOcr",
+            type="PipeExtract",
             category="PipeOperator",
             ocr="base_ocr_mistral",
         ),
@@ -43,7 +43,7 @@ class PipeOcrTestCases:
             description="OCR with page options",
             inputs={"document": InputRequirementBlueprint(concept="PDF")},
             output="PageContent",
-            type="PipeOcr",
+            type="PipeExtract",
             category="PipeOperator",
             ocr="base_ocr_mistral",
             page_images=True,

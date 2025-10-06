@@ -113,7 +113,7 @@ nav:
       - Pipe Operators:
         - Overview: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md
         - PipeLLM: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md
-        - PipeOcr: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeOcr.md
+        - PipeExtract: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeExtract.md
         - PipeImgGen: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeImgGen.md
         - PipeCompose: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeCompose.md
         - PipeFunc: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc.md

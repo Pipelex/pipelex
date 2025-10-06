@@ -35,7 +35,7 @@ class ExtractSkill(StrEnum):
 class PipeExtractSpec(PipeSpec):
     """Spec for OCR (Optical Character Recognition) pipe operations in the Pipelex framework.
 
-    PipeOcr enables text extraction from images and documents using OCR technology.
+    PipeExtract enables text extraction from images and documents using OCR technology.
     Supports various OCR platforms and output configurations including image detection,
     caption generation, and page rendering.
 
@@ -43,7 +43,7 @@ class PipeExtractSpec(PipeSpec):
         - inputs dict must have exactly one input entry, and the value must be either `Image` or `PDF`.
     """
 
-    type: SkipJsonSchema[Literal["PipeOcr"]] = "PipeOcr"
+    type: SkipJsonSchema[Literal["PipeExtract"]] = "PipeExtract"
     category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
     ocr: ExtractSkill | str = Field(description="Select the most adequate extraction model skill according to the task to be performed.")
     page_images: bool | None = Field(default=None, description="Whether to include detected images in the Extract output.")
@@ -59,10 +59,10 @@ class PipeExtractSpec(PipeSpec):
     @classmethod
     def validate_extract_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
         if inputs_value is None:
-            msg = "PipeOcr must have exactly one input which must be either`Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either`Image` or `PDF`."
             raise PipeDefinitionError(msg)
         if len(inputs_value) != 1:
-            msg = "PipeOcr must have exactly one input which must be either`Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either`Image` or `PDF`."
             raise PipeDefinitionError(msg)
         return inputs_value
 

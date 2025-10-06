@@ -9,7 +9,7 @@ class DryRunConfig(ConfigModel):
     apply_to_jinja2_rendering: bool
     text_gen_truncate_length: int
     nb_list_items: int
-    nb_ocr_pages: int
+    nb_extract_pages: int
     image_urls: List[str]
     allowed_to_fail_pipes: List[str] = Field(default_factory=list)
 ```
@@ -19,7 +19,7 @@ class DryRunConfig(ConfigModel):
 - `apply_to_jinja2_rendering`: When true, simulates Jinja2 template rendering during dry runs
 - `text_gen_truncate_length`: Maximum length of generated text during dry runs
 - `nb_list_items`: Number of items to generate for list content during dry runs
-- `nb_ocr_pages`: Number of pages to simulate for OCR operations during dry runs
+- `nb_extract_pages`: Number of pages to simulate for OCR operations during dry runs
 - `image_urls`: List of image URLs to use for dry run testing (must be non-empty)
 - `allowed_to_fail_pipes`: List of pipe names that are allowed to fail during dry runs (optional)
 
@@ -30,7 +30,7 @@ class DryRunConfig(ConfigModel):
 apply_to_jinja2_rendering = true
 text_gen_truncate_length = 100
 nb_list_items = 3
-nb_ocr_pages = 2
+nb_extract_pages = 2
 image_urls = ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
 allowed_to_fail_pipes = ["optional_pipe", "experimental_pipe"]
 ```

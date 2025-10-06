@@ -5,7 +5,7 @@ from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 
 class PipeExtractBlueprint(PipeBlueprint):
-    type: Literal["PipeOcr"] = "PipeOcr"
+    type: Literal["PipeExtract"] = "PipeExtract"
     category: Literal["PipeOperator"] = "PipeOperator"
     ocr: ExtractChoice | None = None
     page_images: bool | None = None

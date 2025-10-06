@@ -17,8 +17,10 @@ best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-medium"
 best-grok = "grok-3"
 
+cheap-gpt = "gpt-4o-mini"
 cheap_llm_for_text = "gpt-4o-mini"
 cheap_llm_for_object = "gpt-4o-mini"
+cheap_llm_for_vision = "gemini-2.5-flash-lite"
 
 base_llm_for_text = "gpt-4o-mini"
 base_llm_for_object = "gpt-4o-mini"
@@ -53,6 +55,8 @@ cheap_llm_to_structure = { llm_handle = "cheap_llm_for_object", temperature = 0.
 
 llm_for_testing_gen_text = { llm_handle = "base_llm_for_text", temperature = 0.5 }
 llm_for_testing_gen_object = { llm_handle = "base_llm_for_object", temperature = 0.5 }
+llm_for_testing_vision = { llm_handle = "cheap_llm_for_vision", temperature = 0.5 }
+llm_for_testing_vision_structured = { llm_handle = "cheap-gpt", temperature = 0.5 }
 
 ####################################################################################################
 # LLM Presets — Specific skills
@@ -106,12 +110,12 @@ for_object = "cheap_llm_for_object"
 # OCR Presets
 ####################################################################################################
 
-[ocr]
+[extract]
 choice_default = "base_ocr_mistral"
 
-[ocr.presets]
-base_ocr_mistral = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-base_ocr_pypdfium2 = { ocr_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+[extract.presets]
+base_ocr_mistral = { extract_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
+base_ocr_pypdfium2 = { extract_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
 
 ####################################################################################################
 # Image Generation Presets

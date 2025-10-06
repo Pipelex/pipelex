@@ -285,7 +285,7 @@ Look at the Pipes we have in order to adapt it. Pipes are organized in two categ
 
 2. **Operators** - For specific tasks:
    - `PipeLLM` - Generate Text and Objects (include Vision LLM)
-   - `PipeOcr` - Extract text and images from an image or a PDF
+   - `PipeExtract` - Extract text and images from an image or a PDF
    - `PipeCompose` - For composing text using Jinja2 templates: supports html, markdown, mermaid, etc.
    - `PipeImgGen` - Generate Images
    - `PipeFunc` - For running classic python scripts
@@ -495,14 +495,14 @@ DO NOT write "$topic" alone in an isolated line.
 DO write things like "Write an essay about $topic" to include text into an actual sentence.
 
 
-## PipeOcr operator
+## PipeExtract operator
 
-The PipeOcr operator is used to extract text and images from an image or a PDF
+The PipeExtract operator is used to extract text and images from an image or a PDF
 
 ### Simple Text Extraction
 ```plx
 [pipe.extract_info]
-type = "PipeOcr"
+type = "PipeExtract"
 description = "extract the information"
 inputs = { document = "PDF" } # or { image = "Image" } if it's an image. This is the only input.
 output = "Page"
@@ -511,7 +511,7 @@ output = "Page"
 Only one input is allowed and it must either be an `Image` or a `PDF`.
 
 The output concept `Page` is a native concept, with the structure `PageContent`:
-It corresponds to 1 page. Therefore, the PipeOcr is outputing a `ListContent` of `Page`
+It corresponds to 1 page. Therefore, the PipeExtract is outputing a `ListContent` of `Page`
 
 ```python
 class TextAndImagesContent(StuffContent):

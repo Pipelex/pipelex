@@ -113,7 +113,7 @@
 ### Changed
 
 - ⚠️ Breaking changes:
-  - Renamed `ocr_handle` to `ocr_model` in `PipeOcr` blueprint, so you'll need to update your PLX code accordingly
+  - Renamed `ocr_handle` to `ocr_model` in `PipeExtract` blueprint, so you'll need to update your PLX code accordingly
   - Updated .env.example file with slightly modified key names (more standard).
 - OCR system now uses InferenceModelSpec with unified model handles
 - Renamed `get_llm_deck()` to `get_model_deck()` and updated parameter names from `llm_handle` to `model_handle`
@@ -379,7 +379,7 @@ Simplified input memory:
 - Refactored `PipeInput` to use `InputRequirement` and `TypedNamedInputRequirement` classes instead of plain strings for input specifications.
 - Updated `WorkingMemoryFactory` to handle `ImplicitMemory` instead of `CompactMemory`.
 - Replaced `ExecutePipelineException` with `PipelineInputError` in `execute_pipeline` function.
-- Updated `PipeBatch`, `PipeCondition`, `PipeParallel`, `PipeSequence`, `PipeFunc`, `PipeImgGen`, `PipeCompose`, `PipeLLM`, and `PipeOcr` classes to use `InputRequirement` for input handling.
+- Updated `PipeBatch`, `PipeCondition`, `PipeParallel`, `PipeSequence`, `PipeFunc`, `PipeImgGen`, `PipeCompose`, `PipeLLM`, and `PipeExtract` classes to use `InputRequirement` for input handling.
 - Updated `PipeInput` creation in various test files to use `make_from_dict` method.
 - Updated `pyproject.toml` to exclude `pypdfium2` version `4.30.1`.
 - Updated `Jinja2TemplateCategory` to handle HTML and Markdown templates differently.
@@ -633,7 +633,7 @@ Simplified input memory:
 ### Tooling Improvements
 
 - Pipeline tracking: restored **visual flowchart generation using Mermaid**
-- Enhanced dry run configuration: added more granular control with `nb_list_items`, `nb_ocr_pages`, and `image_urls`
+- Enhanced dry run configuration: added more granular control with `nb_list_items`, `nb_extract_pages`, and `image_urls`
 - New feature flags: better control over pipeline tracking, activity tracking, and reporting
 - Improved OCR configuration: handle image file type for Mistral-OCR, added `default_page_views_dpi` setting
 - Enhanced LLM configuration: **better prompting for structured generation with automatic schema insertion** for two-step structuring: generate plain text and then structure via Json
@@ -682,7 +682,7 @@ Simplified input memory:
 ### Highlights
 
 - **Structured Input Specifications**: Pipe inputs are now defined as a dictionary mapping a required variable name to a concept code (`required_variable` -> `concept_code`). This replaces the previous single `input` field and allows for multiple, named inputs, making pipes more powerful and explicit. This is a **breaking change**.
-- **Static Validation for Inference Pipes**: You can now catch configuration and input mistakes in your pipelines *before* running any operations. This static validation checks `PipeLLM`, `PipeOcr`, and `PipeImgGen`. Static validation for controller pipes (PipeSequence, PipeParallel…) will come in a future release.
+- **Static Validation for Inference Pipes**: You can now catch configuration and input mistakes in your pipelines *before* running any operations. This static validation checks `PipeLLM`, `PipeExtract`, and `PipeImgGen`. Static validation for controller pipes (PipeSequence, PipeParallel…) will come in a future release.
     - Configure the behavior for different error types using the `static_validation_config` section in your settings. For each error type, choose to `raise`, `log`, or `ignore`.
 - **Dry Run Mode for Zero-Cost Pipeline Validation**: A powerful dry-run mode allows you to test entire pipelines without making any actual inference calls. It's fast, costs nothing, works offline, and is perfect for linting and validating pipeline logic.
     - The new `dry_run_config` lets you control settings, like disabling Jinja2 rendering during a dry run.
@@ -839,7 +839,7 @@ is_reporting_enabled = true
 
 ## [v0.2.1] - 2025-05-22
 
-- Added `OcrWorkerAbstract` and `MistralOcrWorker`, along with `PipeOcr` for OCR processing of images and PDFs.
+- Added `OcrWorkerAbstract` and `MistralOcrWorker`, along with `PipeExtract` for OCR processing of images and PDFs.
 - Introduced `MissionManager` for managing missions, cost reports, and activity tracking.
 - Added detection and handling for pipe stack overflow, configurable with `pipe_stack_limit`.
 - More possibilities for dependency injection and better class structure.
