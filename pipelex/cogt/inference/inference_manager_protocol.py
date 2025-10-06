@@ -32,7 +32,7 @@ class InferenceManagerProtocol(Protocol):
     def get_img_gen_worker(self, img_gen_handle: str) -> ImgGenWorkerAbstract: ...
 
     ####################################################################################################
-    # OCR Workers
+    # Extract Workers
     ####################################################################################################
 
-    def get_ocr_worker(self, model_handle: str) -> ExtractWorkerAbstract: ...
+    def get_extract_worker(self, model_handle: str) -> ExtractWorkerAbstract: ...

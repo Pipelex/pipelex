@@ -13,6 +13,6 @@ class TestSetupInferenceWorkers:
                     if isinstance(llm_worker, LLMWorkerInternalAbstract):
                         assert inference_model == llm_worker.inference_model
                 case ModelType.TEXT_EXTRACTOR:
-                    _ = inference_manager.get_ocr_worker(model_handle=model_handle)
+                    _ = inference_manager.get_extract_worker(model_handle=model_handle)
                 case ModelType.IMG_GEN:
                     _ = inference_manager.get_img_gen_worker(img_gen_handle=model_handle)

@@ -18,7 +18,7 @@ from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 
 
-class MistralOcrWorker(ExtractWorkerAbstract):
+class MistralExtractWorker(ExtractWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
