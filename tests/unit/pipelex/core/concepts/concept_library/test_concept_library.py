@@ -1,13 +1,13 @@
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.hub import get_concept_library
 
 
 class TestConceptLibrary:
     def test_is_image_concept(self):
         concept_library = get_concept_library()
-        native_image_concept = ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE])
+        native_image_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE)
 
         concept_1 = ConceptFactory.make_from_blueprint(
             domain="test",

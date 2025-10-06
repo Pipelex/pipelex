@@ -2,7 +2,7 @@ import pytest
 
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
 from pipelex.core.stuffs.page_content import PageContent
@@ -24,7 +24,7 @@ class TestDryWorkingMemory:
             TypedNamedInputRequirement(
                 variable_name="page",
                 concept=ConceptFactory.make(
-                    concept_code=NativeConceptEnum.PAGE, domain="test_tricky_questions", description="Lorem Ipsum", structure_class_name="Page"
+                    concept_code=NativeConceptCode.PAGE, domain="test_tricky_questions", description="Lorem Ipsum", structure_class_name="Page"
                 ),
                 structure_class=PageContent,
             ),
@@ -37,7 +37,7 @@ class TestDryWorkingMemory:
 
         # Verify concept code is correct
         page_stuff = dry_memory.get_stuff("page")
-        assert page_stuff.concept.code == NativeConceptEnum.PAGE
+        assert page_stuff.concept.code == NativeConceptCode.PAGE
         assert page_stuff.stuff_name == "page"
 
         # Verify structured content was created properly

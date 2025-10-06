@@ -7,7 +7,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum, NativeConceptManager
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements import InputRequirements
@@ -65,7 +65,7 @@ class PipeCondition(PipeController):
             pipe = get_required_pipe(pipe_code=pipe_code)
             if self.output.concept_string not in (
                 pipe.output.concept_string,
-                NativeConceptManager.get_native_concept_string(NativeConceptEnum.DYNAMIC),
+                NativeConceptCode.DYNAMIC.concept_string,
             ):
                 msg = (
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
@@ -157,7 +157,7 @@ class PipeCondition(PipeController):
                 needed_inputs.add_requirement(
                     variable_name=var_name,
                     concept=ConceptFactory.make_native_concept(
-                        native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.ANYTHING],
+                        native_concept_code=NativeConceptCode.ANYTHING,
                     ),
                 )
 

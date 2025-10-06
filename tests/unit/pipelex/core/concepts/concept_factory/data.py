@@ -7,7 +7,7 @@ from pipelex.core.concepts.concept_blueprint import (
     ConceptStructureBlueprintFieldType,
 )
 from pipelex.core.concepts.concept_factory import DomainAndConceptCode
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 
 
@@ -16,16 +16,16 @@ class TestCases:
     MAKE_REFINES_TEST_CASES: ClassVar[list[tuple[str, ConceptBlueprint, str]]] = [
         (
             "native_concept_string",
-            ConceptBlueprint(description="A concept that refines a native text concept", refines=NativeConceptEnum.TEXT),
-            f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
+            ConceptBlueprint(description="A concept that refines a native text concept", refines=NativeConceptCode.TEXT),
+            f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         ),
         (
             "fully_qualified_native_string",
             ConceptBlueprint(
                 description="A concept that refines a fully qualified native concept",
-                refines=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
+                refines=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
             ),
-            f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
+            f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         ),
     ]
 
@@ -82,7 +82,7 @@ class TestCases:
                 domain=SpecialDomain.IMPLICIT,
                 code="SimpleConcept",
                 description="A simple concept",
-                structure_class_name=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT].content_class_name,
+                structure_class_name=NativeConceptCode.TEXT.structure_class_name,
                 refines=None,
             ),
         ),
@@ -97,7 +97,7 @@ class TestCases:
                 domain=SpecialDomain.IMPLICIT,
                 code="ConceptWithStructure",
                 description="A concept with string structure",
-                structure_class_name=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT].content_class_name,
+                structure_class_name=NativeConceptCode.TEXT.structure_class_name,
                 refines=None,
             ),
         ),
@@ -112,7 +112,7 @@ class TestCases:
                 domain=SpecialDomain.IMPLICIT,
                 code="MyTextConcept",
                 description="A concept that refines Text",
-                structure_class_name=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT].content_class_name,
+                structure_class_name=NativeConceptCode.TEXT.structure_class_name,
                 refines="native.Text",
             ),
         ),
@@ -127,7 +127,7 @@ class TestCases:
                 domain=SpecialDomain.IMPLICIT,
                 code="MyImageConcept",
                 description="A concept that refines native.Image",
-                structure_class_name=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE].content_class_name,
+                structure_class_name=NativeConceptCode.IMAGE.structure_class_name,
                 refines="native.Image",
             ),
         ),
@@ -142,7 +142,7 @@ class TestCases:
                 domain=SpecialDomain.NATIVE,
                 code="Text",
                 description="Native text concept",
-                structure_class_name=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT].content_class_name,
+                structure_class_name=NativeConceptCode.TEXT.structure_class_name,
                 refines=None,
             ),
         ),
@@ -157,7 +157,7 @@ class TestCases:
                 domain="my_domain",
                 code="DomainConcept",
                 description="A concept from same domain",
-                structure_class_name=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT].content_class_name,
+                structure_class_name=NativeConceptCode.TEXT.structure_class_name,
                 refines=None,
             ),
         ),
@@ -172,7 +172,7 @@ class TestCases:
                 domain=SpecialDomain.IMPLICIT,
                 code="UnknownConcept",
                 description="An unknown concept",
-                structure_class_name=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT].content_class_name,
+                structure_class_name=NativeConceptCode.TEXT.structure_class_name,
                 refines=None,
             ),
         ),
@@ -241,7 +241,7 @@ class TestCases:
                 domain=SpecialDomain.IMPLICIT,
                 code="ConceptWithRefines",
                 description="A concept with refines",
-                structure_class_name=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT].content_class_name,
+                structure_class_name=NativeConceptCode.TEXT.structure_class_name,
                 refines="native.Text",
             ),
         ),
@@ -256,7 +256,7 @@ class TestCases:
                 domain="my_domain",
                 code="ConceptWithRefines",
                 description="A concept with refines",
-                structure_class_name=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE].content_class_name,
+                structure_class_name=NativeConceptCode.IMAGE.structure_class_name,
                 refines="native.Image",
             ),
         ),

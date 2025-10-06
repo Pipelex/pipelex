@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
@@ -23,7 +23,7 @@ prompt_template = "Generate a story about a programmer"
             "generate_text": PipeLLMBlueprint(
                 type="PipeLLM",
                 description="Generate text using LLM",
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 prompt_template="Generate a story about a programmer",
             ),
         },
@@ -55,7 +55,7 @@ Extract information about $topic from this text:
                 type="PipeLLM",
                 description="Extract information from text",
                 inputs={"text": "Text", "topic": "Text"},
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 prompt_template="Extract information about $topic from this text:\n\n@text\n",
             ),
         },
@@ -82,7 +82,7 @@ prompt_template = "Analyze the following data and provide insights"
             "expert_analysis": PipeLLMBlueprint(
                 type="PipeLLM",
                 description="Expert analysis with system prompt",
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 system_prompt="You are a data analysis expert with 20 years of experience",
                 prompt_template="Analyze the following data and provide insights",
             ),
@@ -112,7 +112,7 @@ Extract all articles/items from this invoice text: $extracted_text. For each ite
             "expert_analysis": PipeLLMBlueprint(
                 type="PipeLLM",
                 description="Expert analysis with system prompt",
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 prompt_template="""Extract all articles/items from this invoice text: $extracted_text. For each item find: item name, quantity, unit price, total price, description, and product code if
  available. Return each article as separate structured data.
 """,
@@ -140,7 +140,7 @@ nb_output = 3
             "generate_ideas": PipeLLMBlueprint(
                 type="PipeLLM",
                 description="Generate multiple ideas",
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 nb_output=3,
                 prompt_template="Generate creative ideas for a mobile app",
             ),
@@ -170,7 +170,7 @@ multiple_output = true
                 type="PipeLLM",
                 description="Brainstorm multiple solutions",
                 inputs={"problem": InputRequirementBlueprint(concept="Text")},
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 multiple_output=True,
                 prompt_template="Brainstorm solutions for this problem: $problem",
             ),
@@ -199,7 +199,7 @@ prompt_template = "Describe what you see in this image in detail"
                 type="PipeLLM",
                 description="Analyze image content",
                 inputs={"image": "Image"},
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 prompt_template="Describe what you see in this image in detail",
             ),
         },
@@ -227,7 +227,7 @@ template_name = "analysis_template"
                 type="PipeLLM",
                 description="Use named template",
                 inputs={"data": "Text"},
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 template_name="analysis_template",
             ),
         },
@@ -253,7 +253,7 @@ prompt = "Write a haiku about programming"
             "simple_generation": PipeLLMBlueprint(
                 type="PipeLLM",
                 description="Simple text generation with fixed prompt",
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 prompt="Write a haiku about programming",
             ),
         },
@@ -282,7 +282,7 @@ prompt_template = "Analyze this content: @content"
                 type="PipeLLM",
                 description="Analysis with dynamic system prompt",
                 inputs={"expertise_level": "Text", "content": "Text"},
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 system_prompt_template="You are an expert with $expertise_level level knowledge",
                 prompt_template="Analyze this content: @content",
             ),

@@ -1,5 +1,3 @@
-from typing import NamedTuple
-
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.types import StrEnum
 
@@ -8,13 +6,7 @@ class NativeConceptEnumError(Exception):
     pass
 
 
-class NativeConceptEnumData(NamedTuple):
-    code: str
-    content_class_name: str
-    description: str
-
-
-class NativeConceptEnum(StrEnum):
+class NativeConceptCode(StrEnum):
     DYNAMIC = "Dynamic"
     TEXT = "Text"
     IMAGE = "Image"
@@ -25,119 +17,60 @@ class NativeConceptEnum(StrEnum):
     PAGE = "Page"
     ANYTHING = "Anything"
 
-    @classmethod
-    def values_list(cls) -> list["NativeConceptEnum"]:
-        return list(cls)
+    @property
+    def concept_string(self) -> str:
+        return f"{SpecialDomain.NATIVE}.{self.value}"
+
+    @property
+    def structure_class_name(self) -> str:
+        return f"{self.value}Content"
 
     @classmethod
     def is_text(cls, concept_code: str) -> bool:
         try:
-            enum_value = NativeConceptEnum(concept_code)
+            enum_value = NativeConceptCode(concept_code)
         except ValueError:
             return False
 
         match enum_value:
-            case NativeConceptEnum.TEXT:
+            case NativeConceptCode.TEXT:
                 return True
             case (
-                NativeConceptEnum.DYNAMIC
-                | NativeConceptEnum.IMAGE
-                | NativeConceptEnum.PDF
-                | NativeConceptEnum.TEXT_AND_IMAGES
-                | NativeConceptEnum.NUMBER
-                | NativeConceptEnum.LLM_PROMPT
-                | NativeConceptEnum.PAGE
-                | NativeConceptEnum.ANYTHING
+                NativeConceptCode.DYNAMIC
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.PDF
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.LLM_PROMPT
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.ANYTHING
             ):
                 return False
 
-
-NATIVE_CONCEPTS_DATA: dict[NativeConceptEnum, NativeConceptEnumData] = {
-    NativeConceptEnum.DYNAMIC: NativeConceptEnumData(
-        code=NativeConceptEnum.DYNAMIC,
-        content_class_name=f"{NativeConceptEnum.DYNAMIC}Content",
-        description="A dynamic concept",
-    ),
-    NativeConceptEnum.TEXT: NativeConceptEnumData(
-        code=NativeConceptEnum.TEXT,
-        content_class_name=f"{NativeConceptEnum.TEXT}Content",
-        description="A text",
-    ),
-    NativeConceptEnum.IMAGE: NativeConceptEnumData(
-        code=NativeConceptEnum.IMAGE,
-        content_class_name=f"{NativeConceptEnum.IMAGE}Content",
-        description="An image",
-    ),
-    NativeConceptEnum.PDF: NativeConceptEnumData(
-        code=NativeConceptEnum.PDF,
-        content_class_name=f"{NativeConceptEnum.PDF}Content",
-        description="A PDF",
-    ),
-    NativeConceptEnum.TEXT_AND_IMAGES: NativeConceptEnumData(
-        code=NativeConceptEnum.TEXT_AND_IMAGES,
-        content_class_name=f"{NativeConceptEnum.TEXT_AND_IMAGES}Content",
-        description="A text and an image",
-    ),
-    NativeConceptEnum.NUMBER: NativeConceptEnumData(
-        code=NativeConceptEnum.NUMBER,
-        content_class_name=f"{NativeConceptEnum.NUMBER}Content",
-        description="A number",
-    ),
-    NativeConceptEnum.LLM_PROMPT: NativeConceptEnumData(
-        code=NativeConceptEnum.LLM_PROMPT,
-        content_class_name=f"{NativeConceptEnum.LLM_PROMPT}Content",
-        description="A prompt for an LLM",
-    ),
-    NativeConceptEnum.PAGE: NativeConceptEnumData(
-        code=NativeConceptEnum.PAGE,
-        content_class_name=f"{NativeConceptEnum.PAGE}Content",
-        description="The content of a page of a document, comprising text and linked images and an optional page view image",
-    ),
-    NativeConceptEnum.ANYTHING: NativeConceptEnumData(
-        code=NativeConceptEnum.ANYTHING,
-        content_class_name=f"{NativeConceptEnum.ANYTHING}Content",
-        description="Anything",
-    ),
-}
-
-
-class NativeConceptManager:
     @classmethod
-    def is_native_concept(cls, concept_string_or_code: str) -> bool:
-        native_concept_values = NativeConceptEnum.values_list()
+    def values_list(cls) -> list["NativeConceptCode"]:
+        return list(cls)
 
+    @classmethod
+    def is_native_concept(cls, concept_code: str) -> bool:
+        return concept_code in cls.values_list()
+
+    @classmethod
+    def native_concept_class_names(cls):
+        return [native_concept.structure_class_name for native_concept in cls]
+
+    @classmethod
+    def get_validated_native_concept_string(cls, concept_string_or_code: str) -> str | None:
         if "." in concept_string_or_code:
-            domain, concept_code = concept_string_or_code.split(".", 1)
-            if SpecialDomain.is_native(domain=domain) and concept_code in native_concept_values:
-                return True
-
-        return concept_string_or_code in native_concept_values
-
-    @classmethod
-    def get_native_concept_string(cls, concept_string_or_code: str) -> str:
-        if not cls.is_native_concept(concept_string_or_code):
-            msg = f"Trying to get a native concept with code '{concept_string_or_code}' that is not a native concept"
-            raise NativeConceptEnumError(msg)
-
-        if "." in concept_string_or_code and SpecialDomain.is_native(domain=concept_string_or_code.split(".")[0]):
-            return concept_string_or_code
-
-        return f"{SpecialDomain.NATIVE}.{concept_string_or_code}"
-
-    @classmethod
-    def get_native_concept_enum(cls, concept_string_or_code: str) -> NativeConceptEnum:
-        if not cls.is_native_concept(concept_string_or_code):
-            msg = f"Trying to get a native concept with string or code '{concept_string_or_code}' that is not a native concept"
-            raise NativeConceptEnumError(msg)
-
-        if "." in concept_string_or_code:
-            _, concept_code = concept_string_or_code.split(".", 1)
+            if concept_string_or_code.count(".") > 1:
+                msg = f"Trying to get a native concept with code '{concept_string_or_code}' but that is not a native concept"
+                raise NativeConceptEnumError(msg)
+            domain_code, concept_code = concept_string_or_code.split(".", 1)
+            if SpecialDomain.is_native(domain=domain_code) and concept_code in cls.values_list():
+                return concept_string_or_code
+            else:
+                return None
+        elif concept_string_or_code in cls.values_list():
+            return f"{SpecialDomain.NATIVE}.{concept_string_or_code}"
         else:
-            concept_code = concept_string_or_code
-
-        return NativeConceptEnum(concept_code)
-
-    @classmethod
-    def get_native_concept_data(cls, concept_string_or_code: str) -> NativeConceptEnumData:
-        enum_value = cls.get_native_concept_enum(concept_string_or_code)
-        return NATIVE_CONCEPTS_DATA[enum_value]
+            return None

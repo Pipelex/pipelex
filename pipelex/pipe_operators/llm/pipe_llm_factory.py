@@ -4,7 +4,7 @@ from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_setting import LLMSettingChoices
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
@@ -84,9 +84,9 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     ),
                 )
 
-                if Concept.are_concept_compatible(concept_1=concept, concept_2=get_native_concept(NativeConceptEnum.IMAGE), strict=True):
+                if Concept.are_concept_compatible(concept_1=concept, concept_2=get_native_concept(NativeConceptCode.IMAGE), strict=True):
                     user_images.append(stuff_name)
-                elif Concept.are_concept_compatible(concept_1=concept, concept_2=get_native_concept(NativeConceptEnum.IMAGE), strict=False):
+                elif Concept.are_concept_compatible(concept_1=concept, concept_2=get_native_concept(NativeConceptCode.IMAGE), strict=False):
                     # Get image field paths relative to the concept
                     image_field_paths = concept.search_for_nested_image_fields_in_structure_class()
                     # Prefix each path with the stuff_name to make them absolute

@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from pipelex.core.concepts.concept_native import NativeConceptEnum, NativeConceptManager
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptStringOrConceptCodeError
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
@@ -124,7 +124,7 @@ class ConceptBlueprint(BaseModel):
     @classmethod
     def is_native_concept_code(cls, concept_code: str) -> bool:
         ConceptBlueprint.validate_concept_code(concept_code=concept_code)
-        return concept_code in NativeConceptEnum.values_list()
+        return NativeConceptCode.is_native_concept(concept_code=concept_code)
 
     @classmethod
     def validate_concept_code(cls, concept_code: str) -> None:
@@ -175,7 +175,7 @@ class ConceptBlueprint(BaseModel):
             raise ConceptCodeError(msg)
 
         # Validate that if the concept code is among the native concepts, the domain MUST be native.
-        if concept_code in NativeConceptEnum.values_list():
+        if concept_code in NativeConceptCode.values_list():
             if not SpecialDomain.is_native(domain=domain):
                 msg = (
                     f"Concept string '{concept_string}' is invalid. "
@@ -185,7 +185,7 @@ class ConceptBlueprint(BaseModel):
                 raise ConceptStringError(msg)
         # Validate that if the domain is native, the concept code is a native concept
         if SpecialDomain.is_native(domain=domain):
-            if concept_code not in NativeConceptEnum.values_list():
+            if concept_code not in NativeConceptCode.values_list():
                 msg = (
                     f"Concept string '{concept_string}' is invalid. "
                     f"Concept code '{concept_code}' is not a native concept, so the domain must not be '{SpecialDomain.NATIVE}'."
@@ -196,10 +196,9 @@ class ConceptBlueprint(BaseModel):
     @classmethod
     def validate_refines(cls, refines: str | None = None) -> str | None:
         if refines is not None:
-            if not NativeConceptManager.is_native_concept(refines):
-                msg = f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon."
+            if not NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refines):
+                msg = f"Refine '{refines}' is not a native concept and we currently can only refine native concepts"
                 raise ConceptBlueprintError(msg)
-            cls.validate_concept_string_or_code(concept_string_or_code=refines)
         return refines
 
     @model_validator(mode="before")

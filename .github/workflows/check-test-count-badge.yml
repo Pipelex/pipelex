@@ -2,6 +2,8 @@ name: Check test count matches badge
 
 on:
   pull_request:
+    branches:
+      - main
 
 jobs:
   check:

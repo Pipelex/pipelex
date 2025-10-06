@@ -7,7 +7,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
@@ -29,11 +29,8 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
 
     @override
     def setup(self):
-        native_concepts = [
-            ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[native_concept])
-            for native_concept in NativeConceptEnum.values_list()
-        ]
-        self.add_concepts(native_concepts)
+        all_native_concepts = ConceptFactory.make_all_native_concepts()
+        self.add_concepts(concepts=all_native_concepts)
 
     @override
     def reset(self):
@@ -96,7 +93,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         return the_concept
 
     @override
-    def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
+    def get_native_concept(self, native_concept: NativeConceptCode) -> Concept:
         the_native_concept = self.get_optional_concept(f"{SpecialDomain.NATIVE}.{native_concept}")
         if not the_native_concept:
             msg = f"Native concept '{native_concept}' not found in the library"
@@ -105,7 +102,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
 
     def get_native_concepts(self) -> list[Concept]:
         """Create all native concepts from the hardcoded data"""
-        return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptEnum.values_list()]
+        return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptCode.values_list()]
 
     @override
     def get_class(self, concept_code: str) -> type[Any] | None:
@@ -121,7 +118,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
         refines_image = self.is_compatible(
             tested_concept=concept,
-            wanted_concept=self.get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+            wanted_concept=self.get_native_concept(native_concept=NativeConceptCode.IMAGE),
             strict=True,
         )
         return is_image_class or refines_image

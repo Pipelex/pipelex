@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.concepts.concept_native import NativeConceptManager
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
@@ -32,20 +32,20 @@ class Concept(BaseModel):
         return concept_string.startswith(SpecialDomain.IMPLICIT)
 
     @field_validator("code")
-    @staticmethod
-    def validate_code(code: str) -> str:
+    @classmethod
+    def validate_code(cls, code: str) -> str:
         ConceptBlueprint.validate_concept_code(concept_code=code)
         return code
 
     @field_validator("domain")
-    @staticmethod
-    def validate_domain(domain: str) -> str:
+    @classmethod
+    def validate_domain(cls, domain: str) -> str:
         DomainBlueprint.validate_domain_code(code=domain)
         return domain
 
     @field_validator("refines", mode="before")
-    @staticmethod
-    def validate_refines(refines: str | None) -> str | None:
+    @classmethod
+    def validate_refines(cls, refines: str | None) -> str | None:
         if refines is None:
             return None
         ConceptBlueprint.validate_concept_string(concept_string=refines)
@@ -57,7 +57,7 @@ class Concept(BaseModel):
 
     @classmethod
     def is_native_concept(cls, concept: "Concept") -> bool:
-        return NativeConceptManager.is_native_concept(concept_string_or_code=concept.concept_string)
+        return NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept.concept_string) is not None
 
     @classmethod
     def are_concept_compatible(cls, concept_1: "Concept", concept_2: "Concept", strict: bool = False) -> bool:

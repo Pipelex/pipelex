@@ -1,6 +1,6 @@
 from typing import Any
 
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.tools.misc.dict_utils import apply_to_strings_in_list, apply_to_strings_recursive, insert_before
 
 
@@ -37,7 +37,7 @@ class TestDictUtils:
 
     def test_complex_nested_structure(self) -> None:
         """Test with complex nested dictionary structure."""
-        original = {"type": "PipeLLM", "description": "Test pipe", "output": NativeConceptEnum.TEXT, "system_prompt": "Test prompt"}
+        original = {"type": "PipeLLM", "description": "Test pipe", "output": NativeConceptCode.TEXT, "system_prompt": "Test prompt"}
 
         # Insert inputs before output
         result = insert_before(original, "output", "inputs", "InputText")

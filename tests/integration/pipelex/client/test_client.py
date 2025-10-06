@@ -5,7 +5,7 @@ from pipelex import pretty_print
 from pipelex.client.client import PipelexClient
 from pipelex.client.protocol import COMPACT_MEMORY_KEY, PipelineState
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff import Stuff
@@ -29,7 +29,7 @@ class TestPipelexApiClient:
                 pipe_code="retrieve_excerpts",
                 memory=[
                     StuffFactory.make_stuff(
-                        concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+                        concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
                         name="text",
                         content=TextContent(
                             text="""
@@ -140,7 +140,7 @@ class TestPipelexApiClient:
                 assert isinstance(item["justification"], str)
 
             # Verify text structure
-            assert working_memory["text"]["concept_code"] == f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}"
+            assert working_memory["text"]["concept_code"] == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
             assert "content" in working_memory["text"]
             assert isinstance(working_memory["text"]["content"], str)
             assert "The Dawn of Ultra-Rapid Transit" in working_memory["text"]["content"]

@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff import Stuff
@@ -25,7 +25,7 @@ class TestPipeLLM:
     ):
         pipe_llm_blueprint = PipeLLMBlueprint(
             description="LLM test for basic text generation",
-            output=NativeConceptEnum.TEXT,
+            output=NativeConceptCode.TEXT,
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             prompt=PipeTestCases.USER_PROMPT,
         )
@@ -145,7 +145,7 @@ class TestPipeLLM:
             pipe_llm_blueprint = PipeLLMBlueprint(
                 description="LLM test for image processing with attributes",
                 inputs={stuff_name: InputRequirementBlueprint(concept=stuff.concept.concept_string)},
-                output=NativeConceptEnum.TEXT,
+                output=NativeConceptCode.TEXT,
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,
             )

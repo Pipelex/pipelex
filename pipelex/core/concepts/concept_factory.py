@@ -7,7 +7,7 @@ from pipelex.core.concepts.concept_blueprint import (
     ConceptStructureBlueprint,
     ConceptStructureBlueprintFieldType,
 )
-from pipelex.core.concepts.concept_native import NativeConceptEnumData, NativeConceptManager
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generator import StructureGenerator
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent
@@ -69,13 +69,76 @@ class ConceptFactory:
         )
 
     @classmethod
-    def make_native_concept(cls, native_concept_data: NativeConceptEnumData) -> Concept:
-        return Concept(
-            code=native_concept_data.code,
-            domain=SpecialDomain.NATIVE,
-            description=native_concept_data.description,
-            structure_class_name=native_concept_data.content_class_name,
-        )
+    def make_native_concept(cls, native_concept_code: NativeConceptCode) -> Concept:
+        structure_class_name = native_concept_code.structure_class_name
+        match native_concept_code:
+            case NativeConceptCode.DYNAMIC:
+                return Concept(
+                    code=native_concept_code,
+                    domain=SpecialDomain.NATIVE,
+                    description="A dynamic concept",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.TEXT:
+                return Concept(
+                    code=native_concept_code,
+                    domain=SpecialDomain.NATIVE,
+                    description="A text",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.IMAGE:
+                return Concept(
+                    code=native_concept_code,
+                    domain=SpecialDomain.NATIVE,
+                    description="An image",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.PDF:
+                return Concept(
+                    code=native_concept_code,
+                    domain=SpecialDomain.NATIVE,
+                    description="A PDF",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.TEXT_AND_IMAGES:
+                return Concept(
+                    code=native_concept_code,
+                    domain=SpecialDomain.NATIVE,
+                    description="A text and an image",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.NUMBER:
+                return Concept(
+                    code=native_concept_code,
+                    domain=SpecialDomain.NATIVE,
+                    description="A number",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.LLM_PROMPT:
+                return Concept(
+                    code=native_concept_code,
+                    domain=SpecialDomain.NATIVE,
+                    description="A prompt for an LLM",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.PAGE:
+                return Concept(
+                    code=native_concept_code,
+                    domain=SpecialDomain.NATIVE,
+                    description="The content of a page of a document, comprising text and linked images and an optional page view image",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.ANYTHING:
+                return Concept(
+                    code=native_concept_code,
+                    domain=SpecialDomain.NATIVE,
+                    description="Anything",
+                    structure_class_name=structure_class_name,
+                )
+
+    @classmethod
+    def make_all_native_concepts(cls) -> list[Concept]:
+        return [cls.make_native_concept(native_concept_code=native_concept) for native_concept in NativeConceptCode.values_list()]
 
     @classmethod
     def make_domain_and_concept_code_from_concept_string_or_code(
@@ -89,7 +152,7 @@ class ConceptFactory:
             # Is a concept string.
             parts = concept_string_or_code.rsplit(".")
             return DomainAndConceptCode(domain=parts[0], concept_code=parts[1])
-        if NativeConceptManager.is_native_concept(concept_string_or_code=concept_string_or_code):
+        if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string_or_code):
             return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=concept_string_or_code)
 
         if (
@@ -119,10 +182,11 @@ class ConceptFactory:
 
     @classmethod
     def make_refine(cls, refine: str) -> str:
-        if not NativeConceptManager.is_native_concept(concept_string_or_code=refine):
-            msg = f"Refine '{refine}' is not a native concept"
+        if native_concept_string := NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine):
+            return native_concept_string
+        else:
+            msg = f"Refine '{refine}' is not a native concept and we currently can only refine native concepts"
             raise ConceptRefineError(msg)
-        return NativeConceptManager.get_native_concept_string(concept_string_or_code=refine)
 
     @classmethod
     def make_from_blueprint_or_description(
