@@ -66,26 +66,6 @@ class StuffFactory:
         )
 
     @classmethod
-    def make_stuff_using_concept_name_and_search_domains(
-        cls,
-        concept_name: str,
-        search_domains: list[str],
-        content: StuffContent,
-        name: str | None = None,
-        code: str | None = None,
-    ) -> Stuff:
-        # TODO: Add unit tests for this method
-        concept_library = get_concept_library()
-        concept = concept_library.search_for_concept_in_domains(
-            concept_code=concept_name,
-            search_domains=search_domains,
-        )
-        if not concept:
-            msg = f"Could not find a concept named '{concept_name}' in domains {search_domains}"
-            raise StuffFactoryError(msg)
-        return cls.make_stuff(concept=concept, content=content, name=name, code=code)
-
-    @classmethod
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
         concept_library = get_concept_library()
         if isinstance(blueprint.content, str) and concept_library.is_compatible(
@@ -129,6 +109,26 @@ class StuffFactory:
             content=the_stuff_content,
             name=name,
         )
+
+    @classmethod
+    def make_stuff_using_concept_name_and_search_domains(
+        cls,
+        concept_name: str,
+        search_domains: list[str],
+        content: StuffContent,
+        name: str | None = None,
+        code: str | None = None,
+    ) -> Stuff:
+        # TODO: Add unit tests for this method
+        concept_library = get_concept_library()
+        concept = concept_library.search_for_concept_in_domains(
+            concept_code=concept_name,
+            search_domains=search_domains,
+        )
+        if not concept:
+            msg = f"Could not find a concept named '{concept_name}' in domains {search_domains}"
+            raise StuffFactoryError(msg)
+        return cls.make_stuff(concept=concept, content=content, name=name, code=code)
 
     @classmethod
     def make_stuff_from_stuff_content_using_search_domains(
