@@ -4,7 +4,7 @@ from pipelex.cogt.extract.extract_setting import ExtractChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 
-class PipeOcrBlueprint(PipeBlueprint):
+class PipeExtractBlueprint(PipeBlueprint):
     type: Literal["PipeOcr"] = "PipeOcr"
     category: Literal["PipeOperator"] = "PipeOperator"
     ocr: ExtractChoice | None = None

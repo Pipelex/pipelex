@@ -11,10 +11,10 @@ from pipelex.libraries.pipelines.builder.concept.concept_spec import ConceptSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_condition_spec import PipeConditionSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_extract_spec import PipeExtractSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_func_spec import PipeFuncSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_img_spec import PipeImgGenSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_llm_spec import PipeLLMSpec
-from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_spec import PipeOcrSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.types import Self
@@ -25,7 +25,7 @@ PipeSpecUnion = (
     | PipeImgGenSpec
     | PipeComposeSpec
     | PipeLLMSpec
-    | PipeOcrSpec
+    | PipeExtractSpec
     | PipeBatchSpec
     | PipeConditionSpec
     | PipeParallelSpec
@@ -94,7 +94,7 @@ class PipeFailure(StructuredContent):
         | PipeImgGenSpec
         | PipeComposeSpec
         | PipeLLMSpec
-        | PipeOcrSpec
+        | PipeExtractSpec
         | PipeBatchSpec
         | PipeConditionSpec
         | PipeParallelSpec

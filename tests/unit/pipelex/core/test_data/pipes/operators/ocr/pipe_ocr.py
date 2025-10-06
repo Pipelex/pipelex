@@ -1,6 +1,6 @@
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
+from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 
 PIPE_OCR = (
     "pipe_ocr",
@@ -17,7 +17,7 @@ ocr = "base_ocr_pypdfium2"
         domain="test_pipes",
         description="Domain with OCR pipe",
         pipe={
-            "extract_text": PipeOcrBlueprint(
+            "extract_text": PipeExtractBlueprint(
                 type="PipeOcr",
                 description="Extract text from document",
                 output=NativeConceptCode.PAGE,

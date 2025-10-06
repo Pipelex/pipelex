@@ -39,11 +39,11 @@ from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 from pipelex.types import Self
 
 
-class PipeOcrOutput(PipeOutput):
+class PipeExtractOutput(PipeOutput):
     pass
 
 
-class PipeOcr(PipeOperator[PipeOcrOutput]):
+class PipeExtract(PipeOperator[PipeExtractOutput]):
     type: Literal["PipeOcr"] = "PipeOcr"
     extract_choice: ExtractChoice | None
     should_caption_images: bool
@@ -158,7 +158,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
-    ) -> PipeOcrOutput:
+    ) -> PipeExtractOutput:
         content_generator = content_generator or get_content_generator()
 
         image_uri: str | None = None
@@ -250,7 +250,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
             name=output_name,
         )
 
-        return PipeOcrOutput(
+        return PipeExtractOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
@@ -262,7 +262,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-    ) -> PipeOcrOutput:
+    ) -> PipeExtractOutput:
         log.debug(f"PipeOcr: dry run operator pipe: {self.code}")
         if pipe_run_params.run_mode != PipeRunMode.DRY:
             msg = f"Running pipe '{self.code}' (PipeOcr) _dry_run_operator_pipe() in non-dry mode is not allowed."

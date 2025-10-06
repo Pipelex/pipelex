@@ -1,21 +1,21 @@
 from typing import ClassVar
 
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
-from pipelex.libraries.pipelines.builder.pipe.pipe_ocr_spec import PipeOcrSpec
-from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
+from pipelex.libraries.pipelines.builder.pipe.pipe_extract_spec import PipeExtractSpec
+from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 
 
 class PipeOcrTestCases:
     SIMPLE_OCR = (
         "simple_ocr",
-        PipeOcrSpec(
+        PipeExtractSpec(
             pipe_code="ocr_extractor",
             description="Extract text from image",
             inputs={"image": "Image"},
             output="ExtractedText",
             ocr="extract_text_from_visuals",
         ),
-        PipeOcrBlueprint(
+        PipeExtractBlueprint(
             source=None,
             description="Extract text from image",
             inputs={"image": InputRequirementBlueprint(concept="Image")},
@@ -28,7 +28,7 @@ class PipeOcrTestCases:
 
     OCR_WITH_OPTIONS = (
         "ocr_with_options",
-        PipeOcrSpec(
+        PipeExtractSpec(
             pipe_code="advanced_ocr",
             description="OCR with page options",
             inputs={"document": "PDF"},
@@ -38,7 +38,7 @@ class PipeOcrTestCases:
             page_image_captions=True,
             page_views=True,
         ),
-        PipeOcrBlueprint(
+        PipeExtractBlueprint(
             source=None,
             description="OCR with page options",
             inputs={"document": InputRequirementBlueprint(concept="PDF")},
@@ -53,7 +53,7 @@ class PipeOcrTestCases:
         ),
     )
 
-    TEST_CASES: ClassVar[list[tuple[str, PipeOcrSpec, PipeOcrBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, PipeExtractSpec, PipeExtractBlueprint]]] = [
         SIMPLE_OCR,
         OCR_WITH_OPTIONS,
     ]

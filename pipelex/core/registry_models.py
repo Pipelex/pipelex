@@ -24,14 +24,14 @@ from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
+from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
+from pipelex.pipe_operators.extract.pipe_extract_factory import PipeExtractFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
-from pipelex.pipe_operators.ocr.pipe_ocr import PipeOcr
-from pipelex.pipe_operators.ocr.pipe_ocr_factory import PipeOcrFactory
 from pipelex.tools.registry_models import ModelType, RegistryModels
 
 
@@ -43,7 +43,7 @@ class PipelexRegistryModels(RegistryModels):
         PipeImgGen,
         PipeCompose,
         PipeLLM,
-        PipeOcr,
+        PipeExtract,
     ]
 
     PIPE_OPERATORS_FACTORY: ClassVar[list[PipeFactoryProtocol[Any, Any]]] = [
@@ -51,7 +51,7 @@ class PipelexRegistryModels(RegistryModels):
         PipeImgGenFactory,
         PipeComposeFactory,
         PipeLLMFactory,
-        PipeOcrFactory,
+        PipeExtractFactory,
     ]
 
     PIPE_CONTROLLERS: ClassVar[list[PipeAbstractType]] = [

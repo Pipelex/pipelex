@@ -8,8 +8,8 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.hub import get_concept_library, get_pipe_router
-from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
-from pipelex.pipe_operators.ocr.pipe_ocr_factory import PipeOcrFactory
+from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
+from pipelex.pipe_operators.extract.pipe_extract_factory import PipeExtractFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -44,7 +44,7 @@ class TestPipeOCR:
         pipe_run_mode: PipeRunMode,
         image_url: str,
     ):
-        pipe_ocr_blueprint = PipeOcrBlueprint(
+        pipe_ocr_blueprint = PipeExtractBlueprint(
             description="OCR test for image processing",
             inputs={"page_scan": InputRequirementBlueprint(concept=NativeConceptCode.IMAGE)},
             output=NativeConceptCode.TEXT_AND_IMAGES,
@@ -56,7 +56,7 @@ class TestPipeOCR:
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeOcrFactory.make_from_blueprint(
+            pipe=PipeExtractFactory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_ocr_image",
                 blueprint=pipe_ocr_blueprint,
@@ -82,7 +82,7 @@ class TestPipeOCR:
         pdf_url: str,
     ):
         input_name = "arbitrary_name"
-        pipe_ocr_blueprint = PipeOcrBlueprint(
+        pipe_ocr_blueprint = PipeExtractBlueprint(
             description="OCR test for PDF processing",
             inputs={input_name: InputRequirementBlueprint(concept=NativeConceptCode.PDF)},
             output=NativeConceptCode.TEXT_AND_IMAGES,
@@ -94,7 +94,7 @@ class TestPipeOCR:
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeOcrFactory.make_from_blueprint(
+            pipe=PipeExtractFactory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_ocr_pdf",
                 blueprint=pipe_ocr_blueprint,

@@ -13,7 +13,6 @@ class PipeImgGenBlueprint(PipeBlueprint):
     img_gen_prompt: str | None = None
     img_gen_prompt_var_name: str | None = None
 
-    # New ImgGenChoice pattern (like LLM)
     img_gen: ImgGenChoice | None = None
 
     # One-time settings (not in ImgGenSetting)

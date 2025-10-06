@@ -5,27 +5,27 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.hub import get_required_concept
-from pipelex.pipe_operators.ocr.pipe_ocr import PipeOcr
-from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
+from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
+from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 
 
-class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
+class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract]):
     @classmethod
     @override
     def make_from_blueprint(
         cls,
         domain: str,
         pipe_code: str,
-        blueprint: PipeOcrBlueprint,
+        blueprint: PipeExtractBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
-    ) -> PipeOcr:
+    ) -> PipeExtract:
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
 
-        return PipeOcr(
+        return PipeExtract(
             domain=domain,
             code=pipe_code,
             description=blueprint.description,

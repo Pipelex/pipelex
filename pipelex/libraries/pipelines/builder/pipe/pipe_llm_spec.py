@@ -83,7 +83,7 @@ class PipeLLMSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeLLM"]] = "PipeLLM"
     category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    llm: LLMSkill | str = Field(description="The required skill of the LLM according to the task to be performed.")
+    llm: LLMSkill | str = Field(description="Select the most adequate LLM model skill according to the task to be performed.")
     temperature: float | None = Field(default=None, ge=0, le=1)
     system_prompt: str | None = Field(default=None, description="A system-level prompt to guide the LLM's behavior, style and skills.")
     prompt_template: str | None = Field(
