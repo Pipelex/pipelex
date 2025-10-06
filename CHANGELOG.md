@@ -49,6 +49,7 @@
  - Updated `PipelexBundleSpec.to_blueprint()` to sort pipes by dependencies before creating bundle
  - Changed exception base class from `PipelexError` to `PipelexException` throughout codebase
  - Updated Makefile pyright target to use `--pythonpath` flag correctly
+ - Refactored native concept and its helpers
 
 ### Fixed
  - Fixed Makefile target `pyright` to use correct pythonpath flag

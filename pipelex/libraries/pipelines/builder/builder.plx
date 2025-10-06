@@ -101,7 +101,7 @@ inputs = { plan_draft = "PlanDraft", brief = "UserBrief" }
 output = "ConceptDrafts"
 llm = "llm_to_engineer"
 prompt_template = """
-We are working on writing an AI pipeleine to fulfill this brief:
+We are working on writing an AI pipeline to fulfill this brief:
 @brief
 
 We have already written a plan for the pipeline. It's built using pipes, each with its own inputs (one or more) and output (single).
