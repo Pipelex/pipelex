@@ -30,7 +30,7 @@ Here are some of the examples you can find in the cookbook, organized by categor
 
 ### Document Processing
 
-*   [**Simple OCR**](./simple-extract.md): A basic OCR pipeline to extract text from a PDF.
+*   [**Simple OCR**](./simple-ocr.md): A basic OCR pipeline to extract text from a PDF.
 *   [**Generic Document Extraction**](./extract-generic.md): A powerful pipeline to extract text and images from complex documents.
 *   [**Invoice Extractor**](./invoice-extractor.md): A complete workflow for processing invoices, including reporting.
 *   [**Proof of Purchase Extraction**](./extract-proof-of-purchase.md): A targeted pipeline for extracting data from receipts.
