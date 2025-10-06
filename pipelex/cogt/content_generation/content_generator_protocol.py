@@ -2,15 +2,15 @@ from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
 from typing import Any, ParamSpec, Protocol, TypeVar
 
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_input import ExtractInput
-from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams
-from pipelex.cogt.ocr.ocr_output import ExtractOutput
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
@@ -118,11 +118,11 @@ class ContentGeneratorProtocol(Protocol):
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
     ) -> str: ...
 
-    async def make_ocr_extract_pages(
+    async def make_extract_pages(
         self,
         job_metadata: JobMetadata,
-        ocr_input: ExtractInput,
-        ocr_handle: str,
-        ocr_job_params: ExtractJobParams,
+        extract_input: ExtractInput,
+        extract_handle: str,
+        extract_job_params: ExtractJobParams,
         extract_job_config: ExtractJobConfig,
     ) -> ExtractOutput: ...

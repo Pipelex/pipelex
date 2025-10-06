@@ -34,8 +34,8 @@ class TestModelDeckGetOptionalInferenceModel:
                 for_text=LLMSetting(llm_handle="default_text", temperature=0.7, max_tokens=1000),
                 for_object=LLMSetting(llm_handle="default_object", temperature=0.1, max_tokens=1000),
             ),
-            ocr_presets={},
-            ocr_choice_default="base_ocr_mistral",
+            extract_presets={},
+            extract_choice_default="base_ocr_mistral",
             img_gen_presets={},
             img_gen_choice_default="base_img_gen",
         )

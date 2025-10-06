@@ -4,18 +4,18 @@ from pydantic import Field, field_validator, model_validator
 
 from pipelex import log
 from pipelex.cogt.exceptions import (
+    ExtractChoiceNotFoundError,
     ImgGenChoiceNotFoundError,
     LLMChoiceNotFoundError,
     LLMHandleNotFoundError,
     LLMSettingsValidationError,
     ModelDeckValidatonError,
-    OcrChoiceNotFoundError,
 )
+from pipelex.cogt.extract.extract_setting import ExtractChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.ocr.ocr_setting import ExtractChoice, ExtractSetting
 from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.exceptions import ConfigValidationError
 from pipelex.types import Self
@@ -34,7 +34,7 @@ class LLMDeckBlueprint(ConfigModel):
     )
 
 
-class OCRDeckBlueprint(ConfigModel):
+class ExtractDeckBlueprint(ConfigModel):
     presets: dict[str, ExtractSetting] = Field(default_factory=dict)
     choice_default: ExtractChoice
 
@@ -48,7 +48,7 @@ class ModelDeckBlueprint(ConfigModel):
     aliases: dict[str, Waterfall] = Field(default_factory=dict)
 
     llm: LLMDeckBlueprint
-    ocr: OCRDeckBlueprint
+    extract: ExtractDeckBlueprint
     img_gen: ImgGenDeckBlueprint
 
 
@@ -63,8 +63,8 @@ class ModelDeck(ConfigModel):
         for_object=None,
     )
 
-    ocr_presets: dict[str, ExtractSetting] = Field(default_factory=dict)
-    ocr_choice_default: ExtractChoice
+    extract_presets: dict[str, ExtractSetting] = Field(default_factory=dict)
+    extract_choice_default: ExtractChoice
 
     img_gen_presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
     img_gen_choice_default: ImgGenChoice
@@ -91,16 +91,16 @@ class ModelDeck(ConfigModel):
         msg = f"LLM choice '{llm_choice}' not found in deck"
         raise LLMChoiceNotFoundError(msg)
 
-    def get_ocr_setting(self, ocr_choice: ExtractChoice) -> ExtractSetting:
-        if isinstance(ocr_choice, ExtractSetting):
-            return ocr_choice
-        # it's a string, so either an ocr preset id or an ocr handle
-        if ocr_preset := self.ocr_presets.get(ocr_choice):
-            return ocr_preset
-        if self.is_handle_defined(model_handle=ocr_choice):
-            return ExtractSetting(extract_handle=ocr_choice)
-        msg = f"OCR choice '{ocr_choice}' not found in deck"
-        raise OcrChoiceNotFoundError(msg)
+    def get_extract_setting(self, extract_choice: ExtractChoice) -> ExtractSetting:
+        if isinstance(extract_choice, ExtractSetting):
+            return extract_choice
+        # it's a string, so either an extract preset id or an extract handle
+        if extract_preset := self.extract_presets.get(extract_choice):
+            return extract_preset
+        if self.is_handle_defined(model_handle=extract_choice):
+            return ExtractSetting(extract_handle=extract_choice)
+        msg = f"Extract choice '{extract_choice}' not found in deck"
+        raise ExtractChoiceNotFoundError(msg)
 
     def get_img_gen_setting(self, img_gen_choice: ImgGenChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):

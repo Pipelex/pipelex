@@ -34,7 +34,7 @@ class LLMChoiceNotFoundError(CogtError):
     pass
 
 
-class OcrChoiceNotFoundError(CogtError):
+class ExtractChoiceNotFoundError(CogtError):
     pass
 
 

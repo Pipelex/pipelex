@@ -11,7 +11,7 @@ class ExtractSetting(ConfigModel):
     image_min_size: int | None = Field(default=None, ge=0)
 
     def desc(self) -> str:
-        return f"OcrSetting(ocr_handle={self.extract_handle}, max_nb_images={self.max_nb_images}, image_min_size={self.image_min_size})"
+        return f"OcrSetting(extract_handle={self.extract_handle}, max_nb_images={self.max_nb_images}, image_min_size={self.image_min_size})"
 
 
 ExtractChoice = Union[ExtractSetting, str]

@@ -3,13 +3,13 @@ from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.cogt.exceptions import LLMHandleNotFoundError
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_input import ExtractInput
-from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams
-from pipelex.cogt.ocr.ocr_output import ExtractOutput
 from pipelex.hub import get_content_generator, get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import ImageTestCases, PDFTestCases
@@ -129,12 +129,12 @@ class TestContentGenerator:
 
     @pytest.mark.ocr
     @pytest.mark.inference
-    async def test_make_ocr_extract_pages_from_image(self, ocr_handle_from_image: str, request: FixtureRequest):
-        ocr_output = await get_content_generator().make_ocr_extract_pages(
+    async def test_make_extract_pages_from_image(self, extract_handle_from_image: str, request: FixtureRequest):
+        ocr_output = await get_content_generator().make_extract_pages(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-            ocr_handle=ocr_handle_from_image,
-            ocr_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
-            ocr_job_params=ExtractJobParams.make_default_ocr_job_params(),
+            extract_handle=extract_handle_from_image,
+            extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
+            extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
         )
         pretty_print(ocr_output, title="ocr_extract_pages")
@@ -142,12 +142,12 @@ class TestContentGenerator:
 
     @pytest.mark.ocr
     @pytest.mark.inference
-    async def test_make_ocr_extract_pages_from_pdf(self, ocr_handle: str, request: FixtureRequest):
-        ocr_output = await get_content_generator().make_ocr_extract_pages(
+    async def test_make_extract_pages_from_pdf(self, extract_handle: str, request: FixtureRequest):
+        ocr_output = await get_content_generator().make_extract_pages(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-            ocr_handle=ocr_handle,
-            ocr_input=ExtractInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
-            ocr_job_params=ExtractJobParams.make_default_ocr_job_params(),
+            extract_handle=extract_handle,
+            extract_input=ExtractInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
+            extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
         )
         pretty_print(ocr_output, title="ocr_extract_pages")

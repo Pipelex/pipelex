@@ -4,14 +4,14 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import LLMAssignmentError
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_input import ExtractInput
-from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.hub import get_class_registry
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory

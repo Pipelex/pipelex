@@ -13,10 +13,13 @@ from pipelex.cogt.content_generation.assignment_models import (
     TextThenObjectAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
+from pipelex.cogt.content_generation.extract_generate import extract_gen_pages
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list, img_gen_single_image
 from pipelex.cogt.content_generation.jinja2_generate import jinja2_gen_text
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
-from pipelex.cogt.content_generation.ocr_generate import extract_gen_pages
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
@@ -24,9 +27,6 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_input import ExtractInput
-from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams
-from pipelex.cogt.ocr.ocr_output import ExtractOutput
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
@@ -261,19 +261,19 @@ class ContentGenerator(ContentGeneratorProtocol):
         return await jinja2_gen_text(jinja2_assignment=jinja2_assignment)
 
     @override
-    async def make_ocr_extract_pages(
+    async def make_extract_pages(
         self,
         job_metadata: JobMetadata,
-        ocr_input: ExtractInput,
-        ocr_handle: str,
-        ocr_job_params: ExtractJobParams | None = None,
+        extract_input: ExtractInput,
+        extract_handle: str,
+        extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
     ) -> ExtractOutput:
-        ocr_assignment = ExtractAssignment(
+        extract_assignment = ExtractAssignment(
             job_metadata=job_metadata,
-            extract_input=ocr_input,
-            extract_handle=ocr_handle,
-            extract_job_params=ocr_job_params or ExtractJobParams.make_default_ocr_job_params(),
+            extract_input=extract_input,
+            extract_handle=extract_handle,
+            extract_job_params=extract_job_params or ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=extract_job_config or ExtractJobConfig(),
         )
-        return await extract_gen_pages(ocr_assignment=ocr_assignment)
+        return await extract_gen_pages(extract_assignment=extract_assignment)

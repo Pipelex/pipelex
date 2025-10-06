@@ -2,9 +2,9 @@ from datetime import datetime
 
 from typing_extensions import override
 
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams, ExtractJobReport
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
-from pipelex.cogt.ocr.ocr_input import ExtractInput
-from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams, ExtractJobReport
 
 
 class ExtractJob(InferenceJobAbstract):

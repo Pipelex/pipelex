@@ -5,15 +5,15 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_input import ExtractInput
-from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams
-from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
@@ -195,27 +195,27 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         )
 
     @override
-    async def make_ocr_extract_pages(
+    async def make_extract_pages(
         self,
         job_metadata: JobMetadata,
-        ocr_input: ExtractInput,
-        ocr_handle: str,
-        ocr_job_params: ExtractJobParams | None = None,
+        extract_input: ExtractInput,
+        extract_handle: str,
+        extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
     ) -> ExtractOutput:
-        func_name = "make_ocr_extract_pages"
+        func_name = "make_extract_pages"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        if ocr_input.image_uri:
-            ocr_image_as_page = Page(
+        if extract_input.image_uri:
+            image_as_page = Page(
                 text="DRY RUN: OCR text",
                 extracted_images=[],
                 page_view=None,
             )
-            ocr_output = ExtractOutput(
-                pages={1: ocr_image_as_page},
+            extract_output = ExtractOutput(
+                pages={1: image_as_page},
             )
         else:
-            nb_pages = get_config().pipelex.dry_run_config.nb_ocr_pages
+            nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
             pages = {
                 page_index: Page(
                     text="DRY RUN: OCR text",
@@ -228,5 +228,5 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                 )
                 for page_index in range(1, nb_pages + 1)
             }
-            ocr_output = ExtractOutput(pages=pages)
-        return ocr_output
+            extract_output = ExtractOutput(pages=pages)
+        return extract_output

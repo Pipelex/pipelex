@@ -10,7 +10,7 @@ from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
-    from pipelex.cogt.ocr.ocr_setting import ExtractChoice
+    from pipelex.cogt.extract.extract_setting import ExtractChoice
 
 
 class AvailableOcr(StrEnum):
@@ -57,7 +57,7 @@ class PipeOcrSpec(PipeSpec):
 
     @field_validator("inputs", mode="before")
     @classmethod
-    def validate_ocr_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
+    def validate_extract_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
         if inputs_value is None:
             msg = "PipeOcr must have exactly one input which must be either`Image` or `PDF`."
             raise PipeDefinitionError(msg)

@@ -40,9 +40,9 @@ class PipeOcrFactory(PipeFactoryProtocol[PipeOcrBlueprint, PipeOcr]):
                 blueprint=blueprint.inputs or {},
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
-            ocr_choice=blueprint.ocr,
+            extract_choice=blueprint.ocr,
             should_include_images=blueprint.page_images or False,
             should_caption_images=blueprint.page_image_captions or False,
             should_include_page_views=blueprint.page_views or False,
-            page_views_dpi=blueprint.page_views_dpi or get_config().cogt.ocr_config.default_page_views_dpi,
+            page_views_dpi=blueprint.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi,
         )

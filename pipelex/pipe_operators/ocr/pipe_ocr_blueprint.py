@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pipelex.cogt.ocr.ocr_setting import ExtractChoice
+from pipelex.cogt.extract.extract_setting import ExtractChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 

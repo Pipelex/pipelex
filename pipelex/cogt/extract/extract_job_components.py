@@ -12,7 +12,7 @@ class ExtractJobParams(BaseModel):
     page_views_dpi: int | None
 
     @classmethod
-    def make_default_ocr_job_params(cls) -> "ExtractJobParams":
+    def make_default_extract_job_params(cls) -> "ExtractJobParams":
         return ExtractJobParams(
             should_caption_images=False,
             max_nb_images=None,

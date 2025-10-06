@@ -1,12 +1,12 @@
-from pipelex.cogt.ocr.ocr_input import ExtractInput
-from pipelex.cogt.ocr.ocr_job import ExtractJob
-from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams, ExtractJobReport
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams, ExtractJobReport
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 
 
 class ExtractJobFactory:
     @classmethod
-    def make_ocr_job(
+    def make_extract_job(
         cls,
         extract_input: ExtractInput,
         extract_job_params: ExtractJobParams | None = None,
@@ -14,11 +14,10 @@ class ExtractJobFactory:
         job_metadata: JobMetadata | None = None,
     ) -> ExtractJob:
         # TODO: manage the param default through the config
-        # ocr_config = get_config().cogt.ocr_config
         job_metadata = job_metadata or JobMetadata(
-            job_category=JobCategory.OCR_JOB,
+            job_category=JobCategory.EXTRACT_JOB,
         )
-        job_params = extract_job_params or ExtractJobParams.make_default_ocr_job_params()
+        job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
         job_config = extract_job_config or ExtractJobConfig()
         job_report = ExtractJobReport()
 

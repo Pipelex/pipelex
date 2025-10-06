@@ -2,11 +2,11 @@ from typing import Any
 
 from typing_extensions import override
 
+from pipelex.cogt.extract.extract_input import ExtractInputError
+from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.extract.extract_output import ExtractOutput, Page
+from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.ocr.ocr_input import ExtractInputError
-from pipelex.cogt.ocr.ocr_job import ExtractJob
-from pipelex.cogt.ocr.ocr_output import ExtractOutput, Page
-from pipelex.cogt.ocr.ocr_worker_abstract import ExtractWorkerAbstract
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer

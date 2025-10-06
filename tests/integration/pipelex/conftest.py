@@ -210,7 +210,7 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
         "mistral-ocr",
     ],
 )
-def ocr_handle(request: pytest.FixtureRequest) -> str:
+def extract_handle(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
     return request.param
 
@@ -220,7 +220,7 @@ def ocr_handle(request: pytest.FixtureRequest) -> str:
         "mistral-ocr",
     ],
 )
-def ocr_handle_from_image(request: pytest.FixtureRequest) -> str:
+def extract_handle_from_image(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
     return request.param
 
@@ -230,7 +230,7 @@ def ocr_handle_from_image(request: pytest.FixtureRequest) -> str:
         "base_ocr_mistral",
     ],
 )
-def ocr_choice_for_pdf(request: pytest.FixtureRequest) -> str:
+def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
     return request.param
 
@@ -240,6 +240,6 @@ def ocr_choice_for_pdf(request: pytest.FixtureRequest) -> str:
         "base_ocr_mistral",
     ],
 )
-def ocr_choice_for_image(request: pytest.FixtureRequest) -> str:
+def extract_choice_for_image(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
     return request.param

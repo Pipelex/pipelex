@@ -40,7 +40,7 @@ class TestPipeOCR:
     @pytest.mark.parametrize("image_url", PipeOcrTestCases.PIPE_OCR_IMAGE_TEST_CASES)
     async def test_pipe_ocr_image(
         self,
-        ocr_choice_for_image: str,
+        extract_choice_for_image: str,
         pipe_run_mode: PipeRunMode,
         image_url: str,
     ):
@@ -52,7 +52,7 @@ class TestPipeOCR:
             page_image_captions=False,
             page_views=True,
             page_views_dpi=72,
-            ocr=ocr_choice_for_image,
+            ocr=extract_choice_for_image,
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
@@ -77,7 +77,7 @@ class TestPipeOCR:
     @pytest.mark.parametrize("pdf_url", PipeOcrTestCases.PIPE_OCR_PDF_TEST_CASES)
     async def test_pipe_ocr_pdf(
         self,
-        ocr_choice_for_pdf: str,
+        extract_choice_for_pdf: str,
         pipe_run_mode: PipeRunMode,
         pdf_url: str,
     ):
@@ -86,7 +86,7 @@ class TestPipeOCR:
             description="OCR test for PDF processing",
             inputs={input_name: InputRequirementBlueprint(concept=NativeConceptCode.PDF)},
             output=NativeConceptCode.TEXT_AND_IMAGES,
-            ocr=ocr_choice_for_pdf,
+            ocr=extract_choice_for_pdf,
             page_images=True,
             page_image_captions=False,
             page_views=True,

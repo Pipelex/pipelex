@@ -19,10 +19,10 @@ from openai.types.chat import (
 )
 
 from pipelex.cogt.exceptions import PromptImageFormatError
+from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
-from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64

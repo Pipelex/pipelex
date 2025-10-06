@@ -6,7 +6,7 @@ from PIL import Image
 from typing_extensions import override
 from yattag import Doc
 
-from pipelex.cogt.ocr.ocr_output import ExtractedImage
+from pipelex.cogt.extract.extract_output import ExtractedImage
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_directory_exists, get_incremental_file_path, save_text_to_path

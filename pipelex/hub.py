@@ -6,12 +6,12 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
+from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.cogt.ocr.ocr_worker_abstract import ExtractWorkerAbstract
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.core.concepts.concept_native import NativeConceptCode
@@ -371,10 +371,10 @@ def get_img_gen_worker(
     return get_inference_manager().get_img_gen_worker(img_gen_handle=img_gen_handle)
 
 
-def get_ocr_worker(
-    ocr_handle: str,
+def get_extract_worker(
+    extract_handle: str,
 ) -> ExtractWorkerAbstract:
-    return get_inference_manager().get_extract_worker(model_handle=ocr_handle)
+    return get_inference_manager().get_extract_worker(extract_handle=extract_handle)
 
 
 def get_report_delegate() -> ReportingProtocol:

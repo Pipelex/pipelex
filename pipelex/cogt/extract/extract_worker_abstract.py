@@ -4,10 +4,10 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.ocr.ocr_job import ExtractJob
-from pipelex.cogt.ocr.ocr_output import ExtractOutput
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -50,7 +50,7 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         # TODO: check can generate object (where it will be appropriate)
 
         # metadata
-        extract_job.job_metadata.unit_job_id = UnitJobId.OCR_EXTRACT_PAGES
+        extract_job.job_metadata.unit_job_id = UnitJobId.EXTRACT_PAGES
 
         # Prepare job
         extract_job.extract_job_before_start()

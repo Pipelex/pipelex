@@ -5,7 +5,7 @@ from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.misc.file_utils import find_files_in_dir
 
 
-class OcrConfig(ConfigModel):
+class ExtractConfig(ConfigModel):
     page_output_text_file_name: str
     default_page_views_dpi: int
 
@@ -36,7 +36,7 @@ class LLMConfig(ConfigModel):
 class InferenceManagerConfig(ConfigModel):
     is_auto_setup_preset_llm: bool
     is_auto_setup_preset_img_gen: bool
-    is_auto_setup_preset_ocr: bool
+    is_auto_setup_preset_extract: bool
 
 
 class InferenceConfig(ConfigModel):
@@ -72,4 +72,4 @@ class Cogt(ConfigModel):
     inference_manager_config: InferenceManagerConfig
     llm_config: LLMConfig
     img_gen_config: ImgGenConfig
-    ocr_config: OcrConfig
+    extract_config: ExtractConfig

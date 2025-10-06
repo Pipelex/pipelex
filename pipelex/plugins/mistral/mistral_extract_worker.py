@@ -5,11 +5,11 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import OcrCapabilityError, SdkTypeError
+from pipelex.cogt.extract.extract_input import ExtractInputError
+from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.extract.extract_output import ExtractOutput
+from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.ocr.ocr_input import ExtractInputError
-from pipelex.cogt.ocr.ocr_job import ExtractJob
-from pipelex.cogt.ocr.ocr_output import ExtractOutput
-from pipelex.cogt.ocr.ocr_worker_abstract import ExtractWorkerAbstract
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.plugins.mistral.mistral_utils import upload_file_for_ocr
 from pipelex.reporting.reporting_protocol import ReportingProtocol

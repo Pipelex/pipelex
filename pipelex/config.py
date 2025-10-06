@@ -49,7 +49,7 @@ class DryRunConfig(ConfigModel):
     apply_to_jinja2_rendering: bool
     text_gen_truncate_length: int
     nb_list_items: int
-    nb_ocr_pages: int
+    nb_extract_pages: int
     image_urls: list[str]
     allowed_to_fail_pipes: list[str] = Field(default_factory=list)
 

@@ -2,6 +2,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceManagerWorkerSetupError
+from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
+from pipelex.cogt.extract.extract_worker_factory import ExtractWorkerFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.img_gen.img_gen_worker_factory import ImgGenWorkerFactory
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
@@ -9,8 +11,6 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.ocr.ocr_worker_abstract import ExtractWorkerAbstract
-from pipelex.cogt.ocr.ocr_worker_factory import ExtractWorkerFactory
 from pipelex.config import get_config
 from pipelex.hub import get_models_manager, get_report_delegate
 
@@ -34,8 +34,8 @@ class InferenceManager(InferenceManagerProtocol):
         for img_gen_worker in self.img_gen_workers.values():
             img_gen_worker.teardown()
         self.img_gen_workers = {}
-        for ocr_worker in self.extract_workers.values():
-            ocr_worker.teardown()
+        for extract_worker in self.extract_workers.values():
+            extract_worker.teardown()
         self.extract_workers = {}
         log.verbose("InferenceManager teardown done")
 
@@ -49,9 +49,9 @@ class InferenceManager(InferenceManagerProtocol):
             log.debug(f"  {handle}:")
             log.debug(img_gen_worker_async.desc)
         log.debug("OCR Workers:")
-        for handle, ocr_worker_async in self.extract_workers.items():
+        for handle, extract_worker_async in self.extract_workers.items():
             log.debug(f"  {handle}:")
-            log.debug(ocr_worker_async.desc)
+            log.debug(extract_worker_async.desc)
 
     ####################################################################################################
     # Setup LLM Workers
@@ -126,25 +126,25 @@ class InferenceManager(InferenceManagerProtocol):
     def _setup_one_extract_worker(
         self,
         inference_model: InferenceModelSpec,
-        model_handle: str,
+        extract_handle: str,
     ) -> ExtractWorkerAbstract:
         extract_worker = self.extract_worker_factory.make_extract_worker(
             inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
         )
-        self.extract_workers[model_handle] = extract_worker
+        self.extract_workers[extract_handle] = extract_worker
         return extract_worker
 
     @override
-    def get_extract_worker(self, model_handle: str) -> ExtractWorkerAbstract:
-        if extract_worker := self.extract_workers.get(model_handle):
+    def get_extract_worker(self, extract_handle: str) -> ExtractWorkerAbstract:
+        if extract_worker := self.extract_workers.get(extract_handle):
             return extract_worker
-        if not get_config().cogt.inference_manager_config.is_auto_setup_preset_ocr:
-            msg = f"Found no OCR worker for '{model_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_ocr"
+        if not get_config().cogt.inference_manager_config.is_auto_setup_preset_extract:
+            msg = f"Found no Extract worker for '{extract_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_extract"
             raise InferenceManagerWorkerSetupError(msg)
 
-        inference_model = get_models_manager().get_inference_model(model_handle=model_handle)
+        inference_model = get_models_manager().get_inference_model(model_handle=extract_handle)
         return self._setup_one_extract_worker(
             inference_model=inference_model,
-            model_handle=model_handle,
+            extract_handle=extract_handle,
         )
