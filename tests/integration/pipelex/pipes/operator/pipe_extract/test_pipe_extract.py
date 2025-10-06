@@ -17,7 +17,7 @@ from tests.integration.pipelex.test_data import PipeExtractTestCases
 
 
 @pytest.mark.dry_runnable
-@pytest.mark.ocr
+@pytest.mark.extract
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeExtract:

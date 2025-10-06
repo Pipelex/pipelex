@@ -19,7 +19,7 @@ from tests.integration.pipelex.test_data import PipeTestCases
 
 @pytest.mark.dry_runnable
 @pytest.mark.llm
-@pytest.mark.ocr
+@pytest.mark.extract
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeRunningVariants:

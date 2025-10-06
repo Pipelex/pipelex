@@ -1113,6 +1113,7 @@ NEVER USE unittest.mock or MagicMock. YOU MUST USE pytest-mock instead.
 Apply the appropriate markers:
 - "llm: uses an LLM to generate text or objects"
 - "img_gen: uses an image generation AI"
+- "extract: uses ocr models"
 - "inference: uses either an LLM or an image generation AI"
 - "gha_disabled: will not be able to run properly on GitHub Actions"
 

@@ -127,7 +127,7 @@ class TestContentGenerator:
         assert isinstance(jinja2_text, str)
         assert jinja2_text == "The answer is: elementary, my dear Watson"
 
-    @pytest.mark.ocr
+    @pytest.mark.extract
     @pytest.mark.inference
     async def test_make_extract_pages_from_image(self, extract_handle_from_image: str, request: FixtureRequest):
         extract_output = await get_content_generator().make_extract_pages(
@@ -140,7 +140,7 @@ class TestContentGenerator:
         pretty_print(extract_output, title="ocr_extract_pages")
         assert isinstance(extract_output, ExtractOutput)
 
-    @pytest.mark.ocr
+    @pytest.mark.extract
     @pytest.mark.inference
     async def test_make_extract_pages_from_pdf(self, extract_handle: str, request: FixtureRequest):
         extract_output = await get_content_generator().make_extract_pages(

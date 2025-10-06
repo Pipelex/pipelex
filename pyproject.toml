@@ -210,7 +210,7 @@ strictSetInference = true
 typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
-addopts = "--import-mode=importlib -ra -m 'not (inference or llm or img_gen or ocr or needs_output or pipelex_api)'"
+addopts = "--import-mode=importlib -ra -m 'not (inference or llm or img_gen or extract or needs_output or pipelex_api)'"
 asyncio_default_fixture_loop_scope = "session"
 filterwarnings = [
     "ignore:Support for class-based `config` is deprecated:DeprecationWarning",
@@ -220,7 +220,7 @@ markers = [
     "inference: slow and costly due to inference calls",
     "llm: slow and costly due to llm inference calls",
     "img_gen: slow and costly due to image generation inference calls",
-    "ocr: slow and costly due to ocr inference calls",
+    "extract: slow and costly due to ocr inference calls",
     "gha_disabled: tests that should not run in GitHub Actions",
     "codex_disabled: tests that should not run in Codex",
     "dry_runnable: tests that can be run in dry-run mode",

@@ -10,7 +10,7 @@ from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from tests.cases import ImageTestCases, PDFTestCases
 
 
-@pytest.mark.ocr
+@pytest.mark.extract
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestOcr:
