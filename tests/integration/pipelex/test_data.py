@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.pdf_content import PDFContent
@@ -48,17 +48,17 @@ class PipeTestCases:
     # Create simple Stuff objects
     SIMPLE_STUFF_TEXT = StuffFactory.make_stuff(
         name="text",
-        concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+        concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
         content=TextContent(text="Describe a t-shirt in 2 sentences"),
     )
     SIMPLE_STUFF_IMAGE = StuffFactory.make_stuff(
         name="image",
-        concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE]),
+        concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.IMAGE),
         content=ImageContent(url=URL_IMG_FASHION_PHOTO_1),
     )
     SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
         name="document",
-        concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.PDF]),
+        concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.PDF),
         content=PDFContent(url=PDFTestCases.DOCUMENT_URLS[0]),
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
@@ -74,7 +74,7 @@ class PipeTestCases:
 
     STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1 = SomeContentWithImageAttribute(image_attribute=ImageContent(url=URL_IMG_FASHION_PHOTO_1))
     STUFF_WITH_IMAGE_ATTRIBUTE = StuffFactory.make_stuff(
-        concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE]),
+        concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.IMAGE),
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
         name="stuff_with_image",
     )
@@ -83,7 +83,7 @@ class PipeTestCases:
         sub_object=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_1,
     )
     STUFF_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT = StuffFactory.make_stuff(
-        concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE]),
+        concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.IMAGE),
         content=STUFF_CONTENT_WITH_IMAGE_ATTRIBUTE_IN_SUB_OBJECT,
         name="stuff_with_image_in_sub_object",
     )

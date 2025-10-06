@@ -10,7 +10,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
@@ -41,8 +41,8 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     model_config = ConfigDict(extra="forbid", strict=False)
 
     adhoc_pipe_code: ClassVar[str] = "jinja2_render"
-    output: Concept = ConceptFactory.make_native_concept(
-        native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT],
+    output: Concept = ConceptFactory.make_native_concept_from_enum(
+        native_concept_enum=NativeConceptEnum.TEXT,
     )
 
     jinja2_name: str | None = None

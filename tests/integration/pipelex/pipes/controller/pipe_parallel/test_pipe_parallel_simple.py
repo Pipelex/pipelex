@@ -4,7 +4,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
@@ -46,7 +46,7 @@ class TestPipeParallelSimple:
 
         # Create test data
         input_text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
             content=TextContent(text="The weather is beautiful today. I love sunny days and outdoor activities."),
             name="input_text",
         )
@@ -161,7 +161,7 @@ class TestPipeParallelSimple:
         )
         # Create test data - shorter text
         input_text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
             content=TextContent(text="Hello world"),
             name="input_text",
         )

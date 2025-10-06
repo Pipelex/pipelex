@@ -1,17 +1,9 @@
-from typing import NamedTuple
-
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.types import StrEnum
 
 
 class NativeConceptEnumError(Exception):
     pass
-
-
-class NativeConceptEnumData(NamedTuple):
-    code: str
-    content_class_name: str
-    description: str
 
 
 class NativeConceptEnum(StrEnum):
@@ -25,9 +17,17 @@ class NativeConceptEnum(StrEnum):
     PAGE = "Page"
     ANYTHING = "Anything"
 
+    @property
+    def structure_class_name(self) -> str:
+        return f"{self.value}Content"
+
     @classmethod
     def values_list(cls) -> list["NativeConceptEnum"]:
         return list(cls)
+
+    @classmethod
+    def is_native_concept(cls, concept_code: str) -> bool:
+        return concept_code in cls.values_list()
 
     @classmethod
     def is_text(cls, concept_code: str) -> bool:
@@ -51,54 +51,9 @@ class NativeConceptEnum(StrEnum):
             ):
                 return False
 
-
-NATIVE_CONCEPTS_DATA: dict[NativeConceptEnum, NativeConceptEnumData] = {
-    NativeConceptEnum.DYNAMIC: NativeConceptEnumData(
-        code=NativeConceptEnum.DYNAMIC,
-        content_class_name=f"{NativeConceptEnum.DYNAMIC}Content",
-        description="A dynamic concept",
-    ),
-    NativeConceptEnum.TEXT: NativeConceptEnumData(
-        code=NativeConceptEnum.TEXT,
-        content_class_name=f"{NativeConceptEnum.TEXT}Content",
-        description="A text",
-    ),
-    NativeConceptEnum.IMAGE: NativeConceptEnumData(
-        code=NativeConceptEnum.IMAGE,
-        content_class_name=f"{NativeConceptEnum.IMAGE}Content",
-        description="An image",
-    ),
-    NativeConceptEnum.PDF: NativeConceptEnumData(
-        code=NativeConceptEnum.PDF,
-        content_class_name=f"{NativeConceptEnum.PDF}Content",
-        description="A PDF",
-    ),
-    NativeConceptEnum.TEXT_AND_IMAGES: NativeConceptEnumData(
-        code=NativeConceptEnum.TEXT_AND_IMAGES,
-        content_class_name=f"{NativeConceptEnum.TEXT_AND_IMAGES}Content",
-        description="A text and an image",
-    ),
-    NativeConceptEnum.NUMBER: NativeConceptEnumData(
-        code=NativeConceptEnum.NUMBER,
-        content_class_name=f"{NativeConceptEnum.NUMBER}Content",
-        description="A number",
-    ),
-    NativeConceptEnum.LLM_PROMPT: NativeConceptEnumData(
-        code=NativeConceptEnum.LLM_PROMPT,
-        content_class_name=f"{NativeConceptEnum.LLM_PROMPT}Content",
-        description="A prompt for an LLM",
-    ),
-    NativeConceptEnum.PAGE: NativeConceptEnumData(
-        code=NativeConceptEnum.PAGE,
-        content_class_name=f"{NativeConceptEnum.PAGE}Content",
-        description="The content of a page of a document, comprising text and linked images and an optional page view image",
-    ),
-    NativeConceptEnum.ANYTHING: NativeConceptEnumData(
-        code=NativeConceptEnum.ANYTHING,
-        content_class_name=f"{NativeConceptEnum.ANYTHING}Content",
-        description="Anything",
-    ),
-}
+    @classmethod
+    def native_concept_class_names(cls):
+        return [native_concept.structure_class_name for native_concept in cls]
 
 
 class NativeConceptManager:
@@ -136,8 +91,3 @@ class NativeConceptManager:
             concept_code = concept_string_or_code
 
         return NativeConceptEnum(concept_code)
-
-    @classmethod
-    def get_native_concept_data(cls, concept_string_or_code: str) -> NativeConceptEnumData:
-        enum_value = cls.get_native_concept_enum(concept_string_or_code)
-        return NATIVE_CONCEPTS_DATA[enum_value]

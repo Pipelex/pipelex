@@ -5,7 +5,7 @@ from pipelex import pretty_print
 from pipelex.client.client import PipelexClient
 from pipelex.client.protocol import COMPACT_MEMORY_KEY, PipelineState
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff import Stuff
@@ -29,7 +29,7 @@ class TestPipelexApiClient:
                 pipe_code="retrieve_excerpts",
                 memory=[
                     StuffFactory.make_stuff(
-                        concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+                        concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
                         name="text",
                         content=TextContent(
                             text="""

@@ -3,7 +3,7 @@ import pytest
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum, NativeConceptManager
+from pipelex.core.concepts.concept_native import NativeConceptEnum, NativeConceptManager
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.exceptions import DomainError
@@ -99,7 +99,7 @@ class TestConcept:
         valid_definition = "Lorem Ipsum"
 
         for native_concept in NativeConceptEnum.values_list():
-            assert Concept.is_native_concept(ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[native_concept])) is True
+            assert Concept.is_native_concept(ConceptFactory.make_native_concept_from_enum(native_concept_enum=native_concept)) is True
 
         assert (
             Concept.is_native_concept(
@@ -285,12 +285,12 @@ class TestConcept:
             concept_codes_from_the_same_domain=["Code1"],
         )
 
-        concept_5 = ConceptFactory.make_native_concept(
-            native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.PAGE],
+        concept_5 = ConceptFactory.make_native_concept_from_enum(
+            native_concept_enum=NativeConceptEnum.PAGE,
         )
 
-        concept_6 = ConceptFactory.make_native_concept(
-            native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE],
+        concept_6 = ConceptFactory.make_native_concept_from_enum(
+            native_concept_enum=NativeConceptEnum.IMAGE,
         )
 
         concept_7 = ConceptFactory.make_from_blueprint(

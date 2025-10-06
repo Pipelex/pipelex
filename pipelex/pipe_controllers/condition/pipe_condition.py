@@ -7,7 +7,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum, NativeConceptManager
+from pipelex.core.concepts.concept_native import NativeConceptEnum, NativeConceptManager
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements import InputRequirements
@@ -156,8 +156,8 @@ class PipeCondition(PipeController):
                 # so we'll use a generic placeholder that will be validated later
                 needed_inputs.add_requirement(
                     variable_name=var_name,
-                    concept=ConceptFactory.make_native_concept(
-                        native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.ANYTHING],
+                    concept=ConceptFactory.make_native_concept_from_enum(
+                        native_concept_enum=NativeConceptEnum.ANYTHING,
                     ),
                 )
 

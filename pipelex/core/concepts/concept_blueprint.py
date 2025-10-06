@@ -124,7 +124,7 @@ class ConceptBlueprint(BaseModel):
     @classmethod
     def is_native_concept_code(cls, concept_code: str) -> bool:
         ConceptBlueprint.validate_concept_code(concept_code=concept_code)
-        return concept_code in NativeConceptEnum.values_list()
+        return NativeConceptEnum.is_native_concept(concept_code=concept_code)
 
     @classmethod
     def validate_concept_code(cls, concept_code: str) -> None:

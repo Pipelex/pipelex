@@ -7,7 +7,7 @@ from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
@@ -46,7 +46,7 @@ class TestPipeConditionSimple:
             blueprint=pipe_condition_blueprint,
         )
         input_text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
             content=TextContent(text="hello world"),  # 11 characters
             name="input_text",
         )
@@ -118,7 +118,7 @@ class TestPipeConditionSimple:
 
         # Create test data - short text input (<= 5 characters)
         input_text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
             content=TextContent(text="hi"),  # 2 characters
             name="input_text",
         )

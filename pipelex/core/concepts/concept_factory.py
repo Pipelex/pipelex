@@ -7,7 +7,7 @@ from pipelex.core.concepts.concept_blueprint import (
     ConceptStructureBlueprint,
     ConceptStructureBlueprintFieldType,
 )
-from pipelex.core.concepts.concept_native import NativeConceptEnumData, NativeConceptManager
+from pipelex.core.concepts.concept_native import NativeConceptEnum, NativeConceptManager
 from pipelex.core.concepts.structure_generator import StructureGenerator
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent
@@ -69,13 +69,76 @@ class ConceptFactory:
         )
 
     @classmethod
-    def make_native_concept(cls, native_concept_data: NativeConceptEnumData) -> Concept:
-        return Concept(
-            code=native_concept_data.code,
-            domain=SpecialDomain.NATIVE,
-            description=native_concept_data.description,
-            structure_class_name=native_concept_data.content_class_name,
-        )
+    def make_native_concept_from_enum(cls, native_concept_enum: NativeConceptEnum) -> Concept:
+        structure_class_name = native_concept_enum.structure_class_name
+        match native_concept_enum:
+            case NativeConceptEnum.DYNAMIC:
+                return Concept(
+                    code=native_concept_enum,
+                    domain=SpecialDomain.NATIVE,
+                    description="A dynamic concept",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptEnum.TEXT:
+                return Concept(
+                    code=native_concept_enum,
+                    domain=SpecialDomain.NATIVE,
+                    description="A text",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptEnum.IMAGE:
+                return Concept(
+                    code=native_concept_enum,
+                    domain=SpecialDomain.NATIVE,
+                    description="An image",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptEnum.PDF:
+                return Concept(
+                    code=native_concept_enum,
+                    domain=SpecialDomain.NATIVE,
+                    description="A PDF",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptEnum.TEXT_AND_IMAGES:
+                return Concept(
+                    code=native_concept_enum,
+                    domain=SpecialDomain.NATIVE,
+                    description="A text and an image",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptEnum.NUMBER:
+                return Concept(
+                    code=native_concept_enum,
+                    domain=SpecialDomain.NATIVE,
+                    description="A number",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptEnum.LLM_PROMPT:
+                return Concept(
+                    code=native_concept_enum,
+                    domain=SpecialDomain.NATIVE,
+                    description="A prompt for an LLM",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptEnum.PAGE:
+                return Concept(
+                    code=native_concept_enum,
+                    domain=SpecialDomain.NATIVE,
+                    description="The content of a page of a document, comprising text and linked images and an optional page view image",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptEnum.ANYTHING:
+                return Concept(
+                    code=native_concept_enum,
+                    domain=SpecialDomain.NATIVE,
+                    description="Anything",
+                    structure_class_name=structure_class_name,
+                )
+
+    @classmethod
+    def make_all_native_concepts(cls) -> list[Concept]:
+        return [cls.make_native_concept_from_enum(native_concept_enum=native_concept) for native_concept in NativeConceptEnum.values_list()]
 
     @classmethod
     def make_domain_and_concept_code_from_concept_string_or_code(

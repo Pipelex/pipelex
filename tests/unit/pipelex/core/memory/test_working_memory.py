@@ -3,7 +3,7 @@ from typing import ClassVar
 import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -86,19 +86,19 @@ class TestWorkingMemory:
     def multiple_stuff_memory(self) -> WorkingMemory:
         """Create WorkingMemory with multiple stuff items."""
         text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
             name="question",
             content=TextContent(text="What are the aerodynamic features?"),
         )
 
         document_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
             name="document",
             content=TextContent(text=TestWorkingMemoryData.SAMPLE_TEXT),
         )
 
         image_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.IMAGE]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.IMAGE),
             name="diagram",
             content=ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
         )
@@ -109,13 +109,13 @@ class TestWorkingMemory:
     def memory_with_aliases(self) -> WorkingMemory:
         """Create WorkingMemory with aliases."""
         text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
             name="primary_text",
             content=TextContent(text="Primary content"),
         )
 
         secondary_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
             name="secondary_text",
             content=TextContent(text="Secondary content"),
         )
@@ -156,7 +156,7 @@ class TestWorkingMemory:
         )
 
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.TEXT_AND_IMAGES]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT_AND_IMAGES),
             name="project_overview",
             content=text_and_images_content,
         )
@@ -187,7 +187,7 @@ class TestWorkingMemory:
         number_content = NumberContent(number=3.14159)
 
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[NativeConceptEnum.NUMBER]),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.NUMBER),
             name="pi_value",
             content=number_content,
         )

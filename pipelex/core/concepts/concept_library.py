@@ -7,7 +7,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
-from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
@@ -29,11 +29,8 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
 
     @override
     def setup(self):
-        native_concepts = [
-            ConceptFactory.make_native_concept(native_concept_data=NATIVE_CONCEPTS_DATA[native_concept])
-            for native_concept in NativeConceptEnum.values_list()
-        ]
-        self.add_concepts(native_concepts)
+        all_native_concepts = ConceptFactory.make_all_native_concepts()
+        self.add_concepts(concepts=all_native_concepts)
 
     @override
     def reset(self):
