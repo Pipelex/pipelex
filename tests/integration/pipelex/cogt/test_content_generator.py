@@ -7,9 +7,9 @@ from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_input import OcrInput
-from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
-from pipelex.cogt.ocr.ocr_output import OcrOutput
+from pipelex.cogt.ocr.ocr_input import ExtractInput
+from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.ocr.ocr_output import ExtractOutput
 from pipelex.hub import get_content_generator, get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import ImageTestCases, PDFTestCases
@@ -133,12 +133,12 @@ class TestContentGenerator:
         ocr_output = await get_content_generator().make_ocr_extract_pages(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
             ocr_handle=ocr_handle_from_image,
-            ocr_input=OcrInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
-            ocr_job_params=OcrJobParams.make_default_ocr_job_params(),
-            ocr_job_config=OcrJobConfig(),
+            ocr_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
+            ocr_job_params=ExtractJobParams.make_default_ocr_job_params(),
+            extract_job_config=ExtractJobConfig(),
         )
         pretty_print(ocr_output, title="ocr_extract_pages")
-        assert isinstance(ocr_output, OcrOutput)
+        assert isinstance(ocr_output, ExtractOutput)
 
     @pytest.mark.ocr
     @pytest.mark.inference
@@ -146,12 +146,12 @@ class TestContentGenerator:
         ocr_output = await get_content_generator().make_ocr_extract_pages(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
             ocr_handle=ocr_handle,
-            ocr_input=OcrInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
-            ocr_job_params=OcrJobParams.make_default_ocr_job_params(),
-            ocr_job_config=OcrJobConfig(),
+            ocr_input=ExtractInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
+            ocr_job_params=ExtractJobParams.make_default_ocr_job_params(),
+            extract_job_config=ExtractJobConfig(),
         )
         pretty_print(ocr_output, title="ocr_extract_pages")
-        assert isinstance(ocr_output, OcrOutput)
+        assert isinstance(ocr_output, ExtractOutput)
 
     @pytest.mark.llm
     @pytest.mark.inference

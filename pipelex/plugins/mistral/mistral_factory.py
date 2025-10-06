@@ -1,4 +1,5 @@
-from mistralai import Mistral, OCRImageObject, OCRResponse
+import mistralai
+from mistralai import Mistral
 from mistralai.models import (
     ContentChunk,
     ImageURLChunk,
@@ -21,7 +22,7 @@ from pipelex.cogt.exceptions import PromptImageFormatError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
-from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
+from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
@@ -111,14 +112,13 @@ class MistralFactory:
         return nb_tokens_by_category
 
     @classmethod
-    async def make_ocr_output_from_mistral_response(
+    async def make_extract_output_from_mistral_response(
         cls,
-        mistral_ocr_response: OCRResponse,
+        mistral_extract_response: mistralai.OCRResponse,
         should_include_images: bool = False,
-        # export_dir: Optional[str] = None,
-    ) -> OcrOutput:
+    ) -> ExtractOutput:
         pages: dict[int, Page] = {}
-        for ocr_response_page in mistral_ocr_response.pages:
+        for ocr_response_page in mistral_extract_response.pages:
             page = Page(
                 text=ocr_response_page.markdown,
                 extracted_images=[],
@@ -129,14 +129,14 @@ class MistralFactory:
                     page.extracted_images.append(extracted_image)
             pages[ocr_response_page.index] = page
 
-        return OcrOutput(
+        return ExtractOutput(
             pages=pages,
         )
 
     @classmethod
     def make_extracted_image_from_page_from_mistral_ocr_image_obj(
         cls,
-        mistral_ocr_image_obj: OCRImageObject,
+        mistral_ocr_image_obj: mistralai.OCRImageObject,
     ) -> ExtractedImageFromPage:
         return ExtractedImageFromPage(
             image_id=mistral_ocr_image_obj.id,

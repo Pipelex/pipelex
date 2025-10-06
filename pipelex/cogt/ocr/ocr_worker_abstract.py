@@ -6,13 +6,13 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.ocr.ocr_job import OcrJob
-from pipelex.cogt.ocr.ocr_output import OcrOutput
+from pipelex.cogt.ocr.ocr_job import ExtractJob
+from pipelex.cogt.ocr.ocr_output import ExtractOutput
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
-class OcrWorkerAbstract(InferenceWorkerAbstract):
+class ExtractWorkerAbstract(InferenceWorkerAbstract):
     def __init__(
         self,
         extra_config: dict[str, Any],
@@ -32,42 +32,42 @@ class OcrWorkerAbstract(InferenceWorkerAbstract):
     def desc(self) -> str:
         return f"OCR-Worker:{self.inference_model.tag}"
 
-    def _check_can_perform_job(self, ocr_job: OcrJob):
+    def _check_can_perform_job(self, extract_job: ExtractJob):
         # This can be overridden by subclasses for specific checks
         pass
 
-    async def ocr_extract_pages(
+    async def extract_pages(
         self,
-        ocr_job: OcrJob,
-    ) -> OcrOutput:
-        log.debug(f"OCR Worker ocr_extract_pages:\n{self.inference_model.desc}")
+        extract_job: ExtractJob,
+    ) -> ExtractOutput:
+        log.debug(f"Extract Worker extract_pages:\n{self.inference_model.desc}")
 
         # Verify that the job is valid
-        ocr_job.validate_before_execution()
+        extract_job.validate_before_execution()
 
         # Verify feasibility
-        self._check_can_perform_job(ocr_job=ocr_job)
+        self._check_can_perform_job(extract_job=extract_job)
         # TODO: check can generate object (where it will be appropriate)
 
         # metadata
-        ocr_job.job_metadata.unit_job_id = UnitJobId.OCR_EXTRACT_PAGES
+        extract_job.job_metadata.unit_job_id = UnitJobId.OCR_EXTRACT_PAGES
 
         # Prepare job
-        ocr_job.ocr_job_before_start()
+        extract_job.extract_job_before_start()
 
         # Execute job
-        result = await self._ocr_extract_pages(ocr_job=ocr_job)
+        result = await self._extract_pages(extract_job=extract_job)
 
         # Report job
-        ocr_job.ocr_job_after_complete()
+        extract_job.extract_job_after_complete()
         if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=ocr_job)
+            self.reporting_delegate.report_inference_job(inference_job=extract_job)
 
         return result
 
     @abstractmethod
-    async def _ocr_extract_pages(
+    async def _extract_pages(
         self,
-        ocr_job: OcrJob,
-    ) -> OcrOutput:
+        extract_job: ExtractJob,
+    ) -> ExtractOutput:
         pass

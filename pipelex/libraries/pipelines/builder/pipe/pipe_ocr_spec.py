@@ -10,7 +10,7 @@ from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
-    from pipelex.cogt.ocr.ocr_setting import OcrChoice
+    from pipelex.cogt.ocr.ocr_setting import ExtractChoice
 
 
 class AvailableOcr(StrEnum):
@@ -71,7 +71,7 @@ class PipeOcrSpec(PipeSpec):
         base_blueprint = super().to_blueprint()
 
         # create ocr choice as a str
-        ocr: OcrChoice
+        ocr: ExtractChoice
         if isinstance(self.ocr, OcrSkill):
             ocr = self.ocr.ocr_recommendation.value
         else:

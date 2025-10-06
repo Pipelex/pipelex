@@ -11,9 +11,9 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_input import OcrInput
-from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
-from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, OcrOutput, Page
+from pipelex.cogt.ocr.ocr_input import ExtractInput
+from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.ocr.ocr_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
@@ -198,11 +198,11 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_ocr_extract_pages(
         self,
         job_metadata: JobMetadata,
-        ocr_input: OcrInput,
+        ocr_input: ExtractInput,
         ocr_handle: str,
-        ocr_job_params: OcrJobParams | None = None,
-        ocr_job_config: OcrJobConfig | None = None,
-    ) -> OcrOutput:
+        ocr_job_params: ExtractJobParams | None = None,
+        extract_job_config: ExtractJobConfig | None = None,
+    ) -> ExtractOutput:
         func_name = "make_ocr_extract_pages"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         if ocr_input.image_uri:
@@ -211,7 +211,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                 extracted_images=[],
                 page_view=None,
             )
-            ocr_output = OcrOutput(
+            ocr_output = ExtractOutput(
                 pages={1: ocr_image_as_page},
             )
         else:
@@ -228,5 +228,5 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                 )
                 for page_index in range(1, nb_pages + 1)
             }
-            ocr_output = OcrOutput(pages=pages)
+            ocr_output = ExtractOutput(pages=pages)
         return ocr_output

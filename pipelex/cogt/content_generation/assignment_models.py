@@ -10,8 +10,8 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.cogt.ocr.ocr_input import OcrInput
-from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
+from pipelex.cogt.ocr.ocr_input import ExtractInput
+from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.hub import get_class_registry
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
@@ -134,9 +134,9 @@ class Jinja2Assignment(BaseModel):
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
 
 
-class OcrAssignment(BaseModel):
+class ExtractAssignment(BaseModel):
     job_metadata: JobMetadata
-    ocr_handle: str
-    ocr_input: OcrInput
-    ocr_job_params: OcrJobParams
-    ocr_job_config: OcrJobConfig
+    extract_handle: str
+    extract_input: ExtractInput
+    extract_job_params: ExtractJobParams
+    extract_job_config: ExtractJobConfig

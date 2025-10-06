@@ -15,7 +15,7 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
+from pipelex.cogt.ocr.ocr_setting import ExtractChoice, ExtractSetting
 from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.exceptions import ConfigValidationError
 from pipelex.types import Self
@@ -35,8 +35,8 @@ class LLMDeckBlueprint(ConfigModel):
 
 
 class OCRDeckBlueprint(ConfigModel):
-    presets: dict[str, OcrSetting] = Field(default_factory=dict)
-    choice_default: OcrChoice
+    presets: dict[str, ExtractSetting] = Field(default_factory=dict)
+    choice_default: ExtractChoice
 
 
 class ImgGenDeckBlueprint(ConfigModel):
@@ -63,8 +63,8 @@ class ModelDeck(ConfigModel):
         for_object=None,
     )
 
-    ocr_presets: dict[str, OcrSetting] = Field(default_factory=dict)
-    ocr_choice_default: OcrChoice
+    ocr_presets: dict[str, ExtractSetting] = Field(default_factory=dict)
+    ocr_choice_default: ExtractChoice
 
     img_gen_presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
     img_gen_choice_default: ImgGenChoice
@@ -91,14 +91,14 @@ class ModelDeck(ConfigModel):
         msg = f"LLM choice '{llm_choice}' not found in deck"
         raise LLMChoiceNotFoundError(msg)
 
-    def get_ocr_setting(self, ocr_choice: OcrChoice) -> OcrSetting:
-        if isinstance(ocr_choice, OcrSetting):
+    def get_ocr_setting(self, ocr_choice: ExtractChoice) -> ExtractSetting:
+        if isinstance(ocr_choice, ExtractSetting):
             return ocr_choice
         # it's a string, so either an ocr preset id or an ocr handle
         if ocr_preset := self.ocr_presets.get(ocr_choice):
             return ocr_preset
         if self.is_handle_defined(model_handle=ocr_choice):
-            return OcrSetting(ocr_handle=ocr_choice)
+            return ExtractSetting(extract_handle=ocr_choice)
         msg = f"OCR choice '{ocr_choice}' not found in deck"
         raise OcrChoiceNotFoundError(msg)
 

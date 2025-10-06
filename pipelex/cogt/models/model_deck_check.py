@@ -1,7 +1,7 @@
 from pipelex.cogt.exceptions import ImgGenChoiceNotFoundError, LLMChoiceNotFoundError, OcrChoiceNotFoundError
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting
-from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
+from pipelex.cogt.ocr.ocr_setting import ExtractChoice, ExtractSetting
 from pipelex.hub import get_model_deck
 
 
@@ -17,8 +17,8 @@ def check_llm_choice_with_deck(llm_choice: LLMChoice):
     raise LLMChoiceNotFoundError(msg)
 
 
-def check_ocr_choice_with_deck(ocr_choice: OcrChoice):
-    if isinstance(ocr_choice, OcrSetting):
+def check_ocr_choice_with_deck(ocr_choice: ExtractChoice):
+    if isinstance(ocr_choice, ExtractSetting):
         return
     ocr_deck = get_model_deck()
     if ocr_choice in ocr_deck.ocr_presets or ocr_deck.is_handle_defined(model_handle=ocr_choice):

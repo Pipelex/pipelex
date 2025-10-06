@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from pipelex.tools.config.config_model import ConfigModel
 
 
-class OcrJobParams(BaseModel):
+class ExtractJobParams(BaseModel):
     should_include_images: bool
     max_nb_images: int | None
     image_min_size: int | None
@@ -12,8 +12,8 @@ class OcrJobParams(BaseModel):
     page_views_dpi: int | None
 
     @classmethod
-    def make_default_ocr_job_params(cls) -> "OcrJobParams":
-        return OcrJobParams(
+    def make_default_ocr_job_params(cls) -> "ExtractJobParams":
+        return ExtractJobParams(
             should_caption_images=False,
             max_nb_images=None,
             image_min_size=None,
@@ -23,7 +23,7 @@ class OcrJobParams(BaseModel):
         )
 
 
-class OcrJobConfig(ConfigModel):
+class ExtractJobConfig(ConfigModel):
     pass
 
 
@@ -32,5 +32,5 @@ class OcrJobConfig(ConfigModel):
 ########################################################################
 
 
-class OcrJobReport(ConfigModel):
+class ExtractJobReport(ConfigModel):
     pass

@@ -44,7 +44,7 @@ class Page(CustomBaseModel):
             page_view.save_to_directory(directory=directory)
 
 
-class OcrOutput(CustomBaseModel):
+class ExtractOutput(CustomBaseModel):
     pages: dict[int, Page]
 
     @property

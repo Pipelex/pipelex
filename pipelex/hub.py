@@ -11,7 +11,7 @@ from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerPr
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
+from pipelex.cogt.ocr.ocr_worker_abstract import ExtractWorkerAbstract
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.core.concepts.concept_native import NativeConceptEnum
@@ -373,7 +373,7 @@ def get_img_gen_worker(
 
 def get_ocr_worker(
     ocr_handle: str,
-) -> OcrWorkerAbstract:
+) -> ExtractWorkerAbstract:
     return get_inference_manager().get_ocr_worker(model_handle=ocr_handle)
 
 

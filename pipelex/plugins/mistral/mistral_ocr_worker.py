@@ -6,10 +6,10 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import OcrCapabilityError, SdkTypeError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.ocr.ocr_input import OcrInputError
-from pipelex.cogt.ocr.ocr_job import OcrJob
-from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
+from pipelex.cogt.ocr.ocr_input import ExtractInputError
+from pipelex.cogt.ocr.ocr_job import ExtractJob
+from pipelex.cogt.ocr.ocr_output import ExtractOutput
+from pipelex.cogt.ocr.ocr_worker_abstract import ExtractWorkerAbstract
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.plugins.mistral.mistral_utils import upload_file_for_ocr
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -18,7 +18,7 @@ from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 
 
-class MistralOcrWorker(OcrWorkerAbstract):
+class MistralOcrWorker(ExtractWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
@@ -39,34 +39,34 @@ class MistralOcrWorker(OcrWorkerAbstract):
         self.mistral_client: Mistral = sdk_instance
 
     @override
-    async def _ocr_extract_pages(
+    async def _extract_pages(
         self,
-        ocr_job: OcrJob,
-    ) -> OcrOutput:
+        extract_job: ExtractJob,
+    ) -> ExtractOutput:
         # TODO: report usage
-        if image_uri := ocr_job.ocr_input.image_uri:
+        if image_uri := extract_job.extract_input.image_uri:
             ocr_output = await self._make_ocr_output_from_image(
                 image_uri=image_uri,
-                should_caption_image=ocr_job.job_params.should_caption_images,
+                should_caption_image=extract_job.job_params.should_caption_images,
             )
 
-        elif pdf_uri := ocr_job.ocr_input.pdf_uri:
+        elif pdf_uri := extract_job.extract_input.pdf_uri:
             ocr_output = await self._make_ocr_output_from_pdf(
                 pdf_uri=pdf_uri,
-                should_include_images=ocr_job.job_params.should_include_images,
-                should_caption_images=ocr_job.job_params.should_caption_images,
-                should_include_page_views=ocr_job.job_params.should_include_page_views,
+                should_include_images=extract_job.job_params.should_include_images,
+                should_caption_images=extract_job.job_params.should_caption_images,
+                should_include_page_views=extract_job.job_params.should_include_page_views,
             )
         else:
-            msg = "No image nor PDF URI provided in OcrJob"
-            raise OcrInputError(msg)
+            msg = "No image nor PDF URI provided in ExtractJob"
+            raise ExtractInputError(msg)
         return ocr_output
 
     async def _make_ocr_output_from_image(
         self,
         image_uri: str,
         should_caption_image: bool = False,
-    ) -> OcrOutput:
+    ) -> ExtractOutput:
         if should_caption_image:
             msg = "Captioning is not implemented for Mistral OCR."
             raise NotImplementedError(msg)
@@ -86,7 +86,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         should_include_images: bool,
         should_caption_images: bool,
         should_include_page_views: bool,
-    ) -> OcrOutput:
+    ) -> ExtractOutput:
         if should_caption_images:
             msg = "Captioning is not implemented for Mistral OCR."
             raise OcrCapabilityError(msg)
@@ -97,7 +97,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
             # the caller will be responsible to get the page views using other solution if needed
             # raise OcrCapabilityError("Page views are not implemented for Mistral OCR.")
         pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
-        ocr_output: OcrOutput
+        ocr_output: ExtractOutput
         if pdf_url:
             ocr_output = await self.extract_from_pdf_url(
                 pdf_url=pdf_url,
@@ -114,41 +114,41 @@ class MistralOcrWorker(OcrWorkerAbstract):
     async def extract_from_image_url(
         self,
         image_url: str,
-    ) -> OcrOutput:
-        ocr_response = await self.mistral_client.ocr.process_async(
+    ) -> ExtractOutput:
+        extract_response = await self.mistral_client.ocr.process_async(
             model=self.inference_model.model_id,
             document={
                 "type": "image_url",
                 "image_url": image_url,
             },
         )
-        return await MistralFactory.make_ocr_output_from_mistral_response(
-            mistral_ocr_response=ocr_response,
+        return await MistralFactory.make_extract_output_from_mistral_response(
+            mistral_extract_response=extract_response,
         )
 
     async def extract_from_image_file(
         self,
         image_path: str,
-    ) -> OcrOutput:
+    ) -> ExtractOutput:
         b64 = await load_binary_as_base64_async(path=image_path)
 
         file_type = detect_file_type_from_base64(b64=b64)
         mime_type = file_type.mime
 
-        ocr_response = await self.mistral_client.ocr.process_async(
+        extract_response = await self.mistral_client.ocr.process_async(
             model=self.inference_model.model_id,
             document={"type": "image_url", "image_url": f"data:{mime_type};base64,{b64.decode('utf-8')}"},
         )
-        return await MistralFactory.make_ocr_output_from_mistral_response(
-            mistral_ocr_response=ocr_response,
+        return await MistralFactory.make_extract_output_from_mistral_response(
+            mistral_extract_response=extract_response,
         )
 
     async def extract_from_pdf_url(
         self,
         pdf_url: str,
         should_include_images: bool = False,
-    ) -> OcrOutput:
-        ocr_response = await self.mistral_client.ocr.process_async(
+    ) -> ExtractOutput:
+        extract_response = await self.mistral_client.ocr.process_async(
             model=self.inference_model.model_id,
             document={
                 "type": "document_url",
@@ -157,8 +157,8 @@ class MistralOcrWorker(OcrWorkerAbstract):
             include_image_base64=should_include_images,
         )
 
-        return await MistralFactory.make_ocr_output_from_mistral_response(
-            mistral_ocr_response=ocr_response,
+        return await MistralFactory.make_extract_output_from_mistral_response(
+            mistral_extract_response=extract_response,
             should_include_images=should_include_images,
         )
 
@@ -166,7 +166,7 @@ class MistralOcrWorker(OcrWorkerAbstract):
         self,
         pdf_path: str,
         should_include_images: bool = False,
-    ) -> OcrOutput:
+    ) -> ExtractOutput:
         # Upload the file
         uploaded_file_id = await upload_file_for_ocr(
             mistral_client=self.mistral_client,

@@ -9,8 +9,8 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
-from pipelex.cogt.ocr.ocr_worker_factory import OcrWorkerFactory
+from pipelex.cogt.ocr.ocr_worker_abstract import ExtractWorkerAbstract
+from pipelex.cogt.ocr.ocr_worker_factory import ExtractWorkerFactory
 from pipelex.config import get_config
 from pipelex.hub import get_models_manager, get_report_delegate
 
@@ -18,15 +18,15 @@ from pipelex.hub import get_models_manager, get_report_delegate
 class InferenceManager(InferenceManagerProtocol):
     def __init__(self):
         self.img_gen_worker_factory = ImgGenWorkerFactory()
-        self.ocr_worker_factory = OcrWorkerFactory()
+        self.ocr_worker_factory = ExtractWorkerFactory()
         self.llm_workers: dict[str, LLMWorkerAbstract] = {}
         self.img_gen_workers: dict[str, ImgGenWorkerAbstract] = {}
-        self.ocr_workers: dict[str, OcrWorkerAbstract] = {}
+        self.ocr_workers: dict[str, ExtractWorkerAbstract] = {}
 
     @override
     def teardown(self):
         self.img_gen_worker_factory = ImgGenWorkerFactory()
-        self.ocr_worker_factory = OcrWorkerFactory()
+        self.ocr_worker_factory = ExtractWorkerFactory()
         for llm_worker in self.llm_workers.values():
             llm_worker.teardown()
         self.llm_workers = {}
@@ -126,8 +126,8 @@ class InferenceManager(InferenceManagerProtocol):
         self,
         inference_model: InferenceModelSpec,
         model_handle: str,
-    ) -> OcrWorkerAbstract:
-        ocr_worker = self.ocr_worker_factory.make_ocr_worker(
+    ) -> ExtractWorkerAbstract:
+        ocr_worker = self.ocr_worker_factory.make_extract_worker(
             inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
         )
@@ -135,7 +135,7 @@ class InferenceManager(InferenceManagerProtocol):
         return ocr_worker
 
     @override
-    def get_ocr_worker(self, model_handle: str) -> OcrWorkerAbstract:
+    def get_ocr_worker(self, model_handle: str) -> ExtractWorkerAbstract:
         if ocr_worker := self.ocr_workers.get(model_handle):
             return ocr_worker
         if not get_config().cogt.inference_manager_config.is_auto_setup_preset_ocr:

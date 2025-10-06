@@ -7,9 +7,9 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.models.model_deck_check import check_ocr_choice_with_deck
-from pipelex.cogt.ocr.ocr_input import OcrInput
-from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
-from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
+from pipelex.cogt.ocr.ocr_input import ExtractInput
+from pipelex.cogt.ocr.ocr_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.ocr.ocr_setting import ExtractChoice, ExtractSetting
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -45,7 +45,7 @@ class PipeOcrOutput(PipeOutput):
 
 class PipeOcr(PipeOperator[PipeOcrOutput]):
     type: Literal["PipeOcr"] = "PipeOcr"
-    ocr_choice: OcrChoice | None
+    ocr_choice: ExtractChoice | None
     should_caption_images: bool
     should_include_images: bool
     should_include_page_views: bool
@@ -173,10 +173,10 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
             msg = "PipeOcr should have a non-None image_stuff_name or pdf_stuff_name"
             raise PipeDefinitionError(msg)
 
-        ocr_choice: OcrChoice = self.ocr_choice or get_model_deck().ocr_choice_default
-        ocr_setting: OcrSetting = get_model_deck().get_ocr_setting(ocr_choice=ocr_choice)
+        ocr_choice: ExtractChoice = self.ocr_choice or get_model_deck().ocr_choice_default
+        ocr_setting: ExtractSetting = get_model_deck().get_ocr_setting(ocr_choice=ocr_choice)
 
-        ocr_job_params = OcrJobParams(
+        ocr_job_params = ExtractJobParams(
             should_include_images=self.should_include_images,
             should_caption_images=self.should_caption_images,
             should_include_page_views=self.should_include_page_views,
@@ -184,16 +184,16 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
             max_nb_images=ocr_setting.max_nb_images,
             image_min_size=ocr_setting.image_min_size,
         )
-        ocr_input = OcrInput(
+        ocr_input = ExtractInput(
             image_uri=image_uri,
             pdf_uri=pdf_uri,
         )
         ocr_output = await content_generator.make_ocr_extract_pages(
             ocr_input=ocr_input,
-            ocr_handle=ocr_setting.ocr_handle,
+            ocr_handle=ocr_setting.extract_handle,
             job_metadata=job_metadata,
             ocr_job_params=ocr_job_params,
-            ocr_job_config=OcrJobConfig(),
+            extract_job_config=ExtractJobConfig(),
         )
 
         # Build the output stuff, which is a list of page contents

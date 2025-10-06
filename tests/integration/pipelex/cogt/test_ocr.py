@@ -1,9 +1,9 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.cogt.ocr.ocr_input import OcrInput
-from pipelex.cogt.ocr.ocr_job_components import OcrJobParams
-from pipelex.cogt.ocr.ocr_job_factory import OcrJobFactory
+from pipelex.cogt.ocr.ocr_input import ExtractInput
+from pipelex.cogt.ocr.ocr_job_components import ExtractJobParams
+from pipelex.cogt.ocr.ocr_job_factory import ExtractJobFactory
 from pipelex.config import get_config
 from pipelex.hub import get_ocr_worker
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
@@ -17,10 +17,10 @@ class TestOcr:
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
     async def test_ocr_pdf_path(self, ocr_handle: str, file_path: str):
         ocr_worker = get_ocr_worker(ocr_handle=ocr_handle)
-        ocr_job = OcrJobFactory.make_ocr_job(
-            ocr_input=OcrInput(pdf_uri=file_path),
+        ocr_job = ExtractJobFactory.make_ocr_job(
+            extract_input=ExtractInput(pdf_uri=file_path),
         )
-        ocr_output = await ocr_worker.ocr_extract_pages(ocr_job=ocr_job)
+        ocr_output = await ocr_worker.extract_pages(extract_job=ocr_job)
         pretty_print(ocr_output, title="OCR Output")
 
         assert ocr_output.pages
@@ -28,37 +28,37 @@ class TestOcr:
     @pytest.mark.parametrize("url", PDFTestCases.DOCUMENT_URLS)
     async def test_ocr_pdf_url(self, ocr_handle: str, url: str):
         ocr_worker = get_ocr_worker(ocr_handle=ocr_handle)
-        ocr_job = OcrJobFactory.make_ocr_job(
-            ocr_input=OcrInput(pdf_uri=url),
+        ocr_job = ExtractJobFactory.make_ocr_job(
+            extract_input=ExtractInput(pdf_uri=url),
         )
-        ocr_output = await ocr_worker.ocr_extract_pages(ocr_job=ocr_job)
+        ocr_output = await ocr_worker.extract_pages(extract_job=ocr_job)
         pretty_print(ocr_output, title="OCR Output")
         assert ocr_output.pages
 
     @pytest.mark.parametrize("file_path", ImageTestCases.IMAGE_FILE_PATHS)
     async def test_ocr_image_file(self, ocr_handle_from_image: str, file_path: str):
         ocr_worker = get_ocr_worker(ocr_handle=ocr_handle_from_image)
-        ocr_job = OcrJobFactory.make_ocr_job(
-            ocr_input=OcrInput(image_uri=file_path),
+        ocr_job = ExtractJobFactory.make_ocr_job(
+            extract_input=ExtractInput(image_uri=file_path),
         )
-        ocr_output = await ocr_worker.ocr_extract_pages(ocr_job=ocr_job)
+        ocr_output = await ocr_worker.extract_pages(extract_job=ocr_job)
         pretty_print(ocr_output, title="OCR Output")
         assert ocr_output.pages
 
     @pytest.mark.parametrize("url", ImageTestCases.IMAGE_URLS)
     async def test_ocr_image_url(self, ocr_handle_from_image: str, url: str):
         ocr_worker = get_ocr_worker(ocr_handle=ocr_handle_from_image)
-        ocr_job = OcrJobFactory.make_ocr_job(
-            ocr_input=OcrInput(image_uri=url),
+        ocr_job = ExtractJobFactory.make_ocr_job(
+            extract_input=ExtractInput(image_uri=url),
         )
-        ocr_output = await ocr_worker.ocr_extract_pages(ocr_job=ocr_job)
+        ocr_output = await ocr_worker.extract_pages(extract_job=ocr_job)
         pretty_print(ocr_output, title="OCR Output")
         assert ocr_output.pages
 
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
     async def test_ocr_image_save(self, ocr_handle_from_image: str, file_path: str):
         ocr_worker = get_ocr_worker(ocr_handle=ocr_handle_from_image)
-        ocr_job_params = OcrJobParams(
+        ocr_job_params = ExtractJobParams(
             should_include_images=True,
             should_caption_images=False,
             should_include_page_views=False,
@@ -66,11 +66,11 @@ class TestOcr:
             max_nb_images=None,
             image_min_size=None,
         )
-        ocr_job = OcrJobFactory.make_ocr_job(
-            ocr_input=OcrInput(pdf_uri=file_path),
-            ocr_job_params=ocr_job_params,
+        ocr_job = ExtractJobFactory.make_ocr_job(
+            extract_input=ExtractInput(pdf_uri=file_path),
+            extract_job_params=ocr_job_params,
         )
-        ocr_output = await ocr_worker.ocr_extract_pages(ocr_job=ocr_job)
+        ocr_output = await ocr_worker.extract_pages(extract_job=ocr_job)
         pretty_print(ocr_output, title="OCR Output")
         directory = get_incremental_directory_path(
             base_path="results/test_ocr_image_save",
