@@ -8,7 +8,7 @@ from pytest import FixtureRequest
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -39,7 +39,7 @@ class TestPipeSequenceSimple:
         )
         concept_library = get_concept_library()
         concept_library.add_concepts([concept_1])
-        concept_2 = get_native_concept(native_concept=NativeConceptEnum.TEXT)
+        concept_2 = get_native_concept(native_concept=NativeConceptCode.TEXT)
 
         # Create PipeSequence instance - pipes are loaded from PLX files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
@@ -60,7 +60,7 @@ class TestPipeSequenceSimple:
 
         # Create test data - single text input
         input_text_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
             content=TextContent(text="hello world"),
             name="input_text",
         )

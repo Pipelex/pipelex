@@ -11,7 +11,7 @@ from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_setting import OcrChoice, OcrSetting
 from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -71,7 +71,7 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
 
     @override
     def validate_output(self):
-        if self.output != get_native_concept(native_concept=NativeConceptEnum.PAGE):
+        if self.output != get_native_concept(native_concept=NativeConceptCode.PAGE):
             msg = f"PipeOcr output should be a Page concept, but is {self.output.concept_string}"
             raise PipeDefinitionError(msg)
 
@@ -119,13 +119,13 @@ class PipeOcr(PipeOperator[PipeOcrOutput]):
         log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
         if concept_library.is_compatible(
             tested_concept=requirement.concept,
-            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
             strict=True,
         ):
             self.image_stuff_name = input_name
         elif concept_library.is_compatible(
             tested_concept=requirement.concept,
-            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.PDF),
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.PDF),
             strict=True,
         ):
             self.pdf_stuff_name = input_name

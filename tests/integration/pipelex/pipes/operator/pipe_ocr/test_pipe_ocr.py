@@ -3,7 +3,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.page_content import PageContent
@@ -46,8 +46,8 @@ class TestPipeOCR:
     ):
         pipe_ocr_blueprint = PipeOcrBlueprint(
             description="OCR test for image processing",
-            inputs={"page_scan": InputRequirementBlueprint(concept=NativeConceptEnum.IMAGE)},
-            output=NativeConceptEnum.TEXT_AND_IMAGES,
+            inputs={"page_scan": InputRequirementBlueprint(concept=NativeConceptCode.IMAGE)},
+            output=NativeConceptCode.TEXT_AND_IMAGES,
             page_images=True,
             page_image_captions=False,
             page_views=True,
@@ -84,8 +84,8 @@ class TestPipeOCR:
         input_name = "arbitrary_name"
         pipe_ocr_blueprint = PipeOcrBlueprint(
             description="OCR test for PDF processing",
-            inputs={input_name: InputRequirementBlueprint(concept=NativeConceptEnum.PDF)},
-            output=NativeConceptEnum.TEXT_AND_IMAGES,
+            inputs={input_name: InputRequirementBlueprint(concept=NativeConceptCode.PDF)},
+            output=NativeConceptCode.TEXT_AND_IMAGES,
             ocr=ocr_choice_for_pdf,
             page_images=True,
             page_image_captions=False,

@@ -7,7 +7,7 @@ from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum, NativeConceptManager
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -41,7 +41,7 @@ class StuffFactory:
     @classmethod
     def make_from_str(cls, str_value: str, name: str) -> Stuff:
         return cls.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
             content=TextContent(text=str_value),
             name=name,
         )
@@ -78,10 +78,10 @@ class StuffFactory:
         concept_library = get_concept_library()
         if isinstance(blueprint.content, str) and concept_library.is_compatible(
             tested_concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
-            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.TEXT),
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
         ):
             the_stuff = cls.make_stuff(
-                concept=get_native_concept(native_concept=NativeConceptEnum.TEXT),
+                concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
                 content=TextContent(text=blueprint.content),
                 name=blueprint.stuff_name,
             )
@@ -169,10 +169,10 @@ class StuffFactory:
         elif isinstance(stuff_content_or_data, StuffContent):
             content = stuff_content_or_data
             concept_class_name = type(content).__name__
-            native_concept_class_names = NativeConceptEnum.native_concept_class_names()
+            native_concept_class_names = NativeConceptCode.native_concept_class_names()
 
             if concept_class_name in native_concept_class_names:
-                concept = get_native_concept(native_concept=NativeConceptEnum(concept_class_name.split("Content")[0]))
+                concept = get_native_concept(native_concept=NativeConceptCode(concept_class_name.split("Content")[0]))
                 return cls.make_stuff(
                     concept=concept,
                     content=content,
@@ -214,7 +214,7 @@ class StuffFactory:
         elif isinstance(stuff_content_or_data, str):
             str_stuff: str = stuff_content_or_data
             return StuffFactory.make_stuff(
-                concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+                concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
                 content=TextContent(text=str_stuff),
                 name=name,
             )
@@ -226,8 +226,8 @@ class StuffFactory:
                     msg = "Stuff content data dict is badly formed: no concept code"
                     raise StuffFactoryError(msg)
                 content_value = stuff_content_dict["content"]
-                if NativeConceptManager.is_native_concept(concept_string_or_code=concept_code):
-                    concept = ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum(concept_code))
+                if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_code):
+                    concept = ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode(concept_code))
                     content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
                         concept=concept,
                         value=content_value,

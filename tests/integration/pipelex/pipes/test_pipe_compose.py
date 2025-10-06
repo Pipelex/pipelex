@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
@@ -30,7 +30,7 @@ class TestPipeCompose:
         pipe_compose_blueprint = PipeComposeBlueprint(
             description="Jinja2 test for any context",
             jinja2=jinja2,
-            output=NativeConceptEnum.TEXT,
+            output=NativeConceptCode.TEXT,
             extra_context={"place_holder": "[some text from test_pipe_compose_for_any]"},
         )
 
@@ -58,7 +58,7 @@ class TestPipeCompose:
             description="Jinja2 test for stuff context",
             jinja2=jinja2,
             prompting_style=PromptingStyle(tag_style=TagStyle.TICKS, text_format=TextFormat.MARKDOWN),
-            output=NativeConceptEnum.TEXT,
+            output=NativeConceptCode.TEXT,
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(

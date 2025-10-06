@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
@@ -37,7 +37,7 @@ def register_test_concepts():
 
     # Define concept specifications: (code, description, structure_class_name, refines)
     concept_specs: list[tuple[str, str, str, str | None]] = [
-        ("ProfilePhoto", "A profile photo", "ProfilePhoto", f"native.{NativeConceptEnum.IMAGE}"),
+        ("ProfilePhoto", "A profile photo", "ProfilePhoto", f"native.{NativeConceptCode.IMAGE}"),
         ("PersonWithDirectImage", "A person with a direct image field", "PersonWithDirectImage", None),
         ("PersonWithRefinedImage", "A person with a refined image field", "PersonWithRefinedImage", None),
         ("PersonWithText", "A person with only text", "PersonWithText", None),
@@ -122,7 +122,7 @@ class TestConceptFindImageFieldPaths:
         the concept is an image, not a structured type with image fields.
         """
         # Get concept
-        concept = get_native_concept(NativeConceptEnum.IMAGE)
+        concept = get_native_concept(NativeConceptCode.IMAGE)
 
         # Find image paths
         image_paths = concept.search_for_nested_image_fields_in_structure_class()
@@ -136,7 +136,7 @@ class TestConceptFindImageFieldPaths:
         This tests the native concept that combines text and images.
         """
         # Get the native TextAndImages concept
-        concept = get_native_concept(NativeConceptEnum.TEXT_AND_IMAGES)
+        concept = get_native_concept(NativeConceptCode.TEXT_AND_IMAGES)
 
         # Find image paths
         image_paths = concept.search_for_nested_image_fields_in_structure_class()

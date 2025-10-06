@@ -1,5 +1,5 @@
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.pipe_operators.ocr.pipe_ocr_blueprint import PipeOcrBlueprint
 
 PIPE_OCR = (
@@ -20,7 +20,7 @@ ocr = "base_ocr_pypdfium2"
             "extract_text": PipeOcrBlueprint(
                 type="PipeOcr",
                 description="Extract text from document",
-                output=NativeConceptEnum.PAGE,
+                output=NativeConceptCode.PAGE,
                 ocr="base_ocr_pypdfium2",
             ),
         },

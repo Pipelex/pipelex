@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from pipelex.client.api_serializer import ApiSerializer
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.number_content import NumberContent
@@ -73,7 +73,7 @@ class TestApiSerialization:
     @pytest.fixture
     def text_content_memory(self) -> WorkingMemory:
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
             name="sample_text",
             content=TextContent(text="Sample text content"),
         )
@@ -83,7 +83,7 @@ class TestApiSerialization:
     def number_content_memory(self) -> WorkingMemory:
         number_content = NumberContent(number=3.14159)
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.NUMBER),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.NUMBER),
             name="pi_value",
             content=number_content,
         )
@@ -144,7 +144,7 @@ class TestApiSerialization:
         assert "sample_text" in compact_memory
 
         text_blueprint = compact_memory["sample_text"]
-        assert text_blueprint["concept_code"] == NativeConceptEnum.TEXT
+        assert text_blueprint["concept_code"] == NativeConceptCode.TEXT
         assert isinstance(text_blueprint["content"], str)
         assert text_blueprint["content"] == "Sample text content"
 
@@ -155,6 +155,6 @@ class TestApiSerialization:
         assert "pi_value" in compact_memory
 
         number_blueprint = compact_memory["pi_value"]
-        assert number_blueprint["concept_code"] == NativeConceptEnum.NUMBER
+        assert number_blueprint["concept_code"] == NativeConceptCode.NUMBER
         assert isinstance(number_blueprint["content"], dict)
         assert number_blueprint["content"]["number"] == 3.14159

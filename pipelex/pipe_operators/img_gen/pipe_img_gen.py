@@ -12,7 +12,7 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
@@ -106,7 +106,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     def validate_output(self):
         if not get_concept_library().is_compatible(
             tested_concept=self.output,
-            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
             strict=True,
         ):
             msg = (
@@ -122,7 +122,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             needed_inputs.add_requirement(
                 variable_name="img_gen_prompt",
                 concept=ConceptFactory.make_native_concept_from_enum(
-                    native_concept_enum=NativeConceptEnum.TEXT,
+                    native_concept_enum=NativeConceptCode.TEXT,
                 ),
             )
         else:
@@ -185,7 +185,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         input_name, requirement = self.inputs.items[0]
         if concept_library.is_compatible(
             tested_concept=requirement.concept,
-            wanted_concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+            wanted_concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
         ):
             self.img_gen_prompt_var_name = input_name
         else:

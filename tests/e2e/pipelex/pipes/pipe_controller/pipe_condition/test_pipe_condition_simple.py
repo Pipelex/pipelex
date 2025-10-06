@@ -4,7 +4,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
@@ -28,7 +28,7 @@ class TestPipeConditionSimple:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Test condition that should fail",
             inputs={"user_category": InputRequirementBlueprint(concept="test_pipe_condition.CategoryInput")},
-            output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
             expression_template="{{ user_category.category }}",
             outcomes={"small": "process_small", "medium": "process_medium", "large": "process_large"},
             default_outcome="process_small",
@@ -62,7 +62,7 @@ class TestPipeConditionSimple:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Test condition that should succeed",
             inputs={"user_status": InputRequirementBlueprint(concept="test_pipe_condition.CategoryInput")},
-            output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
             expression_template="{{ user_status.category }}",
             outcomes={"active": "process_small", "inactive": "process_medium", "pending": "process_large"},
             default_outcome="process_small",

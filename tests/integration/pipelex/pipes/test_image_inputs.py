@@ -2,7 +2,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
@@ -67,7 +67,7 @@ class TestImageInputs:
 
         # Create stuff from page content
         stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.PAGE),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.PAGE),
             content=page_content,
             name="page",
         )

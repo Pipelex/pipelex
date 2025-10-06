@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
@@ -32,7 +32,7 @@ class TestPipeImgGen:
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
             description="Image generation test",
             img_gen_prompt=image_desc,
-            output=NativeConceptEnum.IMAGE,
+            output=NativeConceptCode.IMAGE,
             nb_output=1,
         )
 

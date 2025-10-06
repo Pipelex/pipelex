@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 
 
 class ConceptLibraryAbstract(ABC):
@@ -59,5 +59,5 @@ class ConceptLibraryAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_native_concept(self, native_concept: NativeConceptEnum) -> Concept:
+    def get_native_concept(self, native_concept: NativeConceptCode) -> Concept:
         pass

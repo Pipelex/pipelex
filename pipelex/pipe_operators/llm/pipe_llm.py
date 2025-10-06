@@ -14,7 +14,7 @@ from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoice
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import Domain, SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
@@ -75,10 +75,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
-        if self.structuring_method is not None and self.output.structure_class_name == NativeConceptEnum.TEXT:
+        if self.structuring_method is not None and self.output.structure_class_name == NativeConceptCode.TEXT:
             msg = (
                 f"Output concept '{self.output.code}' is considered a Text concept, "
-                f"so it cannot be structured. Maybe you forgot to add '{NativeConceptEnum.TEXT}' to the class registry?"
+                f"so it cannot be structured. Maybe you forgot to add '{NativeConceptCode.TEXT}' to the class registry?"
             )
             raise PipeDefinitionError(msg)
         return self
@@ -99,7 +99,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def validate_output(self):
         if get_concept_library().is_compatible(
             tested_concept=self.output,
-            wanted_concept=get_native_concept(native_concept=NativeConceptEnum.IMAGE),
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
         ):
             msg = (
                 f"The output of a LLM pipe cannot be compatible with the Image concept. In the "
@@ -184,13 +184,13 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         # interpret / unwrap the arguments
         log.debug(f"PipeLLM pipe_code = {self.code}")
         output_concept = self.output
-        if self.output.code == SpecialDomain.NATIVE + "." + NativeConceptEnum.DYNAMIC:
+        if self.output.code == SpecialDomain.NATIVE + "." + NativeConceptCode.DYNAMIC:
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
             output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
 
             if not output_concept_code:
-                output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptEnum.TEXT
+                output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT
             else:
                 output_concept = get_required_concept(
                     concept_string=ConceptFactory.make_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code),

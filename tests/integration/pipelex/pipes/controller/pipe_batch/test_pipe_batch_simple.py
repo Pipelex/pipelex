@@ -7,7 +7,7 @@ from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.list_content import ListContent
@@ -74,7 +74,7 @@ class TestPipeBatchSimple:
         ]
 
         text_list_stuff = StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
             content=ListContent[StuffContent](items=cast("list[StuffContent]", text_items)),
             name="text_list",
         )

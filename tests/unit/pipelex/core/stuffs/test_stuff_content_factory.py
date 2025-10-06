@@ -4,7 +4,7 @@ import pytest
 
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptEnum
+from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffContentFactory
@@ -14,19 +14,19 @@ from pipelex.core.stuffs.text_content import TextContent
 class TestCases:
     # Test cases for TextContent with string content
     TEXT_STRING_BLUEPRINT: ClassVar[dict[str, Any]] = {
-        "concept_string": f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
+        "concept_string": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         "content": "The Dawn of Ultra-Rapid Transit: NextGen High-Speed Trains Redefine Travel",
     }
 
     # Test cases for TextContent with dict content
     TEXT_DICT_BLUEPRINT: ClassVar[dict[str, Any]] = {
-        "concept_string": f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
+        "concept_string": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         "content": {"text": "Sample text content"},
     }
 
     # Test cases for native concept without prefix (should work)
     TEXT_NO_PREFIX_BLUEPRINT: ClassVar[dict[str, Any]] = {
-        "concept_string": f"{NativeConceptEnum.TEXT}",
+        "concept_string": f"{NativeConceptCode.TEXT}",
         "content": {"text": "Text content without native prefix"},
     }
 
@@ -92,7 +92,7 @@ class TestStuffContentFactory:
     def test_make_stuffcontent_from_concept_code_required_text_content(self):
         """Test required method with native.Text concept (should work)."""
         result = StuffContentFactory.make_stuff_content_from_concept_required(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
             value="Test text content",
         )
 
@@ -102,7 +102,7 @@ class TestStuffContentFactory:
     def test_make_stuffcontent_from_concept_code_required_implicit_concept(self):
         """Test required method with implicit concept (should create TextContent)."""
         result = StuffContentFactory.make_stuff_content_from_concept_required(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
             value="Test content for implicit concept",
         )
 
@@ -112,7 +112,7 @@ class TestStuffContentFactory:
     def test_make_stuffcontent_from_concept_code_with_fallback_text_success(self):
         """Test fallback method with native.Text concept."""
         result = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
             value="Test text content",
         )
 
@@ -122,7 +122,7 @@ class TestStuffContentFactory:
     def test_make_stuffcontent_from_concept_code_with_fallback_implicit_string(self):
         """Test fallback method with implicit concept and string value."""
         result = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
             value="Fallback text content",
         )
 
@@ -132,7 +132,7 @@ class TestStuffContentFactory:
     def test_make_stuffcontent_from_concept_code_with_fallback_implicit_dict(self):
         """Test fallback method with implicit concept and dict value."""
         result = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+            concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
             value={"text": "Dict fallback content"},
         )
 
@@ -150,7 +150,7 @@ class TestStuffContentFactory:
         if test_name.startswith("text_"):
             # Test native.Text concept with required method
             result = StuffContentFactory.make_stuff_content_from_concept_required(
-                concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+                concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
                 value=content,
             )
             assert isinstance(result, TextContent)
@@ -168,7 +168,7 @@ class TestStuffContentFactory:
             # The dict will be passed through model_validate which should fail for TextContent
             try:
                 result_required = StuffContentFactory.make_stuff_content_from_concept_required(
-                    concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+                    concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
                     value=content,
                 )
                 # If it succeeds, it should be TextContent (due to implicit concept)
@@ -180,7 +180,7 @@ class TestStuffContentFactory:
             # Test fallback method - same behavior expected
             try:
                 result_fallback = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-                    concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+                    concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
                     value=content,
                 )
                 # If it succeeds, it should be TextContent (due to implicit concept)
@@ -193,13 +193,13 @@ class TestStuffContentFactory:
             # Both methods should work and return TextContent due to implicit concept creation
 
             result_required = StuffContentFactory.make_stuff_content_from_concept_required(
-                concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+                concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
                 value=content,
             )
             assert isinstance(result_required, TextContent)
 
             result_fallback = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-                concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptEnum.TEXT),
+                concept=ConceptFactory.make_native_concept_from_enum(native_concept_enum=NativeConceptCode.TEXT),
                 value=content,
             )
             assert isinstance(result_fallback, TextContent)
