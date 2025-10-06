@@ -38,13 +38,13 @@ class TestPipeExtract:
 
     @pytest.mark.usefixtures("setup")
     @pytest.mark.parametrize("image_url", PipeExtractTestCases.PIPE_OCR_IMAGE_TEST_CASES)
-    async def test_pipe_ocr_image(
+    async def test_pipe_extract_image(
         self,
         extract_choice_for_image: str,
         pipe_run_mode: PipeRunMode,
         image_url: str,
     ):
-        pipe_ocr_blueprint = PipeExtractBlueprint(
+        pipe_extract_blueprint = PipeExtractBlueprint(
             description="OCR test for image processing",
             inputs={"page_scan": InputRequirementBlueprint(concept=NativeConceptCode.IMAGE)},
             output=NativeConceptCode.TEXT_AND_IMAGES,
@@ -59,7 +59,7 @@ class TestPipeExtract:
             pipe=PipeExtractFactory.make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_ocr_image",
-                blueprint=pipe_ocr_blueprint,
+                blueprint=pipe_extract_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_image(
@@ -71,8 +71,8 @@ class TestPipeExtract:
             pipe_job=pipe_job,
         )
 
-        ocr_text = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
-        pretty_print(ocr_text, title="ocr_text")
+        list_result = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
+        pretty_print(list_result, title="list_result")
 
     @pytest.mark.parametrize("pdf_url", PipeExtractTestCases.PIPE_OCR_PDF_TEST_CASES)
     async def test_pipe_ocr_pdf(
@@ -108,5 +108,5 @@ class TestPipeExtract:
         pipe_extract_output = await get_pipe_router().run(
             pipe_job=pipe_job,
         )
-        ocr_text = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
-        pretty_print(ocr_text, title="ocr_text")
+        extracted_text = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
+        pretty_print(extracted_text, title="extracted_text")

@@ -174,15 +174,15 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             raise PipeDefinitionError(msg)
 
         extract_choice: ExtractChoice = self.extract_choice or get_model_deck().extract_choice_default
-        ocr_setting: ExtractSetting = get_model_deck().get_extract_setting(extract_choice=extract_choice)
+        extract_setting: ExtractSetting = get_model_deck().get_extract_setting(extract_choice=extract_choice)
 
         extract_job_params = ExtractJobParams(
             should_include_images=self.should_include_images,
             should_caption_images=self.should_caption_images,
             should_include_page_views=self.should_include_page_views,
             page_views_dpi=self.page_views_dpi,
-            max_nb_images=ocr_setting.max_nb_images,
-            image_min_size=ocr_setting.image_min_size,
+            max_nb_images=extract_setting.max_nb_images,
+            image_min_size=extract_setting.image_min_size,
         )
         extract_input = ExtractInput(
             image_uri=image_uri,
@@ -190,7 +190,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         )
         extract_output = await content_generator.make_extract_pages(
             extract_input=extract_input,
-            extract_handle=ocr_setting.extract_handle,
+            extract_handle=extract_setting.extract_handle,
             job_metadata=job_metadata,
             extract_job_params=extract_job_params,
             extract_job_config=ExtractJobConfig(),

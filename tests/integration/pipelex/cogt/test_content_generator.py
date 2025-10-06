@@ -137,7 +137,7 @@ class TestContentGenerator:
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
         )
-        pretty_print(extract_output, title="ocr_extract_pages")
+        pretty_print(extract_output, title="extract_pages")
         assert isinstance(extract_output, ExtractOutput)
 
     @pytest.mark.extract
@@ -150,7 +150,7 @@ class TestContentGenerator:
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
         )
-        pretty_print(extract_output, title="ocr_extract_pages")
+        pretty_print(extract_output, title="extract_pages")
         assert isinstance(extract_output, ExtractOutput)
 
     @pytest.mark.llm
