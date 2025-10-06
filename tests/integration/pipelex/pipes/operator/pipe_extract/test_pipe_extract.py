@@ -20,7 +20,7 @@ from tests.integration.pipelex.test_data import PipeExtractTestCases
 @pytest.mark.ocr
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipeOCR:
+class TestPipeExtract:
     @pytest.fixture(scope="class", autouse=True)
     def setup(self):
         concept_library = get_concept_library()
@@ -67,11 +67,11 @@ class TestPipeOCR:
                 name="page_scan",
             ),
         )
-        pipe_ocr_output = await get_pipe_router().run(
+        pipe_extract_output = await get_pipe_router().run(
             pipe_job=pipe_job,
         )
 
-        ocr_text = pipe_ocr_output.main_stuff_as_list(item_type=PageContent)
+        ocr_text = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
         pretty_print(ocr_text, title="ocr_text")
 
     @pytest.mark.parametrize("pdf_url", PipeExtractTestCases.PIPE_OCR_PDF_TEST_CASES)
@@ -105,8 +105,8 @@ class TestPipeOCR:
                 name=input_name,
             ),
         )
-        pipe_ocr_output = await get_pipe_router().run(
+        pipe_extract_output = await get_pipe_router().run(
             pipe_job=pipe_job,
         )
-        ocr_text = pipe_ocr_output.main_stuff_as_list(item_type=PageContent)
+        ocr_text = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
         pretty_print(ocr_text, title="ocr_text")

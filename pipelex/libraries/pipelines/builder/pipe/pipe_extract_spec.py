@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 class AvailableExtractModel(StrEnum):
     BASE_OCR_MISTRAL = "base_ocr_mistral"
-    # BASE_OCR_PYPDFIUM2 = "base_ocr_pypdfium2"
+    # BASE_EXTRACT_PYPDFIUM2 = "base_extract_pypdfium2"
 
 
 class ExtractSkill(StrEnum):
@@ -45,15 +45,15 @@ class PipeExtractSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeExtract"]] = "PipeExtract"
     category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    ocr: ExtractSkill | str = Field(description="Select the most adequate extraction model skill according to the task to be performed.")
+    extract_skill: ExtractSkill | str = Field(description="Select the most adequate extraction model skill according to the task to be performed.")
     page_images: bool | None = Field(default=None, description="Whether to include detected images in the Extract output.")
     page_image_captions: bool | None = Field(default=None, description="Whether to generate captions for detected images using AI.")
     page_views: bool | None = Field(default=None, description="Whether to include rendered page views in the output.")
 
-    @field_validator("ocr", mode="before")
+    @field_validator("extract_skill", mode="before")
     @classmethod
-    def validate_ocr(cls, ocr_value: str) -> ExtractSkill:
-        return ExtractSkill(ocr_value)
+    def validate_extract_skill(cls, extract_skill_value: str) -> ExtractSkill:
+        return ExtractSkill(extract_skill_value)
 
     @field_validator("inputs", mode="before")
     @classmethod
@@ -70,12 +70,12 @@ class PipeExtractSpec(PipeSpec):
     def to_blueprint(self) -> PipeExtractBlueprint:
         base_blueprint = super().to_blueprint()
 
-        # create ocr choice as a str
-        ocr: ExtractChoice
-        if isinstance(self.ocr, ExtractSkill):
-            ocr = self.ocr.model_recommendation.value
+        # create extract choice as a str
+        extract_model_choice: ExtractChoice
+        if isinstance(self.extract_skill, ExtractSkill):
+            extract_model_choice = self.extract_skill.model_recommendation.value
         else:
-            ocr = ExtractSkill(self.ocr).model_recommendation.value
+            extract_model_choice = ExtractSkill(self.extract_skill).model_recommendation.value
 
         return PipeExtractBlueprint(
             source=None,
@@ -84,7 +84,7 @@ class PipeExtractSpec(PipeSpec):
             output=base_blueprint.output,
             type=self.type,
             category=self.category,
-            ocr=ocr,
+            ocr=extract_model_choice,
             page_images=self.page_images,
             page_image_captions=self.page_image_captions,
             page_views=self.page_views,

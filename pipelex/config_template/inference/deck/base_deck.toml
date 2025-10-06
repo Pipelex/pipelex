@@ -115,7 +115,7 @@ choice_default = "base_ocr_mistral"
 
 [extract.presets]
 base_ocr_mistral = { extract_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-base_ocr_pypdfium2 = { extract_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+base_extract_pypdfium2 = { extract_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
 
 ####################################################################################################
 # Image Generation Presets

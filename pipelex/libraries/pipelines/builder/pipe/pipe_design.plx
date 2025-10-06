@@ -5,16 +5,16 @@ description = "Build and process pipes."
 PipeSignature = "A pipe contract which says what the pipe does, not how it does it: code (the pipe code in snake_case), type, description, inputs, output."
 PipeSpec = "A structured spec for a pipe (union)."
 # Pipe controllers
-PipeBatchSpec = "A structured spec for a pipe batch."
-PipeConditionSpec = "A structured spec for a pipe condition."
-PipeParallelSpec = "A structured spec for a pipe parallel."
-PipeSequenceSpec = "A structured spec for a pipe sequence."
+PipeBatchSpec = "A structured spec for a PipeBatch."
+PipeConditionSpec = "A structured spec for a PipeCondition."
+PipeParallelSpec = "A structured spec for a PipeParallel."
+PipeSequenceSpec = "A structured spec for a PipeSequence."
 # Pipe operators
-PipeFuncSpec = "A structured spec for a pipe func."
-PipeImgGenSpec = "A structured spec for a pipe img gen."
-# PipeComposeSpec = "A structured spec for a pipe jinja2."
-PipeLLMSpec = "A structured spec for a pipe llm."
-PipeExtractSpec = "A structured spec for a pipe ocr."
+PipeFuncSpec = "A structured spec for a PipeFunc."
+PipeImgGenSpec = "A structured spec for a PipeImgGen."
+PipeComposeSpec = "A structured spec for a pipe jinja2."
+PipeLLMSpec = "A structured spec for a PipeLLM."
+PipeExtractSpec = "A structured spec for a PipeExtract."
 PipeFailure = "Details of a single pipe failure during dry run."
 
 [pipe]
@@ -32,7 +32,7 @@ PipeSequence  = "detail_pipe_sequence"
 PipeParallel  = "detail_pipe_parallel"
 PipeCondition = "detail_pipe_condition"
 PipeLLM       = "detail_pipe_llm"
-PipeExtract       = "detail_pipe_ocr"
+PipeExtract   = "detail_pipe_extract"
 PipeImgGen    = "detail_pipe_img_gen"
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ Here are the concepts you can use for inputs/outputs:
 @concept_specs
 """
 
-[pipe.detail_pipe_ocr]
+[pipe.detail_pipe_extract]
 type = "PipeLLM"
 description = "Build a PipeExtractSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }

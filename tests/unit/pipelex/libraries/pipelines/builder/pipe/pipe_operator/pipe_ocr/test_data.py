@@ -13,7 +13,7 @@ class PipeExtractTestCases:
             description="Extract text from image",
             inputs={"image": "Image"},
             output="ExtractedText",
-            ocr="extract_text_from_visuals",
+            extract_skill="extract_text_from_visuals",
         ),
         PipeExtractBlueprint(
             source=None,
@@ -33,7 +33,7 @@ class PipeExtractTestCases:
             description="OCR with page options",
             inputs={"document": "PDF"},
             output="PageContent",
-            ocr="extract_text_from_pdf",
+            extract_skill="extract_text_from_pdf",
             page_images=True,
             page_image_captions=True,
             page_views=True,

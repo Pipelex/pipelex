@@ -6,11 +6,11 @@ This is a fundamental building block for many document processing workflows.
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/simple_ocr.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/simple_ocr.py)
+[**➡️ View on GitHub: examples/simple_extract.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/simple_ocr.py)
 
 ## The Pipeline Explained
 
-The core of this example is a simple function that creates a "working memory" from a PDF and then executes a pre-defined pipeline called `ocr_page_contents_from_pdf`.
+The core of this example is a simple function that creates a "working memory" from a PDF and then executes a pre-defined pipeline called `extract_page_contents_from_pdf`.
 
 ```python
 async def simple_ocr(pdf_url: str):
@@ -20,7 +20,7 @@ async def simple_ocr(pdf_url: str):
         name="pdf",
     )
     pipe_output = await execute_pipeline(
-        pipe_code="ocr_page_contents_from_pdf",
+        pipe_code="extract_page_contents_from_pdf",
         working_memory=working_memory,
     )
     page_content_list: ListContent[PageContent] = pipe_output.main_stuff_as_list(item_type=PageContent)

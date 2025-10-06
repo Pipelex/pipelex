@@ -188,7 +188,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             image_uri=image_uri,
             pdf_uri=pdf_uri,
         )
-        ocr_output = await content_generator.make_extract_pages(
+        extract_output = await content_generator.make_extract_pages(
             extract_input=extract_input,
             extract_handle=ocr_setting.extract_handle,
             job_metadata=job_metadata,
@@ -202,15 +202,15 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             log.debug(f"should_include_page_views: {self.should_include_page_views}, pdf_uri: {pdf_uri}, image_uri: {image_uri}")
             if pdf_uri:
                 page_view_contents.extend(
-                    ImageContent.make_from_extracted_image(extracted_image=page.page_view) for page in ocr_output.pages.values() if page.page_view
+                    ImageContent.make_from_extracted_image(extracted_image=page.page_view) for page in extract_output.pages.values() if page.page_view
                 )
                 log.debug(f"page_view_contents: {page_view_contents}")
                 needs_to_generate_page_views: bool
                 if len(page_view_contents) == 0:
                     log.debug("No page views found in the OCR output")
                     needs_to_generate_page_views = True
-                elif len(page_view_contents) < len(ocr_output.pages):
-                    log.warning(f"Only {len(page_view_contents)} page found in the OCR output, but {len(ocr_output.pages)} pages")
+                elif len(page_view_contents) < len(extract_output.pages):
+                    log.warning(f"Only {len(page_view_contents)} page found in the OCR output, but {len(extract_output.pages)} pages")
                     needs_to_generate_page_views = True
                 else:
                     log.debug("All page views found in the OCR output")
@@ -223,7 +223,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
                 page_view_contents = [ImageContent(url=image_uri)]
 
         page_contents: list[PageContent] = []
-        for page_index, page in ocr_output.pages.items():
+        for page_index, page in extract_output.pages.items():
             images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
             log.debug(f"images: {images}, page_view_contents: {page_view_contents}, index: {page_index}")
             page_view = page_view_contents[page_index - 1] if self.should_include_page_views else None

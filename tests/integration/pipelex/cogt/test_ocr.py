@@ -20,10 +20,10 @@ class TestOcr:
         ocr_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(pdf_uri=file_path),
         )
-        ocr_output = await extract_worker.extract_pages(extract_job=ocr_job)
-        pretty_print(ocr_output, title="OCR Output")
+        extract_output = await extract_worker.extract_pages(extract_job=ocr_job)
+        pretty_print(extract_output, title="OCR Output")
 
-        assert ocr_output.pages
+        assert extract_output.pages
 
     @pytest.mark.parametrize("url", PDFTestCases.DOCUMENT_URLS)
     async def test_ocr_pdf_url(self, extract_handle: str, url: str):
@@ -31,9 +31,9 @@ class TestOcr:
         ocr_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(pdf_uri=url),
         )
-        ocr_output = await extract_worker.extract_pages(extract_job=ocr_job)
-        pretty_print(ocr_output, title="OCR Output")
-        assert ocr_output.pages
+        extract_output = await extract_worker.extract_pages(extract_job=ocr_job)
+        pretty_print(extract_output, title="OCR Output")
+        assert extract_output.pages
 
     @pytest.mark.parametrize("file_path", ImageTestCases.IMAGE_FILE_PATHS)
     async def test_ocr_image_file(self, extract_handle_from_image: str, file_path: str):
@@ -41,9 +41,9 @@ class TestOcr:
         ocr_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(image_uri=file_path),
         )
-        ocr_output = await extract_worker.extract_pages(extract_job=ocr_job)
-        pretty_print(ocr_output, title="OCR Output")
-        assert ocr_output.pages
+        extract_output = await extract_worker.extract_pages(extract_job=ocr_job)
+        pretty_print(extract_output, title="OCR Output")
+        assert extract_output.pages
 
     @pytest.mark.parametrize("url", ImageTestCases.IMAGE_URLS)
     async def test_ocr_image_url(self, extract_handle_from_image: str, url: str):
@@ -51,9 +51,9 @@ class TestOcr:
         ocr_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(image_uri=url),
         )
-        ocr_output = await extract_worker.extract_pages(extract_job=ocr_job)
-        pretty_print(ocr_output, title="OCR Output")
-        assert ocr_output.pages
+        extract_output = await extract_worker.extract_pages(extract_job=ocr_job)
+        pretty_print(extract_output, title="OCR Output")
+        assert extract_output.pages
 
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
     async def test_ocr_image_save(self, extract_handle_from_image: str, file_path: str):
@@ -70,13 +70,13 @@ class TestOcr:
             extract_input=ExtractInput(pdf_uri=file_path),
             extract_job_params=extract_job_params,
         )
-        ocr_output = await extract_worker.extract_pages(extract_job=ocr_job)
-        pretty_print(ocr_output, title="OCR Output")
+        extract_output = await extract_worker.extract_pages(extract_job=ocr_job)
+        pretty_print(extract_output, title="OCR Output")
         directory = get_incremental_directory_path(
             base_path="results/test_ocr_image_save",
-            base_name="ocr_output",
+            base_name="extract_output",
         )
-        ocr_output.save_to_directory(
+        extract_output.save_to_directory(
             directory=directory,
             page_text_file_name=get_config().cogt.extract_config.page_output_text_file_name,
         )

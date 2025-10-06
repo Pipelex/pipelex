@@ -370,15 +370,6 @@ smart_llm = [
     "gemini-2.5-pro",
 ]
 
-# OCR aliases
-best-ocr = "mistral-ocr"
-local-ocr = "pypdfium2-extract-text"
-
-# Image generation aliases
-base-img-gen = "flux-pro/v1.1"
-best-img-gen = "flux-pro/v1.1-ultra"
-fast-img-gen = "fast-lightning-sdxl"
-
 # Aliases can also define fallback chains
 llm_to_engineer = { llm_handle = "smart_llm", temperature = 0.2 }
 ```
@@ -403,10 +394,10 @@ llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
 OCR presets combine OCR model selection with optimized parameters:
 
 ```toml
-[ocr.presets]
+[extract.presets]
 # General purpose OCR
 base_ocr_mistral = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-base_ocr_pypdfium2 = { ocr_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+base_extract_pypdfium2 = { extract_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
 ```
 
 ### Image Generation Presets
@@ -430,7 +421,7 @@ Set default models for different types of AI operations:
 for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
 
-[ocr]
+[extract]
 choice_default = "base_ocr_mistral"
 
 [img_gen]
@@ -448,8 +439,8 @@ Use `.pipelex/inference/deck/overrides.toml` for project-specific customizations
 [llm.presets]
 llm_to_extract_invoice = { llm_handle = "gpt-4o-mini", temperature = 0.2 }
 
-[ocr.presets]
-my_custom_ocr = { ocr_handle = "mistral-ocr", max_nb_images = 5 }
+[extract.presets]
+my_custom_extract extract ocr_handle = "mistral-ocr", max_nb_images = 5 }
 
 [img_gen.presets]
 my_custom_img_gen = { img_gen_handle = "flux-dev", quality = "medium" }
@@ -457,7 +448,7 @@ my_custom_img_gen = { img_gen_handle = "flux-dev", quality = "medium" }
 # Add custom aliases
 [aliases]
 my_custom_llm = "claude-3-sonnet"
-my_custom_ocr = "pypdfium2-extract-text"
+my_custom_extract = "pypdfium2-extract-text"
 my_custom_img_gen = "base-img-gen"
 ```
 

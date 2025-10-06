@@ -19,7 +19,7 @@ class Flow(StructuredContent):
     implementation details. It shows:
     - Domain and description
     - Pipe controllers (sequence, parallel, condition, batch) with their full structure
-    - Pipe operators (LLM, func, img_gen, compose, ocr) as signatures only
+    - Pipe operators (LLM, Func, ImgGgen, Compose, Extract) as signatures only
 
     This representation is useful for understanding the overall workflow and
     dependencies without getting into implementation specifics.

@@ -130,28 +130,28 @@ class TestContentGenerator:
     @pytest.mark.ocr
     @pytest.mark.inference
     async def test_make_extract_pages_from_image(self, extract_handle_from_image: str, request: FixtureRequest):
-        ocr_output = await get_content_generator().make_extract_pages(
+        extract_output = await get_content_generator().make_extract_pages(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
             extract_handle=extract_handle_from_image,
             extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
         )
-        pretty_print(ocr_output, title="ocr_extract_pages")
-        assert isinstance(ocr_output, ExtractOutput)
+        pretty_print(extract_output, title="ocr_extract_pages")
+        assert isinstance(extract_output, ExtractOutput)
 
     @pytest.mark.ocr
     @pytest.mark.inference
     async def test_make_extract_pages_from_pdf(self, extract_handle: str, request: FixtureRequest):
-        ocr_output = await get_content_generator().make_extract_pages(
+        extract_output = await get_content_generator().make_extract_pages(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
             extract_handle=extract_handle,
             extract_input=ExtractInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
         )
-        pretty_print(ocr_output, title="ocr_extract_pages")
-        assert isinstance(ocr_output, ExtractOutput)
+        pretty_print(extract_output, title="ocr_extract_pages")
+        assert isinstance(extract_output, ExtractOutput)
 
     @pytest.mark.llm
     @pytest.mark.inference
