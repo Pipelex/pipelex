@@ -36,17 +36,17 @@ class LLMSetting(ConfigModel):
         )
 
 
-LLMChoice = Union[LLMSetting, str]
+LLMModelChoice = Union[LLMSetting, str]
 
 
 class LLMSettingChoicesDefaults(ConfigModel):
-    for_text: LLMChoice
-    for_object: LLMChoice
+    for_text: LLMModelChoice
+    for_object: LLMModelChoice
 
 
 class LLMSettingChoices(ConfigModel):
-    for_text: LLMChoice | None
-    for_object: LLMChoice | None
+    for_text: LLMModelChoice | None
+    for_object: LLMModelChoice | None
 
     def list_choices(self) -> set[str]:
         return {c for c in (self.for_text, self.for_object) if isinstance(c, str)}
@@ -54,8 +54,8 @@ class LLMSettingChoices(ConfigModel):
     @classmethod
     def make_completed_with_defaults(
         cls,
-        for_text: LLMChoice | None = None,
-        for_object: LLMChoice | None = None,
+        for_text: LLMModelChoice | None = None,
+        for_object: LLMModelChoice | None = None,
     ) -> Self:
         return cls(
             for_text=for_text,

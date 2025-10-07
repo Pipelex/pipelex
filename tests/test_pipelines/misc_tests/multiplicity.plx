@@ -15,7 +15,7 @@ output = "Color"
 prompt_template = """
 Remind me of the colors of the {{ _nb_output }} original power rangers.
 """
-llm = "llm_for_creative_writing"
+model = "llm_for_creative_writing"
 nb_output = 5
 
 [pipe.alltime_power_ranger_colors]
@@ -26,7 +26,7 @@ prompt_template = """
 Remind me of the colors of all the power rangers over all series.
 Don't list the names of the characters or the name of the series: just list the colors.
 """
-llm = "llm_for_creative_writing"
+model = "llm_for_creative_writing"
 
 [pipe.imagine_nature_product]
 type = "PipeLLM"

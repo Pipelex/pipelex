@@ -14,4 +14,4 @@ class ExtractSetting(ConfigModel):
         return f"OcrSetting(extract_handle={self.extract_handle}, max_nb_images={self.max_nb_images}, image_min_size={self.image_min_size})"
 
 
-ExtractChoice = Union[ExtractSetting, str]
+ExtractModelChoice = Union[ExtractSetting, str]

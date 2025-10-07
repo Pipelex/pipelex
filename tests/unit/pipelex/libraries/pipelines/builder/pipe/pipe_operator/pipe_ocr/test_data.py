@@ -22,7 +22,7 @@ class PipeExtractTestCases:
             output="ExtractedText",
             type="PipeExtract",
             category="PipeOperator",
-            ocr="base_ocr_mistral",
+            model="base_ocr_mistral",
         ),
     )
 
@@ -45,7 +45,7 @@ class PipeExtractTestCases:
             output="PageContent",
             type="PipeExtract",
             category="PipeOperator",
-            ocr="base_ocr_mistral",
+            model="base_ocr_mistral",
             page_images=True,
             page_image_captions=True,
             page_views=True,

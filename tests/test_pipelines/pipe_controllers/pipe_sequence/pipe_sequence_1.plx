@@ -23,7 +23,7 @@ type = "PipeLLM"
 description = "Clean and normalize the input text"
 inputs = { raw_text = "RawText" }
 output = "CleanedText"
-llm = "llm_for_testing_gen_text"
+model = "llm_for_testing_gen_text"
 prompt_template = """
 Clean and normalize the following text by:
 - Removing extra whitespace
@@ -38,7 +38,7 @@ type = "PipeLLM"
 description = "Generate a summary of the cleaned text"
 inputs = { cleaned_text = "CleanedText" }
 output = "SummaryText"
-llm = "llm_for_testing_gen_text"
+model = "llm_for_testing_gen_text"
 prompt_template = """
 Generate a concise summary of the following text in 2-3 sentences:
 

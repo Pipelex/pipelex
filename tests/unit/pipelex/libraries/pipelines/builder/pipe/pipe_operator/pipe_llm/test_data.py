@@ -24,7 +24,7 @@ class PipeLLMTestCases:
             inputs={"topic": InputRequirementBlueprint(concept="Text")},
             output="Text",
             prompt_template="Write about $topic",
-            llm="claude-4.1-opus",
+            model="claude-4.1-opus",
         ),
     )
 
@@ -44,7 +44,7 @@ class PipeLLMTestCases:
             description="Generate without inputs",
             output="Text",
             prompt_template="Generate something interesting",
-            llm="claude-4.1-opus",
+            model="claude-4.1-opus",
         ),
     )
 
@@ -65,7 +65,7 @@ class PipeLLMTestCases:
             inputs={"image": InputRequirementBlueprint(concept="Image")},
             output="Text",
             prompt_template="Analyze the image: $image",
-            llm="gemini-2.5-flash-lite",
+            model="gemini-2.5-flash-lite",
         ),
     )
 
@@ -83,7 +83,7 @@ class PipeLLMTestCases:
             source=None,
             type="PipeLLM",
             description="Generate with preset",
-            llm="claude-4.5-sonnet",
+            model="claude-4.5-sonnet",
             output="Text",
             prompt_template="Generate text",
         ),
@@ -104,7 +104,7 @@ class PipeLLMTestCases:
             source=None,
             type="PipeLLM",
             description="Generate with settings",
-            llm=LLMSetting(
+            model=LLMSetting(
                 llm_handle="claude-4.5-sonnet",
                 temperature=0.7,
                 max_tokens=None,  # "auto" is handled at conversion to core
@@ -133,7 +133,7 @@ class PipeLLMTestCases:
             system_prompt="You are a data analyst",
             prompt_template="Analyze: @data",
             output="Analysis",
-            llm="claude-4.5-sonnet",
+            model="claude-4.5-sonnet",
         ),
     )
 
@@ -156,7 +156,7 @@ class PipeLLMTestCases:
             nb_output=None,
             output="Item",
             prompt_template="Generate items",
-            llm="claude-4.5-sonnet",
+            model="claude-4.5-sonnet",
         ),
     )
 
@@ -179,7 +179,7 @@ class PipeLLMTestCases:
             multiple_output=None,
             output="Item",
             prompt_template="Generate items",
-            llm="claude-4.5-sonnet",
+            model="claude-4.5-sonnet",
         ),
     )
 

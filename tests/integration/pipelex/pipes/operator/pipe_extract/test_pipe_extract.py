@@ -52,7 +52,7 @@ class TestPipeExtract:
             page_image_captions=False,
             page_views=True,
             page_views_dpi=72,
-            ocr=extract_choice_for_image,
+            model=extract_choice_for_image,
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
@@ -86,7 +86,7 @@ class TestPipeExtract:
             description="OCR test for PDF processing",
             inputs={input_name: InputRequirementBlueprint(concept=NativeConceptCode.PDF)},
             output=NativeConceptCode.TEXT_AND_IMAGES,
-            ocr=extract_choice_for_pdf,
+            model=extract_choice_for_pdf,
             page_images=True,
             page_image_captions=False,
             page_views=True,

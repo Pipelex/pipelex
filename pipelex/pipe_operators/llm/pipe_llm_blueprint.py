@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import field_validator, model_validator
 
-from pipelex.cogt.llm.llm_setting import LLMChoice
+from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
@@ -18,8 +18,8 @@ class PipeLLMBlueprint(PipeBlueprint):
     type: Literal["PipeLLM"] = "PipeLLM"
     category: Literal["PipeOperator"] = "PipeOperator"
 
-    llm: LLMChoice | None = None
-    llm_to_structure: LLMChoice | None = None
+    model: LLMModelChoice | None = None
+    model_to_structure: LLMModelChoice | None = None
 
     system_prompt_template: str | None = None
     system_prompt_template_name: str | None = None

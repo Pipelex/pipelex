@@ -11,7 +11,7 @@ description = "Domain with OCR pipe"
 type = "PipeExtract"
 description = "Extract text from document"
 output = "Page"
-ocr = "base_extract_pypdfium2"
+model = "base_extract_pypdfium2"
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -21,7 +21,7 @@ ocr = "base_extract_pypdfium2"
                 type="PipeExtract",
                 description="Extract text from document",
                 output=NativeConceptCode.PAGE,
-                ocr="base_extract_pypdfium2",
+                model="base_extract_pypdfium2",
             ),
         },
     ),

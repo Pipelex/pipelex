@@ -28,7 +28,7 @@ description = "Generate exactly 5 creative ideas for a topic"
 inputs = { topic = "CreativeTopic" }
 output = "CreativeIdea"
 nb_output = 5
-llm = "llm_for_creative_writing"
+model = "llm_for_creative_writing"
 prompt_template = """
 Generate $_nb_output creative and innovative ideas for the following topic:
 
@@ -48,7 +48,7 @@ description = "Brainstorm variable number of concepts"
 inputs = { topic = "CreativeTopic" }
 output = "CreativeIdea"
 multiple_output = true
-llm = "llm_for_creative_writing"
+model = "llm_for_creative_writing"
 prompt_template = """
 Brainstorm creative concepts related to this topic. Generate as many good ideas as come to mind:
 
@@ -62,7 +62,7 @@ type = "PipeLLM"
 description = "Analyze a single idea in detail"
 inputs = { single_idea = "CreativeIdea" }
 output = "IdeaAnalysis"
-llm = "llm_for_testing_gen_text"
+model = "llm_for_testing_gen_text"
 prompt_template = """
 Perform a detailed analysis of this creative idea:
 
@@ -83,7 +83,7 @@ type = "PipeLLM"
 description = "Evaluate and rank all analyzed ideas"
 inputs = { detailed_analyses = "IdeaAnalysis" }
 output = "IdeaEvaluation"
-llm = "llm_for_testing_gen_text"
+model = "llm_for_testing_gen_text"
 prompt_template = """
 Based on these detailed analyses, rank all ideas from best to worst:
 
@@ -100,7 +100,7 @@ type = "PipeLLM"
 description = "Select the best idea based on evaluation"
 inputs = { evaluation = "IdeaEvaluation" }
 output = "BestIdea"
-llm = "llm_for_testing_gen_text"
+model = "llm_for_testing_gen_text"
 prompt_template = """
 Based on this evaluation, select the single best idea and explain why it stands out:
 

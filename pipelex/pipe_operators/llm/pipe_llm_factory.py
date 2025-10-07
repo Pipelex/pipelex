@@ -104,8 +104,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         )
 
         llm_choices = LLMSettingChoices(
-            for_text=blueprint.llm,
-            for_object=blueprint.llm_to_structure,
+            for_text=blueprint.model,
+            for_object=blueprint.model_to_structure,
         )
 
         # output_multiplicity defaults to False for PipeLLM so unless it's run with explicit demand for multiple outputs,

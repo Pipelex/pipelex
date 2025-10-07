@@ -10,7 +10,7 @@ from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlu
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
-    from pipelex.cogt.extract.extract_setting import ExtractChoice
+    from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 
 
 class AvailableExtractModel(StrEnum):
@@ -71,7 +71,7 @@ class PipeExtractSpec(PipeSpec):
         base_blueprint = super().to_blueprint()
 
         # create extract choice as a str
-        extract_model_choice: ExtractChoice
+        extract_model_choice: ExtractModelChoice
         if isinstance(self.extract_skill, ExtractSkill):
             extract_model_choice = self.extract_skill.model_recommendation.value
         else:
@@ -84,7 +84,7 @@ class PipeExtractSpec(PipeSpec):
             output=base_blueprint.output,
             type=self.type,
             category=self.category,
-            ocr=extract_model_choice,
+            model=extract_model_choice,
             page_images=self.page_images,
             page_image_captions=self.page_image_captions,
             page_views=self.page_views,

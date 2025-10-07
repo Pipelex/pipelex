@@ -25,7 +25,7 @@ type = "PipeLLM"
 description = "Analyze document length and structure"
 inputs = { document = "DocumentInput" }
 output = "LengthAnalysis"
-llm = "llm_for_testing_gen_text"
+model = "llm_for_testing_gen_text"
 prompt_template = """
 Analyze the length and structure of this document:
 
@@ -42,7 +42,7 @@ type = "PipeLLM"
 description = "Analyze document content and themes"
 inputs = { document = "DocumentInput" }
 output = "ContentAnalysis"
-llm = "llm_for_testing_gen_text"
+model = "llm_for_testing_gen_text"
 prompt_template = """
 Analyze the content and themes of this document:
 

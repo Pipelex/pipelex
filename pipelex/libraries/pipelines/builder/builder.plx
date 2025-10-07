@@ -35,7 +35,7 @@ type = "PipeLLM"
 description = "Turn the brief into a DomainInformation object."
 inputs = { brief = "UserBrief" }
 output = "DomainInformation"
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 Name and define the domain of this process:
 @brief
@@ -51,7 +51,7 @@ type = "PipeLLM"
 description = "Turn the brief into a pseudo-code plan describing controllers, pipes, their inputs/outputs."
 inputs = { brief = "UserBrief" }
 output = "PlanDraft"
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 Return a draft of a plan that narrates the pipeline as pseudo-steps (no code):
 - Explicitly indicate when you are running things in sequence,
@@ -99,7 +99,7 @@ type = "PipeLLM"
 description = "Interpret the draft of a plan to create an AI pipeline, and define the needed concepts."
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief" }
 output = "ConceptDrafts"
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 We are working on writing an AI pipeline to fulfill this brief:
 @brief
@@ -145,7 +145,7 @@ description = "Structure the concept definitions."
 inputs = { concept_drafts = "ConceptDrafts", brief = "UserBrief" }
 output = "concept.ConceptSpec"
 multiple_output = true
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 system_prompt = """
 You are an expert at data extraction and json formatting.
 """
@@ -164,7 +164,7 @@ description = "Write the pipe signatures for the plan."
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeSignature"
 multiple_output = true
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 system_prompt = """
 You are a Senior engineer, very well versed in creating pipelines.
 You are very thorough about naming stuff, structured and rigorous in your planning.

@@ -11,9 +11,9 @@ from pipelex.cogt.exceptions import (
     LLMSettingsValidationError,
     ModelDeckValidatonError,
 )
-from pipelex.cogt.extract.extract_setting import ExtractChoice, ExtractSetting
-from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
-from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
+from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
+from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.tools.config.config_model import ConfigModel
@@ -36,12 +36,12 @@ class LLMDeckBlueprint(ConfigModel):
 
 class ExtractDeckBlueprint(ConfigModel):
     presets: dict[str, ExtractSetting] = Field(default_factory=dict)
-    choice_default: ExtractChoice
+    choice_default: ExtractModelChoice
 
 
 class ImgGenDeckBlueprint(ConfigModel):
     presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
-    choice_default: ImgGenChoice
+    choice_default: ImgGenModelChoice
 
 
 class ModelDeckBlueprint(ConfigModel):
@@ -64,12 +64,12 @@ class ModelDeck(ConfigModel):
     )
 
     extract_presets: dict[str, ExtractSetting] = Field(default_factory=dict)
-    extract_choice_default: ExtractChoice
+    extract_choice_default: ExtractModelChoice
 
     img_gen_presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
-    img_gen_choice_default: ImgGenChoice
+    img_gen_choice_default: ImgGenModelChoice
 
-    def check_llm_setting(self, llm_setting_or_preset_id: LLMChoice, is_disabled_allowed: bool = False):
+    def check_llm_setting(self, llm_setting_or_preset_id: LLMModelChoice, is_disabled_allowed: bool = False):
         if isinstance(llm_setting_or_preset_id, LLMSetting):
             return
         preset_id: str = llm_setting_or_preset_id
@@ -80,7 +80,7 @@ class ModelDeck(ConfigModel):
         msg = f"llm preset id '{preset_id}' not found in deck"
         raise LLMChoiceNotFoundError(msg)
 
-    def get_llm_setting(self, llm_choice: LLMChoice) -> LLMSetting:
+    def get_llm_setting(self, llm_choice: LLMModelChoice) -> LLMSetting:
         if isinstance(llm_choice, LLMSetting):
             return llm_choice
         # it's a string, so either an llm preset id or an llm handle
@@ -91,7 +91,7 @@ class ModelDeck(ConfigModel):
         msg = f"LLM choice '{llm_choice}' not found in deck"
         raise LLMChoiceNotFoundError(msg)
 
-    def get_extract_setting(self, extract_choice: ExtractChoice) -> ExtractSetting:
+    def get_extract_setting(self, extract_choice: ExtractModelChoice) -> ExtractSetting:
         if isinstance(extract_choice, ExtractSetting):
             return extract_choice
         # it's a string, so either an extract preset id or an extract handle
@@ -102,7 +102,7 @@ class ModelDeck(ConfigModel):
         msg = f"Extract choice '{extract_choice}' not found in deck"
         raise ExtractChoiceNotFoundError(msg)
 
-    def get_img_gen_setting(self, img_gen_choice: ImgGenChoice) -> ImgGenSetting:
+    def get_img_gen_setting(self, img_gen_choice: ImgGenModelChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):
             return img_gen_choice
         # it's a string, so either an img gen preset id or an img gen handle

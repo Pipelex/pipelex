@@ -88,8 +88,8 @@ class TestPipeLLM:
             inputs={"data": "Text"},
             output=f"test_structured_generations.{concept}",
             prompt_template=BasicStructuredDataTestCases.EXTRACTION_PROMPT,
-            llm=llm,
-            llm_to_structure=llm_to_structure,
+            model=llm,
+            model_to_structure=llm_to_structure,
             structuring_method=structuring_method,
         )
 

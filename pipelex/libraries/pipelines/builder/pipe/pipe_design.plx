@@ -44,7 +44,7 @@ type = "PipeLLM"
 description = "Build a PipeSequenceSpec from the signature (children referenced by code)."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeSequenceSpec"
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 Your job is to design a PipeSequenceSpec to orchestrate a sequence of pipe steps that will run one after the other.
 
@@ -63,7 +63,7 @@ type = "PipeLLM"
 description = "Build a PipeParallelSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeParallelSpec"
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 Your job is to design a PipeParallelSpec to orchestrate a bunch of pipe steps that will run in parallel.
 
@@ -82,7 +82,7 @@ type = "PipeLLM"
 description = "Build a PipeConditionSpec from the signature (provide expression/outcome consistent with children)."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeConditionSpec"
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 Your job is to design a PipeConditionSpec to route to the correct pipe step based on a conditional expression.
 
@@ -105,7 +105,7 @@ type = "PipeLLM"
 description = "Build a PipeLLMSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeLLMSpec"
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 Your job is to design a PipeLLMSpec to use an LLM to generate a text, or a structured object using different kinds of inputs.
 Whatever it's really going to do has already been decided, as you can see:
@@ -129,7 +129,7 @@ type = "PipeLLM"
 description = "Build a PipeExtractSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeExtractSpec"
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 Your job is to design a PipeExtractSpec to extract text from an image or a pdf.
 
@@ -148,7 +148,7 @@ type = "PipeLLM"
 description = "Build a PipeImgGenSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeImgGenSpec"
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 Your job is to design a PipeImgGenSpec to generate an image from a text prompt.
 
@@ -169,7 +169,7 @@ type = "PipeLLM"
 description = "Build a PipeComposeSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "PipeComposeSpec"
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 Your job is to design a PipeComposeSpec to render a jinja2 template.
 

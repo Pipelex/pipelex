@@ -31,4 +31,4 @@ class ImgGenSetting(ConfigModel):
         )
 
 
-ImgGenChoice = Union[ImgGenSetting, str]
+ImgGenModelChoice = Union[ImgGenSetting, str]

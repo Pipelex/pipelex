@@ -22,7 +22,7 @@ description = "Convert the ConceptSpec (with its structure draft) into a proper 
 inputs = { concept_spec_draft = "ConceptSpecDraft" }
 output = "ConceptStructureSpec"
 multiple_output = true
-llm = "llm_to_engineer"
+model = "llm_to_engineer"
 prompt_template = """
 Create a ConceptStructureSpec from the ConceptSpecDraft.
 Please focus only on the structure.

@@ -7,7 +7,7 @@ domain = "failing_pipelines"
 type = "PipeLLM"
 description = "This pipe is a dummy pipe"
 output = "Text"
-llm = { llm_handle = "gpt-4o-mini", temperature = 1, max_tokens = 50 }
+model = { llm_handle = "gpt-4o-mini", temperature = 1, max_tokens = 50 }
 prompt_template = """
 Output only "Hello".
 """
