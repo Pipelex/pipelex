@@ -440,7 +440,7 @@ Use `.pipelex/inference/deck/overrides.toml` for project-specific customizations
 llm_to_extract_invoice = { llm_handle = "gpt-4o-mini", temperature = 0.2 }
 
 [extract.presets]
-my_custom_extract extract ocr_handle = "mistral-ocr", max_nb_images = 5 }
+my_custom_extract = { ocr_handle = "mistral-ocr", max_nb_images = 5 }
 
 [img_gen.presets]
 my_custom_img_gen = { img_gen_handle = "flux-dev", quality = "medium" }
