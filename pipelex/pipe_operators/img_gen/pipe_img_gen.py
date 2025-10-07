@@ -247,7 +247,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         elif self.img_gen_handle is not None:
             # Legacy pattern: create ImgGenSetting from individual settings
             img_gen_setting = ImgGenSetting(
-                img_gen_handle=self.img_gen_handle,
+                model=self.img_gen_handle,
                 quality=self.quality,
                 nb_steps=self.nb_steps,
                 guidance_scale=self.guidance_scale or img_gen_param_defaults.guidance_scale,
@@ -280,7 +280,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             seed=seed,
         )
         # Get the image generation handle
-        img_gen_handle = img_gen_setting.img_gen_handle
+        img_gen_handle = img_gen_setting.model
         log.debug(f"Using img_gen handle: {img_gen_handle}")
 
         the_content: StuffContent

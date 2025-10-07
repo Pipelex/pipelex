@@ -76,7 +76,7 @@ class LLMAssignment(BaseModel):
 
     @property
     def llm_handle(self) -> str:
-        return self.llm_setting.llm_handle
+        return self.llm_setting.model
 
     @property
     def llm_job_params(self) -> LLMJobParams:

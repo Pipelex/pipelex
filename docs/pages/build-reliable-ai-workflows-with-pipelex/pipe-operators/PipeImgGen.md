@@ -60,7 +60,7 @@ type = "PipeImgGen"
 description = "Generate a futuristic car image"
 output = "Image"
 img_gen_prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
-img_gen = "base_img_gen"
+model = "base_img_gen"
 aspect_ratio = "16:9"
 quality = "hd"
 ```
@@ -79,7 +79,7 @@ description = "Generate three logo variations from a prompt"
 inputs = { prompt = "images.ImgGenPrompt" }
 output = "Image"
 nb_output = 3
-img_gen = "base_img_gen"
+model = "base_img_gen"
 aspect_ratio = "1:1"
 ```
 

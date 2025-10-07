@@ -93,7 +93,7 @@ class TestExternalPlugin:
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             prompt=PipeTestCases.USER_PROMPT,
             model=LLMSetting(
-                llm_handle=llm_handle,
+                model=llm_handle,
                 temperature=0.5,
                 max_tokens=None,
             ),

@@ -156,7 +156,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_llm_text_with_error(self, request: FixtureRequest):
-        llm_setting_main = LLMSetting(llm_handle="bad_handle_to_test_failure", temperature=0.5, max_tokens=100)
+        llm_setting_main = LLMSetting(model="bad_handle_to_test_failure", temperature=0.5, max_tokens=100)
         with pytest.raises(LLMHandleNotFoundError) as excinfo:
             await get_content_generator().make_llm_text(
                 job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]

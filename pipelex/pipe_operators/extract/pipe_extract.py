@@ -190,7 +190,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         )
         extract_output = await content_generator.make_extract_pages(
             extract_input=extract_input,
-            extract_handle=extract_setting.extract_handle,
+            extract_handle=extract_setting.model,
             job_metadata=job_metadata,
             extract_job_params=extract_job_params,
             extract_job_config=ExtractJobConfig(),

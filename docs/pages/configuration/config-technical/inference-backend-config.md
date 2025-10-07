@@ -131,7 +131,7 @@ Once configured, all models are available through the unified backend. Use stand
 ```plx
 [pipe.example]
 type = "PipeLLM"
-llm = { llm_handle = "claude-4.5-sonnet", temperature = 0.7 }
+model = { llm_handle = "claude-4.5-sonnet", temperature = 0.7 }
 # Model automatically routed through Pipelex Inference
 ```
 

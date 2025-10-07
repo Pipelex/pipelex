@@ -60,7 +60,7 @@ type = "PipeLLM"
 description = "Write markdown from page content"
 inputs = { "page_content.page_view" = "Page" } # The LLM receives the image of the page
 output = "ProofOfPurchase" # The LLM is forced to output a ProofOfPurchase object
-llm = "llm_for_img_to_text"
+model = "llm_for_img_to_text"
 structuring_method = "preliminary_text"
 system_prompt = """You are a multimodal LLM, expert at converting images into perfect markdown."""
 prompt_template = """

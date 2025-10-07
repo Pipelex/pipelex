@@ -105,7 +105,7 @@ class PipeLLMTestCases:
             type="PipeLLM",
             description="Generate with settings",
             model=LLMSetting(
-                llm_handle="claude-4.5-sonnet",
+                model="claude-4.5-sonnet",
                 temperature=0.7,
                 max_tokens=None,  # "auto" is handled at conversion to core
             ),

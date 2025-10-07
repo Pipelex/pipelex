@@ -130,7 +130,7 @@ python character.py
 type = "PipeLLM"
 description = "Create a character."
 output = "Text"
-llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
+model = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
@@ -142,7 +142,7 @@ Think of it and then output the character description."""
 type = "PipeLLM"
 description = "Create a character."
 output = "Text"
-llm = "llm_for_creative_writing"
+model = "llm_for_creative_writing"
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 

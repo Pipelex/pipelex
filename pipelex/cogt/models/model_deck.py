@@ -87,7 +87,7 @@ class ModelDeck(ConfigModel):
         if llm_preset := self.llm_presets.get(llm_choice):
             return llm_preset
         if self.is_handle_defined(model_handle=llm_choice):
-            return LLMSetting(llm_handle=llm_choice, temperature=0.7, max_tokens=None)
+            return LLMSetting(model=llm_choice, temperature=0.7, max_tokens=None)
         msg = f"LLM choice '{llm_choice}' not found in deck"
         raise LLMChoiceNotFoundError(msg)
 
@@ -98,7 +98,7 @@ class ModelDeck(ConfigModel):
         if extract_preset := self.extract_presets.get(extract_choice):
             return extract_preset
         if self.is_handle_defined(model_handle=extract_choice):
-            return ExtractSetting(extract_handle=extract_choice)
+            return ExtractSetting(model=extract_choice)
         msg = f"Extract choice '{extract_choice}' not found in deck"
         raise ExtractChoiceNotFoundError(msg)
 
@@ -109,14 +109,14 @@ class ModelDeck(ConfigModel):
         if img_gen_preset := self.img_gen_presets.get(img_gen_choice):
             return img_gen_preset
         if self.is_handle_defined(model_handle=img_gen_choice):
-            return ImgGenSetting(img_gen_handle=img_gen_choice)
+            return ImgGenSetting(model=img_gen_choice)
         msg = f"Image generation choice '{img_gen_choice}' not found in deck"
         raise ImgGenChoiceNotFoundError(msg)
 
     @classmethod
     def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]
         for llm_preset_id, llm_setting in deck.llm_presets.items():
-            inference_model = deck.get_required_inference_model(model_handle=llm_setting.llm_handle)
+            inference_model = deck.get_required_inference_model(model_handle=llm_setting.model)
             try:
                 cls._validate_llm_setting(llm_setting=llm_setting, inference_model=inference_model)
             except ConfigValidationError as exc:
@@ -132,13 +132,13 @@ class ModelDeck(ConfigModel):
         if inference_model.max_tokens is not None and (llm_setting_max_tokens := llm_setting.max_tokens):
             if llm_setting_max_tokens > inference_model.max_tokens:
                 msg = (
-                    f"LLM setting '{llm_setting.llm_handle}' has a max_tokens of {llm_setting_max_tokens}, "
+                    f"LLM setting '{llm_setting.model}' has a max_tokens of {llm_setting_max_tokens}, "
                     f"which is greater than the model's max_tokens of {inference_model.max_tokens}"
                 )
                 raise LLMSettingsValidationError(msg)
         if ModelConstraints.TEMPERATURE_MUST_BE_1 in inference_model.constraints and llm_setting.temperature != 1:
             msg = (
-                f"LLM setting '{llm_setting.llm_handle}' has a temperature of {llm_setting.temperature}, "
+                f"LLM setting '{llm_setting.model}' has a temperature of {llm_setting.temperature}, "
                 f"which is not allowed by the model's constraints: it must be 1"
             )
             raise LLMSettingsValidationError(msg)
@@ -165,8 +165,8 @@ class ModelDeck(ConfigModel):
 
     def validate_llm_presets(self) -> Self:
         for llm_preset_id, llm_setting in self.llm_presets.items():
-            if llm_setting.llm_handle not in self.inference_models:
-                msg = f"llm_handle '{llm_setting.llm_handle}' for llm_preset '{llm_preset_id}' not found in deck"
+            if llm_setting.model not in self.inference_models:
+                msg = f"llm_handle '{llm_setting.model}' for llm_preset '{llm_preset_id}' not found in deck"
                 raise LLMHandleNotFoundError(msg)
         return self
 

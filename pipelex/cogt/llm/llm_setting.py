@@ -9,7 +9,7 @@ from pipelex.types import Self
 
 
 class LLMSetting(ConfigModel):
-    llm_handle: str
+    model: str
     temperature: float = Field(..., ge=0, le=1)
     max_tokens: int | None = None
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
@@ -31,7 +31,7 @@ class LLMSetting(ConfigModel):
 
     def desc(self) -> str:
         return (
-            f"LLMSetting(llm_handle={self.llm_handle}, temperature={self.temperature}, "
+            f"LLMSetting(llm_handle={self.model}, temperature={self.temperature}, "
             f"max_tokens={self.max_tokens}, prompting_target={self.prompting_target})"
         )
 

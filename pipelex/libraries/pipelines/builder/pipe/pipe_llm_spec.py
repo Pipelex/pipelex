@@ -139,7 +139,7 @@ class PipeLLMSpec(PipeSpec):
 
         # Make it a LLMSetting if temperature is provided
         if self.temperature:
-            llm_choice = LLMSetting(llm_handle=llm_choice, temperature=self.temperature)
+            llm_choice = LLMSetting(model=llm_choice, temperature=self.temperature)
 
         return PipeLLMBlueprint(
             type="PipeLLM",

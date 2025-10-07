@@ -497,7 +497,7 @@ type = "PipeImgGen"
 description = "Generate a high-quality photo"
 inputs = { prompt = "ImgGenPrompt" }
 output = "Photo"
-img_gen = { img_gen_handle = "dall-e-3", quality = "hd" }
+model = { img_gen_handle = "flux-pro/v1.1-ultra", quality = "hd" }
 aspect_ratio = "16:9"
 nb_steps = 8
 ```
@@ -520,7 +520,7 @@ type = "PipeImgGen"
 description = "Generate image with custom settings"
 inputs = { prompt = "ImgGenPrompt" }
 output = "Image"
-img_gen = "img_gen_preset_name"  # Use predefined preset
+model = "img_gen_preset_name"  # Use predefined preset
 aspect_ratio = "1:1"
 quality = "hd"
 background = "transparent"
@@ -944,7 +944,7 @@ Here is an example of using an llm_handle to specify which LLM to use in a PipeL
 type = "PipeLLM"
 description = "Write text about Hello World."
 output = "Text"
-llm = { llm_handle = "gpt-5", temperature = 0.9 }
+model = { llm_handle = "gpt-5", temperature = 0.9 }
 prompt_template = """
 Write a haiku about Hello World.
 """
@@ -970,7 +970,7 @@ type = "PipeLLM"
 description = "Extract invoice information from an invoice text transcript"
 inputs = { invoice_text = "InvoiceText" }
 output = "Invoice"
-llm = "llm_to_extract_invoice"
+model = "llm_to_extract_invoice"
 prompt_template = """
 Extract invoice information from this invoice:
 
@@ -980,7 +980,7 @@ The category of this invoice is: $invoice_details.category.
 """
 ```
 
-The setting here `llm = "llm_to_extract_invoice"` works because "llm_to_extract_invoice" has been declared as an llm_preset in the deck.
+The setting here `model = "llm_to_extract_invoice"` works because "llm_to_extract_invoice" has been declared as an llm_preset in the deck.
 You must not use an LLM preset in a PipeLLM that does not exist in the deck. If needed, you can add llm presets.
 
 You can override the predefined llm presets by setting them in `.pipelex/inference/deck/overrides.toml`.

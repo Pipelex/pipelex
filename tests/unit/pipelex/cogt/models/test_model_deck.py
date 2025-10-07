@@ -31,8 +31,8 @@ class TestModelDeckGetOptionalInferenceModel:
             aliases=aliases or {},
             llm_presets={},
             llm_choice_defaults=LLMSettingChoicesDefaults(
-                for_text=LLMSetting(llm_handle="default_text", temperature=0.7, max_tokens=1000),
-                for_object=LLMSetting(llm_handle="default_object", temperature=0.1, max_tokens=1000),
+                for_text=LLMSetting(model="default_text", temperature=0.7, max_tokens=1000),
+                for_object=LLMSetting(model="default_object", temperature=0.1, max_tokens=1000),
             ),
             extract_presets={},
             extract_choice_default="base_ocr_mistral",

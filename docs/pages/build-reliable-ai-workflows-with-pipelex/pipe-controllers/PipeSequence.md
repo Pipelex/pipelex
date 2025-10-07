@@ -44,7 +44,7 @@ Let's imagine a pipeline that first extracts text from an image, then summarizes
 type = "PipeExtract"
 description = "Extract text from an image"
 output = "Text"
-ocr = "mistral-ocr"
+model = "mistral-ocr"
 
 [pipe.summarize_text]
 type = "PipeLLM"
