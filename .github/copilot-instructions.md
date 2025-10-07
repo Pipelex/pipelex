@@ -633,7 +633,7 @@ type = "PipeImgGen"
 description = "Generate a high-quality photo"
 inputs = { prompt = "ImgGenPrompt" }
 output = "Photo"
-model = { img_gen_handle = "flux-pro/v1.1-ultra", quality = "hd" }
+model = { model = "flux-pro/v1.1-ultra", quality = "hd" }
 aspect_ratio = "16:9"
 nb_steps = 8
 ```
@@ -815,7 +815,7 @@ Here is an example of using an llm_handle to specify which LLM to use in a PipeL
 type = "PipeLLM"
 description = "Write text about Hello World."
 output = "Text"
-model = { llm_handle = "gpt-5", temperature = 0.9 }
+model = { model = "gpt-5", temperature = 0.9 }
 prompt_template = """
 Write a haiku about Hello World.
 """
@@ -829,8 +829,8 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 
 Examples:
 ```toml
-llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
-llm_to_extract_invoice = { llm_handle = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
+llm_to_reason = { model = "base-claude", temperature = 1 }
+llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 
 The interest is that these presets can be used to set the LLM choice in a PipeLLM, like this:
