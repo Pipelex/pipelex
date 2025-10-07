@@ -10,13 +10,6 @@ from pipelex.types import StrEnum
 CONFIG_BASE_OVERRIDES_BEFORE_ENV = ["local"]
 CONFIG_BASE_OVERRIDES_AFTER_ENV = ["super"]
 
-
-class SecretMethod(StrEnum):
-    NONE = "none"
-    ENV_VAR = "env_var"
-    SECRET_PROVIDER = "secret_provider"
-
-
 class ConfigRoot(ConfigModel):
     """Main configuration class for the project.
 
