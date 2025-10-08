@@ -31,6 +31,8 @@ class LLMConfig(ConfigModel):
     llm_job_config: LLMJobConfig
     is_structure_prompt_enabled: bool
     default_max_images: int
+    is_dump_text_prompts_enabled: bool
+    is_dump_response_text_enabled: bool
 
 
 class InferenceManagerConfig(ConfigModel):

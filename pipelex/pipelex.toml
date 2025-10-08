@@ -88,6 +88,8 @@ is_auto_setup_preset_extract = true
 [cogt.llm_config]
 default_max_images = 100
 is_structure_prompt_enabled = true
+is_dump_text_prompts_enabled = false
+is_dump_response_text_enabled = false
 
 [cogt.llm_config.instructor_config]
 is_openai_structured_output_enabled = false

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
@@ -55,6 +55,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     async def _after_job(
         self,
         llm_job: LLMJob,
+        result: Any,  # noqa: ARG002
     ):
         # Report job
         llm_job.llm_job_after_complete()
@@ -79,7 +80,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         result = await self._gen_text(llm_job=llm_job)
 
-        await self._after_job(llm_job=llm_job)
+        await self._after_job(llm_job=llm_job, result=result)
 
         return result
 
@@ -110,7 +111,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if hasattr(result, "_raw_response"):
             delattr(result, "_raw_response")
 
-        await self._after_job(llm_job=llm_job)
+        await self._after_job(llm_job=llm_job, result=result)
 
         return result
 
