@@ -23,7 +23,7 @@ def detect_jinja2_required_variables(
         List of variable names required by the template
 
     Raises:
-        Jinja2StuffError: If neither jinja2 nor jinja2_name is provided
+        Jinja2DetectVariablesError: If there is an error parsing the template
 
     """
     jinja2_env = make_jinja2_env_without_loader(
