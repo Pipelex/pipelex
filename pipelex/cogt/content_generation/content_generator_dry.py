@@ -180,8 +180,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_jinja2_text(
         self,
         context: dict[str, Any],
-        jinja2_name: str | None = None,
-        jinja2: str | None = None,
+        jinja2: str,
         prompting_style: PromptingStyle | None = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
     ) -> str:
@@ -190,7 +189,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         jinja2_truncated = jinja2[: self._text_gen_truncate_length] if jinja2 else None
         return (
-            f"DRY RUN: {func_name} • context={context} • jinja2_name={jinja2_name} • "
+            f"DRY RUN: {func_name} • context={context} • "
             f"jinja2={jinja2_truncated} • prompting_style={prompting_style} • template_category={template_category}"
         )
 

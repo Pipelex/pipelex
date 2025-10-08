@@ -27,7 +27,7 @@ class TestPipeLLM:
             description="LLM test for basic text generation",
             output=NativeConceptCode.TEXT,
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
-            prompt=PipeTestCases.USER_PROMPT,
+            user_prompt=PipeTestCases.USER_PROMPT,
         )
         pipe = PipeLLMFactory.make_from_blueprint(
             domain="documents",
@@ -87,7 +87,7 @@ class TestPipeLLM:
             description=f"Extract {concept} from text",
             inputs={"data": "Text"},
             output=f"test_structured_generations.{concept}",
-            prompt_template=BasicStructuredDataTestCases.EXTRACTION_PROMPT,
+            user_prompt=BasicStructuredDataTestCases.EXTRACTION_PROMPT,
             model=llm,
             model_to_structure=llm_to_structure,
             structuring_method=structuring_method,
@@ -147,7 +147,7 @@ class TestPipeLLM:
                 inputs={stuff_name: InputRequirementBlueprint(concept=stuff.concept.concept_string)},
                 output=NativeConceptCode.TEXT,
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
-                prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,
+                user_prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,
             )
 
             pipe_job = PipeJobFactory.make_pipe_job(

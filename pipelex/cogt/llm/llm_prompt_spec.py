@@ -6,7 +6,6 @@ from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptSpecError
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
@@ -26,12 +25,8 @@ class LLMPromptSpec(BaseModel):
     prompting_style: PromptingStyle | None = None
 
     system_prompt_jinja2_blueprint: Jinja2Blueprint | None = None
-    system_prompt_verbatim_name: str | None = None
-    system_prompt: str | None = None
 
     user_text_jinja2_blueprint: Jinja2Blueprint | None = None
-    user_prompt_verbatim_name: str | None = None
-    user_text: str | None = None
 
     user_images: list[str] | None = None
 
@@ -60,18 +55,7 @@ class LLMPromptSpec(BaseModel):
         return self
 
     def validate_with_libraries(self):
-        llm_config = get_config().cogt.llm_config
-        if self.user_prompt_verbatim_name:
-            llm_config.get_template(template_name=self.user_prompt_verbatim_name)
-        if self.system_prompt_verbatim_name:
-            llm_config.get_template(template_name=self.system_prompt_verbatim_name)
-
-        if self.user_text_jinja2_blueprint and self.user_text_jinja2_blueprint.jinja2_name:
-            the_template = llm_config.get_template(template_name=self.user_text_jinja2_blueprint.jinja2_name)
-            log.debug(f"Validated jinja2 template '{self.user_text_jinja2_blueprint.jinja2_name}':\n{the_template}")
-        if self.system_prompt_jinja2_blueprint and self.system_prompt_jinja2_blueprint.jinja2_name:
-            the_template = llm_config.get_template(template_name=self.system_prompt_jinja2_blueprint.jinja2_name)
-            log.debug(f"Validated jinja2 template '{self.system_prompt_jinja2_blueprint.jinja2_name}':\n{the_template}")
+        pass
 
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
@@ -151,33 +135,32 @@ class LLMPromptSpec(BaseModel):
             for image_index, image_name in enumerate(prompt_user_images.keys()):
                 extra_params[image_name] = f"[Image {image_index + 1}]"
                 log.warning(f"Replacing image variable '{image_name}' with numbered tag '[Image {image_index + 1}]'")
-        user_text = await self._unravel_text(
-            context_provider=context_provider,
-            jinja2_blueprint=self.user_text_jinja2_blueprint,
-            text_verbatim_name=self.user_prompt_verbatim_name,
-            fixed_text=self.user_text,
-            extra_params=extra_params,
-        )
-        if not user_text:
-            # TODO: link to docs
-            msg = "Could not unravel user_text, we need either a jinja2_blueprint, a text_verbatim_name or a fixed user_text"
-            raise LLMPromptSpecError(msg)
-
-        if output_structure_prompt:
-            user_text += output_structure_prompt
+        user_text: str | None = None
+        if self.user_text_jinja2_blueprint:
+            user_text = await self._unravel_text(
+                context_provider=context_provider,
+                jinja2_blueprint=self.user_text_jinja2_blueprint,
+                extra_params=extra_params,
+            )
+            if output_structure_prompt:
+                user_text += output_structure_prompt
+        else:
+            user_text = output_structure_prompt
+            # Note that output_structure_prompt can be None
+            # it's OK to have a null user_text
 
         log.verbose(f"User text with {output_concept_string=}:\n {user_text}")
 
         ############################################################
         # System text
         ############################################################
-        system_text = await self._unravel_text(
-            context_provider=context_provider,
-            jinja2_blueprint=self.system_prompt_jinja2_blueprint,
-            text_verbatim_name=self.system_prompt_verbatim_name,
-            fixed_text=self.system_prompt,
-            extra_params=extra_params,
-        )
+        system_text: str | None = None
+        if self.system_prompt_jinja2_blueprint:
+            system_text = await self._unravel_text(
+                context_provider=context_provider,
+                jinja2_blueprint=self.system_prompt_jinja2_blueprint,
+                extra_params=extra_params,
+            )
 
         ############################################################
         # Full LLMPrompt
@@ -191,45 +174,25 @@ class LLMPromptSpec(BaseModel):
     async def _unravel_text(
         self,
         context_provider: ContextProviderAbstract,
-        jinja2_blueprint: Jinja2Blueprint | None,
-        text_verbatim_name: str | None,
-        fixed_text: str | None,
+        jinja2_blueprint: Jinja2Blueprint,
         extra_params: dict[str, Any] | None = None,
-    ) -> str | None:
-        the_text: str | None
-        if jinja2_blueprint:
-            log.verbose(f"Working with Jinja2 pipe '{jinja2_blueprint.jinja2_name}'")
-            if (prompting_style := self.prompting_style) and not jinja2_blueprint.prompting_style:
-                jinja2_blueprint.prompting_style = prompting_style
-                log.verbose(f"Setting prompting style to {prompting_style}")
+    ) -> str:
+        if (prompting_style := self.prompting_style) and not jinja2_blueprint.prompting_style:
+            jinja2_blueprint.prompting_style = prompting_style
+            log.verbose(f"Setting prompting style to {prompting_style}")
 
-            log.info(f"extra_params: {extra_params}")
-            log.info(f"jinja2_blueprint.extra_context: {jinja2_blueprint.extra_context}")
+        log.info(f"extra_params: {extra_params}")
+        log.info(f"jinja2_blueprint.extra_context: {jinja2_blueprint.extra_context}")
 
-            context: dict[str, Any] = context_provider.generate_jinja2_context()
-            if extra_params:
-                context.update(**extra_params)
-            if jinja2_blueprint.extra_context:
-                context.update(**jinja2_blueprint.extra_context)
+        context: dict[str, Any] = context_provider.generate_jinja2_context()
+        if extra_params:
+            context.update(**extra_params)
+        if jinja2_blueprint.extra_context:
+            context.update(**jinja2_blueprint.extra_context)
 
-            the_text = await get_content_generator().make_jinja2_text(
-                context=context,
-                jinja2_name=jinja2_blueprint.jinja2_name,
-                jinja2=jinja2_blueprint.jinja2,
-                prompting_style=self.prompting_style,
-                template_category=jinja2_blueprint.template_category,
-            )
-        elif text_verbatim_name:
-            llm_config = get_config().cogt.llm_config
-            user_text_verbatim = llm_config.get_template(
-                template_name=text_verbatim_name,
-            )
-            if not user_text_verbatim:
-                msg = f"Could not find text_verbatim template '{text_verbatim_name}'"
-                raise LLMPromptSpecError(msg)
-            the_text = user_text_verbatim
-        elif fixed_text:
-            the_text = fixed_text
-        else:
-            the_text = None
-        return the_text
+        return await get_content_generator().make_jinja2_text(
+            context=context,
+            jinja2=jinja2_blueprint.jinja2,
+            prompting_style=self.prompting_style,
+            template_category=jinja2_blueprint.template_category,
+        )

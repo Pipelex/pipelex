@@ -42,7 +42,7 @@ steps = [
                 description="Generate content",
                 inputs={"data": "InputData"},
                 output="ProcessedData",
-                prompt_template="Process this data: @data",
+                user_prompt="Process this data: @data",
             ),
             "sequence_pipe": PipeSequenceBlueprint(
                 type="PipeSequence",

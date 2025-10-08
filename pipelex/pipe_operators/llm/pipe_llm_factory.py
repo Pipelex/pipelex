@@ -14,7 +14,7 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_run_params import make_output_multiplicity
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
-from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
+from pipelex.tools.templating.jinja2_errors import TemplateSyntaxError
 
 
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
@@ -27,39 +27,34 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         blueprint: PipeLLMBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeLLM:
+        system_prompt_template = blueprint.system_prompt
+        if not system_prompt_template and (domain_obj := get_optional_domain(domain=domain)):
+            system_prompt_template = domain_obj.system_prompt
+
         system_prompt_jinja2_blueprint: Jinja2Blueprint | None = None
-        system_prompt: str | None = None
-        if blueprint.system_prompt_template or blueprint.system_prompt_template_name:
+        if system_prompt_template:
             try:
                 system_prompt_jinja2_blueprint = Jinja2Blueprint(
-                    jinja2=blueprint.system_prompt_template,
-                    jinja2_name=blueprint.system_prompt_template_name,
+                    jinja2=system_prompt_template,
                 )
-            except Jinja2TemplateError as exc:
-                error_msg = f"Jinja2 template error in system prompt for pipe '{pipe_code}' in domain '{domain}': {exc}."
-                if blueprint.system_prompt_template:
-                    error_msg += f"\nThe system prompt template is:\n{blueprint.system_prompt_template}"
-                else:
-                    error_msg += "The system prompt template is not provided."
+            except TemplateSyntaxError as exc:
+                error_msg = (
+                    f"Template syntax error in system prompt for pipe '{pipe_code}' "
+                    f"in domain '{domain}': {exc}. Template source:\n{blueprint.system_prompt}"
+                )
                 raise PipeDefinitionError(error_msg) from exc
-        elif not blueprint.system_prompt and not blueprint.system_prompt_name:
-            # really no system prompt provided, let's use the domain's default system prompt
-            if domain_obj := get_optional_domain(domain=domain):
-                system_prompt = domain_obj.system_prompt
 
         user_text_jinja2_blueprint: Jinja2Blueprint | None = None
-        if blueprint.prompt_template or blueprint.template_name:
+        if blueprint.user_prompt:
             try:
                 user_text_jinja2_blueprint = Jinja2Blueprint(
-                    jinja2=blueprint.prompt_template,
-                    jinja2_name=blueprint.template_name,
+                    jinja2=blueprint.user_prompt,
                 )
-            except Jinja2TemplateError as exc:
-                error_msg = f"Jinja2 syntax error in user prompt for pipe '{pipe_code}' in domain '{domain}': {exc}."
-                if blueprint.prompt_template:
-                    error_msg += f"\nThe prompt template is:\n{blueprint.prompt_template}"
-                else:
-                    error_msg += "The prompt template is not provided."
+            except TemplateSyntaxError as exc:
+                error_msg = (
+                    f"Template syntax error in user prompt for pipe '{pipe_code}' "
+                    f"in domain '{domain}': {exc}. Template source:\n{blueprint.user_prompt}"
+                )
                 raise PipeDefinitionError(error_msg) from exc
 
         user_images: list[str] = []
@@ -95,11 +90,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
 
         llm_prompt_spec = LLMPromptSpec(
             system_prompt_jinja2_blueprint=system_prompt_jinja2_blueprint,
-            system_prompt_verbatim_name=blueprint.system_prompt_name,
-            system_prompt=blueprint.system_prompt or system_prompt,
             user_text_jinja2_blueprint=user_text_jinja2_blueprint,
-            user_prompt_verbatim_name=blueprint.prompt_name,
-            user_text=blueprint.prompt,
             user_images=user_images or None,
         )
 

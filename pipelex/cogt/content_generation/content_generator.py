@@ -245,15 +245,13 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_jinja2_text(
         self,
         context: dict[str, Any],
-        jinja2_name: str | None = None,
-        jinja2: str | None = None,
+        jinja2: str,
         prompting_style: PromptingStyle | None = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
     ) -> str:
         log.debug(f"context: {context}")
         jinja2_assignment = Jinja2Assignment(
             context=context,
-            jinja2_name=jinja2_name,
             jinja2=jinja2,
             prompting_style=prompting_style,
             template_category=template_category,

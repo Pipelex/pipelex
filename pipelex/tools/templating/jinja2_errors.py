@@ -1,7 +1,7 @@
 from pipelex.tools.exceptions import ToolException
 
 
-class Jinja2TemplateError(ToolException):
+class TemplateSyntaxError(ToolException):
     pass
 
 

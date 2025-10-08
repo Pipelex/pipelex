@@ -21,15 +21,8 @@ class PipeLLMBlueprint(PipeBlueprint):
     model: LLMModelChoice | None = None
     model_to_structure: LLMModelChoice | None = None
 
-    system_prompt_template: str | None = None
-    system_prompt_template_name: str | None = None
-    system_prompt_name: str | None = None
     system_prompt: str | None = None
-
-    prompt_template: str | None = None
-    template_name: str | None = None
-    prompt_name: str | None = None
-    prompt: str | None = None
+    user_prompt: str | None = None
 
     structuring_method: StructuringMethod | None = None
     prompt_template_to_structure: str | None = None

@@ -1,6 +1,5 @@
 from typing import Any, ClassVar, Literal
 
-from jinja2 import TemplateSyntaxError
 from pydantic import ConfigDict, model_validator
 from typing_extensions import override
 
@@ -23,12 +22,11 @@ from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
+from pipelex.tools.templating.jinja2_errors import TemplateSyntaxError
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
 from pipelex.tools.templating.templating_models import PromptingStyle
-from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 from pipelex.types import Self
 
 
@@ -52,15 +50,11 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @model_validator(mode="after")
     def validate_jinja2(self) -> Self:
-        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["jinja2_name", "jinja2"]):
-            msg = "PipeCompose should have exactly one of jinja2_name or jinja2"
-            raise PipeDefinitionError(msg)
-        if self.jinja2:
-            try:
-                check_jinja2_parsing(jinja2_template_source=self.jinja2, template_category=self.template_category)
-            except TemplateSyntaxError as exc:
-                msg = f"Could not parse Jinja2 template included in PipeCompose: {exc}"
-                raise Jinja2TemplateError(msg) from exc
+        try:
+            check_jinja2_parsing(jinja2_template_source=self.jinja2, template_category=self.template_category)
+        except TemplateSyntaxError as exc:
+            msg = f"Could not parse template included in PipeCompose '{self.code}: {exc}"
+            raise PipeDefinitionError(msg) from exc
         return self
 
     @model_validator(mode="after")

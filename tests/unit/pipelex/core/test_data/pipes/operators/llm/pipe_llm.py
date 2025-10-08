@@ -24,7 +24,7 @@ prompt_template = "Generate a story about a programmer"
                 type="PipeLLM",
                 description="Generate text using LLM",
                 output=NativeConceptCode.TEXT,
-                prompt_template="Generate a story about a programmer",
+                user_prompt="Generate a story about a programmer",
             ),
         },
     ),
@@ -56,7 +56,7 @@ Extract information about $topic from this text:
                 description="Extract information from text",
                 inputs={"text": "Text", "topic": "Text"},
                 output=NativeConceptCode.TEXT,
-                prompt_template="Extract information about $topic from this text:\n\n@text\n",
+                user_prompt="Extract information about $topic from this text:\n\n@text\n",
             ),
         },
     ),
@@ -84,7 +84,7 @@ prompt_template = "Analyze the following data and provide insights"
                 description="Expert analysis with system prompt",
                 output=NativeConceptCode.TEXT,
                 system_prompt="You are a data analysis expert with 20 years of experience",
-                prompt_template="Analyze the following data and provide insights",
+                user_prompt="Analyze the following data and provide insights",
             ),
         },
     ),
@@ -113,7 +113,7 @@ Extract all articles/items from this invoice text: $extracted_text. For each ite
                 type="PipeLLM",
                 description="Expert analysis with system prompt",
                 output=NativeConceptCode.TEXT,
-                prompt_template="""Extract all articles/items from this invoice text: $extracted_text. For each item find: item name, quantity, unit price, total price, description, and product code if
+                user_prompt="""Extract all articles/items from this invoice text: $extracted_text. For each item find: item name, quantity, unit price, total price, description, and product code if
  available. Return each article as separate structured data.
 """,
             ),
@@ -142,7 +142,7 @@ nb_output = 3
                 description="Generate multiple ideas",
                 output=NativeConceptCode.TEXT,
                 nb_output=3,
-                prompt_template="Generate creative ideas for a mobile app",
+                user_prompt="Generate creative ideas for a mobile app",
             ),
         },
     ),
@@ -172,7 +172,7 @@ multiple_output = true
                 inputs={"problem": InputRequirementBlueprint(concept="Text")},
                 output=NativeConceptCode.TEXT,
                 multiple_output=True,
-                prompt_template="Brainstorm solutions for this problem: $problem",
+                user_prompt="Brainstorm solutions for this problem: $problem",
             ),
         },
     ),
@@ -200,41 +200,13 @@ prompt_template = "Describe what you see in this image in detail"
                 description="Analyze image content",
                 inputs={"image": "Image"},
                 output=NativeConceptCode.TEXT,
-                prompt_template="Describe what you see in this image in detail",
+                user_prompt="Describe what you see in this image in detail",
             ),
         },
     ),
 )
 
-# PipeLLM with template name instead of inline template
-PIPE_LLM_TEMPLATE_NAME = (
-    "pipe_llm_template_name",
-    """domain = "test_pipes"
-description = "Domain with pipe definitions"
-
-[pipe.use_template]
-type = "PipeLLM"
-description = "Use named template"
-inputs = { data = "Text" }
-output = "Text"
-template_name = "analysis_template"
-""",
-    PipelexBundleBlueprint(
-        domain="test_pipes",
-        description="Domain with pipe definitions",
-        pipe={
-            "use_template": PipeLLMBlueprint(
-                type="PipeLLM",
-                description="Use named template",
-                inputs={"data": "Text"},
-                output=NativeConceptCode.TEXT,
-                template_name="analysis_template",
-            ),
-        },
-    ),
-)
-
-# PipeLLM with fixed prompt (no template)
+# PipeLLM with fixed prompt (not an actual template)
 PIPE_LLM_FIXED_PROMPT = (
     "pipe_llm_fixed_prompt",
     """domain = "test_pipes"
@@ -254,7 +226,7 @@ prompt = "Write a haiku about programming"
                 type="PipeLLM",
                 description="Simple text generation with fixed prompt",
                 output=NativeConceptCode.TEXT,
-                prompt="Write a haiku about programming",
+                user_prompt="Write a haiku about programming",
             ),
         },
     ),
@@ -283,8 +255,8 @@ prompt_template = "Analyze this content: @content"
                 description="Analysis with dynamic system prompt",
                 inputs={"expertise_level": "Text", "content": "Text"},
                 output=NativeConceptCode.TEXT,
-                system_prompt_template="You are an expert with $expertise_level level knowledge",
-                prompt_template="Analyze this content: @content",
+                system_prompt="You are an expert with $expertise_level level knowledge",
+                user_prompt="Analyze this content: @content",
             ),
         },
     ),
@@ -316,7 +288,7 @@ prompt_template = "Extract person information from this text: @text"
                 description="Extract structured person information",
                 inputs={"text": InputRequirementBlueprint(concept="Text", multiplicity=1)},
                 output="PersonInfo",
-                prompt_template="Extract person information from this text: @text",
+                user_prompt="Extract person information from this text: @text",
             ),
         },
     ),
@@ -355,7 +327,7 @@ Documents: @documents
                     "query": InputRequirementBlueprint(concept="Text", multiplicity=False),
                 },
                 output="DocumentSummary",
-                prompt_template="""Analyze these documents based on the query: $query
+                user_prompt="""Analyze these documents based on the query: $query
 
 Documents: @documents
 """,
@@ -373,7 +345,6 @@ PIPE_LLM_TEST_CASES = [
     PIPE_LLM_MULTIPLE_OUTPUTS,
     PIPE_LLM_DYNAMIC_MULTIPLE,
     PIPE_LLM_VISION,
-    PIPE_LLM_TEMPLATE_NAME,
     PIPE_LLM_FIXED_PROMPT,
     PIPE_LLM_SYSTEM_TEMPLATE,
     PIPE_LLM_STRUCTURED_OUTPUT,
