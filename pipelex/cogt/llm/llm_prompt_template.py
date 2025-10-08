@@ -93,6 +93,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
         # input variables can be applied to prompt texts used as templates
         if llm_prompt.system_text:
             try:
+                # TODO: use jinja2 templating here
                 llm_prompt.system_text = llm_prompt.system_text.format(**all_template_inputs.root)
             except KeyError as exc:
                 error_msg = f"Could not apply inputs to system_text. KeyError = {exc}. system_text = '{llm_prompt.system_text}'"
@@ -102,6 +103,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
                 raise LLMPromptFactoryError(message=error_msg) from exc
         if llm_prompt.user_text:
             try:
+                # TODO: use jinja2 templating here
                 llm_prompt.user_text = llm_prompt.user_text.format(**all_template_inputs.root)
             except KeyError as exc:
                 error_msg = f"Could not apply inputs to user_text. KeyError = {exc}. user_text = '{llm_prompt.user_text}'"
