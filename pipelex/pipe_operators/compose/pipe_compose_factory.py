@@ -8,7 +8,7 @@ from pipelex.hub import get_required_concept
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
 from pipelex.tools.templating.template_preprocessor import preprocess_template
 
 
@@ -22,7 +22,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         blueprint: PipeComposeBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeCompose:
-        preprocessed_template = preprocess_template(blueprint.jinja2)
+        preprocessed_template = preprocess_template(blueprint.template_source)
         check_jinja2_parsing(
             jinja2_template_source=preprocessed_template,
             template_category=blueprint.template_category,
@@ -49,7 +49,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
                 ),
             ),
             jinja2=preprocessed_template,
-            prompting_style=blueprint.prompting_style,
+            templating_style=blueprint.templating_style,
             template_category=blueprint.template_category,
             extra_context=blueprint.extra_context,
         )
@@ -64,7 +64,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         preprocessed_template = preprocess_template(template_str)
         check_jinja2_parsing(
             jinja2_template_source=preprocessed_template,
-            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+            template_category=TemplateCategory.LLM_PROMPT,
         )
         return PipeCompose(
             domain=domain,

@@ -25,8 +25,8 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_errors import TemplateSyntaxError
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.templating_models import PromptingStyle
+from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.types import Self
 
 
@@ -44,8 +44,8 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     )
 
     jinja2: str
-    prompting_style: PromptingStyle | None = None
-    template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
+    templating_style: TemplatingStyle | None = None
+    template_category: TemplateCategory = TemplateCategory.BASIC
     extra_context: dict[str, Any] | None = None
 
     @model_validator(mode="after")
@@ -88,7 +88,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @property
     def desc(self) -> str:
-        return f"Jinja2 included template, prompting style {self.prompting_style}"
+        return f"Jinja2 included template, prompting style {self.templating_style}"
 
     @override
     def required_variables(self) -> set[str]:
@@ -125,7 +125,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         jinja2_text = await content_generator.make_jinja2_text(
             context=context,
             jinja2=self.jinja2,
-            prompting_style=self.prompting_style,
+            templating_style=self.templating_style,
             template_category=self.template_category,
         )
         log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")

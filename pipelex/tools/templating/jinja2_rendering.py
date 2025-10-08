@@ -16,13 +16,9 @@ from pipelex.tools.templating.jinja2_errors import (
 )
 from pipelex.tools.templating.jinja2_models import Jinja2ContextKey
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
 from pipelex.tools.templating.template_preprocessor import preprocess_template
-from pipelex.tools.templating.templating_models import PromptingStyle
-
-########################################################################################
-# Jinja2 rendering
-########################################################################################
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 def _add_to_templating_context(temlating_context: dict[str, Any], jinja2_context_key: Jinja2ContextKey, value: Any) -> None:
@@ -34,9 +30,9 @@ def _add_to_templating_context(temlating_context: dict[str, Any], jinja2_context
 
 async def render_jinja2(
     template_source: str,
-    template_category: Jinja2TemplateCategory,
+    template_category: TemplateCategory,
     temlating_context: dict[str, Any],
-    prompting_style: PromptingStyle | None = None,
+    templating_style: TemplatingStyle | None = None,
 ) -> str:
     jinja2_env = make_jinja2_env_without_loader(
         template_category=template_category,
@@ -60,16 +56,16 @@ async def render_jinja2(
         if undeclared_variables:
             log.verbose(undeclared_variables, "Jinja2 undeclared_variables")
     temlating_context = temlating_context.copy()
-    if prompting_style:
+    if templating_style:
         _add_to_templating_context(
             temlating_context=temlating_context,
             jinja2_context_key=Jinja2ContextKey.TAG_STYLE,
-            value=prompting_style.tag_style,
+            value=templating_style.tag_style,
         )
         _add_to_templating_context(
             temlating_context=temlating_context,
             jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT,
-            value=prompting_style.text_format,
+            value=templating_style.text_format,
         )
 
     try:

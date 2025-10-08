@@ -1,50 +1,52 @@
 from jinja2 import BaseLoader, Environment, PackageLoader
 
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
 
 
 def make_jinja2_env_from_loader(
-    template_category: Jinja2TemplateCategory,
+    template_category: TemplateCategory,
     loader: BaseLoader,
 ) -> Environment:
+    autoescape: bool
+    trim_blocks: bool
+    lstrip_blocks: bool
     match template_category:
-        case Jinja2TemplateCategory.HTML:
-            jinja2_env = Environment(
-                loader=loader,
-                enable_async=True,
-                autoescape=False,
-                trim_blocks=True,
-                lstrip_blocks=True,
-            )
-        case Jinja2TemplateCategory.MARKDOWN:
-            jinja2_env = Environment(
-                loader=loader,
-                enable_async=True,
-                autoescape=False,
-                trim_blocks=True,
-                lstrip_blocks=True,
-            )
-        case Jinja2TemplateCategory.MERMAID:
-            jinja2_env = Environment(
-                loader=loader,
-                enable_async=True,
-                autoescape=False,
-                trim_blocks=False,
-                lstrip_blocks=False,
-            )
-        case Jinja2TemplateCategory.LLM_PROMPT:
-            jinja2_env = Environment(
-                loader=loader,
-                enable_async=True,
-                autoescape=False,
-                trim_blocks=False,
-                lstrip_blocks=False,
-            )
-    return jinja2_env
+        case TemplateCategory.BASIC:
+            autoescape = False
+            trim_blocks = False
+            lstrip_blocks = False
+        case TemplateCategory.EXPRESSION:
+            autoescape = False
+            trim_blocks = False
+            lstrip_blocks = False
+        case TemplateCategory.HTML:
+            autoescape = False
+            trim_blocks = True
+            lstrip_blocks = True
+        case TemplateCategory.MARKDOWN:
+            autoescape = False
+            trim_blocks = True
+            lstrip_blocks = True
+        case TemplateCategory.MERMAID:
+            autoescape = False
+            trim_blocks = False
+            lstrip_blocks = False
+        case TemplateCategory.LLM_PROMPT:
+            autoescape = False
+            trim_blocks = False
+            lstrip_blocks = False
+
+    return Environment(
+        loader=loader,
+        enable_async=True,
+        autoescape=autoescape,
+        trim_blocks=trim_blocks,
+        lstrip_blocks=lstrip_blocks,
+    )
 
 
 def make_jinja2_env_from_package(
-    template_category: Jinja2TemplateCategory,
+    template_category: TemplateCategory,
     package_name: str,
     package_path: str,
 ) -> tuple[Environment, BaseLoader]:
@@ -58,7 +60,7 @@ def make_jinja2_env_from_package(
 
 
 def make_jinja2_env_without_loader(
-    template_category: Jinja2TemplateCategory,
+    template_category: TemplateCategory,
 ) -> Environment:
     loader = BaseLoader()
     jinja2_env = make_jinja2_env_from_loader(template_category=template_category, loader=loader)

@@ -7,7 +7,7 @@ from typing_extensions import override
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.exceptions import StuffArtefactError
 from pipelex.tools.templating.jinja2_models import Jinja2ContextKey, Jinja2TaggableAbstract
-from pipelex.tools.templating.templating_models import TextFormat
+from pipelex.tools.templating.templating_style import TextFormat
 
 
 class StuffArtefact(RootModel[dict[str, Any]], Jinja2TaggableAbstract):

@@ -12,8 +12,8 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.templating_models import PromptingStyle
+from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
@@ -113,8 +113,8 @@ class ContentGeneratorProtocol(Protocol):
         self,
         context: dict[str, Any],
         jinja2: str,
-        prompting_style: PromptingStyle | None = None,
-        template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
+        templating_style: TemplatingStyle | None = None,
+        template_category: TemplateCategory | None = None,
     ) -> str: ...
 
     async def make_extract_pages(

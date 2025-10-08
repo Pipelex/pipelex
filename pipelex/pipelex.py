@@ -212,13 +212,8 @@ class Pipelex(metaclass=MetaSingleton):
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}")
 
     def setup_libraries(self):
-        try:
-            self.library_manager.setup()
-            self.library_manager.load_libraries()
-        except ValidationError as exc:
-            formatted_error_msg = format_pydantic_validation_error(exc)
-            msg = f"Could not setup libraries because of: {formatted_error_msg}"
-            raise PipelexSetupError(msg) from exc
+        self.library_manager.setup()
+        self.library_manager.load_libraries()
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_config().project_name}")
 
     def validate_libraries(self):

@@ -1,6 +1,5 @@
 from typing_extensions import override
 
-from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_setting import LLMSettingChoices
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -10,11 +9,13 @@ from pipelex.core.pipes.input_requirements_factory import InputRequirementsFacto
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_native_concept, get_optional_domain, get_required_concept
+from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_run_params import make_output_multiplicity
-from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_errors import TemplateSyntaxError
+from pipelex.tools.templating.template_blueprint import TemplateBlueprint
+from pipelex.tools.templating.template_category import TemplateCategory
 
 
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
@@ -31,11 +32,12 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         if not system_prompt and (domain_obj := get_optional_domain(domain=domain)):
             system_prompt = domain_obj.system_prompt
 
-        system_prompt_jinja2_blueprint: Jinja2Blueprint | None = None
+        system_prompt_jinja2_blueprint: TemplateBlueprint | None = None
         if system_prompt:
             try:
-                system_prompt_jinja2_blueprint = Jinja2Blueprint(
-                    jinja2=system_prompt,
+                system_prompt_jinja2_blueprint = TemplateBlueprint(
+                    source=system_prompt,
+                    category=TemplateCategory.LLM_PROMPT,
                 )
             except TemplateSyntaxError as exc:
                 error_msg = (
@@ -44,11 +46,12 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 )
                 raise PipeDefinitionError(error_msg) from exc
 
-        user_text_jinja2_blueprint: Jinja2Blueprint | None = None
+        user_text_jinja2_blueprint: TemplateBlueprint | None = None
         if blueprint.prompt:
             try:
-                user_text_jinja2_blueprint = Jinja2Blueprint(
-                    jinja2=blueprint.prompt,
+                user_text_jinja2_blueprint = TemplateBlueprint(
+                    source=blueprint.prompt,
+                    category=TemplateCategory.LLM_PROMPT,
                 )
             except TemplateSyntaxError as exc:
                 error_msg = (
@@ -87,9 +90,9 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     for field_path in image_field_paths:
                         user_images.append(f"{stuff_name}.{field_path}")
 
-        llm_prompt_spec = LLMPromptSpec(
-            system_prompt_jinja2_blueprint=system_prompt_jinja2_blueprint,
-            user_text_jinja2_blueprint=user_text_jinja2_blueprint,
+        llm_prompt_spec = LLMPromptBlueprint(
+            system_prompt_blueprint=system_prompt_jinja2_blueprint,
+            prompt_blueprint=user_text_jinja2_blueprint,
             user_images=user_images or None,
         )
 

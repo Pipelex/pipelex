@@ -21,6 +21,7 @@ class SectionKey(StrEnum):
 
 
 CONCEPT_STRUCTURE_FIELD_KEY = "structure"
+PIPE_TEMPLATE_FIELD_KEY = "template"
 
 
 class PlxFactory:
@@ -93,17 +94,24 @@ class PlxFactory:
 
         This creates a second-level standard table, and only uses inline tables for
         third level and deeper structures.
+
+        Special case: template field is converted to a nested table section instead of inline.
         """
         tbl = table()
 
         # If field ordering is provided, add fields in the specified order first
         if field_ordering:
             for field_key in field_ordering:
-                if field_key in mapping and field_key != "category":  # Skip category field
+                if field_key in mapping and field_key != "category":  # Skip category field (pipe metadata)
                     field_value = mapping[field_key]
                     if isinstance(field_value, Mapping):
-                        # Third-level mapping -> inline table
-                        tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
+                        # Special handling for template field - create nested table instead of inline
+                        if field_key == PIPE_TEMPLATE_FIELD_KEY:
+                            field_value = cast("Mapping[str, Any]", field_value)
+                            tbl.add(field_key, cls.make_template_table(template_value=field_value))
+                        else:
+                            # Third-level mapping -> inline table
+                            tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
                     else:
                         tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
 
@@ -111,20 +119,30 @@ class PlxFactory:
             for field_key, field_value in mapping.items():
                 if field_key not in field_ordering and field_key != "category":
                     if isinstance(field_value, Mapping):
-                        # Third-level mapping -> inline table
-                        tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
+                        # Special handling for template field - create nested table instead of inline
+                        if field_key == PIPE_TEMPLATE_FIELD_KEY:
+                            field_value = cast("Mapping[str, Any]", field_value)
+                            tbl.add(field_key, cls.make_template_table(template_value=field_value))
+                        else:
+                            # Third-level mapping -> inline table
+                            tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
                     else:
                         tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
         else:
             # No field ordering provided, use original logic
             for field_key, field_value in mapping.items():
-                # Skip the category field as it's not needed in PLX output
+                # Skip the category field as it's not needed in PLX output (pipe metadata)
                 if field_key == "category":
                     continue
 
                 if isinstance(field_value, Mapping):
-                    # Third-level mapping -> inline table
-                    tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
+                    # Special handling for template field - create nested table instead of inline
+                    if field_key == PIPE_TEMPLATE_FIELD_KEY:
+                        field_value = cast("Mapping[str, Any]", field_value)
+                        tbl.add(field_key, cls.make_template_table(template_value=field_value))
+                    else:
+                        # Third-level mapping -> inline table
+                        tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
                 else:
                     tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
         return tbl
@@ -196,6 +214,16 @@ class PlxFactory:
         return find_and_replace_inline_tables(toml_string)
 
     @classmethod
+    def make_template_table(cls, template_value: Mapping[str, Any]) -> Any:
+        """Create a table for template fields, preserving all fields including category."""
+        tbl = table()
+        # For template, we want to keep all fields including 'category'
+        # which has a different meaning than the pipe's category field
+        for template_field_key, template_field_value in template_value.items():
+            tbl.add(template_field_key, cls.convert_dicts_to_inline_tables(template_field_value))
+        return tbl
+
+    @classmethod
     def make_table_obj_for_pipe(cls, section_value: Mapping[str, Any]) -> Any:
         """Make a table object for a pipe section."""
         log.debug("******** Making table object for pipe section ********")
@@ -208,6 +236,7 @@ class PlxFactory:
                 continue
             log.debug(f"Field is a mapping: key = {field_key}, value = {field_value}")
             field_value = cast("Mapping[str, Any]", field_value)
+            # Convert pipe configuration to table (handles template field specially)
             table_obj.add(field_key, cls.convert_mapping_to_table(field_value, field_ordering=cls._plx_config().pipes.field_ordering))
         return table_obj
 

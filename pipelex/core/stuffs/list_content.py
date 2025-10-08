@@ -4,7 +4,7 @@ from json2html import json2html
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
-from pipelex.tools.templating.templating_models import TextFormat
+from pipelex.tools.templating.templating_style import TextFormat
 
 
 class ListContent(StuffContent, Generic[StuffContentType]):

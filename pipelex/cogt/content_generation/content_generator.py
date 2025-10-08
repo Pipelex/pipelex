@@ -29,8 +29,8 @@ from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.templating_models import PromptingStyle
+from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -246,15 +246,15 @@ class ContentGenerator(ContentGeneratorProtocol):
         self,
         context: dict[str, Any],
         jinja2: str,
-        prompting_style: PromptingStyle | None = None,
-        template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
+        templating_style: TemplatingStyle | None = None,
+        template_category: TemplateCategory | None = None,
     ) -> str:
         log.debug(f"context: {context}")
         jinja2_assignment = Jinja2Assignment(
             context=context,
-            jinja2=jinja2,
-            prompting_style=prompting_style,
-            template_category=template_category,
+            source=jinja2,
+            templating_style=templating_style,
+            category=template_category or TemplateCategory.BASIC,
         )
         return await jinja2_gen_text(jinja2_assignment=jinja2_assignment)
 

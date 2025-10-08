@@ -3,8 +3,9 @@ from typing import ClassVar
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.libraries.pipelines.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
+from pipelex.tools.templating.template_blueprint import TemplateBlueprint
+from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
 
 
 class PipeComposeTestCases:
@@ -15,7 +16,7 @@ class PipeComposeTestCases:
             description="Render a template",
             inputs={"data": "Data"},
             output="RenderedText",
-            jinja2="Hello {{ data.name }}!",
+            template="Hello {{ data.name }}!",
             target_format="markdown",
         ),
         PipeComposeBlueprint(
@@ -24,13 +25,15 @@ class PipeComposeTestCases:
             output="RenderedText",
             type="PipeCompose",
             category="PipeOperator",
-            jinja2="Hello {{ data.name }}!",
-            prompting_style=PromptingStyle(
-                tag_style=TagStyle.TICKS,
-                text_format=TextFormat.MARKDOWN,
+            template=TemplateBlueprint(
+                source="Hello {{ data.name }}!",
+                category=TemplateCategory.MARKDOWN,
+                templating_style=TemplatingStyle(
+                    tag_style=TagStyle.TICKS,
+                    text_format=TextFormat.MARKDOWN,
+                ),
+                extra_context=None,
             ),
-            template_category=Jinja2TemplateCategory.MARKDOWN,
-            extra_context=None,
         ),
     )
 

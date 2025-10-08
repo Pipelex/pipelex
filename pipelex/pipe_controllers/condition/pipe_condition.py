@@ -31,7 +31,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 from pipelex.types import Self
 
@@ -109,7 +109,7 @@ class PipeCondition(PipeController):
         # TODO: use jinja2 directly without going though a pipe
         # Variables from the expression/expression_template
         expression_required_variables = detect_jinja2_required_variables(
-            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+            template_category=TemplateCategory.EXPRESSION,
             template_source=self.applied_expression_template,
         )
         required_variables.update(expression_required_variables)
@@ -142,7 +142,7 @@ class PipeCondition(PipeController):
 
         # 1. Add the variables from the expression/expression_template
         required_variables = detect_jinja2_required_variables(
-            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+            template_category=TemplateCategory.EXPRESSION,
             template_source=self.applied_expression_template,
         )
 
@@ -253,7 +253,7 @@ class PipeCondition(PipeController):
         evaluated_expression = await content_generator.make_jinja2_text(
             context=working_memory.generate_jinja2_context(),
             jinja2=self.applied_expression_template,
-            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+            template_category=TemplateCategory.EXPRESSION,
         )
 
         # Validate the evaluated expression
@@ -387,7 +387,7 @@ class PipeCondition(PipeController):
         # 2. Validate that the expression template is valid
         try:
             required_variables = detect_jinja2_required_variables(
-                template_category=Jinja2TemplateCategory.LLM_PROMPT,
+                template_category=TemplateCategory.EXPRESSION,
                 template_source=self.applied_expression_template,
             )
             log.debug(f"Expression template is valid, requires variables: {required_variables}")

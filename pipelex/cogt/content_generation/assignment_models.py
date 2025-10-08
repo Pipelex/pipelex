@@ -14,8 +14,8 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.hub import get_class_registry
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.templating_models import PromptingStyle
+from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class LLMAssignmentFactory(BaseModel):
@@ -128,9 +128,9 @@ class ImgGenAssignment(BaseModel):
 
 class Jinja2Assignment(BaseModel):
     context: dict[str, Any]
-    jinja2: str
-    prompting_style: PromptingStyle | None = None
-    template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
+    source: str
+    templating_style: TemplatingStyle | None = None
+    category: TemplateCategory
 
 
 class ExtractAssignment(BaseModel):

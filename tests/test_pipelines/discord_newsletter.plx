@@ -81,8 +81,10 @@ type = "PipeCompose"
 description = "Combine weekly and channel summaries into a complete newsletter following specific formatting requirements"
 inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummary" }
 output = "HtmlNewsletter"
-template_category = "html"
-jinja2 = """
+
+[pipe.format_html_newsletter.template]
+category = "html"
+source = """
 <!-- Weekly Summary -->
 <h2>☀️ Weekly Summary</h2>
 <p>

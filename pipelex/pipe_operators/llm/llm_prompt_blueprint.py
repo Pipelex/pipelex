@@ -9,20 +9,19 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
-from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.templating.template_blueprint import TemplateBlueprint
 from pipelex.tools.templating.template_preprocessor import preprocess_template
-from pipelex.tools.templating.templating_models import PromptingStyle
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
 
 
-# TODO: move this to pipe operators
-class LLMPromptSpec(BaseModel):
-    prompting_style: PromptingStyle | None = None
-    system_prompt_jinja2_blueprint: Jinja2Blueprint | None = None
-    user_text_jinja2_blueprint: Jinja2Blueprint | None = None
+class LLMPromptBlueprint(BaseModel):
+    templating_style: TemplatingStyle | None = None
+    system_prompt_blueprint: TemplateBlueprint | None = None
+    prompt_blueprint: TemplateBlueprint | None = None
     user_images: list[str] | None = None
 
     def validate_with_libraries(self):
@@ -34,20 +33,20 @@ class LLMPromptSpec(BaseModel):
             user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
             required_variables.update(user_images_top_object_name)
 
-        if self.user_text_jinja2_blueprint:
-            template_source = preprocess_template(self.user_text_jinja2_blueprint.jinja2)
+        if self.prompt_blueprint:
+            template_source = preprocess_template(self.prompt_blueprint.source)
             required_variables.update(
                 detect_jinja2_required_variables(
-                    template_category=self.user_text_jinja2_blueprint.template_category,
+                    template_category=self.prompt_blueprint.category,
                     template_source=template_source,
                 )
             )
 
-        if self.system_prompt_jinja2_blueprint:
-            system_prompt_template_source = preprocess_template(self.system_prompt_jinja2_blueprint.jinja2)
+        if self.system_prompt_blueprint:
+            system_prompt_template_source = preprocess_template(self.system_prompt_blueprint.source)
             required_variables.update(
                 detect_jinja2_required_variables(
-                    template_category=self.system_prompt_jinja2_blueprint.template_category,
+                    template_category=self.system_prompt_blueprint.category,
                     template_source=system_prompt_template_source,
                 )
             )
@@ -119,10 +118,10 @@ class LLMPromptSpec(BaseModel):
                 extra_params[image_name] = f"[Image {image_index + 1}]"
                 log.warning(f"Replacing image variable '{image_name}' with numbered tag '[Image {image_index + 1}]'")
         user_text: str | None = None
-        if self.user_text_jinja2_blueprint:
+        if self.prompt_blueprint:
             user_text = await self._unravel_text(
                 context_provider=context_provider,
-                jinja2_blueprint=self.user_text_jinja2_blueprint,
+                jinja2_blueprint=self.prompt_blueprint,
                 extra_params=extra_params,
             )
             if output_structure_prompt:
@@ -138,10 +137,10 @@ class LLMPromptSpec(BaseModel):
         # System text
         ############################################################
         system_text: str | None = None
-        if self.system_prompt_jinja2_blueprint:
+        if self.system_prompt_blueprint:
             system_text = await self._unravel_text(
                 context_provider=context_provider,
-                jinja2_blueprint=self.system_prompt_jinja2_blueprint,
+                jinja2_blueprint=self.system_prompt_blueprint,
                 extra_params=extra_params,
             )
 
@@ -157,12 +156,12 @@ class LLMPromptSpec(BaseModel):
     async def _unravel_text(
         self,
         context_provider: ContextProviderAbstract,
-        jinja2_blueprint: Jinja2Blueprint,
+        jinja2_blueprint: TemplateBlueprint,
         extra_params: dict[str, Any] | None = None,
     ) -> str:
-        if (prompting_style := self.prompting_style) and not jinja2_blueprint.prompting_style:
-            jinja2_blueprint.prompting_style = prompting_style
-            log.verbose(f"Setting prompting style to {prompting_style}")
+        if (templating_style := self.templating_style) and not jinja2_blueprint.templating_style:
+            jinja2_blueprint.templating_style = templating_style
+            log.verbose(f"Setting prompting style to {templating_style}")
 
         log.info(f"extra_params: {extra_params}")
         log.info(f"jinja2_blueprint.extra_context: {jinja2_blueprint.extra_context}")
@@ -175,7 +174,7 @@ class LLMPromptSpec(BaseModel):
 
         return await get_content_generator().make_jinja2_text(
             context=context,
-            jinja2=jinja2_blueprint.jinja2,
-            prompting_style=self.prompting_style,
-            template_category=jinja2_blueprint.template_category,
+            jinja2=jinja2_blueprint.source,
+            templating_style=self.templating_style,
+            template_category=jinja2_blueprint.category,
         )

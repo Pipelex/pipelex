@@ -8,7 +8,6 @@ from pipelex.cogt.content_generation.content_generator_dry import ContentGenerat
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
-from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
@@ -40,6 +39,7 @@ from pipelex.hub import (
     get_required_domain,
     get_required_pipe,
 )
+from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import (
@@ -49,7 +49,7 @@ from pipelex.pipe_run.pipe_run_params import (
     output_multiplicity_to_apply,
 )
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
+from pipelex.tools.templating.template_category import TemplateCategory
 from pipelex.tools.typing.structure_printer import StructurePrinter
 from pipelex.types import Self
 
@@ -60,7 +60,7 @@ class PipeLLMOutput(PipeOutput):
 
 class PipeLLM(PipeOperator[PipeLLMOutput]):
     type: Literal["PipeLLM"] = "PipeLLM"
-    llm_prompt_spec: LLMPromptSpec
+    llm_prompt_spec: LLMPromptBlueprint
     llm_choices: LLMSettingChoices | None = None
     structuring_method: StructuringMethod | None = None
     prompt_template_to_structure: str | None = None
@@ -229,13 +229,13 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         )
         llm_setting_for_object: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_object)
 
-        if (not self.llm_prompt_spec.prompting_style) and (
+        if (not self.llm_prompt_spec.templating_style) and (
             inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.model)
         ):
             # Note: the case where we don't get an inference model corresponds to the use of an external LLM Plugin
             # TODO: improve this by making it possible to get the inference model for external LLM Plugins
             prompting_target = llm_setting_main.prompting_target or inference_model.prompting_target
-            self.llm_prompt_spec.prompting_style = get_config().pipelex.prompting_config.get_prompting_style(
+            self.llm_prompt_spec.templating_style = get_config().pipelex.prompting_config.get_prompting_style(
                 prompting_target=prompting_target,
             )
 
@@ -498,5 +498,5 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 "class_structure_str": class_structure_str,
             },
             jinja2=template_source,
-            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+            template_category=TemplateCategory.LLM_PROMPT,
         )

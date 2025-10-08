@@ -5,7 +5,7 @@ from jinja2.runtime import Context, Undefined
 
 from pipelex.tools.templating.jinja2_errors import Jinja2ContextError
 from pipelex.tools.templating.jinja2_models import Jinja2ContextKey, Jinja2TaggableAbstract
-from pipelex.tools.templating.templating_models import TagStyle, TextFormat
+from pipelex.tools.templating.templating_style import TagStyle, TextFormat
 from pipelex.types import StrEnum
 
 ########################################################################################

@@ -51,7 +51,7 @@ type = "PipeCompose"
 description = "Conclude a thoughtful answer"
 inputs = { thoughtful_answer = "ThoughtfulAnswer" }
 output = "ThoughtfulAnswerConclusion"
-jinja2 = "After analyzing the question, here is my answer: $thoughtful_answer.the_answer"
+template = "After analyzing the question, here is my answer: $thoughtful_answer.the_answer"
 
 
 [pipe.conclude_tricky_question_by_steps]
