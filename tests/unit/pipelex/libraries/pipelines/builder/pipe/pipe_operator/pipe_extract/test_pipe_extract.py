@@ -3,7 +3,7 @@ import pytest
 from pipelex import log
 from pipelex.libraries.pipelines.builder.pipe.pipe_extract_spec import PipeExtractSpec
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
-from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_operator.pipe_ocr.test_data import PipeExtractTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.pipe_operator.pipe_extract.test_data import PipeExtractTestCases
 
 
 class TestPipeExtractBlueprintConversion:
@@ -11,7 +11,7 @@ class TestPipeExtractBlueprintConversion:
         ("test_name", "pipe_spec", "expected_blueprint"),
         PipeExtractTestCases.TEST_CASES,
     )
-    def test_pipe_ocr_spec_to_blueprint(
+    def test_pipe_extract_spec_to_blueprint(
         self,
         test_name: str,
         pipe_spec: PipeExtractSpec,
