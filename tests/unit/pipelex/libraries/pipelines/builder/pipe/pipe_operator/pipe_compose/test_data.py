@@ -24,7 +24,6 @@ class PipeComposeTestCases:
             output="RenderedText",
             type="PipeCompose",
             category="PipeOperator",
-            jinja2_name=None,
             jinja2="Hello {{ data.name }}!",
             prompting_style=PromptingStyle(
                 tag_style=TagStyle.TICKS,

@@ -23,7 +23,7 @@ from pipelex.exceptions import (
     StaticValidationErrorType,
     WorkingMemoryStuffNotFoundError,
 )
-from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe, get_template_provider
+from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -110,9 +110,7 @@ class PipeCondition(PipeController):
         # Variables from the expression/expression_template
         expression_required_variables = detect_jinja2_required_variables(
             template_category=Jinja2TemplateCategory.LLM_PROMPT,
-            template_provider=get_template_provider(),
-            jinja2_name=None,
-            jinja2=self.applied_expression_template,
+            template_source=self.applied_expression_template,
         )
         required_variables.update(expression_required_variables)
 
@@ -145,9 +143,7 @@ class PipeCondition(PipeController):
         # 1. Add the variables from the expression/expression_template
         required_variables = detect_jinja2_required_variables(
             template_category=Jinja2TemplateCategory.LLM_PROMPT,
-            template_provider=get_template_provider(),
-            jinja2_name=None,
-            jinja2=self.applied_expression_template,
+            template_source=self.applied_expression_template,
         )
 
         for var_name in required_variables:
@@ -392,9 +388,7 @@ class PipeCondition(PipeController):
         try:
             required_variables = detect_jinja2_required_variables(
                 template_category=Jinja2TemplateCategory.LLM_PROMPT,
-                template_provider=get_template_provider(),
-                jinja2_name=None,
-                jinja2=self.applied_expression_template,
+                template_source=self.applied_expression_template,
             )
             log.debug(f"Expression template is valid, requires variables: {required_variables}")
         except Exception as exc:

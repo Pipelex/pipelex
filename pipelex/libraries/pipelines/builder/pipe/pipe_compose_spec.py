@@ -77,7 +77,7 @@ class PipeComposeSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeCompose"]] = "PipeCompose"
     category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    jinja2: str | None = Field(default=None, description="Jinja2 template string")
+    jinja2: str = Field(description="Jinja2 template string")
     target_format: TargetFormat | str = Field(description="Target format for the output")
 
     @field_validator("target_format", mode="before")
@@ -99,7 +99,6 @@ class PipeComposeSpec(PipeSpec):
             output=base_blueprint.output,
             type=self.type,
             category=self.category,
-            jinja2_name=None,
             jinja2=self.jinja2,
             prompting_style=prompting_style,
             template_category=template_category,

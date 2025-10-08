@@ -128,8 +128,7 @@ class ImgGenAssignment(BaseModel):
 
 class Jinja2Assignment(BaseModel):
     context: dict[str, Any]
-    jinja2_name: str | None = None
-    jinja2: str | None = None
+    jinja2: str
     prompting_style: PromptingStyle | None = None
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
 

@@ -18,7 +18,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
-from pipelex.hub import get_content_generator, get_template_provider
+from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -45,8 +45,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         native_concept_code=NativeConceptCode.TEXT,
     )
 
-    jinja2_name: str | None = None
-    jinja2: str | None = None
+    jinja2: str
     prompting_style: PromptingStyle | None = None
     template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
     extra_context: dict[str, Any] | None = None
@@ -84,9 +83,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     def validate_with_libraries(self):
-        if self.jinja2_name:
-            the_template = get_config().cogt.llm_config.get_template(template_name=self.jinja2_name)
-            log.debug(f"Validated jinja2 template '{self.jinja2_name}':\n{the_template}")
+        pass
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
@@ -97,20 +94,13 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @property
     def desc(self) -> str:
-        if self.jinja2:
-            return f"Jinja2 included template, prompting style {self.prompting_style}"
-        elif jinja2_name := self.jinja2_name:
-            return f"Jinja2 template '{jinja2_name}', prompting style {self.prompting_style}"
-        else:
-            return "Jinja2 template not defined"
+        return f"Jinja2 included template, prompting style {self.prompting_style}"
 
     @override
     def required_variables(self) -> set[str]:
         required_variables = detect_jinja2_required_variables(
             template_category=self.template_category,
-            template_provider=get_template_provider(),
-            jinja2_name=self.jinja2_name,
-            jinja2=self.jinja2,
+            template_source=self.jinja2,
         )
         return {
             variable_name
@@ -140,7 +130,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
         jinja2_text = await content_generator.make_jinja2_text(
             context=context,
-            jinja2_name=self.jinja2_name,
             jinja2=self.jinja2,
             prompting_style=self.prompting_style,
             template_category=self.template_category,

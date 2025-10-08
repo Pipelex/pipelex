@@ -4,7 +4,6 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_required_concept
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
@@ -23,15 +22,11 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         blueprint: PipeComposeBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeCompose:
-        preprocessed_template: str | None = None
-        if blueprint.jinja2:
-            preprocessed_template = preprocess_template(blueprint.jinja2)
-            check_jinja2_parsing(
-                jinja2_template_source=preprocessed_template,
-                template_category=blueprint.template_category,
-            )
-        else:
-            preprocessed_template = None
+        preprocessed_template = preprocess_template(blueprint.jinja2)
+        check_jinja2_parsing(
+            jinja2_template_source=preprocessed_template,
+            template_category=blueprint.template_category,
+        )
 
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
@@ -53,7 +48,6 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
                     concept_code=output_domain_and_code.concept_code,
                 ),
             ),
-            jinja2_name=blueprint.jinja2_name,
             jinja2=preprocessed_template,
             prompting_style=blueprint.prompting_style,
             template_category=blueprint.template_category,
@@ -64,29 +58,17 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
     def make_pipe_compose_from_template_str(
         cls,
         domain: str,
+        template_str: str,
         inputs: InputRequirements | None = None,
-        template_str: str | None = None,
-        template_name: str | None = None,
     ) -> PipeCompose:
-        if template_str:
-            preprocessed_template = preprocess_template(template_str)
-            check_jinja2_parsing(
-                jinja2_template_source=preprocessed_template,
-                template_category=Jinja2TemplateCategory.LLM_PROMPT,
-            )
-            return PipeCompose(
-                domain=domain,
-                code="adhoc_pipe_compose_from_template_str",
-                jinja2=preprocessed_template,
-                inputs=inputs or InputRequirementsFactory.make_empty(),
-            )
-        elif template_name:
-            return PipeCompose(
-                domain=domain,
-                code="adhoc_pipe_compose_from_template_name",
-                jinja2_name=template_name,
-                inputs=inputs or InputRequirementsFactory.make_empty(),
-            )
-        else:
-            msg = "Could not make a PipeCompose because neither template_str nor template_name were provided"
-            raise PipeDefinitionError(msg)
+        preprocessed_template = preprocess_template(template_str)
+        check_jinja2_parsing(
+            jinja2_template_source=preprocessed_template,
+            template_category=Jinja2TemplateCategory.LLM_PROMPT,
+        )
+        return PipeCompose(
+            domain=domain,
+            code="adhoc_pipe_compose_from_template_str",
+            jinja2=preprocessed_template,
+            inputs=inputs or InputRequirementsFactory.make_empty(),
+        )

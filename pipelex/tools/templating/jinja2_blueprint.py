@@ -7,8 +7,7 @@ from pipelex.tools.templating.templating_models import PromptingStyle
 
 
 class Jinja2Blueprint(BaseModel):
-    jinja2_name: str | None = Field(default=None, description="Name of the Jinja2 template to use")
-    jinja2: str | None = Field(default=None, description="Raw Jinja2 template string")
+    jinja2: str = Field(description="Raw Jinja2 template string")
     prompting_style: PromptingStyle | None = Field(default=None, description="Style of prompting to use (typically for different LLMs)")
     template_category: Jinja2TemplateCategory = Field(
         default=Jinja2TemplateCategory.LLM_PROMPT,

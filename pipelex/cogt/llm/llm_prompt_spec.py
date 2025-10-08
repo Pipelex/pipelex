@@ -8,7 +8,7 @@ from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.hub import get_content_generator, get_template_provider
+from pipelex.hub import get_content_generator
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
 from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
@@ -83,8 +83,7 @@ class LLMPromptSpec(BaseModel):
             template_source = preprocess_template(self.user_text_jinja2_blueprint.jinja2)
             required_variables = detect_jinja2_required_variables(
                 template_category=self.user_text_jinja2_blueprint.template_category,
-                template_provider=get_template_provider(),
-                jinja2=template_source,
+                template_source=template_source,
             )
         return {
             variable_name

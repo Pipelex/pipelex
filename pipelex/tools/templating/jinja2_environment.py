@@ -1,8 +1,6 @@
 from jinja2 import BaseLoader, Environment, PackageLoader
 
 from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.jinja2_template_loader import Jinja2TemplateLoader
-from pipelex.tools.templating.template_provider_abstract import TemplateProviderAbstract
 
 
 def make_jinja2_env_from_loader(
@@ -64,16 +62,3 @@ def make_jinja2_env_without_loader(
 ) -> Environment:
     loader = BaseLoader()
     return make_jinja2_env_from_loader(template_category=template_category, loader=loader)
-
-
-def make_jinja2_env_from_template_provider(
-    template_category: Jinja2TemplateCategory,
-    template_provider: TemplateProviderAbstract,
-) -> tuple[Environment, BaseLoader]:
-    loader = Jinja2TemplateLoader(template_provider=template_provider)
-    jinja2_env = make_jinja2_env_from_loader(template_category=template_category, loader=loader)
-
-    filters = template_category.filters
-    for filter_name, filter_function in filters.items():
-        jinja2_env.filters[filter_name] = filter_function  # pyright: ignore[reportArgumentType]
-    return jinja2_env, loader
