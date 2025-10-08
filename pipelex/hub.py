@@ -332,10 +332,6 @@ def get_template_provider() -> TemplateProviderAbstract:
     return get_pipelex_hub().get_required_template_provider()
 
 
-def get_template(template_name: str) -> str:
-    return get_template_provider().get_template(template_name=template_name)
-
-
 def get_class_registry() -> ClassRegistryAbstract:
     return get_pipelex_hub().get_required_class_registry()
 

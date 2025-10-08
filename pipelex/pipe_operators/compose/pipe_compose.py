@@ -18,7 +18,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
-from pipelex.hub import get_content_generator, get_template, get_template_provider
+from pipelex.hub import get_content_generator, get_template_provider
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -85,7 +85,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     @override
     def validate_with_libraries(self):
         if self.jinja2_name:
-            the_template = get_template(template_name=self.jinja2_name)
+            the_template = get_config().cogt.llm_config.get_template(template_name=self.jinja2_name)
             log.debug(f"Validated jinja2 template '{self.jinja2_name}':\n{the_template}")
 
     @override
