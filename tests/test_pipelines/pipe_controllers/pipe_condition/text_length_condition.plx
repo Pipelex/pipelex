@@ -8,7 +8,7 @@ type = "PipeLLM"
 description = "Capitalize text for long inputs"
 inputs = { input_text = "Text" }
 output = "Text"
-prompt_template = """Transform the following LONG text to uppercase and add "LONG: " prefix:
+prompt = """Transform the following LONG text to uppercase and add "LONG: " prefix:
 
 @input_text.text
 
@@ -19,7 +19,7 @@ type = "PipeLLM"
 description = "Add prefix for short text inputs"
 inputs = { input_text = "Text" }
 output = "Text"
-prompt_template = """Add the prefix "SHORT: " to the beginning of the following text:
+prompt = """Add the prefix "SHORT: " to the beginning of the following text:
 
 @input_text.text
 

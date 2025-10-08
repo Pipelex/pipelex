@@ -36,7 +36,7 @@ description = "Turn the brief into a DomainInformation object."
 inputs = { brief = "UserBrief" }
 output = "DomainInformation"
 model = "llm_to_engineer"
-prompt_template = """
+prompt = """
 Name and define the domain of this process:
 @brief
 
@@ -52,7 +52,7 @@ description = "Turn the brief into a pseudo-code plan describing controllers, pi
 inputs = { brief = "UserBrief" }
 output = "PlanDraft"
 model = "llm_to_engineer"
-prompt_template = """
+prompt = """
 Return a draft of a plan that narrates the pipeline as pseudo-steps (no code):
 - Explicitly indicate when you are running things in sequence,
   or in parallel (several independant steps in parallel),
@@ -100,7 +100,7 @@ description = "Interpret the draft of a plan to create an AI pipeline, and defin
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief" }
 output = "ConceptDrafts"
 model = "llm_to_engineer"
-prompt_template = """
+prompt = """
 We are working on writing an AI pipeline to fulfill this brief:
 @brief
 
@@ -149,7 +149,7 @@ model = "llm_to_engineer"
 system_prompt = """
 You are an expert at data extraction and json formatting.
 """
-prompt_template = """
+prompt = """
 You are on a big journey to construct a pipeline, and this is one of the steps. 
 Here is the overalle mission of the user:
 @brief
@@ -169,7 +169,7 @@ system_prompt = """
 You are a Senior engineer, very well versed in creating pipelines.
 You are very thorough about naming stuff, structured and rigorous in your planning.
 """
-prompt_template = """
+prompt = """
 Your job is to structure the required PipeSignatures for defining a pipeline which has already been drafted.
 
 @brief

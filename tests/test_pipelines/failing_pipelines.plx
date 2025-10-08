@@ -8,7 +8,7 @@ type = "PipeLLM"
 description = "This pipe is a dummy pipe"
 output = "Text"
 model = { model = "gpt-4o-mini", temperature = 1, max_tokens = 50 }
-prompt_template = """
+prompt = """
 Output only "Hello".
 """
 

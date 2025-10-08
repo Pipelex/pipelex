@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptSpecError
@@ -13,8 +13,6 @@ from pipelex.tools.templating.jinja2_blueprint import Jinja2Blueprint
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.templating_models import PromptingStyle
-from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list, has_more_than_one_among_attributes_from_list
-from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage

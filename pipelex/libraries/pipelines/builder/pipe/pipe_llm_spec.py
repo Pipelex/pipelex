@@ -148,7 +148,7 @@ class PipeLLMSpec(PipeSpec):
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             system_prompt=self.system_prompt,
-            user_prompt=self.user_prompt,
+            prompt=self.user_prompt,
             model=llm_choice,
             nb_output=self.nb_output,
             multiple_output=self.multiple_output,

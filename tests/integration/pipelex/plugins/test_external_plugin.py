@@ -91,7 +91,7 @@ class TestExternalPlugin:
             description="LLM test with external plugin",
             output=NativeConceptCode.TEXT,
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
-            user_prompt=PipeTestCases.USER_PROMPT,
+            prompt=PipeTestCases.USER_PROMPT,
             model=LLMSetting(
                 model=llm_handle,
                 temperature=0.5,

@@ -14,7 +14,7 @@ type = "PipeLLM"
 description = "Generate a description of an animal"
 inputs = { animal = "Animal" }
 output = "AnimalDescription"
-prompt_template = """
+prompt = """
 Given the reference to an animal, generate a description of the animal.
 
 @animal

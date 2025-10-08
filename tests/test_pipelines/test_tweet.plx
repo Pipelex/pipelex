@@ -17,7 +17,7 @@ system_prompt = """
 You are an expert in social media optimization, particularly for tech content on Twitter/X.
 Your role is to analyze tech tweets and check if they display typical startup communication pitfalls.
 """
-prompt_template = """
+prompt = """
 Evaluate the tweet for these key issues:
 
 **Fluffiness** - Overuse of buzzwords without concrete meaning (e.g., "synergizing disruptive paradigms")
@@ -45,7 +45,7 @@ system_prompt = """
 You are an expert in writing engaging tech tweets that drive meaningful discussions and engagement.
 Your goal is to rewrite tweets to be impactful and avoid the pitfalls identified in the analysis.
 """
-prompt_template = """
+prompt = """
 Rewrite this tech tweet to be more engaging and effective, based on the analysis:
 
 Original tweet:

@@ -27,7 +27,7 @@ inputs = { document = "Document" }
 output = "CustomerReview"
 multiple_output = true
 model = "llm_for_testing_gen_text"
-prompt_template = """
+prompt = """
 Extract each individual customer review from this document as separate items:
 
 @document
@@ -39,7 +39,7 @@ description = "Analyze sentiment of a single review"
 inputs = { single_review = "CustomerReview" }
 output = "SentimentAnalysis"
 model = "llm_for_testing_gen_text"
-prompt_template = """
+prompt = """
 Analyze the sentiment of this customer review:
 
 @single_review
@@ -53,7 +53,7 @@ description = "Aggregate all review analyses into final rating"
 inputs = { sentiment_analyses = "SentimentAnalysis" }
 output = "ProductRating"
 model = "llm_for_testing_gen_text"
-prompt_template = """
+prompt = """
 Based on these sentiment analyses, provide an overall product rating:
 
 @sentiment_analyses

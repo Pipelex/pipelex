@@ -12,7 +12,7 @@ type = "PipeLLM"
 description = "Generate a description of a flower"
 inputs = { flower = "Flower" }
 output = "FlowerDescription"
-prompt_template = """
+prompt = """
 Given the reference to a flower, generate a description of the flower.
 
 @flower

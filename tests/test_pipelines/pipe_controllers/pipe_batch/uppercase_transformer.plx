@@ -20,7 +20,7 @@ type = "PipeLLM"
 description = "Transform text to uppercase"
 inputs = { text_item = "Text" }
 output = "UppercaseText"
-prompt_template = """
+prompt = """
 Transform the following text to uppercase and add the prefix "UPPER: ":
 
 @text_item

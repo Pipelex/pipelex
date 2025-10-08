@@ -24,7 +24,7 @@ description = "Clean and normalize the input text"
 inputs = { raw_text = "RawText" }
 output = "CleanedText"
 model = "llm_for_testing_gen_text"
-prompt_template = """
+prompt = """
 Clean and normalize the following text by:
 - Removing extra whitespace
 - Fixing basic grammar and punctuation
@@ -39,7 +39,7 @@ description = "Generate a summary of the cleaned text"
 inputs = { cleaned_text = "CleanedText" }
 output = "SummaryText"
 model = "llm_for_testing_gen_text"
-prompt_template = """
+prompt = """
 Generate a concise summary of the following text in 2-3 sentences:
 
 @cleaned_text

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import field_validator, model_validator
 
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -21,14 +21,8 @@ class PipeLLMBlueprint(PipeBlueprint):
     model: LLMModelChoice | None = None
     model_to_structure: LLMModelChoice | None = None
 
-    system_prompt: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("system_prompt", "system_prompt_template", "system"),
-    )
-    user_prompt: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("user_prompt", "user_prompt_template", "prompt_template", "prompt"),
-    )
+    system_prompt: str | None = None
+    prompt: str | None = None
 
     structuring_method: StructuringMethod | None = None
     prompt_template_to_structure: str | None = None

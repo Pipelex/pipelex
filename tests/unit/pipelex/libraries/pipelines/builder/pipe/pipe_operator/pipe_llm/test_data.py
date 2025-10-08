@@ -23,7 +23,7 @@ class PipeLLMTestCases:
             description="Generate text",
             inputs={"topic": InputRequirementBlueprint(concept="Text")},
             output="Text",
-            user_prompt="Write about $topic",
+            prompt="Write about $topic",
             model="claude-4.1-opus",
         ),
     )
@@ -43,7 +43,7 @@ class PipeLLMTestCases:
             type="PipeLLM",
             description="Generate without inputs",
             output="Text",
-            user_prompt="Generate something interesting",
+            prompt="Generate something interesting",
             model="claude-4.1-opus",
         ),
     )
@@ -64,7 +64,7 @@ class PipeLLMTestCases:
             description="Analyze image",
             inputs={"image": InputRequirementBlueprint(concept="Image")},
             output="Text",
-            user_prompt="Analyze the image: $image",
+            prompt="Analyze the image: $image",
             model="gemini-2.5-flash-lite",
         ),
     )
@@ -85,7 +85,7 @@ class PipeLLMTestCases:
             description="Generate with preset",
             model="claude-4.5-sonnet",
             output="Text",
-            user_prompt="Generate text",
+            prompt="Generate text",
         ),
     )
 
@@ -110,7 +110,7 @@ class PipeLLMTestCases:
                 max_tokens=None,  # "auto" is handled at conversion to core
             ),
             output="Text",
-            user_prompt="Generate text",
+            prompt="Generate text",
         ),
     )
 
@@ -131,7 +131,7 @@ class PipeLLMTestCases:
             description="Generate with system prompt",
             inputs={"data": InputRequirementBlueprint(concept="Data")},
             system_prompt="You are a data analyst",
-            user_prompt="Analyze: @data",
+            prompt="Analyze: @data",
             output="Analysis",
             model="claude-4.5-sonnet",
         ),
@@ -155,7 +155,7 @@ class PipeLLMTestCases:
             multiple_output=True,
             nb_output=None,
             output="Item",
-            user_prompt="Generate items",
+            prompt="Generate items",
             model="claude-4.5-sonnet",
         ),
     )
@@ -178,7 +178,7 @@ class PipeLLMTestCases:
             nb_output=5,
             multiple_output=None,
             output="Item",
-            user_prompt="Generate items",
+            prompt="Generate items",
             model="claude-4.5-sonnet",
         ),
     )

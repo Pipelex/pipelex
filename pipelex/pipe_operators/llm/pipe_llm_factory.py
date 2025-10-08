@@ -27,15 +27,15 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         blueprint: PipeLLMBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeLLM:
-        system_prompt_template = blueprint.system_prompt
-        if not system_prompt_template and (domain_obj := get_optional_domain(domain=domain)):
-            system_prompt_template = domain_obj.system_prompt
+        system_prompt = blueprint.system_prompt
+        if not system_prompt and (domain_obj := get_optional_domain(domain=domain)):
+            system_prompt = domain_obj.system_prompt
 
         system_prompt_jinja2_blueprint: Jinja2Blueprint | None = None
-        if system_prompt_template:
+        if system_prompt:
             try:
                 system_prompt_jinja2_blueprint = Jinja2Blueprint(
-                    jinja2=system_prompt_template,
+                    jinja2=system_prompt,
                 )
             except TemplateSyntaxError as exc:
                 error_msg = (
@@ -45,15 +45,14 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 raise PipeDefinitionError(error_msg) from exc
 
         user_text_jinja2_blueprint: Jinja2Blueprint | None = None
-        if blueprint.user_prompt:
+        if blueprint.prompt:
             try:
                 user_text_jinja2_blueprint = Jinja2Blueprint(
-                    jinja2=blueprint.user_prompt,
+                    jinja2=blueprint.prompt,
                 )
             except TemplateSyntaxError as exc:
                 error_msg = (
-                    f"Template syntax error in user prompt for pipe '{pipe_code}' "
-                    f"in domain '{domain}': {exc}. Template source:\n{blueprint.user_prompt}"
+                    f"Template syntax error in user prompt for pipe '{pipe_code}' in domain '{domain}': {exc}. Template source:\n{blueprint.prompt}"
                 )
                 raise PipeDefinitionError(error_msg) from exc
 

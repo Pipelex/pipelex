@@ -17,7 +17,7 @@ description = "Analyze a question to determine whether it's straightforward or t
 inputs = { question = "Question" }
 output = "QuestionAnalysis"
 model = "llm_to_reason"
-prompt_template = """
+prompt = """
 Here is a question for an LLM:
 @question
 Do you think it's tricky, or maybe even a deceptive trap?
@@ -33,7 +33,7 @@ description = "Answer knowingly after analyzing a question"
 inputs = { question = "Question", question_analysis = "QuestionAnalysis" }
 output = "ThoughtfulAnswer"
 model = "llm_to_reason"
-prompt_template = """
+prompt = """
 A question was asked:
 @question
 A thoughtful analysis was given:
