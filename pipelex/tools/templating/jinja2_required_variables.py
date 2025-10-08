@@ -34,13 +34,15 @@ def detect_jinja2_required_variables(
         parsed_ast = jinja2_env.parse(template_source)
         undeclared_variables = meta.find_undeclared_variables(parsed_ast)
     except Jinja2StuffError as stuff_error:
-        msg = f"Jinja2 detect variables — stuff error: '{stuff_error}', template_source:\n{template_source}"
+        msg = f"Jinja2 detect variables — stuff error: '{stuff_error}', template_category: {template_category}, template_source:\n{template_source}"
         raise Jinja2DetectVariablesError(msg) from stuff_error
     except TemplateSyntaxError as syntax_error:
-        msg = f"Jinja2 detect variables — syntax error: '{syntax_error}', template_source:\n{template_source}"
+        msg = f"Jinja2 detect variables — syntax error: '{syntax_error}', template_category: {template_category}, template_source:\n{template_source}"
         raise Jinja2DetectVariablesError(msg) from syntax_error
     except UndefinedError as undef_error:
-        msg = f"Jinja2 detect variables — undefined error: '{undef_error}', template_source:\n{template_source}"
+        msg = (
+            f"Jinja2 detect variables — undefined error: '{undef_error}', template_category: {template_category}, template_source:\n{template_source}"
+        )
         raise Jinja2DetectVariablesError(msg) from undef_error
 
     return undeclared_variables

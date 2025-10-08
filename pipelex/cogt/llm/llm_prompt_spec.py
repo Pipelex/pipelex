@@ -23,36 +23,9 @@ if TYPE_CHECKING:
 # TODO: move this to pipe operators
 class LLMPromptSpec(BaseModel):
     prompting_style: PromptingStyle | None = None
-
     system_prompt_jinja2_blueprint: Jinja2Blueprint | None = None
-
     user_text_jinja2_blueprint: Jinja2Blueprint | None = None
-
     user_images: list[str] | None = None
-
-    @model_validator(mode="after")
-    def validate_user_text(self) -> Self:
-        if not has_exactly_one_among_attributes_from_list(
-            obj=self,
-            attributes_list=[
-                "user_text_jinja2_blueprint",
-                "user_prompt_verbatim_name",
-                "user_text",
-            ],
-        ):
-            msg = f"LLMPromptSpec user text must have exactly one of user_text, user_text_jinja2_blueprint or user_prompt_verbatim_name: {self}"
-            raise LLMPromptSpecError(msg)
-        if has_more_than_one_among_attributes_from_list(
-            obj=self,
-            attributes_list=[
-                "system_prompt_jinja2_blueprint",
-                "system_prompt_verbatim_name",
-                "system_prompt",
-            ],
-        ):
-            msg = f"LLMPromptSpec system got more than one of system_prompt, system_prompt_jinja2_blueprint, system_prompt_verbatim_name: {self}"
-            raise LLMPromptSpecError(msg)
-        return self
 
     def validate_with_libraries(self):
         pass
@@ -63,12 +36,24 @@ class LLMPromptSpec(BaseModel):
             user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
             required_variables.update(user_images_top_object_name)
 
-        if self.user_text_jinja2_blueprint and self.user_text_jinja2_blueprint.jinja2:
+        if self.user_text_jinja2_blueprint:
             template_source = preprocess_template(self.user_text_jinja2_blueprint.jinja2)
-            required_variables = detect_jinja2_required_variables(
-                template_category=self.user_text_jinja2_blueprint.template_category,
-                template_source=template_source,
+            required_variables.update(
+                detect_jinja2_required_variables(
+                    template_category=self.user_text_jinja2_blueprint.template_category,
+                    template_source=template_source,
+                )
             )
+
+        if self.system_prompt_jinja2_blueprint:
+            system_prompt_template_source = preprocess_template(self.system_prompt_jinja2_blueprint.jinja2)
+            required_variables.update(
+                detect_jinja2_required_variables(
+                    template_category=self.system_prompt_jinja2_blueprint.template_category,
+                    template_source=system_prompt_template_source,
+                )
+            )
+
         return {
             variable_name
             for variable_name in required_variables

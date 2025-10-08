@@ -61,4 +61,9 @@ def make_jinja2_env_without_loader(
     template_category: Jinja2TemplateCategory,
 ) -> Environment:
     loader = BaseLoader()
-    return make_jinja2_env_from_loader(template_category=template_category, loader=loader)
+    jinja2_env = make_jinja2_env_from_loader(template_category=template_category, loader=loader)
+
+    filters = template_category.filters
+    for filter_name, filter_function in filters.items():
+        jinja2_env.filters[filter_name] = filter_function  # pyright: ignore[reportArgumentType]
+    return jinja2_env
