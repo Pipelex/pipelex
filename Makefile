@@ -75,6 +75,7 @@ make test-quiet               - Run unit tests without prints (no inference)
 make tq                       - Shorthand -> test-quiet
 make test-with-prints         - Run tests with prints (no inference)
 make tp                       - Shorthand -> test-with-prints
+make tb                       - Shorthand -> `make test-with-prints TEST=test_boot`
 make test-inference           - Run unit tests only for inference (with prints)
 make ti                       - Shorthand -> test-inference
 make tip                      - Shorthand -> test-inference-with-prints (parallelized inference tests)
@@ -284,6 +285,11 @@ test-with-prints: env
 
 tp: test-with-prints
 	@echo "> done: tp = test-with-prints"
+
+tb: env
+	$(call PRINT_TITLE,"Unit testing a simple boot")
+	@echo "• Running unit test test_boot"
+	$(VENV_PYTEST) -s -m $(USUAL_PYTEST_MARKERS) -k "test_boot" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,)));
 
 test-inference-with-prints: env
 	$(call PRINT_TITLE,"Unit testing")
