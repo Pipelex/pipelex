@@ -1,7 +1,7 @@
 from pipelex.cogt.content_generation.assignment_models import Jinja2Assignment
+from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_rendering import render_jinja2
-from pipelex.tools.templating.template_preprocessor import preprocess_template
 
 
 async def jinja2_gen_text(jinja2_assignment: Jinja2Assignment) -> str:

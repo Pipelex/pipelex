@@ -1,7 +1,11 @@
 from pipelex.tools.exceptions import ToolException
 
 
-class TemplateSyntaxError(ToolException):
+class Jinja2TemplateSyntaxError(ToolException):
+    pass
+
+
+class Jinja2TemplateRenderError(ToolException):
     pass
 
 
@@ -10,10 +14,6 @@ class Jinja2StuffError(ToolException):
 
 
 class Jinja2ContextError(ToolException):
-    pass
-
-
-class Jinja2RenderError(ToolException):
     pass
 
 

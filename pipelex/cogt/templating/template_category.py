@@ -3,9 +3,9 @@ from typing import Any
 
 from jinja2.runtime import Context
 
+from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.tools.templating.jinja2_filters import tag, text_format
 from pipelex.tools.templating.jinja2_models import Jinja2FilterName
-from pipelex.tools.templating.templating_style import TextFormat
 from pipelex.types import StrEnum
 
 

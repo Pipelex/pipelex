@@ -12,10 +12,10 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.hub import get_class_registry
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.template_category import TemplateCategory
-from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class LLMAssignmentFactory(BaseModel):

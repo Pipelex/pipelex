@@ -1,9 +1,9 @@
 from typing import Any, Literal
 
+from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.tools.templating.template_blueprint import TemplateBlueprint
-from pipelex.tools.templating.template_category import TemplateCategory
-from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class PipeComposeBlueprint(PipeBlueprint):

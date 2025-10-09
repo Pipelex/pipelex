@@ -3,9 +3,9 @@ from typing import Any
 import pytest
 
 from pipelex import log, pretty_print
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
 from pipelex.tools.templating.jinja2_rendering import render_jinja2
-from pipelex.tools.templating.template_category import TemplateCategory
-from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
 from tests.cases import Fruit, JINJA2TestCases
 
 PLACE_HOLDER = "place_holder"

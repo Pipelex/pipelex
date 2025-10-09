@@ -4,11 +4,11 @@ from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
+from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
 from pipelex.libraries.pipelines.builder.pipe.pipe_signature import PipeSpec
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
-from pipelex.tools.templating.template_blueprint import TemplateBlueprint
-from pipelex.tools.templating.template_category import TemplateCategory
-from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
 from pipelex.types import StrEnum
 
 

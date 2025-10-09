@@ -6,13 +6,13 @@ from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptSpecError
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+from pipelex.cogt.templating.template_preprocessor import preprocess_template
+from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
-from pipelex.tools.templating.template_blueprint import TemplateBlueprint
-from pipelex.tools.templating.template_preprocessor import preprocess_template
-from pipelex.tools.templating.templating_style import TemplatingStyle
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage

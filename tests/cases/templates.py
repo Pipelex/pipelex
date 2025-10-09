@@ -2,7 +2,7 @@
 
 from typing import Any, ClassVar
 
-from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
 
 from .registry import Fruit
 

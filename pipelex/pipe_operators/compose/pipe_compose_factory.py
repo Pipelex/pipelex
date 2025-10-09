@@ -1,5 +1,7 @@
 from typing_extensions import override
 
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
@@ -8,8 +10,6 @@ from pipelex.hub import get_required_concept
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
-from pipelex.tools.templating.template_category import TemplateCategory
-from pipelex.tools.templating.template_preprocessor import preprocess_template
 
 
 class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose]):

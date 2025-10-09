@@ -1,6 +1,6 @@
 from jinja2 import BaseLoader, Environment, PackageLoader
 
-from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_category import TemplateCategory
 
 
 def make_jinja2_env_from_loader(

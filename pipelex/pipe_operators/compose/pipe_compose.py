@@ -6,6 +6,8 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -22,11 +24,9 @@ from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_errors import TemplateSyntaxError
+from pipelex.tools.templating.jinja2_errors import Jinja2TemplateSyntaxError
 from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
-from pipelex.tools.templating.template_category import TemplateCategory
-from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.types import Self
 
 
@@ -52,7 +52,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     def validate_jinja2(self) -> Self:
         try:
             check_jinja2_parsing(jinja2_template_source=self.jinja2, template_category=self.template_category)
-        except TemplateSyntaxError as exc:
+        except Jinja2TemplateSyntaxError as exc:
             msg = f"Could not parse template included in PipeCompose '{self.code}: {exc}"
             raise PipeDefinitionError(msg) from exc
         return self

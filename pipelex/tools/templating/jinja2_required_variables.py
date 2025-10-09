@@ -4,9 +4,9 @@ from jinja2.exceptions import (
     UndefinedError,
 )
 
+from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.templating.jinja2_environment import make_jinja2_env_without_loader
 from pipelex.tools.templating.jinja2_errors import Jinja2DetectVariablesError, Jinja2StuffError
-from pipelex.tools.templating.template_category import TemplateCategory
 
 
 def detect_jinja2_required_variables(

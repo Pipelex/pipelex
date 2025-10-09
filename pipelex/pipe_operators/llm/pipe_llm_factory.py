@@ -1,6 +1,8 @@
 from typing_extensions import override
 
 from pipelex.cogt.llm.llm_setting import LLMSettingChoices
+from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
@@ -13,9 +15,7 @@ from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_run_params import make_output_multiplicity
-from pipelex.tools.templating.jinja2_errors import TemplateSyntaxError
-from pipelex.tools.templating.template_blueprint import TemplateBlueprint
-from pipelex.tools.templating.template_category import TemplateCategory
+from pipelex.tools.templating.jinja2_errors import Jinja2TemplateSyntaxError
 
 
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
@@ -39,7 +39,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     source=system_prompt,
                     category=TemplateCategory.LLM_PROMPT,
                 )
-            except TemplateSyntaxError as exc:
+            except Jinja2TemplateSyntaxError as exc:
                 error_msg = (
                     f"Template syntax error in system prompt for pipe '{pipe_code}' "
                     f"in domain '{domain}': {exc}. Template source:\n{blueprint.system_prompt}"
@@ -53,7 +53,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     source=blueprint.prompt,
                     category=TemplateCategory.LLM_PROMPT,
                 )
-            except TemplateSyntaxError as exc:
+            except Jinja2TemplateSyntaxError as exc:
                 error_msg = (
                     f"Template syntax error in user prompt for pipe '{pipe_code}' in domain '{domain}': {exc}. Template source:\n{blueprint.prompt}"
                 )
