@@ -6,17 +6,17 @@ from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import (
     ExtractAssignment,
     ImgGenAssignment,
-    Jinja2Assignment,
     LLMAssignment,
     LLMAssignmentFactory,
     ObjectAssignment,
+    TemplatingAssignment,
     TextThenObjectAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list, img_gen_single_image
-from pipelex.cogt.content_generation.jinja2_generate import jinja2_gen_text
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
+from pipelex.cogt.content_generation.templating_generate import templating_gen_text
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -242,21 +242,21 @@ class ContentGenerator(ContentGeneratorProtocol):
         return generated_image_list
 
     @override
-    async def make_jinja2_text(
+    async def make_templated_text(
         self,
         context: dict[str, Any],
-        jinja2: str,
+        template_source: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
     ) -> str:
         log.debug(f"context: {context}")
-        jinja2_assignment = Jinja2Assignment(
+        templating_assignment = TemplatingAssignment(
             context=context,
-            source=jinja2,
+            source=template_source,
             templating_style=templating_style,
             category=template_category or TemplateCategory.BASIC,
         )
-        return await jinja2_gen_text(jinja2_assignment=jinja2_assignment)
+        return await templating_gen_text(templating_assignment=templating_assignment)
 
     @override
     async def make_extract_pages(

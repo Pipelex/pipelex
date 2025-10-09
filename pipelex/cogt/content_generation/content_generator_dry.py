@@ -18,6 +18,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -177,17 +178,17 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         ]
 
     @override
-    async def make_jinja2_text(
+    async def make_templated_text(
         self,
         context: dict[str, Any],
-        jinja2: str,
+        template_source: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
     ) -> str:
-        # TODO: Use the code that checks if the jinja2 is a valid template
-        func_name = "make_jinja2_text"
+        check_jinja2_parsing(jinja2_template_source=template_source, template_category=template_category or TemplateCategory.BASIC)
+        func_name = "make_templated_text"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        jinja2_truncated = jinja2[: self._text_gen_truncate_length] if jinja2 else None
+        jinja2_truncated = template_source[: self._text_gen_truncate_length]
         return (
             f"DRY RUN: {func_name} • context={context} • "
             f"jinja2={jinja2_truncated} • templating_style={templating_style} • template_category={template_category}"

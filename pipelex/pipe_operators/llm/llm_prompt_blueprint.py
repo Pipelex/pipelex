@@ -11,8 +11,8 @@ from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
-from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
@@ -172,9 +172,9 @@ class LLMPromptBlueprint(BaseModel):
         if jinja2_blueprint.extra_context:
             context.update(**jinja2_blueprint.extra_context)
 
-        return await get_content_generator().make_jinja2_text(
+        return await get_content_generator().make_templated_text(
             context=context,
-            jinja2=jinja2_blueprint.source,
+            template_source=jinja2_blueprint.source,
             templating_style=self.templating_style,
             template_category=jinja2_blueprint.category,
         )

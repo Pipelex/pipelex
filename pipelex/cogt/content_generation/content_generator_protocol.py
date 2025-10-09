@@ -109,10 +109,10 @@ class ContentGeneratorProtocol(Protocol):
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> list[GeneratedImage]: ...
 
-    async def make_jinja2_text(
+    async def make_templated_text(
         self,
         context: dict[str, Any],
-        jinja2: str,
+        template_source: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
     ) -> str: ...

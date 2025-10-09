@@ -493,10 +493,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         else:
             template_source = llm_config.get_template(template_name="output_structure_prompt_no_preliminary_text")
 
-        return await get_content_generator().make_jinja2_text(
+        return await get_content_generator().make_templated_text(
             context={
                 "class_structure_str": class_structure_str,
             },
-            jinja2=template_source,
+            template_source=template_source,
             template_category=TemplateCategory.LLM_PROMPT,
         )

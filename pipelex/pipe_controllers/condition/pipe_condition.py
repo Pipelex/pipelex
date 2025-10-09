@@ -250,9 +250,9 @@ class PipeCondition(PipeController):
         # Evaluate the expression using Jinja2 templating
 
         # TODO: create a proper category instead of using Jinja2TemplateCategory.LLM_PROMPT
-        evaluated_expression = await content_generator.make_jinja2_text(
+        evaluated_expression = await content_generator.make_templated_text(
             context=working_memory.generate_jinja2_context(),
-            jinja2=self.applied_expression_template,
+            template_source=self.applied_expression_template,
             template_category=TemplateCategory.EXPRESSION,
         )
 

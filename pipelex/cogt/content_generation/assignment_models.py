@@ -126,7 +126,7 @@ class ImgGenAssignment(BaseModel):
     nb_images: int
 
 
-class Jinja2Assignment(BaseModel):
+class TemplatingAssignment(BaseModel):
     context: dict[str, Any]
     source: str
     templating_style: TemplatingStyle | None = None

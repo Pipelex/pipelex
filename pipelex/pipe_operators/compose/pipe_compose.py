@@ -122,9 +122,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.extra_context:
             context.update(**self.extra_context)
 
-        jinja2_text = await content_generator.make_jinja2_text(
+        jinja2_text = await content_generator.make_templated_text(
             context=context,
-            jinja2=self.jinja2,
+            template_source=self.jinja2,
             templating_style=self.templating_style,
             template_category=self.template_category,
         )
