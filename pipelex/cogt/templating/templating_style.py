@@ -23,7 +23,7 @@ class TagStyle(StrEnum):
     SQUARE_BRACKETS = "square_brackets"
 
 
-class PromptingStyle(BaseModel):
+class TemplatingStyle(BaseModel):
     tag_style: TagStyle = Field(strict=False)
     text_format: TextFormat = Field(TextFormat.PLAIN, strict=False)
 

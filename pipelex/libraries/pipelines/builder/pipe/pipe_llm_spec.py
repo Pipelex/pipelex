@@ -85,8 +85,8 @@ class PipeLLMSpec(PipeSpec):
     category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
     llm: LLMSkill | str = Field(description="Select the most adequate LLM model skill according to the task to be performed.")
     temperature: float | None = Field(default=None, ge=0, le=1)
-    system_prompt: str | None = Field(default=None, description="A system-level prompt to guide the LLM's behavior, style and skills.")
-    prompt_template: str | None = Field(
+    system_prompt: str | None = Field(default=None, description="A system prompt to guide the LLM's behavior, style and skills. Can be a template.")
+    prompt: str | None = Field(
         description=(
             "A template for the user prompt. Use `$` prefix for inline variables (e.g., `$topic`) and `@` prefix "
             "to insert content as a block with delimiters (e.g., `@extracted_text` --> extracted_text: ```\n[the extracted_text goes here]\n```). "
@@ -148,7 +148,7 @@ class PipeLLMSpec(PipeSpec):
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             system_prompt=self.system_prompt,
-            prompt_template=self.prompt_template,
+            prompt=self.prompt,
             model=llm_choice,
             nb_output=self.nb_output,
             multiple_output=self.multiple_output,

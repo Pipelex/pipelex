@@ -5,7 +5,7 @@ from pydantic import field_validator, model_validator
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.exceptions import PipeDefinitionError
-from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_lists
+from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
 from pipelex.types import Self, StrEnum
 
 
@@ -21,14 +21,7 @@ class PipeLLMBlueprint(PipeBlueprint):
     model: LLMModelChoice | None = None
     model_to_structure: LLMModelChoice | None = None
 
-    system_prompt_template: str | None = None
-    system_prompt_template_name: str | None = None
-    system_prompt_name: str | None = None
     system_prompt: str | None = None
-
-    prompt_template: str | None = None
-    template_name: str | None = None
-    prompt_name: str | None = None
     prompt: str | None = None
 
     structuring_method: StructuringMethod | None = None
@@ -48,13 +41,9 @@ class PipeLLMBlueprint(PipeBlueprint):
 
     @model_validator(mode="after")
     def validate_multiple_output(self) -> Self:
-        if excess_attributes_list := has_more_than_one_among_attributes_from_lists(
+        if excess_attributes_list := has_more_than_one_among_attributes_from_list(
             self,
-            attributes_lists=[
-                ["nb_output", "multiple_output"],
-                ["system_prompt", "system_prompt_name", "system_prompt_template", "system_prompt_template_name"],
-                ["prompt", "prompt_name", "prompt_template", "template_name"],
-            ],
+            attributes_list=["nb_output", "multiple_output"],
         ):
             msg = f"PipeLLMBlueprint should have no more than one of {excess_attributes_list} among them"
             raise PipeDefinitionError(msg)

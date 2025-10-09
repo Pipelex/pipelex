@@ -33,7 +33,7 @@ description = "Summarize the new member announcements"
 inputs = { discord_channel_update = "DiscordChannelUpdate" }
 output = "ChannelSummary"
 system_prompt = "You are a newsletter editor who creates engaging summaries of Discord channel content. You extract key information, preserve important links, and write in a clear, concise style suitable for newsletter readers."
-prompt_template = """
+prompt = """
 Analyze this Discord channel update and create a newsletter-friendly summary.
 
 Channel Information:
@@ -48,7 +48,7 @@ description = "Summarize a Discord channel's messages into newsletter-friendly c
 inputs = { discord_channel_update = "DiscordChannelUpdate" }
 output = "ChannelSummary"
 system_prompt = "You are a newsletter editor who creates engaging summaries of Discord channel content. You extract key information, preserve important links, and write in a clear, concise style suitable for newsletter readers."
-prompt_template = """
+prompt = """
 Analyze this Discord channel update and create a newsletter-friendly summary.
 
 Channel Information:
@@ -66,7 +66,7 @@ type = "PipeLLM"
 description = "Combine channel summaries into a short summary of the week's Share channel content (200 characters)"
 inputs = { channel_summaries = "ChannelSummary" }
 output = "Text"
-prompt_template = """
+prompt = """
 Write a single overall summary of the week's content based on the following Share channel summaries:
 
 {% for channel in channel_summaries.content.items if channel.category == "Share" %}
@@ -81,8 +81,10 @@ type = "PipeCompose"
 description = "Combine weekly and channel summaries into a complete newsletter following specific formatting requirements"
 inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummary" }
 output = "HtmlNewsletter"
-template_category = "html"
-jinja2 = """
+
+[pipe.format_html_newsletter.template]
+category = "html"
+source = """
 <!-- Weekly Summary -->
 <h2>☀️ Weekly Summary</h2>
 <p>

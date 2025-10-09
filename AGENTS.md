@@ -566,7 +566,7 @@ description = "Compose a personalized follow-up email for CRM"
 inputs = { customer = "Customer", deal = "Deal", sales_rep = "SalesRep" }
 output = "Text"
 template_category = "html"
-prompting_style = { tag_style = "square_brackets", text_format = "html" }
+templating_style = { tag_style = "square_brackets", text_format = "html" }
 jinja2 = """
 Subject: Following up on our $deal.product_name discussion
 
@@ -602,7 +602,7 @@ $sales_rep.phone | $sales_rep.email
 - `jinja2`: Inline Jinja2 template (mutually exclusive with jinja2_name)
 - `jinja2_name`: Name of a predefined template (mutually exclusive with jinja2)
 - `template_category`: Template type ("llm_prompt", "html", "markdown", "mermaid", etc.)
-- `prompting_style`: Styling options for template rendering
+- `templating_style`: Styling options for template rendering
 - `extra_context`: Additional context variables for template
 
 ### Template Variables

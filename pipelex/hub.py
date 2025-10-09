@@ -32,7 +32,6 @@ from pipelex.tools.config.config_root import ConfigRoot
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.templating.template_provider_abstract import TemplateProviderAbstract
 
 
 class PipelexHub:
@@ -47,7 +46,6 @@ class PipelexHub:
         # tools
         self._config: ConfigRoot | None = None
         self._secrets_provider: SecretsProviderAbstract | None = None
-        self._template_provider: TemplateProviderAbstract | None = None
         self._class_registry: ClassRegistryAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
         # cogt
@@ -117,9 +115,6 @@ class PipelexHub:
 
     def set_storage_provider(self, storage_provider: StorageProviderAbstract | None):
         self._storage_provider = storage_provider
-
-    def set_template_provider(self, template_provider: TemplateProviderAbstract):
-        self._template_provider = template_provider
 
     def set_class_registry(self, class_registry: ClassRegistryAbstract):
         self._class_registry = class_registry
@@ -198,12 +193,6 @@ class PipelexHub:
             msg = "Secrets provider is not set. You must initialize Pipelex first."
             raise RuntimeError(msg)
         return self._secrets_provider
-
-    def get_required_template_provider(self) -> TemplateProviderAbstract:
-        if self._template_provider is None:
-            msg = "Template provider is not set. You must initialize Pipelex first."
-            raise RuntimeError(msg)
-        return self._template_provider
 
     def get_required_class_registry(self) -> ClassRegistryAbstract:
         if self._class_registry is None:
@@ -326,14 +315,6 @@ def get_secrets_provider() -> SecretsProviderAbstract:
 
 def get_storage_provider() -> StorageProviderAbstract:
     return get_pipelex_hub().get_storage_provider()
-
-
-def get_template_provider() -> TemplateProviderAbstract:
-    return get_pipelex_hub().get_required_template_provider()
-
-
-def get_template(template_name: str) -> str:
-    return get_template_provider().get_template(template_name=template_name)
 
 
 def get_class_registry() -> ClassRegistryAbstract:

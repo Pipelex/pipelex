@@ -243,16 +243,16 @@ class LibraryManager(LibraryManagerAbstract):
         for plx_file_path in valid_plx_paths:
             try:
                 blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
-            except FileNotFoundError as exc:
+            except FileNotFoundError as domain_def_error:
                 msg = f"Could not find PLX blueprint at '{plx_file_path}'"
-                raise LibraryLoadingError(msg) from exc
-            except ValidationError as exc:
-                formatted_error_msg = format_pydantic_validation_error(exc)
+                raise LibraryLoadingError(msg) from domain_def_error
+            except PipeDefinitionError as domain_def_error:
+                msg = f"Could not load PLX blueprint from '{plx_file_path}': {domain_def_error}"
+                raise LibraryLoadingError(msg) from domain_def_error
+            except ValidationError as domain_def_error:
+                formatted_error_msg = format_pydantic_validation_error(domain_def_error)
                 msg = f"Could not load PLX blueprint from '{plx_file_path}' because of: {formatted_error_msg}"
-                raise LibraryLoadingError(msg) from exc
-            except PipeDefinitionError as exc:
-                msg = f"Could not load PLX blueprint from '{plx_file_path}': {exc}"
-                raise LibraryLoadingError(msg) from exc
+                raise LibraryLoadingError(msg) from domain_def_error
             blueprint.source = str(plx_file_path)
             blueprints.append(blueprint)
 
@@ -261,9 +261,13 @@ class LibraryManager(LibraryManagerAbstract):
         for blueprint in blueprints:
             try:
                 domain = self._load_domain_from_blueprint(blueprint)
-            except DomainDefinitionError as exc:
-                msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
-                raise LibraryLoadingError(msg) from exc
+            except DomainDefinitionError as domain_def_error:
+                msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {domain_def_error}"
+                raise LibraryLoadingError(msg) from domain_def_error
+            except ValidationError as validation_error:
+                formatted_error_msg = format_pydantic_validation_error(validation_error)
+                msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {formatted_error_msg}"
+                raise LibraryLoadingError(msg) from validation_error
             all_domains.append(domain)
         self.domain_library.add_domains(domains=all_domains)
 
@@ -272,9 +276,13 @@ class LibraryManager(LibraryManagerAbstract):
         for blueprint in blueprints:
             try:
                 concepts = self._load_concepts_from_blueprint(blueprint)
-            except ConceptDefinitionError as exc:
-                msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
-                raise LibraryLoadingError(msg) from exc
+            except ConceptDefinitionError as concept_def_error:
+                msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {concept_def_error}"
+                raise LibraryLoadingError(msg) from concept_def_error
+            except ValidationError as validation_error:
+                formatted_error_msg = format_pydantic_validation_error(validation_error)
+                msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {formatted_error_msg}"
+                raise LibraryLoadingError(msg) from validation_error
             all_concepts.extend(concepts)
         self.concept_library.add_concepts(concepts=all_concepts)
 
@@ -283,8 +291,12 @@ class LibraryManager(LibraryManagerAbstract):
         for blueprint in blueprints:
             try:
                 pipes = self._load_pipes_from_blueprint(blueprint)
-            except PipeDefinitionError as exc:
-                msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
-                raise LibraryLoadingError(msg) from exc
+            except PipeDefinitionError as pipe_def_error:
+                msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {pipe_def_error}"
+                raise LibraryLoadingError(msg) from pipe_def_error
+            except ValidationError as validation_error:
+                formatted_error_msg = format_pydantic_validation_error(validation_error)
+                msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {formatted_error_msg}"
+                raise LibraryLoadingError(msg) from validation_error
             all_pipes.extend(pipes)
         self.pipe_library.add_pipes(pipes=all_pipes)

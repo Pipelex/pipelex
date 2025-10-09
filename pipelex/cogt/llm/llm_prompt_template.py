@@ -9,7 +9,6 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from pipelex.config import get_config
-from pipelex.hub import get_template
 from pipelex.tools.misc.string_utils import is_none_or_has_text
 
 
@@ -93,6 +92,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
         # input variables can be applied to prompt texts used as templates
         if llm_prompt.system_text:
             try:
+                # TODO: use jinja2 templating here
                 llm_prompt.system_text = llm_prompt.system_text.format(**all_template_inputs.root)
             except KeyError as exc:
                 error_msg = f"Could not apply inputs to system_text. KeyError = {exc}. system_text = '{llm_prompt.system_text}'"
@@ -102,6 +102,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
                 raise LLMPromptFactoryError(message=error_msg) from exc
         if llm_prompt.user_text:
             try:
+                # TODO: use jinja2 templating here
                 llm_prompt.user_text = llm_prompt.user_text.format(**all_template_inputs.root)
             except KeyError as exc:
                 error_msg = f"Could not apply inputs to user_text. KeyError = {exc}. user_text = '{llm_prompt.user_text}'"
@@ -114,9 +115,9 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
 
     @classmethod
     def for_structure_from_preliminary_text(cls) -> "LLMPromptTemplate":
-        generic_template_names = get_config().pipelex.generic_template_names
+        llm_config = get_config().cogt.llm_config
         proto_prompt = LLMPrompt(
-            system_text=get_template(generic_template_names.structure_from_preliminary_text_system),
-            user_text=get_template(generic_template_names.structure_from_preliminary_text_user),
+            system_text=llm_config.get_template("structure_from_preliminary_text_system"),
+            user_text=llm_config.get_template("structure_from_preliminary_text_user"),
         )
         return cls(proto_prompt=proto_prompt)

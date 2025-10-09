@@ -12,7 +12,7 @@ FantasyScene = "A fantasy scene"
 type = "PipeLLM"
 description = "Recall the colors of the original power rangers"
 output = "Color"
-prompt_template = """
+prompt = """
 Remind me of the colors of the {{ _nb_output }} original power rangers.
 """
 model = "llm_for_creative_writing"
@@ -22,7 +22,7 @@ nb_output = 5
 type = "PipeLLM"
 description = "Recall the colors of all the power rangers"
 output = "Color"
-prompt_template = """
+prompt = """
 Remind me of the colors of all the power rangers over all series.
 Don't list the names of the characters or the name of the series: just list the colors.
 """
@@ -33,7 +33,7 @@ type = "PipeLLM"
 description = "Imagine a product of nature"
 inputs = { color = "Color" }
 output = "ProductOfNature"
-prompt_template = """
+prompt = """
 Propose a product of nature of this color: $color.
 Just state what it is in a single sentence.
 """
@@ -43,7 +43,7 @@ type = "PipeLLM"
 description = "Imagine a fantasy scene including products of nature"
 inputs = { product_of_nature = "ProductOfNature" }
 output = "images.ImgGenPrompt"
-prompt_template = """
+prompt = """
 Imagine a fantasy scene including the following products of nature:
 
 @product_of_nature

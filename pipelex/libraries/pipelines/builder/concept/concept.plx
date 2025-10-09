@@ -23,7 +23,7 @@ inputs = { concept_spec_draft = "ConceptSpecDraft" }
 output = "ConceptStructureSpec"
 multiple_output = true
 model = "llm_to_engineer"
-prompt_template = """
+prompt = """
 Create a ConceptStructureSpec from the ConceptSpecDraft.
 Please focus only on the structure.
 

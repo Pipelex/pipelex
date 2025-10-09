@@ -6,10 +6,12 @@ type = "PipeCompose"
 description = "Jinja2 test 1"
 inputs = { text = "Text" }
 output = "Text"
-jinja2 = """
+
+[pipe.jinja2_test_1.template]
+source = """
 This is a simple test prompt:
 @text
 """
-prompting_style = { tag_style = "square_brackets", text_format = "markdown" }
-template_category = "llm_prompt"
+templating_style = { tag_style = "square_brackets", text_format = "markdown" }
+category = "llm_prompt"
 

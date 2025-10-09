@@ -51,7 +51,6 @@ from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.templating.template_library import TemplateLibrary
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import Self
 
@@ -67,7 +66,6 @@ class Pipelex(metaclass=MetaSingleton):
         pipelex_hub: PipelexHub | None = None,
         config_cls: type[ConfigRoot] | None = None,
         class_registry: ClassRegistryAbstract | None = None,
-        template_provider: TemplateLibrary | None = None,
         models_manager: ModelManagerAbstract | None = None,
         inference_manager: InferenceManager | None = None,
         pipeline_manager: PipelineManager | None = None,
@@ -94,9 +92,6 @@ class Pipelex(metaclass=MetaSingleton):
         log.debug("Logs are configured")
 
         # tools
-        self.template_provider = template_provider or TemplateLibrary.make_empty(config_dir_path=config_dir_path)
-        self.pipelex_hub.set_template_provider(self.template_provider)
-
         self.class_registry = class_registry or ClassRegistry()
         self.pipelex_hub.set_class_registry(self.class_registry)
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
@@ -217,14 +212,8 @@ class Pipelex(metaclass=MetaSingleton):
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}")
 
     def setup_libraries(self):
-        try:
-            self.template_provider.setup()
-            self.library_manager.setup()
-            self.library_manager.load_libraries()
-        except ValidationError as exc:
-            formatted_error_msg = format_pydantic_validation_error(exc)
-            msg = f"Could not setup libraries because of: {formatted_error_msg}"
-            raise PipelexSetupError(msg) from exc
+        self.library_manager.setup()
+        self.library_manager.load_libraries()
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_config().project_name}")
 
     def validate_libraries(self):
@@ -241,7 +230,6 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipeline_manager.teardown()
         self.pipeline_tracker.teardown()
         self.library_manager.teardown()
-        self.template_provider.teardown()
         self.activity_manager.teardown()
 
         # cogt

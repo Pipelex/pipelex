@@ -6,6 +6,10 @@ class CogtError(RootException):
     pass
 
 
+class LLMConfigError(CogtError):
+    pass
+
+
 class InferenceManagerWorkerSetupError(CogtError, FatalError):
     pass
 

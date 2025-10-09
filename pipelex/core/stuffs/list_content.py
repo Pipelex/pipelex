@@ -3,8 +3,8 @@ from typing import Any, Generic
 from json2html import json2html
 from typing_extensions import override
 
+from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
-from pipelex.tools.templating.templating_models import TextFormat
 
 
 class ListContent(StuffContent, Generic[StuffContentType]):

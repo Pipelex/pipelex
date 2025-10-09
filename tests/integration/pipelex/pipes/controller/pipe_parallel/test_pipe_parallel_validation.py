@@ -46,7 +46,7 @@ class TestPipeParallelValidation:
             },
             description="Analysis pipe for document processing",
             output=ConceptFactory.make_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
-            prompt_template="Analyze this document:  \n@context\n@document",
+            prompt="Analyze this document:  \n@context\n@document",
         )
 
         real_pipe = PipeLLMFactory.make_from_blueprint(

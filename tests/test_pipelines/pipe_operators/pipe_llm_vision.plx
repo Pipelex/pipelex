@@ -11,7 +11,7 @@ description = "Describe what is in the image"
 inputs = { image = "Image" }
 output = "Text"
 model = "llm_for_testing_vision"
-prompt_template = """
+prompt = """
 Describe what you see in this image in 1-2 sentences, be concise.
 $image
 """
@@ -22,7 +22,7 @@ description = "Describe what is in the image"
 inputs = { imageA = "Image", imageB = "Image" }
 output = "BasicDescription"
 model = "llm_to_extract_diagram"
-prompt_template = """
+prompt = """
 Describe what you see in $imageA only.
 Completely ignore $imageB.
 """
@@ -33,7 +33,7 @@ description = "Describe what is in the image"
 inputs = { imageA = "Image", imageB = "Image" }
 output = "BasicDescription"
 model = "llm_to_extract_diagram"
-prompt_template = """
+prompt = """
 Describe what you see in $imageB only.
 Completely ignore $imageA.
 """
@@ -46,7 +46,7 @@ inputs = { image = "images.Photo" }
 output = "VisionAnalysis"
 model = "llm_to_extract_diagram"
 system_prompt = "You are an expert image analyst. Provide detailed, accurate descriptions."
-prompt_template = """
+prompt = """
 Analyze this image and describe what's the main topic etc.
 $image
 --------------------------------

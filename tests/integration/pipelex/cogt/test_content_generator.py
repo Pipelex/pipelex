@@ -115,14 +115,14 @@ class TestContentGenerator:
         assert isinstance(image, GeneratedImage)
 
     @pytest.mark.usefixtures("request")
-    async def test_make_jinja2_text(self):
+    async def test_make_templated_text(self):
         context = {
             "the_answer": "elementary, my dear Watson",
         }
 
-        jinja2_text: str = await get_content_generator().make_jinja2_text(
+        jinja2_text: str = await get_content_generator().make_templated_text(
             context=context,
-            jinja2="The answer is: {{ the_answer }}",
+            template="The answer is: {{ the_answer }}",
         )
         assert isinstance(jinja2_text, str)
         assert jinja2_text == "The answer is: elementary, my dear Watson"

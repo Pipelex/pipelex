@@ -17,7 +17,7 @@ type = "PipeLLM"
 description = "Generate content"
 inputs = { data = "InputData" }
 output = "ProcessedData"
-prompt_template = "Process this data: @data"
+prompt = "Process this data: @data"
 
 [pipe.sequence_pipe]
 type = "PipeSequence"
@@ -42,7 +42,7 @@ steps = [
                 description="Generate content",
                 inputs={"data": "InputData"},
                 output="ProcessedData",
-                prompt_template="Process this data: @data",
+                prompt="Process this data: @data",
             ),
             "sequence_pipe": PipeSequenceBlueprint(
                 type="PipeSequence",

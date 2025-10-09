@@ -108,7 +108,7 @@ class TestImageInputs:
             description="Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes",
             inputs={"page": "Page"},
             output="Text",
-            prompt_template="Describe the page: @page",
+            prompt="Describe the page: @page",
         )
 
         pipe_llm = PipeLLMFactory.make_from_blueprint(

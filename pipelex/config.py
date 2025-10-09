@@ -5,6 +5,7 @@ from pydantic import Field, field_validator
 
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
+from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.exceptions import PipelexConfigError, StaticValidationErrorType
 from pipelex.hub import get_required_config
 from pipelex.language.plx_config import PlxConfig
@@ -14,7 +15,6 @@ from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.config.config_model import ConfigModel
 from pipelex.tools.config.config_root import ConfigRoot
 from pipelex.tools.log.log_config import LogConfig
-from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.types import StrEnum
 
 
@@ -29,8 +29,8 @@ class StaticValidationConfig(ConfigModel):
     reactions: dict[StaticValidationErrorType, StaticValidationReaction]
 
     @field_validator("reactions", mode="before")
-    @staticmethod
-    def validate_reactions(value: dict[str, str]) -> dict[StaticValidationErrorType, StaticValidationReaction]:
+    @classmethod
+    def validate_reactions(cls, value: dict[str, str]) -> dict[StaticValidationErrorType, StaticValidationReaction]:
         return cast(
             "dict[StaticValidationErrorType, StaticValidationReaction]",
             ConfigModel.transform_dict_str_to_enum(
@@ -54,8 +54,8 @@ class DryRunConfig(ConfigModel):
     allowed_to_fail_pipes: list[str] = Field(default_factory=list)
 
     @field_validator("image_urls", mode="before")
-    @staticmethod
-    def validate_image_urls(value: list[str]) -> list[str]:
+    @classmethod
+    def validate_image_urls(cls, value: list[str]) -> list[str]:
         if not value:
             msg = "dry_run_config.image_urls must be a non-empty list"
             raise PipelexConfigError(msg)
@@ -72,10 +72,10 @@ class StructureConfig(ConfigModel):
 
 
 class PromptingConfig(ConfigModel):
-    default_prompting_style: PromptingStyle
-    prompting_styles: dict[str, PromptingStyle]
+    default_prompting_style: TemplatingStyle
+    prompting_styles: dict[str, TemplatingStyle]
 
-    def get_prompting_style(self, prompting_target: PromptingTarget | None = None) -> PromptingStyle | None:
+    def get_prompting_style(self, prompting_target: PromptingTarget | None = None) -> TemplatingStyle | None:
         if prompting_target:
             return self.prompting_styles.get(prompting_target, self.default_prompting_style)
         return None

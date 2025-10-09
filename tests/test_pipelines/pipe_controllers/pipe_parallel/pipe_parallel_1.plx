@@ -26,7 +26,7 @@ description = "Analyze document length and structure"
 inputs = { document = "DocumentInput" }
 output = "LengthAnalysis"
 model = "llm_for_testing_gen_text"
-prompt_template = """
+prompt = """
 Analyze the length and structure of this document:
 
 @document.text
@@ -43,7 +43,7 @@ description = "Analyze document content and themes"
 inputs = { document = "DocumentInput" }
 output = "ContentAnalysis"
 model = "llm_for_testing_gen_text"
-prompt_template = """
+prompt = """
 Analyze the content and themes of this document:
 
 @document.text

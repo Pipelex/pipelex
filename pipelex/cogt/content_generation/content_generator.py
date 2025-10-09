@@ -6,17 +6,17 @@ from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import (
     ExtractAssignment,
     ImgGenAssignment,
-    Jinja2Assignment,
     LLMAssignment,
     LLMAssignmentFactory,
     ObjectAssignment,
+    TemplatingAssignment,
     TextThenObjectAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list, img_gen_single_image
-from pipelex.cogt.content_generation.jinja2_generate import jinja2_gen_text
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
+from pipelex.cogt.content_generation.templating_generate import templating_gen_text
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -27,10 +27,10 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -242,23 +242,21 @@ class ContentGenerator(ContentGeneratorProtocol):
         return generated_image_list
 
     @override
-    async def make_jinja2_text(
+    async def make_templated_text(
         self,
         context: dict[str, Any],
-        jinja2_name: str | None = None,
-        jinja2: str | None = None,
-        prompting_style: PromptingStyle | None = None,
-        template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
+        template: str,
+        templating_style: TemplatingStyle | None = None,
+        template_category: TemplateCategory | None = None,
     ) -> str:
         log.debug(f"context: {context}")
-        jinja2_assignment = Jinja2Assignment(
+        templating_assignment = TemplatingAssignment(
             context=context,
-            jinja2_name=jinja2_name,
-            jinja2=jinja2,
-            prompting_style=prompting_style,
-            template_category=template_category,
+            template=template,
+            templating_style=templating_style,
+            category=template_category or TemplateCategory.BASIC,
         )
-        return await jinja2_gen_text(jinja2_assignment=jinja2_assignment)
+        return await templating_gen_text(templating_assignment=templating_assignment)
 
     @override
     async def make_extract_pages(

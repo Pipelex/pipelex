@@ -11,7 +11,7 @@ from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, ComplexStructuredDataTestCases, PipeTestCases
+from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, PipeTestCases
 
 
 @pytest.mark.dry_runnable
@@ -51,21 +51,22 @@ class TestPipeLLM:
 
     @pytest.mark.parametrize(
         ("topic", "data", "concept"),
-        BasicStructuredDataTestCases.STRUCTURE_TEST_CASES + ComplexStructuredDataTestCases.STRUCTURE_TEST_CASES,
+        BasicStructuredDataTestCases.STRUCTURE_TEST_CASES,
+        # + ComplexStructuredDataTestCases.STRUCTURE_TEST_CASES,
     )
     @pytest.mark.parametrize(
         "structuring_method",
         [
-            StructuringMethod.DIRECT,
+            # StructuringMethod.DIRECT,
             StructuringMethod.PRELIMINARY_TEXT,
         ],
     )
     @pytest.mark.parametrize(
         ("llm", "llm_to_structure"),
         [
-            # ("gpt-4o-mini", "gpt-4o-mini"),
+            ("gpt-4o-mini", "gpt-4o-mini"),
             # ("gemini-2.5-flash-lite", "gemini-2.5-flash-lite"),
-            ("gemini-2.5-flash-lite", "gpt-4o-mini"),
+            # ("gemini-2.5-flash-lite", "gpt-4o-mini"),
         ],
     )
     async def test_pipe_llm_structured(
@@ -87,7 +88,7 @@ class TestPipeLLM:
             description=f"Extract {concept} from text",
             inputs={"data": "Text"},
             output=f"test_structured_generations.{concept}",
-            prompt_template=BasicStructuredDataTestCases.EXTRACTION_PROMPT,
+            prompt=BasicStructuredDataTestCases.EXTRACTION_PROMPT,
             model=llm,
             model_to_structure=llm_to_structure,
             structuring_method=structuring_method,

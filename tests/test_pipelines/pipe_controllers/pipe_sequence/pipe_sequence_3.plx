@@ -29,7 +29,7 @@ inputs = { topic = "CreativeTopic" }
 output = "CreativeIdea"
 nb_output = 5
 model = "llm_for_creative_writing"
-prompt_template = """
+prompt = """
 Generate $_nb_output creative and innovative ideas for the following topic:
 
 @topic
@@ -49,7 +49,7 @@ inputs = { topic = "CreativeTopic" }
 output = "CreativeIdea"
 multiple_output = true
 model = "llm_for_creative_writing"
-prompt_template = """
+prompt = """
 Brainstorm creative concepts related to this topic. Generate as many good ideas as come to mind:
 
 @topic
@@ -63,7 +63,7 @@ description = "Analyze a single idea in detail"
 inputs = { single_idea = "CreativeIdea" }
 output = "IdeaAnalysis"
 model = "llm_for_testing_gen_text"
-prompt_template = """
+prompt = """
 Perform a detailed analysis of this creative idea:
 
 @single_idea
@@ -84,7 +84,7 @@ description = "Evaluate and rank all analyzed ideas"
 inputs = { detailed_analyses = "IdeaAnalysis" }
 output = "IdeaEvaluation"
 model = "llm_for_testing_gen_text"
-prompt_template = """
+prompt = """
 Based on these detailed analyses, rank all ideas from best to worst:
 
 @detailed_analyses
@@ -101,7 +101,7 @@ description = "Select the best idea based on evaluation"
 inputs = { evaluation = "IdeaEvaluation" }
 output = "BestIdea"
 model = "llm_for_testing_gen_text"
-prompt_template = """
+prompt = """
 Based on this evaluation, select the single best idea and explain why it stands out:
 
 @evaluation
