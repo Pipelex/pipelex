@@ -90,7 +90,7 @@ class Pipelex(metaclass=MetaSingleton):
         try:
             self.pipelex_hub.setup_config(config_cls=config_cls or PipelexConfig)
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(validation_error=validation_error)
+            validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
             msg = f"Could not setup config because of: {validation_error_msg}"
             raise PipelexConfigError(msg) from validation_error
 
@@ -196,7 +196,7 @@ class Pipelex(metaclass=MetaSingleton):
             if not isinstance(cause_exc, ValidationError):
                 msg += f"\nUnxpexted cause:{cause_exc}"
                 raise PipelexSetupError(msg) from cause_exc
-            validation_error_msg = msg + "\n" + report_validation_error(validation_error=cause_exc)
+            validation_error_msg = msg + "\n" + report_validation_error(category="config", validation_error=cause_exc)
             raise PipelexSetupError(validation_error_msg) from backends_validation_exc
         except InferenceBackendCredentialsError as credentials_exc:
             backend_name = credentials_exc.backend_name
@@ -248,7 +248,7 @@ class Pipelex(metaclass=MetaSingleton):
         try:
             self.library_manager.validate_libraries()
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(validation_error=validation_error)
+            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
             msg = f"Could not validate libraries because of: {validation_error_msg}"
             raise PipelexSetupError(msg) from validation_error
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_config().project_name}")

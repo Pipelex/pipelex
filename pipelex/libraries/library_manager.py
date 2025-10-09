@@ -250,7 +250,7 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Could not load PLX blueprint from '{plx_file_path}': {pipe_def_error}"
                 raise LibraryLoadingError(msg) from pipe_def_error
             except ValidationError as validation_error:
-                validation_error_msg = report_validation_error(validation_error=validation_error)
+                validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
                 msg = f"Could not load PLX blueprint from '{plx_file_path}' because of: {validation_error_msg}"
                 raise LibraryLoadingError(msg) from validation_error
             blueprint.source = str(plx_file_path)
@@ -265,7 +265,7 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {domain_def_error}"
                 raise LibraryLoadingError(msg) from domain_def_error
             except ValidationError as validation_error:
-                validation_error_msg = report_validation_error(validation_error=validation_error)
+                validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
                 msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {validation_error_msg}"
                 raise LibraryLoadingError(msg) from validation_error
             all_domains.append(domain)
@@ -280,7 +280,7 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {concept_def_error}"
                 raise LibraryLoadingError(msg) from concept_def_error
             except ValidationError as validation_error:
-                validation_error_msg = report_validation_error(validation_error=validation_error)
+                validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
                 msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {validation_error_msg}"
                 raise LibraryLoadingError(msg) from validation_error
             all_concepts.extend(concepts)
@@ -295,7 +295,7 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {pipe_def_error}"
                 raise LibraryLoadingError(msg) from pipe_def_error
             except ValidationError as validation_error:
-                validation_error_msg = report_validation_error(validation_error=validation_error)
+                validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
                 msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {validation_error_msg}"
                 raise LibraryLoadingError(msg) from validation_error
             all_pipes.extend(pipes)

@@ -281,11 +281,14 @@ field_ordering = ["type", "description", "inputs", "output"]
 # Migration config
 ####################################################################################################
 
-[migration.renaming_map]
+[migration.migration_maps.config]
 definition = "description"
 ocr_config = "extract_config"
 ocr = "extract"
-# ocr = "model"
+
+[migration.migration_maps.plx]
+img_gen = "model"
+ocr = "model"
 llm_handle = "model"
 llm = "model"
 llm_to_structure = "model_to_structure"
