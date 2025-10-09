@@ -8,6 +8,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -225,9 +226,10 @@ class StuffFactory:
                 if not concept_code:
                     msg = "Stuff content data dict is badly formed: no concept code"
                     raise StuffFactoryError(msg)
+                domain_and_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(domain=SpecialDomain.NATIVE, concept_string_or_code=concept_code)
                 content_value = stuff_content_dict["content"]
-                if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_code):
-                    concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode(concept_code))
+                if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=domain_and_concept_code.concept_code):
+                    concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode(domain_and_concept_code.concept_code))
                     content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
                         concept=concept,
                         value=content_value,
