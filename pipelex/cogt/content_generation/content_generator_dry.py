@@ -33,7 +33,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_llm_text(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_llm_text(
         self,
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
@@ -46,7 +46,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_object_direct(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_object_direct(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -70,7 +70,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_text_then_object(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_text_then_object(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -91,7 +91,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_object_list_direct(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_object_list_direct(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -114,7 +114,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_text_then_object_list(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_text_then_object_list(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -136,7 +136,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_single_image(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_single_image(
         self,
         job_metadata: JobMetadata,
         img_gen_handle: str,
@@ -156,7 +156,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_image_list(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_image_list(
         self,
         job_metadata: JobMetadata,
         img_gen_handle: str,

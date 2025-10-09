@@ -143,11 +143,15 @@ class MissingPluginError(CogtError):
     pass
 
 
-class OcrCapabilityError(CogtError):
+class ExtractCapabilityError(CogtError):
     pass
 
 
 class RoutingProfileLibraryNotFoundError(CogtError):
+    pass
+
+
+class RoutingProfileValidationError(CogtError):
     pass
 
 
@@ -160,6 +164,14 @@ class InferenceModelSpecError(CogtError):
 
 
 class InferenceBackendError(CogtError):
+    pass
+
+
+class InferenceBackendLibraryNotFoundError(CogtError):
+    pass
+
+
+class InferenceBackendLibraryValidationError(CogtError):
     pass
 
 
@@ -191,9 +203,13 @@ class RoutingProfileError(CogtError):
     pass
 
 
-class ModelsManagerError(CogtError):
+class ModelManagerError(CogtError):
     pass
 
 
 class ModelDeckNotFoundError(CogtError):
+    pass
+
+
+class ModelDeckValidationError(CogtError):
     pass

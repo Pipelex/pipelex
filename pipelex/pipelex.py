@@ -14,7 +14,15 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
-from pipelex.cogt.exceptions import InferenceBackendCredentialsError, RoutingProfileLibraryNotFoundError
+from pipelex.cogt.exceptions import (
+    InferenceBackendCredentialsError,
+    InferenceBackendLibraryNotFoundError,
+    InferenceBackendLibraryValidationError,
+    ModelDeckNotFoundError,
+    ModelDeckValidationError,
+    RoutingProfileLibraryNotFoundError,
+    RoutingProfileValidationError,
+)
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
@@ -23,6 +31,7 @@ from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.core.registry_models import PipelexRegistryModels
+from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager_factory import LibraryManagerFactory
@@ -51,8 +60,8 @@ from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import Self
+from pipelex.urls import URLs
 
 PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
 PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
@@ -80,10 +89,10 @@ class Pipelex(metaclass=MetaSingleton):
         # tools
         try:
             self.pipelex_hub.setup_config(config_cls=config_cls or PipelexConfig)
-        except ValidationError as exc:
-            formatted_error_msg = format_pydantic_validation_error(exc)
-            msg = f"Could not setup config because of: {formatted_error_msg}"
-            raise PipelexConfigError(msg) from exc
+        except ValidationError as validation_error:
+            validation_error_msg = report_validation_error(validation_error=validation_error)
+            msg = f"Could not setup config because of: {validation_error_msg}"
+            raise PipelexConfigError(msg) from validation_error
 
         log.configure(
             project_name=get_config().project_name or "unknown_project",
@@ -167,9 +176,28 @@ class Pipelex(metaclass=MetaSingleton):
         self.plugin_manager.setup()
         try:
             self.models_manager.setup()
-        except RoutingProfileLibraryNotFoundError as routing_profile_library_exc:
-            msg = "The routing library could not be found, please call `pipelex init config` to create it"
-            raise PipelexSetupError(msg) from routing_profile_library_exc
+        except (RoutingProfileLibraryNotFoundError, InferenceBackendLibraryNotFoundError, ModelDeckNotFoundError) as backends_not_found_exc:
+            msg = (
+                "Some config files are missing for the inference backend library, routing profile library, or model deck. "
+                "Run `pipelex init config` to generate the missing files."
+            )
+            raise PipelexSetupError(msg) from backends_not_found_exc
+        except (RoutingProfileValidationError, InferenceBackendLibraryValidationError, ModelDeckValidationError) as backends_validation_exc:
+            msg = (
+                "Some config files are invalid for the inference backend library, routing profile library, or model deck. "
+                "You can fix them manually, or run `pipelex init config --reset` to regenerate them. "
+                "Note that this command resets all config files to their default values.\n"
+                f"If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.\n"
+            )
+            cause_exc = backends_validation_exc.__cause__
+            if cause_exc is None:
+                msg += f"\nUnxpexted cause:{cause_exc}"
+                raise PipelexSetupError(msg) from cause_exc
+            if not isinstance(cause_exc, ValidationError):
+                msg += f"\nUnxpexted cause:{cause_exc}"
+                raise PipelexSetupError(msg) from cause_exc
+            validation_error_msg = msg + "\n" + report_validation_error(validation_error=cause_exc)
+            raise PipelexSetupError(validation_error_msg) from backends_validation_exc
         except InferenceBackendCredentialsError as credentials_exc:
             backend_name = credentials_exc.backend_name
             var_name = credentials_exc.key_name
@@ -219,10 +247,10 @@ class Pipelex(metaclass=MetaSingleton):
     def validate_libraries(self):
         try:
             self.library_manager.validate_libraries()
-        except ValidationError as exc:
-            formatted_error_msg = format_pydantic_validation_error(exc)
-            msg = f"Could not validate libraries because of: {formatted_error_msg}"
-            raise PipelexSetupError(msg) from exc
+        except ValidationError as validation_error:
+            validation_error_msg = report_validation_error(validation_error=validation_error)
+            msg = f"Could not validate libraries because of: {validation_error_msg}"
+            raise PipelexSetupError(msg) from validation_error
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_config().project_name}")
 
     def teardown(self):

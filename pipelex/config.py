@@ -119,10 +119,21 @@ class Pipelex(ConfigModel):
     observer_config: ObserverConfig
 
 
+class MigrationConfig(ConfigModel):
+    renaming_map: dict[str, str]
+
+    def text_in_renaming_keys(self, text: str) -> list[tuple[str, str]]:
+        return [(key, value) for key, value in self.renaming_map.items() if text in key]
+
+    def text_in_renaming_values(self, text: str) -> list[tuple[str, str]]:
+        return [(key, value) for key, value in self.renaming_map.items() if text in value]
+
+
 class PipelexConfig(ConfigRoot):
     session_id: str = shortuuid.uuid()
     cogt: Cogt
     pipelex: Pipelex
+    migration: MigrationConfig
 
 
 def get_config() -> PipelexConfig:

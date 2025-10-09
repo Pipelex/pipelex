@@ -6,6 +6,8 @@ from pipelex.cogt.exceptions import (
     InferenceBackendCredentialsError,
     InferenceBackendCredentialsErrorType,
     InferenceBackendLibraryError,
+    InferenceBackendLibraryNotFoundError,
+    InferenceBackendLibraryValidationError,
     InferenceModelSpecError,
 )
 from pipelex.cogt.model_backends.backend import InferenceBackend
@@ -38,9 +40,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backends_library_path = get_config().cogt.inference_config.backends_library_path
         try:
             backends_dict = load_toml_from_path(path=backends_library_path)
-        except (FileNotFoundError, InferenceBackendLibraryError) as exc:
-            msg = f"Failed to load inference backend library from file '{backends_library_path}': {exc}"
-            raise InferenceBackendLibraryError(msg) from exc
+        except FileNotFoundError as file_not_found_exc:
+            msg = f"Could not find inference backend library at '{backends_library_path}': {file_not_found_exc}"
+            raise InferenceBackendLibraryNotFoundError(msg) from file_not_found_exc
+        except ValidationError as exc:
+            msg = f"Invalid inference backend library configuration in '{backends_library_path}': {exc}"
+            raise InferenceBackendLibraryValidationError(msg) from exc
         for backend_name, backend_dict in backends_dict.items():
             # We'll split the read settings into standard fields and extra config
             standard_fields = InferenceBackendBlueprint.model_fields.keys()

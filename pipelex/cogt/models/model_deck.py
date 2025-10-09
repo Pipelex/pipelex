@@ -114,7 +114,7 @@ class ModelDeck(ConfigModel):
         raise ImgGenChoiceNotFoundError(msg)
 
     @classmethod
-    def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]
+    def final_validate(cls, deck: Self):
         for llm_preset_id, llm_setting in deck.llm_presets.items():
             inference_model = deck.get_required_inference_model(model_handle=llm_setting.model)
             try:

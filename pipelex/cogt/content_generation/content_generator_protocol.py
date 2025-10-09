@@ -45,22 +45,22 @@ def update_job_metadata(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P
 
 
 class ContentGeneratorProtocol(Protocol):
-    async def make_llm_text(
+    def make_llm_text(
         self,
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-    ) -> str: ...
+    ) -> Coroutine[Any, Any, str]: ...
 
-    async def make_object_direct(
+    def make_object_direct(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
-    ) -> BaseModelTypeVar: ...
+    ) -> Coroutine[Any, Any, BaseModelTypeVar]: ...
 
-    async def make_text_then_object(
+    def make_text_then_object(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -68,18 +68,18 @@ class ContentGeneratorProtocol(Protocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object: LLMPromptFactoryAbstract | None = None,
-    ) -> BaseModelTypeVar: ...
+    ) -> Coroutine[Any, Any, BaseModelTypeVar]: ...
 
-    async def make_object_list_direct(
+    def make_object_list_direct(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: int | None = None,
-    ) -> list[BaseModelTypeVar]: ...
+    ) -> Coroutine[Any, Any, list[BaseModelTypeVar]]: ...
 
-    async def make_text_then_object_list(
+    def make_text_then_object_list(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -88,18 +88,18 @@ class ContentGeneratorProtocol(Protocol):
         llm_prompt_for_text: LLMPrompt,
         llm_prompt_factory_for_object_list: LLMPromptFactoryAbstract | None = None,
         nb_items: int | None = None,
-    ) -> list[BaseModelTypeVar]: ...
+    ) -> Coroutine[Any, Any, list[BaseModelTypeVar]]: ...
 
-    async def make_single_image(
+    def make_single_image(
         self,
         job_metadata: JobMetadata,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> GeneratedImage: ...
+    ) -> Coroutine[Any, Any, GeneratedImage]: ...
 
-    async def make_image_list(
+    def make_image_list(
         self,
         job_metadata: JobMetadata,
         img_gen_handle: str,
@@ -107,21 +107,21 @@ class ContentGeneratorProtocol(Protocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> list[GeneratedImage]: ...
+    ) -> Coroutine[Any, Any, list[GeneratedImage]]: ...
 
-    async def make_templated_text(
+    def make_templated_text(
         self,
         context: dict[str, Any],
         template: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
-    ) -> str: ...
+    ) -> Coroutine[Any, Any, str]: ...
 
-    async def make_extract_pages(
+    def make_extract_pages(
         self,
         job_metadata: JobMetadata,
         extract_input: ExtractInput,
         extract_handle: str,
         extract_job_params: ExtractJobParams,
         extract_job_config: ExtractJobConfig,
-    ) -> ExtractOutput: ...
+    ) -> Coroutine[Any, Any, ExtractOutput]: ...
