@@ -63,7 +63,7 @@ class PipeImgGenSpec(PipeSpec):
             category=self.category,
             img_gen_prompt=None,
             img_gen_prompt_var_name=None,
-            img_gen=self.img_gen_skill.model_recommendation if self.img_gen_skill else None,
+            model=self.img_gen_skill.model_recommendation if self.img_gen_skill else None,
             aspect_ratio=None,
             background=None,
             output_format=None,

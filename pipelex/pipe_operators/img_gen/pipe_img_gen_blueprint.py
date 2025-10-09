@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import Field
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
-from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 
@@ -13,7 +13,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
     img_gen_prompt: str | None = None
     img_gen_prompt_var_name: str | None = None
 
-    img_gen: ImgGenChoice | None = None
+    model: ImgGenModelChoice | None = None
 
     # One-time settings (not in ImgGenSetting)
     aspect_ratio: AspectRatio | None = Field(default=None, strict=False)

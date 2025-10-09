@@ -1,12 +1,13 @@
-from typing import Any, ClassVar, Literal
+from typing import Any, Literal
 
-from jinja2 import TemplateSyntaxError
 from pydantic import ConfigDict, model_validator
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -18,17 +19,14 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipeDefinitionError, PipeRunParamsError
-from pipelex.hub import get_content_generator, get_template, get_template_provider
+from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_errors import Jinja2TemplateError
-from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
-from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.templating_models import PromptingStyle
-from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
+from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
+from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.types import Self
 
 
@@ -40,28 +38,22 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     type: Literal["PipeCompose"] = "PipeCompose"
     model_config = ConfigDict(extra="forbid", strict=False)
 
-    adhoc_pipe_code: ClassVar[str] = "jinja2_render"
     output: Concept = ConceptFactory.make_native_concept(
         native_concept_code=NativeConceptCode.TEXT,
     )
 
-    jinja2_name: str | None = None
-    jinja2: str | None = None
-    prompting_style: PromptingStyle | None = None
-    template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT
+    template: str
+    templating_style: TemplatingStyle | None = None
+    template_category: TemplateCategory = TemplateCategory.BASIC
     extra_context: dict[str, Any] | None = None
 
     @model_validator(mode="after")
-    def validate_jinja2(self) -> Self:
-        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["jinja2_name", "jinja2"]):
-            msg = "PipeCompose should have exactly one of jinja2_name or jinja2"
-            raise PipeDefinitionError(msg)
-        if self.jinja2:
-            try:
-                check_jinja2_parsing(jinja2_template_source=self.jinja2, template_category=self.template_category)
-            except TemplateSyntaxError as exc:
-                msg = f"Could not parse Jinja2 template included in PipeCompose: {exc}"
-                raise Jinja2TemplateError(msg) from exc
+    def validate_template(self) -> Self:
+        try:
+            check_jinja2_parsing(template_source=self.template, template_category=self.template_category)
+        except Jinja2TemplateSyntaxError as exc:
+            msg = f"Could not parse template for PipeCompose '{self.code}: {exc}"
+            raise PipeDefinitionError(msg) from exc
         return self
 
     @model_validator(mode="after")
@@ -84,9 +76,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     def validate_with_libraries(self):
-        if self.jinja2_name:
-            the_template = get_template(template_name=self.jinja2_name)
-            log.debug(f"Validated jinja2 template '{self.jinja2_name}':\n{the_template}")
+        pass
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
@@ -97,20 +87,13 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @property
     def desc(self) -> str:
-        if self.jinja2:
-            return f"Jinja2 included template, prompting style {self.prompting_style}"
-        elif jinja2_name := self.jinja2_name:
-            return f"Jinja2 template '{jinja2_name}', prompting style {self.prompting_style}"
-        else:
-            return "Jinja2 template not defined"
+        return f"Jinja2 included template, prompting style {self.templating_style}"
 
     @override
     def required_variables(self) -> set[str]:
         required_variables = detect_jinja2_required_variables(
             template_category=self.template_category,
-            template_provider=get_template_provider(),
-            jinja2_name=self.jinja2_name,
-            jinja2=self.jinja2,
+            template_source=self.template,
         )
         return {
             variable_name
@@ -138,11 +121,10 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.extra_context:
             context.update(**self.extra_context)
 
-        jinja2_text = await content_generator.make_jinja2_text(
+        jinja2_text = await content_generator.make_templated_text(
             context=context,
-            jinja2_name=self.jinja2_name,
-            jinja2=self.jinja2,
-            prompting_style=self.prompting_style,
+            template=self.template,
+            templating_style=self.templating_style,
             template_category=self.template_category,
         )
         log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")

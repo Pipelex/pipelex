@@ -26,8 +26,8 @@ description = "Extract individual reviews from document"
 inputs = { document = "Document" }
 output = "CustomerReview"
 multiple_output = true
-llm = "llm_for_testing_gen_text"
-prompt_template = """
+model = "llm_for_testing_gen_text"
+prompt = """
 Extract each individual customer review from this document as separate items:
 
 @document
@@ -38,8 +38,8 @@ type = "PipeLLM"
 description = "Analyze sentiment of a single review"
 inputs = { single_review = "CustomerReview" }
 output = "SentimentAnalysis"
-llm = "llm_for_testing_gen_text"
-prompt_template = """
+model = "llm_for_testing_gen_text"
+prompt = """
 Analyze the sentiment of this customer review:
 
 @single_review
@@ -52,8 +52,8 @@ type = "PipeLLM"
 description = "Aggregate all review analyses into final rating"
 inputs = { sentiment_analyses = "SentimentAnalysis" }
 output = "ProductRating"
-llm = "llm_for_testing_gen_text"
-prompt_template = """
+model = "llm_for_testing_gen_text"
+prompt = """
 Based on these sentiment analyses, provide an overall product rating:
 
 @sentiment_analyses

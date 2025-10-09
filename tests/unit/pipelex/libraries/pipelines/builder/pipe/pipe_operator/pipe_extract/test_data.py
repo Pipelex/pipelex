@@ -6,10 +6,10 @@ from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlu
 
 
 class PipeExtractTestCases:
-    SIMPLE_OCR = (
-        "simple_ocr",
+    SIMPLE_EXTRACT = (
+        "simple_extract",
         PipeExtractSpec(
-            pipe_code="ocr_extractor",
+            pipe_code="extractor",
             description="Extract text from image",
             inputs={"image": "Image"},
             output="ExtractedText",
@@ -22,15 +22,15 @@ class PipeExtractTestCases:
             output="ExtractedText",
             type="PipeExtract",
             category="PipeOperator",
-            ocr="base_ocr_mistral",
+            model="base_ocr_mistral",
         ),
     )
 
-    OCR_WITH_OPTIONS = (
-        "ocr_with_options",
+    EXTRACT_WITH_OPTIONS = (
+        "extract_with_options",
         PipeExtractSpec(
-            pipe_code="advanced_ocr",
-            description="OCR with page options",
+            pipe_code="advanced_extract",
+            description="Extract with page options",
             inputs={"document": "PDF"},
             output="PageContent",
             extract_skill="extract_text_from_pdf",
@@ -40,12 +40,12 @@ class PipeExtractTestCases:
         ),
         PipeExtractBlueprint(
             source=None,
-            description="OCR with page options",
+            description="Extract with page options",
             inputs={"document": InputRequirementBlueprint(concept="PDF")},
             output="PageContent",
             type="PipeExtract",
             category="PipeOperator",
-            ocr="base_ocr_mistral",
+            model="base_ocr_mistral",
             page_images=True,
             page_image_captions=True,
             page_views=True,
@@ -54,6 +54,6 @@ class PipeExtractTestCases:
     )
 
     TEST_CASES: ClassVar[list[tuple[str, PipeExtractSpec, PipeExtractBlueprint]]] = [
-        SIMPLE_OCR,
-        OCR_WITH_OPTIONS,
+        SIMPLE_EXTRACT,
+        EXTRACT_WITH_OPTIONS,
     ]

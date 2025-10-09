@@ -8,7 +8,7 @@ from pipelex.cogt.content_generation.content_generator_dry import ContentGenerat
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat, Quality
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -65,7 +65,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     img_gen_prompt_var_name: str | None = None
 
     # New ImgGenChoice pattern (like LLM)
-    img_gen: ImgGenChoice | None = None
+    img_gen: ImgGenModelChoice | None = None
 
     # Legacy individual settings (for backwards compatibility)
     img_gen_handle: str | None = None
@@ -247,7 +247,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         elif self.img_gen_handle is not None:
             # Legacy pattern: create ImgGenSetting from individual settings
             img_gen_setting = ImgGenSetting(
-                img_gen_handle=self.img_gen_handle,
+                model=self.img_gen_handle,
                 quality=self.quality,
                 nb_steps=self.nb_steps,
                 guidance_scale=self.guidance_scale or img_gen_param_defaults.guidance_scale,
@@ -280,7 +280,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             seed=seed,
         )
         # Get the image generation handle
-        img_gen_handle = img_gen_setting.img_gen_handle
+        img_gen_handle = img_gen_setting.model
         log.debug(f"Using img_gen handle: {img_gen_handle}")
 
         the_content: StuffContent

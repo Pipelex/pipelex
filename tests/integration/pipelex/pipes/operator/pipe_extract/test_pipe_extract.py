@@ -26,7 +26,7 @@ class TestPipeExtract:
         concept_library = get_concept_library()
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="PageScan",
-            domain="ocr",
+            domain="extract",
             blueprint=ConceptBlueprint(description="Lorem Ipsum"),
             concept_codes_from_the_same_domain=["PageScan"],
         )
@@ -52,13 +52,13 @@ class TestPipeExtract:
             page_image_captions=False,
             page_views=True,
             page_views_dpi=72,
-            ocr=extract_choice_for_image,
+            model=extract_choice_for_image,
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeExtractFactory.make_from_blueprint(
                 domain="generic",
-                pipe_code="adhoc_for_test_pipe_ocr_image",
+                pipe_code="adhoc_for_test_pipe_extract_from_image",
                 blueprint=pipe_extract_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -75,18 +75,18 @@ class TestPipeExtract:
         pretty_print(list_result, title="list_result")
 
     @pytest.mark.parametrize("pdf_url", PipeExtractTestCases.PIPE_OCR_PDF_TEST_CASES)
-    async def test_pipe_ocr_pdf(
+    async def test_pipe_extract_from_pdf(
         self,
         extract_choice_for_pdf: str,
         pipe_run_mode: PipeRunMode,
         pdf_url: str,
     ):
         input_name = "arbitrary_name"
-        pipe_ocr_blueprint = PipeExtractBlueprint(
+        blueprint = PipeExtractBlueprint(
             description="OCR test for PDF processing",
             inputs={input_name: InputRequirementBlueprint(concept=NativeConceptCode.PDF)},
             output=NativeConceptCode.TEXT_AND_IMAGES,
-            ocr=extract_choice_for_pdf,
+            model=extract_choice_for_pdf,
             page_images=True,
             page_image_captions=False,
             page_views=True,
@@ -96,8 +96,8 @@ class TestPipeExtract:
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeExtractFactory.make_from_blueprint(
                 domain="generic",
-                pipe_code="adhoc_for_test_pipe_ocr_pdf",
-                blueprint=pipe_ocr_blueprint,
+                pipe_code="adhoc_for_test_pipe_extract_from_pdf",
+                blueprint=blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=WorkingMemoryFactory.make_from_pdf(

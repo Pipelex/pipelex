@@ -13,7 +13,7 @@ type = "PipeLLM"
 description = "Simple LLM test from image"
 inputs = { image = "Image" }
 output = "Text"
-prompt_template = """
+prompt = """
 Describe the using rap lyrics, including puns and references to the image.
 @image
 """
@@ -22,8 +22,8 @@ Describe the using rap lyrics, including puns and references to the image.
 type = "PipeLLM"
 description = "No Input"
 output = "Text"
-llm = "llm_for_testing_gen_text"
-prompt_template = """
+model = "llm_for_testing_gen_text"
+prompt = """
 Explain that this is a test prompt which took no input from the user.
 """
 
@@ -31,8 +31,8 @@ Explain that this is a test prompt which took no input from the user.
 type = "PipeLLM"
 description = "No Input but generates a text that could be long"
 output = "Text"
-llm = { llm_handle = "gpt-4o-mini", temperature = 0.5, max_tokens = 1000 }
-prompt_template = """
+model = { model = "gpt-4o-mini", temperature = 0.5, max_tokens = 1000 }
+prompt = """
 Tell me a short story about a red baloon.
 """
 

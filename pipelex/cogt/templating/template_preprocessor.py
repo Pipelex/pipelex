@@ -8,7 +8,7 @@ from re import Match
 #         template_str: The template string to check
 
 #     Raises:
-#         Jinja2TemplateError: If any non-allowed filters are found
+#         TemplateSyntaxError: If any non-allowed filters are found
 
 #     """
 #     # Pattern to match Jinja2 filter syntax: {{ variable|filter() }} or {{ variable|filter(param) }}
@@ -28,7 +28,7 @@ from re import Match
 
 #     if invalid_filters:
 #         msg = f"Invalid Jinja2 filters found: {invalid_filters}. Only the following filters are allowed: {ALLOWED_FILTERS}"
-#         raise Jinja2TemplateError(msg)
+#         raise TemplateSyntaxError(msg)
 
 
 # Handle @variable patterns

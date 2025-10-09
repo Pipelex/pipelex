@@ -81,7 +81,7 @@ description = "Extract the precise dates of the task, start_date and end_date"
 inputs = { gantt_chart_image = "GanttChartImage", gantt_timescale = "GanttTimescaleDescription", gantt_task_name = "GanttTaskName" }
 output = "GanttTaskDetails" # The output is structured as a GanttTaskDetails object
 structuring_method = "preliminary_text"
-llm = "llm_to_extract_diagram"
+model = "llm_to_extract_diagram"
 prompt_template = """
 I am sharing an image of a Gantt chart.
 Please analyse the image and for a given task name (and only this task), extract the information of the task, if relevant.

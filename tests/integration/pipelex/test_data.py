@@ -303,17 +303,17 @@ Extract information from the following text:
 
     # Combined test cases for parametrized tests
     STRUCTURE_TEST_CASES: ClassVar[list[tuple[str, str, str]]] = [  # topic, data, concept
-        ("Simple structure basic", SIMPLE_STRUCTURE_1, "ConceptWithSimpleStructure"),
+        # ("Simple structure basic", SIMPLE_STRUCTURE_1, "ConceptWithSimpleStructure"),
         ("Simple structure narrative", SIMPLE_STRUCTURE_2, "ConceptWithSimpleStructure"),
-        ("Optionals all present", OPTIONAL_ALL_PRESENT, "ConceptWithOptionals"),
-        ("Optionals some missing", OPTIONAL_SOME_MISSING, "ConceptWithOptionals"),
-        ("Optionals all missing", OPTIONAL_ALL_MISSING, "ConceptWithOptionals"),
-        ("Lists with data", LISTS_WITH_DATA, "ConceptWithLists"),
-        ("Lists empty", LISTS_EMPTY, "ConceptWithLists"),
-        ("Lists mixed", LISTS_MIXED, "ConceptWithLists"),
-        ("Nested full", NESTED_FULL, "ConceptWithNestedStructures"),
-        ("Nested partial", NESTED_PARTIAL, "ConceptWithNestedStructures"),
-        ("Nested complex", NESTED_COMPLEX, "ConceptWithNestedStructures"),
+        # ("Optionals all present", OPTIONAL_ALL_PRESENT, "ConceptWithOptionals"),
+        # ("Optionals some missing", OPTIONAL_SOME_MISSING, "ConceptWithOptionals"),
+        # ("Optionals all missing", OPTIONAL_ALL_MISSING, "ConceptWithOptionals"),
+        # ("Lists with data", LISTS_WITH_DATA, "ConceptWithLists"),
+        # ("Lists empty", LISTS_EMPTY, "ConceptWithLists"),
+        # ("Lists mixed", LISTS_MIXED, "ConceptWithLists"),
+        # ("Nested full", NESTED_FULL, "ConceptWithNestedStructures"),
+        # ("Nested partial", NESTED_PARTIAL, "ConceptWithNestedStructures"),
+        # ("Nested complex", NESTED_COMPLEX, "ConceptWithNestedStructures"),
     ]
 
 

@@ -30,7 +30,7 @@ class TestLLMReport:
         llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
         pretty_print(llm_setting, title=llm_preset_id)
         pretty_print(prompt_text)
-        llm_worker = get_llm_worker(llm_handle=llm_setting.llm_handle)
+        llm_worker = get_llm_worker(llm_handle=llm_setting.model)
         llm_job_params = llm_setting.make_llm_job_params()
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(

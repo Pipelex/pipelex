@@ -566,7 +566,7 @@ description = "Compose a personalized follow-up email for CRM"
 inputs = { customer = "Customer", deal = "Deal", sales_rep = "SalesRep" }
 output = "Text"
 template_category = "html"
-prompting_style = { tag_style = "square_brackets", text_format = "html" }
+templating_style = { tag_style = "square_brackets", text_format = "html" }
 jinja2 = """
 Subject: Following up on our $deal.product_name discussion
 
@@ -602,7 +602,7 @@ $sales_rep.phone | $sales_rep.email
 - `jinja2`: Inline Jinja2 template (mutually exclusive with jinja2_name)
 - `jinja2_name`: Name of a predefined template (mutually exclusive with jinja2)
 - `template_category`: Template type ("llm_prompt", "html", "markdown", "mermaid", etc.)
-- `prompting_style`: Styling options for template rendering
+- `templating_style`: Styling options for template rendering
 - `extra_context`: Additional context variables for template
 
 ### Template Variables
@@ -633,7 +633,7 @@ type = "PipeImgGen"
 description = "Generate a high-quality photo"
 inputs = { prompt = "ImgGenPrompt" }
 output = "Photo"
-img_gen = { img_gen_handle = "dall-e-3", quality = "hd" }
+model = { model = "fast-img-gen", quality = "hd" }
 aspect_ratio = "16:9"
 nb_steps = 8
 ```
@@ -656,7 +656,7 @@ type = "PipeImgGen"
 description = "Generate image with custom settings"
 inputs = { prompt = "ImgGenPrompt" }
 output = "Image"
-img_gen = "img_gen_preset_name"  # Use predefined preset
+model = "img_gen_preset_name"  # Use predefined preset
 aspect_ratio = "1:1"
 quality = "hd"
 background = "transparent"
@@ -815,7 +815,7 @@ Here is an example of using an llm_handle to specify which LLM to use in a PipeL
 type = "PipeLLM"
 description = "Write text about Hello World."
 output = "Text"
-llm = { llm_handle = "gpt-5", temperature = 0.9 }
+model = { model = "gpt-5", temperature = 0.9 }
 prompt_template = """
 Write a haiku about Hello World.
 """
@@ -829,8 +829,8 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 
 Examples:
 ```toml
-llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
-llm_to_extract_invoice = { llm_handle = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
+llm_to_reason = { model = "base-claude", temperature = 1 }
+llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 
 The interest is that these presets can be used to set the LLM choice in a PipeLLM, like this:
@@ -841,7 +841,7 @@ type = "PipeLLM"
 description = "Extract invoice information from an invoice text transcript"
 inputs = { invoice_text = "InvoiceText" }
 output = "Invoice"
-llm = "llm_to_extract_invoice"
+model = "llm_to_extract_invoice"
 prompt_template = """
 Extract invoice information from this invoice:
 
@@ -851,7 +851,7 @@ The category of this invoice is: $invoice_details.category.
 """
 ```
 
-The setting here `llm = "llm_to_extract_invoice"` works because "llm_to_extract_invoice" has been declared as an llm_preset in the deck.
+The setting here `model = "llm_to_extract_invoice"` works because "llm_to_extract_invoice" has been declared as an llm_preset in the deck.
 You must not use an LLM preset in a PipeLLM that does not exist in the deck. If needed, you can add llm presets.
 
 You can override the predefined llm presets by setting them in `.pipelex/inference/deck/overrides.toml`.

@@ -9,7 +9,7 @@ from pipelex.types import Self
 
 
 class ImgGenSetting(ConfigModel):
-    img_gen_handle: str
+    model: str
     quality: Quality | None = Field(default=None, strict=False)
     nb_steps: int | None = Field(default=None, gt=0)
     guidance_scale: float | None = Field(default=None, gt=0)
@@ -25,10 +25,10 @@ class ImgGenSetting(ConfigModel):
 
     def desc(self) -> str:
         return (
-            f"ImgGenSetting(img_gen_handle={self.img_gen_handle}, quality={self.quality}, "
+            f"ImgGenSetting(img_gen_handle={self.model}, quality={self.quality}, "
             f"nb_steps={self.nb_steps}, guidance_scale={self.guidance_scale}, "
             f"is_moderated={self.is_moderated}, safety_tolerance={self.safety_tolerance})"
         )
 
 
-ImgGenChoice = Union[ImgGenSetting, str]
+ImgGenModelChoice = Union[ImgGenSetting, str]

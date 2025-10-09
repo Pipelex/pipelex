@@ -4,7 +4,7 @@ from typing import Any, TypeVar
 from kajson import kajson
 from typing_extensions import override
 
-from pipelex.tools.templating.templating_models import TextFormat
+from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")

@@ -131,7 +131,7 @@ Once configured, all models are available through the unified backend. Use stand
 ```plx
 [pipe.example]
 type = "PipeLLM"
-llm = { llm_handle = "claude-4.5-sonnet", temperature = 0.7 }
+model = { model = "claude-4.5-sonnet", temperature = 0.7 }
 # Model automatically routed through Pipelex Inference
 ```
 
@@ -371,7 +371,7 @@ smart_llm = [
 ]
 
 # Aliases can also define fallback chains
-llm_to_engineer = { llm_handle = "smart_llm", temperature = 0.2 }
+llm_to_engineer = { model = "smart_llm", temperature = 0.2 }
 ```
 
 ### LLM Presets
@@ -381,13 +381,13 @@ Presets combine model selection with optimized parameters for specific tasks:
 ```toml
 [llm.presets]
 # General purpose presets
-cheap_llm_for_text = { llm_handle = "cheap_llm_for_text", temperature = 0.5 }
-cheap_llm_for_object = { llm_handle = "cheap_llm_for_object", temperature = 0.5 }
+cheap_llm_for_text = { model = "cheap_llm_for_text", temperature = 0.5 }
+cheap_llm_for_object = { model = "cheap_llm_for_object", temperature = 0.5 }
 
 # Task-specific presets
-llm_for_creative_writing = { llm_handle = "claude-4.5-sonnet", temperature = 0.9 }
-llm_to_extract_invoice = { llm_handle = "claude-4.5-sonnet", temperature = 0.1 }
-llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
+llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
+llm_to_extract_invoice = { model = "claude-4.5-sonnet", temperature = 0.1 }
+llm_to_reason = { model = "base-claude", temperature = 1 }
 
 ### OCR Presets
 
@@ -397,7 +397,7 @@ OCR presets combine OCR model selection with optimized parameters:
 [extract.presets]
 # General purpose OCR
 base_ocr_mistral = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-base_extract_pypdfium2 = { extract_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+base_extract_pypdfium2 = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
 ```
 
 ### Image Generation Presets
@@ -407,9 +407,9 @@ Image generation presets combine model selection with generation parameters:
 ```toml
 [img_gen.presets]
 # General purpose image generation
-base_img_gen = { img_gen_handle = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
-fast_img_gen = { img_gen_handle = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
-high_quality_img_gen = { img_gen_handle = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
+base_img_gen = { model = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
+fast_img_gen = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
+high_quality_img_gen = { model = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
 ```
 
 ### Default Choices
@@ -437,13 +437,13 @@ Use `.pipelex/inference/deck/overrides.toml` for project-specific customizations
 ```toml
 # Override specific presets
 [llm.presets]
-llm_to_extract_invoice = { llm_handle = "gpt-4o-mini", temperature = 0.2 }
+llm_to_extract_invoice = { model = "gpt-4o-mini", temperature = 0.2 }
 
 [extract.presets]
 my_custom_extract = { ocr_handle = "mistral-ocr", max_nb_images = 5 }
 
 [img_gen.presets]
-my_custom_img_gen = { img_gen_handle = "flux-dev", quality = "medium" }
+my_custom_img_gen = { model = "flux-dev", quality = "medium" }
 
 # Add custom aliases
 [aliases]

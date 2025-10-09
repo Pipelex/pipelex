@@ -1,11 +1,11 @@
 from pipelex.cogt.exceptions import ExtractChoiceNotFoundError, ImgGenChoiceNotFoundError, LLMChoiceNotFoundError
-from pipelex.cogt.extract.extract_setting import ExtractChoice, ExtractSetting
-from pipelex.cogt.img_gen.img_gen_setting import ImgGenChoice, ImgGenSetting
-from pipelex.cogt.llm.llm_setting import LLMChoice, LLMSetting
+from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
+from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.hub import get_model_deck
 
 
-def check_llm_choice_with_deck(llm_choice: LLMChoice):
+def check_llm_choice_with_deck(llm_choice: LLMModelChoice):
     if isinstance(llm_choice, LLMSetting):
         return
 
@@ -17,7 +17,7 @@ def check_llm_choice_with_deck(llm_choice: LLMChoice):
     raise LLMChoiceNotFoundError(msg)
 
 
-def check_extract_choice_with_deck(extract_choice: ExtractChoice):
+def check_extract_choice_with_deck(extract_choice: ExtractModelChoice):
     if isinstance(extract_choice, ExtractSetting):
         return
     model_deck = get_model_deck()
@@ -27,7 +27,7 @@ def check_extract_choice_with_deck(extract_choice: ExtractChoice):
     raise ExtractChoiceNotFoundError(msg)
 
 
-def check_img_gen_choice_with_deck(img_gen_choice: ImgGenChoice):
+def check_img_gen_choice_with_deck(img_gen_choice: ImgGenModelChoice):
     if isinstance(img_gen_choice, ImgGenSetting):
         return
     model_deck = get_model_deck()

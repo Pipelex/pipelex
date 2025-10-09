@@ -82,7 +82,7 @@ description = "Extract invoice information from an invoice text transcript"
 inputs = { "invoice_page.page_view" = "Page", invoice_details = "InvoiceDetails" }
 output = "Invoice"
 # The output is constrained to the "Invoice" model
-llm = "llm_to_extract_invoice" 
+model = "llm_to_extract_invoice" 
 prompt_template = """
 Extract invoice information from this invoice:
 
@@ -91,7 +91,7 @@ The category of this invoice is: $invoice_details.category.
 @invoice_page.text_and_images.text.text
 """
 ```
-This shows how a complex workflow, including OCR and LLM calls, can be defined in a simple, readable format. The `llm = "llm_to_extract_invoice"` line is particularly powerful, as it tells the LLM to structure its output according to the `Invoice` model. 
+This shows how a complex workflow, including OCR and LLM calls, can be defined in a simple, readable format. The `model = "llm_to_extract_invoice"` line is particularly powerful, as it tells the LLM to structure its output according to the `Invoice` model. 
 
 ## The Pipeline Flowchart
 

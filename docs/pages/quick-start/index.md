@@ -130,7 +130,7 @@ python character.py
 type = "PipeLLM"
 description = "Create a character."
 output = "Text"
-llm = { llm_handle = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
+model = { model = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
@@ -142,12 +142,12 @@ Think of it and then output the character description."""
 type = "PipeLLM"
 description = "Create a character."
 output = "Text"
-llm = "llm_for_creative_writing"
+model = "llm_for_creative_writing"
 prompt_template = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 
 # The llm deck above is defined in `.pipelex/inference/deck/base_deck.toml` as:
-# llm_for_creative_writing = { llm_handle = "best-claude", temperature = 0.9 }
+# llm_for_creative_writing = { model = "best-claude", temperature = 0.9 }
 # it's a base preset that we provide. you can add your own presets, too.
 ```
 

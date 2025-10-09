@@ -40,7 +40,7 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
                 blueprint=blueprint.inputs or {},
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
-            extract_choice=blueprint.ocr,
+            extract_choice=blueprint.model,
             should_include_images=blueprint.page_images or False,
             should_caption_images=blueprint.page_image_captions or False,
             should_include_page_views=blueprint.page_views or False,

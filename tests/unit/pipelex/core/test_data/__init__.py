@@ -13,7 +13,7 @@ from .pipes.controllers.condition.pipe_condition import PIPE_CONDITION_TEST_CASE
 from .pipes.controllers.parallel.pipe_parallel import PIPE_PARALLEL_TEST_CASES
 from .pipes.controllers.sequence.pipe_sequence import PIPE_SEQUENCE_TEST_CASES
 from .pipes.operators.compose.pipe_compose import PIPE_COMPOSE_TEST_CASES
-from .pipes.operators.extract.pipe_ocr import PIPE_OCR_TEST_CASES
+from .pipes.operators.extract.pipe_extract import PIPE_EXTRACT_TEST_CASES
 from .pipes.operators.func.pipe_func import PIPE_FUNC_TEST_CASES
 from .pipes.operators.img_gen.pipe_img_gen import PIPE_IMG_GEN_TEST_CASES
 from .pipes.operators.llm.pipe_llm import PIPE_LLM_TEST_CASES
@@ -32,7 +32,7 @@ class InterpreterTestCases:
         *SIMPLE_CONCEPT_TEST_CASES,
         # Pipe operator tests
         *PIPE_LLM_TEST_CASES,
-        *PIPE_OCR_TEST_CASES,
+        *PIPE_EXTRACT_TEST_CASES,
         *PIPE_FUNC_TEST_CASES,
         *PIPE_IMG_GEN_TEST_CASES,
         *PIPE_COMPOSE_TEST_CASES,

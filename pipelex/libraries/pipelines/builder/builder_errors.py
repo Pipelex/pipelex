@@ -13,7 +13,7 @@ from pipelex.libraries.pipelines.builder.pipe.pipe_compose_spec import PipeCompo
 from pipelex.libraries.pipelines.builder.pipe.pipe_condition_spec import PipeConditionSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_extract_spec import PipeExtractSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_func_spec import PipeFuncSpec
-from pipelex.libraries.pipelines.builder.pipe.pipe_img_spec import PipeImgGenSpec
+from pipelex.libraries.pipelines.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.libraries.pipelines.builder.pipe.pipe_sequence_spec import PipeSequenceSpec

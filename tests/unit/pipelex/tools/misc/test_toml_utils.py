@@ -21,7 +21,7 @@ TestConcept = "A test concept"
 [pipe.test_pipe]
 type = "PipeLLM"
 description = "Test pipe definition"
-prompt_template = '''
+user_prompt = '''
 This is a test prompt
 '''
 """
@@ -51,7 +51,7 @@ description = "Test"
 [pipe.test_pipe]
 type = "PipeLLM"
 description = "Test"
-prompt_template = """
+user_prompt = """
 Output this only: "test"
 """
 '''
@@ -128,7 +128,7 @@ TestConcept = "A test concept"
 description = "Test"
 
 [pipe.test_pipe]
-prompt_template = \"\"\"
+user_prompt = \"\"\"
 Output: "test"
 \"\"\"
 """
@@ -168,7 +168,7 @@ large = "process_large_2"
 type = "PipeLLM"
 description = "Generate random text for large items"
 output = "native.Text"
-prompt_template = """
+user_prompt = """
 Output this only: "large"
 """ '''
         toml_file = tmp_path / "pipe_condition_real_case.toml"

@@ -3,9 +3,11 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job import LLMJob
+from pipelex.cogt.llm.llm_utils import dump_prompt, dump_response_from_text_gen
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.config import get_config
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -50,6 +52,18 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         log.info(f"LLM Worker: {self.desc} --------------------------------")
         await super()._before_job(llm_job=llm_job)
         llm_job.llm_job_before_start(inference_model=self.inference_model)
+        if get_config().cogt.llm_config.is_dump_text_prompts_enabled:
+            dump_prompt(llm_prompt=llm_job.llm_prompt)
+
+    @override
+    async def _after_job(
+        self,
+        llm_job: LLMJob,
+        result: str,
+    ):
+        if get_config().cogt.llm_config.is_dump_response_text_enabled:
+            dump_response_from_text_gen(response=result)
+        await super()._after_job(llm_job=llm_job, result=result)
 
     @override
     def _check_can_perform_job(self, llm_job: LLMJob):

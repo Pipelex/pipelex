@@ -48,55 +48,55 @@ fast-img-gen = "fast-lightning-sdxl"
 ####################################################################################################
 # LLM Presets — General purpose
 
-cheap_llm_for_text = { llm_handle = "cheap_llm_for_text", temperature = 0.5 }
-cheap_llm_for_short_text = { llm_handle = "cheap_llm_for_text", temperature = 0.5, max_tokens = 50 }
-cheap_llm_for_object = { llm_handle = "cheap_llm_for_object", temperature = 0.5 }
-cheap_llm_to_structure = { llm_handle = "cheap_llm_for_object", temperature = 0.1 }
+cheap_llm_for_text = { model = "cheap_llm_for_text", temperature = 0.5 }
+cheap_llm_for_short_text = { model = "cheap_llm_for_text", temperature = 0.5, max_tokens = 50 }
+cheap_llm_for_object = { model = "cheap_llm_for_object", temperature = 0.5 }
+cheap_llm_to_structure = { model = "cheap_llm_for_object", temperature = 0.1 }
 
-llm_for_testing_gen_text = { llm_handle = "base_llm_for_text", temperature = 0.5 }
-llm_for_testing_gen_object = { llm_handle = "base_llm_for_object", temperature = 0.5 }
-llm_for_testing_vision = { llm_handle = "cheap_llm_for_vision", temperature = 0.5 }
-llm_for_testing_vision_structured = { llm_handle = "cheap-gpt", temperature = 0.5 }
+llm_for_testing_gen_text = { model = "base_llm_for_text", temperature = 0.5 }
+llm_for_testing_gen_object = { model = "base_llm_for_object", temperature = 0.5 }
+llm_for_testing_vision = { model = "cheap_llm_for_vision", temperature = 0.5 }
+llm_for_testing_vision_structured = { model = "cheap-gpt", temperature = 0.5 }
 
 ####################################################################################################
 # LLM Presets — Specific skills
 
 # Cheap llm
-llm_cheap = { llm_handle = "base-gemini", temperature = 0.1 }
+llm_cheap = { model = "base-gemini", temperature = 0.1 }
 
 # Generation skills
-llm_for_factual_writing = { llm_handle = "base-gpt", temperature = 0.1 }
-llm_for_creative_writing = { llm_handle = "claude-4.5-sonnet", temperature = 0.9 }
+llm_for_factual_writing = { model = "base-gpt", temperature = 0.1 }
+llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
 
 # Reasoning skills
-llm_to_reason_short = { llm_handle = "base-claude", temperature = 0.5, max_tokens = 500 }
-llm_to_reason = { llm_handle = "base-claude", temperature = 1 }
-llm_to_reason_on_diagram = { llm_handle = "base-claude", temperature = 0.5 }
+llm_to_reason_short = { model = "base-claude", temperature = 0.5, max_tokens = 500 }
+llm_to_reason = { model = "base-claude", temperature = 1 }
+llm_to_reason_on_diagram = { model = "base-claude", temperature = 0.5 }
 
 # Search and answer skills
-llm_to_answer = { llm_handle = "base-claude", temperature = 0.1 }
-llm_to_retrieve = { llm_handle = "base-gemini", temperature = 0.1 }
-llm_for_enrichment = { llm_handle = "gpt-4o", temperature = 0.1 }
-llm_to_enrich = { llm_handle = "base-claude", temperature = 0.1 }
-llm_for_question_and_excerpt_reformulation = { llm_handle = "gpt-4o", temperature = 0.9 }
+llm_to_answer = { model = "base-claude", temperature = 0.1 }
+llm_to_retrieve = { model = "base-gemini", temperature = 0.1 }
+llm_for_enrichment = { model = "gpt-4o", temperature = 0.1 }
+llm_to_enrich = { model = "base-claude", temperature = 0.1 }
+llm_for_question_and_excerpt_reformulation = { model = "gpt-4o", temperature = 0.9 }
 
 # Engineering skills
-llm_to_engineer = { llm_handle = "smart_llm", temperature = 0.2 }
-llm_to_write = { llm_handle = "base-gemini", temperature = 0.2 }
-llm_to_pipelex = { llm_handle = "base-claude", temperature = 0.2 }
+llm_to_engineer = { model = "smart_llm", temperature = 0.2 }
+llm_to_write = { model = "base-gemini", temperature = 0.2 }
+llm_to_pipelex = { model = "base-claude", temperature = 0.2 }
 
 # Image skills
-llm_to_write_img_gen_prompt = { llm_handle = "base-claude", temperature = 0.2 }
-llm_to_describe_img = { llm_handle = "base-claude", temperature = 0.5 }
-llm_to_design_fashion = { llm_handle = "base-claude", temperature = 0.7 }
-llm_for_img_to_text = { llm_handle = "base-claude", temperature = 0.1 }
+llm_to_write_img_gen_prompt = { model = "base-claude", temperature = 0.2 }
+llm_to_describe_img = { model = "base-claude", temperature = 0.5 }
+llm_to_design_fashion = { model = "base-claude", temperature = 0.7 }
+llm_for_img_to_text = { model = "base-claude", temperature = 0.1 }
 
 # Extraction skills
-llm_to_extract_diagram = { llm_handle = "base-claude", temperature = 0.5 }
-llm_to_extract_invoice = { llm_handle = "claude-4.5-sonnet", temperature = 0.1 }
-llm_to_extract_invoice_from_scan = { llm_handle = "base-claude", temperature = 0.5 }
-llm_to_extract_legal_terms = { llm_handle = "base-claude", temperature = 0.1 }
-llm_to_extract_tables = { llm_handle = "base-claude", temperature = 0.1 }
+llm_to_extract_diagram = { model = "base-claude", temperature = 0.5 }
+llm_to_extract_invoice = { model = "claude-4.5-sonnet", temperature = 0.1 }
+llm_to_extract_invoice_from_scan = { model = "base-claude", temperature = 0.5 }
+llm_to_extract_legal_terms = { model = "base-claude", temperature = 0.1 }
+llm_to_extract_tables = { model = "base-claude", temperature = 0.1 }
 
 ####################################################################################################
 # LLM Choices
@@ -114,8 +114,8 @@ for_object = "cheap_llm_for_object"
 choice_default = "base_ocr_mistral"
 
 [extract.presets]
-base_ocr_mistral = { extract_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-base_extract_pypdfium2 = { extract_handle = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+base_ocr_mistral = { model = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
+base_extract_pypdfium2 = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
 
 ####################################################################################################
 # Image Generation Presets
@@ -126,13 +126,13 @@ choice_default = "base_img_gen"
 
 [img_gen.presets]
 # General purpose
-base_img_gen = { img_gen_handle = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
-fast_img_gen = { img_gen_handle = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
-high_quality_img_gen = { img_gen_handle = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
+base_img_gen = { model = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
+fast_img_gen = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
+high_quality_img_gen = { model = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
 
 # Specific skills
-img_gen_for_art = { img_gen_handle = "best-img-gen", quality = "high", guidance_scale = 9.0, is_moderated = false, safety_tolerance = 5 }
-img_gen_for_diagram = { img_gen_handle = "base-img-gen", quality = "medium", guidance_scale = 7.0, is_moderated = true, safety_tolerance = 2 }
-img_gen_for_mockup = { img_gen_handle = "base-img-gen", quality = "medium", guidance_scale = 6.5, is_moderated = true, safety_tolerance = 3 }
-img_gen_for_product = { img_gen_handle = "best-img-gen", quality = "high", guidance_scale = 8.5, is_moderated = true, safety_tolerance = 2 }
-img_gen_for_testing = { img_gen_handle = "fast-img-gen", nb_steps = 4, guidance_scale = 4.0, is_moderated = true, safety_tolerance = 4 }
+img_gen_for_art = { model = "best-img-gen", quality = "high", guidance_scale = 9.0, is_moderated = false, safety_tolerance = 5 }
+img_gen_for_diagram = { model = "base-img-gen", quality = "medium", guidance_scale = 7.0, is_moderated = true, safety_tolerance = 2 }
+img_gen_for_mockup = { model = "base-img-gen", quality = "medium", guidance_scale = 6.5, is_moderated = true, safety_tolerance = 3 }
+img_gen_for_product = { model = "best-img-gen", quality = "high", guidance_scale = 8.5, is_moderated = true, safety_tolerance = 2 }
+img_gen_for_testing = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 4.0, is_moderated = true, safety_tolerance = 4 }

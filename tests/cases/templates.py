@@ -2,7 +2,7 @@
 
 from typing import Any, ClassVar
 
-from pipelex.tools.templating.templating_models import PromptingStyle, TagStyle, TextFormat
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
 
 from .registry import Fruit
 
@@ -90,20 +90,20 @@ Format filter html:
     ]
 
     # Style configurations
-    STYLE: ClassVar[list[PromptingStyle]] = [
-        PromptingStyle(
+    STYLE: ClassVar[list[TemplatingStyle]] = [
+        TemplatingStyle(
             tag_style=TagStyle.NO_TAG,
             text_format=TextFormat.PLAIN,
         ),
-        PromptingStyle(
+        TemplatingStyle(
             tag_style=TagStyle.TICKS,
             text_format=TextFormat.MARKDOWN,
         ),
-        PromptingStyle(
+        TemplatingStyle(
             tag_style=TagStyle.XML,
             text_format=TextFormat.HTML,
         ),
-        PromptingStyle(
+        TemplatingStyle(
             tag_style=TagStyle.SQUARE_BRACKETS,
             text_format=TextFormat.JSON,
         ),

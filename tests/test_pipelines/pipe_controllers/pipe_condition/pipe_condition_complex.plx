@@ -70,7 +70,7 @@ type = "PipeLLM"
 description = "Process urgent technical documents with high priority"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
-prompt_template = """
+prompt = """
 Process this urgent technical document with immediate attention.
 @doc_request.document_type
 @doc_request.priority
@@ -86,7 +86,7 @@ type = "PipeLLM"
 description = "Process complex technical documents for expert users"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
-prompt_template = """
+prompt = """
 Process this complex technical document for expert user.
 @doc_request.document_type
 @doc_request.complexity
@@ -100,7 +100,7 @@ type = "PipeLLM"
 description = "Process standard technical documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
-prompt_template = """
+prompt = """
 Process this standard technical document.
 @doc_request.document_type
 @user_profile.user_level
@@ -114,7 +114,7 @@ type = "PipeLLM"
 description = "Process urgent business documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
-prompt_template = """
+prompt = """
 Process this urgent business document.
 @doc_request.priority
 @user_profile.department
@@ -127,7 +127,7 @@ type = "PipeLLM"
 description = "Process finance business documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
-prompt_template = """
+prompt = """
 Process this finance business document.
 @user_profile.department
 @doc_request.document_type
@@ -140,7 +140,7 @@ type = "PipeLLM"
 description = "Process marketing business documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
-prompt_template = """
+prompt = """
 Process this marketing business document.
 @user_profile.department
 @doc_request.language
@@ -153,7 +153,7 @@ type = "PipeLLM"
 description = "Process general business documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
-prompt_template = """
+prompt = """
 Process this general business document.
 @doc_request.document_type
 @user_profile.department
@@ -167,7 +167,7 @@ type = "PipeLLM"
 description = "Process complex legal documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
-prompt_template = """
+prompt = """
 Process this complex legal document.
 @doc_request.complexity
 @user_profile.user_level
@@ -181,7 +181,7 @@ type = "PipeLLM"
 description = "Process international legal documents"
 inputs = { doc_request = "DocumentRequest" }
 output = "native.Text"
-prompt_template = """
+prompt = """
 Process this international legal document.
 @doc_request.language
 @doc_request.document_type
@@ -194,7 +194,7 @@ type = "PipeLLM"
 description = "Process standard legal documents"
 inputs = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
 output = "native.Text"
-prompt_template = """
+prompt = """
 Process this standard legal document.
 @doc_request.document_type
 @user_profile.user_level

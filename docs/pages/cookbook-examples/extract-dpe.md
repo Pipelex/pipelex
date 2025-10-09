@@ -64,7 +64,7 @@ type = "PipeLLM"
 description = "Write markdown from page content of a 'Diagnostic de Performance Energetique'"
 inputs = { page_content = "Page" }
 output = "Dpe" # The output is structured as a Dpe object
-llm = "llm_for_img_to_text"
+model = "llm_for_img_to_text"
 structuring_method = "preliminary_text"
 system_prompt = """You are a multimodal LLM, expert in converting images into perfect markdown."""
 prompt_template = """

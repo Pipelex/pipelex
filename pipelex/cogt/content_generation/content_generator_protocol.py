@@ -11,9 +11,9 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.templating_models import PromptingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
@@ -109,13 +109,12 @@ class ContentGeneratorProtocol(Protocol):
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> list[GeneratedImage]: ...
 
-    async def make_jinja2_text(
+    async def make_templated_text(
         self,
         context: dict[str, Any],
-        jinja2_name: str | None = None,
-        jinja2: str | None = None,
-        prompting_style: PromptingStyle | None = None,
-        template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
+        template: str,
+        templating_style: TemplatingStyle | None = None,
+        template_category: TemplateCategory | None = None,
     ) -> str: ...
 
     async def make_extract_pages(

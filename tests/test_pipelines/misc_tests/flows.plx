@@ -11,10 +11,10 @@ Color = "A color"
 type = "PipeLLM"
 description = "Choose Colors"
 output = "Color"
-prompt_template = """
+prompt = """
 Choose {{ _nb_output }} colors.
 """
-llm = "llm_for_creative_writing"
+model = "llm_for_creative_writing"
 
 [pipe.sequence_for_batch_test]
 type = "PipeSequence"
@@ -31,7 +31,7 @@ type = "PipeLLM"
 description = "Capitalize Colors"
 inputs = { color = "Color" }
 output = "Color"
-prompt_template = """
+prompt = """
 Put the first letter of a word that represents a color as a capital letter.
 Here is the word:
 
@@ -45,7 +45,7 @@ type = "PipeLLM"
 description = "Capitalize Last Letter"
 inputs = { capitalized_color = "Color" }
 output = "Color"
-prompt_template = """
+prompt = """
 Put the last letter of a word that represents a color as a capital letter.
 Here is the word:
 

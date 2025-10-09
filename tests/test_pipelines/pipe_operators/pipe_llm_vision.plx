@@ -10,8 +10,8 @@ type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { image = "Image" }
 output = "Text"
-llm = "llm_for_testing_vision"
-prompt_template = """
+model = "llm_for_testing_vision"
+prompt = """
 Describe what you see in this image in 1-2 sentences, be concise.
 $image
 """
@@ -21,8 +21,8 @@ type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { imageA = "Image", imageB = "Image" }
 output = "BasicDescription"
-llm = "llm_to_extract_diagram"
-prompt_template = """
+model = "llm_to_extract_diagram"
+prompt = """
 Describe what you see in $imageA only.
 Completely ignore $imageB.
 """
@@ -32,8 +32,8 @@ type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { imageA = "Image", imageB = "Image" }
 output = "BasicDescription"
-llm = "llm_to_extract_diagram"
-prompt_template = """
+model = "llm_to_extract_diagram"
+prompt = """
 Describe what you see in $imageB only.
 Completely ignore $imageA.
 """
@@ -44,9 +44,9 @@ type = "PipeLLM"
 description = "Provide detailed analysis of the image"
 inputs = { image = "images.Photo" }
 output = "VisionAnalysis"
-llm = "llm_to_extract_diagram"
+model = "llm_to_extract_diagram"
 system_prompt = "You are an expert image analyst. Provide detailed, accurate descriptions."
-prompt_template = """
+prompt = """
 Analyze this image and describe what's the main topic etc.
 $image
 --------------------------------

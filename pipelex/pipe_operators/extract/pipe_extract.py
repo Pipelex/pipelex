@@ -8,7 +8,7 @@ from pipelex.cogt.content_generation.content_generator_dry import ContentGenerat
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
-from pipelex.cogt.extract.extract_setting import ExtractChoice, ExtractSetting
+from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_native import NativeConceptCode
@@ -45,7 +45,7 @@ class PipeExtractOutput(PipeOutput):
 
 class PipeExtract(PipeOperator[PipeExtractOutput]):
     type: Literal["PipeExtract"] = "PipeExtract"
-    extract_choice: ExtractChoice | None
+    extract_choice: ExtractModelChoice | None
     should_caption_images: bool
     should_include_images: bool
     should_include_page_views: bool
@@ -173,7 +173,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             msg = "PipeExtract should have a non-None image_stuff_name or pdf_stuff_name"
             raise PipeDefinitionError(msg)
 
-        extract_choice: ExtractChoice = self.extract_choice or get_model_deck().extract_choice_default
+        extract_choice: ExtractModelChoice = self.extract_choice or get_model_deck().extract_choice_default
         extract_setting: ExtractSetting = get_model_deck().get_extract_setting(extract_choice=extract_choice)
 
         extract_job_params = ExtractJobParams(
@@ -190,7 +190,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         )
         extract_output = await content_generator.make_extract_pages(
             extract_input=extract_input,
-            extract_handle=extract_setting.extract_handle,
+            extract_handle=extract_setting.model,
             job_metadata=job_metadata,
             extract_job_params=extract_job_params,
             extract_job_config=ExtractJobConfig(),

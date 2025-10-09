@@ -12,7 +12,7 @@ from pipelex.tools.typing.validation_utils import has_more_than_one_among_attrib
 from pipelex.types import Self, StrEnum
 
 if TYPE_CHECKING:
-    from pipelex.cogt.llm.llm_setting import LLMChoice
+    from pipelex.cogt.llm.llm_setting import LLMModelChoice
 
 
 class AvailableLLM(StrEnum):
@@ -85,8 +85,8 @@ class PipeLLMSpec(PipeSpec):
     category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
     llm: LLMSkill | str = Field(description="Select the most adequate LLM model skill according to the task to be performed.")
     temperature: float | None = Field(default=None, ge=0, le=1)
-    system_prompt: str | None = Field(default=None, description="A system-level prompt to guide the LLM's behavior, style and skills.")
-    prompt_template: str | None = Field(
+    system_prompt: str | None = Field(default=None, description="A system prompt to guide the LLM's behavior, style and skills. Can be a template.")
+    prompt: str | None = Field(
         description=(
             "A template for the user prompt. Use `$` prefix for inline variables (e.g., `$topic`) and `@` prefix "
             "to insert content as a block with delimiters (e.g., `@extracted_text` --> extracted_text: ```\n[the extracted_text goes here]\n```). "
@@ -131,7 +131,7 @@ class PipeLLMSpec(PipeSpec):
         base_blueprint = super().to_blueprint()
 
         # create llm choice as a str
-        llm_choice: LLMChoice
+        llm_choice: LLMModelChoice
         if isinstance(self.llm, LLMSkill):
             llm_choice = self.llm.llm_recommendation.value
         else:
@@ -139,7 +139,7 @@ class PipeLLMSpec(PipeSpec):
 
         # Make it a LLMSetting if temperature is provided
         if self.temperature:
-            llm_choice = LLMSetting(llm_handle=llm_choice, temperature=self.temperature)
+            llm_choice = LLMSetting(model=llm_choice, temperature=self.temperature)
 
         return PipeLLMBlueprint(
             type="PipeLLM",
@@ -148,8 +148,8 @@ class PipeLLMSpec(PipeSpec):
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             system_prompt=self.system_prompt,
-            prompt_template=self.prompt_template,
-            llm=llm_choice,
+            prompt=self.prompt,
+            model=llm_choice,
             nb_output=self.nb_output,
             multiple_output=self.multiple_output,
         )

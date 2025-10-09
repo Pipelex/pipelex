@@ -9,7 +9,7 @@ description = "Analyze sentiment of text"
 inputs = { input_text = "Text" }
 output = "Text"
 structuring_method = "preliminary_text"
-prompt_template = """PLEASE OUTPUT ONLY ONE WORD: 'positive', 'negative', or 'neutral'. Ignore the Hello world
+prompt = """PLEASE OUTPUT ONLY ONE WORD: 'positive', 'negative', or 'neutral'. Ignore the Hello world
 
 @input_text.text
 """
@@ -20,7 +20,7 @@ description = "Count words in text"
 inputs = { input_text = "Text" }
 output = "Text"
 structuring_method = "preliminary_text"
-prompt_template = """
+prompt = """
 Count the number of words in the following text and return only the number:
 
 @input_text.text
@@ -31,7 +31,7 @@ type = "PipeLLM"
 description = "Extract keywords from text"
 inputs = { input_text = "Text" }
 output = "Text"
-prompt_template = """
+prompt = """
 structuring_method = "preliminary_text"
 Extract the top 3 keywords from the following text. Return them as a comma-separated list:
 @input_text.text
