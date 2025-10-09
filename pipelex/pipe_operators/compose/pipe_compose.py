@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Literal
+from typing import Any, Literal
 
 from pydantic import ConfigDict, model_validator
 from typing_extensions import override
@@ -38,22 +38,21 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     type: Literal["PipeCompose"] = "PipeCompose"
     model_config = ConfigDict(extra="forbid", strict=False)
 
-    adhoc_pipe_code: ClassVar[str] = "jinja2_render"
     output: Concept = ConceptFactory.make_native_concept(
         native_concept_code=NativeConceptCode.TEXT,
     )
 
-    jinja2: str
+    template: str
     templating_style: TemplatingStyle | None = None
     template_category: TemplateCategory = TemplateCategory.BASIC
     extra_context: dict[str, Any] | None = None
 
     @model_validator(mode="after")
-    def validate_jinja2(self) -> Self:
+    def validate_template(self) -> Self:
         try:
-            check_jinja2_parsing(jinja2_template_source=self.jinja2, template_category=self.template_category)
+            check_jinja2_parsing(template_source=self.template, template_category=self.template_category)
         except Jinja2TemplateSyntaxError as exc:
-            msg = f"Could not parse template included in PipeCompose '{self.code}: {exc}"
+            msg = f"Could not parse template for PipeCompose '{self.code}: {exc}"
             raise PipeDefinitionError(msg) from exc
         return self
 
@@ -94,7 +93,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     def required_variables(self) -> set[str]:
         required_variables = detect_jinja2_required_variables(
             template_category=self.template_category,
-            template_source=self.jinja2,
+            template_source=self.template,
         )
         return {
             variable_name
@@ -124,7 +123,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
         jinja2_text = await content_generator.make_templated_text(
             context=context,
-            template_source=self.jinja2,
+            template=self.template,
             templating_style=self.templating_style,
             template_category=self.template_category,
         )

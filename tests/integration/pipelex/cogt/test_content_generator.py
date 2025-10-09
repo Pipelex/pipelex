@@ -122,7 +122,7 @@ class TestContentGenerator:
 
         jinja2_text: str = await get_content_generator().make_templated_text(
             context=context,
-            template_source="The answer is: {{ the_answer }}",
+            template="The answer is: {{ the_answer }}",
         )
         assert isinstance(jinja2_text, str)
         assert jinja2_text == "The answer is: elementary, my dear Watson"

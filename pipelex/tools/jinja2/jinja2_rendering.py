@@ -46,7 +46,7 @@ async def render_jinja2(
         raise Jinja2TemplateRenderError(msg) from exc
     template_source = preprocess_template(template_source)
     check_jinja2_parsing(
-        jinja2_template_source=template_source,
+        template_source=template_source,
         template_category=template_category,
     )
 

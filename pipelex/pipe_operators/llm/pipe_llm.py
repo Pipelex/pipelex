@@ -497,6 +497,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             context={
                 "class_structure_str": class_structure_str,
             },
-            template_source=template_source,
+            template=template_source,
             template_category=TemplateCategory.LLM_PROMPT,
         )

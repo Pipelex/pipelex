@@ -17,5 +17,5 @@ class TemplateBlueprint(BaseModel):
 
     @model_validator(mode="after")
     def validate_template(self) -> "TemplateBlueprint":
-        check_jinja2_parsing(jinja2_template_source=self.source, template_category=self.category)
+        check_jinja2_parsing(template_source=self.source, template_category=self.category)
         return self

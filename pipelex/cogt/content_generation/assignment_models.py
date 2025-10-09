@@ -128,7 +128,7 @@ class ImgGenAssignment(BaseModel):
 
 class TemplatingAssignment(BaseModel):
     context: dict[str, Any]
-    source: str
+    template: str
     templating_style: TemplatingStyle | None = None
     category: TemplateCategory
 

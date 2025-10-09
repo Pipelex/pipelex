@@ -245,14 +245,14 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_templated_text(
         self,
         context: dict[str, Any],
-        template_source: str,
+        template: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
     ) -> str:
         log.debug(f"context: {context}")
         templating_assignment = TemplatingAssignment(
             context=context,
-            source=template_source,
+            template=template,
             templating_style=templating_style,
             category=template_category or TemplateCategory.BASIC,
         )

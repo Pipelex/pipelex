@@ -174,7 +174,7 @@ class LLMPromptBlueprint(BaseModel):
 
         return await get_content_generator().make_templated_text(
             context=context,
-            template_source=jinja2_blueprint.source,
+            template=jinja2_blueprint.source,
             templating_style=self.templating_style,
             template_category=jinja2_blueprint.category,
         )

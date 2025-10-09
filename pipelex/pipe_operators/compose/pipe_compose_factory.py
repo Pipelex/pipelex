@@ -24,7 +24,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
     ) -> PipeCompose:
         preprocessed_template = preprocess_template(blueprint.template_source)
         check_jinja2_parsing(
-            jinja2_template_source=preprocessed_template,
+            template_source=preprocessed_template,
             template_category=blueprint.template_category,
         )
 
@@ -48,7 +48,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
                     concept_code=output_domain_and_code.concept_code,
                 ),
             ),
-            jinja2=preprocessed_template,
+            template=preprocessed_template,
             templating_style=blueprint.templating_style,
             template_category=blueprint.template_category,
             extra_context=blueprint.extra_context,
@@ -63,12 +63,12 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
     ) -> PipeCompose:
         preprocessed_template = preprocess_template(template_str)
         check_jinja2_parsing(
-            jinja2_template_source=preprocessed_template,
+            template_source=preprocessed_template,
             template_category=TemplateCategory.LLM_PROMPT,
         )
         return PipeCompose(
             domain=domain,
             code="adhoc_pipe_compose_from_template_str",
-            jinja2=preprocessed_template,
+            template=preprocessed_template,
             inputs=inputs or InputRequirementsFactory.make_empty(),
         )

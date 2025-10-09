@@ -106,7 +106,6 @@ class PipeCondition(PipeController):
     @override
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
-        # TODO: use jinja2 directly without going though a pipe
         # Variables from the expression/expression_template
         expression_required_variables = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
@@ -247,12 +246,11 @@ class PipeCondition(PipeController):
             PipeConditionError: If expression evaluation fails or no matching pipe is found
         """
         content_generator = get_content_generator()
-        # Evaluate the expression using Jinja2 templating
 
-        # TODO: create a proper category instead of using Jinja2TemplateCategory.LLM_PROMPT
+        # Evaluate the expression using templating
         evaluated_expression = await content_generator.make_templated_text(
             context=working_memory.generate_jinja2_context(),
-            template_source=self.applied_expression_template,
+            template=self.applied_expression_template,
             template_category=TemplateCategory.EXPRESSION,
         )
 

@@ -112,7 +112,7 @@ class ContentGeneratorProtocol(Protocol):
     async def make_templated_text(
         self,
         context: dict[str, Any],
-        template_source: str,
+        template: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
     ) -> str: ...

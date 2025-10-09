@@ -181,14 +181,14 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     async def make_templated_text(
         self,
         context: dict[str, Any],
-        template_source: str,
+        template: str,
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
     ) -> str:
-        check_jinja2_parsing(jinja2_template_source=template_source, template_category=template_category or TemplateCategory.BASIC)
+        check_jinja2_parsing(template_source=template, template_category=template_category or TemplateCategory.BASIC)
         func_name = "make_templated_text"
         log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-        jinja2_truncated = template_source[: self._text_gen_truncate_length]
+        jinja2_truncated = template[: self._text_gen_truncate_length]
         return (
             f"DRY RUN: {func_name} • context={context} • "
             f"jinja2={jinja2_truncated} • templating_style={templating_style} • template_category={template_category}"
