@@ -12,7 +12,7 @@ from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
-from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage

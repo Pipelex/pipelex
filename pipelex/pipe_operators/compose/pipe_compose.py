@@ -24,9 +24,9 @@ from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_errors import Jinja2TemplateSyntaxError
-from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
-from pipelex.tools.templating.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
+from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.types import Self
 
 

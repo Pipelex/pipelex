@@ -9,7 +9,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.hub import get_required_concept
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
-from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 
 
 class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose]):

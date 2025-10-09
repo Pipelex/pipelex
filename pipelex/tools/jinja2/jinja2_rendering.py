@@ -11,14 +11,14 @@ from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.tools.templating.jinja2_environment import make_jinja2_env_without_loader
-from pipelex.tools.templating.jinja2_errors import (
+from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
+from pipelex.tools.jinja2.jinja2_errors import (
     Jinja2ContextError,
     Jinja2StuffError,
     Jinja2TemplateRenderError,
 )
-from pipelex.tools.templating.jinja2_models import Jinja2ContextKey
-from pipelex.tools.templating.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
+from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 
 
 def _add_to_templating_context(temlating_context: dict[str, Any], jinja2_context_key: Jinja2ContextKey, value: Any) -> None:
