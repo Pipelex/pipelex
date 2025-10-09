@@ -163,8 +163,8 @@ class LLMPromptBlueprint(BaseModel):
             jinja2_blueprint.templating_style = templating_style
             log.verbose(f"Setting prompting style to {templating_style}")
 
-        log.info(f"extra_params: {extra_params}")
-        log.info(f"jinja2_blueprint.extra_context: {jinja2_blueprint.extra_context}")
+        log.debug(f"extra_params in _unravel_text: {extra_params}")
+        log.debug(f"jinja2_blueprint.extra_context in _unravel_text: {jinja2_blueprint.extra_context}")
 
         context: dict[str, Any] = context_provider.generate_jinja2_context()
         if extra_params:
