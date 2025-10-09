@@ -226,7 +226,9 @@ class StuffFactory:
                 if not concept_code:
                     msg = "Stuff content data dict is badly formed: no concept code"
                     raise StuffFactoryError(msg)
-                domain_and_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(domain=SpecialDomain.NATIVE, concept_string_or_code=concept_code)
+                domain_and_concept_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
+                    domain=SpecialDomain.NATIVE, concept_string_or_code=concept_code
+                )
                 content_value = stuff_content_dict["content"]
                 if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=domain_and_concept_code.concept_code):
                     concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode(domain_and_concept_code.concept_code))

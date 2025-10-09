@@ -92,7 +92,7 @@ class PipelexClient(PipelexProtocol):
 
         if input_memory is not None:
             working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
-            
+
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
             working_memory=working_memory,
             output_name=output_name,
