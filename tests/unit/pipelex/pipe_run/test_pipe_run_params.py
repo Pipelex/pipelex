@@ -6,7 +6,7 @@ from pipelex.pipe_run.pipe_run_params import (
     make_output_multiplicity,
     output_multiplicity_to_apply,
 )
-from tests.unit.pipelex.core.pipes.data import MAKE_OUTPUT_MULTIPLICITY_TEST_CASES, OUTPUT_MULTIPLICITY_TO_APPLY_TEST_CASES
+from tests.unit.pipelex.pipe_run.data import MAKE_OUTPUT_MULTIPLICITY_TEST_CASES, OUTPUT_MULTIPLICITY_TO_APPLY_TEST_CASES
 
 
 class TestMakeOutputMultiplicity:
