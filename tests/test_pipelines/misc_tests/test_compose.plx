@@ -8,7 +8,7 @@ inputs = { text = "Text" }
 output = "Text"
 
 [pipe.jinja2_test_1.template]
-source = """
+template = """
 This is a simple test prompt:
 @text
 """

@@ -34,7 +34,7 @@ class LLMPromptBlueprint(BaseModel):
             required_variables.update(user_images_top_object_name)
 
         if self.prompt_blueprint:
-            template_source = preprocess_template(self.prompt_blueprint.source)
+            template_source = preprocess_template(self.prompt_blueprint.template)
             required_variables.update(
                 detect_jinja2_required_variables(
                     template_category=self.prompt_blueprint.category,
@@ -43,7 +43,7 @@ class LLMPromptBlueprint(BaseModel):
             )
 
         if self.system_prompt_blueprint:
-            system_prompt_template_source = preprocess_template(self.system_prompt_blueprint.source)
+            system_prompt_template_source = preprocess_template(self.system_prompt_blueprint.template)
             required_variables.update(
                 detect_jinja2_required_variables(
                     template_category=self.system_prompt_blueprint.category,
@@ -174,7 +174,7 @@ class LLMPromptBlueprint(BaseModel):
 
         return await get_content_generator().make_templated_text(
             context=context,
-            template=jinja2_blueprint.source,
+            template=jinja2_blueprint.template,
             templating_style=self.templating_style,
             template_category=jinja2_blueprint.category,
         )

@@ -26,7 +26,7 @@ class PipeComposeTestCases:
             type="PipeCompose",
             pipe_category="PipeOperator",
             template=TemplateBlueprint(
-                source="Hello {{ data.name }}!",
+                template="Hello {{ data.name }}!",
                 category=TemplateCategory.MARKDOWN,
                 templating_style=TemplatingStyle(
                     tag_style=TagStyle.TICKS,

@@ -50,7 +50,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             ),
             template=preprocessed_template,
             templating_style=blueprint.templating_style,
-            template_category=blueprint.template_category,
+            category=blueprint.template_category,
             extra_context=blueprint.extra_context,
         )
 

@@ -16,7 +16,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class PipeAbstract(ABC, BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    category: Any  # Any so that subclasses can put a Literal
+    pipe_category: Any  # Any so that subclasses can put a Literal
     type: Any  # Any so that subclasses can put a Literal
     code: str
     domain: str

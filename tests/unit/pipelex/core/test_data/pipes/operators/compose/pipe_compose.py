@@ -52,7 +52,7 @@ category = "markdown"
                 description="Process a Jinja2 template",
                 output=NativeConceptCode.TEXT,
                 template=TemplateBlueprint(
-                    source="Hello {{ name }}!",
+                    template="Hello {{ name }}!",
                     category=TemplateCategory.MARKDOWN,
                 ),
             ),

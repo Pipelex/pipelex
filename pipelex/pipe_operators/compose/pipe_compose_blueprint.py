@@ -14,7 +14,7 @@ class PipeComposeBlueprint(PipeBlueprint):
     @property
     def template_source(self) -> str:
         if isinstance(self.template, TemplateBlueprint):
-            return self.template.source
+            return self.template.template
         return self.template
 
     @property

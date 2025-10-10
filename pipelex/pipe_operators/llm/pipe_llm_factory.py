@@ -36,7 +36,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         if system_prompt:
             try:
                 system_prompt_jinja2_blueprint = TemplateBlueprint(
-                    source=system_prompt,
+                    template=system_prompt,
                     category=TemplateCategory.LLM_PROMPT,
                 )
             except Jinja2TemplateSyntaxError as exc:
@@ -50,7 +50,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         if blueprint.prompt:
             try:
                 user_text_jinja2_blueprint = TemplateBlueprint(
-                    source=blueprint.prompt,
+                    template=blueprint.prompt,
                     category=TemplateCategory.LLM_PROMPT,
                 )
             except Jinja2TemplateSyntaxError as exc:

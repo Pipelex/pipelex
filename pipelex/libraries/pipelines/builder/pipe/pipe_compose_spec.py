@@ -95,7 +95,7 @@ class PipeComposeSpec(PipeSpec):
         category = target_format.category
 
         template_blueprint = TemplateBlueprint(
-            source=self.template,
+            template=self.template,
             templating_style=templating_style,
             category=category,
             extra_context=None,
