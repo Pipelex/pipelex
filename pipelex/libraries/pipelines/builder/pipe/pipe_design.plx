@@ -117,8 +117,8 @@ You will specifically generate the PipeLLM related to this signature:
 @pipe_signature
 
 If it's a structured generation, indicate it in the system_prompt to clarify the task.
-If it's to generate free form text, the prompt_template should indicate to be concise.
-If it's to generate an image generation, the prompt_template should indicate to be VERY concise and focus and apply the best practice for image generation.
+If it's to generate free form text, the prompt should indicate to be concise.
+If it's to generate an image generation prompt, the prompt should indicate to be VERY concise and focus and apply the best practice for image generation.
 
 Here are the concepts you can use for inputs/outputs:
 @concept_specs
