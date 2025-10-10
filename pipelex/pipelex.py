@@ -183,12 +183,13 @@ class Pipelex(metaclass=MetaSingleton):
             )
             raise PipelexSetupError(msg) from backends_not_found_exc
         except (RoutingProfileValidationError, InferenceBackendLibraryValidationError, ModelDeckValidationError) as backends_validation_exc:
-            msg = (
+            comment_msg = (
                 "Some config files are invalid for the inference backend library, routing profile library, or model deck. "
                 "You can fix them manually, or run `pipelex init config --reset` to regenerate them. "
                 "Note that this command resets all config files to their default values.\n"
                 f"If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.\n"
             )
+            msg = ""
             cause_exc = backends_validation_exc.__cause__
             if cause_exc is None:
                 msg += f"\nUnxpexted cause:{cause_exc}"
@@ -197,6 +198,7 @@ class Pipelex(metaclass=MetaSingleton):
                 msg += f"\nUnxpexted cause:{cause_exc}"
                 raise PipelexSetupError(msg) from cause_exc
             validation_error_msg = msg + "\n" + report_validation_error(category="config", validation_error=cause_exc)
+            validation_error_msg += "\n\n" + comment_msg
             raise PipelexSetupError(validation_error_msg) from backends_validation_exc
         except InferenceBackendCredentialsError as credentials_exc:
             backend_name = credentials_exc.backend_name
