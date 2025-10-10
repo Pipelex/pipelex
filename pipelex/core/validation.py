@@ -60,5 +60,5 @@ def report_validation_error(category: str, validation_error: ValidationError) ->
     report_msg = validation_error_analysis.error_msg
     if migration_reports:
         migration_reports_str = "\n".join(migration_reports)
-        report_msg += "\n\nThe following fields have been renamed in the new version of Pipelex:\n\n" + migration_reports_str
+        report_msg += "\n\nNote that some fields have been renamed in the new version of Pipelex.\n\n" + migration_reports_str
     return report_msg

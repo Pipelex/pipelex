@@ -161,6 +161,32 @@ class Pipelex(metaclass=MetaSingleton):
 
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
+    @staticmethod
+    def _get_config_not_found_error_msg(component_name: str) -> str:
+        """Generate error message for missing config files."""
+        return f"Config files are missing for the {component_name}. Run `pipelex init config` to generate the missing files."
+
+    @staticmethod
+    def _get_validation_error_msg(component_name: str, validation_exc: Exception) -> str:
+        """Generate error message for invalid config files."""
+        msg = ""
+        cause_exc = validation_exc.__cause__
+        if cause_exc is None:
+            msg += f"\nUnxpexted cause:{cause_exc}"
+            raise PipelexSetupError(msg) from cause_exc
+        if not isinstance(cause_exc, ValidationError):
+            msg += f"\nUnxpexted cause:{cause_exc}"
+            raise PipelexSetupError(msg) from cause_exc
+        report = report_validation_error(category="config", validation_error=cause_exc)
+        return f"""{msg}
+{report}
+
+Config files are invalid for the {component_name}.
+You can fix them manually, or run `pipelex init config --reset` to regenerate them.
+Note that this command resets all config files to their default values.
+If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
+"""
+
     def setup(
         self,
         secrets_provider: SecretsProviderAbstract | None = None,
@@ -176,30 +202,24 @@ class Pipelex(metaclass=MetaSingleton):
         self.plugin_manager.setup()
         try:
             self.models_manager.setup()
-        except (RoutingProfileLibraryNotFoundError, InferenceBackendLibraryNotFoundError, ModelDeckNotFoundError) as backends_not_found_exc:
-            msg = (
-                "Some config files are missing for the inference backend library, routing profile library, or model deck. "
-                "Run `pipelex init config` to generate the missing files."
-            )
-            raise PipelexSetupError(msg) from backends_not_found_exc
-        except (RoutingProfileValidationError, InferenceBackendLibraryValidationError, ModelDeckValidationError) as backends_validation_exc:
-            comment_msg = (
-                "Some config files are invalid for the inference backend library, routing profile library, or model deck. "
-                "You can fix them manually, or run `pipelex init config --reset` to regenerate them. "
-                "Note that this command resets all config files to their default values.\n"
-                f"If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.\n"
-            )
-            msg = ""
-            cause_exc = backends_validation_exc.__cause__
-            if cause_exc is None:
-                msg += f"\nUnxpexted cause:{cause_exc}"
-                raise PipelexSetupError(msg) from cause_exc
-            if not isinstance(cause_exc, ValidationError):
-                msg += f"\nUnxpexted cause:{cause_exc}"
-                raise PipelexSetupError(msg) from cause_exc
-            validation_error_msg = msg + "\n" + report_validation_error(category="config", validation_error=cause_exc)
-            validation_error_msg += "\n\n" + comment_msg
-            raise PipelexSetupError(validation_error_msg) from backends_validation_exc
+        except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
+            msg = self._get_config_not_found_error_msg("routing profile library")
+            raise PipelexSetupError(msg) from routing_not_found_exc
+        except InferenceBackendLibraryNotFoundError as backend_not_found_exc:
+            msg = self._get_config_not_found_error_msg("inference backend library")
+            raise PipelexSetupError(msg) from backend_not_found_exc
+        except ModelDeckNotFoundError as deck_not_found_exc:
+            msg = self._get_config_not_found_error_msg("model deck")
+            raise PipelexSetupError(msg) from deck_not_found_exc
+        except RoutingProfileValidationError as routing_validation_exc:
+            msg = self._get_validation_error_msg("routing profile library", routing_validation_exc)
+            raise PipelexSetupError(msg) from routing_validation_exc
+        except InferenceBackendLibraryValidationError as backend_validation_exc:
+            msg = self._get_validation_error_msg("inference backend library", backend_validation_exc)
+            raise PipelexSetupError(msg) from backend_validation_exc
+        except ModelDeckValidationError as deck_validation_exc:
+            msg = self._get_validation_error_msg("model deck", deck_validation_exc)
+            raise PipelexSetupError(msg) from deck_validation_exc
         except InferenceBackendCredentialsError as credentials_exc:
             backend_name = credentials_exc.backend_name
             var_name = credentials_exc.key_name
