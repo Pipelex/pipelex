@@ -16,7 +16,7 @@ class PipeSequenceSpec(PipeSpec):
     """
 
     type: SkipJsonSchema[Literal["PipeSequence"]] = "PipeSequence"
-    category: SkipJsonSchema[Literal["PipeController"]] = "PipeController"
+    pipe_category: SkipJsonSchema[Literal["PipeController"]] = "PipeController"
     steps: list[SubPipeSpec] = Field(
         description=("List of SubPipeSpec instances to execute sequentially. Each step runs after the previous one completes.")
     )
@@ -30,6 +30,6 @@ class PipeSequenceSpec(PipeSpec):
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             type=self.type,
-            category=self.category,
+            pipe_category=self.pipe_category,
             steps=core_steps,
         )

@@ -26,7 +26,7 @@ class PipeSequenceTestCases:
             inputs={"input_data": InputRequirementBlueprint(concept="Text")},
             output="ProcessedData",
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             steps=[
                 SubPipeBlueprint(pipe="step1", result="result1"),
                 SubPipeBlueprint(pipe="step2", result="result2"),
@@ -57,7 +57,7 @@ class PipeSequenceTestCases:
             inputs={"items": InputRequirementBlueprint(concept="ItemList")},
             output="ProcessedItems",
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             steps=[
                 SubPipeBlueprint(pipe="prepare", result="prepared_items"),
                 SubPipeBlueprint(

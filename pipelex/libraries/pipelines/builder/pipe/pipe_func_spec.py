@@ -12,7 +12,7 @@ class PipeFuncSpec(PipeSpec):
     """PipeFunc enables calling custom functions in the Pipelex framework."""
 
     type: SkipJsonSchema[Literal["PipeFunc"]] = "PipeFunc"
-    category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
+    pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
     function_name: str = Field(description="The name of the function to call.")
 
     @override
@@ -23,6 +23,6 @@ class PipeFuncSpec(PipeSpec):
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             type=self.type,
-            category=self.category,
+            pipe_category=self.pipe_category,
             function_name=self.function_name,
         )

@@ -77,7 +77,7 @@ class PipeComposeSpec(PipeSpec):
     """PipeComposeSpec defines a templating operation based on a Jinja2 template."""
 
     type: SkipJsonSchema[Literal["PipeCompose"]] = "PipeCompose"
-    category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
+    pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
     template: str = Field(description="Jinja2 template string")
     target_format: TargetFormat | str = Field(description="Target format for the output")
 
@@ -106,6 +106,6 @@ class PipeComposeSpec(PipeSpec):
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             type=self.type,
-            category=self.category,
+            pipe_category=self.pipe_category,
             template=template_blueprint,
         )

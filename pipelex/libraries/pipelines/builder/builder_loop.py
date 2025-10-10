@@ -59,7 +59,7 @@ class BuilderLoop:
                 raise PipelexBundleUnexpectedError(message=msg) from bundle_error
             match static_error.error_type:
                 case StaticValidationErrorType.MISSING_INPUT_VARIABLE | StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE:
-                    if not AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.category):
+                    if not AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.pipe_category):
                         msg = (
                             f"Static validation error: pipelex_bundle_spec had an input requirement error for a pipe spec of type "
                             f"{pipe_spec.type} for considered pipe code: '{static_error.pipe_code}' but it was not a PipeController. "

@@ -48,7 +48,7 @@ class FlowFactory:
 
         if bundle_blueprint.pipe:
             for pipe_code, pipe_blueprint in bundle_blueprint.pipe.items():
-                if pipe_blueprint.category == AllowedPipeCategories.PIPE_CONTROLLER:
+                if pipe_blueprint.pipe_category == AllowedPipeCategories.PIPE_CONTROLLER:
                     # Keep controllers as-is (they are already blueprints which match spec structure)
                     # Type check to ensure we only assign controller blueprints
                     if isinstance(
@@ -88,7 +88,7 @@ class FlowFactory:
 
         return PipeSignature(
             code=pipe_code,
-            category="PipeSignature",
+            pipe_category="PipeSignature",
             type=pipe_blueprint.type,
             description=pipe_blueprint.description or "",
             inputs=inputs,

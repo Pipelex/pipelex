@@ -20,7 +20,7 @@ class PipeFuncTestCases:
             inputs={"data": InputRequirementBlueprint(concept="Data")},
             output="ProcessedData",
             type="PipeFunc",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             function_name="process_data",
         ),
     )
@@ -39,7 +39,7 @@ class PipeFuncTestCases:
             inputs=None,
             output="GeneratedData",
             type="PipeFunc",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             function_name="generate_data",
         ),
     )

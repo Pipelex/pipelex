@@ -21,7 +21,7 @@ class PipeExtractTestCases:
             inputs={"image": InputRequirementBlueprint(concept="Image")},
             output="ExtractedText",
             type="PipeExtract",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             model="base_ocr_mistral",
         ),
     )
@@ -44,7 +44,7 @@ class PipeExtractTestCases:
             inputs={"document": InputRequirementBlueprint(concept="PDF")},
             output="PageContent",
             type="PipeExtract",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             model="base_ocr_mistral",
             page_images=True,
             page_image_captions=True,

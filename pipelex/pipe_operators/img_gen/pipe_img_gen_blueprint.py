@@ -9,7 +9,7 @@ from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 class PipeImgGenBlueprint(PipeBlueprint):
     type: Literal["PipeImgGen"] = "PipeImgGen"
-    category: Literal["PipeOperator"] = "PipeOperator"
+    pipe_category: Literal["PipeOperator"] = "PipeOperator"
     img_gen_prompt: str | None = None
     img_gen_prompt_var_name: str | None = None
 

@@ -27,7 +27,7 @@ class PipeParallelTestCases:
             inputs={"data": InputRequirementBlueprint(concept="Data")},
             output="Results",
             type="PipeParallel",
-            category="PipeController",
+            pipe_category="PipeController",
             parallels=[
                 SubPipeBlueprint(pipe="analyze_data", result="analysis"),
                 SubPipeBlueprint(pipe="transform_data", result="transformed"),
@@ -58,7 +58,7 @@ class PipeParallelTestCases:
             inputs={"input": InputRequirementBlueprint(concept="Input")},
             output="CombinedResult",
             type="PipeParallel",
-            category="PipeController",
+            pipe_category="PipeController",
             parallels=[
                 SubPipeBlueprint(pipe="pipe1", result="result1"),
                 SubPipeBlueprint(pipe="pipe2", result="result2"),
@@ -88,7 +88,7 @@ class PipeParallelTestCases:
             inputs={"input": InputRequirementBlueprint(concept="Input")},
             output="CombinedResult",
             type="PipeParallel",
-            category="PipeController",
+            pipe_category="PipeController",
             parallels=[
                 SubPipeBlueprint(pipe="pipe1", result="result1"),
                 SubPipeBlueprint(pipe="pipe2", result="result2"),

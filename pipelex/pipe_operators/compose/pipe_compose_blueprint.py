@@ -8,7 +8,7 @@ from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 class PipeComposeBlueprint(PipeBlueprint):
     type: Literal["PipeCompose"] = "PipeCompose"
-    category: Literal["PipeOperator"] = "PipeOperator"
+    pipe_category: Literal["PipeOperator"] = "PipeOperator"
     template: str | TemplateBlueprint
 
     @property

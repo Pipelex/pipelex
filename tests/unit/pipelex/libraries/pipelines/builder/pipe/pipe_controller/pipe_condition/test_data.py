@@ -26,7 +26,7 @@ class PipeConditionTestCases:
             inputs={"item": InputRequirementBlueprint(concept="Item")},
             output="ProcessedItem",
             type="PipeCondition",
-            category="PipeController",
+            pipe_category="PipeController",
             expression=None,
             expression_template="{{ item.category }}",
             outcomes={

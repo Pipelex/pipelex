@@ -11,14 +11,14 @@ class PipeBlueprintTestCases:
         PipeSpec(
             pipe_code="simple_pipe",
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="A simple pipe",
             inputs={"input": "Text"},
             output="ProcessedText",
         ),
         PipeBlueprint(
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="A simple pipe",
             inputs={"input": InputRequirementBlueprint(concept="Text")},
             output="ProcessedText",
@@ -30,7 +30,7 @@ class PipeBlueprintTestCases:
         PipeSpec(
             pipe_code="pipe_with_requirements",
             type="PipeFunc",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Pipe with input requirements",
             inputs={
                 "data": "Data",
@@ -40,7 +40,7 @@ class PipeBlueprintTestCases:
         ),
         PipeBlueprint(
             type="PipeFunc",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Pipe with input requirements",
             inputs={
                 "data": InputRequirementBlueprint(concept="Data"),
@@ -55,14 +55,14 @@ class PipeBlueprintTestCases:
         PipeSpec(
             pipe_code="pipe_no_inputs",
             type="PipeFunc",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Pipe without inputs",
             inputs={},
             output="GeneratedData",
         ),
         PipeBlueprint(
             type="PipeFunc",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Pipe without inputs",
             inputs=None,
             output="GeneratedData",

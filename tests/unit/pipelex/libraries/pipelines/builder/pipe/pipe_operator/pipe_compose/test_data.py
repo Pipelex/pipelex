@@ -24,7 +24,7 @@ class PipeComposeTestCases:
             inputs={"data": InputRequirementBlueprint(concept="Data")},
             output="RenderedText",
             type="PipeCompose",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             template=TemplateBlueprint(
                 source="Hello {{ data.name }}!",
                 category=TemplateCategory.MARKDOWN,
