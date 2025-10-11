@@ -11,11 +11,11 @@ from .templates import JINJA2TestCases
 from .urls import TestURLs
 
 __all__ = [
-    "PDFTestCases",
-    "ImageTestCases",
-    "TestURLs",
     "ClassRegistryTestCases",
     "FileHelperTestCases",
     "Fruit",
+    "ImageTestCases",
     "JINJA2TestCases",
+    "PDFTestCases",
+    "TestURLs",
 ]

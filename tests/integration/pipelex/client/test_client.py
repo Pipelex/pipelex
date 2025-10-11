@@ -1,5 +1,3 @@
-from typing import List
-
 import pytest
 from pydantic import BaseModel
 
@@ -17,17 +15,15 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 
 class Example(BaseModel):
     pipe_code: str
-    memory: List[Stuff]
+    memory: list[Stuff]
 
 
 @pytest.mark.pipelex_api
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipelexApiClient:
     @pytest.fixture
-    def examples(self) -> List[Example]:
-        """
-        Fixture providing test example for API client tests.
-        """
+    def examples(self) -> list[Example]:
+        """Fixture providing test example for API client tests."""
         return [
             Example(
                 pipe_code="retrieve_excerpts",
@@ -40,46 +36,49 @@ class TestPipelexApiClient:
                                 The Dawn of Ultra-Rapid Transit: NextGen High-Speed Trains Redefine Travel
                                 By Eliza Montgomery, Transportation Technology Reporter
 
-                                In an era where time is increasingly precious, a revolution in rail transportation is quietly 
-                                transforming how we connect cities and regions. The emergence of ultra-high-speed train 
-                                networks, capable of speeds exceeding 350 mph, promises to render certain short-haul 
+                                In an era where time is increasingly precious, a revolution in rail transportation is quietly
+                                transforming how we connect cities and regions. The emergence of ultra-high-speed train
+                                networks, capable of speeds exceeding 350 mph, promises to render certain short-haul
                                 flights obsolete while dramatically reducing carbon emissions.
 
                                 QuantumRail's Breakthrough Technology
-                                Leading this transportation revolution is QuantumRail Technologies, whose new MagLev-X 
-                                platform has shattered previous speed records during recent tests in Nevada's 
-                                Velocity Valley testinggrounds. The train achieved a remarkable 368 mph, 
+                                Leading this transportation revolution is QuantumRail Technologies, whose new MagLev-X
+                                platform has shattered previous speed records during recent tests in Nevada's
+                                Velocity Valley testinggrounds. The train achieved a remarkable 368 mph,
                                 maintaining this speed for over fifteen minutes.
 
-                                'What we're seeing isn't just an incremental improvement—it's a fundamental shift 
-                                in transportationphysics,' explains Dr. Hiroshi Takahashi, Chief Engineer at 
-                                QuantumRail. 'The MagLev-X's superconducting magnets and aerodynamic profile 
+                                'What we're seeing isn't just an incremental improvement—it's a fundamental shift
+                                in transportationphysics,' explains Dr. Hiroshi Takahashi, Chief Engineer at
+                                QuantumRail. 'The MagLev-X's superconducting magnets and aerodynamic profile
                                 allow us to overcome limitations that have constrained train speeds for decades.'
 
                                 Economic Implications
-                                The introduction of these next-generation trains isn't merely a technical 
+                                The introduction of these next-generation trains isn't merely a technical
                                 achievement—it represents a potential economic windfall for connected regions.
-                                The TransContinental Alliance, a consortium of cities supporting high-speed rail 
-                                development, estimates that new high-speed corridors could generate $87 
+                                The TransContinental Alliance, a consortium of cities supporting high-speed rail
+                                development, estimates that new high-speed corridors could generate $87
                                 billion in economic activity over the next decade.
 
-                                'When you can travel between Chicago and Detroit in under an hour, 
-                                you're essentially creating a single economic zone, notes Dr. Amara Washington, 
-                                economist at the Urban Mobility Institute. This transforms labor markets, housing 
+                                'When you can travel between Chicago and Detroit in under an hour,
+                                you're essentially creating a single economic zone, notes Dr. Amara Washington,
+                                economist at the Urban Mobility Institute. This transforms labor markets, housing
                                 patterns, and business relationships.
 
                                 WindStream's Competitive Response
-                                Not to be outdone, European manufacturer WindStream Mobility has unveiled 
-                                its own ultra-high-speed platform, the AeroGlide TGV-7. Featuring a 
-                                distinctive bionic design inspired by peregrine falcons, the train uses an innovative 
-                                hybrid propulsion system that combines traditional electric motors with 
+                                Not to be outdone, European manufacturer WindStream Mobility has unveiled
+                                its own ultra-high-speed platform, the AeroGlide TGV-7. Featuring a
+                                distinctive bionic design inspired by peregrine falcons, the train uses an innovative
+                                hybrid propulsion system that combines traditional electric motors with
                                 compressed air boosters for acceleration phases.
-                            """
+                            """,
                         ),
                     ),
                     StuffFactory.make_stuff(
                         concept=ConceptFactory.make(
-                            concept_code="Question", domain="answer", definition="answer.Question", structure_class_name="Question"
+                            concept_code="Question",
+                            domain="answer",
+                            description="answer.Question",
+                            structure_class_name="Question",
                         ),
                         name="question",
                         content=TextContent(text="Aerodynamic features?"),
@@ -90,13 +89,13 @@ class TestPipelexApiClient:
 
     async def test_client_execute_pipeline(
         self,
-        examples: List[Example],
+        examples: list[Example],
     ):
-        """
-        Test the execute_pipe method with the example.
+        """Test the execute_pipe method with the example.
 
         Args:
             examples: List of test examples from the fixture
+
         """
         for example in examples:
             # Create working memory from example data
@@ -141,7 +140,7 @@ class TestPipelexApiClient:
                 assert isinstance(item["justification"], str)
 
             # Verify text structure
-            assert working_memory["text"]["concept_code"] == f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}"
+            assert working_memory["text"]["concept_code"] == f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}"
             assert "content" in working_memory["text"]
             assert isinstance(working_memory["text"]["content"], str)
             assert "The Dawn of Ultra-Rapid Transit" in working_memory["text"]["content"]

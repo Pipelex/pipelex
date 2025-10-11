@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job import OcrJob
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams, OcrJobReport
@@ -11,9 +9,9 @@ class OcrJobFactory:
     def make_ocr_job(
         cls,
         ocr_input: OcrInput,
-        ocr_job_params: Optional[OcrJobParams] = None,
-        ocr_job_config: Optional[OcrJobConfig] = None,
-        job_metadata: Optional[JobMetadata] = None,
+        ocr_job_params: OcrJobParams | None = None,
+        ocr_job_config: OcrJobConfig | None = None,
+        job_metadata: JobMetadata | None = None,
     ) -> OcrJob:
         # TODO: manage the param default through the config
         # ocr_config = get_config().cogt.ocr_config

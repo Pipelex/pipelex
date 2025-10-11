@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from jinja2 import pass_context
 from jinja2.runtime import Context, Undefined
@@ -12,45 +12,44 @@ from pipelex.types import StrEnum
 # Jinja2 filters
 ########################################################################################
 
-ALLOWED_FILTERS = ["tag", "format"]
+ALLOWED_FILTERS = ["tag", "format", "default"]
 
 
 # Filter to format some Stuff or any object with the appropriate text formatting methods
 @pass_context
-def text_format(context: Context, value: Any, text_format: Optional[TextFormat] = None) -> Any:
+def text_format(context: Context, value: Any, text_format: TextFormat | None = None) -> Any:
     if text_format:
         if isinstance(text_format, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             applied_text_format = TextFormat(text_format)
         elif isinstance(text_format, TextFormat):  # pyright: ignore[reportUnnecessaryIsInstance]
             applied_text_format = text_format
         else:
-            raise Jinja2ContextError(f"Invalid text format: '{text_format}'")
+            msg = f"Invalid text format: '{text_format}'"
+            raise Jinja2ContextError(msg)
     else:
         applied_text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN))
 
     if hasattr(value, "rendered_str"):
-        rendered_str = value.rendered_str(text_format=applied_text_format)
-        return rendered_str
-    elif hasattr(value, applied_text_format.render_method_name):
+        return value.rendered_str(text_format=applied_text_format)
+    if hasattr(value, applied_text_format.render_method_name):
         render_method = getattr(value, applied_text_format.render_method_name)
-        rendered_str = render_method()
-        return rendered_str
-    elif isinstance(value, StrEnum):
+        return render_method()
+    if isinstance(value, StrEnum):
         return value.value
-    else:
-        return value
+    return value
 
 
 # TODO: better separate tag and render
 # Filter to tag the variable with a tag style and a provided name, appropriate for tagging in a prompt
 @pass_context
-def tag(context: Context, value: Any, tag_name: Optional[str] = None) -> Any:
+def tag(context: Context, value: Any, tag_name: str | None = None) -> Any:
     if isinstance(value, Undefined):
         # maybe we don't need this check
         if tag_name:
-            raise Jinja2ContextError(f"Jinja2 undefined value with tag_name '{tag_name}'")
-        else:
-            raise Jinja2ContextError("Jinja2 undefined value.")
+            msg = f"Jinja2 undefined value with tag_name '{tag_name}'"
+            raise Jinja2ContextError(msg)
+        msg = "Jinja2 undefined value."
+        raise Jinja2ContextError(msg)
 
     if isinstance(value, Jinja2TaggableAbstract):
         value, tag_name = value.render_tagged_for_jinja2(context=context, tag_name=tag_name)
@@ -58,13 +57,15 @@ def tag(context: Context, value: Any, tag_name: Optional[str] = None) -> Any:
     return render_any_tagged_for_jinja2(context=context, value=value, tag_name=tag_name)
 
 
-def render_any_tagged_for_jinja2(context: Context, value: Any, tag_name: Optional[str] = None) -> Any:
+def render_any_tagged_for_jinja2(context: Context, value: Any, tag_name: str | None = None) -> Any:
     tag_style_str = context.get(Jinja2ContextKey.TAG_STYLE)
     tag_style: TagStyle
     if tag_style_str:
         tag_style = TagStyle(tag_style_str)
     else:
-        raise Jinja2ContextError(f"Tag style is required for Jinja2 tag filter (context.name = {context.name})")
+        # raise Jinja2ContextError(f"Tag style is required for Jinja2 tag filter (context.name = {context.name})")
+        # TODO: ignoring this error is a workaround, the real bug will be fixed as part of a full refactor of the jinja2 filters
+        tag_style = TagStyle.TICKS
 
     tagged: Any
     if tag_name:

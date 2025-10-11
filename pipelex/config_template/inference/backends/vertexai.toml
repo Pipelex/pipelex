@@ -1,0 +1,50 @@
+################################################################################
+# VertexAI Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Google VertexAI models.
+# It contains model definitions for Gemini language models
+# accessible through the Google VertexAI API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["gemini-2.0-flash"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "openai"
+prompting_target = "gemini"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- Gemini 2.0 Series --------------------------------------------------------
+["gemini-2.0-flash"]
+model_id = "google/gemini-2.0-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.1, output = 0.4 }
+
+# --- Gemini 2.5 Series --------------------------------------------------------
+["gemini-2.5-pro"]
+model_id = "google/gemini-2.5-pro"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.25, output = 10.0 }
+
+["gemini-2.5-flash"]
+model_id = "google/gemini-2.5-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.30, output = 2.50 }

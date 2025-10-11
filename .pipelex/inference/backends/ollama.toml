@@ -1,0 +1,60 @@
+################################################################################
+# Ollama Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Ollama models.
+# It contains model definitions for local language models
+# accessible through the Ollama API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["mistral-small3.1-24b"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "openai"
+prompting_target = "anthropic"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- Gemma Models -------------------------------------------------------------
+[gemma3-4b]
+model_id = "gemma3:4b"
+inputs = ["text"]
+outputs = ["text"]
+max_prompt_images = 3000
+costs = { input = 0, output = 0 }
+
+# --- Llama Models -------------------------------------------------------------
+[llama4-scout]
+model_id = "llama4:scout"
+inputs = ["text"]
+outputs = ["text"]
+max_prompt_images = 3000
+costs = { input = 0, output = 0 }
+
+# --- Mistral Models -----------------------------------------------------------
+["mistral-small3.1-24b"]
+model_id = "mistral-small3.1:24b"
+inputs = ["text"]
+outputs = ["text"]
+max_prompt_images = 3000
+costs = { input = 0, output = 0 }
+
+# --- Qwen Models --------------------------------------------------------------
+[qwen3-8b]
+model_id = "qwen3:8b"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+# TODO: support <think> tokens
+

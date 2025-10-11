@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from pipelex.pipeline.pipeline import Pipeline
 
@@ -14,7 +13,7 @@ class PipelineManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_optional_pipeline(self, pipeline_run_id: str) -> Optional[Pipeline]:
+    def get_optional_pipeline(self, pipeline_run_id: str) -> Pipeline | None:
         pass
 
     @abstractmethod

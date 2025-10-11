@@ -1,22 +1,25 @@
 import importlib
 import os
 from configparser import ConfigParser
-from typing import Any, Dict, Optional
+from typing import Any
 
 import toml
 
-from pipelex.tools.config.models import (
+from pipelex.tools.config.config_root import (
     CONFIG_BASE_OVERRIDES_AFTER_ENV,
     CONFIG_BASE_OVERRIDES_BEFORE_ENV,
 )
 from pipelex.tools.misc.json_utils import deep_update
-from pipelex.tools.misc.toml_utils import failable_load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
 from pipelex.tools.runtime_manager import runtime_manager
 
+CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
+CONFIG_TEMPLATE_SUBPATH = "config_template"
+INFERENCE_CONFIG_SUBPATH = "inference"
 
 
-class ConfigException(Exception):
+class ConfigError(Exception):
     pass
 
 
@@ -36,34 +39,46 @@ class ConfigManager:
         return os.path.dirname(os.path.dirname(current_dir))
 
     @property
+    def pipelex_root_config_path(self) -> str:
+        return os.path.join(self.pipelex_root_dir, CONFIG_NAME)
+
+    @property
     def local_root_dir(self) -> str:
         """Get the root directory of the project using pipelex.
-        This is the directory from where the command is being run."""
+        This is the directory from where the command is being run.
+        """
         return os.path.abspath(os.getcwd())
 
-    def get_pipelex_config(self) -> Dict[str, Any]:
+    @property
+    def pipelex_config_dir(self) -> str:
+        return os.path.join(self.local_root_dir, CONFIG_DIR_NAME)
+
+    @property
+    def pipelex_specific_config_file_path(self) -> str:
+        return os.path.join(self.pipelex_config_dir, CONFIG_NAME)
+
+    def get_pipelex_config(self) -> dict[str, Any]:
         """Get the pipelex configuration from pipelex.toml.
 
         Returns:
             Dict[str, Any]: The configuration dictionary from pipelex.toml
-        """
-        config_path = os.path.join(self.pipelex_root_dir, CONFIG_NAME)
-        config = failable_load_toml_from_path(config_path)
-        return config or {}
 
-    def get_local_config(self) -> Dict[str, Any]:
+        """
+        config_path = self.pipelex_root_config_path
+        return load_toml_from_path(config_path)
+
+    def get_local_config(self) -> dict[str, Any]:
         """Get the local pipelex configuration from pipelex.toml in the project root.
 
         Returns:
             Dict[str, Any]: The configuration dictionary from the local pipelex.toml
-        """
-        config_path = os.path.join(self.local_root_dir, CONFIG_NAME)
-        config = failable_load_toml_from_path(config_path)
-        return config or {}
 
-    def load_inheritance_config(self, the_pipelex_config: Dict[str, Any]):
         """
-        Load the config by inheritance in a pyproject.toml file.
+        config_path = os.path.join(self.pipelex_config_dir, CONFIG_NAME)
+        return load_toml_from_path_if_exists(config_path) or {}
+
+    def load_inheritance_config(self, the_pipelex_config: dict[str, Any]):
+        """Load the config by inheritance in a pyproject.toml file.
         This will be removed in the future.
         Requires to have a pyproject.toml file in the project root.
         """
@@ -72,7 +87,7 @@ class ConfigManager:
             print(f"pyproject.toml not found in {self.local_root_dir}")
             return
 
-        def _find_package_path(package_name: str) -> Optional[str]:
+        def _find_package_path(package_name: str) -> str | None:
             """Find package path by importing it"""
             try:
                 module = importlib.import_module(package_name)
@@ -90,11 +105,11 @@ class ConfigManager:
                 if package_path:
                     config_path = os.path.join(package_path, "pipelex.toml")
                     if os.path.exists(config_path):
-                        config = failable_load_toml_from_path(config_path)
+                        config = load_toml_from_path_if_exists(config_path)
                         if config:
                             deep_update(the_pipelex_config, config)
 
-    def load_config(self, specific_config_path: Optional[str] = None) -> Dict[str, Any]:
+    def load_config(self, specific_config_path: str | None = None) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
 
         The configuration is loaded and merged in the following order:
@@ -104,12 +119,11 @@ class ConfigManager:
            - pipelex_local.toml (before env)
            - pipelex_{environment}.toml
            - pipelex_{run_mode}.toml
-           - pipelex_user.toml (after env)
 
         Returns:
             Dict[str, Any]: The merged configuration dictionary
-        """
 
+        """
         #################### 1. Load pipelex config ####################
         pipelex_config = self.get_pipelex_config()
 
@@ -124,29 +138,33 @@ class ConfigManager:
                 deep_update(pipelex_config, local_config)
 
         #################### 4. Load overrides for the current project ####################
-        list_of_overrides = (
-            CONFIG_BASE_OVERRIDES_BEFORE_ENV + [runtime_manager.environment] + [runtime_manager.run_mode] + CONFIG_BASE_OVERRIDES_AFTER_ENV
-        )
+        list_of_overrides = [
+            *CONFIG_BASE_OVERRIDES_BEFORE_ENV,
+            runtime_manager.environment,
+            runtime_manager.run_mode,
+            *CONFIG_BASE_OVERRIDES_AFTER_ENV,
+        ]
         for override in list_of_overrides:
             if override:
                 if override == runtime_manager.run_mode.UNIT_TEST:
                     override_path = os.path.join(self.local_root_dir, "tests", f"pipelex_{override}.toml")
                 else:
                     override_path = os.path.join(self.local_root_dir, "pipelex" if self.is_in_pipelex_config else "", f"pipelex_{override}.toml")
-                if override_dict := failable_load_toml_from_path(override_path):
+                if override_dict := load_toml_from_path_if_exists(override_path):
                     deep_update(pipelex_config, override_dict)
 
         #################### 5. Load specific config ####################
         if specific_config_path:
-            config = failable_load_toml_from_path(specific_config_path)
+            config = load_toml_from_path_if_exists(specific_config_path)
             if config:
                 deep_update(pipelex_config, config)
             else:
-                raise ConfigException(f"Failed to load specific config from {specific_config_path}")
+                msg = f"Failed to load specific config from {specific_config_path}"
+                raise ConfigError(msg)
 
         return pipelex_config
 
-    def get_project_name(self) -> Optional[str]:
+    def get_project_name(self) -> str | None:
         """Get the project name from configuration files.
 
         Checks the following files in order:
@@ -156,15 +174,15 @@ class ConfigManager:
         4. setup.py
 
         Returns:
-            Optional[str]: The project name or None if not found
+            str | None: The project name or None if not found
+
         """
         # First check pipelex's pyproject.toml
         pipelex_pyproject_path = os.path.join(os.path.dirname(self.local_root_dir), "pyproject.toml")
         try:
             pyproject = toml.load(pipelex_pyproject_path)
-            if project_name := pyproject.get("project", {}).get("name"):
-                if isinstance(project_name, str):
-                    return project_name
+            if (project_name := pyproject.get("project", {}).get("name")) and isinstance(project_name, str):
+                return str(project_name)
         except FileNotFoundError:
             pass
         except toml.TomlDecodeError as exc:
@@ -176,9 +194,9 @@ class ConfigManager:
         pyproject_path = os.path.join(self.local_root_dir, "pyproject.toml")
         try:
             pyproject = toml.load(pyproject_path)
-            if project_name := pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name"):
-                if isinstance(project_name, str):
-                    return project_name
+            name_obj: object = pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name")
+            if isinstance(name_obj, str):
+                return name_obj
         except FileNotFoundError as exc:
             print(f"Local pyproject.toml not found at {pyproject_path}: {exc}")
         except toml.TomlDecodeError as exc:
@@ -191,9 +209,8 @@ class ConfigManager:
         try:
             config = ConfigParser()
             config.read(setup_cfg_path)
-            if config.has_section("metadata"):
-                if cfg_name := config.get("metadata", "name", fallback=None):
-                    return cfg_name
+            if (cfg_name := config.get("metadata", "name", fallback=None)) and config.has_section("metadata"):
+                return cfg_name
         except FileNotFoundError as exc:
             print(f"setup.cfg not found at {setup_cfg_path}: {exc}")
         except (ValueError, OSError) as exc:
@@ -216,7 +233,7 @@ class ConfigManager:
                                     return line[start + 1 : end]
         except FileNotFoundError as exc:
             print(f"setup.py not found at {setup_py_path}: {exc}")
-        except (IOError, UnicodeDecodeError) as exc:
+        except (OSError, UnicodeDecodeError) as exc:
             print(f"Failed to read setup.py at {setup_py_path}: {exc}")
 
         print("Could not find project name in any of the configuration files")

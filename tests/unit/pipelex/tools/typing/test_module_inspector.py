@@ -1,9 +1,7 @@
-# SPDX-FileCopyrightText: © 2025 Evotis S.A.S.
-# SPDX-License-Identifier: Apache-2.0
-
 import os
 import shutil
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -33,11 +31,11 @@ class TestImportModuleFromFile:
         # Clean up nested directories and __pycache__ directories
         directories_to_remove = ["nested/subdir", "nested", "__pycache__", "nested/__pycache__", "nested/subdir/__pycache__"]
         for dir_path in directories_to_remove:
-            if os.path.exists(dir_path):
+            if Path(dir_path).exists():
                 shutil.rmtree(dir_path)
 
         # Clean up sys.modules entries for test modules
-        modules_to_remove = [name for name in sys.modules.keys() if name.startswith("test_module")]
+        modules_to_remove = [name for name in sys.modules if name.startswith("test_module")]
         for module_name in modules_to_remove:
             del sys.modules[module_name]
 
@@ -57,7 +55,7 @@ class TestClass:
         assert hasattr(module, "TestClass")
         assert module.test_function() == "test_value"
 
-    def test_import_non_python_file_raises_error(self, tmp_path: Path):
+    def test_import_non_python_file_raises_error(self):
         """Test that importing a non-Python file raises ModuleFileError."""
         test_file_path = "test_file.txt"
         with open(test_file_path, "w") as test_file:
@@ -66,13 +64,13 @@ class TestClass:
             import_module_from_file(test_file_path)
         assert "is not a Python file" in str(excinfo.value)
 
-    def test_import_nonexistent_file_raises_error(self, tmp_path: Path):
+    def test_import_nonexistent_file_raises_error(self):
         """Test that importing a nonexistent file raises FileNotFoundError."""
         nonexistent_file_path = "nonexistent.py"
         with pytest.raises(FileNotFoundError):
             import_module_from_file(nonexistent_file_path)
 
-    def test_import_file_with_syntax_error_raises_error(self, tmp_path: Path):
+    def test_import_file_with_syntax_error_raises_error(self):
         """Test that importing a file with syntax errors raises SyntaxError."""
         test_file_path = "syntax_error.py"
         with open(test_file_path, "w") as test_file:
@@ -83,7 +81,7 @@ def test_function(
         with pytest.raises(SyntaxError):
             import_module_from_file(test_file_path)
 
-    def test_import_file_with_import_error_raises_error(self, tmp_path: Path):
+    def test_import_file_with_import_error_raises_error(self):
         """Test that importing a file with import errors raises ImportError."""
         test_file_path = "import_error.py"
         with open(test_file_path, "w") as test_file:
@@ -93,7 +91,7 @@ import nonexistent_module
         with pytest.raises(ImportError):
             import_module_from_file(test_file_path)
 
-    def test_module_added_to_sys_modules(self, tmp_path: Path):
+    def test_module_added_to_sys_modules(self):
         """Test that imported module is added to sys.modules."""
         test_file_path = "test_module.py"
         with open(test_file_path, "w") as test_file:
@@ -108,7 +106,7 @@ def test_function():
         assert expected_module_name in sys.modules
         assert sys.modules[expected_module_name] is module
 
-    def test_module_name_with_path_separators(self, tmp_path: Path):
+    def test_module_name_with_path_separators(self):
         """Test that module name is correctly formatted with path separators (should use file basename)."""
         test_file_path = "nested/subdir/test_module.py"
         # Create nested directories
@@ -126,8 +124,6 @@ def test_function():
 class TestFindClassesInModule:
     def test_find_all_classes_no_base_class(self):
         """Test finding all classes when no base class is specified."""
-        import types
-
         test_module = types.ModuleType("test_module")
 
         class ClassA:
@@ -139,18 +135,17 @@ class TestFindClassesInModule:
         # Set __module__ so inspect.getmembers finds them
         ClassA.__module__ = test_module.__name__
         ClassB.__module__ = test_module.__name__
-        setattr(test_module, "ClassA", ClassA)
-        setattr(test_module, "ClassB", ClassB)
-        setattr(test_module, "some_function", lambda: None)
+        test_module.ClassA = ClassA  # type: ignore[attr-defined]
+        test_module.ClassB = ClassB  # type: ignore[attr-defined]
+        test_module.some_function = lambda: None  # type: ignore[attr-defined]
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
-        assert len(classes) == 2
+        expected_number_of_classes = 2
+        assert len(classes) == expected_number_of_classes
         assert ClassA in classes
         assert ClassB in classes
 
     def test_find_classes_with_base_class(self):
         """Test finding classes that inherit from a specific base class."""
-        import types
-
         test_module = types.ModuleType("test_module")
 
         class BaseClass:
@@ -166,19 +161,18 @@ class TestFindClassesInModule:
         BaseClass.__module__ = test_module.__name__
         SubClass.__module__ = test_module.__name__
         UnrelatedClass.__module__ = test_module.__name__
-        setattr(test_module, "BaseClass", BaseClass)
-        setattr(test_module, "SubClass", SubClass)
-        setattr(test_module, "UnrelatedClass", UnrelatedClass)
+        test_module.BaseClass = BaseClass  # type: ignore[attr-defined]
+        test_module.SubClass = SubClass  # type: ignore[attr-defined]
+        test_module.UnrelatedClass = UnrelatedClass  # type: ignore[attr-defined]
         classes = find_classes_in_module(test_module, base_class=BaseClass, include_imported=False)
-        assert len(classes) == 2  # BaseClass and SubClass
+        expected_number_of_classes = 2
+        assert len(classes) == expected_number_of_classes
         assert BaseClass in classes
         assert SubClass in classes
         assert UnrelatedClass not in classes
 
     def test_find_classes_exclude_imported(self):
         """Test that imported classes are excluded when include_imported=False."""
-        import types
-
         test_module = types.ModuleType("test_module")
 
         class LocalClass:
@@ -189,17 +183,16 @@ class TestFindClassesInModule:
 
         LocalClass.__module__ = test_module.__name__
         ImportedClass.__module__ = "other_module"
-        setattr(test_module, "LocalClass", LocalClass)
-        setattr(test_module, "ImportedClass", ImportedClass)
+        test_module.LocalClass = LocalClass  # type: ignore[attr-defined]
+        test_module.ImportedClass = ImportedClass  # type: ignore[attr-defined]
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
-        assert len(classes) == 1
+        expected_number_of_classes = 1
+        assert len(classes) == expected_number_of_classes
         assert LocalClass in classes
         assert ImportedClass not in classes
 
     def test_find_classes_include_imported(self):
         """Test that imported classes are included when include_imported=True."""
-        import types
-
         test_module = types.ModuleType("test_module")
 
         class LocalClass:
@@ -210,25 +203,23 @@ class TestFindClassesInModule:
 
         LocalClass.__module__ = test_module.__name__
         ImportedClass.__module__ = "other_module"
-        setattr(test_module, "LocalClass", LocalClass)
-        setattr(test_module, "ImportedClass", ImportedClass)
+        test_module.LocalClass = LocalClass  # type: ignore[attr-defined]
+        test_module.ImportedClass = ImportedClass  # type: ignore[attr-defined]
         classes = find_classes_in_module(test_module, base_class=None, include_imported=True)
-        assert len(classes) == 2
+        expected_number_of_classes = 2
+        assert len(classes) == expected_number_of_classes
         assert LocalClass in classes
         assert ImportedClass in classes
 
     def test_find_classes_empty_module(self):
         """Test finding classes in an empty module."""
-        import types
-
         test_module = types.ModuleType("test_module")
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
-        assert len(classes) == 0
+        expected_number_of_classes = 0
+        assert len(classes) == expected_number_of_classes
 
     def test_find_classes_with_functions_and_variables(self):
         """Test that functions and variables are not included in class search."""
-        import types
-
         test_module = types.ModuleType("test_module")
 
         class TestClass:
@@ -239,18 +230,17 @@ class TestFindClassesInModule:
         def test_function():
             pass
 
-        setattr(test_module, "TestClass", TestClass)
-        setattr(test_module, "test_function", test_function)
-        setattr(test_module, "some_variable", 42)
-        setattr(test_module, "some_string", "hello")
+        test_module.TestClass = TestClass  # type: ignore[attr-defined]
+        test_module.test_function = test_function  # type: ignore[attr-defined]
+        test_module.some_variable = 42  # type: ignore[attr-defined]
+        test_module.some_string = "hello"  # type: ignore[attr-defined]
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
-        assert len(classes) == 1
+        expected_number_of_classes = 1
+        assert len(classes) == expected_number_of_classes
         assert TestClass in classes
 
     def test_find_classes_with_nested_classes(self):
         """Test finding classes including nested classes."""
-        import types
-
         test_module = types.ModuleType("test_module")
 
         class OuterClass:
@@ -258,15 +248,14 @@ class TestFindClassesInModule:
                 pass
 
         OuterClass.__module__ = test_module.__name__
-        setattr(test_module, "OuterClass", OuterClass)
+        test_module.OuterClass = OuterClass  # type: ignore[attr-defined]
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
-        assert len(classes) == 1
+        expected_number_of_classes = 1
+        assert len(classes) == expected_number_of_classes
         assert OuterClass in classes
 
     def test_find_classes_with_builtin_types(self):
         """Test finding classes including user-defined types (not builtins, which can't be assigned __module__)."""
-        import types
-
         test_module = types.ModuleType("test_module")
 
         class MyClassA:
@@ -277,17 +266,15 @@ class TestFindClassesInModule:
 
         MyClassA.__module__ = test_module.__name__
         MyClassB.__module__ = test_module.__name__
-        setattr(test_module, "MyClassA", MyClassA)
-        setattr(test_module, "MyClassB", MyClassB)
+        test_module.MyClassA = MyClassA  # type: ignore[attr-defined]
+        test_module.MyClassB = MyClassB  # type: ignore[attr-defined]
         classes = find_classes_in_module(test_module, base_class=None, include_imported=False)
-        assert len(classes) == 2
+        expected_number_of_classes = 2
+        assert len(classes) == expected_number_of_classes
         assert MyClassA in classes
         assert MyClassB in classes
 
     def test_find_classes_with_base_class_and_imported(self):
-        """Test finding classes with base class filter and imported classes."""
-        import types
-
         test_module = types.ModuleType("test_module")
 
         class BaseClass:
@@ -302,16 +289,18 @@ class TestFindClassesInModule:
         BaseClass.__module__ = test_module.__name__
         LocalSubClass.__module__ = test_module.__name__
         ImportedSubClass.__module__ = "other_module"
-        setattr(test_module, "BaseClass", BaseClass)
-        setattr(test_module, "LocalSubClass", LocalSubClass)
-        setattr(test_module, "ImportedSubClass", ImportedSubClass)
+        test_module.BaseClass = BaseClass  # type: ignore[attr-defined]
+        test_module.LocalSubClass = LocalSubClass  # type: ignore[attr-defined]
+        test_module.ImportedSubClass = ImportedSubClass  # type: ignore[attr-defined]
         classes = find_classes_in_module(test_module, base_class=BaseClass, include_imported=False)
-        assert len(classes) == 2  # BaseClass and LocalSubClass
+        expected_number_of_classes = 2
+        assert len(classes) == expected_number_of_classes
         assert BaseClass in classes
         assert LocalSubClass in classes
         assert ImportedSubClass not in classes
         classes = find_classes_in_module(test_module, base_class=BaseClass, include_imported=True)
-        assert len(classes) == 3  # BaseClass, LocalSubClass, and ImportedSubClass
+        expected_number_of_classes = 3
+        assert len(classes) == expected_number_of_classes
         assert BaseClass in classes
         assert LocalSubClass in classes
         assert ImportedSubClass in classes

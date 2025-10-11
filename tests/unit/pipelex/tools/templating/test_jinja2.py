@@ -73,7 +73,7 @@ class TestRenderJinja2:
 
     @pytest.mark.parametrize("jinja2", JINJA2TestCases.JINJA2_FOR_STUFF)
     @pytest.mark.parametrize("prompting_style", JINJA2TestCases.STYLE)
-    @pytest.mark.parametrize("topic, any_object", JINJA2TestCases.ANY_OBJECT)
+    @pytest.mark.parametrize(("topic", "any_object"), JINJA2TestCases.ANY_OBJECT)
     async def test_render_jinja2_from_any_object(self, jinja2: str, prompting_style: PromptingStyle, topic: str, any_object: Any):
         temlating_context = {PLACE_HOLDER: any_object}
         log.verbose(f"Rendering Jinja2 for '{topic}' with style '{prompting_style}'")

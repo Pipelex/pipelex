@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -7,7 +6,7 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 class InferenceWorkerAbstract(ABC):
     def __init__(
         self,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         self.reporting_delegate = reporting_delegate
 

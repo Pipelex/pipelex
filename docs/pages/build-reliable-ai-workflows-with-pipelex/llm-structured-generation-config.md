@@ -17,7 +17,7 @@ class StructureConfig(ConfigModel):
 
 ```toml
 [pipelex.structure_config]
-is_default_text_then_structure = true
+is_default_text_then_structure = false  # Set to true for better results: generates text before structuring
 ```
 
 ## Processing Flow
@@ -36,7 +36,7 @@ The `is_default_text_then_structure` flag determines how LLM pipes generate stru
    ```
    Your job is to extract and structure information from a text.
    Here is the text:
-   {preliminary_text}
+   {{ preliminary_text|tag("text") }}
 
    Now generate the JSON in the required format.
    Do not create information that is not in the text.

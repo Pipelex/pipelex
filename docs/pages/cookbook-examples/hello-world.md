@@ -17,7 +17,7 @@ The `hello_world` function demonstrates the simplest possible Pipelex pipeline. 
 ```python
 import asyncio
 
-from pipelex import pretty_print
+from pipelex.tools.misc.pretty import pretty_print
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
@@ -41,13 +41,13 @@ asyncio.run(hello_world())
 
 This example shows the minimal setup needed to run a Pipelex pipeline: initialize Pipelex, execute a pipeline by its code name, and pretty-print the results.
 
-## The Pipeline Definition: `hello_world.toml`
+## The Pipeline Definition: `hello_world.plx`
 
 The pipeline definition is extremely simple - it's a single LLM call that generates a haiku:
 
-```toml
+```plx
 domain = "quick_start"
-definition = "Discovering Pipelex"
+description = "Discovering Pipelex"
 
 [pipe]
 [pipe.hello_world]

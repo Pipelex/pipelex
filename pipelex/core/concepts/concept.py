@@ -1,10 +1,9 @@
-from typing import Optional
-
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex import log
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_native import NativeConceptManager
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -17,9 +16,9 @@ class Concept(BaseModel):
 
     code: str
     domain: str
-    definition: str
+    description: str
     structure_class_name: str
-    refines: Optional[str] = None
+    refines: str | None = None
 
     @property
     def concept_string(self) -> str:
@@ -28,20 +27,23 @@ class Concept(BaseModel):
     @classmethod
     def is_implicit_concept(cls, concept_string: str) -> bool:
         ConceptBlueprint.validate_concept_string(concept_string=concept_string)
-        return concept_string.startswith(SpecialDomain.IMPLICIT.value)
+        return concept_string.startswith(SpecialDomain.IMPLICIT)
 
     @field_validator("code")
-    def validate_code(cls, code: str) -> str:
+    @staticmethod
+    def validate_code(code: str) -> str:
         ConceptBlueprint.validate_concept_code(concept_code=code)
         return code
 
     @field_validator("domain")
-    def validate_domain(cls, domain: str) -> str:
+    @staticmethod
+    def validate_domain(domain: str) -> str:
         DomainBlueprint.validate_domain_code(code=domain)
         return domain
 
     @field_validator("refines", mode="before")
-    def validate_refines(cls, refines: Optional[str]) -> Optional[str]:
+    @staticmethod
+    def validate_refines(refines: str | None) -> str | None:
         if refines is None:
             return None
         ConceptBlueprint.validate_concept_string(concept_string=refines)
@@ -53,7 +55,7 @@ class Concept(BaseModel):
 
     @classmethod
     def is_native_concept(cls, concept: "Concept") -> bool:
-        return ConceptBlueprint.is_native_concept_string_or_concept_code(concept_string_or_concept_code=concept.concept_string)
+        return NativeConceptManager.is_native_concept(concept_string_or_code=concept.concept_string)
 
     @classmethod
     def are_concept_compatible(cls, concept_1: "Concept", concept_2: "Concept", strict: bool = False) -> bool:
@@ -71,16 +73,15 @@ class Concept(BaseModel):
             if strict:
                 # Check if classes are equivalent (same fields, types, descriptions)
                 return ClassRegistryUtils.are_classes_equivalent(concept_1_class, concept_2_class)
-            else:
-                # Check if concept_1 is a subclass of concept_2
-                try:
-                    if issubclass(concept_1_class, concept_2_class):
-                        return True
-                except TypeError:
-                    pass
+            # Check if concept_1 is a subclass of concept_2
+            try:
+                if issubclass(concept_1_class, concept_2_class):
+                    return True
+            except TypeError:
+                pass
 
-                # Check if concept_1 has a field that is of type concept_2_class
-                return ClassRegistryUtils.has_compatible_field(concept_1_class, concept_2_class)
+            # Check if concept_1 has compatible fields with concept_2
+            return ClassRegistryUtils.has_compatible_field(concept_1_class, concept_2_class)
         return False
 
     @classmethod
@@ -88,8 +89,7 @@ class Concept(BaseModel):
         # We get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
         if KajsonManager.get_class_registry().has_subclass(name=structure_class_name, base_class=StuffContent):
             return True
-        else:
-            # We get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
-            if KajsonManager.get_class_registry().has_class(name=structure_class_name):
-                log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
-            return False
+        # We get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
+        if KajsonManager.get_class_registry().has_class(name=structure_class_name):
+            log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
+        return False

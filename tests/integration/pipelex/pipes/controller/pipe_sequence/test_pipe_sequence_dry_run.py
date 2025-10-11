@@ -1,29 +1,29 @@
-"""Dry run tests for PipeSequence controller with batching functionality."""
+from typing import TYPE_CHECKING
 
 import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipe_router, get_report_delegate
+from pipelex.hub import get_pipe_router, get_required_pipe
+from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.json_utils import load_json_list_from_path
 from tests.test_pipelines.discord_newsletter import ChannelSummary, DiscordChannelUpdate
+
+if TYPE_CHECKING:
+    from pipelex.core.memory.working_memory import WorkingMemory
+    from pipelex.core.stuffs.stuff import Stuff
 
 
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeSequenceDryRun:
-    """Test PipeSequence dry run functionality with batching."""
-
     async def test_discord_newsletter_dry_run_working_memory(
         self,
         request: FixtureRequest,
@@ -31,12 +31,11 @@ class TestPipeSequenceDryRun:
     ) -> None:
         """Test that the Discord newsletter pipeline creates correct working memory with ListContent for batched inputs."""
         # Load the discord channel updates data from JSON
-        DISCORD_EXTRACT_PATH = "tests/data/discord_newsletter/discord_sample.json"
-        discord_channel_updates_data = load_json_list_from_path(DISCORD_EXTRACT_PATH)
+        discord_channel_updates_data = load_json_list_from_path(path="tests/data/discord_newsletter/discord_sample.json")
 
         # Create structured DiscordChannelUpdate objects
         discord_channel_updates = ListContent[DiscordChannelUpdate](
-            items=[DiscordChannelUpdate.model_validate(article_data) for article_data in discord_channel_updates_data]
+            items=[DiscordChannelUpdate.model_validate(article_data) for article_data in discord_channel_updates_data],
         )
 
         # Create Stuff object for the discord channel updates list
@@ -44,7 +43,7 @@ class TestPipeSequenceDryRun:
             concept=ConceptFactory.make(
                 concept_code="DiscordChannelUpdate",
                 domain="discord_newsletter",
-                definition="Lorem Ipsum",
+                description="Lorem Ipsum",
                 structure_class_name="DiscordChannelUpdate",
             ),
             content=discord_channel_updates,
@@ -54,16 +53,17 @@ class TestPipeSequenceDryRun:
         # Create working memory with the discord channel updates
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=discord_updates_stuff)
         # Run the Discord newsletter pipeline in dry run mode
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code="write_discord_newsletter",
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
-            working_memory=working_memory,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+        pipe_output = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code="write_discord_newsletter"),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+                working_memory=working_memory,
+                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            ),
         )
 
         # Log output for debugging
         pretty_print(pipe_output, title="Discord Newsletter Dry Run Output")
-        get_report_delegate().generate_report()
 
         # Basic assertions
         assert pipe_output is not None

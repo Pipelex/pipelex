@@ -1,14 +1,13 @@
+from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
-from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional, ParamSpec, Protocol, Type, TypeVar
+from typing import Any, ParamSpec, Protocol, TypeVar
 
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams
-from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
+from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
+from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
@@ -28,10 +27,12 @@ def update_job_metadata(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P
         # Attempt to get job_metadata from kwargs or from args
         job_metadata = kwargs.get("job_metadata")
         if job_metadata is None:
-            raise RuntimeError("job_metadata argument is required for this decorated function.")
+            msg = "job_metadata argument is required for this decorated function."
+            raise RuntimeError(msg)
 
         if not isinstance(job_metadata, JobMetadata):
-            raise TypeError("The job_metadata argument must be of type JobMetadata.")
+            msg = "The job_metadata argument must be of type JobMetadata."
+            raise TypeError(msg)
 
         updated_metadata = JobMetadata(
             content_generation_job_id=func.__name__,
@@ -54,7 +55,7 @@ class ContentGeneratorProtocol(Protocol):
     async def make_object_direct(
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar: ...
@@ -62,58 +63,58 @@ class ContentGeneratorProtocol(Protocol):
     async def make_text_then_object(
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_main: LLMSetting,
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object: Optional[LLMPromptFactoryAbstract] = None,
+        llm_prompt_factory_for_object: LLMPromptFactoryAbstract | None = None,
     ) -> BaseModelTypeVar: ...
 
     async def make_object_list_direct(
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
-        nb_items: Optional[int] = None,
-    ) -> List[BaseModelTypeVar]: ...
+        nb_items: int | None = None,
+    ) -> list[BaseModelTypeVar]: ...
 
     async def make_text_then_object_list(
         self,
         job_metadata: JobMetadata,
-        object_class: Type[BaseModelTypeVar],
+        object_class: type[BaseModelTypeVar],
         llm_setting_main: LLMSetting,
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
-        llm_prompt_factory_for_object_list: Optional[LLMPromptFactoryAbstract] = None,
-        nb_items: Optional[int] = None,
-    ) -> List[BaseModelTypeVar]: ...
+        llm_prompt_factory_for_object_list: LLMPromptFactoryAbstract | None = None,
+        nb_items: int | None = None,
+    ) -> list[BaseModelTypeVar]: ...
 
     async def make_single_image(
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
-        imgg_prompt: ImggPrompt,
-        imgg_job_params: Optional[ImggJobParams] = None,
-        imgg_job_config: Optional[ImggJobConfig] = None,
+        img_gen_handle: str,
+        img_gen_prompt: ImgGenPrompt,
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> GeneratedImage: ...
 
     async def make_image_list(
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
-        imgg_prompt: ImggPrompt,
+        img_gen_handle: str,
+        img_gen_prompt: ImgGenPrompt,
         nb_images: int,
-        imgg_job_params: Optional[ImggJobParams] = None,
-        imgg_job_config: Optional[ImggJobConfig] = None,
-    ) -> List[GeneratedImage]: ...
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
+    ) -> list[GeneratedImage]: ...
 
     async def make_jinja2_text(
         self,
-        context: Dict[str, Any],
-        jinja2_name: Optional[str] = None,
-        jinja2: Optional[str] = None,
-        prompting_style: Optional[PromptingStyle] = None,
+        context: dict[str, Any],
+        jinja2_name: str | None = None,
+        jinja2: str | None = None,
+        prompting_style: PromptingStyle | None = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
     ) -> str: ...
 
@@ -121,7 +122,7 @@ class ContentGeneratorProtocol(Protocol):
         self,
         job_metadata: JobMetadata,
         ocr_input: OcrInput,
-        ocr_handle: OcrHandle,
+        ocr_handle: str,
         ocr_job_params: OcrJobParams,
         ocr_job_config: OcrJobConfig,
     ) -> OcrOutput: ...

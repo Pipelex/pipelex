@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pipelex.tools.exceptions import ToolException
 
 
@@ -23,7 +21,7 @@ class Jinja2DetectVariablesError(ToolException):
     pass
 
 
-def make_jinja2_error_explanation(jinja2_name: Optional[str], template_text: Optional[str]) -> str:
+def make_jinja2_error_explanation(jinja2_name: str | None, template_text: str | None) -> str:
     explanation = ""
     if jinja2_name:
         explanation += f"\nJinja2 name: '{jinja2_name}'\n"

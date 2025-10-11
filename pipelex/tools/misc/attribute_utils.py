@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Union
+from typing import Any, ClassVar
 
 
 class AttributePolisher:
@@ -25,19 +25,17 @@ class AttributePolisher:
         if not isinstance(value, (str, bytes)):
             return False
 
-        if name == "base_64" and len(value) > cls.base_64_truncate_length:
-            return True
-        elif name == "url" and isinstance(value, str) and value.startswith("data:image/") and len(value) > cls.url_truncate_length:
-            return True
-        return False
+        return (name == "base_64" and len(value) > cls.base_64_truncate_length) or (
+            name == "url" and isinstance(value, str) and value.startswith("data:image/") and len(value) > cls.url_truncate_length
+        )
 
     @classmethod
-    def get_truncated_value(cls, name: str, value: Union[str, bytes]) -> Union[str, bytes]:
+    def get_truncated_value(cls, name: str, value: str | bytes) -> str | bytes:
         """Get the truncated value based on the field name and value type."""
         if isinstance(value, bytes):
             return cls._truncate_bytes(value, cls.base_64_truncate_length)
-        elif name == "base_64":
+        if name == "base_64":
             return cls._truncate_string(value, cls.base_64_truncate_length)
-        elif name == "url" and value.startswith("data:image/"):
+        if name == "url" and value.startswith("data:image/"):
             return cls._truncate_string(value, cls.url_truncate_length)
         return value

@@ -1,42 +1,51 @@
 import inspect
-from typing import Any, Callable, Dict, List, Tuple, Type
+from collections.abc import Callable
+from typing import Any
 
 from instructor import OpenAISchema, openai_schema
 from openai.types.chat import ChatCompletionMessage
 from pydantic import BaseModel, create_model
 
 
-def create_pydantic_model_from_function(func: Callable[..., Any]) -> Type[BaseModel]:
-    """
-    Creates a Pydantic BaseModel from a function's signature.
+def create_pydantic_model_from_function(func: Callable[..., Any]) -> type[BaseModel]:
+    """Create a Pydantic BaseModel from a function's signature.
 
-    Parameters:
-        func (Callable): The function from which to derive the BaseModel.
+    Args:
+        func: The function to inspect. Its parameters become model fields.
 
     Returns:
-        Type[BaseModel]: A dynamically created Pydantic BaseModel class.
+        type[BaseModel]: A dynamically created Pydantic model class.
+
+    Raises:
+        ValueError: If the function has unsupported parameter kinds.
+
     """
     sig = inspect.signature(func)
-    fields: Dict[str, Tuple[Type[Any], Any]] = {
+    fields: dict[str, tuple[type[Any], Any]] = {
         name: (param.annotation, param.default if param.default is not inspect.Parameter.empty else ...) for name, param in sig.parameters.items()
     }
     model_name = func.__name__
-    return create_model(__model_name=model_name, **fields)  # type: ignore
+    return create_model(__model_name=model_name, **fields)  # type: ignore[name-defined,call-overload,no-any-return] # pyright: ignore[reportCallIssue, reportUnknownVariableType]
 
 
-def create_openai_schema_from_function(func: Callable[..., Any]) -> Dict[str, Any]:
-    """
-    Creates an OpenAI schema from a function.
+def create_openai_schema_from_function(func: Callable[..., Any]) -> dict[str, Any]:
+    """Creates an OpenAI schema from a function.
 
-    Parameters:
-        func (Callable): The function from which to derive the OpenAI schema.
+    Parameters
+    ----------
+    func : Callable[..., Any]
+        The Python function to introspect and convert into an OpenAI tool schema.
 
     Returns:
-        Dict[str, Any]: The OpenAI schema as a dictionary.
+    -------
+    dict[str, Any]
+        The OpenAI-compatible schema describing the function's name, description,
+        and parameters.
+
     """
-    model: Type[BaseModel] = create_pydantic_model_from_function(func)
+    model: type[BaseModel] = create_pydantic_model_from_function(func)
     the_openai_schema: OpenAISchema = openai_schema(model)
-    as_openai_schema: Dict[str, Any] = the_openai_schema.openai_schema
+    as_openai_schema: dict[str, Any] = the_openai_schema.openai_schema
 
     # replace description using first non-empty line of func.__doc__ description
     if func.__doc__:
@@ -47,10 +56,10 @@ def create_openai_schema_from_function(func: Callable[..., Any]) -> Dict[str, An
     return as_openai_schema
 
 
-def list_openai_tools(openai_message: ChatCompletionMessage) -> List[str]:
+def list_openai_tools(openai_message: ChatCompletionMessage) -> list[str]:
     if not openai_message.tool_calls:
         return []
-    tools: List[str] = []
+    tools: list[str] = []
     for tool_call in openai_message.tool_calls:
         if tool_call.type == "function":
             tools.append(tool_call.function.name)

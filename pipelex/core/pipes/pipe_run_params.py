@@ -1,11 +1,13 @@
-from typing import Any, Dict, List, Optional, Union
+from __future__ import annotations
+
+from typing import Any, Union
 
 from pydantic import BaseModel, Field, field_validator
-from typing_extensions import Self
 
 from pipelex import log
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
-from pipelex.types import StrEnum
+from pipelex.exceptions import BatchParamsError
+from pipelex.types import Self, StrEnum
 
 
 class PipeRunParamKey(StrEnum):
@@ -24,23 +26,21 @@ PipeOutputMultiplicity = Union[bool, int]
 
 
 class OutputMultiplicityResolution(BaseModel):
-    """
-    Result of resolving output multiplicity settings between base and override values.
+    """Result of resolving output multiplicity settings between base and override values.
 
     This model provides a clear, structured representation of how output multiplicity
     should be applied, replacing the previous tuple-based return format.
     """
 
-    resolved_multiplicity: Optional[PipeOutputMultiplicity] = Field(description="The final multiplicity value to use after resolution")
+    resolved_multiplicity: PipeOutputMultiplicity | None = Field(description="The final multiplicity value to use after resolution")
 
-    enable_multiple_outputs: bool = Field(description="Whether multiple outputs should be generated")
+    is_multiple_outputs_enabled: bool = Field(description="Whether multiple outputs should be generated")
 
-    specific_output_count: Optional[int] = Field(default=None, description="Exact number of outputs to generate, if specified")
+    specific_output_count: int | None = Field(default=None, description="Exact number of outputs to generate, if specified")
 
 
-def make_output_multiplicity(nb_output: Optional[int], multiple_output: Optional[bool]) -> Optional[PipeOutputMultiplicity]:
-    """
-    This function takes two mutually exclusive parameters that control how many outputs
+def make_output_multiplicity(nb_output: int | None, multiple_output: bool | None) -> PipeOutputMultiplicity | None:
+    """This function takes two mutually exclusive parameters that control how many outputs
     a pipe should generate and converts them into a single PipeOutputMultiplicity type.
 
     Args:
@@ -58,8 +58,9 @@ def make_output_multiplicity(nb_output: Optional[int], multiple_output: Optional
         None
         >>> make_output_multiplicity(nb_output=0, multiple_output=True)
         True
+
     """
-    output_multiplicity: Optional[PipeOutputMultiplicity]
+    output_multiplicity: PipeOutputMultiplicity | None
     if nb_output:
         output_multiplicity = nb_output
     elif multiple_output:
@@ -70,11 +71,10 @@ def make_output_multiplicity(nb_output: Optional[int], multiple_output: Optional
 
 
 def output_multiplicity_to_apply(
-    base_multiplicity: Optional[PipeOutputMultiplicity],
-    override_multiplicity: Optional[PipeOutputMultiplicity],
+    base_multiplicity: PipeOutputMultiplicity | None,
+    override_multiplicity: PipeOutputMultiplicity | None,
 ) -> OutputMultiplicityResolution:
-    """
-    Resolve output multiplicity settings by combining base configuration with override.
+    """Resolve output multiplicity settings by combining base configuration with override.
 
     This function implements a priority system where override values take precedence over
     base values, with clear logic to handle different type combinations and return
@@ -113,6 +113,7 @@ def output_multiplicity_to_apply(
         >>> result = output_multiplicity_to_apply(3, None)
         >>> (result.resolved_multiplicity, result.enable_multiple_outputs, result.specific_output_count)
         (3, True, 3)
+
     """
     log.debug(f"base_multiplicity = {base_multiplicity}")
     log.debug(f"override_multiplicity = {override_multiplicity}")
@@ -124,16 +125,22 @@ def output_multiplicity_to_apply(
         if isinstance(base_multiplicity, bool):
             log.debug("base_multiplicity is bool")
             return OutputMultiplicityResolution(
-                resolved_multiplicity=base_multiplicity, enable_multiple_outputs=base_multiplicity, specific_output_count=None
+                resolved_multiplicity=base_multiplicity,
+                is_multiple_outputs_enabled=base_multiplicity,
+                specific_output_count=None,
             )
         elif isinstance(base_multiplicity, int):
             log.debug("base_multiplicity is int")
             return OutputMultiplicityResolution(
-                resolved_multiplicity=base_multiplicity, enable_multiple_outputs=True, specific_output_count=base_multiplicity
+                resolved_multiplicity=base_multiplicity,
+                is_multiple_outputs_enabled=True,
+                specific_output_count=base_multiplicity,
             )
         else:
             log.debug("base_multiplicity is None")
-            return OutputMultiplicityResolution(resolved_multiplicity=base_multiplicity, enable_multiple_outputs=False, specific_output_count=None)
+            return OutputMultiplicityResolution(
+                resolved_multiplicity=base_multiplicity, is_multiple_outputs_enabled=False, specific_output_count=None
+            )
 
     # Case 2: Override is a boolean
     elif isinstance(override_multiplicity, bool):
@@ -144,23 +151,25 @@ def output_multiplicity_to_apply(
 
             if isinstance(base_multiplicity, bool):
                 log.debug("base_multiplicity is bool - disregarding base, using True")
-                return OutputMultiplicityResolution(resolved_multiplicity=True, enable_multiple_outputs=True, specific_output_count=None)
+                return OutputMultiplicityResolution(resolved_multiplicity=True, is_multiple_outputs_enabled=True, specific_output_count=None)
             else:
                 log.debug("base_multiplicity is int or None - preserving base value")
                 return OutputMultiplicityResolution(
                     resolved_multiplicity=base_multiplicity,
-                    enable_multiple_outputs=True,
+                    is_multiple_outputs_enabled=True,
                     specific_output_count=base_multiplicity if isinstance(base_multiplicity, int) else None,
                 )
         else:
             log.debug("override_multiplicity is False - forcing single output")
-            return OutputMultiplicityResolution(resolved_multiplicity=False, enable_multiple_outputs=False, specific_output_count=None)
+            return OutputMultiplicityResolution(resolved_multiplicity=False, is_multiple_outputs_enabled=False, specific_output_count=None)
 
-    # Case 3: Override is an integer
     else:
+        # Case 3: Override is an integer
         log.debug("override_multiplicity is int - using override value")
         return OutputMultiplicityResolution(
-            resolved_multiplicity=override_multiplicity, enable_multiple_outputs=True, specific_output_count=override_multiplicity
+            resolved_multiplicity=override_multiplicity,
+            is_multiple_outputs_enabled=True,
+            specific_output_count=override_multiplicity,
         )
 
 
@@ -171,25 +180,23 @@ class BatchParams(BaseModel):
     @classmethod
     def make_optional_batch_params(
         cls,
-        input_list_name: Union[bool, str],
-        input_item_name: Optional[str] = None,
-    ) -> Optional["BatchParams"]:
-        the_batch_params: Optional[BatchParams] = None
-        if input_list_name or input_item_name:
-            input_list_stuff_name: str
-            if isinstance(input_list_name, str):
-                input_list_stuff_name = input_list_name
-            else:
-                input_list_stuff_name = MAIN_STUFF_NAME
+        input_list_name: str | None,
+        input_item_name: str | None,
+    ) -> BatchParams | None:
+        if input_list_name:
             input_item_stuff_name = input_item_name or BATCH_ITEM_STUFF_NAME
-            the_batch_params = BatchParams(
-                input_list_stuff_name=input_list_stuff_name,
+            return BatchParams(
+                input_list_stuff_name=input_list_name,
                 input_item_stuff_name=input_item_stuff_name,
             )
-        return the_batch_params
+        elif input_item_name:
+            msg = "input_item_name is required when input_list_name is not provided"
+            raise BatchParamsError(msg)
+        else:
+            return None
 
     @classmethod
-    def make_default(cls) -> "BatchParams":
+    def make_default(cls) -> BatchParams:
         return BatchParams(
             input_list_stuff_name=MAIN_STUFF_NAME,
             input_item_stuff_name=BATCH_ITEM_STUFF_NAME,
@@ -198,26 +205,27 @@ class BatchParams(BaseModel):
 
 class PipeRunParams(BaseModel):
     run_mode: PipeRunMode = PipeRunMode.LIVE
-    final_stuff_code: Optional[str] = None
-    is_with_preliminary_text: Optional[bool] = None
-    output_multiplicity: Optional[PipeOutputMultiplicity] = None
-    dynamic_output_concept_code: Optional[str] = None
-    batch_params: Optional[BatchParams] = None
-    params: Dict[str, Any] = Field(default_factory=dict)
+    final_stuff_code: str | None = None
+    is_with_preliminary_text: bool | None = None
+    output_multiplicity: PipeOutputMultiplicity | None = None
+    dynamic_output_concept_code: str | None = None
+    batch_params: BatchParams | None = None
+    params: dict[str, Any] = Field(default_factory=dict)
 
     pipe_stack_limit: int
-    pipe_stack: List[str] = Field(default_factory=list)
-    pipe_layers: List[str] = Field(default_factory=list)
+    pipe_stack: list[str] = Field(default_factory=list)
+    pipe_layers: list[str] = Field(default_factory=list)
 
     @field_validator("params")
     @classmethod
-    def validate_param_keys(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_param_keys(cls, value: dict[str, Any]) -> dict[str, Any]:
         for key in value:
             if key == PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT:
                 # TODO: validate the concept code
                 pass
             if not key.startswith("_"):
-                raise ValueError(f"Parameter key '{key}' must start with an underscore '_'")
+                msg = f"Parameter key '{key}' must start with an underscore '_'"
+                raise ValueError(msg)
         return value
 
     def make_deep_copy(self) -> Self:
@@ -230,11 +238,10 @@ class PipeRunParams(BaseModel):
     def copy_by_injecting_multiplicity(
         cls,
         pipe_run_params: Self,
-        applied_output_multiplicity: Optional[PipeOutputMultiplicity],
-        is_with_preliminary_text: Optional[bool] = None,
+        applied_output_multiplicity: PipeOutputMultiplicity | None,
+        is_with_preliminary_text: bool | None = None,
     ) -> Self:
-        """
-        Copy the run params the nb_output into the params, and remove the attribute.
+        """Copy the run params the nb_output into the params, and remove the attribute.
         This is useful to make a single prompt with multiple outputs.
         """
         new_run_params = pipe_run_params.model_copy()

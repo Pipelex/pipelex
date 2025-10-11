@@ -1,6 +1,5 @@
 import re
 import textwrap
-from typing import Dict, List, Optional, Union
 
 import pytest
 from pydantic import BaseModel, Field
@@ -13,22 +12,22 @@ class Address(BaseModel):
     street: str
     city: str
     country: str
-    postal_code: Optional[str] = None
+    postal_code: str | None = None
 
 
 class UserPreferences(BaseModel):
     theme: str = "dark"
     notifications: bool = True
-    tags: List[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
 
 class ComplexUser(BaseModel):
     name: str
     age: int
-    email: Optional[str]
-    addresses: List[Address]
+    email: str | None
+    addresses: list[Address]
     preferences: UserPreferences
-    metadata: Dict[str, Union[str, int, bool]] = Field(default_factory=dict)
+    metadata: dict[str, str | int | bool] = Field(default_factory=dict)
 
 
 def remove_ansi_escape_codes(text: str) -> str:

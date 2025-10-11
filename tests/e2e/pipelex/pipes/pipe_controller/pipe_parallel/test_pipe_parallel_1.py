@@ -6,11 +6,11 @@ from pytest import FixtureRequest
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipe_router, get_report_delegate
+from pipelex.hub import get_pipe_router, get_required_pipe
+from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.test_pipelines.pipe_controllers.pipe_parallel.pipe_parallel import ContentAnalysis, DocumentInput, LengthAnalysis
 
@@ -40,7 +40,7 @@ class TestPipeParallelDocumentAnalysis:
             concept=ConceptFactory.make(
                 concept_code="DocumentInput",
                 domain="test_pipe_parallel",
-                definition="test_pipe_parallel.DocumentInput",
+                description="test_pipe_parallel.DocumentInput",
                 structure_class_name="DocumentInput",
             ),
             content=document_input,
@@ -51,16 +51,17 @@ class TestPipeParallelDocumentAnalysis:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff)
 
         # Run the pipe
-        pipe_output: PipeOutput = await get_pipe_router().run_pipe_code(
-            pipe_code="parallel_document_analysis",
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            working_memory=working_memory,
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+        pipe_output = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code="parallel_document_analysis"),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+                working_memory=working_memory,
+                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            ),
         )
 
         # Log output and generate report
         pretty_print(pipe_output, title="PipeParallel document analysis test")
-        get_report_delegate().generate_report()
 
         # Basic assertions
         assert pipe_output is not None
@@ -79,8 +80,8 @@ class TestPipeParallelDocumentAnalysis:
         assert hasattr(combined_analysis, "content_result")
 
         # Verify that both analyses contain meaningful content
-        length_analysis = cast(LengthAnalysis, length_result_stuff.content)
-        content_analysis = cast(ContentAnalysis, content_result_stuff.content)
+        length_analysis = cast("LengthAnalysis", length_result_stuff.content)
+        content_analysis = cast("ContentAnalysis", content_result_stuff.content)
 
         assert isinstance(length_analysis.analysis, str)
         assert isinstance(content_analysis.analysis, str)

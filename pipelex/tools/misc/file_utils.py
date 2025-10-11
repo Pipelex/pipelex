@@ -2,7 +2,6 @@ import importlib.resources
 import os
 import shutil
 from pathlib import Path
-from typing import List, Optional
 
 ########################################################
 # Save & Load
@@ -10,15 +9,17 @@ from typing import List, Optional
 
 
 def save_bytes_to_binary_file(file_path: str, byte_data: bytes, create_directory: bool = False) -> str:
-    """
-    Write binary data to a file.
+    """Write binary data to a file.
 
     Args:
         file_path (str): Path where the binary data will be saved
         byte_data (bytes): Binary data to be written
+        create_directory (bool, optional): Whether to create the directory if it doesn't exist.
+            Defaults to False.
 
     Returns:
         str: Path to the saved file
+
     """
     # Ensure the directory exists
     if create_directory:
@@ -30,8 +31,7 @@ def save_bytes_to_binary_file(file_path: str, byte_data: bytes, create_directory
 
 
 def save_text_to_path(text: str, path: str, create_directory: bool = False):
-    """
-    Writes text content to a file at the specified path.
+    """Writes text content to a file at the specified path.
 
     This function opens a file in write mode and writes the provided text to it.
     If the file already exists, it will be overwritten.
@@ -44,6 +44,7 @@ def save_text_to_path(text: str, path: str, create_directory: bool = False):
 
     Raises:
         IOError: If there are issues writing to the file (e.g., permission denied).
+
     """
     if create_directory:
         directory = os.path.dirname(path)
@@ -55,8 +56,7 @@ def save_text_to_path(text: str, path: str, create_directory: bool = False):
 
 
 def load_text_from_path(path: str) -> str:
-    """
-    Reads and returns the entire contents of a text file.
+    """Reads and returns the entire contents of a text file.
 
     This function opens a file in text mode using UTF-8 encoding and reads
     its entire contents into a string.
@@ -69,14 +69,14 @@ def load_text_from_path(path: str) -> str:
 
     Raises:
         FileNotFoundError: If the file does not exist.
+
     """
     with open(path, encoding="utf-8") as file:
         return file.read()
 
 
-def failable_load_text_from_path(path: str) -> Optional[str]:
-    """
-    Attempts to read a text file, returning None if the file doesn't exist.
+def failable_load_text_from_path(path: str) -> str | None:
+    """Attempts to read a text file, returning None if the file doesn't exist.
 
     This function is a safer version of load_text_from_path that handles missing files
     gracefully by returning None instead of raising an error.
@@ -86,6 +86,7 @@ def failable_load_text_from_path(path: str) -> Optional[str]:
 
     Returns:
         Optional[str]: The complete contents of the file as a string, or None if the file doesn't exist.
+
     """
     if not path_exists(path):
         return None
@@ -98,8 +99,7 @@ def failable_load_text_from_path(path: str) -> Optional[str]:
 
 
 def copy_file(source_path: str, target_path: str, overwrite: bool = True) -> None:
-    """
-    Copies a file from the source path to the target path.
+    """Copies a file from the source path to the target path.
 
     Creates any necessary parent directories for the target path if they don't exist.
 
@@ -107,6 +107,7 @@ def copy_file(source_path: str, target_path: str, overwrite: bool = True) -> Non
         source_path (str): The path to the source file.
         target_path (str): The path to the target file.
         overwrite (bool, optional): Whether to overwrite existing files. Defaults to True.
+
     """
     # Ensure the target directory exists
     target_dir = os.path.dirname(target_path)
@@ -123,9 +124,7 @@ def copy_file_from_package(
     target_path: str,
     overwrite: bool = True,
 ) -> None:
-    """
-    Copies a file from a package to a target directory.
-    """
+    """Copies a file from a package to a target directory."""
     file_path = str(importlib.resources.files(package_name).joinpath(file_path_in_package))
     copy_file(
         source_path=file_path,
@@ -139,10 +138,9 @@ def copy_folder_from_package(
     folder_path_in_package: str,
     target_dir: str,
     overwrite: bool = True,
-    non_overwrite_files: Optional[List[str]] = None,
+    non_overwrite_files: list[str] | None = None,
 ) -> None:
-    """
-    Copies a folder from a package to a target directory.
+    """Copies a folder from a package to a target directory.
 
     This function walks through the specified folder in the package and copies
     all files and directories to the target directory, preserving the directory
@@ -153,6 +151,8 @@ def copy_folder_from_package(
         folder_path_in_package (str): The path to the folder in the package to copy.
         target_dir (str): The target directory to copy the folder to.
         overwrite (bool, optional): Whether to overwrite existing files. Defaults to True.
+        non_overwrite_files (Optional[List[str]], optional): List of files to not overwrite. Defaults to None.
+
     """
     os.makedirs(target_dir, exist_ok=True)
 
@@ -177,7 +177,7 @@ def copy_folder_from_package(
             dest_file = os.path.join(target_subdir, file)
 
             # Check if the file exists and respect the overwrite parameter
-            if not os.path.exists(dest_file) or (overwrite and file not in non_overwrite_files):
+            if not Path(dest_file).exists() or (overwrite and file not in non_overwrite_files):
                 copy_file(
                     source_path=src_file,
                     target_path=dest_file,
@@ -187,8 +187,7 @@ def copy_folder_from_package(
 
 
 def remove_file(file_path: str):
-    """
-    Removes a file if it exists at the specified path.
+    """Removes a file if it exists at the specified path.
 
     This function checks if a file exists before attempting to remove it,
     preventing errors from trying to remove non-existent files.
@@ -198,22 +197,23 @@ def remove_file(file_path: str):
 
     Note:
         This function silently succeeds if the file doesn't exist.
+
     """
     if path_exists(file_path):
-        os.remove(file_path)
+        Path(file_path).unlink()
 
 
 def remove_folder(folder_path: str) -> None:
-    """
-    Removes a folder if it exists at the specified path.
+    """Removes a folder if it exists at the specified path.
 
     This function checks if a folder exists before attempting to remove it,
     preventing errors from trying to remove non-existent folders.
 
     Args:
         folder_path (str): The path to the folder to be removed.
+
     """
-    if os.path.exists(folder_path):
+    if Path(folder_path).exists():
         shutil.rmtree(folder_path)
 
 
@@ -223,18 +223,17 @@ def remove_folder(folder_path: str) -> None:
 
 
 def ensure_directory_exists(directory_path: str) -> None:
-    """
-    Creates a directory and any necessary parent directories if they don't exist.
+    """Creates a directory and any necessary parent directories if they don't exist.
 
     Args:
         directory_path (str): The path to the directory to create.
+
     """
-    os.makedirs(directory_path, exist_ok=True)
+    Path(directory_path).mkdir(parents=True, exist_ok=True)
 
 
 def ensure_path(path: str) -> bool:
-    """
-    Ensures a directory exists at the specified path, creating it if necessary.
+    """Ensures a directory exists at the specified path, creating it if necessary.
 
     This function checks if a directory exists at the given path. If it doesn't exist,
     it creates the directory and any necessary parent directories.
@@ -244,17 +243,25 @@ def ensure_path(path: str) -> bool:
 
     Returns:
         bool: True if the directory was created, False if it already existed.
+
     """
-    typed_path = Path(path)
-    if typed_path.exists():
+    if Path(path).exists():
         return False
-    typed_path.mkdir(parents=True, exist_ok=True)
+    Path(path).mkdir(parents=True, exist_ok=True)
     return True
 
 
-def path_exists(path_str: str) -> bool:
+def ensure_directory_for_file_path(file_path: str) -> None:
+    """Ensures a directory exists for the specified file path.
+
+    Args:
+        file_path (str): The path to the file.
     """
-    Checks if a file or directory exists at the specified path.
+    ensure_directory_exists(os.path.dirname(file_path))
+
+
+def path_exists(path_str: str) -> bool:
+    """Checks if a file or directory exists at the specified path.
 
     This function converts the input string path to a Path object and checks
     if anything exists at that location in the filesystem.
@@ -264,14 +271,13 @@ def path_exists(path_str: str) -> bool:
 
     Returns:
         bool: True if a file or directory exists at the path, False otherwise.
+
     """
-    path = Path(path_str)
-    return path.exists()
+    return Path(path_str).exists()
 
 
 def get_incremental_directory_path(base_path: str, base_name: str, start_at: int = 1) -> str:
-    """
-    Generates a unique directory path by incrementing a counter until an unused path is found.
+    """Generates a unique directory path by incrementing a counter until an unused path is found.
 
     This function creates a directory path in the format 'base_path/base_name_XX' where XX
     is a two-digit number that starts at start_at and increments until an unused path is found.
@@ -284,6 +290,7 @@ def get_incremental_directory_path(base_path: str, base_name: str, start_at: int
 
     Returns:
         str: The path to the newly created directory.
+
     """
     counter = start_at
     while True:
@@ -302,8 +309,7 @@ def get_incremental_file_path(
     start_at: int = 1,
     avoid_suffix_if_possible: bool = False,
 ) -> str:
-    """
-    Generates a unique file path by incrementing a counter until an unused path is found.
+    """Generates a unique file path by incrementing a counter until an unused path is found.
 
     This function creates a file path in the format 'base_path/base_name_XX.extension' where XX
     is a two-digit number that starts at start_at and increments until an unused path is found.
@@ -314,9 +320,11 @@ def get_incremental_file_path(
         base_name (str): The base name for the file (will be appended with _XX).
         extension (str): The file extension (without the dot).
         start_at (int, optional): The number to start counting from. Defaults to 1.
+        avoid_suffix_if_possible (bool, optional): If True, avoids adding a suffix if possible. Defaults to False.
 
     Returns:
         str: A unique file path that does not exist in the filesystem.
+
     """
     if avoid_suffix_if_possible:
         # try without adding the suffix
@@ -339,20 +347,19 @@ def get_incremental_file_path(
 ########################################################
 
 
-def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool) -> List[Path]:
-    """
-    Find files matching a pattern in a directory.
+def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool) -> list[Path]:
+    """Find files matching a pattern in a directory.
 
     Args:
         dir_path: Directory path to search in
         pattern: File pattern to match (e.g. "*.py")
-        recursive: Whether to search recursively in subdirectories
+        is_recursive: Whether to search recursively in subdirectories
 
     Returns:
         List of matching Path objects
+
     """
     path = Path(dir_path)
     if is_recursive:
         return list(path.rglob(pattern))
-    else:
-        return list(path.glob(pattern))
+    return list(path.glob(pattern))

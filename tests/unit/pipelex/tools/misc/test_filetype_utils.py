@@ -69,7 +69,7 @@ class TestDetectFileTypeFromPath:
         # Mock filetype.guess to return None (unrecognized file type)
         mock_filetype_guess = mocker.patch("filetype.guess", return_value=None)
 
-        with pytest.raises(FileTypeException, match="Could not identify file type of '/unknown/file.xyz'"):
+        with pytest.raises(FileTypeException, match=r"Could not identify file type of '/unknown/file\.xyz'"):
             detect_file_type_from_path("/unknown/file.xyz")
 
         mock_filetype_guess.assert_called_once_with("/unknown/file.xyz")
@@ -79,7 +79,7 @@ class TestDetectFileTypeFromPath:
         mock_filetype_guess = mocker.patch("filetype.guess", return_value=None)
 
         path = Path("/unknown/file.xyz")
-        with pytest.raises(FileTypeException, match="Could not identify file type of '/unknown/file.xyz'"):
+        with pytest.raises(FileTypeException, match=r"Could not identify file type of '/unknown/file\.xyz'"):
             detect_file_type_from_path(path)
 
         mock_filetype_guess.assert_called_once_with(path)
@@ -131,7 +131,8 @@ class TestDetectFileTypeFromBase64:
     def test_detect_file_type_from_base64_string_success(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
         mock_detect_bytes = mocker.patch(
-            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="gif", mime="image/gif")
+            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes",
+            return_value=FileType(extension="gif", mime="image/gif"),
         )
 
         # GIF header encoded in base64
@@ -148,7 +149,8 @@ class TestDetectFileTypeFromBase64:
     def test_detect_file_type_from_base64_bytes_success(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
         mock_detect_bytes = mocker.patch(
-            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="jpg", mime="image/jpeg")
+            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes",
+            return_value=FileType(extension="jpg", mime="image/jpeg"),
         )
 
         # JPEG header encoded in base64
@@ -165,7 +167,8 @@ class TestDetectFileTypeFromBase64:
     def test_detect_file_type_from_base64_data_url_success(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
         mock_detect_bytes = mocker.patch(
-            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="png", mime="image/png")
+            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes",
+            return_value=FileType(extension="png", mime="image/png"),
         )
 
         # PNG header encoded in base64
@@ -183,7 +186,8 @@ class TestDetectFileTypeFromBase64:
     def test_detect_file_type_from_base64_data_url_with_whitespace(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
         mock_detect_bytes = mocker.patch(
-            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="txt", mime="text/plain")
+            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes",
+            return_value=FileType(extension="txt", mime="text/plain"),
         )
 
         test_bytes = b"hello world"
@@ -198,14 +202,14 @@ class TestDetectFileTypeFromBase64:
         assert result.mime == "text/plain"
         mock_detect_bytes.assert_called_once_with(buf=test_bytes)
 
-    def test_detect_file_type_from_base64_invalid_base64_string(self, mocker: MockerFixture):
+    def test_detect_file_type_from_base64_invalid_base64_string(self, mocker: MockerFixture):  # noqa: ARG002
         # Test with invalid base64 string
         invalid_b64 = "invalid!base64!string!"
 
         with pytest.raises(FileTypeException, match="Could not identify file type of given bytes because input is not valid Base-64"):
             detect_file_type_from_base64(invalid_b64)
 
-    def test_detect_file_type_from_base64_invalid_base64_bytes(self, mocker: MockerFixture):
+    def test_detect_file_type_from_base64_invalid_base64_bytes(self, mocker: MockerFixture):  # noqa: ARG002
         # Test with invalid base64 bytes
         invalid_b64_bytes = b"invalid!base64!bytes!"
 
@@ -215,7 +219,8 @@ class TestDetectFileTypeFromBase64:
     def test_detect_file_type_from_base64_data_url_no_comma(self, mocker: MockerFixture):
         # Test data URL without comma (should be treated as regular base64)
         mocker.patch(
-            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes", return_value=FileType(extension="bin", mime="application/octet-stream")
+            "pipelex.tools.misc.filetype_utils.detect_file_type_from_bytes",
+            return_value=FileType(extension="bin", mime="application/octet-stream"),
         )
 
         # This will be treated as a base64 string since there's no comma

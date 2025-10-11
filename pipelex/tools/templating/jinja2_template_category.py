@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 from jinja2.runtime import Context
 
@@ -8,6 +9,7 @@ from pipelex.tools.templating.templating_models import TextFormat
 from pipelex.types import StrEnum
 
 
+# TODO: add more categories
 class Jinja2TemplateCategory(StrEnum):
     HTML = "html"
     MARKDOWN = "markdown"
@@ -15,7 +17,7 @@ class Jinja2TemplateCategory(StrEnum):
     LLM_PROMPT = "llm_prompt"
 
     @property
-    def filters(self) -> Dict[Jinja2FilterName, Callable[[Context, Any, Optional[TextFormat]], Any]]:
+    def filters(self) -> dict[Jinja2FilterName, Callable[[Context, Any, TextFormat | None], Any]]:
         match self:
             case Jinja2TemplateCategory.MERMAID:
                 return {}

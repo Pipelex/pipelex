@@ -1,4 +1,4 @@
-from typing import List, Type, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -25,23 +25,20 @@ class PipeOutput(BaseModel):
     def main_stuff(self) -> Stuff:
         return self.working_memory.get_main_stuff()
 
-    def main_stuff_as_list(self, item_type: Type[StuffContentType]) -> ListContent[StuffContentType]:
-        """
-        Get main stuff content as ListContent with items of type StuffContentType.
+    def main_stuff_as_list(self, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
+        """Get main stuff content as ListContent with items of type StuffContentType.
         If the items are of possibly various types, use item_type=StuffContent.
         """
         return self.working_memory.main_stuff_as_list(item_type=item_type)
 
-    def main_stuff_as_items(self, item_type: Type[StuffContentType]) -> List[StuffContentType]:
-        """
-        Get main stuff content as ListContent with items of type StuffContentType.
+    def main_stuff_as_items(self, item_type: type[StuffContentType]) -> list[StuffContentType]:
+        """Get main stuff content as ListContent with items of type StuffContentType.
         Return the actual items
         """
         return self.working_memory.main_stuff_as_list(item_type=item_type).items
 
-    def main_stuff_as(self, content_type: Type[StuffContentType]) -> StuffContentType:
-        """
-        Get main stuff content as StuffContentType.
+    def main_stuff_as(self, content_type: type[StuffContentType]) -> StuffContentType:
+        """Get main stuff content as StuffContentType.
         If the items are of possibly various types, use item_type=StuffContent.
         """
         return self.working_memory.main_stuff_as(content_type=content_type)

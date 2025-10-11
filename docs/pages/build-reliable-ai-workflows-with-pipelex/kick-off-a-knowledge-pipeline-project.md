@@ -2,13 +2,13 @@
 
 ## Creating Your First Pipeline
 
-A pipeline in Pipelex is a collection of related concepts and pipes. Start by creating a TOML file in the `pipelines` directory:
+A pipeline in Pipelex is a collection of related concepts and pipes. Start by creating a PLX file in the `pipelines` directory:
 
-```toml
-# pipelex_libraries/pipelines/tutorial.toml
+```plx
+# pipelex_libraries/pipelines/tutorial.plx
 
 domain = "tutorial"
-definition = "My first Pipelex library"
+description = "My first Pipelex library"
 system_prompt = "You are a helpful assistant."
 
 [concept]
@@ -43,18 +43,18 @@ A domain in Pipelex represents a topic or area of functionality within your pipe
 
 ### Domain in Practice
 
-When you create a pipeline file (`.toml`), you always start by declaring its domain:
+When you create a pipeline file (`.plx`), you always start by declaring its domain:
 
-```toml
+```plx
 domain = "finance"                                      # The domain name for this file
-definition = "Financial document processing"            # Optional description
+description = "Financial document processing"            # Optional description
 system_prompt = "You are an expert financial analyst."  # Optional system prompt for all PipeLLM in this domain
 ```
 
 A domain consists of:
 
-1.  **Pipeline File** (`.toml`)
-    ```toml
+1.  **Pipeline File** (`.plx`)
+    ```plx
     domain = "finance"
    
     [concept]
@@ -99,7 +99,7 @@ A domain consists of:
 
 2.  **Organization**
     - One domain per topic/functionality.
-    - Match Python file names with domain names (`finance.toml` -> `finance.py`).
+    - Match Python file names with domain names (`finance.plx` -> `finance.py`).
     - Keep related concepts within the same domain.
 
 3.  **Documentation**
@@ -115,8 +115,8 @@ When using a domain in your code, you refer to concepts with `domain.ConceptName
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 
 # The concept_code combines domain and concept names
-invoice_stuff = StuffFactory.make_stuff(
-    concept_str="finance.Invoice",  # domain.ConceptName
+invoice_stuff = StuffFactory.make_from_concept_string(
+    concept_string="finance.Invoice",  # domain.ConceptName
     name="invoice_123",
     content=invoice_data # dictionary or Invoice object
 )
@@ -126,13 +126,13 @@ invoice_stuff = StuffFactory.make_stuff(
 
 Consistent naming makes your pipeline code discoverable and maintainable:
 
-### TOML Files
-- Use lowercase with underscores: `legal_contracts.toml`, `customer_service.toml`
-- Match the domain name when possible: domain "legal" → `legal.toml`
-- For multi-word domains, use underscores: domain "customer_service" → `customer_service.toml`
+### PLX Files
+- Use lowercase with underscores: `legal_contracts.plx`, `customer_service.plx`
+- Match the domain name when possible: domain "legal" → `legal.plx`
+- For multi-word domains, use underscores: domain "customer_service" → `customer_service.plx`
 
 ### Python Model Files
-- It is recommended to match the TOML filename exactly: `legal.toml` → `legal.py`
+- It is recommended to match the PLX filename exactly: `legal.plx` → `legal.py`
 - But in any case, Pipelex will load models from all python modules in the `pipelines` directory or its subdirectories.
 
 ## Project Structure
@@ -144,7 +144,7 @@ your-project/
 ├── pipelex_libraries/         # All your pipeline code lives here
 │   ├── pipelines/             # Pipeline definitions and models
 │   │   ├── __init__.py
-│   │   ├── characters.toml    # Domain definitions
+│   │   ├── characters.plx     # Domain definitions
 │   │   └── characters.py      # Python models for concepts
 │   ├── templates/             # Reusable prompt templates
 │   ├── llm_integrations/      # LLM provider configurations

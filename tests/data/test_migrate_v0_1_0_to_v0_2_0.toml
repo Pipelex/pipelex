@@ -1,5 +1,5 @@
 domain = "test"
-definition = "Test domain"
+description = "Test domain"
 
 [concept]
 SimpleText = "A simple text concept"
@@ -16,7 +16,7 @@ structure = "CustomStructure"
 refines = "Text"
 
 [concept.AlreadyMigrated]
-definition = "This one is already migrated"
+description = "This one is already migrated"
 refines = "Text"
 
 [pipe.test_pipe]

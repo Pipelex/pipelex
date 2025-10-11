@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -8,9 +8,9 @@ from pipelex.tools.misc.markdown_utils import convert_to_markdown
 class Article(BaseModel):
     title: str
     author: str
-    tags: List[str]
+    tags: list[str]
     content: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 def test_convert_md():

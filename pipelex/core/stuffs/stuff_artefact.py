@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from jinja2.runtime import Context
 from pydantic import RootModel
@@ -10,7 +10,7 @@ from pipelex.tools.templating.jinja2_models import Jinja2ContextKey, Jinja2Tagga
 from pipelex.tools.templating.templating_models import TextFormat
 
 
-class StuffArtefact(RootModel[Dict[str, Any]], Jinja2TaggableAbstract):
+class StuffArtefact(RootModel[dict[str, Any]], Jinja2TaggableAbstract):
     """A flattened representation of Stuff and its content as a dictionary.
 
     This RootModel implementation allows for subscript access to the underlying dictionary
@@ -45,12 +45,12 @@ class StuffArtefact(RootModel[Dict[str, Any]], Jinja2TaggableAbstract):
     def rendered_str(self, text_format: TextFormat) -> str:
         content = self.root["content"]
         if not isinstance(content, StuffContent):
-            raise StuffArtefactError(f"StuffArtefact has no StuffContent, content: {self}")
-        rendered_str = content.rendered_str(text_format=text_format)
-        return rendered_str
+            msg = f"StuffArtefact has no StuffContent, content: {self}"
+            raise StuffArtefactError(msg)
+        return content.rendered_str(text_format=text_format)
 
     @override
-    def render_tagged_for_jinja2(self, context: Context, tag_name: Optional[str] = None) -> Tuple[Any, Optional[str]]:
+    def render_tagged_for_jinja2(self, context: Context, tag_name: str | None = None) -> tuple[Any, str | None]:
         # TODO: factorize the text formatting with the jinja2 "text_format" filter
         text_format = context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN)
         rendered_str = self.rendered_str(text_format=text_format)

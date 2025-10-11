@@ -1,6 +1,6 @@
 """Registry and model constants for testing."""
 
-from typing import ClassVar, List
+from typing import ClassVar
 
 from pydantic import BaseModel
 from typing_extensions import override
@@ -11,14 +11,14 @@ class ClassRegistryTestCases:
 
     MODEL_FOLDER_PATH = "tests/data/tools_data/mock_folder_with_classes"
 
-    CLASSES_TO_REGISTER: ClassVar[List[str]] = [
+    CLASSES_TO_REGISTER: ClassVar[list[str]] = [
         "Class1",
         "Class2",
         "Class3",
         "Class4",
     ]
 
-    CLASSES_NOT_TO_REGISTER: ClassVar[List[str]] = [
+    CLASSES_NOT_TO_REGISTER: ClassVar[list[str]] = [
         "ClassA",
         "ClassB",
     ]

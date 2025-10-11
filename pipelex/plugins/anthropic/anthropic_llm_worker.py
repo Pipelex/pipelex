@@ -1,52 +1,73 @@
-from typing import Any, Optional, Type
+from typing import Any
 
 import instructor
-from anthropic import NOT_GIVEN, AsyncAnthropic, AsyncAnthropicBedrock
+from anthropic import AsyncAnthropic, AsyncAnthropicBedrock, omit
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.hub import get_plugin_manager
-from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.config import get_config
+from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicWorkerConfigurationError
+from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory, AnthropicSdkVariant
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.misc.instructor_utils import dump_error, dump_kwargs, dump_response
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.types import StrEnum
+
+
+class AnthropicExtraField(StrEnum):
+    CLAUDE_4_TOKENS_LIMIT = "claude_4_tokens_limit"
+
+
+class AnthropicLLMWorkerError(Exception):
+    """Base exception for Anthropic LLM Worker errors."""
+
+
+class AnthropicBadRequestError(AnthropicLLMWorkerError):
+    """Raised when Anthropic API returns a BadRequestError."""
+
+
+class AnthropicInstructorError(AnthropicLLMWorkerError):
+    """Raised when Instructor encounters an error with Anthropic."""
 
 
 class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        llm_engine: LLMEngine,
-        structure_method: Optional[StructureMethod] = None,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        extra_config: dict[str, Any],
+        inference_model: InferenceModelSpec,
+        structure_method: StructureMethod | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
-            llm_engine=llm_engine,
+            inference_model=inference_model,
             structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
-        self.default_max_tokens: int
-        if default_max_tokens := llm_engine.llm_model.max_tokens:
-            self.default_max_tokens = default_max_tokens
+        self.extra_config: dict[str, Any] = extra_config
+        self.default_max_tokens: int = 0
+        if inference_model.max_tokens:
+            self.default_max_tokens = inference_model.max_tokens
         else:
-            raise LLMEngineParameterError(
-                f"No max_tokens provided for llm model '{self.llm_engine.llm_model.desc}', but it is required for Anthropic"
-            )
+            msg = f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Anthropic"
+            raise AnthropicWorkerConfigurationError(msg)
 
         # Verify if the sdk_instance is compatible with the current LLM platform
         if isinstance(sdk_instance, (AsyncAnthropic, AsyncAnthropicBedrock)):
-            if llm_engine.llm_platform == LLMPlatform.ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropic)):
-                raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
-            elif llm_engine.llm_platform == LLMPlatform.BEDROCK_ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropicBedrock)):
-                raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
+            if (inference_model.sdk == AnthropicSdkVariant.ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropic))) or (
+                inference_model.sdk == AnthropicSdkVariant.BEDROCK_ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropicBedrock))
+            ):
+                msg = f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}"
+                raise SdkTypeError(msg)
         else:
-            raise SdkTypeError(f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}")
+            msg = f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}"
+            raise SdkTypeError(msg)
 
         self.anthropic_async_client = sdk_instance
         if structure_method:
@@ -56,17 +77,28 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         else:
             self.instructor_for_objects = instructor.from_anthropic(client=sdk_instance)
 
+        instructor_config = get_config().cogt.llm_config.instructor_config
+        if instructor_config.is_dump_kwargs_enabled:
+            self.instructor_for_objects.on(hook_name="completion:kwargs", handler=dump_kwargs)
+        if instructor_config.is_dump_response_enabled:
+            self.instructor_for_objects.on(hook_name="completion:response", handler=dump_response)
+        if instructor_config.is_dump_error_enabled:
+            self.instructor_for_objects.on(hook_name="completion:error", handler=dump_error)
+
     #########################################################
     # Instance methods
     #########################################################
 
     # TODO: implement streaming behind the scenes to avoid timeout/streaming errors with Claude 4 and high tokens
-    def _adapt_max_tokens(self, max_tokens: Optional[int]) -> int:
+    def _adapt_max_tokens(self, max_tokens: int | None) -> int:
         max_tokens = max_tokens or self.default_max_tokens
-        if claude_4_tokens_limit := get_plugin_manager().plugin_configs.anthropic_config.claude_4_tokens_limit:
-            if max_tokens > claude_4_tokens_limit:
-                max_tokens = claude_4_tokens_limit
-                log.warning(f"Max tokens is greater than the claude 4 reduced tokens limit, reducing to {max_tokens}")
+
+        if (claude_4_tokens_limit := self.extra_config.get(AnthropicExtraField.CLAUDE_4_TOKENS_LIMIT)) and max_tokens > claude_4_tokens_limit:
+            max_tokens = claude_4_tokens_limit
+            log.warning(f"Max tokens is greater than the claude 4 reduced tokens limit, reducing to {max_tokens}")
+        if not max_tokens:
+            msg = f"Max tokens is None for model {self.inference_model.desc}"
+            raise AnthropicWorkerConfigurationError(msg)
         return max_tokens
 
     @override
@@ -78,20 +110,22 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         max_tokens = self._adapt_max_tokens(max_tokens=llm_job.job_params.max_tokens)
         response = await self.anthropic_async_client.messages.create(
             messages=[message],
-            system=llm_job.llm_prompt.system_text or NOT_GIVEN,
-            model=self.llm_engine.llm_id,
+            system=llm_job.llm_prompt.system_text or omit,
+            model=self.inference_model.model_id,
             temperature=llm_job.job_params.temperature,
             max_tokens=max_tokens,
         )
 
         single_content_block = response.content[0]
         if single_content_block.type != "text":
-            raise LLMCompletionError(f"Unexpected content block type: {single_content_block.type}\nmodel: {self.llm_engine.llm_model.desc}")
+            msg = f"Unexpected content block type: {single_content_block.type}\nmodel: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
         full_reply_content = single_content_block.text
 
         single_content_block = response.content[0]
         if single_content_block.type != "text":
-            raise LLMCompletionError(f"Unexpected content block type: {single_content_block.type}\nmodel: {self.llm_engine.llm_model.desc}")
+            msg = f"Unexpected content block type: {single_content_block.type}\nmodel: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
         full_reply_content = single_content_block.text
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
@@ -103,7 +137,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         messages = await AnthropicFactory.make_simple_messages(llm_job=llm_job)
         max_tokens = self._adapt_max_tokens(max_tokens=llm_job.job_params.max_tokens)
@@ -111,7 +145,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             messages=messages,
             response_model=schema,
             max_retries=llm_job.job_config.max_retries,
-            model=self.llm_engine.llm_id,
+            model=self.inference_model.model_id,
             temperature=llm_job.job_params.temperature,
             max_tokens=max_tokens,
         )

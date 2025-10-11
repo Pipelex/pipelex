@@ -1,7 +1,7 @@
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.hub import get_concept_provider, get_pipe_provider
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
@@ -18,15 +18,24 @@ class TestPipeParallelValidation:
         # Create a real PipeLLM that will infer inputs from the prompt template
         domain = "test_domain"
         concept_library = get_concept_provider()
-        concept_blueprint = ConceptBlueprint(definition="A test document")
+        concept_blueprint = ConceptBlueprint(description="A test document")
         concept_1 = ConceptFactory.make_from_blueprint(
-            domain=domain, concept_code="Document", blueprint=concept_blueprint, concept_codes_from_the_same_domain=["Document"]
+            domain=domain,
+            concept_code="Document",
+            blueprint=concept_blueprint,
+            concept_codes_from_the_same_domain=["Document"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
-            domain=domain, concept_code="Context", blueprint=concept_blueprint, concept_codes_from_the_same_domain=["Context"]
+            domain=domain,
+            concept_code="Context",
+            blueprint=concept_blueprint,
+            concept_codes_from_the_same_domain=["Context"],
         )
         concept_3 = ConceptFactory.make_from_blueprint(
-            domain=domain, concept_code="Analysis", blueprint=concept_blueprint, concept_codes_from_the_same_domain=["Analysis"]
+            domain=domain,
+            concept_code="Analysis",
+            blueprint=concept_blueprint,
+            concept_codes_from_the_same_domain=["Analysis"],
         )
         concept_library.add_concepts(concepts=[concept_1, concept_2, concept_3])
 
@@ -35,8 +44,8 @@ class TestPipeParallelValidation:
                 "document": InputRequirementBlueprint(concept=concept_1.concept_string),
                 "context": InputRequirementBlueprint(concept=concept_2.concept_string),
             },
-            definition="Analysis pipe for document processing",
-            output=ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
+            description="Analysis pipe for document processing",
+            output=ConceptFactory.make_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
             prompt_template="Analyze this document:  \n@context\n@document",
         )
 
@@ -56,12 +65,12 @@ class TestPipeParallelValidation:
 
         # Create PipeParallel that would reference this pipe
         pipe_parallel_blueprint = PipeParallelBlueprint(
-            definition="Parallel document processor for testing",
+            description="Parallel document processor for testing",
             inputs={
                 "document": InputRequirementBlueprint(concept=concept_1.code),
                 "context": InputRequirementBlueprint(concept=concept_2.code),
             },
-            output=ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
+            output=ConceptFactory.make_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
             parallels=[SubPipeBlueprint(pipe=real_pipe.code, result="analysis_result")],
             add_each_output=True,
             combined_output=None,
@@ -90,22 +99,31 @@ class TestPipeParallelValidation:
         # Create a simple PipeParallel with proper inputs
         domain = "test_domain"
         concept_library = get_concept_provider()
-        concept_blueprint = ConceptBlueprint(definition="Lorem Ipsum")
+        concept_blueprint = ConceptBlueprint(description="Lorem Ipsum")
         concept_1 = ConceptFactory.make_from_blueprint(
-            domain=domain, concept_code="Document", blueprint=concept_blueprint, concept_codes_from_the_same_domain=["Document"]
+            domain=domain,
+            concept_code="Document",
+            blueprint=concept_blueprint,
+            concept_codes_from_the_same_domain=["Document"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
-            domain=domain, concept_code="Context", blueprint=concept_blueprint, concept_codes_from_the_same_domain=["Context"]
+            domain=domain,
+            concept_code="Context",
+            blueprint=concept_blueprint,
+            concept_codes_from_the_same_domain=["Context"],
         )
         concept_3 = ConceptFactory.make_from_blueprint(
-            domain=domain, concept_code="ProcessedAnalysis", blueprint=concept_blueprint, concept_codes_from_the_same_domain=["ProcessedAnalysis"]
+            domain=domain,
+            concept_code="ProcessedAnalysis",
+            blueprint=concept_blueprint,
+            concept_codes_from_the_same_domain=["ProcessedAnalysis"],
         )
         concept_library.add_concepts(concepts=[concept_1, concept_2, concept_3])
 
         pipe_parallel_blueprint = PipeParallelBlueprint(
-            definition="Basic parallel pipe for testing",
+            description="Basic parallel pipe for testing",
             inputs={"input_var": InputRequirementBlueprint(concept=concept_1.concept_string)},
-            output=ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
+            output=ConceptFactory.make_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
             parallels=[SubPipeBlueprint(pipe="test_pipe_1", result="result_1")],
             add_each_output=True,
             combined_output=None,
@@ -133,26 +151,35 @@ class TestPipeParallelValidation:
         """Test that PipeParallel needed_inputs method can be called and returns expected structure"""
         domain = "test_domain"
         concept_library = get_concept_provider()
-        concept_blueprint = ConceptBlueprint(definition="A test document")
+        concept_blueprint = ConceptBlueprint(description="A test document")
         concept_1 = ConceptFactory.make_from_blueprint(
-            domain=domain, concept_code="Document", blueprint=concept_blueprint, concept_codes_from_the_same_domain=["Document"]
+            domain=domain,
+            concept_code="Document",
+            blueprint=concept_blueprint,
+            concept_codes_from_the_same_domain=["Document"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
-            domain=domain, concept_code="Context", blueprint=concept_blueprint, concept_codes_from_the_same_domain=["Context"]
+            domain=domain,
+            concept_code="Context",
+            blueprint=concept_blueprint,
+            concept_codes_from_the_same_domain=["Context"],
         )
         concept_3 = ConceptFactory.make_from_blueprint(
-            domain=domain, concept_code="ProcessedAnalysis", blueprint=concept_blueprint, concept_codes_from_the_same_domain=["ProcessedAnalysis"]
+            domain=domain,
+            concept_code="ProcessedAnalysis",
+            blueprint=concept_blueprint,
+            concept_codes_from_the_same_domain=["ProcessedAnalysis"],
         )
         concept_library.add_concepts(concepts=[concept_1, concept_2, concept_3])
 
         # Create PipeParallel with no sub-pipes to avoid dependency resolution
         pipe_parallel_blueprint = PipeParallelBlueprint(
-            definition="Parallel processor for testing inputs structure",
+            description="Parallel processor for testing inputs structure",
             inputs={
                 "document": InputRequirementBlueprint(concept=concept_1.concept_string),
                 "context": InputRequirementBlueprint(concept=concept_2.concept_string),
             },
-            output=ConceptFactory.construct_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
+            output=ConceptFactory.make_concept_string_with_domain(domain=domain, concept_code=concept_3.code),
             parallels=[],  # No sub-pipes to avoid dependency issues
             add_each_output=True,
             combined_output=None,

@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from click import ClickException
 from typing_extensions import override
 
@@ -24,12 +22,12 @@ class StaticValidationError(Exception):
         self,
         error_type: StaticValidationErrorType,
         domain: str,
-        pipe_code: Optional[str] = None,
-        variable_names: Optional[List[str]] = None,
-        required_concept_codes: Optional[List[str]] = None,
-        provided_concept_code: Optional[str] = None,
-        file_path: Optional[str] = None,
-        explanation: Optional[str] = None,
+        pipe_code: str | None = None,
+        variable_names: list[str] | None = None,
+        required_concept_codes: list[str] | None = None,
+        provided_concept_code: str | None = None,
+        file_path: str | None = None,
+        explanation: str | None = None,
     ):
         self.error_type = error_type
         self.domain = domain
@@ -93,8 +91,6 @@ class WorkingMemoryStuffNotFoundError(WorkingMemoryVariableError):
 class PipelexCLIError(PipelexError, ClickException):
     """Raised when there's an error in CLI usage or operation."""
 
-    pass
-
 
 class PipelexConfigError(PipelexError):
     pass
@@ -108,19 +104,15 @@ class ClientAuthenticationError(PipelexError):
     pass
 
 
-class DomainDefinitionError(PipelexError):
-    pass
-
-
 class ConceptLibraryConceptNotFoundError(PipelexError):
     pass
 
 
-class ConceptFactoryError(PipelexError):
+class LibraryError(PipelexError):
     pass
 
 
-class LibraryError(PipelexError):
+class LibraryLoadingError(LibraryError):
     pass
 
 
@@ -148,8 +140,96 @@ class LibraryParsingError(LibraryError):
     pass
 
 
+class DomainDefinitionError(PipelexError):
+    def __init__(self, message: str, domain_code: str, description: str, source: str | None = None):
+        self.domain_code = domain_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
+
+
+class ConceptDefinitionError(PipelexError):
+    def __init__(
+        self,
+        message: str,
+        domain_code: str,
+        concept_code: str,
+        description: str,
+        structure_class_python_code: str | None = None,
+        source: str | None = None,
+    ):
+        self.domain_code = domain_code
+        self.concept_code = concept_code
+        self.description = description
+        self.structure_class_python_code = structure_class_python_code
+        self.source = source
+        super().__init__(message)
+
+
+class ConceptStructureGeneratorError(PipelexError):
+    def __init__(self, message: str, structure_class_python_code: str | None = None):
+        self.structure_class_python_code = structure_class_python_code
+        super().__init__(message)
+
+
+# TODO: add details from all cases raising this error
 class PipeDefinitionError(PipelexError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        domain_code: str | None = None,
+        pipe_code: str | None = None,
+        description: str | None = None,
+        source: str | None = None,
+    ):
+        self.domain_code = domain_code
+        self.pipe_code = pipe_code
+        self.description = description
+        self.source = source
+        message = message + " • " + self.pipe_details()
+        super().__init__(message)
+
+    def pipe_details(self) -> str:
+        if not self.domain_code and not self.pipe_code and not self.description and not self.source:
+            return "No pipe details provided"
+        details = "Pipe details:"
+        if self.domain_code:
+            details += f" • domain='{self.domain_code}'"
+        if self.pipe_code:
+            details += f" • pipe='{self.pipe_code}'"
+        if self.description:
+            details += f" • description='{self.description}'"
+        if self.source:
+            details += f" • source='{self.source}'"
+        return details
+
+
+class DomainLoadingError(LibraryLoadingError):
+    def __init__(self, message: str, domain_code: str, description: str, source: str | None = None):
+        self.domain_code = domain_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
+
+
+class ConceptLoadingError(LibraryLoadingError):
+    def __init__(
+        self, message: str, concept_definition_error: ConceptDefinitionError, concept_code: str, description: str, source: str | None = None
+    ):
+        self.concept_definition_error = concept_definition_error
+        self.concept_code = concept_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
+
+
+class PipeLoadingError(LibraryLoadingError):
+    def __init__(self, message: str, pipe_definition_error: PipeDefinitionError, pipe_code: str, description: str, source: str | None = None):
+        self.pipe_definition_error = pipe_definition_error
+        self.pipe_code = pipe_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
 
 
 class UnexpectedPipeDefinitionError(PipeDefinitionError):
@@ -185,10 +265,14 @@ class PipeStackOverflowError(PipeExecutionError):
 class DryRunError(PipeExecutionError):
     """Raised when a dry run fails due to missing inputs or other validation issues."""
 
-    def __init__(self, message: str, missing_inputs: Optional[List[str]] = None, pipe_code: Optional[str] = None):
+    def __init__(self, message: str, missing_inputs: list[str] | None = None, pipe_code: str | None = None):
         self.missing_inputs = missing_inputs or []
         self.pipe_code = pipe_code
         super().__init__(message)
+
+
+class BatchParamsError(PipelexError):
+    pass
 
 
 class PipeConditionError(PipelexError):
@@ -206,31 +290,21 @@ class PipeRunParamsError(PipelexError):
 class PipeBatchError(PipelexError):
     """Base class for all PipeBatch-related errors."""
 
-    pass
-
 
 class PipeBatchRecursionError(PipeBatchError):
     """Raised when a PipeBatch attempts to run itself recursively."""
-
-    pass
 
 
 class PipeBatchInputError(PipeBatchError):
     """Raised when the input to a PipeBatch is not a ListContent or is invalid."""
 
-    pass
-
 
 class PipeBatchOutputError(PipeBatchError):
     """Raised when there's an error with the output structure of a PipeBatch operation."""
 
-    pass
-
 
 class PipeBatchBranchError(PipeBatchError):
     """Raised when there's an error with a branch pipe execution in PipeBatch."""
-
-    pass
 
 
 class JobHistoryError(PipelexError):
@@ -253,6 +327,10 @@ class ConceptCodeError(ConceptError):
     pass
 
 
+class ConceptRefineError(ConceptError):
+    pass
+
+
 class PipelineManagerNotFoundError(PipelexError):
     pass
 
@@ -272,10 +350,8 @@ class PipeInputDetailsError(PipelexError):
 class ApiSerializationError(Exception):
     """Exception raised when API serialization fails."""
 
-    pass
 
-
-class StartPipelineException(Exception):
+class StartPipelineError(Exception):
     pass
 
 

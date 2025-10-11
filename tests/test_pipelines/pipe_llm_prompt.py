@@ -1,4 +1,4 @@
-from typing import List, Literal
+from typing import Literal
 
 from pydantic import Field
 
@@ -60,5 +60,5 @@ class PersonContent(StructuredContent):
 class ComplexListContent(StructuredContent):
     """A content class with list fields."""
 
-    items: List[str] = Field(description="List of items")
-    tags: List[str] = Field(description="List of tags")
+    items: list[str] = Field(description="List of items")
+    tags: list[str] = Field(description="List of tags")

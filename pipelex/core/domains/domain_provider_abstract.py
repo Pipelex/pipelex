@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from pipelex.core.domains.domain import Domain
 
 
 class DomainProviderAbstract(ABC):
     @abstractmethod
-    def get_domain(self, domain: str) -> Optional[Domain]:
+    def get_domain(self, domain: str) -> Domain | None:
         pass
 
     @abstractmethod

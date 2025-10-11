@@ -5,8 +5,8 @@ from pipelex.tools.templating.jinja2_rendering import render_jinja2
 from pipelex.tools.templating.template_preprocessor import preprocess_template
 
 
-# TODO: get rid of this intermediate call which seems useless, or explain why it stays
 async def jinja2_gen_text(jinja2_assignment: Jinja2Assignment) -> str:
+    # Intermediate call to preprocess the template with our syntax patterns (@, $, @?, etc.)
     if jinja2_assignment.jinja2:
         jinja2_assignment.jinja2 = preprocess_template(template=jinja2_assignment.jinja2)
         check_jinja2_parsing(jinja2_assignment.jinja2)

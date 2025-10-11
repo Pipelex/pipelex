@@ -1,145 +1,177 @@
-from __future__ import annotations
-
 import asyncio
-from typing import Annotated, Optional
+import time
+from typing import Annotated
 
 import typer
 
-from pipelex.create.build_blueprint import do_build_blueprint
-from pipelex.create.draft_pipeline import do_draft_pipeline, do_draft_pipeline_text
-from pipelex.exceptions import PipelexCLIError
+from pipelex import pretty_print
+from pipelex.hub import get_report_delegate
+from pipelex.language.plx_factory import PlxFactory
+from pipelex.libraries.pipelines.builder.builder import PipelexBundleSpec
+from pipelex.libraries.pipelines.builder.builder_loop import BuilderLoop
 from pipelex.pipelex import Pipelex
-from pipelex.tools.misc.file_utils import load_text_from_path
+from pipelex.pipeline.execute import execute_pipeline
+from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, save_text_to_path
+from pipelex.tools.misc.json_utils import save_as_json_to_path
 
-# Typer group for build commands
-build_app = typer.Typer(help="Build artifacts like pipeline blueprints", no_args_is_help=True)
+build_app = typer.Typer(help="Build artifacts like pipelines", no_args_is_help=True)
+
+"""
+Today's example:
+pipelex build pipe "Given an expense report, apply company rules"
+pipelex build partial "Given an expense report, apply company rules" -o results/generated.json
+
+Other ideas:
+pipelex build pipe "Take a photo as input, and render the opposite of the photo"
+pipelex build pipe "Given an RDFP PDF, build a compliance matrix"
+"""
 
 
-@build_app.command("draft")
-def build_draft_pipeline_cmd(
-    pipeline_name: Annotated[
+@build_app.command("one-shot")
+def build_one_shot_cmd(
+    brief: Annotated[
         str,
-        typer.Argument(help="Name/code of the pipeline to generate"),
+        typer.Argument(help="Brief description of what the pipeline should do"),
     ],
-    domain: Annotated[
-        str,
-        typer.Option("--domain", "-d", help="Domain of the pipeline to generate"),
-    ] = "wip_domain",
-    requirements: Annotated[
-        Optional[str],
-        typer.Option("--requirements", "-r", help="Requirements text to generate the pipeline blueprint from"),
-    ] = None,
-    requirements_file: Annotated[
-        Optional[str],
-        typer.Option("--file", "-f", help="Path to a file containing the requirements text"),
-    ] = None,
     output_path: Annotated[
-        Optional[str],
-        typer.Option("--output", "-o", help="Path to save the generated TOML blueprint (optional)"),
-    ] = None,
-    raw: Annotated[
+        str,
+        typer.Option("--output", "-o", help="Path to save the generated PLX file"),
+    ] = "./results/generated_pipeline.plx",
+    no_output: Annotated[
         bool,
-        typer.Option("--raw", help="Raw text draft"),
+        typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
-    relative_config_folder_path: Annotated[
-        str,
-        typer.Option(
-            "--config-folder-path",
-            "-c",
-            help="Relative path to the config folder path (libraries)",
-        ),
-    ] = "./pipelex_libraries",
 ) -> None:
-    # Initialize Pipelex (loads libraries and pipes)
-    Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
+    typer.echo("=" * 70)
+    typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
+    typer.echo("")
 
-    # Get requirements text
-    try:
-        requirements_text: str
-        if requirements_file:
-            requirements_text = load_text_from_path(requirements_file)
+    async def run_pipeline():
+        if no_output:
+            typer.echo(typer.style("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+        elif not output_path:
+            typer.echo(typer.style("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED))
+            raise typer.Exit(1)
         else:
-            if not requirements:
-                raise PipelexCLIError("You must provide requirements text via --requirements or a file via --file")
-            requirements_text = requirements
-    except Exception as exc:
-        raise PipelexCLIError(f"Failed to load requirements: {exc}") from exc
+            ensure_directory_for_file_path(file_path=output_path)
 
-    if raw:
-        asyncio.run(
-            do_draft_pipeline_text(
-                domain=domain,
-                pipeline_name=pipeline_name,
-                requirements=requirements_text,
-                output_path=output_path,
-            )
+        pipe_output = await execute_pipeline(
+            pipe_code="pipe_builder",
+            input_memory={"brief": brief},
         )
-    else:
-        asyncio.run(
-            do_draft_pipeline(
-                pipeline_name=pipeline_name,
-                requirements=requirements_text,
-                output_path=output_path,
-            )
-        )
+        pretty_print(pipe_output, title="Pipe Output")
+
+        # Save to file unless explicitly disabled with --no-output
+        if no_output:
+            typer.echo(typer.style("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+            return
+
+        pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
+        plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+        save_text_to_path(text=plx_content, path=output_path)
+        typer.echo(typer.style(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN))
+
+    start_time = time.time()
+    asyncio.run(run_pipeline())
+    end_time = time.time()
+    typer.echo(typer.style(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN))
+
+    get_report_delegate().generate_report()
 
 
-@build_app.command("blueprint")
-def build_blueprint_cmd(
-    pipeline_name: Annotated[
+@build_app.command("pipe")
+def build_pipe_cmd(
+    brief: Annotated[
         str,
-        typer.Argument(help="Name/code of the pipeline to generate"),
+        typer.Argument(help="Brief description of what the pipeline should do"),
     ],
-    domain: Annotated[
-        str,
-        typer.Option("--domain", "-d", help="Domain of the pipeline to generate"),
-    ] = "wip_domain",
-    requirements: Annotated[
-        Optional[str],
-        typer.Option("--requirements", "-r", help="Requirements text to generate the pipeline blueprint from"),
-    ] = None,
-    requirements_file: Annotated[
-        Optional[str],
-        typer.Option("--file", "-f", help="Path to a file containing the requirements text"),
-    ] = None,
     output_path: Annotated[
-        Optional[str],
-        typer.Option("--output", "-o", help="Path to save the generated TOML blueprint (optional)"),
-    ] = None,
-    validate: Annotated[
-        bool,
-        typer.Option("--validate", help="Dry-run the first generated pipe from the blueprint"),
-    ] = False,
-    relative_config_folder_path: Annotated[
         str,
-        typer.Option(
-            "--config-folder-path",
-            "-c",
-            help="Relative path to the config folder path (libraries)",
-        ),
-    ] = "./pipelex_libraries",
+        typer.Option("--output", "-o", help="Path to save the generated PLX file"),
+    ] = "./results/generated_pipeline.plx",
+    no_output: Annotated[
+        bool,
+        typer.Option("--no-output", help="Skip saving the pipeline to file"),
+    ] = False,
 ) -> None:
-    # Initialize Pipelex (loads libraries and pipes)
-    Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
+    typer.echo("=" * 70)
+    typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
+    typer.echo("")
 
-    # Get requirements text
-    try:
-        requirements_text: str
-        if requirements_file:
-            requirements_text = load_text_from_path(requirements_file)
+    async def run_pipeline():
+        if no_output:
+            typer.echo(typer.style("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+        elif not output_path:
+            typer.echo(typer.style("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED))
+            raise typer.Exit(1)
         else:
-            if not requirements:
-                raise PipelexCLIError("You must provide requirements text via --requirements or a file via --file")
-            requirements_text = requirements
-    except Exception as exc:
-        raise PipelexCLIError(f"Failed to load requirements: {exc}") from exc
+            ensure_directory_for_file_path(file_path=output_path)
 
-    asyncio.run(
-        do_build_blueprint(
-            domain=domain,
-            pipeline_name=pipeline_name,
-            requirements=requirements_text,
-            output_path=output_path,
-            validate=validate,
+        builder_loop = BuilderLoop()
+        # Save to file unless explicitly disabled with --no-output
+        if no_output:
+            typer.echo(typer.style("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+            return
+
+        pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code="pipe_builder", input_memory={"brief": brief})
+        plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+        save_text_to_path(text=plx_content, path=output_path)
+        typer.echo(typer.style(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN))
+
+    start_time = time.time()
+    asyncio.run(run_pipeline())
+    end_time = time.time()
+    typer.echo(typer.style(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN))
+
+    get_report_delegate().generate_report()
+
+
+@build_app.command("partial")
+def build_partial_cmd(
+    brief: Annotated[
+        str,
+        typer.Argument(help="Brief description of what the pipeline should do"),
+    ],
+    output_path: Annotated[
+        str,
+        typer.Option("--output", "-o", help="Path to save the generated PLX file"),
+    ] = "./results/generated_pipeline.plx",
+    no_output: Annotated[
+        bool,
+        typer.Option("--no-output", help="Skip saving the pipeline to file"),
+    ] = False,
+) -> None:
+    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
+    typer.echo("=" * 70)
+    typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
+    typer.echo("")
+
+    async def run_pipeline():
+        if no_output:
+            typer.echo(typer.style("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+        elif not output_path:
+            typer.echo(typer.style("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED))
+            raise typer.Exit(1)
+        else:
+            ensure_directory_for_file_path(file_path=output_path)
+
+        pipe_output = await execute_pipeline(
+            pipe_code="pipe_builder",
+            input_memory={"brief": brief},
         )
-    )
+        # Save to file unless explicitly disabled with --no-output
+        if no_output:
+            typer.echo(typer.style("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+            return
+        json_output = pipe_output.main_stuff.content.smart_dump()
+        save_as_json_to_path(object_to_save=json_output, path=output_path)
+        typer.echo(typer.style(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN))
+
+    start_time = time.time()
+    asyncio.run(run_pipeline())
+    end_time = time.time()
+    typer.echo(typer.style(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN))
+
+    get_report_delegate().generate_report()

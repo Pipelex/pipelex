@@ -1,7 +1,6 @@
 """Test pipe sequence functionality with output multiplicity and advanced features."""
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -15,7 +14,8 @@ from pipelex.pipeline.execute import execute_pipeline
 @pytest.mark.inference
 @pytest.mark.asyncio
 class TestPipeSequenceMultiplicity:
-    async def test_creative_ideation_sequence_with_multiplicity(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
+    @pytest.mark.usefixtures("request")
+    async def test_creative_ideation_sequence_with_multiplicity(self, pipe_run_mode: PipeRunMode):
         """Test creative ideation sequence with nb_output and batching."""
         # Create test input
         topic_stuff = StuffFactory.make_stuff(
@@ -23,7 +23,7 @@ class TestPipeSequenceMultiplicity:
             concept=ConceptFactory.make(
                 concept_code="CreativeTopic",
                 domain="creative_ideation",
-                definition="creative_ideation.CreativeTopic",
+                description="creative_ideation.CreativeTopic",
                 structure_class_name="CreativeTopic",
             ),
             content=TextContent(text="Sustainable transportation solutions for urban areas"),

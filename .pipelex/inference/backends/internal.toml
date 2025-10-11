@@ -1,0 +1,26 @@
+################################################################################
+# Internal Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for internal software-only models.
+# These models run internally without external APIs or AI services.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
+
+################################################################################
+# TEXT EXTRACTION MODELS
+################################################################################
+
+# --- PyPDFium2 Text Extractor -------------------------------------------------
+[pypdfium2-extract-text]
+model_type = "text_extractor"
+sdk = "pypdfium2"
+model_id = "extract-text"
+inputs = ["pdf"]
+outputs = ["pages"]
+costs = {}
+

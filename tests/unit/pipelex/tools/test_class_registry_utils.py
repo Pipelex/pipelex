@@ -16,12 +16,21 @@ class TestClassRegistryUtilsUnit:
         mock_module.__name__ = "test_module"
 
         # Mock the functions at the location where they're imported in ClassRegistryUtils
-        mock_import = mocker.patch("pipelex.tools.class_registry_utils.import_module_from_file", return_value=mock_module)
-        mock_find = mocker.patch("pipelex.tools.class_registry_utils.find_classes_in_module", return_value=[str, int])
+        mock_import = mocker.patch(
+            "pipelex.tools.class_registry_utils.import_module_from_file",
+            return_value=mock_module,
+        )
+        mock_find = mocker.patch(
+            "pipelex.tools.class_registry_utils.find_classes_in_module",
+            return_value=[str, int],
+        )
 
         # Mock the global class registry
         mock_registry = mocker.MagicMock()
-        mocker.patch("pipelex.tools.class_registry_utils.KajsonManager.get_class_registry", return_value=mock_registry)
+        mocker.patch(
+            "pipelex.tools.class_registry_utils.KajsonManager.get_class_registry",
+            return_value=mock_registry,
+        )
 
         ClassRegistryUtils.register_classes_in_file(file_path="/fake/path.py", base_class=None, is_include_imported=False)
 
@@ -39,7 +48,12 @@ class TestClassRegistryUtilsUnit:
         mock_find_files = mocker.patch.object(ClassRegistryUtils, "find_files_in_dir", return_value=mock_files)
         mock_register_file = mocker.patch.object(ClassRegistryUtils, "register_classes_in_file")
 
-        ClassRegistryUtils.register_classes_in_folder(folder_path="/fake/folder", base_class=BaseModel, is_recursive=True, is_include_imported=False)
+        ClassRegistryUtils.register_classes_in_folder(
+            folder_path="/fake/folder",
+            base_class=BaseModel,
+            is_recursive=True,
+            is_include_imported=False,
+        )
 
         # Verify find_files_in_dir was called correctly
         mock_find_files.assert_called_once_with(dir_path="/fake/folder", pattern="*.py", is_recursive=True)

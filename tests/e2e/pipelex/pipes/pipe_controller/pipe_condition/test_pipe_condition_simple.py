@@ -7,12 +7,12 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input import TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.exceptions import DryRunError
-from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint, PipeConditionPipeMapBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition import CategoryInput
@@ -26,11 +26,11 @@ class TestPipeConditionSimple:
         """Test a PipeCondition created directly in code that should FAIL dry run."""
         # Create a PipeCondition directly in Python that requires an input
         pipe_condition_blueprint = PipeConditionBlueprint(
-            definition="Test condition that should fail",
+            description="Test condition that should fail",
             inputs={"user_category": InputRequirementBlueprint(concept="test_pipe_condition.CategoryInput")},
-            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             expression_template="{{ user_category.category }}",
-            pipe_map=PipeConditionPipeMapBlueprint(root={"small": "process_small", "medium": "process_medium", "large": "process_large"}),
+            pipe_map={"small": "process_small", "medium": "process_medium", "large": "process_large"},
             default_pipe_code="process_small",
         )
 
@@ -60,11 +60,11 @@ class TestPipeConditionSimple:
         """Test a PipeCondition created directly in code that should SUCCEED dry run."""
         # Create a PipeCondition directly in Python
         pipe_condition_blueprint = PipeConditionBlueprint(
-            definition="Test condition that should succeed",
+            description="Test condition that should succeed",
             inputs={"user_status": InputRequirementBlueprint(concept="test_pipe_condition.CategoryInput")},
-            output=f"{SpecialDomain.NATIVE.value}.{NativeConceptEnum.TEXT.value}",
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptEnum.TEXT}",
             expression_template="{{ user_status.category }}",
-            pipe_map=PipeConditionPipeMapBlueprint(root={"active": "process_small", "inactive": "process_medium", "pending": "process_large"}),
+            pipe_map={"active": "process_small", "inactive": "process_medium", "pending": "process_large"},
             default_pipe_code="process_small",
         )
 
@@ -82,12 +82,12 @@ class TestPipeConditionSimple:
                     concept=ConceptFactory.make(
                         concept_code="CategoryInput",
                         domain="test_pipe_condition",
-                        definition="CategoryInput",
+                        description="CategoryInput",
                         structure_class_name="CategoryInput",
                     ),
                     structure_class=CategoryInput,
-                )
-            ]
+                ),
+            ],
         )
 
         try:
@@ -104,10 +104,10 @@ class TestPipeConditionSimple:
             pretty_print(pipe_output)
 
         except DryRunError as exc:
+            msg_exc = str(exc)
             # If it fails, it should NOT be due to missing inputs
-            assert "missing required inputs" not in str(exc)
+            assert "missing required inputs" not in str(msg_exc)
             # Should be due to expression evaluation or other validation
-            assert any(keyword in str(exc) for keyword in ["expression", "evaluation", "empty result"])
+            assert any(keyword in str(msg_exc) for keyword in ["expression", "evaluation", "empty result"])
             print(f"✅ Direct PipeCondition passed input validation, failed at expression evaluation (expected): {exc}")
-
         print("✅ Direct PipeCondition test completed successfully!")

@@ -5,8 +5,6 @@ from pipelex.tools.misc.file_utils import find_files_in_dir
 
 
 class TestFindFilesInDir:
-    """Test the find_files_in_dir helper function."""
-
     def test_find_files_non_recursive(self):
         """Test finding files non-recursively."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -45,7 +43,8 @@ class TestFindFilesInDir:
             # Find Python files recursively
             files = find_files_in_dir(temp_dir, "*.py", is_recursive=True)
 
-            assert len(files) == 3
+            expected_files_length = 3
+            assert len(files) == expected_files_length
             file_names = [f.name for f in files]
             assert "file1.py" in file_names
             assert "file2.py" in file_names

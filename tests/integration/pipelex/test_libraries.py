@@ -1,9 +1,4 @@
-"""
-make t TEST=TestLibraries
-"""
-
 from pathlib import Path
-from typing import Optional
 
 import pytest
 from rich import box
@@ -20,7 +15,7 @@ from tests.integration.pipelex.test_data import LibraryTestCases
 
 def pretty_print_all_pipes(
     pipe_library: PipeLibrary,
-    title: Optional[str] = None,
+    title: str | None = None,
 ):
     console = Console()
     table = Table(
@@ -42,7 +37,7 @@ def pretty_print_all_pipes(
         table.add_row(
             pipe.domain,
             pipe.code,
-            pipe.definition,
+            pipe.description,
             pipe.__class__.__name__,
             ", ".join([f"{name}: {concept_code}" for name, concept_code in pipe.inputs.items]),
             pipe.output.code,
@@ -54,7 +49,7 @@ def pretty_print_all_pipes(
 
 def pretty_print_all_concepts(
     concept_library: ConceptLibrary,
-    title: Optional[str] = None,
+    title: str | None = None,
 ):
     console = Console()
     table = Table(
@@ -75,7 +70,7 @@ def pretty_print_all_concepts(
         table.add_row(
             concept.domain,
             concept.code,
-            concept.definition,
+            concept.description,
             concept.structure_class_name,
             concept.refines,
         )
@@ -85,7 +80,7 @@ def pretty_print_all_concepts(
 
 
 class TestLibraries:
-    @pytest.mark.parametrize("known_concept, known_pipe", LibraryTestCases.KNOWN_CONCEPTS_AND_PIPES)
+    @pytest.mark.parametrize(("known_concept", "known_pipe"), LibraryTestCases.KNOWN_CONCEPTS_AND_PIPES)
     def test_load_combo_libraries(
         self,
         known_concept: str,
@@ -101,7 +96,7 @@ class TestLibraries:
         # Test individual concepts and pipes
         assert library_manager.concept_library.get_required_concept(concept_string=known_concept) is not None
         pretty_print(
-            f"Concept: {known_concept} is correctly loaded as {library_manager.concept_library.get_required_concept(concept_string=known_concept)}"
+            f"Concept: {known_concept} is correctly loaded as {library_manager.concept_library.get_required_concept(concept_string=known_concept)}",
         )
         assert library_manager.pipe_library.get_optional_pipe(known_pipe) is not None
         pretty_print(f"Pipe: {known_pipe} is correctly loaded as {library_manager.pipe_library.get_optional_pipe(known_pipe)}")

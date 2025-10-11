@@ -13,14 +13,14 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 
 ## Configuration
 
-`PipeCondition` is configured in your pipeline's `.toml` file.
+`PipeCondition` is configured in your pipeline's `.plx` file.
 
-### TOML Parameters
+### PLX Parameters
 
 | Parameter                      | Type           | Description                                                                                                                                              | Required                       |
 | ------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
 | `type`                         | string         | The type of the pipe: `PipeCondition`                                                                          | Yes                            |
-| `description`                  | string         | A description of the condition operation.                                                                          | Yes                            |
+| `description`                   | string         | A description of the condition operation.                                                                          | Yes                            |
 | `inputs`                       | dictionary     | The input concept(s) for the condition, as a dictionary mapping input names to concept codes.                                                     | Yes                            |
 | `output`                       | string         | The output concept produced by the selected pipe.                                                | Yes                            |
 | `expression`                   | string         | A simple Jinja2 expression. `{{ ... }}` are automatically added. Good for simple variable access like `"my_var.category"`.                                | Yes (or `expression_template`)   |
@@ -36,9 +36,9 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 
 Here's a basic example showing how PipeCondition routes based on input data:
 
-```toml
+```plx
 domain = "routing_example"
-definition = "Example of PipeCondition routing"
+description = "Example of PipeCondition routing"
 
 [concept]
 CategoryInput = "Input with a category field"
@@ -91,7 +91,7 @@ How this works:
 
 ### Example: Routing with default fallback
 
-```toml
+```plx
 [pipe.route_with_fallback]
 type = "PipeCondition"
 description = "Route with default handling"
@@ -135,7 +135,7 @@ Process this unknown document type...
 ## Expression Types
 
 ### Simple Expression
-```toml
+```plx
 expression = "input_data.category"
 ```
 
@@ -145,7 +145,7 @@ expression = "input_data.category"
 - Access to Jinja2 filters and functions
 
 ### Complex Expression  
-```toml
+```plx
 expression_template = "{% if input_data.score >= 70 %}high{% else %}low{% endif %}"
 ```
 
@@ -164,7 +164,7 @@ default_pipe_code = "process_unknown"
 - Fallback pipe when no match is found
 
 ### Expression Aliasing
-```toml
+```plx
 add_alias_from_expression_to = "category_type"
 ```
 

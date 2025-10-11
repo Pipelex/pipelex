@@ -1,13 +1,12 @@
-from typing import Dict, Optional
-
 from pydantic import RootModel
 from typing_extensions import override
 
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_provider_abstract import DomainProviderAbstract
 from pipelex.exceptions import DomainLibraryError
+from pipelex.types import Self
 
-DomainLibraryRoot = Dict[str, Domain]
+DomainLibraryRoot = dict[str, Domain]
 
 
 class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
@@ -18,7 +17,7 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
         self.root = {}
 
     @classmethod
-    def make_empty(cls):
+    def make_empty(cls) -> Self:
         return cls(root={})
 
     def add_domain(self, domain: Domain):
@@ -29,15 +28,24 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainProviderAbstract):
         else:
             self.root[domain_code] = domain
 
+    def add_domains(self, domains: list[Domain]):
+        for domain in domains:
+            self.add_domain(domain=domain)
+
+    def remove_domain_by_code(self, domain_code: str) -> None:
+        if domain_code in self.root:
+            del self.root[domain_code]
+
     @override
-    def get_domain(self, domain: str) -> Optional[Domain]:
+    def get_domain(self, domain: str) -> Domain | None:
         return self.root.get(domain)
 
     @override
     def get_required_domain(self, domain: str) -> Domain:
         the_domain = self.get_domain(domain=domain)
         if not the_domain:
-            raise DomainLibraryError(f"Domain '{domain}' not found. Check for typos and make sure it is declared in a pipeline library.")
+            msg = f"Domain '{domain}' not found. Check for typos and make sure it is declared in a pipeline library."
+            raise DomainLibraryError(msg)
         return the_domain
 
     @override

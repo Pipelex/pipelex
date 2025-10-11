@@ -2,61 +2,86 @@ import asyncio
 import functools
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Tuple
+
+from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_input_spec import PipeInputSpec, TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_input import PipeInputSpec, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import StuffContent, TextContent
-from pipelex.hub import get_class_registry, get_pipe_provider
+from pipelex.hub import get_class_registry
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.types import StrEnum
 
 
-async def dry_run_all_pipes():
-    all_pipes = get_pipe_provider().get_pipes()
-    await dry_run_pipes(pipes=all_pipes)
+class DryRunError(Exception):
+    """Raised when a dry run fails due to missing inputs or other validation issues."""
 
 
-async def dry_run_single_pipe(pipe_code: str):
-    """
-    Dry run a single pipe by its code.
+class DryRunStatus(StrEnum):
+    SUCCESS = "SUCCESS"
+    FAILURE = "FAILURE"
+    WARNING = "WARNING"
+
+    @property
+    def is_failure(self) -> bool:
+        match self:
+            case DryRunStatus.FAILURE:
+                return True
+            case DryRunStatus.SUCCESS:
+                return False
+            case DryRunStatus.WARNING:
+                return False
+
+
+class DryRunOutput(BaseModel):
+    pipe_code: str
+    status: DryRunStatus
+    error_message: str | None = None
+    warning_message: str | None = None
+
+
+async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> DryRunOutput:
+    """Dry run a single pipe directly without parallelization."""
+    allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
+    # TODO: fail and raise properly
+    try:
+        needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
+
+        working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
+        pipe.validate_with_libraries()
+        await pipe.run_pipe(
+            job_metadata=JobMetadata(job_name=f"dry_run_{pipe.code}"),
+            working_memory=working_memory,
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+        )
+    except Exception as exc:
+        if pipe.code in allowed_to_fail_pipes:
+            warning_message = f"Allowed to fail dry run for pipe '{pipe.code}': {exc}"
+            log.warning(warning_message)
+            return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.WARNING, warning_message=warning_message)
+
+        if raise_on_failure:
+            raise
+
+        error_message = f"Dry run failed for pipe '{pipe.code}': {exc}"
+        log.error(error_message)
+        return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
+    log.info(f"Pipe '{pipe.code}' dry run completed successfully")
+    return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
+
+
+async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True, raise_on_failure: bool = True) -> dict[str, DryRunOutput]:
+    """Dry run pipes with optional parallelization.
 
     Args:
-        pipe_code: The code of the pipe to dry run
-
-    Returns:
-        Status string: "SUCCESS" or error message
-    """
-
-    # Get the pipe using the hub function
-    pipe = get_pipe_provider().get_required_pipe(pipe_code=pipe_code)
-    # Run the single pipe
-    await dry_run_pipes(pipes=[pipe])
-
-
-async def dry_run_pipe_codes(pipe_codes: List[str]) -> Dict[str, str]:
-    """
-    Dry run a list of pipe codes.
-    """
-    pipe_provider = get_pipe_provider()
-    pipes = [pipe_provider.get_required_pipe(pipe_code=pipe_code) for pipe_code in pipe_codes]
-    return await dry_run_pipes(pipes=pipes)
-
-
-async def dry_run_pipe(pipe: PipeAbstract):
-    """
-    Dry run a pipe.
-    """
-    return await dry_run_pipes(pipes=[pipe])
-
-
-async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
-    """
-    Dry run all pipes in the library using ThreadPoolExecutor for true parallelism.
+        pipes: List of pipes to dry run
+        run_in_parallel: If True, run pipes in parallel using ThreadPoolExecutor. If False, run sequentially.
+        raise_on_failure: If True, raise an exception if any pipe fails.
 
     For each pipe, this method:
     1. Gets the pipe's needed inputs
@@ -65,104 +90,66 @@ async def dry_run_pipes(pipes: List[PipeAbstract]) -> Dict[str, str]:
 
     Returns:
         Dict mapping pipe codes to their dry run status ("SUCCESS" or error message)
-    """
 
+    Raises:
+        DryRunError: If raise_on_failure is True and any pipe fails.
+
+    """
     start_time = time.time()
-    results: Dict[str, str] = {}
-    pipe_provider = get_pipe_provider()
-    pipe_provider.validate_with_libraries()
-    # Get the list of pipes that are allowed to fail from config
+    results: dict[str, DryRunOutput] = {}
     allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
 
-    log.info(f"Starting dry run for {len(pipes)} pipes...")
+    if run_in_parallel:
 
-    # Define a function that will run in a thread
-    def run_pipe_in_thread(pipe: PipeAbstract) -> Tuple[str, str]:
-        """Execute pipe.run_pipe in a thread and return its status."""
-        # try:
-        # This function runs in a separate thread
-        try:
-            needed_inputs = pipe.needed_inputs()
-            log.debug(f"Needed inputs for {pipe.code}: {needed_inputs}")
-            needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=needed_inputs)
-
-            log.debug(f"Needed inputs for {pipe.code} converted to working memory format: {needed_inputs_for_factory}")
-            working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
-
-            # Create a new event loop for this thread
+        def run_pipe_in_thread(pipe: PipeAbstract) -> DryRunOutput:
+            """Parallel execution using ThreadPoolExecutor"""
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+            return loop.run_until_complete(dry_run_pipe(pipe, raise_on_failure=raise_on_failure))
 
-            try:
-                # Run the pipe in this thread's event loop
-                loop.run_until_complete(
-                    pipe.run_pipe(
-                        job_metadata=JobMetadata(job_name=f"dry_run_{pipe.code}"),
-                        working_memory=working_memory,
-                        pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
-                    )
-                )
-                result = (pipe.code, "SUCCESS")
-                log.debug(f"✓ Pipe {pipe.code} dry run completed successfully")
-                return result
-            finally:
-                loop.close()
+        with ThreadPoolExecutor() as executor:
+            futures = [asyncio.get_running_loop().run_in_executor(executor, functools.partial(run_pipe_in_thread, pipe)) for pipe in pipes]
+            for future in asyncio.as_completed(futures):
+                output = await future
+                results[output.pipe_code] = output
+    else:
+        for pipe in pipes:
+            results[pipe.code] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
 
-        except Exception as exc:
-            error_msg = f"FAILED: {str(exc)}"
+    successful_pipes = [pipe_code for pipe_code, status in results.items() if status.status == DryRunStatus.SUCCESS]
+    failed_pipes = [pipe_code for pipe_code, status in results.items() if status.status != DryRunStatus.SUCCESS]
 
-            # Check if this pipe is allowed to fail
-            if pipe.code in allowed_to_fail_pipes:
-                log.debug(f"✗ Pipe '{pipe.code}' dry run failed: {exc} (this is normal, allowed by config)")
-            else:
-                log.error(f"✗ Pipe '{pipe.code}' dry run failed: {exc}")
-
-            return (pipe.code, error_msg)
-
-    # Get the event loop for the main thread
-    loop = asyncio.get_running_loop()
-
-    # Execute pipes in thread pool
-    with ThreadPoolExecutor() as executor:
-        # Schedule all pipe executions to the thread pool
-        futures = [loop.run_in_executor(executor, functools.partial(run_pipe_in_thread, pipe)) for pipe in pipes]
-
-        # Wait for all executions to complete
-        for future in asyncio.as_completed(futures):
-            pipe_code, status = await future
-            results[pipe_code] = status
-
-    successful_pipes = [pipe_code for pipe_code, status in results.items() if status == "SUCCESS"]
-    failed_pipes = [pipe_code for pipe_code, status in results.items() if status != "SUCCESS"]
-
-    # Filter out pipes that are allowed to fail
     unexpected_failures = {pipe_code: results[pipe_code] for pipe_code in failed_pipes if pipe_code not in allowed_to_fail_pipes}
 
-    log.info(f"Dry run completed: '{len(successful_pipes)}' successful, '{len(failed_pipes)}' failed, in '{time.time() - start_time:.2f}' seconds")
-
+    log.info(
+        f"Dry run completed: '{len(successful_pipes)}' successful, '{len(failed_pipes)}' failed, "
+        f"'{len(allowed_to_fail_pipes)}' allowed to fail, in '{time.time() - start_time:.2f}' seconds",
+    )
     if unexpected_failures:
         unexpected_failures_details = "\n".join([f"'{pipe_code}': {results[pipe_code]}" for pipe_code in unexpected_failures])
-        raise Exception(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
-
-    if failed_pipes and not unexpected_failures:
-        log.info("All failures were expected (allowed by config)")
+        if raise_on_failure:
+            msg = f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}"
+            raise DryRunError(msg)
+        log.error(f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}")
+        return results
 
     return results
 
 
-def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List[TypedNamedInputRequirement]:
-    """
-    Convert PipeInputSpec to the format needed by WorkingMemoryFactory.make_for_dry_run.
+def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> list[TypedNamedInputRequirement]:
+    """Convert PipeInputSpec to the format needed by WorkingMemoryFactory.make_for_dry_run.
 
     Args:
         needed_inputs_spec: PipeInputSpec with detailed_requirements
 
     Returns:
         List of tuples (variable_name, concept_code, structure_class)
+
     """
-    needed_inputs_for_factory: List[TypedNamedInputRequirement] = []
+    needed_inputs_for_factory: list[TypedNamedInputRequirement] = []
     class_registry = get_class_registry()
 
+    # TODO: fail and raise properly
     for named_input_requirement in needed_inputs_spec.named_input_requirements:
         try:
             # Get the concept and its structure class
@@ -182,7 +169,7 @@ def _convert_to_working_memory_format(needed_inputs_spec: PipeInputSpec) -> List
                 # Fallback to TextContent if we can't get the proper class
                 log.warning(
                     f"Could not get structure class '{structure_class_name}' for "
-                    f"concept '{named_input_requirement.concept.code}', falling back to TextContent"
+                    f"concept '{named_input_requirement.concept.code}', falling back to TextContent",
                 )
                 text_typed_named_input_requirement = TypedNamedInputRequirement.make_from_named(
                     named=named_input_requirement,

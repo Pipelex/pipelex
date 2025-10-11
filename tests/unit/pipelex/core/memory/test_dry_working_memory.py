@@ -1,15 +1,10 @@
-"""Test dry working memory functionality."""
-
-from typing import List
-
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec import TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_input import TypedNamedInputRequirement
 from pipelex.core.stuffs.stuff_content import PageContent, TextContent
 from tests.test_pipelines.tricky_questions import ThoughtfulAnswer
 
@@ -17,13 +12,10 @@ from tests.test_pipelines.tricky_questions import ThoughtfulAnswer
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestDryWorkingMemory:
-    """Test WorkingMemory dry run functionality."""
-
+    @pytest.mark.usefixtures("request")
     async def test_make_for_dry_run_with_page_content(
         self,
-        request: FixtureRequest,
     ):
-        """Test that make_for_dry_run creates appropriate mocks for PageContent."""
         log.info("Testing dry run with PageContent")
 
         # Test the specific inputs requested by the user
@@ -31,7 +23,7 @@ class TestDryWorkingMemory:
             TypedNamedInputRequirement(
                 variable_name="page",
                 concept=ConceptFactory.make(
-                    concept_code=NativeConceptEnum.PAGE.value, domain="test_tricky_questions", definition="Lorem Ipsum", structure_class_name="Page"
+                    concept_code=NativeConceptEnum.PAGE, domain="test_tricky_questions", description="Lorem Ipsum", structure_class_name="Page"
                 ),
                 structure_class=PageContent,
             ),
@@ -44,7 +36,7 @@ class TestDryWorkingMemory:
 
         # Verify concept code is correct
         page_stuff = dry_memory.get_stuff("page")
-        assert page_stuff.concept.code == NativeConceptEnum.PAGE.value
+        assert page_stuff.concept.code == NativeConceptEnum.PAGE
         assert page_stuff.stuff_name == "page"
 
         # Verify structured content was created properly
@@ -61,11 +53,10 @@ class TestDryWorkingMemory:
         # Verify page_view field exists (it's Optional so could be None)
         assert hasattr(page_content, "page_view")
 
+    @pytest.mark.usefixtures("request")
     async def test_make_for_dry_run_with_structured_content(
         self,
-        request: FixtureRequest,
     ):
-        """Test that make_for_dry_run creates appropriate mocks for structured content."""
         log.info("Testing dry run with structured content (ThoughtfulAnswer)")
 
         # Use ThoughtfulAnswer from tricky questions domain
@@ -75,22 +66,22 @@ class TestDryWorkingMemory:
                 concept=ConceptFactory.make(
                     concept_code="ThoughtfulAnswer",
                     domain="test_tricky_questions",
-                    definition="Thoughtful answer",
+                    description="Thoughtful answer",
                     structure_class_name="ThoughtfulAnswer",
                 ),
                 structure_class=ThoughtfulAnswer,
             ),
             TypedNamedInputRequirement(
                 variable_name="question",
-                concept=ConceptFactory.make(concept_code="Question", domain="answer", definition="Question", structure_class_name="Question"),
+                concept=ConceptFactory.make(concept_code="Question", domain="answer", description="Question", structure_class_name="Question"),
                 structure_class=TextContent,
             ),
         ]
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
+        expected_number_of_elements_in_memory = 2
 
-        # Verify mocks were created
-        assert len(dry_memory.root) == 2
+        assert len(dry_memory.root) == expected_number_of_elements_in_memory
         assert dry_memory.get_optional_stuff("thoughtful_answer") is not None
         assert dry_memory.get_optional_stuff("question") is not None
 
@@ -120,11 +111,10 @@ class TestDryWorkingMemory:
         log.info("Created mock working memory with structured content:")
         dry_memory.pretty_print_summary()
 
+    @pytest.mark.usefixtures("request")
     async def test_make_for_dry_run_with_text_content_fallback(
         self,
-        request: FixtureRequest,
     ):
-        """Test that make_for_dry_run falls back to TextContent when needed."""
         log.info("Testing dry run with TextContent fallback")
 
         needed_inputs = [
@@ -133,7 +123,7 @@ class TestDryWorkingMemory:
                 concept=ConceptFactory.make(
                     concept_code="QuestionAnalysis",
                     domain="test_tricky_questions",
-                    definition="Question analysis",
+                    description="Question analysis",
                     structure_class_name="QuestionAnalysis",
                 ),
                 structure_class=TextContent,
@@ -143,7 +133,7 @@ class TestDryWorkingMemory:
                 concept=ConceptFactory.make(
                     concept_code="ThoughtfulAnswerConclusion",
                     domain="test_tricky_questions",
-                    definition="Thoughtful answer conclusion",
+                    description="Thoughtful answer conclusion",
                     structure_class_name="ThoughtfulAnswerConclusion",
                 ),
                 structure_class=TextContent,
@@ -152,7 +142,6 @@ class TestDryWorkingMemory:
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
-        # Verify mocks were created
         assert len(dry_memory.root) == 2
         assert dry_memory.get_optional_stuff("question_analysis") is not None
         assert dry_memory.get_optional_stuff("conclusion") is not None
@@ -170,11 +159,10 @@ class TestDryWorkingMemory:
         log.info("Created mock working memory with TextContent fallback:")
         dry_memory.pretty_print_summary()
 
+    @pytest.mark.usefixtures("request")
     async def test_make_for_dry_run_mixed_content_types(
         self,
-        request: FixtureRequest,
     ):
-        """Test that make_for_dry_run handles mixed content types correctly."""
         log.info("Testing dry run with mixed content types")
 
         needed_inputs = [
@@ -183,14 +171,14 @@ class TestDryWorkingMemory:
                 concept=ConceptFactory.make(
                     concept_code="ThoughtfulAnswer",
                     domain="test_tricky_questions",
-                    definition="Thoughtful answer",
+                    description="Thoughtful answer",
                     structure_class_name="ThoughtfulAnswer",
                 ),
                 structure_class=ThoughtfulAnswer,
             ),
             TypedNamedInputRequirement(
                 variable_name="raw_question",
-                concept=ConceptFactory.make(concept_code="Question", domain="answer", definition="Question", structure_class_name="Question"),
+                concept=ConceptFactory.make(concept_code="Question", domain="answer", description="Question", structure_class_name="Question"),
                 structure_class=TextContent,
             ),
             TypedNamedInputRequirement(
@@ -198,7 +186,7 @@ class TestDryWorkingMemory:
                 concept=ConceptFactory.make(
                     concept_code="QuestionAnalysis",
                     domain="test_tricky_questions",
-                    definition="Question analysis",
+                    description="Question analysis",
                     structure_class_name="QuestionAnalysis",
                 ),
                 structure_class=TextContent,
@@ -207,7 +195,6 @@ class TestDryWorkingMemory:
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
-        # Verify all mocks were created
         assert len(dry_memory.root) == 3
 
         # Verify structured content
@@ -230,14 +217,13 @@ class TestDryWorkingMemory:
         log.info("Created mock working memory with mixed content types:")
         dry_memory.pretty_print_summary()
 
+    @pytest.mark.usefixtures("request")
     async def test_make_for_dry_run_empty_inputs(
         self,
-        request: FixtureRequest,
     ):
-        """Test that make_for_dry_run handles empty inputs gracefully."""
         log.info("Testing dry run with empty inputs")
 
-        needed_inputs: List[TypedNamedInputRequirement] = []
+        needed_inputs: list[TypedNamedInputRequirement] = []
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
@@ -247,18 +233,15 @@ class TestDryWorkingMemory:
 
         log.info("Created empty mock working memory")
 
-    async def test_make_for_dry_run_realistic_pipeline_scenario(
-        self,
-        request: FixtureRequest,
-    ):
-        """Test make_for_dry_run with a realistic pipeline scenario from tricky questions."""
+    @pytest.mark.usefixtures("request")
+    async def test_make_for_dry_run_realistic_pipeline_scenario(self):
         log.info("Testing dry run with realistic tricky questions pipeline scenario")
 
         # Simulate the conclude_tricky_question_by_steps pipeline needs
         needed_inputs = [
             TypedNamedInputRequirement(
                 variable_name="question",
-                concept=ConceptFactory.make(concept_code="Question", domain="answer", definition="Question", structure_class_name="Question"),
+                concept=ConceptFactory.make(concept_code="Question", domain="answer", description="Question", structure_class_name="Question"),
                 structure_class=TextContent,
             ),
             TypedNamedInputRequirement(
@@ -266,7 +249,7 @@ class TestDryWorkingMemory:
                 concept=ConceptFactory.make(
                     concept_code="QuestionAnalysis",
                     domain="test_tricky_questions",
-                    definition="Question analysis",
+                    description="Question analysis",
                     structure_class_name="QuestionAnalysis",
                 ),
                 structure_class=TextContent,
@@ -276,7 +259,7 @@ class TestDryWorkingMemory:
                 concept=ConceptFactory.make(
                     concept_code="ThoughtfulAnswer",
                     domain="test_tricky_questions",
-                    definition="Thoughtful answer",
+                    description="Thoughtful answer",
                     structure_class_name="ThoughtfulAnswer",
                 ),
                 structure_class=ThoughtfulAnswer,
@@ -304,10 +287,14 @@ class TestDryWorkingMemory:
 
         # Verify the ThoughtfulAnswer has all required fields with mock data
         ta_content = thoughtful_answer_stuff.content
-        assert isinstance(ta_content.the_trap, str) and len(ta_content.the_trap) > 0
-        assert isinstance(ta_content.the_counter, str) and len(ta_content.the_counter) > 0
-        assert isinstance(ta_content.the_lesson, str) and len(ta_content.the_lesson) > 0
-        assert isinstance(ta_content.the_answer, str) and len(ta_content.the_answer) > 0
+        assert isinstance(ta_content.the_trap, str)
+        assert len(ta_content.the_trap) > 0
+        assert isinstance(ta_content.the_counter, str)
+        assert len(ta_content.the_counter) > 0
+        assert isinstance(ta_content.the_lesson, str)
+        assert len(ta_content.the_lesson) > 0
+        assert isinstance(ta_content.the_answer, str)
+        assert len(ta_content.the_answer) > 0
 
         log.info("Created realistic pipeline mock memory:")
         dry_memory.pretty_print_summary()

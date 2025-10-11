@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from typing_extensions import override
@@ -14,31 +14,34 @@ from pipelex.tools.environment import get_required_env
 
 
 class PipelexClient(PipelexProtocol):
-    """
-    A client for interacting with Pipelex pipelines through the API.
+    """A client for interacting with Pipelex pipelines through the API.
 
     This client provides a user-friendly interface for executing pipelines through
     the remote API.
+
     Args:
         api_token: The API token to use for authentication. If not provided, it will be loaded from the PIPELEX_API_TOKEN environment variable.
         If the environment variable is not set, an error will be raised.
+
     """
 
     def __init__(
         self,
-        api_token: Optional[str] = None,
-        api_base_url: Optional[str] = None,
+        api_token: str | None = None,
+        api_base_url: str | None = None,
     ):
         self.api_token = api_token or get_required_env("PIPELEX_API_TOKEN")
 
         if not self.api_token:
-            raise ClientAuthenticationError("API token is required for API execution")
+            msg = "API token is required for API execution"
+            raise ClientAuthenticationError(msg)
 
         self.api_base_url = api_base_url or get_required_env("PIPELEX_API_BASE_URL")
         if not self.api_base_url:
-            raise ClientAuthenticationError("API base URL is required for API execution")
+            msg = "API base URL is required for API execution"
+            raise ClientAuthenticationError(msg)
 
-        self.client: Optional[httpx.AsyncClient] = None
+        self.client: httpx.AsyncClient | None = None
 
     def start_client(self) -> "PipelexClient":
         """Initialize the HTTP client for API calls."""
@@ -51,8 +54,9 @@ class PipelexClient(PipelexProtocol):
             await self.client.aclose()
             self.client = None
 
-    async def _make_api_call(self, endpoint: str, request: Optional[str] = None) -> Any:
+    async def _make_api_call(self, endpoint: str, request: str | None = None) -> Any:
         """Make an API call to the Pipelex server.
+
         Args:
             endpoint: The API endpoint to call, relative to the base URL
             request: A JSON-formatted string to send as the request body, or None if no body is needed
@@ -60,6 +64,7 @@ class PipelexClient(PipelexProtocol):
             Any: The JSON-decoded response from the server
         Raises:
             httpx.HTTPError: If the request fails or returns a non-200 status code
+
         """
         if not self.client:
             self.start_client()
@@ -75,14 +80,15 @@ class PipelexClient(PipelexProtocol):
     async def execute_pipeline(
         self,
         pipe_code: str,
-        working_memory: Optional[WorkingMemory] = None,
-        input_memory: Optional[CompactMemory] = None,
-        output_name: Optional[str] = None,
-        output_multiplicity: Optional[PipeOutputMultiplicity] = None,
-        dynamic_output_concept_code: Optional[str] = None,
+        working_memory: WorkingMemory | None = None,
+        input_memory: CompactMemory | None = None,
+        output_name: str | None = None,
+        output_multiplicity: PipeOutputMultiplicity | None = None,
+        dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
         if working_memory and input_memory:
-            raise ValueError(f"working_memory and input_memory cannot be provided together to the API execute_pipeline {pipe_code=}")
+            msg = f"working_memory and input_memory cannot be provided together to the API execute_pipeline {pipe_code=}"
+            raise ValueError(msg)
 
         if input_memory is not None:
             working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
@@ -99,14 +105,15 @@ class PipelexClient(PipelexProtocol):
     async def start_pipeline(
         self,
         pipe_code: str,
-        working_memory: Optional[WorkingMemory] = None,
-        input_memory: Optional[CompactMemory] = None,
-        output_name: Optional[str] = None,
-        output_multiplicity: Optional[PipeOutputMultiplicity] = None,
-        dynamic_output_concept_code: Optional[str] = None,
+        working_memory: WorkingMemory | None = None,
+        input_memory: CompactMemory | None = None,
+        output_name: str | None = None,
+        output_multiplicity: PipeOutputMultiplicity | None = None,
+        dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
         if working_memory and input_memory:
-            raise ValueError(f"working_memory and input_memory cannot be provided together to the API start_pipeline {pipe_code=}")
+            msg = f"working_memory and input_memory cannot be provided together to the API start_pipeline {pipe_code=}"
+            raise ValueError(msg)
 
         if input_memory is not None:
             working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)

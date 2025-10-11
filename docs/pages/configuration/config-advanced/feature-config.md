@@ -32,24 +32,24 @@ The feature flags directly affect which implementation is used for certain compo
 ### Pipeline Tracking
 
 ```toml
-is_pipeline_tracking_enabled = false
+is_pipeline_tracking_enabled = true
 ```
 
 - Controls whether pipeline execution tracking is enabled
 - When enabled, tracks the flow and execution of pipelines using by default mermaid chart:
   - View and edit charts at [Mermaid Live Editor](https://mermaid.live)
 - Useful for debugging and monitoring pipeline behavior
-- Default: `false`
+- Default: `true`
 
 ### Activity Tracking
 
 ```toml
-is_activity_tracking_enabled = false
+is_activity_tracking_enabled = true
 ```
 
 - Controls whether activity tracking is enabled
 - When enabled, tracks detailed information about system activities
-- Default: `false`
+- Default: `true`
 
 ### Reporting
 
@@ -68,8 +68,8 @@ is_reporting_enabled = true
 # Enable pipeline tracking for debugging
 is_pipeline_tracking_enabled = true
 
-# Disable activity tracking for performance
-is_activity_tracking_enabled = false
+# Enable activity tracking 
+is_activity_tracking_enabled = true
 
 # Enable reporting for cost monitoring
 is_reporting_enabled = true

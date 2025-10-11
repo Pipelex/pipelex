@@ -19,42 +19,58 @@ The `PageContent` object has the following structure:
 
 ## Configuration
 
-`PipeOcr` is configured in your pipeline's `.toml` file.
+`PipeOcr` is configured in your pipeline's `.plx` file.
 
-### TOML Parameters
+### OCR Models and Backend System
+
+PipeOcr uses the unified inference backend system to manage OCR models. This means you can:
+
+- Use different OCR providers (Mistral OCR, local PDF extraction via internal backend, etc.)
+- Configure OCR models through the same backend system as LLMs and image generation models
+- Use OCR presets for consistent configurations across your pipelines
+- Route OCR requests to different backends based on your routing profile
+
+Common OCR model handles:
+- `mistral-ocr`: Mistral's OCR model for high-quality text and image extraction
+- `pypdfium2-extract-text`: Local PDF text extraction (no API calls required)
+
+OCR presets are defined in your model deck configuration and can include parameters like `max_nb_images` and `image_min_size`.
+
+### PLX Parameters
 
 | Parameter                   | Type    | Description                                                                                                                              | Required |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                      | string  | The type of the pipe: `PipeOcr`                                                                          | Yes      |
 | `description`               | string  | A description of the OCR operation.                                                                   | Yes      |
-| `inputs`                    | Fixed  | The input for the PipeOcr is the key `ocr_input` and the value is either of concept `Image` or `Pdf`.                                                     | Yes       |
+| `inputs`                    | Fixed  | The value is either of concept `Image` or `Pdf`.                                                     | Yes       |
 | `output`                    | string  | The output concept produced by the OCR operation.                                                | Yes      |
-| `should_include_images`     | boolean | If `true`, any images found within the document pages will be extracted and included in the output. Defaults to `false`.                 | No       |
-| `should_include_page_views` | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
+| `page_images`               | boolean | If `true`, any images found within the document pages will be extracted and included in the output. Defaults to `false`.                 | No       |
+| `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
 | `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `150`.                                 | No       |
-| `should_caption_images`     | boolean | If `true`, the OCR service may attempt to generate captions for the images found. *Note: This feature depends on the OCR provider.*        | No       |
+| `page_image_captions`       | boolean | If `true`, the OCR service may attempt to generate captions for the images found. *Note: This feature depends on the OCR provider.*        | No       |
+| `ocr`                       | string  | The OCR model handle, preset, or setting to use (e.g., `"mistral-ocr"`, `"base_ocr_mistral"`). Defaults to the model specified in the global config. | No       |
 
 ### Example: Processing a PDF
 
 This example defines a pipe that takes a PDF, extracts text and full-page images, and outputs them as a list of pages.
 
-```toml
+```plx
 [concept]
 ScannedDocument = "A document that has been scanned as a PDF"
 
 [concept.ExtractedPages]
-definition = "A list of pages extracted from a document by OCR"
+description = "A list of pages extracted from a document by OCR"
 refines = "Page"
 
 [pipe.extract_text_from_document]
 type = "PipeOcr"
 description = "Extract text from a scanned document"
-inputs = { ocr_input = "ScannedDocument" }
-output = "ExtractedText"
-should_include_page_views = true
+inputs = { document = "ScannedDocument" }
+output = "Page"
+page_views = true
 page_views_dpi = 200
 ```
 
-The output of the PipeOcr has to be a concept compatible with the native `Page` concept. A concept is compatible with the `Page` concept if it refines the `Page` concept.
+The output of the PipeOcr must be exactly the native `Page` concept.
 
 To use this pipe, you would first need to load a PDF into the `ScannedDocument` concept. After the pipe runs, the `ExtractedPages` concept will contain a list of `PageContent` objects, where each object has the extracted text and a 200 DPI image of the corresponding page.

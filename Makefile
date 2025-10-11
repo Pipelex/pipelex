@@ -14,10 +14,11 @@ VENV_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
 VENV_MYPY := $(VIRTUAL_ENV)/bin/mypy
 VENV_PIPELEX := $(VIRTUAL_ENV)/bin/pipelex
 VENV_MKDOCS := $(VIRTUAL_ENV)/bin/mkdocs
+VENV_PYLINT := $(VIRTUAL_ENV)/bin/pylint
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or imgg or ocr)) and not (needs_output or pipelex_api)"
+USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or ocr)) and not (needs_output or pipelex_api)"
 
 define PRINT_TITLE
     $(eval PROJECT_PART := [$(PROJECT_NAME)])
@@ -45,12 +46,14 @@ make install                  - Create local virtualenv & install all dependenci
 make update                   - Upgrade dependencies via uv
 make validate                 - Run the setup sequence to validate the config and libraries
 make build                    - Build the wheels
-make doc                      - Serve documentation locally with mkdocs
 
 make format                   - format with ruff format
 make lint                     - lint with ruff check
 make pyright                  - Check types with pyright
 make mypy                     - Check types with mypy
+
+make config-template          - Update config template from .pipelex/
+make cft                      - Shorthand -> config-template
 
 make cleanenv                 - Remove virtual env and lock files
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
@@ -77,15 +80,15 @@ make ti                       - Shorthand -> test-inference
 make tip                      - Shorthand -> test-inference-with-prints (parallelized inference tests)
 make test-ocr                 - Run unit tests only for ocr (with prints)
 make to                       - Shorthand -> test-ocr
-make test-imgg                - Run unit tests only for imgg (with prints)
-make test-g					  - Shorthand -> test-imgg
+make test-img-gen             - Run unit tests only for img_gen (with prints)
+make test-g					  - Shorthand -> test-img-gen
 
 make check-unused-imports     - Check for unused imports without fixing
 make fix-unused-imports       - Fix unused imports with ruff
 make fui                      - Shorthand -> fix-unused-imports
 make check-TODOs              - Check for TODOs
 
-make docs                     - Serve documentation with mkdocs
+make docs                     - Serve documentation locally with mkdocs
 make docs-check               - Check documentation build with mkdocs
 make docs-deploy              - Deploy documentation with mkdocs
 
@@ -99,14 +102,16 @@ export HELP
 
 .PHONY: \
 	all help env lock install update build \
-	format lint pyright mypy \
+	format lint pyright mypy pylint \
 	cleanderived cleanenv cleanlibraries cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
-	test-imgg tg test-ocr to codex-tests gha-tests \
+	test-img-gen tg test-ocr to codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy
+	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy \
+	config-template cft \
+	test-count check-test-badge
 
 all help:
 	@echo "$$HELP"
@@ -160,6 +165,13 @@ build: env
 	$(call PRINT_TITLE,"Building the wheels")
 	@uv build
 
+config-template:
+	$(call PRINT_TITLE,"Updating config template from .pipelex/")
+	@rsync -av --exclude='inference/backends.toml' --delete .pipelex/ pipelex/config_template/
+
+cft: config-template
+	@echo "> done: cft = config-template"
+
 ##############################################################################################
 ############################      Cleaning                        ############################
 ##############################################################################################
@@ -189,7 +201,12 @@ cleanlibraries:
 	@find . -type d -wholename './pipelex_libraries' -exec rm -rf {} + && \
 	echo "Cleaned up pipelex_libraries";
 
-cleanall: cleanderived cleanenv cleanlibraries
+cleanconfig:
+	$(call PRINT_TITLE,"Erasing config files and directories")
+	@find . -type d -wholename './.pipelex' -exec rm -rf {} + && \
+	echo "Cleaned up .pipelex";
+
+cleanall: cleanderived cleanenv cleanlibraries cleanconfig
 	@echo "Cleaned up all derived files and directories";
 
 ##########################################################################################
@@ -269,17 +286,17 @@ tp: test-with-prints
 test-inference-with-prints: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --pipe-run-mode live -m "inference and not imgg" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --pipe-run-mode live -m "inference and not img_gen" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	else \
-		$(VENV_PYTEST) --pipe-run-mode live -m "inference and not imgg" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --pipe-run-mode live -m "inference and not img_gen" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
 
 test-inference-fast: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference and not imgg" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference and not img_gen" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	else \
-		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference and not imgg" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference and not img_gen" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
 
 tip: test-inference-with-prints
@@ -291,9 +308,9 @@ ti: test-inference-fast
 ti-dry: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference and not imgg" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference and not img_gen" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	else \
-		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference and not imgg" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference and not img_gen" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
 
 test-ocr: env
@@ -307,16 +324,16 @@ test-ocr: env
 to: test-ocr
 	@echo "> done: to = test-ocr"
 
-test-imgg: env
+test-img-gen: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "imgg" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "img_gen" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	else \
-		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "imgg" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "img_gen" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
 
-tg: test-imgg
-	@echo "> done: tg = test-imgg"
+tg: test-img-gen
+	@echo "> done: tg = test-img-gen"
 
 test-pipelex-api: env
 	$(call PRINT_TITLE,"Unit testing")
@@ -356,20 +373,23 @@ cm: cov-missing
 
 format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	$(VENV_RUFF) format .
+	$(VENV_RUFF) format . --config pyproject.toml
 
 lint: env
 	$(call PRINT_TITLE,"Linting with ruff")
-	$(VENV_RUFF) check . --fix
+	$(VENV_RUFF) check . --fix --config pyproject.toml
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	@$(VENV_PYRIGHT) --pythonpath $(VIRTUAL_ENV)/bin/python3  && \
-	echo "Done typechecking with pyright — disregard warning about latest version, it's giving us false positives"
+	@$(VENV_PYRIGHT) . --project pyproject.toml
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY)
+	$(VENV_MYPY) --config-file pyproject.toml
+
+pylint: env
+	$(call PRINT_TITLE,"Linting with pylint")
+	$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests
 
 
 ##########################################################################################
@@ -378,11 +398,11 @@ mypy: env
 
 merge-check-ruff-format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	$(VENV_RUFF) format --check .
+	$(VENV_RUFF) format --check . --config pyproject.toml
 
 merge-check-ruff-lint: env check-unused-imports
 	$(call PRINT_TITLE,"Linting with ruff without fixing files")
-	$(VENV_RUFF) check .
+	$(VENV_RUFF) check . --config pyproject.toml
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
@@ -391,6 +411,10 @@ merge-check-pyright: env
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
 	$(VENV_MYPY) --config-file pyproject.toml
+
+merge-check-pylint: env
+	$(call PRINT_TITLE,"Linting with pylint")
+	$(VENV_PYLINT) --rcfile pyproject.toml .
 
 ##########################################################################################
 ### MISCELLANEOUS
@@ -437,7 +461,7 @@ c: format lint pyright mypy
 cc: cleanderived c
 	@echo "> done: cc = cleanderived format lint pyright mypy"
 
-check: cc check-unused-imports
+check: cc check-unused-imports pylint
 	@echo "> done: check"
 
 v: validate
@@ -445,3 +469,25 @@ v: validate
 
 li: lock install
 	@echo "> done: lock install"
+
+
+##########################################################################################
+### TEST BADGE
+##########################################################################################
+
+## Print the number of collected pytest tests (just the integer)
+test-count: env
+	@COUNT=$$($(VENV_PYTEST) --collect-only --disable-warnings -q | awk 'NF' | wc -l | tr -d ' '); \
+	echo $$COUNT
+
+## Compare current test count vs .badges/tests.json -> .message; fail if mismatch
+check-test-badge: env
+	@EXPECTED=$$($(VENV_PYTHON) -c 'import json;print(int(json.load(open(".badges/tests.json"))["message"]))'); \
+	ACTUAL=$$($(VENV_PYTEST) --collect-only --disable-warnings -q | awk 'NF' | wc -l | tr -d ' '); \
+	if [ "$$EXPECTED" != "$$ACTUAL" ]; then \
+		echo "❌ Test count mismatch: badge=$$EXPECTED, actual=$$ACTUAL"; \
+		exit 1; \
+	else \
+		echo "✅ Test count matches: $$ACTUAL"; \
+	fi
+	

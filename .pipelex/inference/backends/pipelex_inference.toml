@@ -1,0 +1,135 @@
+################################################################################
+# Pipelex Inference Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for the Pipelex Inference backend.
+# It contains model definitions for various LLM and image generation models
+# accessible through the Pipelex unified inference API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["gpt-4.1"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "openai"
+prompting_target = "anthropic"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- OpenAI LLMs --------------------------------------------------------------
+[gpt-4o]
+model_id = "pipelex/gpt-4o"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.75, output = 11.00 }
+
+[gpt-4o-mini]
+model_id = "pipelex/gpt-4o-mini"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.17, output = 0.66 }
+
+["gpt-4.1"]
+model_id = "pipelex/gpt-4.1"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+
+["gpt-4.1-mini"]
+model_id = "pipelex/gpt-4.1-mini"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 1.6 }
+
+["gpt-4.1-nano"]
+model_id = "pipelex/gpt-4.1-nano"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.4 }
+
+[gpt-5-nano]
+model_id = "pipelex/gpt-5-nano"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.40 }
+
+[gpt-5-mini]
+model_id = "pipelex/gpt-5-mini"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 2.00 }
+
+[gpt-5-chat]
+model_id = "pipelex/gpt-5-chat"
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 1.25, output = 10.00 }
+
+# --- Claude LLMs --------------------------------------------------------------
+["claude-4-sonnet"]
+model_id = "pipelex/claude-4-sonnet"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
+["claude-4.1-opus"]
+model_id = "pipelex/claude-4.1-opus"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 15, output = 75 }
+
+["claude-4.5-sonnet"]
+model_id = "pipelex/claude-4.5-sonnet"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
+# --- Gemini LLMs --------------------------------------------------------------
+["gemini-2.0-flash"]
+model_id = "gemini/gemini-2.0-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.10, output = 0.40 }
+
+["gemini-2.5-flash"]
+model_id = "gemini/gemini-2.5-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.30, output = 2.50 }
+
+["gemini-2.5-flash-lite"]
+model_id = "gemini/gemini-2.5-flash-lite"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.10, output = 0.40 }
+
+# --- XAI LLMs --------------------------------------------------------------
+
+[grok-3]
+model_id = "grok-3"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 3, output = 15 }
+
+[grok-3-mini]
+model_id = "grok-3-mini"
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.3, output = 0.5 }
+
+################################################################################
+# OCR and IMAGE GENERATION MODELS
+################################################################################
+
+# We are still working in giving you acces to OCR and image generation models
+# and to the best models from Mistral through the Pipelex Inference backend.

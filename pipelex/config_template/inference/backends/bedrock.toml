@@ -1,0 +1,101 @@
+################################################################################
+# AWS Bedrock Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for AWS Bedrock models.
+# It contains model definitions for various language models
+# accessible through the AWS Bedrock service.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["claude-3.5-sonnet"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "bedrock_aioboto3"
+prompting_target = "anthropic"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- Mistral Models -----------------------------------------------------------
+[bedrock-mistral-large]
+model_id = "mistral.mistral-large-2407-v1:0"
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 4.0, output = 12.0 }
+
+# --- Meta Llama Models --------------------------------------------------------
+[bedrock-meta-llama-3-3-70b-instruct]
+model_id = "us.meta.llama3-3-70b-instruct-v1:0"
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+# TODO: find out the actual cost per million tokens for llama3 on bedrock
+costs = { input = 3.0, output = 15.0 }
+
+# --- Amazon Nova Models -------------------------------------------------------
+[bedrock-nova-pro]
+model_id = "us.amazon.nova-pro-v1:0"
+max_tokens = 5120
+inputs = ["text"]
+outputs = ["text"]
+# TODO: find out the actual cost per million tokens for nova on bedrock
+costs = { input = 3.0, output = 15.0 }
+
+# --- Claude LLMs --------------------------------------------------------------
+["claude-3.7-sonnet"]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+
+[claude-4-sonnet]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+max_tokens = 64000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+
+[claude-4-opus]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-opus-4-20250514-v1:0"
+max_tokens = 32000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+
+["claude-4.1-opus"]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-opus-4-1-20250805-v1:0"
+max_tokens = 32000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+
+# anthropic.claude-sonnet-4-5-20250929-v1:0,Anthropic,arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0,
+
+["claude-4.5-sonnet"]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }

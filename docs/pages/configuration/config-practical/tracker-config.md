@@ -73,18 +73,18 @@ The pipeline tracker visualizes:
 ```toml
 [tracker]
 is_debug_mode = false
-is_include_text_preview = true
-is_include_interactivity = true
-theme = "auto"
-layout = "auto"
+is_include_text_preview = false
+is_include_interactivity = false
+theme = "base"
+layout = "dagre"
 wrapping_width = "auto"
 nb_items_limit = "unlimited"
 sub_graph_colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
-pipe_edge_style = "solid"
-branch_edge_style = "dashed"
-aggregate_edge_style = "dotted"
-condition_edge_style = "dashdot"
-choice_edge_style = "solid"
+pipe_edge_style = "---->"
+branch_edge_style = "-...-"
+aggregate_edge_style = "-...-"
+condition_edge_style = "-----"
+choice_edge_style = "-----"
 ```
 
 ## Property Accessors

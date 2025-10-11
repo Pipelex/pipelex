@@ -1,24 +1,23 @@
-from typing import Dict, List, Optional
-
 from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import ReportingManagerError
-from pipelex.cogt.inference.cost_registry import CostRegistry
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
+from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import ReportingConfig
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
-LLMUsageRegistryRoot = List[LLMTokensUsage]
+LLMUsageRegistryRoot = list[LLMTokensUsage]
 
 
 class UsageRegistry(RootModel[LLMUsageRegistryRoot]):
-    root: LLMUsageRegistryRoot = Field(default_factory=list)
+    root: LLMUsageRegistryRoot = Field(default_factory=empty_list_factory_of(LLMTokensUsage))
 
     def get_current_tokens_usage(self) -> LLMUsageRegistryRoot:
         return self.root
@@ -29,7 +28,7 @@ class UsageRegistry(RootModel[LLMUsageRegistryRoot]):
 
 class ReportingManager(ReportingProtocol):
     def __init__(self, reporting_config: ReportingConfig):
-        self._usage_registries: Dict[str, UsageRegistry] = {}
+        self._usage_registries: dict[str, UsageRegistry] = {}
         self._reporting_config = reporting_config
 
     ############################################################
@@ -51,7 +50,8 @@ class ReportingManager(ReportingProtocol):
 
     def _get_registry(self, pipeline_run_id: str) -> UsageRegistry:
         if pipeline_run_id not in self._usage_registries:
-            raise ReportingManagerError(f"Registry for pipeline '{pipeline_run_id}' does not exist")
+            msg = f"Registry for pipeline '{pipeline_run_id}' does not exist"
+            raise ReportingManagerError(msg)
         return self._usage_registries[pipeline_run_id]
 
     def _report_llm_job(self, llm_job: LLMJob):
@@ -61,7 +61,7 @@ class ReportingManager(ReportingProtocol):
             log.warning("LLM job has no llm_tokens_usage")
             return
 
-        llm_token_cost_report: Optional[LLMTokenCostReport] = None
+        llm_token_cost_report: LLMTokenCostReport | None = None
 
         if self._reporting_config.is_log_costs_to_console:
             llm_token_cost_report = CostRegistry.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
@@ -79,7 +79,8 @@ class ReportingManager(ReportingProtocol):
     @override
     def open_registry(self, pipeline_run_id: str):
         if pipeline_run_id in self._usage_registries:
-            raise ReportingManagerError(f"Registry for pipeline '{pipeline_run_id}' already exists")
+            msg = f"Registry for pipeline '{pipeline_run_id}' already exists"
+            raise ReportingManagerError(msg)
         self._usage_registries[pipeline_run_id] = UsageRegistry()
 
     @override
@@ -93,8 +94,8 @@ class ReportingManager(ReportingProtocol):
         self._report_llm_job(llm_job=llm_job)
 
     @override
-    def generate_report(self, pipeline_run_id: Optional[str] = None):
-        cost_report_file_path: Optional[str] = None
+    def generate_report(self, pipeline_run_id: str | None = None):
+        cost_report_file_path: str | None = None
         if self._reporting_config.is_generate_cost_report_file_enabled:
             ensure_path(self._reporting_config.cost_report_dir_path)
             cost_report_file_path = get_incremental_file_path(
@@ -103,7 +104,7 @@ class ReportingManager(ReportingProtocol):
                 extension=self._reporting_config.cost_report_extension,
             )
 
-        registries_to_process: Dict[str, UsageRegistry] = {}
+        registries_to_process: dict[str, UsageRegistry] = {}
         if pipeline_run_id:
             registries_to_process = {pipeline_run_id: self._get_registry(pipeline_run_id)}
         else:

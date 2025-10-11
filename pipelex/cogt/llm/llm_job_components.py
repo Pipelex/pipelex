@@ -11,8 +11,8 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 
 class LLMJobParams(BaseModel):
     temperature: float = Field(..., ge=0, le=1)
-    max_tokens: Optional[int] = Field(None, gt=0)
-    seed: Optional[int] = Field(None, ge=0)
+    max_tokens: int | None = Field(None, gt=0)
+    seed: int | None = Field(None, ge=0)
     # OpenAI tools / connectors (Responses or Chat Completions tools)
     openai_use_responses_api: bool = False
     openai_tools: Optional[List[Dict[str, Any]]] = None
@@ -33,4 +33,4 @@ class LLMJobConfig(BaseModel):
 
 
 class LLMJobReport(BaseModel):
-    llm_tokens_usage: Optional[LLMTokensUsage] = None
+    llm_tokens_usage: LLMTokensUsage | None = None

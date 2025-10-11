@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -13,4 +11,4 @@ class PipeJob(BaseModel):
     working_memory: WorkingMemory = Field(default_factory=WorkingMemory)
     pipe_run_params: PipeRunParams
     job_metadata: JobMetadata
-    output_name: Optional[str] = None
+    output_name: str | None = None

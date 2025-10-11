@@ -5,4 +5,3 @@ class OptimizedTweet(TextContent):
     """A tweet optimized for Twitter/X engagement following best practices."""
 
     # TBD
-    pass

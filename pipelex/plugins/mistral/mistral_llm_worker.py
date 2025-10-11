@@ -1,16 +1,19 @@
-from typing import Any, Optional, Type
+from typing import TYPE_CHECKING, Any
 
 import instructor
 from mistralai import Mistral
-from mistralai.models import ChatCompletionResponse
+
+if TYPE_CHECKING:
+    from mistralai.models import ChatCompletionResponse
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionError, LLMEngineParameterError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_models.llm_engine import LLMEngine
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.plugins.mistral.mistral_exceptions import MistralWorkerConfigurationError
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -20,24 +23,26 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,
-        llm_engine: LLMEngine,
-        structure_method: Optional[StructureMethod] = None,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        inference_model: InferenceModelSpec,
+        structure_method: StructureMethod | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
-            llm_engine=llm_engine,
+            inference_model=inference_model,
             structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
 
         if not isinstance(sdk_instance, Mistral):
-            raise SdkTypeError(f"Provided LLM sdk_instance for {self.__class__.__name__} is not of type Mistral: it's a '{type(sdk_instance)}'")
+            msg = f"Provided LLM sdk_instance for {self.__class__.__name__} is not of type Mistral: it's a '{type(sdk_instance)}'"
+            raise SdkTypeError(msg)
 
-        if default_max_tokens := llm_engine.llm_model.max_tokens:
+        if default_max_tokens := inference_model.max_tokens:
             self.default_max_tokens = default_max_tokens
         else:
-            raise LLMEngineParameterError(f"No max_tokens provided for llm model '{self.llm_engine.llm_model.desc}', but it is required for Mistral")
+            msg = f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Mistral"
+            raise MistralWorkerConfigurationError(msg)
         self.mistral_client_for_text: Mistral = sdk_instance
 
         if structure_method:
@@ -53,19 +58,22 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
     ) -> str:
         messages = MistralFactory.make_simple_messages(llm_job=llm_job)
-        response: Optional[ChatCompletionResponse] = await self.mistral_client_for_text.chat.complete_async(
+        response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
             messages=messages,
-            model=self.llm_engine.llm_id,
+            model=self.inference_model.model_id,
             temperature=llm_job.job_params.temperature,
             max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
         )
         if not response:
-            raise LLMCompletionError("Mistral response is None")
+            msg = "Mistral response is None"
+            raise LLMCompletionError(msg)
         if not response.choices:
-            raise LLMCompletionError("Mistral response.choices is None")
+            msg = "Mistral response.choices is None"
+            raise LLMCompletionError(msg)
         mistral_response_content = response.choices[0].message.content
         if not isinstance(mistral_response_content, str):
-            raise LLMCompletionError("Mistral response.choices[0].message.content is not a string")
+            msg = "Mistral response.choices[0].message.content is not a string"
+            raise LLMCompletionError(msg)
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
             llm_tokens_usage.nb_tokens_by_category = MistralFactory.make_nb_tokens_by_category(usage=usage)
@@ -76,12 +84,12 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
             response_model=schema,
             messages=MistralFactory.make_simple_messages_openai_typed(llm_job=llm_job),
-            model=self.llm_engine.llm_id,
+            model=self.inference_model.model_id,
             temperature=llm_job.job_params.temperature,
             max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
         )

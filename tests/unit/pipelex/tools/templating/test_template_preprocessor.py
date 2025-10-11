@@ -1,9 +1,8 @@
+from pipelex import pretty_print
 from pipelex.tools.templating.template_preprocessor import preprocess_template
 
 
 class TestTemplatePreprocessor:
-    """Test the template preprocessing functionality."""
-
     def test_at_variable_pattern(self):
         """Test basic @variable pattern replacement."""
         template = "@expense\n@invoices"
@@ -121,4 +120,28 @@ Optional notes:
             '{{ valid_var|tag("valid_var") }} with '
             '{% if optional_var %}{{ optional_var|tag("optional_var") }}{% endif %}'
         )
+        assert result == expected
+
+    def test_at_variable_with_trailing_dot(self):
+        """Test @variable pattern with trailing dot (punctuation)."""
+        template = "Extract employee information from this invoice text: @invoice_text."
+        result = preprocess_template(template)
+        expected = 'Extract employee information from this invoice text: {{ invoice_text|tag("invoice_text") }}.'
+        assert result == expected
+
+    def test_optional_at_variable_with_trailing_dot(self):
+        """Test @?variable pattern with trailing dot (punctuation)."""
+        template = "Optional information: @?optional_data."
+        result = preprocess_template(template)
+        expected = 'Optional information: {% if optional_data %}{{ optional_data|tag("optional_data") }}{% endif %}.'
+        assert result == expected
+
+    def test_multiple_at_variables_with_trailing_dots(self):
+        """Test multiple @variable patterns with trailing dots."""
+        template = "Extract all articles from this invoice text: @invoice_text. Process the items: @item_list."
+        result = preprocess_template(template)
+        expected = """Extract all articles from this invoice text: {{ invoice_text|tag("invoice_text") }}. Process the items: {{ item_list|tag("item_list") }}."""  # noqa: E501
+
+        pretty_print(result, title="result")
+        pretty_print(expected, title="expected")
         assert result == expected

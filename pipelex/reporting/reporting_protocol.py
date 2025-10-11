@@ -1,4 +1,4 @@
-from typing import Optional, Protocol
+from typing import Protocol
 
 from typing_extensions import override
 
@@ -10,7 +10,7 @@ class ReportingProtocol(Protocol):
 
     def report_inference_job(self, inference_job: InferenceJobAbstract): ...
 
-    def generate_report(self, pipeline_run_id: Optional[str] = None): ...
+    def generate_report(self, pipeline_run_id: str | None = None): ...
 
     def close_registry(self, pipeline_run_id: str): ...
 
@@ -29,7 +29,7 @@ class ReportingNoOp(ReportingProtocol):
         pass
 
     @override
-    def generate_report(self, pipeline_run_id: Optional[str] = None):
+    def generate_report(self, pipeline_run_id: str | None = None):
         pass
 
     @override

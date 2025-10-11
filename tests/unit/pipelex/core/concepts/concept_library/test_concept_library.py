@@ -13,7 +13,7 @@ class TestConceptLibrary:
             domain="test",
             concept_code="TestConcept",
             blueprint=ConceptBlueprint(
-                definition="Lorem Ipsum",
+                description="Lorem Ipsum",
                 structure="ImageContent",
             ),
         )
@@ -22,7 +22,7 @@ class TestConceptLibrary:
             domain="test",
             concept_code="TestConcept2",
             blueprint=ConceptBlueprint(
-                definition="Lorem Ipsum",
+                description="Lorem Ipsum",
                 refines="native.Image",
             ),
         )
@@ -30,7 +30,7 @@ class TestConceptLibrary:
             domain="test",
             concept_code="TestConcept2",
             blueprint=ConceptBlueprint(
-                definition="Lorem Ipsum",
+                description="Lorem Ipsum",
                 refines="Image",
             ),
         )
@@ -39,7 +39,7 @@ class TestConceptLibrary:
             domain="test",
             concept_code="TestConcept4",
             blueprint=ConceptBlueprint(
-                definition="Lorem Ipsum",
+                description="Lorem Ipsum",
                 structure="ImageContent",
             ),
         )
@@ -48,7 +48,7 @@ class TestConceptLibrary:
             domain="test",
             concept_code="TestConcept5",
             blueprint=ConceptBlueprint(
-                definition="Lorem Ipsum",
+                description="Lorem Ipsum",
                 structure="TextContent",
             ),
         )
@@ -57,7 +57,7 @@ class TestConceptLibrary:
             domain="test",
             concept_code="TestConcept6",
             blueprint=ConceptBlueprint(
-                definition="Lorem Ipsum",
+                description="Lorem Ipsum",
                 structure="PDFContent",
             ),
         )

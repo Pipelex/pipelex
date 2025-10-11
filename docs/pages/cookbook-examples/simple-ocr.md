@@ -16,7 +16,7 @@ The core of this example is a simple function that creates a "working memory" fr
 async def simple_ocr(pdf_url: str):
     working_memory = WorkingMemoryFactory.make_from_pdf(
         pdf_url=pdf_url,
-        concept_str="PDF",
+        concept_string="PDF",
         name="pdf",
     )
     pipe_output = await execute_pipeline(

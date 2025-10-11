@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -14,10 +12,10 @@ class PipeJobFactory:
     def make_pipe_job(
         cls,
         pipe: PipeAbstract,
-        pipe_run_params: Optional[PipeRunParams] = None,
-        working_memory: Optional[WorkingMemory] = None,
-        job_metadata: Optional[JobMetadata] = None,
-        output_name: Optional[str] = None,
+        pipe_run_params: PipeRunParams | None = None,
+        working_memory: WorkingMemory | None = None,
+        job_metadata: JobMetadata | None = None,
+        output_name: str | None = None,
     ) -> PipeJob:
         job_metadata = job_metadata or JobMetadata()
         working_memory = working_memory or WorkingMemoryFactory.make_empty()

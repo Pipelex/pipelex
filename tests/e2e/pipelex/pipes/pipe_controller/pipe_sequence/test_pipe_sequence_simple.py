@@ -24,7 +24,7 @@ async def test_simple_text_sequence(pipe_run_mode: PipeRunMode):
         concept=ConceptFactory.make(
             concept_code="RawText",
             domain="simple_text_processing",
-            definition="simple_text_processing.RawText",
+            description="simple_text_processing.RawText",
             structure_class_name="TextContent",
         ),
         content=TextContent(text="This is  some  messy    text with bad spacing."),

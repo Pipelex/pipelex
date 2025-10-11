@@ -1,5 +1,5 @@
 import os
-from typing import Set, cast
+from typing import cast
 
 from pipelex import log
 from pipelex.config import get_config
@@ -25,10 +25,10 @@ class ActivityHandlerForResultFiles:
         self.result_dir_path = result_dir_path
         self.images_dir_path = os.path.join(result_dir_path, "images")
         ensure_path(self.images_dir_path)
-        imgg_config = get_config().cogt.imgg_config
-        imgg_param_defaults = imgg_config.imgg_param_defaults
-        self.image_output_format = imgg_param_defaults.output_format
-        self.already_handled_stuff: Set[str] = set()
+        img_gen_config = get_config().cogt.img_gen_config
+        img_gen_param_defaults = img_gen_config.img_gen_param_defaults
+        self.image_output_format = img_gen_param_defaults.output_format
+        self.already_handled_stuff: set[str] = set()
 
     def _generate_stuff_id(self, stuff: Stuff) -> str:
         # Use name if available, otherwise just use code
@@ -66,7 +66,7 @@ class ActivityHandlerForResultFiles:
             self._handle_structured_content(content=stuff.content, stuff_id=stuff_id)
         elif isinstance(stuff.content, ListContent):
             # TODO: check that all items are StuffContent
-            self._handle_list_content(content=cast(ListContent[StuffContent], stuff.content), stuff_id=stuff_id)  # type: ignore
+            self._handle_list_content(content=cast("ListContent[StuffContent]", stuff.content), stuff_id=stuff_id)  # pyright: ignore[reportUnknownMemberType]
         else:
             log.error(f"Unhandled stuff content type: {type(stuff.content)}")
 
@@ -88,7 +88,7 @@ class ActivityHandlerForResultFiles:
         # Save the image
         image_path = os.path.join(self.images_dir_path, f"{stuff_id}.{self.image_output_format}")
         if content.url.startswith("http"):
-            image_bytes: bytes = fetch_file_from_url_httpx(url=content.url, timeout=10)
+            image_bytes: bytes = fetch_file_from_url_httpx(url=content.url, request_timeout=10)
             with open(image_path, "wb") as image_file:
                 image_file.write(image_bytes)
         else:

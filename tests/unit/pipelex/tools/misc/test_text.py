@@ -4,7 +4,7 @@ from pipelex.tools.misc.string_utils import has_text
 
 
 @pytest.mark.parametrize(
-    "case, expected",
+    ("case", "expected"),
     [
         ("!!!", False),
         ("   ", False),

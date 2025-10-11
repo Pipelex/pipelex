@@ -1,13 +1,19 @@
 import pytest
+from anthropic import AuthenticationError
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from pipelex.cogt.exceptions import LLMSDKError
-from pipelex.cogt.llm.llm_models.llm_platform import LLMPlatform
-from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_anthropic_models
+from pipelex.hub import get_models_manager
+from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError
+from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_available_models
+from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.tools.environment import all_env_vars_are_set, any_env_var_is_placeholder
+
+REQUIRED_ENV_VARS = ["ANTHROPIC_API_KEY"]
 
 
+# TODO: fix this: test works for Anthropic but not if you set peferred platform for Anthropic is Bedrock
 # make t VERBOSE=2 TEST=TestAnthropic
 @pytest.mark.gha_disabled
 @pytest.mark.codex_disabled
@@ -18,15 +24,25 @@ class TestAnthropic:
     async def test_anthropic_list_models(
         self,
         pytestconfig: pytest.Config,
-        llm_platform_for_anthropic_sdk: LLMPlatform,
+        plugin_for_anthropic: Plugin,
     ):
+        if not all_env_vars_are_set(keys=REQUIRED_ENV_VARS):
+            pytest.skip(f"Some key(s) missing amongst {REQUIRED_ENV_VARS}")
+        if any_env_var_is_placeholder(REQUIRED_ENV_VARS):
+            pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         try:
-            anthropic_models_list = await anthropic_list_anthropic_models(llm_platform=llm_platform_for_anthropic_sdk)
-        except LLMSDKError as exc:
+            backend = get_models_manager().get_required_inference_backend("anthropic")
+            anthropic_models_list = await anthropic_list_available_models(
+                plugin=plugin_for_anthropic,
+                backend=backend,
+            )
+        except AuthenticationError as auth_exc:
+            pytest.fail(f"Authentication error for Anthropic: {auth_exc}")
+        except AnthropicSDKUnsupportedError as exc:
             if "does not support listing models" in str(exc):
                 pytest.skip(f"Skipping: {exc}")
             else:
-                raise exc
+                pytest.fail(f"Error listing Anthropic models: {exc}")
         if pytestconfig.get_verbosity() >= 2:
             # Create and configure the table
             console = Console()

@@ -3,61 +3,60 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.hub import get_report_delegate
 from pipelex.pipeline.execute import execute_pipeline
 from tests.test_pipelines.test_tweet import OptimizedTweet
 
 SAMPLE_DRAFT_TWEET = """
-Local high school basketball star Maria Rodriguez was the talk of Division I scouts - 6'2", 
-averaging 28 points per game, with offers from Duke, Stanford, and UConn all on the table. 
-Her single mother worked three jobs to keep them afloat, and a full ride scholarship seemed 
+Local high school basketball star Maria Rodriguez was the talk of Division I scouts - 6'2",
+averaging 28 points per game, with offers from Duke, Stanford, and UConn all on the table.
+Her single mother worked three jobs to keep them afloat, and a full ride scholarship seemed
 like their golden ticket out of poverty.
 
-But Maria saw something else when she looked around her neighborhood in East Oakland. Kids 
-as young as 8 were getting recruited into gangs because there was literally nothing else to 
-do after school. The community center had been closed for budget cuts, the local high school's 
+But Maria saw something else when she looked around her neighborhood in East Oakland. Kids
+as young as 8 were getting recruited into gangs because there was literally nothing else to
+do after school. The community center had been closed for budget cuts, the local high school's
 sports programs were underfunded, and talented kids were falling through the cracks every single day.
 
-So Maria made a decision that shocked everyone: she turned down every scholarship offer and 
-enrolled at the local community college instead. Her guidance counselor called her crazy. Her mother 
+So Maria made a decision that shocked everyone: she turned down every scholarship offer and
+enrolled at the local community college instead. Her guidance counselor called her crazy. Her mother
 cried for weeks. But Maria had a plan.
 
-She started coaching youth basketball teams for free, but knew she needed to leverage cutting-edge 
-digital transformation strategies to optimize her community impact ecosystem. Maria decided to disrupt 
-traditional youth development paradigms by creating a revolutionary blockchain-powered, cloud-native 
-mobile application called "HoopSync" - a next-generation SaaS platform that synergizes basketball 
-analytics with holistic youth empowerment through machine learning algorithms that predict optimal 
+She started coaching youth basketball teams for free, but knew she needed to leverage cutting-edge
+digital transformation strategies to optimize her community impact ecosystem. Maria decided to disrupt
+traditional youth development paradigms by creating a revolutionary blockchain-powered, cloud-native
+mobile application called "HoopSync" - a next-generation SaaS platform that synergizes basketball
+analytics with holistic youth empowerment through machine learning algorithms that predict optimal
 mentorship touchpoints while scaling community engagement metrics across multiple verticals.
 
-The app was basically just a group chat where kids could message her about practice times, but Maria's 
-LinkedIn posts made it sound like she was launching the next unicorn startup. She used phrases like 
-"pivoting the youth sports landscape through innovative digital solutions" and "monetizing social 
+The app was basically just a group chat where kids could message her about practice times, but Maria's
+LinkedIn posts made it sound like she was launching the next unicorn startup. She used phrases like
+"pivoting the youth sports landscape through innovative digital solutions" and "monetizing social
 impact through strategic technology integration." The cringe factor was off the charts.
 
-Things got ultra-awkward when Maria tried to go viral on TikTok with her "Ball is Life, Tech is Wife" 
-dance challenge. The video of her doing robot moves while dribbling a basketball in her garage got 47 
-views (mostly from her mom's different accounts) and became a local meme for all the wrong reasons. 
-She literally ended every sentence with "periodt bestie" for three months and wore backwards baseball 
+Things got ultra-awkward when Maria tried to go viral on TikTok with her "Ball is Life, Tech is Wife"
+dance challenge. The video of her doing robot moves while dribbling a basketball in her garage got 47
+views (mostly from her mom's different accounts) and became a local meme for all the wrong reasons.
+She literally ended every sentence with "periodt bestie" for three months and wore backwards baseball
 aps to "connect with the youth demographic."
 
-But somehow, despite the cringey marketing and unnecessarily complicated app that could have been a 
-simple calendar, Maria's genuine heart shone through. She personally drove kids to tryouts across the 
-Bay Area, organized weekend tournaments in parking lots, and convinced local businesses to sponsor uniforms. 
-Within two years, she had created a pipeline that helped 47 kids earn college scholarships - more than 
+But somehow, despite the cringey marketing and unnecessarily complicated app that could have been a
+simple calendar, Maria's genuine heart shone through. She personally drove kids to tryouts across the
+Bay Area, organized weekend tournaments in parking lots, and convinced local businesses to sponsor uniforms.
+Within two years, she had created a pipeline that helped 47 kids earn college scholarships - more than
 her high school had produced in the previous decade combined.
 
-The real breakthrough came when one of her TikTok fails accidentally went viral (2.3M views of her 
-tripping while filming a "motivational Monday" video). Instead of hiding, Maria owned the embarrassment 
-and pivoted it into authentic storytelling about failure and resilience. The authenticity resonated, 
-leading to corporate partnerships and even NBA players donating equipment after seeing her genuine 
+The real breakthrough came when one of her TikTok fails accidentally went viral (2.3M views of her
+tripping while filming a "motivational Monday" video). Instead of hiding, Maria owned the embarrassment
+and pivoted it into authentic storytelling about failure and resilience. The authenticity resonated,
+leading to corporate partnerships and even NBA players donating equipment after seeing her genuine
 mission beyond the tech buzzwords.
 
-Now she's breaking ground on a 15,000 square foot community center funded by the unlikely combination 
-of her cringe-famous social media presence and the world's most over-engineered youth sports app. 
-The center will serve 500+ kids annually, and Maria has finally learned that sometimes the best technology 
+Now she's breaking ground on a 15,000 square foot community center funded by the unlikely combination
+of her cringe-famous social media presence and the world's most over-engineered youth sports app.
+The center will serve 500+ kids annually, and Maria has finally learned that sometimes the best technology
 is just showing up with a basketball and genuine care.
 
-Maria's story proves that even the most cringe-worthy execution can't stop authentic purpose, and 
+Maria's story proves that even the most cringe-worthy execution can't stop authentic purpose, and
 that sometimes you have to embrace being the main character of your own embarrassing story to create real change.
 """
 
@@ -72,7 +71,7 @@ I chose the bootcamp.
 
 Fast forward 18 months:
 → $85k salary
-→ Remote work freedom  
+→ Remote work freedom
 → Built apps used by 100k+ people
 → Speaking at conferences
 
@@ -120,7 +119,6 @@ class TestPipeSequenceWithInputMemory:
 
         # Log output and generate report
         pretty_print(pipe_output, title="Pipe output for optimize_tweet_sequence")
-        get_report_delegate().generate_report()
 
         # Verify the optimized tweet is different from the draft
         assert optimized_tweet.text != SAMPLE_DRAFT_TWEET

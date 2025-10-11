@@ -1,12 +1,13 @@
 
 
 [pipelex]
-extra_env_files = []
+[pipelex.observer_config]
+observer_dir = "results/observer"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags
-is_pipeline_tracking_enabled = true
-is_activity_tracking_enabled = true
+is_pipeline_tracking_enabled = false
+is_activity_tracking_enabled = false
 is_reporting_enabled = true
 
 [pipelex.reporting_config]
@@ -59,7 +60,7 @@ pipelex = "INFO"
 is_show_time = false
 is_show_level = true
 is_link_path_enabled = true
-is_markup_enabled = false
+is_markup_enabled = true
 highlighter_name = "json"
 is_rich_tracebacks = true
 is_tracebacks_word_wrap = true
@@ -76,41 +77,39 @@ api_key_method = "env"
 
 [cogt]
 
+[cogt.inference_config]
+inference_config_path = ".pipelex/inference"
+
 [cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
-is_auto_setup_preset_imgg = true
+is_auto_setup_preset_img_gen = true
 is_auto_setup_preset_ocr = true
 
 [cogt.llm_config]
 default_max_images = 100
+is_structure_prompt_enabled = true
 
 [cogt.llm_config.instructor_config]
 is_openai_structured_output_enabled = false
+is_dump_kwargs_enabled = false
+is_dump_response_enabled = false
+is_dump_error_enabled = false
 
 [cogt.llm_config.llm_job_config]
 max_retries = 3
 is_streaming_enabled = false
 
-[cogt.llm_config.preferred_platforms]
-# These overrride the defaults set for any llm handle
-# "gpt-4o-mini" = "openai"
-
 ####################################################################################################
 # Image generation config
 ####################################################################################################
 
-[cogt.imgg_config]
-imgg_handles = ["fal-ai/flux-pro", "fal-ai/fast-lightning-sdxl"]
-default_imgg_handle = "fal-ai/flux-pro/v1.1-ultra"  # use "fal-ai/fast-lightning-sdxl" for SDXL Lightning cheap and fast
-
-[cogt.imgg_config.imgg_job_config]
+[cogt.img_gen_config.img_gen_job_config]
 is_sync_mode = false
 
-[cogt.imgg_config.imgg_param_defaults]
-# quality and nb_steps cannot be set at the same time
-# nb_steps = 1  # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
+[cogt.img_gen_config.img_gen_param_defaults]
+nb_steps = 1            # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
 quality = "low"
-aspect_ratio = "square"  # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
+aspect_ratio = "square" # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
 guidance_scale = 3.5
 background = "auto"
 is_moderated = true
@@ -119,12 +118,15 @@ is_raw = false
 output_format = "jpg"
 seed = "auto"
 
+[cogt.img_gen_config.fal_config]
+flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
+sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
+
 ####################################################################################################
 # OCR config
 ####################################################################################################
 
 [cogt.ocr_config]
-ocr_handles = ["mistral/mistral-ocr-latest"]
 page_output_text_file_name = "page_text.md"
 default_page_views_dpi = 72
 
@@ -142,7 +144,7 @@ mistral = { tag_style = "square_brackets" }
 gemini = { tag_style = "xml" }
 
 [pipelex.structure_config]
-is_default_text_then_structure = false  # turn this to true to get better results: generates text before structuring
+is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
 
 
 ####################################################################################################
@@ -163,7 +165,7 @@ structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
 default_reaction = "raise"
 
 [pipelex.static_validation_config.reactions]
-# enable one of these to tolerate some static validation errors, like you would for pyright or some linters
+# default_reaction is on raise
 # missing_input_variable = "log"
 # extraneous_input_variable = "log"
 # inadequate_input_concept = "log"
@@ -178,7 +180,7 @@ is_include_text_preview = false
 is_include_interactivity = false
 nb_items_limit = "unlimited"
 theme = "base"
-layout = "dagre"  # "elk", "dagre", "fixed"
+layout = "dagre"                                     # "elk", "dagre", "fixed"
 sub_graph_colors = ["#e6f5ff", "#fff5f7", "#f0fff0"]
 wrapping_width = "auto"
 
@@ -205,9 +207,34 @@ apply_to_jinja2_rendering = false
 text_gen_truncate_length = 256
 nb_list_items = 3
 nb_ocr_pages = 4
-allowed_to_fail_pipes = ["infinite_loop_1", "build_blueprint", "structure_blueprint"]
+allowed_to_fail_pipes = [
+    "infinite_loop_1",              # Loop but only for testing purposes
+    "fix_failing_pipes_once",       # Loop but its normal
+    "validate_pipelex_bundle_spec", # Loop but its normal
+    "handle_validation_result",     # Complex case of a sub pipe needed a ListContent because its batching on, but the dry_run cannot know.
+    "pipe_builder",                 # because of the 'fix_failing_pipes_once', 'validate_pipelex_bundle_spec', 'handle_validation_result'
+]
 image_urls = [
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
-    ]
+]
 
+####################################################################################################
+# PLX config
+####################################################################################################
+
+[pipelex.plx_config.inline_tables]
+spaces_inside_curly_braces = true
+
+[pipelex.plx_config.strings]
+prefer_literal = false
+force_multiline = false
+length_limit_to_multiline = 100
+ensure_trailing_newline = true
+ensure_leading_blank_line = true
+
+[pipelex.plx_config.concepts]
+structure_field_ordering = ["type", "description", "choices", "required"]
+
+[pipelex.plx_config.pipes]
+field_ordering = ["type", "description", "inputs", "output"]

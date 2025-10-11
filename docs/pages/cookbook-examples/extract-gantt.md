@@ -15,7 +15,7 @@ async def extract_gantt(image_url: str) -> GanttChart:
     # Create Working Memory
     working_memory = WorkingMemoryFactory.make_from_image(
         image_url=image_url,
-        concept_str="gantt.GanttImage",
+        concept_string="gantt.GanttImage",
         name="gantt_chart_image",
     )
 
@@ -53,11 +53,11 @@ class GanttChart(StructuredContent):
     milestones: Optional[List[Milestone]]
 ```
 
-## The Pipeline Definition: `gantt.toml`
+## The Pipeline Definition: `gantt.plx`
 
 The `extract_gantt_by_steps` pipeline is a sequence of smaller, focused pipes. This is a great example of building a complex workflow from simple, reusable components.
 
-```toml
+```plx
 [pipe.extract_gantt_by_steps]
 type = "PipeSequence"
 description = "Extract all details from a gantt chart"

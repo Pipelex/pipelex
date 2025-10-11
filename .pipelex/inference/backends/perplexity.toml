@@ -1,0 +1,60 @@
+################################################################################
+# Perplexity Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Perplexity AI models.
+# It contains model definitions for Sonar and reasoning models
+# accessible through the Perplexity API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["sonar-pro"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "openai"
+prompting_target = "anthropic"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- Sonar Series -------------------------------------------------------------
+[sonar-pro]
+model_id = "sonar-pro"
+inputs = ["text"]
+outputs = ["text"]
+
+[sonar]
+model_id = "sonar"
+inputs = ["text"]
+outputs = ["text"]
+
+[sonar-deep-research]
+model_id = "sonar-deep-research"
+inputs = ["text"]
+outputs = ["text"]
+
+# --- Sonar Reasoning Series ---------------------------------------------------
+[sonar-reasoning-pro]
+model_id = "sonar-reasoning-pro"
+inputs = ["text"]
+outputs = ["text"]
+
+[sonar-reasoning]
+model_id = "sonar-reasoning"
+inputs = ["text"]
+outputs = ["text"]
+
+# --- DeepSeek Models -----------------------------------------------------------
+[perplexity-deepseek-r1]
+model_id = "r1-1776"
+inputs = ["text"]
+outputs = ["text"]

@@ -1,11 +1,13 @@
 import warnings
-from typing import Any, Dict, List
+from typing import Any
 
 import boto3
 import pytest
 from rich import box
 from rich.console import Console
 from rich.table import Table
+
+from pipelex.tools.environment import all_env_vars_are_set, any_env_var_is_placeholder
 
 warnings.filterwarnings(
     "ignore",
@@ -14,6 +16,8 @@ warnings.filterwarnings(
 )
 # Apply pytest-level filter to ensure the warning is suppressed during test collection and execution
 pytestmark = pytest.mark.filterwarnings("ignore:.*datetime\\.datetime\\.utcnow\\(\\).*:DeprecationWarning")
+
+REQUIRED_ENV_VARS = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"]
 
 
 # make t VERBOSE=2 TEST=TestBedrock
@@ -27,9 +31,13 @@ class TestBedrock:
         bedrock_provider: str,
         bedrock_region_name: str,
     ):
+        if not all_env_vars_are_set(keys=REQUIRED_ENV_VARS):
+            pytest.skip(f"Some key(s) missing amongst {REQUIRED_ENV_VARS}")
+        if any_env_var_is_placeholder(REQUIRED_ENV_VARS):
+            pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         client = boto3.client("bedrock", region_name=bedrock_region_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        response: Dict[str, Any] = client.list_foundation_models(byProvider=bedrock_provider)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        bedrock_models_list: List[Dict[str, Any]] = response["modelSummaries"]  # pyright: ignore[reportUnknownVariableType]
+        response: dict[str, Any] = client.list_foundation_models(byProvider=bedrock_provider)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        bedrock_models_list: list[dict[str, Any]] = response["modelSummaries"]  # pyright: ignore[reportUnknownVariableType]
         if pytestconfig.get_verbosity() >= 2:
             # Create and configure the table
             console = Console()
@@ -59,9 +67,13 @@ class TestBedrock:
         pytestconfig: pytest.Config,
         bedrock_region_name: str,
     ):
+        if not all_env_vars_are_set(keys=REQUIRED_ENV_VARS):
+            pytest.skip(f"Some key(s) missing amongst {REQUIRED_ENV_VARS}")
+        if any_env_var_is_placeholder(REQUIRED_ENV_VARS):
+            pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         client = boto3.client("bedrock", region_name=bedrock_region_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        response: Dict[str, Any] = client.list_inference_profiles()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        inference_profiles_list: List[Dict[str, Any]] = response["inferenceProfileSummaries"]  # pyright: ignore[reportUnknownVariableType]
+        response: dict[str, Any] = client.list_inference_profiles()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        inference_profiles_list: list[dict[str, Any]] = response["inferenceProfileSummaries"]  # pyright: ignore[reportUnknownVariableType]
         if pytestconfig.get_verbosity() >= 2:
             # Create and configure the table
             console = Console()

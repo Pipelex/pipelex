@@ -1,15 +1,13 @@
-import os
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Type
+from typing import ClassVar
 
+from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.llm.llm_models.llm_deck import LLMDeck
 from pipelex.config import get_config
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain import Domain
@@ -21,22 +19,25 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.exceptions import (
+    ConceptDefinitionError,
     ConceptLibraryError,
+    ConceptLoadingError,
+    DomainDefinitionError,
+    DomainLoadingError,
     LibraryError,
+    LibraryLoadingError,
+    PipeDefinitionError,
     PipeLibraryError,
+    PipeLoadingError,
 )
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
+from pipelex.tools.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
-from pipelex.tools.misc.json_utils import deep_update
-from pipelex.tools.misc.toml_utils import TOMLValidationError, load_toml_from_path, validate_toml_file
 from pipelex.tools.runtime_manager import runtime_manager
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import StrEnum
-
-
-class LLMDeckNotFoundError(LibraryError):
-    pass
 
 
 class LibraryComponent(StrEnum):
@@ -44,7 +45,7 @@ class LibraryComponent(StrEnum):
     PIPE = "pipe"
 
     @property
-    def error_class(self) -> Type[LibraryError]:
+    def error_class(self) -> type[LibraryError]:
         match self:
             case LibraryComponent.CONCEPT:
                 return ConceptLibraryError
@@ -53,9 +54,9 @@ class LibraryComponent(StrEnum):
 
 
 class LibraryManager(LibraryManagerAbstract):
-    allowed_root_attributes: ClassVar[List[str]] = [
+    allowed_root_attributes: ClassVar[list[str]] = [
         "domain",
-        "definition",
+        "description",
         "system_prompt",
         "system_prompt_jto_structure",
         "prompt_template_to_structure",
@@ -72,44 +73,14 @@ class LibraryManager(LibraryManagerAbstract):
         self.concept_library = concept_library
         self.pipe_library = pipe_library
         self.library_config = library_config
-        self.llm_deck: Optional[LLMDeck] = None
 
     @override
     def validate_libraries(self):
         log.debug("LibraryManager validating libraries")
 
-        if self.llm_deck is None:
-            raise LibraryError("LLM deck is not loaded")
-
-        self.llm_deck.validate_llm_presets()
-        LLMDeck.final_validate(deck=self.llm_deck)
         self.concept_library.validate_with_libraries()
         self.pipe_library.validate_with_libraries()
         self.domain_library.validate_with_libraries()
-
-    def _validate_toml_files(self):
-        """Validate all TOML files used by the library manager for formatting issues."""
-        log.debug("LibraryManager validating TOML file formatting")
-
-        # Validation of LLM deck paths
-        llm_deck_paths = self.library_config.get_llm_deck_paths()
-        for llm_deck_path in llm_deck_paths:
-            if os.path.exists(llm_deck_path):
-                try:
-                    validate_toml_file(llm_deck_path)
-                except TOMLValidationError as exc:
-                    log.error(f"TOML formatting issues in LLM deck file '{llm_deck_path}': {exc}")
-                    raise LibraryError(f"TOML validation failed for LLM deck file '{llm_deck_path}': {exc}") from exc
-
-        # Validation of template paths
-        template_paths = self.library_config.get_templates_paths()
-        for template_path in template_paths:
-            if os.path.exists(template_path):
-                try:
-                    validate_toml_file(template_path)
-                except TOMLValidationError as exc:
-                    log.error(f"TOML formatting issues in template file '{template_path}': {exc}")
-                    raise LibraryError(f"TOML validation failed for template file '{template_path}': {exc}") from exc
 
     @override
     def setup(self) -> None:
@@ -117,7 +88,6 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def teardown(self) -> None:
-        self.llm_deck = None
         self.pipe_library.teardown()
         self.concept_library.teardown()
         self.domain_library.teardown()
@@ -127,95 +97,114 @@ class LibraryManager(LibraryManagerAbstract):
         self.teardown()
         self.setup()
 
-    def _get_pipeline_library_dirs(self) -> List[Path]:
+    def _get_pipeline_library_dirs(self) -> list[Path]:
         library_dirs = [Path(self.library_config.pipelines_dir_path)]
         if runtime_manager.is_unit_testing:
             log.debug("Registering test pipeline structures for unit testing")
             library_dirs += [Path(self.library_config.test_pipelines_dir_path)]
         return library_dirs
 
-    def _get_pipelex_toml_files_from_dirs(self, dirs: List[Path]) -> List[Path]:
-        """Get all valid Pipelex TOML files from the given directories."""
-
-        all_toml_paths: List[Path] = []
+    def _get_pipelex_plx_files_from_dirs(self, dirs: list[Path]) -> list[Path]:
+        """Get all valid Pipelex PLX files from the given directories."""
+        all_plx_paths: list[Path] = []
         for dir_path in dirs:
             if not dir_path.exists():
-                raise LibraryError(f"Directory does not exist: {dir_path}")
+                msg = f"Directory does not exist: {dir_path}"
+                raise LibraryError(msg)
 
             # Find all TOML files in the directory
-            toml_files = find_files_in_dir(
+            plx_files = find_files_in_dir(
                 dir_path=str(dir_path),
-                pattern="*.toml",
+                pattern="*.plx",
                 is_recursive=True,
             )
 
             # Filter to only include valid Pipelex files
-            for toml_file in toml_files:
-                if PipelexInterpreter.is_pipelex_file(toml_file):
-                    all_toml_paths.append(toml_file)
+            for plx_file in plx_files:
+                if PipelexInterpreter.is_pipelex_file(plx_file):
+                    all_plx_paths.append(plx_file)
                 else:
-                    log.debug(f"Skipping non-Pipelex TOML file: {toml_file}")
+                    log.debug(f"Skipping non-Pipelex PLX file: {plx_file}")
 
-        return all_toml_paths
-
-    @override
-    def load_from_file(self, toml_path: Path) -> None:
-        """Load a single file - this method is kept for compatibility."""
-        if not PipelexInterpreter.is_pipelex_file(toml_path):
-            raise LibraryError(f"File is not a valid Pipelex TOML file: {toml_path}")
-
-        blueprint = PipelexInterpreter(file_path=toml_path).make_pipelex_bundle_blueprint()
-        self.load_from_blueprint(blueprint)
+        return all_plx_paths
 
     @override
-    def load_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[PipeAbstract]:
+    def load_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> list[PipeAbstract]:
         """Load a blueprint."""
         # Create and load domain
-        domain = self._load_domain_from_blueprint(blueprint)
+        try:
+            domain = self._load_domain_from_blueprint(blueprint)
+        except DomainDefinitionError as exc:
+            msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
+            raise DomainLoadingError(message=msg, domain_code=exc.domain_code, description=exc.description, source=exc.source) from exc
         self.domain_library.add_domain(domain=domain)
 
         # Create and load concepts
-        concepts = self._load_concepts_from_blueprint(blueprint)
+        try:
+            concepts = self._load_concepts_from_blueprint(blueprint)
+        except ConceptDefinitionError as exc:
+            msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
+            raise ConceptLoadingError(
+                message=msg, concept_definition_error=exc, concept_code=exc.concept_code, description=exc.description, source=exc.source
+            ) from exc
         self.concept_library.add_concepts(concepts=concepts)
 
         # Create and load pipes
-        pipes = self._load_pipes_from_blueprint(blueprint)
+        try:
+            pipes = self._load_pipes_from_blueprint(blueprint)
+        except PipeDefinitionError as exc:
+            msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
+            raise PipeLoadingError(
+                message=msg, pipe_definition_error=exc, pipe_code=exc.pipe_code or "", description=exc.description or "", source=exc.source
+            ) from exc
         self.pipe_library.add_pipes(pipes=pipes)
 
         return pipes
 
+    @override
+    def remove_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
+        if blueprint.pipe is not None:
+            self.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
+
+        # Remove concepts (they may depend on domain)
+        if blueprint.concept is not None:
+            concept_codes_to_remove = [
+                ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
+                for concept_code in blueprint.concept
+            ]
+            self.concept_library.remove_concepts_by_codes(concept_codes=concept_codes_to_remove)
+
+        self.domain_library.remove_domain_by_code(domain_code=blueprint.domain)
+
     def _load_domain_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> Domain:
-        """Create a Domain from blueprint."""
         return DomainFactory.make_from_blueprint(
             blueprint=DomainBlueprint(
+                source=blueprint.source,
                 code=blueprint.domain,
-                definition=blueprint.definition,
+                description=blueprint.description or "",
                 system_prompt=blueprint.system_prompt,
                 system_prompt_to_structure=blueprint.system_prompt_to_structure,
                 prompt_template_to_structure=blueprint.prompt_template_to_structure,
-            )
+            ),
         )
 
-    def _load_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[Concept]:
-        """Create Concepts from blueprint."""
-        concepts: List[Concept] = []
+    def _load_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> list[Concept]:
+        if blueprint.concept is None:
+            return []
 
-        if blueprint.concept is not None:
-            for concept_code, concept_blueprint_or_str in blueprint.concept.items():
-                concept = ConceptFactory.make_from_blueprint(
-                    domain=blueprint.domain,
-                    concept_code=concept_code,
-                    concept_codes_from_the_same_domain=list(blueprint.concept.keys()),
-                    blueprint=ConceptBlueprint(definition=concept_blueprint_or_str)
-                    if isinstance(concept_blueprint_or_str, str)
-                    else concept_blueprint_or_str,
-                )
-                concepts.append(concept)
+        concepts: list[Concept] = []
+        for concept_code, concept_blueprint_or_description in blueprint.concept.items():
+            concept = ConceptFactory.make_from_blueprint_or_description(
+                domain=blueprint.domain,
+                concept_code=concept_code,
+                concept_codes_from_the_same_domain=list(blueprint.concept.keys()),
+                concept_blueprint_or_description=concept_blueprint_or_description,
+            )
+            concepts.append(concept)
         return concepts
 
-    def _load_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> List[PipeAbstract]:
-        """Create Pipes from blueprint."""
-        pipes: List[PipeAbstract] = []
+    def _load_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> list[PipeAbstract]:
+        pipes: list[PipeAbstract] = []
         if blueprint.pipe is not None:
             for pipe_name, pipe_blueprint in blueprint.pipe.items():
                 pipe = PipeFactory.make_from_blueprint(
@@ -228,70 +217,74 @@ class LibraryManager(LibraryManagerAbstract):
         return pipes
 
     @override
-    def load_libraries(self, library_dirs: Optional[List[Path]] = None, library_file_paths: Optional[List[Path]] = None) -> None:
-        dirs_to_use: List[Path] = self._get_pipeline_library_dirs()
-        all_toml_paths: List[Path] = self._get_pipelex_toml_files_from_dirs(dirs_to_use)
+    def load_libraries(
+        self,
+        library_dirs: list[Path] | None = None,
+        library_file_paths: list[Path] | None = None,
+    ) -> None:
+        dirs_to_use = library_dirs or self._get_pipeline_library_dirs()
 
-        # Remove failing pipelines from the list
-        failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
-        failing_paths_set = {Path(fp) for fp in failing_pipelines_file_paths}
-        all_toml_paths = [path for path in all_toml_paths if path not in failing_paths_set]
-
-        if library_dirs is not None:
-            dirs_to_use = library_dirs
+        valid_plx_paths: list[Path]
+        if library_file_paths:
+            valid_plx_paths = library_file_paths
+        else:
+            all_plx_paths: list[Path] = self._get_pipelex_plx_files_from_dirs(dirs_to_use)
+            # Remove failing pipelines from the list
+            failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
+            valid_plx_paths = [path for path in all_plx_paths if path not in failing_pipelines_file_paths]
 
         # Register classes in the directories
         for library_dir in dirs_to_use:
             ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_dir))
-
-        if library_file_paths is not None:
-            all_toml_paths = library_file_paths
+            FuncRegistryUtils.register_funcs_in_folder(folder_path=str(library_dir))
 
         # Parse all blueprints first
-        blueprints: List[PipelexBundleBlueprint] = []
-        for toml_file_path in all_toml_paths:
-            blueprint = PipelexInterpreter(file_path=toml_file_path).make_pipelex_bundle_blueprint()
+        blueprints: list[PipelexBundleBlueprint] = []
+        for plx_file_path in valid_plx_paths:
+            try:
+                blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
+            except FileNotFoundError as exc:
+                msg = f"Could not find PLX blueprint at '{plx_file_path}'"
+                raise LibraryLoadingError(msg) from exc
+            except ValidationError as exc:
+                formatted_error_msg = format_pydantic_validation_error(exc)
+                msg = f"Could not load PLX blueprint from '{plx_file_path}' because of: {formatted_error_msg}"
+                raise LibraryLoadingError(msg) from exc
+            except PipeDefinitionError as exc:
+                msg = f"Could not load PLX blueprint from '{plx_file_path}': {exc}"
+                raise LibraryLoadingError(msg) from exc
+            blueprint.source = str(plx_file_path)
             blueprints.append(blueprint)
 
         # Load all domains first
-        all_domains: List[Domain] = []
+        all_domains: list[Domain] = []
         for blueprint in blueprints:
-            domain = self._load_domain_from_blueprint(blueprint)
+            try:
+                domain = self._load_domain_from_blueprint(blueprint)
+            except DomainDefinitionError as exc:
+                msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
+                raise LibraryLoadingError(msg) from exc
             all_domains.append(domain)
-        for domain in all_domains:
-            self.domain_library.add_domain(domain=domain)
+        self.domain_library.add_domains(domains=all_domains)
 
         # Load all concepts second
-        all_concepts: List[Concept] = []
+        all_concepts: list[Concept] = []
         for blueprint in blueprints:
-            concepts = self._load_concepts_from_blueprint(blueprint)
+            try:
+                concepts = self._load_concepts_from_blueprint(blueprint)
+            except ConceptDefinitionError as exc:
+                msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
+                raise LibraryLoadingError(msg) from exc
             all_concepts.extend(concepts)
         self.concept_library.add_concepts(concepts=all_concepts)
 
         # Load all pipes third
-        all_pipes: List[PipeAbstract] = []
+        all_pipes: list[PipeAbstract] = []
         for blueprint in blueprints:
-            pipes = self._load_pipes_from_blueprint(blueprint)
+            try:
+                pipes = self._load_pipes_from_blueprint(blueprint)
+            except PipeDefinitionError as exc:
+                msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
+                raise LibraryLoadingError(msg) from exc
             all_pipes.extend(pipes)
         self.pipe_library.add_pipes(pipes=all_pipes)
-
-    # TODO: move to LLMDeckManager
-    def load_deck(self) -> LLMDeck:
-        llm_deck_paths = self.library_config.get_llm_deck_paths()
-        full_llm_deck_dict: Dict[str, Any] = {}
-        if not llm_deck_paths:
-            raise LLMDeckNotFoundError("No LLM deck paths found. Please run `pipelex init-libraries` to create it.")
-
-        for llm_deck_path in llm_deck_paths:
-            if not os.path.exists(llm_deck_path):
-                raise LLMDeckNotFoundError(f"LLM deck path `{llm_deck_path}` not found. Please run `pipelex init-libraries` to create it.")
-            try:
-                llm_deck_dict = load_toml_from_path(path=llm_deck_path)
-                log.debug(f"Loaded LLM deck from {llm_deck_path}")
-                deep_update(full_llm_deck_dict, llm_deck_dict)
-            except Exception as exc:
-                log.error(f"Failed to load LLM deck file '{llm_deck_path}': {exc}")
-                raise
-
-        self.llm_deck = LLMDeck.model_validate(full_llm_deck_dict)
-        return self.llm_deck

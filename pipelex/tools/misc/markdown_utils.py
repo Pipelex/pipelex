@@ -1,29 +1,25 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, cast
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.json_utils import purify_json_dict
 from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
 
 
-def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key: Optional[str] = None) -> str:
-    """
-    Convert arbitrary JSON-compatible Python data to a Markdown string
+def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key: str | None = None) -> str:
+    """Convert arbitrary JSON-compatible Python data to a Markdown string
     without needing to specify the markdown type explicitly.
     """
     if isinstance(data, dict):
-        the_dict: Dict[str, Any] = data
+        the_dict = cast("dict[str, Any]", data)
         # Treat keys as headings and values as their content
-        dict_result_lines: List[str] = []
-        for key, value in the_dict.items():
+        dict_result_lines: list[str] = []
+        for _key, _value in the_dict.items():
             heading_prefix = "#" * min(level, 6)  # Limit heading levels to 6
             # Use the key as a heading
-            if is_pretty:
-                converted_line = f"{heading_prefix} {snake_to_capitalize_first_letter(key)}"
-            else:
-                converted_line = f"{heading_prefix} {key}"
+            converted_line = f"{heading_prefix} {snake_to_capitalize_first_letter(_key)}" if is_pretty else f"{heading_prefix} {_key}"
             # Convert the value recursively, increasing the heading level
             # dict_result_lines.append(convert_to_markdown(data=value, level=level + 1))
-            converted_value = convert_to_markdown(data=value, level=level + 1, key=key)
+            converted_value = convert_to_markdown(data=_value, level=level + 1, key=_key)
             converted_value_nb_lines = len(converted_value.split("\n"))
             if converted_value_nb_lines > 1:
                 dict_result_lines.append(converted_line)
@@ -38,8 +34,8 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key:
         # they become list items.
         if not data:
             return ""
-        the_list: List[Any] = data
-        list_result_lines: List[str] = []
+        the_list = cast("list[Any]", data)
+        list_result_lines: list[str] = []
         for item in the_list:
             # Convert the item first
             item_md = convert_to_markdown(item, level=level)

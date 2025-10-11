@@ -13,13 +13,13 @@ The `optimize_tweet` function is the core of this example. It takes two strings,
 ```python
 async def optimize_tweet(draft_tweet_str: str, writing_style_str: str) -> OptimizedTweet:
     # Create the draft tweet stuff
-    draft_tweet = StuffFactory.make_stuff(
-        concept_str="tech_tweet.DraftTweet",
+    draft_tweet = StuffFactory.make_from_concept_string(
+        concept_string="tech_tweet.DraftTweet",
         content=TextContent(text=draft_tweet_str),
         name="draft_tweet",
     )
-    writing_style = StuffFactory.make_stuff(
-        concept_str="tech_tweet.WritingStyle",
+    writing_style = StuffFactory.make_from_concept_string(
+        concept_string="tech_tweet.WritingStyle",
         content=TextContent(text=writing_style_str),
         name="writing_style",
     )
@@ -55,11 +55,11 @@ class OptimizedTweet(TextContent):
     pass
 ```
 
-## The Pipeline Definition: `tech_tweet.toml`
+## The Pipeline Definition: `tech_tweet.plx`
 
 This pipeline uses a two-step "analyze and optimize" sequence. The first pipe analyzes the draft tweet for common pitfalls, and the second pipe rewrites the tweet based on the analysis and a provided writing style. This is a powerful pattern for refining generated content.
 
-```toml
+```plx
 [pipe.optimize_tweet_sequence]
 type = "PipeSequence"
 description = "Analyze and optimize a tech tweet in sequence"

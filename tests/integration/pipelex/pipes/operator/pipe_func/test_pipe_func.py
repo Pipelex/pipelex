@@ -8,8 +8,7 @@ from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipe_router, get_report_delegate
-from pipelex.pipe_operators.func.pipe_func import PipeFuncOutput
+from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -55,9 +54,9 @@ if __name__ == "__main__":
 
         # Create the PipeFunc job
         pipe_func_blueprint = PipeFuncBlueprint(
-            definition="Function pipe for wrapping lines",
+            description="Function pipe for wrapping lines",
             function_name="wrap_lines",
-            output=NativeConceptEnum.TEXT.value,
+            output=NativeConceptEnum.TEXT,
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
@@ -71,7 +70,7 @@ if __name__ == "__main__":
         )
 
         # Execute the pipe
-        pipe_func_output: PipeFuncOutput = await get_pipe_router().run_pipe_job(
+        pipe_func_output = await get_pipe_router().run(
             pipe_job=pipe_job,
         )
 
@@ -79,7 +78,6 @@ if __name__ == "__main__":
         log.verbose(pipe_func_output, title="pipe_func_output")
         wrapped_text = pipe_func_output.main_stuff_as_text
         pretty_print(wrapped_text, title="wrapped_text")
-        get_report_delegate().generate_report()
 
         # Verify the output contains wrapped lines
         assert pipe_func_output is not None

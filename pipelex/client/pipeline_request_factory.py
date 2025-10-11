@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pipelex.client.api_serializer import ApiSerializer
 from pipelex.client.protocol import COMPACT_MEMORY_KEY, PipelineRequest
@@ -11,13 +11,12 @@ class PipelineRequestFactory:
 
     @staticmethod
     def make_from_working_memory(
-        working_memory: Optional[WorkingMemory] = None,
-        output_name: Optional[str] = None,
-        output_multiplicity: Optional[PipeOutputMultiplicity] = None,
-        dynamic_output_concept_code: Optional[str] = None,
+        working_memory: WorkingMemory | None = None,
+        output_name: str | None = None,
+        output_multiplicity: PipeOutputMultiplicity | None = None,
+        dynamic_output_concept_code: str | None = None,
     ) -> PipelineRequest:
-        """
-        Create a PipelineRequest from a WorkingMemory object.
+        """Create a PipelineRequest from a WorkingMemory object.
 
         Args:
             working_memory: The WorkingMemory to convert
@@ -27,8 +26,8 @@ class PipelineRequestFactory:
 
         Returns:
             PipelineRequest with the working memory serialized to reduced format
-        """
 
+        """
         return PipelineRequest(
             input_memory=ApiSerializer.serialize_working_memory_for_api(working_memory),
             output_name=output_name,
@@ -37,15 +36,15 @@ class PipelineRequestFactory:
         )
 
     @staticmethod
-    def make_from_body(request_body: Dict[str, Any]) -> PipelineRequest:
-        """
-        Create a PipelineRequest from raw request body dictionary.
+    def make_from_body(request_body: dict[str, Any]) -> PipelineRequest:
+        """Create a PipelineRequest from raw request body dictionary.
 
         Args:
             request_body: Raw dictionary from API request body
 
         Returns:
             PipelineRequest object with dictionary working_memory
+
         """
         return PipelineRequest(
             input_memory=request_body.get(COMPACT_MEMORY_KEY),

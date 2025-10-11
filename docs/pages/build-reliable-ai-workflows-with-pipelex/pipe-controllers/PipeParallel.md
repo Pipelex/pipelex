@@ -16,9 +16,9 @@ You must use `add_each_output`, `combined_output`, or both.
 
 ## Configuration
 
-`PipeParallel` is configured in your pipeline's `.toml` file.
+`PipeParallel` is configured in your pipeline's `.plx` file.
 
-### TOML Parameters
+### PLX Parameters
 
 | Parameter         | Type          | Description                                                                                                                                                                    | Required |
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
@@ -27,7 +27,7 @@ You must use `add_each_output`, `combined_output`, or both.
 | `inputs`    | dictionary  | The input concept(s) for the parallel operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
 | `output`   | string          | The output concept produced by the parallel operation.                                                | Yes      |
 | `parallels`       | array of tables| An array defining the pipes to run in parallel. Each table is a sub-pipe definition.                                                                                           | Yes      |
-| `add_each_output` | boolean       | If `true`, adds the output of each parallel pipe to the working memory individually. Defaults to `false`.                                                                       | No       |
+| `add_each_output` | boolean       | If `true`, adds the output of each parallel pipe to the working memory individually. Defaults to `true`.                                                                       | No       |
 | `combined_output` | string        | The name of a concept to use for a single, combined output object. The structure of this concept must have fields that match the `result` names from the `parallels` array.      | No       |
 
 ### Parallel Step Configuration
@@ -43,7 +43,7 @@ Each entry in the `parallels` array is a table with the following keys:
 
 Imagine you have a product description and you want to extract the product features and the product sentiment at the same time.
 
-```toml
+```plx
 [concept.ProductAnalysis]
 structure = "ProductAnalysis" # A Pydantic model with 'features' and 'sentiment' fields
 
@@ -65,7 +65,7 @@ type = "PipeParallel"
 description = "Extract features and sentiment at the same time"
 inputs = { description = "ProductDescription" }
 output = "ProductAnalysis" # This name is for the combined output
-add_each_output = false
+add_each_output = true
 combined_output = "ProductAnalysis"
 parallels = [
     { pipe = "extract_features", result = "features" },

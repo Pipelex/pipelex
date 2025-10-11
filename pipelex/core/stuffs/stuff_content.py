@@ -2,14 +2,14 @@ import base64
 import json
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import Any, Generic, TypeVar
 
 import markdown
 from json2html import json2html
 from kajson import kajson
 from PIL import Image
 from pydantic import BaseModel
-from typing_extensions import Self, override
+from typing_extensions import override
 from yattag import Doc
 
 from pipelex.cogt.ocr.ocr_output import ExtractedImage
@@ -20,6 +20,7 @@ from pipelex.tools.misc.markdown_utils import convert_to_markdown
 from pipelex.tools.misc.path_utils import InterpretedPathOrUrl, interpret_path_or_url
 from pipelex.tools.templating.templating_models import TextFormat
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, clean_model_to_dict
+from pipelex.types import Self
 
 ObjectContentType = TypeVar("ObjectContentType", bound=BaseModel)
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
@@ -32,7 +33,7 @@ class StuffContent(ABC, CustomBaseModel):
     def short_desc(self) -> str:
         return f"some {self.__class__.__name__}"
 
-    def smart_dump(self) -> Union[str, Dict[str, Any], List[str], List[Dict[str, Any]]]:
+    def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
         return self.model_dump(serialize_as_any=True)
 
     @override
@@ -81,7 +82,7 @@ class TextContent(StuffContentInitableFromStr):
     text: str
 
     @override
-    def smart_dump(self) -> Union[str, Dict[str, Any], List[str], List[Dict[str, Any]]]:
+    def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
         return self.text
 
     @property
@@ -105,8 +106,7 @@ class TextContent(StuffContentInitableFromStr):
     @override
     def rendered_html(self) -> str:
         # Convert a markdown string to HTML and return HTML as a Unicode string.
-        html = markdown.markdown(self.text)
-        return html
+        return markdown.markdown(self.text)
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
@@ -138,10 +138,10 @@ class DynamicContent(StuffContent):
 
 
 class NumberContent(StuffContentInitableFromStr):
-    number: Union[int, float]
+    number: int | float
 
     @override
-    def smart_dump(self) -> Union[str, Dict[str, Any], List[str], List[Dict[str, Any]]]:
+    def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
         return str(self.number)
 
     @property
@@ -182,9 +182,9 @@ class NumberContent(StuffContentInitableFromStr):
 
 class ImageContent(StuffContentInitableFromStr):
     url: str
-    source_prompt: Optional[str] = None
-    caption: Optional[str] = None
-    base_64: Optional[str] = None
+    source_prompt: str | None = None
+    caption: str | None = None
+    base_64: str | None = None
 
     @property
     @override
@@ -234,27 +234,26 @@ class ImageContent(StuffContentInitableFromStr):
             base_64=base_64,
         )
 
-    def save_to_directory(self, directory: str, base_name: Optional[str] = None, extension: Optional[str] = None):
+    def save_to_directory(self, directory: str, base_name: str | None = None, extension: str | None = None):
         ensure_directory_exists(directory)
         base_name = base_name or "img"
-        if base_64 := self.base_64:
-            if not extension:
-                match interpret_path_or_url(path_or_uri=self.url):
-                    case InterpretedPathOrUrl.FILE_NAME:
-                        parts = self.url.rsplit(".", 1)
-                        base_name = parts[0]
-                        extension = parts[1]
-                    case _:
-                        file_type = detect_file_type_from_base64(b64=base_64)
-                        base_name = base_name or "img"
-                        extension = file_type.extension
-                file_path = get_incremental_file_path(
-                    base_path=directory,
-                    base_name=base_name,
-                    extension=extension,
-                    avoid_suffix_if_possible=True,
-                )
-                save_base64_to_binary_file(b64=base_64, file_path=file_path)
+        if (base_64 := self.base_64) and not extension:
+            match interpret_path_or_url(path_or_uri=self.url):
+                case InterpretedPathOrUrl.FILE_NAME:
+                    parts = self.url.rsplit(".", 1)
+                    base_name = parts[0]
+                    extension = parts[1]
+                case InterpretedPathOrUrl.FILE_PATH | InterpretedPathOrUrl.FILE_URI | InterpretedPathOrUrl.URL | InterpretedPathOrUrl.BASE_64:
+                    file_type = detect_file_type_from_base64(b64=base_64)
+                    base_name = base_name or "img"
+                    extension = file_type.extension
+            file_path = get_incremental_file_path(
+                base_path=directory,
+                base_name=base_name,
+                extension=extension,
+                avoid_suffix_if_possible=True,
+            )
+            save_base64_to_binary_file(b64=base_64, file_path=file_path)
 
         if caption := self.caption:
             caption_file_path = get_incremental_file_path(
@@ -385,7 +384,7 @@ class StructuredContent(StuffContent):
     def rendered_html(self) -> str:
         dict_dump = clean_model_to_dict(obj=self)
 
-        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType]
+        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
             json=dict_dump,  # pyright: ignore[reportArgumentType]
             clubbing=True,
             table_attributes="",
@@ -399,13 +398,13 @@ class StructuredContent(StuffContent):
 
 
 class ListContent(StuffContent, Generic[StuffContentType]):
-    items: List[StuffContentType]
+    items: list[StuffContentType]
 
     @property
     def nb_items(self) -> int:
         return len(self.items)
 
-    def get_items(self, item_type: Type[StuffContent]) -> List[StuffContent]:
+    def get_items(self, item_type: type[StuffContent]) -> list[StuffContent]:
         return [item for item in self.items if isinstance(item, item_type)]
 
     @property
@@ -414,22 +413,21 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         nb_items = len(self.items)
         if nb_items == 0:
             return "empty list"
-        elif nb_items == 1:
+        if nb_items == 1:
             return f"list of 1 {self.items[0].__class__.__name__}"
+        item_classes: list[str] = [item.__class__.__name__ for item in self.items]
+        item_classes_set = set(item_classes)
+        nb_classes = len(item_classes_set)
+        if nb_classes == 1:
+            return f"list of {len(self.items)} {item_classes[0]}s"
+        elif nb_items == nb_classes:
+            return f"list of {len(self.items)} items of different types"
         else:
-            item_classes: List[str] = [item.__class__.__name__ for item in self.items]
-            item_classes_set = set(item_classes)
-            nb_classes = len(item_classes_set)
-            if nb_classes == 1:
-                return f"list of {len(self.items)} {item_classes[0]}s"
-            elif nb_items == nb_classes:
-                return f"list of {len(self.items)} items of different types"
-            else:
-                return f"list of {len(self.items)} items of {nb_classes} different types"
+            return f"list of {len(self.items)} items of {nb_classes} different types"
 
     @property
-    def _single_class_name(self) -> Optional[str]:
-        item_classes: List[str] = [item.__class__.__name__ for item in self.items]
+    def _single_class_name(self) -> str | None:
+        item_classes: list[str] = [item.__class__.__name__ for item in self.items]
         item_classes_set = set(item_classes)
         nb_classes = len(item_classes_set)
         if nb_classes == 1:
@@ -451,7 +449,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
     def rendered_html(self) -> str:
         list_dump = [item.smart_dump() for item in self.items]
 
-        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType]
+        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
             json=list_dump,  # pyright: ignore[reportArgumentType]
             clubbing=True,
             table_attributes="",
@@ -473,8 +471,8 @@ class ListContent(StuffContent, Generic[StuffContentType]):
 
 
 class TextAndImagesContent(StuffContent):
-    text: Optional[TextContent]
-    images: Optional[List[ImageContent]]
+    text: TextContent | None
+    images: list[ImageContent] | None
 
     @property
     @override
@@ -510,7 +508,7 @@ class TextAndImagesContent(StuffContent):
 
 class PageContent(StructuredContent):
     text_and_images: TextAndImagesContent
-    page_view: Optional[ImageContent] = None
+    page_view: ImageContent | None = None
 
     def save_to_directory(self, directory: str):
         ensure_directory_exists(directory)

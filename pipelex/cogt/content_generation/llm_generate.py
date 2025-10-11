@@ -1,4 +1,4 @@
-from typing import List
+from typing import cast
 
 from pydantic import BaseModel
 
@@ -22,7 +22,6 @@ async def llm_gen_text(llm_assignment: LLMAssignment) -> str:
 
 async def llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
     llm_assignment = object_assignment.llm_assignment_for_object
-    log.verbose(f"llm_gen_object to generate a: '{object_assignment.object_class_name}'")
     llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
     llm_job = LLMJobFactory.make_llm_job(
         job_metadata=llm_assignment.job_metadata,
@@ -38,7 +37,7 @@ async def llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
     return generated_object
 
 
-async def llm_gen_object_list(object_assignment: ObjectAssignment) -> List[BaseModel]:
+async def llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseModel]:
     llm_assignment = object_assignment.llm_assignment_for_object
     log.verbose(f"llm_gen_object_list to generate a list of '{object_assignment.object_class_name}'")
     llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
@@ -51,11 +50,18 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment) -> List[BaseM
     item_class = get_class_registry().get_required_class(name=item_class_name)
 
     class ListSchema(BaseModel):
-        items: List[item_class]  # type: ignore
+        items: list[item_class]  # type: ignore[valid-type] # pyright: ignore[reportInvalidTypeForm]
+
+    ListSchema.__name__ = f"ListOf{item_class_name}"
+
+    if item_class.__doc__:
+        ListSchema.__doc__ = f"List wrapper for {item_class_name}.\n\nItem description:\n{item_class.__doc__}"
+    else:
+        ListSchema.__doc__ = f"A list of {item_class_name}."
 
     wrapped_list: ListSchema = await llm_worker.gen_object(
         llm_job=llm_job,
         schema=ListSchema,
     )
-    generated_list: List[BaseModel] = wrapped_list.items  # pyright: ignore[reportUnknownMemberType]
+    generated_list: list[BaseModel] = cast("list[BaseModel]", wrapped_list.items)  # pyright: ignore[reportUnknownMemberType]
     return generated_list

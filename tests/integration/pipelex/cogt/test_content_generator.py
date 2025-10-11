@@ -1,22 +1,18 @@
-from typing import List
-
 import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.cogt.exceptions import LLMHandleNotFoundError
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
+from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.ocr.ocr_input import OcrInput
 from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
 from pipelex.cogt.ocr.ocr_output import OcrOutput
-from pipelex.hub import get_content_generator, get_llm_deck
+from pipelex.hub import get_content_generator, get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.cases import ImageTestCases
+from tests.cases import ImageTestCases, PDFTestCases
 from tests.integration.pipelex.cogt.test_data import Employee
 
 USER_TEXT_FOR_BASE = """
@@ -61,10 +57,10 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_llm_text_only(self, request: FixtureRequest):
-        llm_setting_main = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_text")
+        llm_setting_main = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_text")
 
         text: str = await get_content_generator().make_llm_text(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
             llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
             llm_setting_main=llm_setting_main,
         )
@@ -75,10 +71,10 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_direct(self, request: FixtureRequest):
-        llm_setting_for_object = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
+        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
 
         person_direct: Employee = await get_content_generator().make_object_direct(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
             object_class=Employee,
             llm_prompt_for_object=LLMPrompt(user_text=USER_TEXT_FOR_SINGLE_PERSON),
             llm_setting_for_object=llm_setting_for_object,
@@ -90,10 +86,10 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_list_direct(self, request: FixtureRequest):
-        llm_setting_for_object = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
+        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
 
-        person_list_direct: List[Employee] = await get_content_generator().make_object_list_direct(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+        person_list_direct: list[Employee] = await get_content_generator().make_object_list_direct(
+            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
             object_class=Employee,
             llm_prompt_for_object_list=LLMPrompt(user_text=USER_TEXTS_FOR_PEOPLE_STR),
             llm_setting_for_object_list=llm_setting_for_object,
@@ -103,20 +99,23 @@ class TestContentGenerator:
         assert isinstance(person_list_direct, list)
         assert all(isinstance(person, Employee) for person in person_list_direct)
 
-    @pytest.mark.imgg
+    @pytest.mark.img_gen
     @pytest.mark.inference
     async def test_make_image(self, request: FixtureRequest):
+        img_gen_handle = "fast-lightning-sdxl"
+        positive_text = "A dog with sunglasses coding on a laptop"
         image: GeneratedImage = await get_content_generator().make_single_image(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
-            imgg_handle=ImggHandle.SDXL_LIGHTNING,
-            imgg_prompt=ImggPrompt(
-                positive_text="A dog with sunglasses coding on a laptop",
+            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            img_gen_handle=img_gen_handle,
+            img_gen_prompt=ImgGenPrompt(
+                positive_text=positive_text,
             ),
         )
-        pretty_print(image, title="make_image")
+        pretty_print(image, title=f"Image generated by '{img_gen_handle}' for '{positive_text}'")
         assert isinstance(image, GeneratedImage)
 
-    async def test_make_jinja2_text(self, request: FixtureRequest):
+    @pytest.mark.usefixtures("request")
+    async def test_make_jinja2_text(self):
         context = {
             "the_answer": "elementary, my dear Watson",
         }
@@ -130,11 +129,24 @@ class TestContentGenerator:
 
     @pytest.mark.ocr
     @pytest.mark.inference
-    async def test_make_ocr_extract_pages(self, request: FixtureRequest):
+    async def test_make_ocr_extract_pages_from_image(self, ocr_handle_from_image: str, request: FixtureRequest):
         ocr_output = await get_content_generator().make_ocr_extract_pages(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
-            ocr_handle=OcrHandle.MISTRAL_OCR,
+            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            ocr_handle=ocr_handle_from_image,
             ocr_input=OcrInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
+            ocr_job_params=OcrJobParams.make_default_ocr_job_params(),
+            ocr_job_config=OcrJobConfig(),
+        )
+        pretty_print(ocr_output, title="ocr_extract_pages")
+        assert isinstance(ocr_output, OcrOutput)
+
+    @pytest.mark.ocr
+    @pytest.mark.inference
+    async def test_make_ocr_extract_pages_from_pdf(self, ocr_handle: str, request: FixtureRequest):
+        ocr_output = await get_content_generator().make_ocr_extract_pages(
+            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            ocr_handle=ocr_handle,
+            ocr_input=OcrInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
             ocr_job_params=OcrJobParams.make_default_ocr_job_params(),
             ocr_job_config=OcrJobConfig(),
         )
@@ -144,14 +156,13 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_llm_text_with_error(self, request: FixtureRequest):
-        BAD_HANDLE_TO_TEST_FAILURE = "bad_handle_to_test_failure"
-        llm_setting_main = LLMSetting(llm_handle=BAD_HANDLE_TO_TEST_FAILURE, temperature=0.5, max_tokens=100)
+        llm_setting_main = LLMSetting(llm_handle="bad_handle_to_test_failure", temperature=0.5, max_tokens=100)
         with pytest.raises(LLMHandleNotFoundError) as excinfo:
             await get_content_generator().make_llm_text(
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # type: ignore
+                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
                 llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
                 llm_setting_main=llm_setting_main,
             )
         error = excinfo.value
         pretty_print(f"Caught expected error: {error}")
-        assert str(error).startswith("LLM Engine blueprint for llm_handle 'bad_handle_to_test_failure' not found")
+        assert str(error).startswith("Model handle 'bad_handle_to_test_failure' not found")

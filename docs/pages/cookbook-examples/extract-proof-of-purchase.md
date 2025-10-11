@@ -14,7 +14,7 @@ The pipeline `power_extractor_proof_of_purchase` is specifically designed to han
 async def extract_proof_of_purchase(pdf_url: str) -> ProofOfPurchase:
     working_memory = WorkingMemoryFactory.make_from_pdf(
         pdf_url=pdf_url,
-        concept_str="PDF",
+        concept_string="PDF",
         name="pdf",
     )
     pipe_output = await execute_pipeline(
@@ -50,11 +50,11 @@ class ProofOfPurchase(StructuredContent):
 ```
 This demonstrates how you can create nested data structures to accurately model your data.
 
-## The Pipeline Definition: `extract_proof_of_purchase.toml`
+## The Pipeline Definition: `extract_proof_of_purchase.plx`
 
 The pipeline uses a powerful `PipeLLM` to extract the structured data from the document. The prompt is carefully engineered to guide the LLM.
 
-```toml
+```plx
 [pipe.write_markdown_from_page_content_proof_of_purchase]
 type = "PipeLLM"
 description = "Write markdown from page content"

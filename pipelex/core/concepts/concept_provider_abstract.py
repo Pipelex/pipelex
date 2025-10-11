@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 
-ConceptLibraryRoot = Dict[str, Concept]
+ConceptLibraryRoot = dict[str, Concept]
 
 
 class ConceptProviderAbstract(ABC):
@@ -13,15 +13,15 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def add_concepts(self, concepts: List[Concept]) -> None:
+    def add_concepts(self, concepts: list[Concept]) -> None:
         pass
 
     @abstractmethod
-    def list_concepts_by_domain(self, domain: str) -> List[Concept]:
+    def list_concepts_by_domain(self, domain: str) -> list[Concept]:
         pass
 
     @abstractmethod
-    def list_concepts(self) -> List[Concept]:
+    def list_concepts(self) -> list[Concept]:
         pass
 
     @abstractmethod
@@ -49,11 +49,11 @@ class ConceptProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def search_for_concept_in_domains(self, concept_code: str, search_domains: List[str]) -> Optional[Concept]:
+    def search_for_concept_in_domains(self, concept_code: str, search_domains: list[str]) -> Concept | None:
         pass
 
     @abstractmethod
-    def get_class(self, concept_code: str) -> Optional[Type[Any]]:
+    def get_class(self, concept_code: str) -> type[Any] | None:
         pass
 
     @abstractmethod

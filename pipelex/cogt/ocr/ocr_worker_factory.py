@@ -1,48 +1,59 @@
-from typing import Optional
-
 from pipelex.cogt.exceptions import MissingDependencyError
-from pipelex.cogt.ocr.ocr_engine import OcrEngine
-from pipelex.cogt.ocr.ocr_platform import OcrPlatform
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
-from pipelex.hub import get_plugin_manager
-from pipelex.plugins.plugin_sdk_registry import PluginSdkHandle
+from pipelex.hub import get_models_manager, get_plugin_manager
+from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
 class OcrWorkerFactory:
     def make_ocr_worker(
         self,
-        ocr_engine: OcrEngine,
-        reporting_delegate: Optional[ReportingProtocol] = None,
+        inference_model: InferenceModelSpec,
+        reporting_delegate: ReportingProtocol | None = None,
     ) -> OcrWorkerAbstract:
-        ocr_sdk_handle = PluginSdkHandle.get_for_ocr_engine(ocr_platform=ocr_engine.ocr_platform)
+        plugin = Plugin.make_for_inference_model(inference_model=inference_model)
+        backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         ocr_worker: OcrWorkerAbstract
-        match ocr_engine.ocr_platform:
-            case OcrPlatform.MISTRAL:
+        match plugin.sdk:
+            case "mistral":
                 try:
-                    import mistralai  # noqa: F401
+                    import mistralai  # noqa: PLC0415,F401
                 except ImportError as exc:
+                    lib_name = "mistralai"
+                    lib_extra_name = "mistral"
+                    msg = "The mistralai SDK is required to use Mistral OCR models through the mistralai client."
                     raise MissingDependencyError(
-                        "mistralai",
-                        "mistral",
-                        "The mistralai SDK is required to use Mistral OCR models through the mistralai client.",
+                        lib_name,
+                        lib_extra_name,
+                        msg,
                     ) from exc
 
-                from pipelex.plugins.mistral.mistral_factory import MistralFactory
-                from pipelex.plugins.mistral.mistral_ocr_worker import MistralOcrWorker
+                from pipelex.plugins.mistral.mistral_factory import MistralFactory  # noqa: PLC0415
+                from pipelex.plugins.mistral.mistral_ocr_worker import MistralOcrWorker  # noqa: PLC0415
 
-                ocr_sdk_instance = plugin_sdk_registry.get_ocr_sdk_instance(
-                    ocr_sdk_handle=ocr_sdk_handle
-                ) or plugin_sdk_registry.set_ocr_sdk_instance(
-                    ocr_sdk_handle=ocr_sdk_handle,
-                    ocr_sdk_instance=MistralFactory.make_mistral_client(),
+                ocr_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=MistralFactory.make_mistral_client(backend=backend),
                 )
 
                 ocr_worker = MistralOcrWorker(
                     sdk_instance=ocr_sdk_instance,
-                    ocr_engine=ocr_engine,
+                    extra_config=backend.extra_config,
+                    inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
+            case "pypdfium2":
+                from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker  # noqa: PLC0415
+
+                ocr_worker = Pypdfium2Worker(
+                    extra_config=backend.extra_config,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case _:
+                msg = f"Plugin '{plugin}' is not supported"
+                raise NotImplementedError(msg)
 
         return ocr_worker

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pipelex.client.api_serializer import ApiSerializer
 from pipelex.client.protocol import PipelineResponse, PipelineState
@@ -10,17 +10,16 @@ class PipelineResponseFactory:
 
     @staticmethod
     def make_from_pipe_output(
-        pipe_output: Optional[PipeOutput] = None,
+        pipe_output: PipeOutput | None = None,
         pipeline_run_id: str = "",
         created_at: str = "",
         pipeline_state: PipelineState = PipelineState.COMPLETED,
-        finished_at: Optional[str] = None,
-        status: Optional[str] = "success",
-        message: Optional[str] = None,
-        error: Optional[str] = None,
+        finished_at: str | None = None,
+        status: str | None = "success",
+        message: str | None = None,
+        error: str | None = None,
     ) -> PipelineResponse:
-        """
-        Create a PipelineResponse from a PipeOutput object.
+        """Create a PipelineResponse from a PipeOutput object.
 
         Args:
             pipe_output: The PipeOutput to convert
@@ -34,6 +33,7 @@ class PipelineResponseFactory:
 
         Returns:
             PipelineResponse with the pipe output serialized to reduced format
+
         """
         compact_output = None
         if pipe_output is not None:
@@ -51,14 +51,14 @@ class PipelineResponseFactory:
         )
 
     @staticmethod
-    def make_from_api_response(response: Dict[str, Any]) -> PipelineResponse:
-        """
-        Create a PipelineResponse from an API response dictionary.
+    def make_from_api_response(response: dict[str, Any]) -> PipelineResponse:
+        """Create a PipelineResponse from an API response dictionary.
 
         Args:
             response: Dictionary containing the API response data
 
         Returns:
             PipelineResponse instance created from the response data
+
         """
-        return PipelineResponse(**response)
+        return PipelineResponse.model_validate(response)

@@ -1,5 +1,3 @@
-from typing import Dict
-
 from pydantic import Field
 from typing_extensions import override
 
@@ -15,7 +13,7 @@ class ActivityManagerError(RootException):
 
 class ActivityManager(ActivityManagerProtocol):
     def __init__(self) -> None:
-        self.activity_callbacks: Dict[str, ActivityCallback] = Field(default_factory=dict)
+        self.activity_callbacks: dict[str, ActivityCallback] = Field(default_factory=dict)
 
     @override
     def setup(self) -> None:

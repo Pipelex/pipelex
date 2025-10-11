@@ -1,10 +1,10 @@
 import re
-from typing import Any, List, Optional
+import unicodedata
+from typing import Any
 
 
 def has_text(text: str) -> bool:
-    """
-    Checks if a string contains any alphanumeric characters.
+    """Checks if a string contains any alphanumeric characters.
 
     This function uses a regex pattern to check for the presence of any alphanumeric
     character, including non-ASCII characters (e.g., é, ñ, etc.).
@@ -14,41 +14,42 @@ def has_text(text: str) -> bool:
 
     Returns:
         bool: True if the string contains at least one alphanumeric character, False otherwise.
+
     """
     return bool(re.search(r"\w", text))
 
 
-def is_none_or_has_text(text: Optional[str]) -> bool:
-    """
-    Checks if a string is None or contains alphanumeric characters.
+def is_none_or_has_text(text: str | None) -> bool:
+    """Checks if a string is None or contains alphanumeric characters.
 
     This function combines a None check with the has_text function to validate that
     a string is either None or contains meaningful content.
 
     Args:
-        text (Optional[str]): The string to check, which can be None.
+        text (str | None): The string to check, which can be None.
 
     Returns:
         bool: True if the string is None or contains at least one alphanumeric character,
               False if it's an empty string or contains only non-alphanumeric characters.
+
     """
     return text is None or has_text(text)
 
 
-def can_inject_text(value: Optional[Any]) -> bool:
-    """
-    Checks if a value can be safely converted to a string containing alphanumeric characters.
+def can_inject_text(value: Any | None) -> bool:
+    """Checks if a value can be safely converted to a string containing alphanumeric characters.
 
     This function attempts to convert any value to a string and checks if it contains
     alphanumeric characters. It handles None values and exceptions gracefully, making it
     safe for type-uncertain inputs.
 
     Args:
-        value (Optional[Any]): Any value that might be convertible to a string, including None.
+        value (Any | None): Any value that might be convertible to a string, including None.
 
     Returns:
         bool: True if the value can be converted to a string containing alphanumeric characters,
               False if the value is None, empty, or cannot be safely converted to a string.
+
     """
     if not value:
         return False
@@ -58,26 +59,25 @@ def can_inject_text(value: Optional[Any]) -> bool:
         return False
 
 
-def is_not_none_and_has_text(text: Optional[str]) -> bool:
-    """
-    Checks if a string is not None and contains alphanumeric characters.
+def is_not_none_and_has_text(text: str | None) -> bool:
+    """Checks if a string is not None and contains alphanumeric characters.
 
     This function combines a None check with the has_text function to validate that
     a string exists and contains meaningful content. It's the opposite of is_none_or_has_text.
 
     Args:
-        text (Optional[str]): The string to check, which can be None.
+        text (str | None): The string to check, which can be None.
 
     Returns:
         bool: True if the string is not None and contains at least one alphanumeric character,
               False if it's None, empty, or contains only non-alphanumeric characters.
+
     """
     return text is not None and has_text(text)
 
 
 def camel_to_snake_case(name: str) -> str:
-    """
-    Converts a camelCase string to snake_case format.
+    """Converts a camelCase string to snake_case format.
 
     This function identifies word boundaries in camelCase by looking for transitions
     between lowercase and uppercase letters, then joins the words with underscores.
@@ -91,14 +91,14 @@ def camel_to_snake_case(name: str) -> str:
     Example:
         >>> camel_to_snake_case("thisIsATest")
         'this_is_a_test'
+
     """
     s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
 def pascal_case_to_snake_case(name: str) -> str:
-    """
-    Converts a PascalCase string to snake_case format.
+    """Converts a PascalCase string to snake_case format.
 
     This function is a wrapper around camel_to_snake_case, as the same conversion
     rules apply to both PascalCase and camelCase strings.
@@ -112,13 +112,13 @@ def pascal_case_to_snake_case(name: str) -> str:
     Example:
         >>> pascal_case_to_snake_case("ThisIsATest")
         'this_is_a_test'
+
     """
     return camel_to_snake_case(name=name)
 
 
 def pascal_case_to_sentence(name: str) -> str:
-    """
-    Converts a PascalCase string to a capitalized sentence.
+    """Converts a PascalCase string to a capitalized sentence.
 
     This function splits a PascalCase string at word boundaries and spaces.
     - Preserves fully uppercase words (e.g., "BOB", "JSON")
@@ -137,10 +137,11 @@ def pascal_case_to_sentence(name: str) -> str:
         'BOB low key'
         >>> pascal_case_to_sentence("ParseJSONData")
         'Parse JSON data'
+
     """
     # First split by spaces
-    space_parts: List[str] = name.split()
-    result_parts: List[str] = []
+    space_parts: list[str] = name.split()
+    result_parts: list[str] = []
 
     for part in space_parts:
         if part.isupper():
@@ -148,16 +149,15 @@ def pascal_case_to_sentence(name: str) -> str:
             result_parts.append(part)
         else:
             # Handle PascalCase parts
-            words: List[str] = re.findall(r"([A-Z][a-z]+|[A-Z]{2,}(?=[A-Z][a-z]|\d|\W|$)|[A-Z]{2,}|[0-9]+)", part)
-            processed_words: List[str] = [word if word.isupper() else word.lower() for word in words]
+            words: list[str] = re.findall(r"([A-Z][a-z]+|[A-Z]{2,}(?=[A-Z][a-z]|\d|\W|$)|[A-Z]{2,}|[0-9]+)", part)
+            processed_words: list[str] = [word if word.isupper() else word.lower() for word in words]
             result_parts.append(" ".join(processed_words))
 
     return " ".join(result_parts).capitalize()
 
 
 def snake_to_pascal_case(snake_str: str) -> str:
-    """
-    Converts a snake_case string to PascalCase format.
+    """Converts a snake_case string to PascalCase format.
 
     This function splits the string at underscores, capitalizes the first letter
     of each component, and joins them together without separators.
@@ -171,14 +171,14 @@ def snake_to_pascal_case(snake_str: str) -> str:
     Example:
         >>> snake_to_pascal_case("hello_world")
         'HelloWorld'
+
     """
     components = snake_str.split("_")
     return "".join(component.title() for component in components)
 
 
 def snake_to_capitalize_first_letter(snake_str: str) -> str:
-    """
-    Converts a snake_case string to a space-separated string with the first letter capitalized.
+    """Converts a snake_case string to a space-separated string with the first letter capitalized.
 
     This function splits the string at underscores, joins the components with spaces,
     and capitalizes only the first letter of the entire string.
@@ -192,6 +192,7 @@ def snake_to_capitalize_first_letter(snake_str: str) -> str:
     Example:
         >>> snake_to_capitalize_first_letter("this_is_a_test")
         'This is a test'
+
     """
     components = snake_str.split("_")
     phrase = " ".join(components)
@@ -204,3 +205,87 @@ def is_snake_case(word: str) -> bool:
 
 def is_pascal_case(word: str) -> bool:
     return re.match(r"^[A-Z][a-zA-Z0-9]*$", word) is not None
+
+
+def normalize_to_ascii(text: str) -> str:
+    """Normalize Unicode to ASCII, converting lookalikes and removing non-ASCII characters.
+
+    Uses NFKD (Compatibility Decomposition) to convert accented characters and
+    Unicode lookalikes to their ASCII equivalents, then strips remaining non-ASCII
+    characters. This prevents homograph/confusable attacks where visually identical
+    characters from different Unicode blocks (Cyrillic, Greek, etc.) are used.
+
+    Args:
+        text: String that may contain Unicode characters including confusables.
+
+    Returns:
+        ASCII-only string safe for identifiers (letters, numbers, underscores only).
+
+    Examples:
+        >>> normalize_to_ascii("OppositeConcept")  # Example with mixed text
+        'OppositeConcept'
+        >>> normalize_to_ascii("Café")
+        'Cafe'
+        >>> normalize_to_ascii("Naïve")
+        'Naive'
+        >>> normalize_to_ascii("hello_world")
+        'hello_world'
+        >>> normalize_to_ascii("Test123")
+        'Test123'
+
+    Note:
+        Cyrillic/Greek letters that look like Latin but don't decompose to ASCII
+        equivalents will be removed entirely (e.g., Cyrillic C (U+0421) looks like Latin C
+        but is a different base character). This is intentional to prevent security
+        issues from homograph attacks.
+
+    """
+    # NFKD: Compatibility decomposition (e.g., é -> e + combining accent)
+    normalized = unicodedata.normalize("NFKD", text)
+    # Keep only ASCII letters, numbers, and underscores
+    return "".join(c for c in normalized if ord(c) < 128 and (c.isalnum() or c == "_"))
+
+
+def matches_wildcard_pattern(text: str, pattern: str) -> bool:
+    """Check if a text matches a wildcard pattern.
+
+    Supports wildcards (*) at the beginning, end, or both.
+    A single asterisk (*) matches any text.
+
+    Args:
+        text: The text to check against the pattern
+        pattern: The pattern to match against, supporting wildcards (*)
+
+    Returns:
+        True if the text matches the pattern
+
+    Examples:
+        >>> matches_wildcard_pattern("claude-3-sonnet", "claude-*")
+        True
+        >>> matches_wildcard_pattern("gpt-4o-mini", "*mini")
+        True
+        >>> matches_wildcard_pattern("mistral-large", "*large*")
+        True
+        >>> matches_wildcard_pattern("any-model", "*")
+        True
+        >>> matches_wildcard_pattern("exact-match", "exact-match")
+        True
+
+    """
+    if pattern == "*":
+        return True
+    elif pattern.startswith("*") and pattern.endswith("*"):
+        # Pattern like "*sonnet*"
+        middle = pattern[1:-1]
+        return middle in text
+    elif pattern.startswith("*"):
+        # Pattern like "*sonnet"
+        suffix = pattern[1:]
+        return text.endswith(suffix)
+    elif pattern.endswith("*"):
+        # Pattern like "claude-*"
+        prefix = pattern[:-1]
+        return text.startswith(prefix)
+    else:
+        # Exact match
+        return text == pattern

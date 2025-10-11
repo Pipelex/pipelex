@@ -1,0 +1,58 @@
+[pipelex_inference]
+endpoint = "https://inference.pipelex.com/v1"
+api_key = "${PIPELEX_INFERENCE_API_KEY}"
+
+[azure_openai]
+enabled = false
+endpoint = "${AZURE_API_BASE}"
+api_key = "${AZURE_API_KEY}"
+api_version = "${AZURE_API_VERSION}"
+
+[bedrock]
+enabled = false
+aws_region = "${AWS_REGION}"
+
+[google]
+enabled = false
+api_key = "${GOOGLE_API_KEY}"
+
+[vertexai]
+enabled = false
+gcp_project_id = "${GCP_PROJECT_ID}"
+gcp_location = "${GCP_LOCATION}"
+gcp_credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
+
+[openai]
+enabled = false
+api_key = "${OPENAI_API_KEY}"
+
+[anthropic]
+enabled = false
+api_key = "${ANTHROPIC_API_KEY}"
+claude_4_tokens_limit = 8192
+
+[mistral]
+enabled = false
+api_key = "${MISTRAL_API_KEY}"
+
+[xai]
+enabled = false
+endpoint = "https://api.x.ai/v1"
+api_key = "${XAI_API_KEY}"
+
+[ollama]
+enabled = false
+endpoint = "http://localhost:11434/v1"
+
+[blackboxai]
+enabled = false
+endpoint = "https://api.blackbox.ai/v1"
+api_key = "${BLACKBOX_API_KEY}"
+
+[fal]
+enabled = false
+api_key = "${FAL_API_KEY}"
+
+[internal] # software-only backend, runs internally, without AI
+enabled = true
+

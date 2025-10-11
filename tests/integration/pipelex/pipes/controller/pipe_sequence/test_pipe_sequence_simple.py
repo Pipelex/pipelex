@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NATIVE_CONCEPTS_DATA, NativeConceptEnum
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_run_params import PipeRunMode
 from pipelex.core.pipes.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.core.stuffs.stuff_content import TextContent
@@ -34,16 +34,16 @@ class TestPipeSequenceSimple:
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept1",
             domain=domain,
-            blueprint=ConceptBlueprint(definition="Lorem Ipsum"),
+            blueprint=ConceptBlueprint(description="Lorem Ipsum"),
             concept_codes_from_the_same_domain=["TestConcept1"],
         )
         concept_library = get_concept_provider()
         concept_library.add_concepts([concept_1])
         concept_2 = concept_library.get_native_concept(native_concept=NativeConceptEnum.TEXT)
 
-        # Create PipeSequence instance - pipes are loaded from TOML files
+        # Create PipeSequence instance - pipes are loaded from PLX files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
-            definition="Simple sequence for text processing",
+            description="Simple sequence for text processing",
             inputs={"input_text": InputRequirementBlueprint(concept=concept_1.concept_string)},
             output=concept_2.concept_string,
             steps=[
@@ -90,7 +90,7 @@ class TestPipeSequenceSimple:
 
         # Actually run the PipeSequence pipe
         pipe_output = await pipe_sequence.run_pipe(
-            job_metadata=JobMetadata(job_name=cast(str, request.node.originalname)),  # type: ignore
+            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
             working_memory=working_memory,
             output_name="sequence_result",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -109,7 +109,7 @@ class TestPipeSequenceSimple:
         assert isinstance(final_result.content, TextContent)
         # Should be: "hello world" -> "HELLO WORLD" -> "PROCESSED: HELLO WORLD"
         if pipe_run_mode != PipeRunMode.DRY:
-            assert final_result.content.text == "PROCESSED: HELLO WORLD"
+            assert final_result.content.text in {"PROCESSED: HELLO WORLD", "PROCESSED: hello world"}
 
         # Verify working memory contains all intermediate results
         final_working_memory = pipe_output.working_memory

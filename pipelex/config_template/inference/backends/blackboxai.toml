@@ -1,0 +1,178 @@
+################################################################################
+# BlackBoxAI Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for BlackBoxAI models.
+# It contains model definitions for various language models from different providers
+# accessible through the BlackBoxAI API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["gpt-4.5-preview"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "openai"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- OpenAI Models ------------------------------------------------------------
+[gpt-4o-mini]
+model_id = "blackboxai/openai/gpt-4o-mini"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.60 }
+
+[gpt-4o]
+model_id = "blackboxai/openai/gpt-4o"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.50, output = 10.00 }
+
+[o1-mini]
+model_id = "blackboxai/openai/o1-mini"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.10, output = 4.40 }
+
+[o4-mini]
+model_id = "blackboxai/openai/o4-mini"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.10, output = 4.40 }
+
+# --- Claude LLMs --------------------------------------------------------------
+["claude-3.5-haiku"]
+model_id = "blackboxai/anthropic/claude-3.5-haiku"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.80, output = 4.00 }
+
+["claude-3.5-sonnet"]
+model_id = "blackboxai/anthropic/claude-3.5-sonnet"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 3.00, output = 15.00 }
+
+["claude-3.7-sonnet"]
+model_id = "blackboxai/anthropic/claude-3.7-sonnet"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 3.00, output = 15.00 }
+
+[claude-opus-4]
+model_id = "blackboxai/anthropic/claude-opus-4"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 15.00, output = 75.00 }
+
+[claude-sonnet-4]
+model_id = "blackboxai/anthropic/claude-sonnet-4"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 3.00, output = 15.00 }
+
+# --- Google Models ------------------------------------------------------------
+["gemini-2.5-flash"]
+model_id = "blackboxai/google/gemini-2.5-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.30, output = 2.50 }
+
+["gemini-2.5-pro"]
+model_id = "blackboxai/google/gemini-2.5-pro"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.00 }
+
+["gemini-flash-1.5-8b"]
+model_id = "blackboxai/google/gemini-flash-1.5-8b"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.04, output = 0.15 }
+
+# --- Mistral Models -----------------------------------------------------------
+[mistral-large]
+model_id = "blackboxai/mistralai/mistral-large"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 2.00, output = 6.00 }
+
+[pixtral-large-2411]
+model_id = "blackboxai/mistralai/pixtral-large-2411"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.00, output = 6.00 }
+
+# --- Meta Llama Models --------------------------------------------------------
+["llama-3.3-70b-instruct"]
+model_id = "blackboxai/meta-llama/llama-3.3-70b-instruct"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.04, output = 0.12 }
+
+["llama-3.2-11b-vision-instruct"]
+model_id = "blackboxai/meta-llama/llama-3.2-11b-vision-instruct"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.05 }
+
+# --- Qwen Models --------------------------------------------------------------
+["qwen-2.5-72b-instruct"]
+model_id = "blackboxai/qwen/qwen-2.5-72b-instruct"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.12, output = 0.39 }
+
+["qwen2.5-vl-72b-instruct"]
+model_id = "blackboxai/qwen/qwen2.5-vl-72b-instruct"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 0.75 }
+
+# --- Amazon Nova Models -------------------------------------------------------
+[nova-micro-v1]
+model_id = "blackboxai/amazon/nova-micro-v1"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.04, output = 0.14 }
+
+[nova-lite-v1]
+model_id = "blackboxai/amazon/nova-lite-v1"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.06, output = 0.24 }
+
+################################################################################
+# FREE MODELS
+################################################################################
+
+# --- DeepSeek Free Models -----------------------------------------------------
+[deepseek-chat-free]
+model_id = "blackboxai/deepseek/deepseek-chat:free"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.00, output = 0.00 }
+
+[deepseek-r1-free]
+model_id = "blackboxai/deepseek/deepseek-r1:free"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.00, output = 0.00 }
+
+# --- Meta Llama Free Models ---------------------------------------------------
+["llama-3.3-70b-instruct-free"]
+model_id = "blackboxai/meta-llama/llama-3.3-70b-instruct:free"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.00, output = 0.00 }
+

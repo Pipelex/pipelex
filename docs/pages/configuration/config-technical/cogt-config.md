@@ -1,16 +1,16 @@
 # Cognitive Tools (Cogt) Configuration
 
-The Cogt configuration manages all cognitive tools in Pipelex, including LLM (Language Models), IMGG (Image Generation), and OCR (Optical Character Recognition) capabilities.
+The Cogt configuration manages all cognitive tools in Pipelex, including LLM (Language Models), Image Generation, and OCR (Optical Character Recognition) capabilities.
 
 ## Overview
 
 ```toml
-[pipelex.cogt]
+[cogt]
 # Main Cogt configuration sections
-[pipelex.cogt.inference_manager_config]
-[pipelex.cogt.llm_config]
-[pipelex.cogt.imgg_config]
-[pipelex.cogt.ocr_config]
+[cogt.inference_manager_config]
+[cogt.llm_config]
+[cogt.img_gen_config]
+[cogt.ocr_config]
 ```
 
 ## Inference Manager Configuration
@@ -18,9 +18,9 @@ The Cogt configuration manages all cognitive tools in Pipelex, including LLM (La
 Controls automatic setup of various cognitive tools:
 
 ```toml
-[pipelex.cogt.inference_manager_config]
+[cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
-is_auto_setup_preset_imgg = true
+is_auto_setup_preset_img_gen = true
 is_auto_setup_preset_ocr = true
 ```
 
@@ -29,22 +29,18 @@ is_auto_setup_preset_ocr = true
 Configuration for all Language Model interactions:
 
 ```toml
-[pipelex.cogt.llm_config]
-default_max_images = 4  # Maximum number of images in prompts
-
-# Platform preferences for different LLMs
-[pipelex.cogt.llm_config.preferred_platforms]
-gpt-4 = "openai"
-claude-3-opus = "anthropic"
+[cogt.llm_config]
+default_max_images = 100  # Maximum number of images in prompts
+is_structure_prompt_enabled = false
 
 # Job configuration
-[pipelex.cogt.llm_config.llm_job_config]
-is_streaming_enabled = true
+[cogt.llm_config.llm_job_config]
+is_streaming_enabled = false
 max_retries = 3  # Between 1 and 10
 
 # Instructor settings
-[pipelex.cogt.llm_config.instructor_config]
-is_openai_structured_output_enabled = true
+[cogt.llm_config.instructor_config]
+is_openai_structured_output_enabled = false
 ```
 
 ### LLM Job Parameters
@@ -55,34 +51,30 @@ When configuring LLM jobs, you can set:
 - `max_tokens` (optional int): Maximum tokens in response
 - `seed` (optional int): For reproducible outputs
 
-## Image Generation (IMGG) Configuration
+## Image Generation Configuration
 
 Configuration for image generation capabilities:
 
 ```toml
-[pipelex.cogt.imgg_config]
-default_imgg_handle = "stable_diffusion"
-imgg_handles = ["stable_diffusion", "dall_e"]
-
-[pipelex.cogt.imgg_config.imgg_job_config]
-is_sync_mode = true
+[cogt.img_gen_config.img_gen_job_config]
+is_sync_mode = false
 
 # Default parameters for image generation
-[pipelex.cogt.imgg_config.imgg_param_defaults]
+[cogt.img_gen_config.img_gen_param_defaults]
 aspect_ratio = "square"  # Options: square, landscape_4_3, landscape_3_2, landscape_16_9, landscape_21_9,
-                         # portrait_4_3, portrait_2_3, portrait_9_16, portrait_9_21
+                         # portrait_3_4, portrait_2_3, portrait_9_16, portrait_9_21
 background = "auto"     # Options: transparent, opaque, auto
-quality = "high"        # Options: low, medium, high
-nb_steps = 50          # Number of diffusion steps
-guidance_scale = 7.5    # Controls adherence to prompt
+quality = "low"        # Options: low, medium, high
+# nb_steps = 1          # Number of diffusion steps (28 is good for Flux, [1,2,4,8] for SDXL Lightning)
+guidance_scale = 3.5    # Controls adherence to prompt
 is_moderated = true    # Enable content moderation
-safety_tolerance = 3    # Safety level (1-6)
+safety_tolerance = 5    # Safety level (1-6)
 is_raw = false         # Raw output mode
-output_format = "png"  # Options: png, jpg, webp
+output_format = "jpg"  # Options: png, jpg, webp
 seed = "auto"          # "auto" or specific integer
 ```
 
-### IMGG Job Parameters
+### ImageGen Job Parameters
 
 Image generation jobs support these parameters:
 
@@ -113,10 +105,28 @@ Image generation jobs support these parameters:
 Configuration for Optical Character Recognition:
 
 ```toml
-[pipelex.cogt.ocr_config]
-ocr_handles = ["tesseract", "azure_ocr"]
-page_output_text_file_name = "page_text.txt"
-```
+[cogt.ocr_config]
+page_output_text_file_name = "page_text.md"
+default_page_views_dpi = 72
+
+## Unified Backend Integration
+
+All cognitive tools (LLMs, OCR, and Image Generation) now use the same unified inference backend system:
+
+### Benefits of Unified System
+
+- **Consistent Configuration**: Same configuration patterns across all AI capabilities
+- **Unified Routing**: All models routed through the same routing profiles
+- **Shared Presets**: Presets for LLMs, OCR, and image generation in the same deck
+- **Single API Management**: Manage all AI provider credentials in one place
+
+### Backend Integration Details
+
+- **LLM Models**: `model_type = "llm"` for text generation and structured outputs
+- **OCR Models**: `model_type = "text_extractor"` for document processing
+- **Image Generation Models**: `model_type = "img_gen"` for image creation
+
+All model types support the same routing, aliasing, and preset systems.
 
 ## Validation Rules
 
@@ -126,7 +136,7 @@ page_output_text_file_name = "page_text.txt"
 - Max retries must be between 1 and 10
 - Seeds must be non-negative
 
-### IMGG Configuration
+### ImageGen Configuration
 - Guidance scale must be positive
 - Safety tolerance must be between 1 and 6
 - Number of steps must be positive
@@ -140,7 +150,7 @@ page_output_text_file_name = "page_text.txt"
     - Use streaming for better user experience
     - Set appropriate retry limits based on your use case
 
-2. **IMGG Settings**:
+2. **ImageGen Settings**:
 
     - Enable moderation for production use
     - Use appropriate aspect ratios for your use case
@@ -155,43 +165,38 @@ page_output_text_file_name = "page_text.txt"
 ## Example Complete Configuration
 
 ```toml
-[pipelex.cogt]
-[pipelex.cogt.inference_manager_config]
+[cogt]
+[cogt.inference_manager_config]
 is_auto_setup_preset_llm = true
-is_auto_setup_preset_imgg = true
+is_auto_setup_preset_img_gen = true
 is_auto_setup_preset_ocr = true
 
-[pipelex.cogt.llm_config]
-default_max_images = 4
-preferred_platforms = { "gpt-4" = "openai", "claude-3-opus" = "anthropic" }
+[cogt.llm_config]
+default_max_images = 100
+is_structure_prompt_enabled = false
 
-[pipelex.cogt.llm_config.llm_job_config]
-is_streaming_enabled = true
+[cogt.llm_config.llm_job_config]
+is_streaming_enabled = false
 max_retries = 3
 
-[pipelex.cogt.llm_config.instructor_config]
-is_openai_structured_output_enabled = true
+[cogt.llm_config.instructor_config]
+is_openai_structured_output_enabled = false
 
-[pipelex.cogt.imgg_config]
-default_imgg_handle = "stable_diffusion"
-imgg_handles = ["stable_diffusion", "dall_e"]
+[cogt.img_gen_config.img_gen_job_config]
+is_sync_mode = false
 
-[pipelex.cogt.imgg_config.imgg_job_config]
-is_sync_mode = true
-
-[pipelex.cogt.imgg_config.imgg_param_defaults]
+[cogt.img_gen_config.img_gen_param_defaults]
 aspect_ratio = "square"
 background = "auto"
-quality = "high"
-nb_steps = 50
-guidance_scale = 7.5
+quality = "low"
+# nb_steps = 1
+guidance_scale = 3.5
 is_moderated = true
-safety_tolerance = 3
+safety_tolerance = 5
 is_raw = false
-output_format = "png"
+output_format = "jpg"
 seed = "auto"
 
-[pipelex.cogt.ocr_config]
-ocr_handles = ["tesseract", "azure_ocr"]
-page_output_text_file_name = "page_text.txt"
+[cogt.ocr_config]
+page_output_text_file_name = "page_text.md"
 ```

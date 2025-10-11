@@ -27,7 +27,7 @@ async def process_expense_report() -> ListContent[Invoice]:
     return pipe_output.main_stuff_as_list(item_type=Invoice)
 ```
 
-This example also showcases some of the powerful observability features of Pipelex. After the pipeline runs, it generates a cost report and a flowchart of the execution.
+This example also showcases some of the powerful observer features of Pipelex. After the pipeline runs, it generates a cost report and a flowchart of the execution.
 
 ```python
 # Print the cost reporting
@@ -57,11 +57,11 @@ class Invoice(StructuredContent):
     # ... other fields
 ```
 
-## The Pipeline Definition: `invoice.toml`
+## The Pipeline Definition: `invoice.plx`
 
-The entire workflow is defined in a TOML file. This declarative approach makes the pipeline easy to understand and modify. Here's a snippet from `invoice.toml`:
+The entire workflow is defined in a PLX file. This declarative approach makes the pipeline easy to understand and modify. Here's a snippet from `invoice.plx`:
 
-```toml
+```plx
 # The main pipeline, a sequence of steps
 [pipe.process_invoice]
 type = "PipeSequence"

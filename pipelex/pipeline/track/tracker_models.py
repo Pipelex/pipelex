@@ -1,5 +1,3 @@
-from typing import Dict, List
-
 from pydantic import BaseModel
 
 from pipelex.types import StrEnum
@@ -41,7 +39,7 @@ class EdgeAttributeKey(StrEnum):
 
 
 class GraphTree(BaseModel):
-    nodes_by_subgraph: Dict[str, List[str]]
+    nodes_by_subgraph: dict[str, list[str]]
 
 
 class SubGraphClassDef(BaseModel):

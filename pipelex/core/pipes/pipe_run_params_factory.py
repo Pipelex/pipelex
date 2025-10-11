@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
@@ -9,11 +9,11 @@ class PipeRunParamsFactory:
     def make_run_params(
         cls,
         pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
-        pipe_stack_limit: Optional[int] = None,
-        output_multiplicity: Optional[PipeOutputMultiplicity] = None,
-        dynamic_output_concept_code: Optional[str] = None,
-        batch_params: Optional[BatchParams] = None,
-        params: Optional[Dict[str, Any]] = None,
+        pipe_stack_limit: int | None = None,
+        output_multiplicity: PipeOutputMultiplicity | None = None,
+        dynamic_output_concept_code: str | None = None,
+        batch_params: BatchParams | None = None,
+        params: dict[str, Any] | None = None,
     ) -> PipeRunParams:
         pipe_stack_limit = pipe_stack_limit or get_config().pipelex.pipe_run_config.pipe_stack_limit
         return PipeRunParams(

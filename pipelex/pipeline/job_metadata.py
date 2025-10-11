@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +9,7 @@ from pipelex.types import StrEnum
 class JobCategory(StrEnum):
     MOCK_JOB = "mock_job"
     LLM_JOB = "llm_job"
-    IMGG_JOB = "imgg_job"
+    IMG_GEN_JOB = "img_gen_job"
     PROMPTING_JOB = "prompting_job"
     JINJA2_JOB = "jinja2_job"
     OCR_JOB = "ocr_job"
@@ -19,24 +18,24 @@ class JobCategory(StrEnum):
 class UnitJobId(StrEnum):
     LLM_GEN_TEXT = "llm_gen_text"
     LLM_GEN_OBJECT = "llm_gen_object"
-    IMGG_TEXT_TO_IMAGE = "imgg_text_to_image"
+    IMG_GEN_TEXT_TO_IMAGE = "img_gen_text_to_image"
     OCR_EXTRACT_PAGES = "ocr_extract_pages"
 
 
 class JobMetadata(BaseModel):
-    job_name: Optional[str] = None
+    job_name: str | None = None
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
-    pipe_job_ids: Optional[List[str]] = None
+    pipe_job_ids: list[str] | None = None
 
-    content_generation_job_id: Optional[str] = None
-    unit_job_id: Optional[str] = None
-    job_category: Optional[JobCategory] = None
+    content_generation_job_id: str | None = None
+    unit_job_id: str | None = None
+    job_category: JobCategory | None = None
 
-    started_at: Optional[datetime] = Field(default_factory=lambda: datetime.now())
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = Field(default_factory=lambda: datetime.now())
+    completed_at: datetime | None = None
 
     @property
-    def duration(self) -> Optional[float]:
+    def duration(self) -> float | None:
         if self.started_at is not None and self.completed_at is not None:
             return (self.completed_at - self.started_at).total_seconds()
         return None

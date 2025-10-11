@@ -1,0 +1,80 @@
+################################################################################
+# Google Gemini API Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Google Gemini API models.
+# It contains model definitions for Gemini language models
+# accessible through the Google Gemini API (not VertexAI).
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["gemini-2.0-flash"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "google"
+prompting_target = "gemini"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- Gemini 2.0 Series --------------------------------------------------------
+["gemini-2.0-flash-exp"]
+model_id = "gemini-2.0-flash-exp"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.0, output = 0.0 } # Free tier during experimental phase
+
+# --- Gemini 1.5 Series --------------------------------------------------------
+["gemini-1.5-pro"]
+model_id = "gemini-1.5-pro"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.25, output = 5.0 } # Updated pricing
+
+["gemini-1.5-flash"]
+model_id = "gemini-1.5-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.075, output = 0.30 } # Updated pricing
+
+["gemini-1.5-flash-8b"]
+model_id = "gemini-1.5-flash-8b"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.0375, output = 0.15 } # Updated pricing
+
+# --- Gemini 2.5 Series (when available) ----------------------------------------
+["gemini-2.5-pro"]
+model_id = "gemini-2.5-pro"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.25, output = 10.0 }
+
+["gemini-2.5-flash"]
+model_id = "gemini-2.5-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.30, output = 2.50 }
+
+["gemini-2.5-flash-lite"]
+model_id = "gemini-2.5-flash-lite"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.10, output = 0.40 }
+

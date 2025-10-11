@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional, Sequence, Set, TypeVar, Union
+from collections.abc import Callable, Sequence
+from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel, ValidationError
 from rich.repr import Result as RichReprResult
@@ -9,6 +10,15 @@ from pipelex.types import StrEnum
 
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
 
+T = TypeVar("T")
+
+
+def empty_list_factory_of(_: type[T]) -> Callable[[], list[T]]:
+    def _factory() -> list[T]:
+        return []
+
+    return _factory
+
 
 def format_pydantic_validation_error(exc: ValidationError) -> str:
     """Format a Pydantic ValidationError into a readable string with detailed error information.
@@ -18,6 +28,7 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
 
     Returns:
         A formatted string containing categorized validation errors
+
     """
     error_msg = "Validation error(s):"
 
@@ -29,7 +40,15 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
     enum_errors = [
         f"{'.'.join(map(str, err['loc']))}: invalid enum value '{err.get('input', 'unknown')}'" for err in exc.errors() if err["type"] == "enum"
     ]
-    model_type_errors: List[str] = []
+    union_tag_errors: list[str] = []
+    for err in exc.errors():
+        if err["type"] == "union_tag_not_found":
+            field_path = ".".join(map(str, err["loc"]))
+            # Extract discriminator field name from context
+            discriminator = err.get("ctx", {}).get("discriminator", "type")
+            union_tag_errors.append(f"{field_path}: missing required discriminator field '{discriminator}'")
+
+    model_type_errors: list[str] = []
     for err in exc.errors():
         if err["type"] == "model_type":
             field_path = ".".join(map(str, err["loc"]))
@@ -50,11 +69,13 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
         error_msg += f"\nValue errors: {value_errors}"
     if enum_errors:
         error_msg += f"\nEnum errors: {enum_errors}"
+    if union_tag_errors:
+        error_msg += f"\nUnion discriminator errors: {union_tag_errors}"
     if model_type_errors:
         error_msg += f"\nModel type errors: {model_type_errors}"
 
     # If none of the specific error types were found, add the raw error messages
-    if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors, model_type_errors]):
+    if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors, union_tag_errors, model_type_errors]):
         error_msg += "\nOther validation errors:"
         for err in exc.errors():
             error_msg += f"\n{'.'.join(map(str, err['loc']))}: {err['type']}: {err['msg']}"
@@ -63,18 +84,19 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
 
 
 def convert_strenum_to_str(
-    obj: Dict[str, Any] | List[Any] | StrEnum | Any,
-) -> Dict[str, Any] | List[Any] | str | Any:
+    obj: dict[str, Any] | list[Any] | StrEnum | Any,
+) -> dict[str, Any] | list[Any] | str | Any:
     if isinstance(obj, dict):
-        obj_dict: Dict[str, Any] = obj
+        obj_dict = cast("dict[str, Any]", obj)
         return {str(key): convert_strenum_to_str(value) for key, value in obj_dict.items()}
     elif isinstance(obj, list):
-        obj_list: List[Any] = obj
+        obj_list = cast("list[Any]", obj)
         return [convert_strenum_to_str(item) for item in obj_list]
     elif isinstance(obj, StrEnum):
         if hasattr(obj, "display_name"):
-            return obj.display_name()  # type: ignore
-        return str(obj)
+            return obj.display_name()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType, reportAttributeAccessIssue]
+        else:
+            return str(obj)
     else:
         return obj
 
@@ -89,25 +111,24 @@ class FieldVisibility(StrEnum):
     ONLY_HIDDEN_FIELDS = "only_hidden_fields"
 
 
-def clean_model_to_dict(obj: BaseModel) -> Dict[str, Any]:
+def clean_model_to_dict(obj: BaseModel) -> dict[str, Any]:
     dict_dump = serialize_model(
         obj=obj,
         field_visibility=FieldVisibility.NO_HIDDEN_FIELDS,
         is_stringify_enums=True,
     )
     if not isinstance(dict_dump, dict):
-        raise TypeError(f"Expected dict, got {type(dict_dump)}")
-    result_dict: Dict[str, Any] = dict_dump
-    return result_dict
+        msg = f"Expected dict, got {type(dict_dump)}"
+        raise TypeError(msg)
+    return cast("dict[str, Any]", dict_dump)
 
 
 def serialize_model(
     obj: Any,
     field_visibility: FieldVisibility = FieldVisibility.NO_HIDDEN_FIELDS,
     is_stringify_enums: bool = True,
-) -> Union[Dict[str, Any], List[Any], Any]:
-    """
-    Recursively serialize a Pydantic BaseModel (and its nested BaseModels)
+) -> dict[str, Any] | list[Any] | Any:
+    """Recursively serialize a Pydantic BaseModel (and its nested BaseModels)
     into a dictionary, omitting any fields marked with
     'json_schema_extra={ExtraFieldAttribute.IS_HIDDEN: True}'.
 
@@ -120,11 +141,16 @@ def serialize_model(
         return obj
 
     # Identify which fields should be excluded
-    fields_to_exclude: Set[str] = set()
+    fields_to_exclude: set[str] = set()
 
     for field_name, field_info in obj.__class__.model_fields.items():
         json_schema_extra = field_info.json_schema_extra
-        is_hidden = json_schema_extra and isinstance(json_schema_extra, dict) and json_schema_extra.get(ExtraFieldAttribute.IS_HIDDEN) is True
+        is_hidden: bool
+        if json_schema_extra and isinstance(json_schema_extra, dict):
+            typed_json_schema_extra = cast("dict[str, Any]", json_schema_extra)
+            is_hidden = typed_json_schema_extra.get(ExtraFieldAttribute.IS_HIDDEN) is True
+        else:
+            is_hidden = False
         match field_visibility:
             case FieldVisibility.ALL_FIELDS:
                 pass
@@ -136,8 +162,8 @@ def serialize_model(
                     fields_to_exclude.add(field_name)
 
     # Build a dict, omitting hidden fields. Recursively handle nested models.
-    data: Dict[str, Any] = {}
-    for field_name, _ in obj.__class__.model_fields.items():
+    data: dict[str, Any] = {}
+    for field_name in obj.__class__.model_fields:
         if field_name in fields_to_exclude:
             continue  # Skip hidden fields
 
@@ -153,7 +179,7 @@ def serialize_model(
 
         # If it's a list, we recurse for each item
         elif isinstance(value, list):
-            value_list: List[Any] = value
+            value_list = cast("list[Any]", value)
             data[field_name] = [
                 serialize_model(
                     obj=item,
@@ -165,7 +191,7 @@ def serialize_model(
 
         # If it's a dict, we can similarly recurse for any nested BaseModels inside the dict
         elif isinstance(value, dict):
-            value_dict: Dict[str, Any] = value
+            value_dict = cast("dict[str, Any]", value)
             data[field_name] = {
                 key: serialize_model(
                     obj=value,
@@ -177,7 +203,7 @@ def serialize_model(
 
         elif is_stringify_enums and isinstance(value, StrEnum):
             if hasattr(value, "display_name"):
-                data[field_name] = value.display_name()  # type: ignore
+                data[field_name] = value.display_name()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
             else:
                 data[field_name] = str(value)
 
@@ -190,10 +216,10 @@ def serialize_model(
 
 class CustomBaseModel(BaseModel):
     @override
-    def __rich_repr__(self) -> RichReprResult:  # type: ignore
-        for item in super().__rich_repr__():  # type: ignore
+    def __rich_repr__(self) -> RichReprResult:
+        for item in super().__rich_repr__():  # type: ignore[misc]
             if isinstance(item, tuple):
-                tuple_item: tuple[Any, ...] = item
+                tuple_item = cast("tuple[Any, ...]", item)
                 if len(tuple_item) >= 2:
                     name = tuple_item[0]
                     value = tuple_item[1]
@@ -209,8 +235,8 @@ class CustomBaseModel(BaseModel):
                 yield item
 
     @override
-    def __repr_args__(self) -> Sequence[tuple[Optional[str], Any]]:
-        processed_args: list[tuple[Optional[str], Any]] = []
+    def __repr_args__(self) -> Sequence[tuple[str | None, Any]]:
+        processed_args: list[tuple[str | None, Any]] = []
         for name, value in super().__repr_args__():
             if name and AttributePolisher.should_truncate(name=name, value=value):
                 truncated_value = AttributePolisher.get_truncated_value(name, value)
@@ -220,8 +246,8 @@ class CustomBaseModel(BaseModel):
         return processed_args
 
     def model_dump_truncated(self, **kwargs: Any) -> Any:
-        """
-        Dump the model to a dictionary with serialize_as_any=True and apply
+        """Dump the model to a dictionary with serialize_as_any=True and apply
+
         AttributePolisher truncation to fields that should be truncated.
         Handles nested attributes recursively.
 
@@ -230,6 +256,7 @@ class CustomBaseModel(BaseModel):
 
         Returns:
             Dictionary with truncated values where appropriate
+
         """
         # Get the model dump with serialize_as_any=True
         dumped_data = self.model_dump(**kwargs)
@@ -237,9 +264,8 @@ class CustomBaseModel(BaseModel):
         # Apply truncation logic recursively
         return self._apply_truncation_recursive(dumped_data)
 
-    def _apply_truncation_recursive(self, obj: Any, name: Optional[str] = None) -> Any:
-        """
-        Recursively apply AttributePolisher truncation logic to a data structure.
+    def _apply_truncation_recursive(self, obj: Any, name: str | None = None) -> Any:
+        """Recursively apply AttributePolisher truncation logic to a data structure.
 
         Args:
             obj: The object to process
@@ -247,6 +273,7 @@ class CustomBaseModel(BaseModel):
 
         Returns:
             The processed object with truncation applied where appropriate
+
         """
         # First check if this specific object should be truncated
         if name and AttributePolisher.should_truncate(name=name, value=obj):
@@ -254,21 +281,20 @@ class CustomBaseModel(BaseModel):
 
         # If it's a dictionary, recurse into its values
         if isinstance(obj, dict):
-            obj_dict: Dict[str, Any] = obj
-            truncated_dict: Dict[str, Any] = {}
+            obj_dict = cast("dict[str, Any]", obj)
+            truncated_dict: dict[str, Any] = {}
             for key, value in obj_dict.items():
                 truncated_dict[key] = self._apply_truncation_recursive(value, name=key)
             return truncated_dict
 
         # If it's a list, recurse into its items
-        elif isinstance(obj, list):
-            obj_list: List[Any] = obj
+        if isinstance(obj, list):
+            obj_list = cast("list[Any]", obj)
             return [self._apply_truncation_recursive(item, name=name) for item in obj_list]
 
         # If it's a tuple, recurse into its items and return as tuple
-        elif isinstance(obj, tuple):
-            return tuple(self._apply_truncation_recursive(item, name=name) for item in obj)  # type: ignore
+        if isinstance(obj, tuple):
+            return tuple(self._apply_truncation_recursive(item, name=name) for item in obj)  # pyright: ignore[reportUnknownVariableType]
 
         # For all other types, return as-is
-        else:
-            return obj
+        return obj

@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any
 
 from typing_extensions import override
 
@@ -6,12 +6,19 @@ from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptFactoryError, LLMPromptTemplateInputsError
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract, make_empty_prompt
+from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from pipelex.config import get_config
 from pipelex.hub import get_template
 from pipelex.tools.misc.string_utils import is_none_or_has_text
-from pipelex.tools.templating.template_provider_abstract import TemplateProviderAbstract
+
+
+def make_empty_prompt() -> LLMPrompt:
+    return LLMPrompt(
+        system_text=None,
+        user_text=None,
+        user_images=[],
+    )
 
 
 class LLMPromptTemplate(LLMPromptFactoryAbstract):
@@ -19,38 +26,29 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
     base_template_inputs: LLMPromptTemplateInputs = LLMPromptTemplateInputs()
 
     # fields kept for reference and debugging only (they have no effect)
-    source_system_template_name: Optional[str] = None
-    source_user_template_name: Optional[str] = None
-
-    @property
-    @override
-    def desc(self) -> str:
-        return f"{LLMPromptTemplate.__name__} based on proto prompt: {self.proto_prompt} and base inputs: {self.base_template_inputs}"
+    source_system_template_name: str | None = None
+    source_user_template_name: str | None = None
 
     @override
     async def make_llm_prompt_from_args(
         self,
         **prompt_arguments: Any,
     ) -> LLMPrompt:
-        return self.synchro_make_llm_prompt_from_args(**prompt_arguments)
-
-    def synchro_make_llm_prompt_from_args(
-        self,
-        **prompt_arguments: Any,
-    ) -> LLMPrompt:
         arguments_dict = prompt_arguments.copy()
 
         # pop the base fields and then use the templating method
-        system_text: Optional[str] = arguments_dict.pop("system_text", None)
-        user_text: Optional[str] = arguments_dict.pop("user_text", None)
+        system_text: str | None = arguments_dict.pop("system_text", None)
+        user_text: str | None = arguments_dict.pop("user_text", None)
+        if not user_text:
+            user_text = self.proto_prompt.user_text
 
         # user_images is Optional here: None means the template is not altering the user_images field
-        user_images: Optional[List[PromptImage]] = None
+        user_images: list[PromptImage] | None = None
         if "user_images" in arguments_dict:
             user_images = arguments_dict.pop("user_images")
         elif "user_image" in arguments_dict:
             user_images = [arguments_dict.pop("user_image")]
-        is_user_images_append: Optional[bool] = arguments_dict.pop("is_user_images_append", None)
+        is_user_images_append: bool | None = arguments_dict.pop("is_user_images_append", None)
 
         return self.make_llm_prompt(
             system_text=system_text,
@@ -62,20 +60,21 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
 
     def make_llm_prompt(
         self,
-        system_text: Optional[str] = None,
-        user_text: Optional[str] = None,
-        user_images: Optional[List[PromptImage]] = None,
-        is_user_images_append: Optional[bool] = None,
-        template_inputs: Optional[LLMPromptTemplateInputs] = None,
+        system_text: str | None = None,
+        user_text: str | None = None,
+        user_images: list[PromptImage] | None = None,
+        is_user_images_append: bool | None = None,
+        template_inputs: LLMPromptTemplateInputs | None = None,
     ) -> LLMPrompt:
-        log.verbose("_make_llm_prompt called for LLMPromptTemplate")
         if not is_none_or_has_text(system_text):
             if system_text == "":
                 log.warning(f"Prompt template system_text should be None or contain text. system_text = '{system_text}'")
             else:
-                raise LLMPromptTemplateInputsError(f"Prompt template system_text should be None or contain text. system_text = '{system_text}'")
+                msg = f"Prompt template system_text should be None or contain text. system_text = '{system_text}'"
+                raise LLMPromptTemplateInputsError(msg)
         if not is_none_or_has_text(user_text):
-            raise LLMPromptTemplateInputsError(f"Prompt template user_text should be None or contain text. system_text = '{user_text}'")
+            msg = f"Prompt template user_text should be None or contain text. system_text = '{user_text}'"
+            raise LLMPromptTemplateInputsError(msg)
 
         all_template_inputs = self.base_template_inputs.complemented_by(additional_template_inputs=template_inputs)
 
@@ -113,47 +112,6 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
                 raise LLMPromptFactoryError(message=error_msg) from exc
 
         return llm_prompt
-
-    # factories of LLMPromptTemplate (which is a factory of LLMPrompt)
-    @classmethod
-    def from_template_name(
-        cls,
-        template_provider: TemplateProviderAbstract,
-        system_text: Optional[str] = None,
-        user_text: Optional[str] = None,
-        user_images: Optional[List[PromptImage]] = None,
-        system_template_name: Optional[str] = None,
-        user_template_name: Optional[str] = None,
-    ) -> "LLMPromptTemplate":
-        proto_prompt: LLMPrompt = LLMPrompt(
-            system_text=system_text,
-            user_text=user_text,
-            user_images=user_images or [],
-        )
-        if user_template_name:
-            proto_prompt.user_text = template_provider.get_template(user_template_name)
-        if system_template_name:
-            proto_prompt.system_text = template_provider.get_template(system_template_name)
-        return cls(
-            proto_prompt=proto_prompt,
-            source_system_template_name=system_template_name,
-            source_user_template_name=user_template_name,
-        )
-
-    # factories of LLMPromptTemplate (which is a factory of LLMPrompt)
-    @classmethod
-    def from_template_contents(
-        cls,
-        system_text: Optional[str] = None,
-        user_text: Optional[str] = None,
-        user_images: Optional[List[PromptImage]] = None,
-    ) -> "LLMPromptTemplate":
-        proto_prompt = LLMPrompt(
-            user_text=user_text,
-            system_text=system_text,
-            user_images=user_images or [],
-        )
-        return cls(proto_prompt=proto_prompt)
 
     @classmethod
     def for_structure_from_preliminary_text(cls) -> "LLMPromptTemplate":

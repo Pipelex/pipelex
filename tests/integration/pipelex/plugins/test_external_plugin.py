@@ -1,5 +1,3 @@
-from typing import Type
-
 import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
 from typing_extensions import override
@@ -8,12 +6,11 @@ from pipelex import log, pretty_print
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
+from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
-from pipelex.cogt.llm.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.core.concepts.concept_native import NativeConceptEnum
 from pipelex.hub import get_inference_manager, get_pipe_router, get_report_delegate
-from pipelex.pipe_operators.llm.pipe_llm import PipeLLMOutput
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -49,16 +46,15 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
-        schema: Type[BaseModelTypeVar],
+        schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        class ObjectFactory(ModelFactory[schema]):  # type: ignore
+        class ObjectFactory(ModelFactory[schema]):  # type: ignore[valid-type]
             __model__ = schema
             __check_model__ = True
             __use_examples__ = True
             __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
-        obj = ObjectFactory.build()
-        return obj
+        return ObjectFactory.build()
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -89,8 +85,8 @@ class TestExternalPlugin:
         )
 
         pipe_llm_blueprint = PipeLLMBlueprint(
-            definition="LLM test with external plugin",
-            output=NativeConceptEnum.TEXT.value,
+            description="LLM test with external plugin",
+            output=NativeConceptEnum.TEXT,
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             prompt=PipeTestCases.USER_PROMPT,
             llm=LLMSetting(
@@ -107,7 +103,7 @@ class TestExternalPlugin:
                 blueprint=pipe_llm_blueprint,
             ),
         )
-        pipe_llm_output: PipeLLMOutput = await get_pipe_router().run_pipe_job(
+        pipe_llm_output = await get_pipe_router().run(
             pipe_job=pipe_job,
         )
 

@@ -1,6 +1,5 @@
-from typing import Optional
-
 from pipelex.tools.exceptions import FatalError, RootException
+from pipelex.types import StrEnum
 
 
 class CogtError(RootException):
@@ -31,15 +30,15 @@ class LLMWorkerError(CogtError):
     pass
 
 
-class LLMEngineParameterError(CogtError):
+class LLMChoiceNotFoundError(CogtError):
     pass
 
 
-class LLMSDKError(CogtError):
+class OcrChoiceNotFoundError(CogtError):
     pass
 
 
-class LLMPresetNotFoundError(CogtError):
+class ImgGenChoiceNotFoundError(CogtError):
     pass
 
 
@@ -47,15 +46,15 @@ class LLMSettingsValidationError(CogtError):
     pass
 
 
-class LLMDeckValidatonError(CogtError):
+class ImgGenSettingsValidationError(CogtError):
+    pass
+
+
+class ModelDeckValidatonError(CogtError):
     pass
 
 
 class LLMHandleNotFoundError(CogtError):
-    pass
-
-
-class LLMModelProviderError(CogtError):
     pass
 
 
@@ -107,26 +106,26 @@ class PromptImageFormatError(CogtError):
     pass
 
 
-class ImggPromptError(CogtError):
+class ImgGenPromptError(CogtError):
     pass
 
 
-class ImggParameterError(CogtError):
+class ImgGenParameterError(CogtError):
     pass
 
 
-class ImggGenerationError(CogtError):
+class ImgGenGenerationError(CogtError):
     pass
 
 
-class ImggGeneratedTypeError(ImggGenerationError):
+class ImgGenGeneratedTypeError(ImgGenGenerationError):
     pass
 
 
 class MissingDependencyError(CogtError):
     """Raised when a required dependency is not installed."""
 
-    def __init__(self, dependency_name: str, extra_name: str, message: Optional[str] = None):
+    def __init__(self, dependency_name: str, extra_name: str, message: str | None = None):
         self.dependency_name = dependency_name
         self.extra_name = extra_name
         error_msg = f"Required dependency '{dependency_name}' is not installed."
@@ -141,4 +140,56 @@ class MissingPluginError(CogtError):
 
 
 class OcrCapabilityError(CogtError):
+    pass
+
+
+class RoutingProfileLibraryNotFoundError(CogtError):
+    pass
+
+
+class RoutingProfileLibraryError(CogtError):
+    pass
+
+
+class InferenceModelSpecError(CogtError):
+    pass
+
+
+class InferenceBackendError(CogtError):
+    pass
+
+
+class InferenceBackendCredentialsErrorType(StrEnum):
+    VAR_NOT_FOUND = "var_not_found"
+    UNKNOWN_VAR_PREFIX = "unknown_var_prefix"
+    VAR_FALLBACK_PATTERN = "var_fallback_pattern"
+
+
+class InferenceBackendCredentialsError(CogtError):
+    def __init__(
+        self,
+        error_type: InferenceBackendCredentialsErrorType,
+        backend_name: str,
+        message: str,
+        key_name: str,
+    ):
+        self.error_type = error_type
+        self.backend_name = backend_name
+        self.key_name = key_name
+        super().__init__(message)
+
+
+class InferenceBackendLibraryError(CogtError):
+    pass
+
+
+class RoutingProfileError(CogtError):
+    pass
+
+
+class ModelsManagerError(CogtError):
+    pass
+
+
+class ModelDeckNotFoundError(CogtError):
     pass

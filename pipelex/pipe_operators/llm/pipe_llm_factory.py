@@ -1,13 +1,11 @@
-from typing import List, Optional
-
 from typing_extensions import override
 
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSettingChoices
 from pipelex.cogt.llm.llm_prompt_spec import LLMPromptSpec
+from pipelex.cogt.llm.llm_setting import LLMSettingChoices
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.pipe_input_spec_blueprint import InputRequirementBlueprint
-from pipelex.core.pipes.pipe_input_spec_factory import PipeInputSpecFactory
+from pipelex.core.pipes.pipe_input_blueprint import InputRequirementBlueprint
+from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
 from pipelex.core.pipes.pipe_run_params import make_output_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_concept_provider, get_optional_domain
@@ -26,10 +24,10 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         domain: str,
         pipe_code: str,
         blueprint: PipeLLMBlueprint,
-        concept_codes_from_the_same_domain: Optional[List[str]] = None,
+        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeLLM:
-        system_prompt_jinja2_blueprint: Optional[Jinja2Blueprint] = None
-        system_prompt: Optional[str] = None
+        system_prompt_jinja2_blueprint: Jinja2Blueprint | None = None
+        system_prompt: str | None = None
         if blueprint.system_prompt_template or blueprint.system_prompt_template_name:
             try:
                 system_prompt_jinja2_blueprint = Jinja2Blueprint(
@@ -48,7 +46,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             if domain_obj := get_optional_domain(domain=domain):
                 system_prompt = domain_obj.system_prompt
 
-        user_text_jinja2_blueprint: Optional[Jinja2Blueprint] = None
+        user_text_jinja2_blueprint: Jinja2Blueprint | None = None
         if blueprint.prompt_template or blueprint.template_name:
             try:
                 user_text_jinja2_blueprint = Jinja2Blueprint(
@@ -72,21 +70,25 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 error_msg = f"Jinja2 template not found for pipe '{pipe_code}' in domain '{domain}': {exc}."
                 raise PipeDefinitionError(error_msg) from exc
 
-        user_images: List[str] = []
+        user_images: list[str] = []
         if blueprint.inputs:
             for stuff_name, requirement in blueprint.inputs.items():
                 if isinstance(requirement, str):
-                    requirement = InputRequirementBlueprint(concept=requirement)
-                concept_string = requirement.concept
-                domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+                    input_requirement_blueprint = InputRequirementBlueprint(concept=requirement)
+                else:
+                    input_requirement_blueprint = requirement
+
+                concept_string = input_requirement_blueprint.concept
+                domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                     domain=domain,
-                    concept_string_or_concept_code=concept_string,
+                    concept_string_or_code=concept_string,
                     concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
                 )
                 concept = get_concept_provider().get_required_concept(
-                    concept_string=ConceptFactory.construct_concept_string_with_domain(
-                        domain=domain_and_code.domain, concept_code=domain_and_code.concept_code
-                    )
+                    concept_string=ConceptFactory.make_concept_string_with_domain(
+                        domain=domain_and_code.domain,
+                        concept_code=domain_and_code.concept_code,
+                    ),
                 )
 
                 if get_concept_provider().is_image_concept(concept=concept):
@@ -114,21 +116,23 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             multiple_output=blueprint.multiple_output,
         )
 
-        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_concept_code(
+        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
-            concept_string_or_concept_code=blueprint.output_concept_string_or_concept_code,
+            concept_string_or_code=blueprint.output,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         output_concept_domain, output_concept_code = output_domain_and_code.domain, output_domain_and_code.concept_code
         return PipeLLM(
             domain=domain,
             code=pipe_code,
-            definition=blueprint.definition,
+            description=blueprint.description,
             inputs=PipeInputSpecFactory.make_from_blueprint(
-                domain=domain, blueprint=blueprint.inputs or {}, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain
+                domain=domain,
+                blueprint=blueprint.inputs or {},
+                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             output=get_concept_provider().get_required_concept(
-                concept_string=ConceptFactory.construct_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code)
+                concept_string=ConceptFactory.make_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code),
             ),
             llm_prompt_spec=llm_prompt_spec,
             llm_choices=llm_choices,

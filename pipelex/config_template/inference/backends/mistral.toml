@@ -1,0 +1,140 @@
+################################################################################
+# Mistral Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Mistral AI models.
+# It contains model definitions for various Mistral language models and specialized models
+# accessible through the Mistral API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["ministral-3b"])
+# - Model costs are in USD per million tokens (input/output)
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "mistral"
+prompting_target = "mistral"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- Ministral Series ---------------------------------------------------------
+[ministral-3b]
+model_id = "ministral-3b-latest"
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.04, output = 0.04 }
+
+[ministral-8b]
+model_id = "ministral-8b-latest"
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.1 }
+
+# --- Mistral 7B Series --------------------------------------------------------
+[mistral-7b-2312]
+model_id = "mistral-large-2402"
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 0.25 }
+
+# --- Mistral 8x7B Series ------------------------------------------------------
+[mistral-8x7b-2312]
+model_id = "open-mixtral-8x7b"
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.7, output = 0.7 }
+
+# --- Mistral Codestral Series -------------------------------------------------
+[mistral-codestral-2405]
+model_id = "codestral-2405"
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 1.0, output = 3.0 }
+
+# --- Mistral Large Series -----------------------------------------------------
+[mistral-large-2402]
+model_id = "mistral-large-2402"
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 4.0, output = 12.0 }
+
+[mistral-large]
+model_id = "mistral-large-latest"
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 4.0, output = 12.0 }
+
+# --- Mistral Small Series -----------------------------------------------------
+[mistral-small-2402]
+model_id = "mistral-small-2402"
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.0, output = 3.0 }
+
+[mistral-small]
+model_id = "mistral-small-latest"
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.0, output = 3.0 }
+
+# --- Pixtral Series -----------------------------------------------------------
+[pixtral-12b]
+model_id = "pixtral-12b-latest"
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.15 }
+
+[pixtral-large]
+model_id = "pixtral-large-latest"
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.0, output = 6.0 }
+
+# --- Mistral Medium Series ----------------------------------------------------
+[mistral-medium]
+model_id = "mistral-medium-latest"
+max_tokens = 128000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2.0 }
+
+[mistral-medium-2508]
+model_id = "mistral-medium-2508"
+max_tokens = 128000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2.0 }
+
+################################################################################
+# OCR MODELS
+################################################################################
+
+# --- OCR Models ---------------------------------------------------------------
+[mistral-ocr]
+model_type = "text_extractor"
+model_id = "mistral-ocr-latest"
+max_tokens = 131072
+inputs = ["pdf", "image"]
+outputs = ["pages"]
+costs = { input = 0.4, output = 2.0 }
+

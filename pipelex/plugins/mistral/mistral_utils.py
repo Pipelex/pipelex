@@ -8,16 +8,17 @@ async def upload_file_for_ocr(
     mistral_client: Mistral,
     file_path: str,
 ) -> str:
-    """
-    Upload a local file to Mistral.
+    """Upload a local file to Mistral.
 
     Args:
-        pdf_path: Path to the local file to upload
+        file_path: Path to the local file to upload
+        mistral_client: Mistral client
 
     Returns:
         ID of the uploaded file
+
     """
-    async with aiofiles.open(file_path, "rb") as file:  # type: ignore[reportUnknownMemberType]
+    async with aiofiles.open(file_path, "rb") as file:  # pyright: ignore[reportUnknownMemberType]
         file_content = await file.read()
 
     uploaded_file = await mistral_client.files.upload_async(
