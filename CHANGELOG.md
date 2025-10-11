@@ -2,10 +2,50 @@
 
 ## [Unreleased]
 
-### Highlights
+### Highlights - Moving fast and breaking things
 
-- In the `PipeLLM`, the image inputs can now be used and tagged in the prompt like all other concepts.
-- Use claude-4.5-sonnet instead of claude-4-sonnet in the base deck.
+- Added the new builder pipeline system for auto-generating Pipelex bundles from user briefs
+  - it's a pipeline to generate pipelines, and it works!
+  - the pipeline definitions are in `pipelex_libraries/pipelines/base_library/builder/`
+  - removed the previous draft which was named `meta_pipeline.plx`
+
+**Breaking changes... for good!**
+
+We tried to group all the renamings we wanted to do which impact our language, so that you get one migration to apply and then we will be way more stable in the future releases.
+
+This is all in the spirit of making Pipelex a declarative language, where you express what you want to do, and the system will figure out how to do it. So our focus inwas to make the Pipelex language easier to understand and use for non-technical users, and at the same time use more consistent and obvious words that developers are used to.
+
+
+- General changes
+  - renamed `definition` fields to `description` across all cases
+
+- Renamed **PipeJinja2** to **PipeCompose**
+  - the fact that our templating engine is Jinja2 is a technnical detail, not fundamental to the language, especially since we included a pre-processor enabling insertion of variables in prompts using `@variable` or `$variable`, in addition to the jinja2 syntax `{{ variable }}`
+  - renamed `jinja2` field to `template` for the same reason
+  - for more control, instead of providing a string for the `template` field, you can also use a nested `template` section with `template`, `category` and `templating_style` fields
+
+- Renamed **PipeOCR** to **PipeExtract**
+  - this is to account for various text extraction techniques from images and docs, including but not only OCR; e.g. we now have integrated the `pypdfium2` package which can extract text and images from PDF, when it's actually real text (not an image), and soon we'll add support for other document extraction models such as IBM's `docling` and Microsoft's `MarkItDown`
+  - removed obligation to name your document input `ocr_input`, it can now be named whatever you want as long as it's a single input and it's either an `Image` or a `PDF` or some concept refining PDF or Image
+  - renamed `ocr_page_contents_from_pdf` to `extract_page_contents_from_pdf`
+  - renamed `ocr_page_contents_and_views_from_pdf` to `extract_page_contents_and_views_from_pdf`
+  - introduced model settings and presets for extract models like we had for LLMs
+  - renamed `ocr_model` to `model` for choice of model, preset, or explicit setting and introduced `base_ocr_mistral` as an alias to `mistral-ocr`
+
+- **PipeLLM** field renames
+  - image inputs must now be tagged in the prompt like all other inputs; you can just drop their names at the beginning or end of the prompt, or you can reference them in meaningful sentences to guide the Visual LLM, e.g. "Analyze the colors in $some_photo and the shapes in $some_painting." 
+  - renamed `prompt_template` field to `prompt`
+  - renamed `llm` field to `model`
+  - renamed `llm_to_structure` field to `model_to_structure`
+
+- **PipeImgGen** field renames
+  - renamed `img_gen` field to `model` for choice of model, preset, or explicit setting
+  - removed some technical settings such as `nb_steps` from the pipe attributes, instead you can set these as model settings or model presets
+  - introduced model settings and presets for image generation models like we had for LLMs
+
+- **PipeCondition** field renames
+  - renamed `pipe_map` to `outcomes`
+  - renamed `default_pipe_code` to `default_outcome` and it's now a required field, because we need to know what to do if the expression doesn't match any key in the outcomes map; if you don't know what to do in that case, then it's a failure and you can use the `fail` value
 
 ### Added
  - Added `Flow` class that represents the flow of pipe signatures
@@ -26,6 +66,7 @@
  - Added `MissingDependencyError` exception for missing optional dependencies
 
 ### Changed
+ - Using `claude-4.5-sonnet` instead of `claude-4-sonnet` across the model deck.
  - Cleanup env example and better explain how to set up keys in README and docs
  - Changed Gemini model configuration from `gemini-2.0-flash-exp` (free tier) to `gemini-2.0-flash` with pricing ($0.10 input, $0.40 output per million tokens)
  - Removed Gemini 1.5 series models (gemini-1.5-pro, gemini-1.5-flash, gemini-1.5-flash-8b) from configuration
@@ -65,6 +106,7 @@
  - Removed `get_optional_library_manager()` method from PipelexHub
  - Removed `get_optional_domain_provider()` and `get_optional_concept_provider()` methods from hub
  - Removed unused test fixtures (apple, cherry, blueberry, concept_provider, pretty) from conftest.py
+ - Removed some Vision/Image description pipes from the base library, because we doubt they were useful as they were
 
 ## [v0.11.0] - 2025-10-01
 

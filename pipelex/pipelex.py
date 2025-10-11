@@ -219,10 +219,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(msg) from backend_validation_exc
         except ModelDeckValidationError as deck_validation_exc:
             msg = self._get_validation_error_msg("model deck", deck_validation_exc)
-            msg += (
-                "\n\nIf you added your own config files to the model deck then they won't be fixed automatically, "
-                "you'll have to change them manually, sorry about that."
-            )
+            msg += "\n\nIf you added your own config files to the model deck then you'll have to change them manually."
             raise PipelexSetupError(msg) from deck_validation_exc
         except InferenceBackendCredentialsError as credentials_exc:
             backend_name = credentials_exc.backend_name
