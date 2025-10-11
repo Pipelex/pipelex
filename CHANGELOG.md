@@ -47,7 +47,25 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
   - renamed `pipe_map` to `outcomes`
   - renamed `default_pipe_code` to `default_outcome` and it's now a required field, because we need to know what to do if the expression doesn't match any key in the outcomes map; if you don't know what to do in that case, then it's a failure and you can use the `fail` value
 
+- **Configuration file changes** (`.pipelex/` directory)
+  - Renamed parameter `llm_handle` to `model` across all LLM presets in deck files
+  - Renamed parameter `img_gen_handle` to `model` across all image generation presets in deck files
+  - Renamed parameter `ocr_handle` to `model` in extraction presets
+  - Renamed `ocr` section to `extract` throughout configuration files
+  - Renamed `ocr_config` to `extract_config` in `pipelex.toml`
+  - Renamed `base_ocr_pypdfium2` to `base_extract_pypdfium2`
+  - Renamed `is_auto_setup_preset_ocr` to `is_auto_setup_preset_extract`
+  - Renamed `nb_ocr_pages` to `nb_extract_pages`
+  - Updated pytest marker from 'ocr' to 'extract'
+
 ### Added
+ - Added `cheap-gpt` model alias for `gpt-4o-mini`
+ - Added `cheap_llm_for_vision` preset using `gemini-2.5-flash-lite`
+ - Added `llm_for_testing_vision` and `llm_for_testing_vision_structured` presets for vision testing
+ - Added `is_dump_text_prompts_enabled` and `is_dump_response_text_enabled` configuration flags to have the console display everything that goes in and out of the LLMs
+ - Added `generic_templates` section in `llm_config` with structure extraction prompts
+ - Added useful error messages with migration configuration maps pin-pointing the fields to rename for config and plx files
+ - Added pytest filterwarnings to ignore deprecated class-based config warnings
  - Added `Flow` class that represents the flow of pipe signatures
  - Added `pipe-builder` command `flow` to generate flow view from pipeline brief
  - Added `FlowFactory` class to create Flow from PipelexBundleSpec or PLX files
@@ -66,10 +84,11 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Added `MissingDependencyError` exception for missing optional dependencies
 
 ### Changed
- - Using `claude-4.5-sonnet` instead of `claude-4-sonnet` across the model deck.
+ - Updated Gemini 2.0 model from `gemini-2.0-flash-exp` to `gemini-2.0-flash` with new pricing (input: $0.10, output: $0.40 per million tokens)
+ - Updated Gemini 2.5 Series comment from '(when available)' to stable release
+ - Updated `base-claude` from `claude-4-sonnet` to `claude-4.5-sonnet` across all presets
+ - Updated kajson dependency from version `0.3.0` to `0.3.1`
  - Cleanup env example and better explain how to set up keys in README and docs
- - Changed Gemini model configuration from `gemini-2.0-flash-exp` (free tier) to `gemini-2.0-flash` with pricing ($0.10 input, $0.40 output per million tokens)
- - Removed Gemini 1.5 series models (gemini-1.5-pro, gemini-1.5-flash, gemini-1.5-flash-8b) from configuration
  - Changed Gemini routing from `google` backend to `pipelex_inference` backend
  - Renamed `ConceptProviderAbstract` to `ConceptLibraryAbstract`
  - Renamed `DomainProviderAbstract` to `DomainLibraryAbstract`
@@ -84,7 +103,6 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Changed `PipeLLM` validation to check all inputs are in required variables
  - Updated `LLMPromptSpec` to handle image collections (lists/tuples) in addition to single images
  - Changed Mermaid diagram URL generation from `/img/` to `/svg/` endpoint
- - Updated kajson dependency from 0.3.0 to 0.3.1
  - Changed `PipeLLMPromptTemplate.make_llm_prompt()` to private method `_make_llm_prompt()`
  - Updated pipe-builder prompts to include concept specs for better context
  - Updated `PipelexBundleSpec.to_blueprint()` to sort pipes by dependencies before creating bundle
@@ -100,6 +118,8 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Updated README badge URL to point to main branch instead of feature/pipe-builder branch
 
 ### Removed
+ - Removed Gemini 1.5 series models: `gemini-1.5-pro`, `gemini-1.5-flash`, and `gemini-1.5-flash-8b`
+ - Removed `base_templates.toml` file (generic prompts moved to `pipelex.toml`)
  - Removed `gpt-5-mini` from possible models in pipe-builder
  - Removed useless functions in `LLMJobFactory`: `make_llm_job_from_prompt_factory()`, `make_llm_job_from_prompt_template()`, `make_llm_job_from_prompt_contents()`
  - Removed `add_or_update_pipe()` method from PipeLibrary
