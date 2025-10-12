@@ -25,7 +25,7 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
   - for more control, instead of providing a string for the `template` field, you can also use a nested `template` section with `template`, `category` and `templating_style` fields
 
 - Renamed **PipeOCR** to **PipeExtract**
-  - this is to account for various text extraction techniques from images and docs, including but not only OCR; e.g. we now have integrated the `pypdfium2` package which can extract text and images from PDF, when it's actually real text (not an image), and soon we'll add support for other document extraction models such as IBM's `docling` and Microsoft's `MarkItDown`
+  - this is to account for various text extraction techniques from images and docs, including but not only OCR; e.g. we now have integrated the `pypdfium2` package which can extract text and images from PDF, when it's actually real text (not an image), and soon we'll add support for other document extraction models solutions
   - removed obligation to name your document input `ocr_input`, it can now be named whatever you want as long as it's a single input and it's either an `Image` or a `PDF` or some concept refining PDF or Image
   - renamed `ocr_page_contents_from_pdf` to `extract_page_contents_from_pdf`
   - renamed `ocr_page_contents_and_views_from_pdf` to `extract_page_contents_and_views_from_pdf`
