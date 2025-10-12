@@ -2195,13 +2195,10 @@ dev = [
     { name = "ruff" },
     { name = "types-aioboto3", extra = ["bedrock", "bedrock-runtime"] },
     { name = "types-aiofiles" },
-    { name = "types-beautifulsoup4" },
     { name = "types-markdown" },
     { name = "types-networkx" },
     { name = "types-openpyxl" },
     { name = "types-pyyaml" },
-    { name = "types-requests" },
-    { name = "types-toml" },
 ]
 docs = [
     { name = "mkdocs" },
@@ -2276,13 +2273,10 @@ requires-dist = [
     { name = "typer", specifier = ">=0.16.0" },
     { name = "types-aioboto3", extras = ["bedrock", "bedrock-runtime"], marker = "extra == 'dev'", specifier = ">=13.4.0" },
     { name = "types-aiofiles", marker = "extra == 'dev'", specifier = ">=24.1.0.20240626" },
-    { name = "types-beautifulsoup4", marker = "extra == 'dev'", specifier = ">=4.12.0.20240907" },
     { name = "types-markdown", marker = "extra == 'dev'", specifier = ">=3.6.0.20240316" },
     { name = "types-networkx", marker = "extra == 'dev'", specifier = ">=3.3.0.20241020" },
     { name = "types-openpyxl", marker = "extra == 'dev'", specifier = ">=3.1.5.20250306" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250326" },
-    { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.32.0.2024091" },
-    { name = "types-toml", marker = "extra == 'dev'", specifier = ">=0.10.8.20240310" },
     { name = "typing-extensions", specifier = ">=4.13.2" },
     { name = "yattag", specifier = ">=1.15.2" },
 ]
@@ -3193,27 +3187,6 @@ wheels = [
 ]
 
 [[package]]
-name = "types-beautifulsoup4"
-version = "4.12.0.20250516"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "types-html5lib" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6d/d1/32b410f6d65eda94d3dfb0b3d0ca151f12cb1dc4cef731dcf7cbfd8716ff/types_beautifulsoup4-4.12.0.20250516.tar.gz", hash = "sha256:aa19dd73b33b70d6296adf92da8ab8a0c945c507e6fb7d5db553415cc77b417e", size = 16628, upload-time = "2025-05-16T03:09:09.93Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7c/79/d84de200a80085b32f12c5820d4fd0addcbe7ba6dce8c1c9d8605e833c8e/types_beautifulsoup4-4.12.0.20250516-py3-none-any.whl", hash = "sha256:5923399d4a1ba9cc8f0096fe334cc732e130269541d66261bb42ab039c0376ee", size = 16879, upload-time = "2025-05-16T03:09:09.051Z" },
-]
-
-[[package]]
-name = "types-html5lib"
-version = "1.1.11.20250917"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/68/4b/a970718e8bd9324ee8fb8eaf02ff069f6d03c20d4523bb4232892ecc3d06/types_html5lib-1.1.11.20250917.tar.gz", hash = "sha256:7b52743377f33f9b4fd7385afbd2d457b8864ee51f90ff2a795ad9e8c053373a", size = 16868, upload-time = "2025-09-17T02:47:41.18Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/8a/da91a9c64dcb5e69beb567519857411996d8ecae9f6f128bcef8260e7a8d/types_html5lib-1.1.11.20250917-py3-none-any.whl", hash = "sha256:b294fd06d60da205daeb2f615485ca4d475088d2eff1009cf427f4a80fcd5346", size = 22908, upload-time = "2025-09-17T02:47:40.39Z" },
-]
-
-[[package]]
 name = "types-markdown"
 version = "3.9.0.20250906"
 source = { registry = "https://pypi.org/simple" }
@@ -3263,33 +3236,12 @@ wheels = [
 ]
 
 [[package]]
-name = "types-requests"
-version = "2.32.4.20250913"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/36/27/489922f4505975b11de2b5ad07b4fe1dca0bca9be81a703f26c5f3acfce5/types_requests-2.32.4.20250913.tar.gz", hash = "sha256:abd6d4f9ce3a9383f269775a9835a4c24e5cd6b9f647d64f88aa4613c33def5d", size = 23113, upload-time = "2025-09-13T02:40:02.309Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/20/9a227ea57c1285986c4cf78400d0a91615d25b24e257fd9e2969606bdfae/types_requests-2.32.4.20250913-py3-none-any.whl", hash = "sha256:78c9c1fffebbe0fa487a418e0fa5252017e9c60d1a2da394077f1780f655d7e1", size = 20658, upload-time = "2025-09-13T02:40:01.115Z" },
-]
-
-[[package]]
 name = "types-s3transfer"
 version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/8e/9b/8913198b7fc700acc1dcb84827137bb2922052e43dde0f4fb0ed2dc6f118/types_s3transfer-0.14.0.tar.gz", hash = "sha256:17f800a87c7eafab0434e9d87452c809c290ae906c2024c24261c564479e9c95", size = 14218, upload-time = "2025-10-11T21:11:27.892Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/92/c3/4dfb2e87c15ca582b7d956dfb7e549de1d005c758eb9a305e934e1b83fda/types_s3transfer-0.14.0-py3-none-any.whl", hash = "sha256:108134854069a38b048e9b710b9b35904d22a9d0f37e4e1889c2e6b58e5b3253", size = 19697, upload-time = "2025-10-11T21:11:26.749Z" },
-]
-
-[[package]]
-name = "types-toml"
-version = "0.10.8.20240310"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/86/47/3e4c75042792bff8e90d7991aa5c51812cc668828cc6cce711e97f63a607/types-toml-0.10.8.20240310.tar.gz", hash = "sha256:3d41501302972436a6b8b239c850b26689657e25281b48ff0ec06345b8830331", size = 4392, upload-time = "2024-03-10T02:18:37.518Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/da/a2/d32ab58c0b216912638b140ab2170ee4b8644067c293b170e19fba340ccc/types_toml-0.10.8.20240310-py3-none-any.whl", hash = "sha256:627b47775d25fa29977d9c70dc0cbab3f314f32c8d8d0c012f2ef5de7aaec05d", size = 4777, upload-time = "2024-03-10T02:18:36.568Z" },
 ]
 
 [[package]]

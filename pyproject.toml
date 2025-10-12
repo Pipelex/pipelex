@@ -82,13 +82,10 @@ dev = [
     "ruff>=0.6.8",
     "types-aioboto3[bedrock,bedrock-runtime]>=13.4.0",
     "types-aiofiles>=24.1.0.20240626",
-    "types-beautifulsoup4>=4.12.0.20240907",
     "types-markdown>=3.6.0.20240316",
     "types-networkx>=3.3.0.20241020",
     "types-openpyxl>=3.1.5.20250306",
-    "types-requests>=2.32.0.2024091",
     "types-PyYAML>=6.0.12.20250326",
-    "types-toml>=0.10.8.20240310",
 ]
 
 [project.scripts]
