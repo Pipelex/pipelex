@@ -5,7 +5,6 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import get_config
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -32,7 +31,6 @@ from pipelex.exceptions import (
     PipeLibraryError,
     PipeLoadingError,
 )
-from pipelex.libraries.library_config import LibraryConfig
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.config.manager import config_manager
@@ -68,12 +66,10 @@ class LibraryManager(LibraryManagerAbstract):
         domain_library: DomainLibrary,
         concept_library: ConceptLibrary,
         pipe_library: PipeLibrary,
-        library_config: LibraryConfig,
     ):
         self.domain_library = domain_library
         self.concept_library = concept_library
         self.pipe_library = pipe_library
-        self.library_config = library_config
 
     @override
     def validate_libraries(self):
@@ -267,12 +263,17 @@ class LibraryManager(LibraryManagerAbstract):
         else:
             all_plx_paths: list[Path] = self._get_pipelex_plx_files_from_dirs(dirs_to_use)
             # Remove failing pipelines from the list
-            failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
-            valid_plx_paths = [path for path in all_plx_paths if path not in failing_pipelines_file_paths]
+            # failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
+            # valid_plx_paths = [path for path in all_plx_paths if path not in failing_pipelines_file_paths]
+            valid_plx_paths = all_plx_paths
 
         # Import modules to load them into sys.modules (but don't register classes yet)
         for library_dir in dirs_to_use:
-            ClassRegistryUtils.import_modules_in_folder(folder_path=str(library_dir))
+            # Only import files that contain StructuredContent subclasses (uses AST pre-check)
+            ClassRegistryUtils.import_modules_in_folder(
+                folder_path=str(library_dir),
+                base_class_names=["StructuredContent"],
+            )
             FuncRegistryUtils.register_funcs_in_folder(folder_path=str(library_dir))
 
         # Auto-discover and register all StructuredContent classes from sys.modules

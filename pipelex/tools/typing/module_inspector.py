@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import inspect
 import os
@@ -98,6 +99,103 @@ def _convert_file_path_to_module_path(file_path: str) -> str:
         raise ModuleFileError(msg)
 
     return result
+
+
+def find_class_names_in_file(file_path: str, base_class_names: list[str] | None = None) -> list[str]:
+    """Find class names in a Python file without executing it using AST parsing.
+
+    This is useful when you want to discover classes without running module-level code.
+
+    Args:
+        file_path: Path to the Python file to analyze
+        base_class_names: Optional list of base class names to filter by.
+                         Only returns classes that inherit from these bases.
+                         If None, returns all class definitions.
+
+    Returns:
+        List of class names found in the file
+
+    Raises:
+        ModuleFileError: If the file cannot be read or parsed
+
+    """
+    # Validate that the file is a Python file
+    if not file_path.endswith(".py"):
+        msg = f"File {file_path} is not a Python file (must end with .py)"
+        raise ModuleFileError(msg)
+
+    # Validate that the path exists and is a file
+    path = Path(file_path)
+    if not path.exists() or not path.is_file():
+        msg = f"Path {file_path} does not exist or is not a file"
+        raise ModuleFileError(msg)
+
+    try:
+        # Read and parse the file
+        with open(file_path, encoding="utf-8") as f:
+            source = f.read()
+        tree = ast.parse(source, filename=file_path)
+    except Exception as e:
+        msg = f"Failed to parse {file_path}: {e}"
+        raise ModuleFileError(msg) from e
+
+    class_names: list[str] = []
+
+    # Walk through the AST to find class definitions
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            # If no base class filter, add all classes
+            if base_class_names is None:
+                class_names.append(node.name)
+                continue
+
+            # Check if this class inherits from any of the specified base classes
+            for base in node.bases:
+                # Handle simple names like "StructuredContent"
+                if isinstance(base, ast.Name) and base.id in base_class_names:
+                    class_names.append(node.name)
+                    break
+                # Handle attribute access like "pipelex.StructuredContent"
+                if isinstance(base, ast.Attribute):
+                    if base.attr in base_class_names:
+                        class_names.append(node.name)
+                        break
+
+    return class_names
+
+
+def import_module_from_file_if_has_classes(
+    file_path: str,
+    base_class_names: list[str] | None = None,
+) -> Any | None:
+    """Import a module only if it contains classes (optionally filtered by base class).
+
+    This function uses AST parsing to check if the file contains relevant classes
+    before importing, avoiding execution of modules that don't have the classes
+    you're looking for.
+
+    Args:
+        file_path: Path to the Python file to potentially import
+        base_class_names: Optional list of base class names to filter by.
+                         Only imports if file contains classes inheriting from these.
+                         If None, imports if file contains any class definitions.
+
+    Returns:
+        The imported module if it contains relevant classes, None otherwise
+
+    Raises:
+        ModuleFileError: If the file is not a Python file or cannot be loaded
+
+    """
+    # First, use AST to check if file has relevant classes
+    class_names = find_class_names_in_file(file_path, base_class_names)
+
+    # If no relevant classes found, skip import
+    if not class_names:
+        return None
+
+    # File has relevant classes, import it
+    return import_module_from_file(file_path)
 
 
 def find_classes_in_module(

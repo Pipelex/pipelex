@@ -13,7 +13,12 @@ if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
 from pipelex import log
-from pipelex.tools.typing.module_inspector import ModuleFileError, find_classes_in_module, import_module_from_file
+from pipelex.tools.typing.module_inspector import (
+    ModuleFileError,
+    find_classes_in_module,
+    import_module_from_file,
+    import_module_from_file_if_has_classes,
+)
 
 _NoneType = type(None)
 _UnionType = getattr(types, "UnionType", None)  # Py3.10+: types.UnionType
@@ -175,15 +180,23 @@ class ClassRegistryUtils:
         cls,
         folder_path: str,
         is_recursive: bool = True,
+        base_class_names: list[str] | None = None,
     ) -> None:
         """Import Python modules without registering their classes.
 
         This loads modules into sys.modules so their classes are available
         for discovery by auto_register_all_subclasses().
 
+        If base_class_names is provided, uses AST parsing to first check if files
+        contain relevant classes before importing them. This avoids executing module-level
+        code in files that don't contain the classes you're looking for.
+
         Args:
             folder_path: Path to folder containing Python files
             is_recursive: Whether to search recursively in subdirectories
+            base_class_names: Optional list of base class names (e.g. ["StructuredContent"]).
+                            If provided, only imports files that contain classes inheriting
+                            from these base classes. If None, imports all Python files.
 
         """
         python_files = cls.find_files_in_dir(
@@ -194,7 +207,15 @@ class ClassRegistryUtils:
 
         for python_file in python_files:
             try:
-                import_module_from_file(str(python_file))
+                if base_class_names is not None:
+                    # Use AST-based import to avoid executing modules without relevant classes
+                    import_module_from_file_if_has_classes(
+                        str(python_file),
+                        base_class_names=base_class_names,
+                    )
+                else:
+                    # Import all modules regardless of content
+                    import_module_from_file(str(python_file))
             except ModuleFileError:
                 # Expected: file validation issues (directories with .py extension, etc.)
                 # log.debug(f"Skipping file {python_file}: {e}")

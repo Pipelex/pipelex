@@ -22,13 +22,11 @@ pipelex build blueprint "BRIEF IN NATURAL LANGUAGE" [OPTIONS]
 **Example:**
 ```bash
 pipelex build blueprint "Take a photo as input, and render the opposite of the photo" \
-  -c your/path/to/pipelex/libraries \
   -o output/pipeline/file/path
 ```
 
 **Options:**
 - `--output, -o`: Output path for generated files
-- `--config, -c`: Path to libraries folder
 
 ## Complete Workflow
 

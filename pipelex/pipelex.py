@@ -1,5 +1,3 @@
-import inspect
-import os
 from importlib.metadata import metadata
 from typing import cast
 
@@ -70,7 +68,7 @@ PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 class Pipelex(metaclass=MetaSingleton):
     def __init__(
         self,
-        config_dir_path: str,
+        config_dir_path: str = "./pipelex",
         # Dependency injection
         pipelex_hub: PipelexHub | None = None,
         config_cls: type[ConfigRoot] | None = None,
@@ -134,7 +132,6 @@ class Pipelex(metaclass=MetaSingleton):
             domain_library=domain_library,
             concept_library=concept_library,
             pipe_library=pipe_library,
-            config_dir_path=config_dir_path,
         )
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
@@ -301,58 +298,24 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
     # TODO: add kwargs to make() so that subclasses can employ specific parameters
     @classmethod
-    def make(
-        cls,
-        relative_config_folder_path: str | None = None,
-        absolute_config_folder_path: str | None = None,
-        from_file: bool | None = True,
-    ) -> Self:
+    def make(cls) -> Self:
         """Create and initialize a Pipelex instance.
-
-        Args:
-            relative_config_folder_path: Path to config folder relative to either the caller file or current working directory.
-                Cannot be used together with absolute_config_folder_path.
-            absolute_config_folder_path: Absolute path to config folder.
-                Cannot be used together with relative_config_folder_path.
-            from_file: Only used when relative_config_folder_path is provided.
-                If True (default), the relative path is resolved relative to the file where make() was called.
-                If False, the relative path is resolved relative to the current working directory (useful for CLI scenarios).
 
         Returns:
             Initialized Pipelex instance.
 
         Raises:
-            PipelexSetupError: If both relative_config_folder_path and absolute_config_folder_path are provided.
-            Or if frame inspection fails when using relative paths with from_file=True.
+            if setup fails
 
         Note:
             If neither path is provided, defaults to "./pipelex_libraries".
 
         """
-        if relative_config_folder_path is not None and absolute_config_folder_path is not None:
-            msg = "Cannot specify both relative_config_folder_path and absolute_config_folder_path"
+        if cls.get_optional_instance() is not None:
+            msg = "Pipelex is already initialized"
             raise PipelexSetupError(msg)
 
-        if relative_config_folder_path is not None:
-            if from_file:
-                current_frame = inspect.currentframe()
-                if current_frame is None:
-                    msg = "Could not find relative config folder path because of: Failed to get current frame"
-                    raise PipelexSetupError(msg)
-                if current_frame.f_back is None:
-                    msg = "Could not find relative config folder path because of: Failed to get caller frame"
-                    raise PipelexSetupError(msg)
-                caller_file = current_frame.f_back.f_code.co_filename
-                caller_dir = os.path.dirname(os.path.abspath(caller_file))
-                config_dir_path = os.path.abspath(os.path.join(caller_dir, relative_config_folder_path))
-            else:
-                config_dir_path = os.path.abspath(os.path.join(os.getcwd(), relative_config_folder_path))
-        elif absolute_config_folder_path is not None:
-            config_dir_path = absolute_config_folder_path
-        else:
-            config_dir_path = "./pipelex_libraries"
-
-        pipelex_instance = cls(config_dir_path=config_dir_path)
+        pipelex_instance = cls()
         pipelex_instance.setup()
         pipelex_instance.setup_libraries()
         return pipelex_instance

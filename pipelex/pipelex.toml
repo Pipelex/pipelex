@@ -186,17 +186,6 @@ gemini = { tag_style = "xml" }
 [pipelex.structure_config]
 is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
 
-
-####################################################################################################
-# Pipelex libraries config
-####################################################################################################
-
-[pipelex.library_config]
-
-[pipelex.generic_template_names]
-structure_from_preliminary_text_system = "structure_from_preliminary_text_system"
-structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
-
 ####################################################################################################
 # Static validation config
 ####################################################################################################

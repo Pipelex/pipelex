@@ -34,9 +34,9 @@ pipelex show pipe PIPE_CODE [-c/--config-folder-path PATH]
 
 ## Usage Tips
 
-1. Always run `pipelex validate all -c path/to/your/pipelex/config/folder` after making changes to your configuration or pipelines
+1. Always run `pipelex validate all` after making changes to your configuration or pipelines
 2. Use `pipelex show config` to debug configuration issues
 3. When initializing a new project:
    - Start with `pipelex init config`
    - Then run `pipelex init libraries`
-   - Finally, validate your setup with `pipelex validate all -c path/to/your/pipelex/config/folder`
+   - Finally, validate your setup with `pipelex validate all`

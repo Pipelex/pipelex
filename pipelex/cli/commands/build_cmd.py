@@ -47,7 +47,7 @@ def build_one_shot_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
+    Pipelex.make()
     typer.echo("=" * 70)
     typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
     typer.echo("")
@@ -100,7 +100,7 @@ def build_pipe_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
+    Pipelex.make()
     typer.echo("=" * 70)
     typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
     typer.echo("")
@@ -148,7 +148,7 @@ def build_partial_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
+    Pipelex.make()
     typer.echo("=" * 70)
     typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
     typer.echo("")
@@ -197,7 +197,7 @@ def build_flow_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make(relative_config_folder_path="../../../pipelex/libraries", from_file=True)
+    Pipelex.make()
     typer.echo("=" * 70)
     typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
     typer.echo("")

@@ -162,6 +162,7 @@ class PipeTestCases:
 
 
 class LibraryTestCases:
+    TEST_PIPELINES_DIR_PATH = "tests/test_pipelines"
     KNOWN_CONCEPTS_AND_PIPES: ClassVar[list[tuple[str, str]]] = [  # concept, pipe
         ("cars.CarDescription", "generate_car_description"),
         ("animals.AnimalDescription", "generate_animal_description"),
